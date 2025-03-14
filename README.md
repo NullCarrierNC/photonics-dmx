@@ -4,7 +4,7 @@ Photonics is a purpose built DMX sequencer for use with YARG and Rock Band 3 Enh
 It uses in-game lighting data to drive DMX lights in time to the music.
 
 It utilizes a library of built in lighting cues to create as close to a plug-and-play DMX experience as possible. 
-If you’re interested in using DMX lights, but don’t want to create all the lighting cues yourself in applications 
+If you're interested in using DMX lights, but don't want to create all the lighting cues yourself in applications 
 like LightJams or QLC+, it might be the solution for you.
 
 It sits somewhere between the original Rock Band Stage Kit and full blown DMX controllers like Lightjams and QLC+. 
@@ -88,4 +88,17 @@ $ npm run build:mac
 
 # For Linux - completely untested to-date!
 $ npm run build:linux
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+$ npm test
+
+# Run tests in watch mode (automatically re-run tests when code changes)
+$ npm run test:watch
+
+# Run tests with code coverage
+$ npm run test:coverage
 ```
