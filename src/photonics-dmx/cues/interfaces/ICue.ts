@@ -4,7 +4,7 @@ import { DmxLightManager } from '../../controllers/DmxLightManager';
 
 export interface ICue {
   /**
-   * The name of the cue, used for identification
+   * The name of the cue
    */
   name: string;
 
