@@ -1,23 +1,25 @@
-import { RGBIP, TrackedLight, WaitCondition } from "../types";
-import { EasingType } from "../easing";
+import { RGBIP, TrackedLight, WaitCondition } from "../../types";
+import { EasingType } from "../../easing";
 
 /**
  * The base interface for all lighting effects.
  * Defines the common properties required for configuring visual effects.
  * More complex effects may extend this with additional properties.
  */
-export interface EffectInterface {
+export interface IEffect {
   /** The condition that triggers the start of the effect */
   waitFor?: WaitCondition;
   
   /** Time to wait before starting the effect (in ms) */
   forTime?: number;
   
-  /** The colour configuration for the effect */
-  color: RGBIP;
+  /** The colour configuration for the effect. Optional as some effects may use
+   * multiple colours (e.g. start/end colours) or may not use a single colour value. */
+  color?: RGBIP;
   
-  /** Duration of the effect (in ms) */
-  duration: number;
+  /** Duration of the effect (in ms). Optional as some effects may have multiple durations
+   * (e.g. fade in/out durations) or may not use a single duration value. */
+  duration?: number;
   
   /** The condition that triggers the end of the effect */
   waitUntil?: WaitCondition;
@@ -32,5 +34,5 @@ export interface EffectInterface {
   layer?: number;
   
   /** The easing function to use for the effect */
-  easing?: EasingType;
+  easing?: EasingType | string;
 }

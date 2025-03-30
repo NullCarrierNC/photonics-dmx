@@ -1,18 +1,27 @@
-import { Effect, TrackedLight, RGBIP, WaitCondition } from "../types";
+import { Effect, RGBIP, WaitCondition } from "../types";
+import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
-interface GetSingleColorEffectParams {
+/**
+ * Interface for flash colour effect parameters, extending the base effect interface
+ */
+interface FlashColorEffectParams extends IEffect {
+    /** The colour to flash to */
     color: RGBIP;
+    /** The condition that triggers the start of the flash */
     startTrigger: WaitCondition;
+    /** Time to wait before starting the flash */
     startWait?: number;
-    endTrigger?:WaitCondition,
-    endWait?:number,
-    durationIn: number;
+    /** The condition that triggers the end of the flash */
+    endTrigger?: WaitCondition;
+    /** Time to wait before ending the flash */
+    endWait?: number;
+    /** Time to hold the flash colour */
     holdTime: number;
+    /** Duration of the fade in */
+    durationIn: number;
+    /** Duration of the fade out */
     durationOut: number;
-    lights: TrackedLight[];
-    layer?: number;
-    easing?: string;
 }
 
 export const getEffectFlashColor = ({
@@ -27,10 +36,10 @@ export const getEffectFlashColor = ({
     lights,
     layer = 0,
     easing = EasingType.SIN_OUT
-}: GetSingleColorEffectParams): Effect => {
+}: FlashColorEffectParams): Effect => {
     const effect: Effect = {
         id: "flash-color",
-        description: "Sets the light a color then quickly fades it out with P",
+        description: "Sets the light a colour then quickly fades it out with P",
         transitions: [
             {
                 lights: lights,

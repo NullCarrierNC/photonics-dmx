@@ -1,11 +1,13 @@
-import { Effect, TrackedLight, RGBIP } from "../types";
+import { Effect, RGBIP } from "../types";
 import { EasingType } from "../easing";
+import { IEffect } from "./interfaces/IEffect";
 
-interface BlackoutEffectParams {
+/**
+ * Interface for blackout effect parameters, extending the base effect interface
+ */
+interface BlackoutEffectParams extends IEffect {
+    /** Duration of the blackout transition */
     duration: number;
-    lights: TrackedLight[];
-    layer?: number;
-    easing?: EasingType | string; 
 }
 
 export const getEffectBlackout = ({

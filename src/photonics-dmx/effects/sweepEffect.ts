@@ -1,19 +1,47 @@
 import { Effect, EffectTransition, TrackedLight, RGBIP, WaitCondition } from "../types";
+import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
-interface SweepEffectParams {
-  // Accept a 1D array of TrackedLight or an array of arrays of TrackedLight.
-  lights: TrackedLight[] | TrackedLight[][]; 
-  high: RGBIP;           // On state colour
-  low: RGBIP;            // Off state colour
-  sweepTime: number;     // Total time (ms) for one complete sweep across all groups
-  fadeInDuration: number;// Desired fade‐in duration (ms)
-  fadeOutDuration: number;// Desired fade‐out duration (ms)
-  layer?: number;       
-  easing?: EasingType | string;
-  waitFor?: WaitCondition; // Wait condition for the fade‐in transition; defaults to "delay"
-  lightOverlap?: number; // Percentage (0 to 100) by which subsequent lights overlap. 0 means no overlap.
-  betweenSweepDelay?: number; // How long to wait until the next sweep can run
+/**
+ * Base interface for sweep effect parameters
+ */
+interface SweepEffectBaseParams {
+    /** On state colour */
+    high: RGBIP;
+    /** Off state colour */
+    low: RGBIP;
+    /** Total time (ms) for one complete sweep across all groups */
+    sweepTime: number;
+    /** Desired fade‐in duration (ms) */
+    fadeInDuration: number;
+    /** Desired fade‐out duration (ms) */
+    fadeOutDuration: number;
+    /** Percentage (0 to 100) by which subsequent lights overlap. 0 means no overlap */
+    lightOverlap?: number;
+    /** How long to wait until the next sweep can run */
+    betweenSweepDelay?: number;
+}
+
+/**
+ * Interface for sweep effect with single array of lights
+ */
+interface SweepEffectSingleParams extends IEffect, SweepEffectBaseParams {
+    /** Array of lights to sweep across */
+    lights: TrackedLight[];
+}
+
+/**
+ * Interface for sweep effect with grouped lights
+ */
+interface SweepEffectGroupedParams extends SweepEffectBaseParams {
+    /** Array of light groups to sweep across */
+    lights: TrackedLight[][];
+    /** The layer to apply the effect on */
+    layer?: number;
+    /** The easing function to use for the effect */
+    easing?: EasingType;
+    /** The condition that triggers the start of the effect */
+    waitFor?: WaitCondition;
 }
 
 /**
@@ -48,7 +76,7 @@ export const getSweepEffect = ({
   waitFor = "delay",
   lightOverlap = 0,
   betweenSweepDelay = 0,
-}: SweepEffectParams): Effect => {
+}: SweepEffectSingleParams | SweepEffectGroupedParams): Effect => {
   
   // Normalize the lights into groups.
   // If lights[0] is an array, assume a 2D array was passed.
