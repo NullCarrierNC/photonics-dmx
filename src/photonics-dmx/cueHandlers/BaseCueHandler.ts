@@ -137,4 +137,7 @@ export abstract class BaseCueHandler extends EventEmitter {
   protected abstract handleCueVerse(parameters: CueData): Promise<void>;
   protected abstract handleCueWarm_Automatic(parameters: CueData): Promise<void>;
   protected abstract handleCueWarm_Manual(parameters: CueData): Promise<void>;
+
+  protected abstract handleBeat(): void;
+  protected abstract handleMeasure(): void;
 } 

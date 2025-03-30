@@ -29,6 +29,21 @@ class YargCueHandler extends BaseCueHandler {
     super(lightManager, photonicsSequencer, debouncePeriod);
   }
 
+  /**
+   * Handle a beat event from YARG
+   */
+  public handleBeat(): void {
+    this._sequencer.onBeat();
+  }
+
+  /**
+   * Handle a measure event from YARG
+   */
+  public handleMeasure(): void {
+    this._sequencer.onBeat();
+    this._sequencer.onMeasure();
+  }
+
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
     if (!this.checkDebounce()) return;
 
@@ -36,25 +51,32 @@ class YargCueHandler extends BaseCueHandler {
     switch (cueType) {
       case CueType.Blackout_Fast:
         this._sequencer.blackout(0);
+        this.emit('cueHandled', parameters);
         return;
       case CueType.Blackout_Slow:
         this._sequencer.blackout(1000);
+        this.emit('cueHandled', parameters);
         return;
       case CueType.Blackout_Spotlight:
         this._sequencer.blackout(0);
+        this.emit('cueHandled', parameters);
         return;
       case CueType.Strobe_Off:
+        this.emit('cueHandled', parameters);
         return; // Do nothing
       case CueType.Keyframe_First:
       case CueType.Keyframe_Next:
       case CueType.Keyframe_Previous:
         this.handleKeyframe();
+        this.emit('cueHandled', parameters);
         return;
       case CueType.NoCue:
         this._sequencer.blackout(0);
+        this.emit('cueHandled', parameters);
         return;
       case CueType.Menu:
         this.registry.setActiveGroups([]);
+        this.emit('cueHandled', parameters);
         break;
     }
 
@@ -62,8 +84,10 @@ class YargCueHandler extends BaseCueHandler {
     const implementation = this.registry.getCueImplementation(cueType);
     if (implementation) {
       await implementation.execute(parameters, this._sequencer, this._lightManager);
+      this.emit('cueHandled', parameters);
     } else {
       console.error(`No implementation found for cue: ${cueType}`);
+      this.emit('cueHandled', parameters);
     }
   }
 
