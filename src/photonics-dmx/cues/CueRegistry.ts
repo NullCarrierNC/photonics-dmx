@@ -52,7 +52,6 @@ export class CueRegistry {
 
   /**
    * Get a cue implementation from the active groups.
-   * If no active groups are set, uses all registered groups.
    * Falls back to the default group if no implementation is found.
    * @param cueType The type of cue to get
    * @returns The cue implementation or null if not found
