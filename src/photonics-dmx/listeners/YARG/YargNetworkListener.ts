@@ -333,7 +333,6 @@ export class YargNetworkListener extends EventEmitter {
 
       const lightingCue = lightingCueMap[lightingCueValue] || `Unknown (${lightingCueValue})`;
 
-      // Create YargCueData with explicit type
       const YargCueData: CueData = {
         datagramVersion,
         platform: this.getPlatform(platformByte),

@@ -1,0 +1,41 @@
+import { CueData } from '../../cueTypes';
+import { ILightingController } from '../../../controllers/sequencer/interfaces';
+import { DmxLightManager } from '../../../controllers/DmxLightManager';
+import { ICue } from '../../interfaces/ICue';
+import { getColor } from '../../../helpers/dmxHelpers';
+import { getSweepEffect } from '../../../effects/sweepEffect';
+import { TrackedLight, RGBIP } from '../../../types';
+import { YargCue } from '../YargCue';
+
+export class MenuCue implements ICue {
+  name = YargCue.Menu;
+
+  async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
+    const frontLights = lightManager.getLights(['front'], 'all');
+    const backLights = lightManager.getLights(['back'], 'all');
+
+    const sortedFrontLights = frontLights.sort((a: TrackedLight, b: TrackedLight) => a.position - b.position);
+    // Sort backLights by position descending
+    const sortedBackLights = backLights.sort((a: TrackedLight, b: TrackedLight) => b.position - a.position);
+
+    // Merge the sorted arrays into allLights
+    const allLights = [...sortedFrontLights, ...sortedBackLights];
+   
+    const blue: RGBIP = getColor('blue', 'low');
+    const brightBlue: RGBIP = getColor('blue', 'high');
+
+    const sweep = getSweepEffect({
+      lights: allLights,
+      high: brightBlue,
+      low: blue,
+      sweepTime: 2000,
+      fadeInDuration: 300,
+      fadeOutDuration: 600,
+      lightOverlap: 70,
+      betweenSweepDelay: 2000,
+      layer: 0,
+    });
+    // Use unblocked to avoid breaking the sweep timing.
+    sequencer.addEffectUnblockedName('menu', sweep, 0, true);
+  }
+} 

@@ -93,8 +93,9 @@ export class Rb3eNetworkListener extends EventEmitter {
     }
 
     // Check "RB3E" magic
-    const magic = buffer.slice(0, 4);
-    if (!magic.equals(PROTOCOL_MAGIC)) {
+    const magic = buffer.subarray(0, 4);
+    if (!(magic[0] === PROTOCOL_MAGIC[0] && magic[1] === PROTOCOL_MAGIC[1] && 
+          magic[2] === PROTOCOL_MAGIC[2] && magic[3] === PROTOCOL_MAGIC[3])) {
       console.warn(`Invalid protocol magic: ${magic.toString('hex')}`);
       return;
     }

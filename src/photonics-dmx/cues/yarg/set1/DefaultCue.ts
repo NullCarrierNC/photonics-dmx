@@ -1,0 +1,22 @@
+import { CueData } from '../../cueTypes';
+import { ILightingController } from '../../../controllers/sequencer/interfaces';
+import { DmxLightManager } from '../../../controllers/DmxLightManager';
+import { ICue } from '../../interfaces/ICue';
+import { YargCue } from '../YargCue';
+import { getColor } from '../../../helpers/dmxHelpers';
+import { getEffectSingleColor } from '../../../effects/effectSingleColor';
+
+export class DefaultCue implements ICue {
+  name = YargCue.Default;
+
+  async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
+    const all = lightManager.getLights(['front'], 'all');
+    const yellow = getColor('yellow', 'medium');
+    const effect = getEffectSingleColor({
+      lights: all,
+      color: yellow,
+      duration: 10,
+    });
+    sequencer.setEffect('default', effect);
+  }
+} 
