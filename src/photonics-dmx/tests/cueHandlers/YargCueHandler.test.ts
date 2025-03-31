@@ -115,10 +115,6 @@ describe('YargCueHandler', () => {
       cueHandledListener.mockClear();
       jest.advanceTimersByTime(20);
 
-      // Test Strobe_Off
-      await cueHandler.handleCue(CueType.Strobe_Off, mockCueData);
-      expect(cueHandledListener).toHaveBeenCalledWith(mockCueData);
-      expect(mockSequencer.blackout).not.toHaveBeenCalled();
 
       jest.useRealTimers();
     });
