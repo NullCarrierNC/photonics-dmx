@@ -3,6 +3,7 @@ import { CueData, CueType } from '../cues/cueTypes';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { CueRegistry } from '../cues/CueRegistry';
+import { LightTarget, LocationGroup, TrackedLight } from '../types';
 
 /**
  * Base class for cue handlers that provides common registry functionality.
@@ -12,8 +13,8 @@ import { CueRegistry } from '../cues/CueRegistry';
 export abstract class BaseCueHandler extends EventEmitter {
   protected _lightManager: DmxLightManager;
   protected _sequencer: ILightingController;
-  protected _debouncePeriod: number;
-  protected _lastCueTime: number = 0;
+  protected debouncePeriod: number;
+  protected lastDebouncedCueTime: number = 0;
   protected registry: CueRegistry;
 
   constructor(
@@ -24,7 +25,7 @@ export abstract class BaseCueHandler extends EventEmitter {
     super();
     this._lightManager = lightManager;
     this._sequencer = photonicsSequencer;
-    this._debouncePeriod = debouncePeriod;
+    this.debouncePeriod = debouncePeriod;
     this.registry = CueRegistry.getInstance();
   }
 
@@ -49,10 +50,10 @@ export abstract class BaseCueHandler extends EventEmitter {
    */
   protected checkDebounce(): boolean {
     const now = Date.now();
-    if (now - this._lastCueTime < this._debouncePeriod) {
+    if (now - this.lastDebouncedCueTime < this.debouncePeriod) {
       return false;
     }
-    this._lastCueTime = now;
+    this.lastDebouncedCueTime = now;
     return true;
   }
 
@@ -93,7 +94,7 @@ export abstract class BaseCueHandler extends EventEmitter {
    * @param time The debounce period in milliseconds
    */
   public setEffectDebouncePeriod(time: number): void {
-    this._debouncePeriod = time;
+    this.debouncePeriod = time;
   }
 
   /**
@@ -101,6 +102,43 @@ export abstract class BaseCueHandler extends EventEmitter {
    */
   public shutdown(): void {
     this.removeAllListeners();
+  }
+
+  public handleBeat(): void {
+    this._sequencer.onBeat();
+  }
+
+  public handleKeyframe(): void {
+    this._sequencer.onKeyframe();
+  }
+
+  public handleMeasure(): void {
+    this._sequencer.onBeat();
+    this._sequencer.onMeasure();
+  }
+
+  public handleSustain(ms: number): void {
+    console.warn("handleSustain called with", ms);
+  }
+
+  public setDebugMode(enable: boolean, refreshRateMs?: number): void {
+    this.enableLightLayerDebug(enable, refreshRateMs);
+  }
+
+  public enableLightLayerDebug(enable: boolean, refreshRateMs?: number): void {
+    this._sequencer.enableDebug(enable);
+    if (refreshRateMs) {
+      this._sequencer.debugLightLayers();
+    }
+  }
+
+  protected getLights(group: LocationGroup[], target: LightTarget): TrackedLight[] {
+    const lights = this._lightManager.getLightsInGroup(group);
+    return this._lightManager.getLightsByTarget(lights, target);
+  }
+
+  protected msPerBeat(beatsPerMinute: number): number {
+    return (60 * 1000) / beatsPerMinute;
   }
 
   // Methods any cue handler must implement
@@ -128,16 +166,13 @@ export abstract class BaseCueHandler extends EventEmitter {
   protected abstract handleCueSilhouettes(parameters: CueData): Promise<void>;
   protected abstract handleCueSilhouettes_Spotlight(parameters: CueData): Promise<void>;
   protected abstract handleCueStomp(parameters: CueData): Promise<void>;
-  protected abstract handleCueStrobe_Fast(parameters: CueData): Promise<void>;
   protected abstract handleCueStrobe_Fastest(parameters: CueData): Promise<void>;
+  protected abstract handleCueStrobe_Fast(parameters: CueData): Promise<void>;
   protected abstract handleCueStrobe_Medium(parameters: CueData): Promise<void>;
-  protected abstract handleCueStrobe_Off(parameters: CueData): Promise<void>;
   protected abstract handleCueStrobe_Slow(parameters: CueData): Promise<void>;
+  protected abstract handleCueStrobe_Off(parameters: CueData): Promise<void>;
   protected abstract handleCueSweep(parameters: CueData): Promise<void>;
   protected abstract handleCueVerse(parameters: CueData): Promise<void>;
   protected abstract handleCueWarm_Automatic(parameters: CueData): Promise<void>;
   protected abstract handleCueWarm_Manual(parameters: CueData): Promise<void>;
-
-  protected abstract handleBeat(): void;
-  protected abstract handleMeasure(): void;
 } 

@@ -9,6 +9,7 @@ import { beforeEach, describe, it, expect } from '@jest/globals';
 // Mock implementations
 class MockCueImplementation implements ICueImplementation {
   constructor(private _name: string) {}
+  get name(): string { return this._name; }
   async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // Mock implementation
   }

@@ -14,7 +14,7 @@ import {
 } from '../../cues/cueTypes';
 
 
-import { AbstractCueHandler } from '../../cueHandlers/AbstractCueHandler';
+import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler';
 
 enum PlatformByte {
   Unknown = 0,
@@ -98,7 +98,7 @@ const PACKET_HEADER = 0x59415247; // 'YARG' in hex
 
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null;
-  private cueHandler:AbstractCueHandler;
+  private cueHandler: BaseCueHandler;
 
   //private logFilePath = path.join(app.getPath('documents'), 'yargLog.json');
   private listening = false;
@@ -114,7 +114,7 @@ export class YargNetworkListener extends EventEmitter {
 
   private lastLogData: Record<string, any> | null = null;
 
-  constructor(cueHandler: AbstractCueHandler) {
+  constructor(cueHandler: BaseCueHandler) {
     super(); // Initialize EventEmitter
     this.cueHandler = cueHandler;
 
