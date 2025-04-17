@@ -42,10 +42,10 @@ const DmxPreview: React.FC = () => {
   const resetKeyframeIndicator = useCallback(() => setShowKeyframeIndicator(false), []);
   
   // Set up auto-reset timeouts for indicators
-  // The delay is null when indicator is off, and set to 10ms when indicator is turned on
-  useTimeoutEffect(resetBeatIndicator, showBeatIndicator ? 10 : null);
-  useTimeoutEffect(resetMeasureIndicator, showMeasureIndicator ? 10 : null);
-  useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 10 : null);
+  // The delay is null when indicator is off, and set to 200ms when indicator is turned on
+  useTimeoutEffect(resetBeatIndicator, showBeatIndicator ? 200 : null);
+  useTimeoutEffect(resetMeasureIndicator, showMeasureIndicator ? 200 : null);
+  useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 200 : null);
 
   // Fetch current group info when selected group changes
   useEffect(() => {
