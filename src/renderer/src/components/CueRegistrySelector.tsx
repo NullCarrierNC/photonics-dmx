@@ -1,0 +1,116 @@
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+
+type CueRegistryType = 'YARG' | 'RB3E';
+
+type CueGroup = {
+  name: string;
+  description: string;
+  cueTypes: string[];
+};
+
+interface CueRegistrySelectorProps {
+  onRegistryChange: (registryType: CueRegistryType) => void;
+  onGroupChange: (groupName: string) => void;
+}
+
+const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
+  onRegistryChange,
+  onGroupChange
+}) => {
+  const [registryType, setRegistryType] = useState<CueRegistryType>('YARG');
+  const [groups, setGroups] = useState<CueGroup[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string>('default');
+  const isMounted = useRef(false);
+  const isInitialMount = useRef(true);
+
+  // Wrap callback to avoid infinite loops
+  const handleGroupChangeCallback = useCallback((groupName: string) => {
+    onGroupChange(groupName);
+  }, [onGroupChange]);
+
+  useEffect(() => {
+    // Fetch available cue groups when component mounts or registry type changes
+    const fetchGroups = async () => {
+      try {
+        console.log('Fetching cue groups...');
+        const availableGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+        console.log('Available groups:', availableGroups);
+        setGroups(availableGroups);
+        
+        // Set default group if available, but only call onGroupChange once
+        if (availableGroups.length > 0) {
+          const defaultGroup = availableGroups.find(g => g.name === 'default') || availableGroups[0];
+          console.log('Setting default group:', defaultGroup.name);
+          setSelectedGroup(defaultGroup.name);
+          
+          // Only trigger callback on initial mount
+          if (isInitialMount.current) {
+            handleGroupChangeCallback(defaultGroup.name);
+            isInitialMount.current = false;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching cue groups:', error);
+      }
+    };
+
+    if (!isMounted.current) {
+      fetchGroups();
+      isMounted.current = true;
+    } else if (registryType) {
+      // Only re-fetch if registry type changed (not on initial mount)
+      fetchGroups();
+    }
+  }, [registryType, handleGroupChangeCallback]);
+
+  const handleRegistryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newType = event.target.value as CueRegistryType;
+    setRegistryType(newType);
+    onRegistryChange(newType);
+  };
+
+  const handleGroupChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const groupName = event.target.value;
+    setSelectedGroup(groupName);
+    handleGroupChangeCallback(groupName);
+  };
+
+  return (
+    <div className="flex items-center gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Game Type
+        </label>
+        <select
+          value={registryType}
+          onChange={handleRegistryChange}
+          className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
+          style={{ width: '200px' }}
+        >
+          <option value="YARG">YARG</option>
+          <option value="RB3E" disabled>RB3E (Coming Soon)</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Cue Group
+        </label>
+        <select
+          value={selectedGroup}
+          onChange={handleGroupChange}
+          className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
+          style={{ width: '200px' }}
+        >
+          {groups.map((group) => (
+            <option key={group.name} value={group.name}>
+              {group.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+};
+
+export default CueRegistrySelector; 

@@ -37,7 +37,7 @@ import { SearchlightsCue } from '../default/SearchlightsCue';
  * implementations for cues they don't define.
  */
 const defaultGroup: ICueGroup = {
-  name: 'default',
+  name: 'YARG Default',
   description: 'The original set of YARG cues. If other groups don\'t define a cue, this group\'s cue will be used.',
   cues: new Map([
     [CueType.Default, new DefaultCue()],

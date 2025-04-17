@@ -4,7 +4,8 @@ import { SenderConfig } from '../../photonics-dmx/types';
 import { SacnSender } from '../../photonics-dmx/senders/SacnSender';
 import { IpcSender } from '../../photonics-dmx/senders/IpcSender';
 import { EnttecProSender } from '../../photonics-dmx/senders/EnttecProSender';
-import { CueTypeDescriptions } from '../../photonics-dmx/cues/cueTypes';
+import { CueType } from '../../photonics-dmx/cues/cueTypes';
+import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
 
 /**
  * Set up light-related IPC handlers
@@ -62,9 +63,58 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   });
 
   // Get available light effects
-  ipcMain.handle('get-available-cues', async () => {
-    // Return the available cue types
-    return CueTypeDescriptions;
+  ipcMain.handle('get-available-cues', async (_, groupName?: string) => {
+    try {
+      // Get the registry instance
+      const registry = CueRegistry.getInstance();
+      
+      // Default to 'default' if no group name is provided
+      const targetGroupName = groupName || 'default';
+      
+      console.log(`Getting cues for group: ${targetGroupName}`);
+      
+      // Set this group as active for this operation
+      registry.setActiveGroups([targetGroupName]);
+      
+      // Get the group directly to check which cues are available
+      const group = registry.getGroup(targetGroupName);
+      if (!group) {
+        console.error(`Group not found: ${targetGroupName}`);
+        return []; // No group found, return empty array
+      }
+      
+      // Get only the cue types that are actually defined in this group
+      const availableCueTypes = Array.from(group.cues.keys());
+      console.log(`Found ${availableCueTypes.length} cue types in group ${targetGroupName}`);
+      
+      if (availableCueTypes.length === 0) {
+        console.error(`No cue types found in group: ${targetGroupName}`);
+        return [];
+      }
+      
+      // Create descriptions based on the implementations
+      const cueDescriptions = availableCueTypes.map(cueType => {
+        // Get the implementation for this cue
+        const implementation = group.cues.get(cueType);
+        
+        // Use only the implementation's description
+        const yargDescription = implementation?.description || 
+                              "No description available";
+        
+        return {
+          id: cueType,
+          yargDescription: yargDescription,
+          rb3Description: "RB3E: Does not currently use cues, lights are set directly from passed LED colour values.",
+          groupName: targetGroupName
+        };
+      });
+      
+      console.log(`Returning ${cueDescriptions.length} cue descriptions`);
+      return cueDescriptions;
+    } catch (error) {
+      console.error('Error getting available cues:', error);
+      return [];
+    }
   });
 
   // Start a test effect
@@ -145,5 +195,31 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         error: error instanceof Error ? error.message : String(error)
       };
     }
+  });
+
+  // Get available cue groups from registry
+  ipcMain.handle('get-cue-groups', async () => {
+    const registry = CueRegistry.getInstance();
+    const groupNames = registry.getRegisteredGroups();
+    
+    // Get descriptions for each group
+    const groupInfo = groupNames.map(groupName => {
+      const group = registry.getGroup(groupName);
+      return {
+        name: groupName,
+        description: group?.description || `${groupName} cue group`,
+        // Get list of cue types defined in this group
+        cueTypes: group ? Array.from(group.cues.keys()) : []
+      };
+    });
+    
+    return groupInfo;
+  });
+  
+  // Set the active cue group
+  ipcMain.handle('set-active-cue-group', async (_, groupName: string) => {
+    const registry = CueRegistry.getInstance();
+    registry.setActiveGroups([groupName]);
+    return { success: true };
   });
 } 

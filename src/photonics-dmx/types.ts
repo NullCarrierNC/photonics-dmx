@@ -439,11 +439,12 @@ export interface ResolvableColor {
   w?: ResolvableValue;
 }
 
-export interface EffectSelector {
+export type EffectSelector = {
   id: string;
   yargDescription: string;
   rb3Description: string;
-}
+  groupName?: string;
+};
 
 // Mapping of easing names to easing functions
 export const easingFunctions: { [key: string]: EasingFunction } = {

@@ -144,4 +144,13 @@ export class CueRegistry {
   public getEnabledGroups(): string[] {
     return Array.from(this.enabledGroups);
   }
+
+  /**
+   * Get a specific group by name
+   * @param groupName The name of the group to get
+   * @returns The group or undefined if not found
+   */
+  public getGroup(groupName: string): ICueGroup | undefined {
+    return this.groups.get(groupName);
+  }
 } 
