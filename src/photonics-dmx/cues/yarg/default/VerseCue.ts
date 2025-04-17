@@ -9,6 +9,7 @@ import { YargCue } from '../YargCue';
 
 export class VerseCue implements ICue {
   name = YargCue.Verse;
+  description = 'Randomized blue or yellow colors at varying intensities on all lights with timing based on song BPM';
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const blueLow = getColor('blue', 'low');

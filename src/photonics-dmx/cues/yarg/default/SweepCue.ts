@@ -5,9 +5,11 @@ import { ICue } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
 import { randomBetween } from '../../../helpers/utils';
+import { YargCue } from '../YargCue';
 
 export class SweepCue implements ICue {
-  name = 'sweep';
+  name = YargCue.Sweep;
+  description = 'Rapid sweep effect that moves a bright color (red/yellow or blue/green based on venue size) across front lights, either left-to-right or right-to-left';
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const transparent = getColor('transparent', 'high');

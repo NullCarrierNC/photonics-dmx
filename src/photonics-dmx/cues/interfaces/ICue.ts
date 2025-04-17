@@ -9,6 +9,11 @@ export interface ICue {
   name: string;
 
   /**
+   * Description of the cue effect's appearance
+   */
+  description?: string;
+
+  /**
    * Execute the cue with the given parameters
    * @param parameters The cue parameters
    * @param sequencer The lighting controller

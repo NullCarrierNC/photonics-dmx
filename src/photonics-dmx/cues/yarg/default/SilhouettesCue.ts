@@ -5,9 +5,11 @@ import { ICue } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 import { randomBetween } from '../../../helpers/utils';
+import { YargCue } from '../YargCue';
 
 export class SilhouettesCue implements ICue {
-  name = 'silhouettes';
+  name = YargCue.Silhouettes;
+  description = 'Cool colors (green, blue, magenta, teal) cycling on back lights or front lights if no back lights are available';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const back = lightManager.getLights(['back'], 'all');
@@ -17,12 +19,12 @@ export class SilhouettesCue implements ICue {
     const magenta = getColor('magenta', 'medium');
     const teal = getColor('teal', 'medium');
 
-    const colours = [green, blue, magenta, teal];
+    const colors = [green, blue, magenta, teal];
 
     const singleColor = getEffectSingleColor({
       waitFor: 'none',
       forTime: 0,
-      color: colours[randomBetween(0, colours.length - 1)],
+      color: colors[randomBetween(0, colors.length - 1)],
       duration: 500,
       waitUntil: 'none',
       untilTime: 0,

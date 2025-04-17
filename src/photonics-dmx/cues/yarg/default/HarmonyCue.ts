@@ -10,6 +10,7 @@ import { YargCue } from '../YargCue';
 
 export class HarmonyCue implements ICue {
   name = YargCue.Harmony;
+  description = 'Interactive color cross-fade effect where colors are determined by drum hits (starting color) and guitar notes (ending color)';
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const red = getColor('red', 'high');

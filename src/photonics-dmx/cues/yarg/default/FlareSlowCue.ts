@@ -9,6 +9,7 @@ import { YargCue } from '../YargCue';
 
 export class FlareSlowCue implements ICue {
   name = YargCue.FlareSlow;
+  description = 'Slower, spaced-out bursts of bright white light on front lights with longer fade times and randomized timing';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const white = getColor('white', 'max');

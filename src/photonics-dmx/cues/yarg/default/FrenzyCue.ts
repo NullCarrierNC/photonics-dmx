@@ -9,6 +9,7 @@ import { YargCue } from '../YargCue';
 
 export class FrenzyCue implements ICue {
   name = YargCue.Frenzy;
+  description = 'Rapid color cycling between high-intensity red, green, blue, and orange on all lights for an energetic, chaotic effect';
   private _lastIndex: number = 0;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {

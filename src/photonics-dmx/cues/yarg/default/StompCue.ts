@@ -5,9 +5,11 @@ import { ICue } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { EasingType } from '../../../easing';
+import { YargCue } from '../YargCue';
 
 export class StompCue implements ICue {
-  name = 'stomp';
+  name = YargCue.Stomp;
+  description = 'White flash effect on front lights with a moderate fade-out';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const white = getColor('white', 'max');

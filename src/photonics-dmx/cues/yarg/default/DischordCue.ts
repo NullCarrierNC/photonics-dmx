@@ -12,6 +12,7 @@ import { YargCue } from '../YargCue';
 
 export class DischordCue implements ICue {
   name = YargCue.Dischord;
+  description = 'Front lights alternate between green and blue on left/right halves with bright red or yellow flashes on the measure';
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const blue = getColor('blue', 'medium');

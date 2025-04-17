@@ -9,6 +9,7 @@ import { YargCue } from '../YargCue';
 
 export class CoolAutomaticCue implements ICue {
   name = YargCue.CoolAutomatic;
+  description = 'Alternates blue and green between front and back lights, triggered by measure events';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const even = lightManager.getLights(['front'], 'all');

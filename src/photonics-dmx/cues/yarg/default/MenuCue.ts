@@ -9,6 +9,7 @@ import { YargCue } from '../YargCue';
 
 export class MenuCue implements ICue {
   name = YargCue.Menu;
+  description = 'Continuous blue sweep effect that moves around all lights in a circular pattern with a 2-second delay between passes';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const frontLights = lightManager.getLights(['front'], 'all');

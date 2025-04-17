@@ -8,6 +8,7 @@ import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 
 export class DefaultCue implements ICue {
   name = YargCue.Default;
+  description = 'Solid medium-yellow color on front lights for a warm, neutral stage ambience';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const all = lightManager.getLights(['front'], 'all');

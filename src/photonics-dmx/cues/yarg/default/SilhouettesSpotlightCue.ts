@@ -4,9 +4,11 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
+import { YargCue } from '../YargCue';
 
 export class SilhouettesSpotlightCue implements ICue {
-  name = 'silhouettes_spotlight';
+  name = YargCue.SilhouettesSpotlight;
+  description = 'Solid low-intensity blue color on all lights (front and back)';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const low = getColor('blue', 'low');

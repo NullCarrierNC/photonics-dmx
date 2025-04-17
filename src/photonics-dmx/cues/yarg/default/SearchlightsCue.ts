@@ -12,6 +12,7 @@ var ltr = true;
 
 export class SearchlightsCue implements ICue {
   name = YargCue.Searchlights;
+  description = 'Slow sweeping effect of a random bright color (red, green, blue, or white) that alternates direction with each activation';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const frontLights = lightManager.getLights(['front'], 'all');

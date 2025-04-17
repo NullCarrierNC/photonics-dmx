@@ -5,9 +5,11 @@ import { ICue } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors';
+import { YargCue } from '../YargCue';
 
 export class WarmManualCue implements ICue {
-  name = 'warm_manual';
+  name = YargCue.WarmManual;
+  description = 'Alternates between red and yellow on even/odd front lights triggered by measure events';
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const even = lightManager.getLights(['front'], 'even');

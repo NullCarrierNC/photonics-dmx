@@ -1,4 +1,3 @@
-
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
@@ -11,6 +10,7 @@ import { YargCue } from '../YargCue';
 
 export class ChorusCue implements ICue {
   name = YargCue.Chorus;
+  description = 'Alternating randomly between Amber/Purple or Yellow/Red colors on all lights with timing based on song BPM';
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const amberLow = getColor('amber', 'low');

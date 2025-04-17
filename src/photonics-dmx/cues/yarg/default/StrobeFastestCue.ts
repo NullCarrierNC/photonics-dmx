@@ -9,6 +9,7 @@ import { RGBIP } from '../../../types';
 
 export class StrobeFastestCue implements ICue {
   name = YargCue.Strobe_Fastest;
+  description = 'Extremely rapid white strobe effect with flashing timed to BPM/64 of the song';
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const white: RGBIP = getColor('white', 'max');

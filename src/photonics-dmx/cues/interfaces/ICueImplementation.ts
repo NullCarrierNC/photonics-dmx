@@ -9,6 +9,11 @@ import { DmxLightManager } from '../../controllers/DmxLightManager';
  */
 export interface ICueImplementation {
   /**
+   * Description of the cue effect's appearance
+   */
+  description?: string;
+  
+  /**
    * Execute the cue implementation
    * @param data The cue data containing timing and parameters
    * @param controller The lighting controller to use

@@ -9,6 +9,7 @@ import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 
 export class ScoreCue implements ICue {
   name = YargCue.Score;
+  description = 'Medium blue base color on front lights with periodic yellow flashes every 4 seconds for a celebratory score screen effect';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const all = lightManager.getLights(['front'], 'all');
