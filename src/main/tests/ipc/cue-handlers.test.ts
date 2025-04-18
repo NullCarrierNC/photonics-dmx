@@ -34,6 +34,7 @@ class MockCueImplementation implements ICueImplementation {
     private _description?: string
   ) {}
   
+  get name(): string { return this._name; }
   get description(): string | undefined { return this._description; }
   
   execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): void {
