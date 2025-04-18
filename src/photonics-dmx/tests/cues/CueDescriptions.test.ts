@@ -53,6 +53,10 @@ describe('Cue Descriptions', () => {
     // Register the groups
     registry.registerGroup(defaultGroup);
     registry.registerGroup(customGroup);
+    // Explicitly set the default group
+    registry.setDefaultGroup(defaultGroup.name);
+    // Explicitly activate the default group
+    registry.activateGroup(defaultGroup.name);
   });
 
   describe('Cue Implementation Descriptions', () => {

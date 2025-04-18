@@ -41,24 +41,26 @@ describe('CueRegistry', () => {
         [CueType.Verse, new MockCueImplementation('custom-verse')],
       ]),
     };
+    
+    // Explicitly register and set the default group
+    registry.registerGroup(defaultGroup);
+    registry.setDefaultGroup(defaultGroup.name);
   });
 
   describe('registerGroup', () => {
     it('should register a group', () => {
-      registry.registerGroup(defaultGroup);
-      expect(registry.getRegisteredGroups()).toContain('default');
+      expect(registry.getAllGroups()).toContain('default');
     });
 
     it('should set default group when registering group named "default"', () => {
-      registry.registerGroup(defaultGroup);
       const implementation = registry.getCueImplementation(CueType.Default);
       expect(implementation).toBeDefined();
+      expect((implementation as MockCueImplementation).name).toBe('default');
     });
   });
 
   describe('getCueImplementation', () => {
     beforeEach(() => {
-      registry.registerGroup(defaultGroup);
       registry.registerGroup(customGroup);
     });
 
@@ -74,9 +76,11 @@ describe('CueRegistry', () => {
       const implementation = registry.getCueImplementation(CueType.Default);
       expect(implementation).toBeDefined();
       expect(implementation).toBeInstanceOf(MockCueImplementation);
+      expect((implementation as MockCueImplementation).name).toBe('default');
     });
 
     it('should return null if no implementation found', () => {
+      registry.setActiveGroups(['custom']);
       const implementation = registry.getCueImplementation(CueType.BigRockEnding);
       expect(implementation).toBeNull();
     });
@@ -84,7 +88,6 @@ describe('CueRegistry', () => {
 
   describe('setActiveGroups', () => {
     beforeEach(() => {
-      registry.registerGroup(defaultGroup);
       registry.registerGroup(customGroup);
     });
 
@@ -107,13 +110,12 @@ describe('CueRegistry', () => {
 
   describe('reset', () => {
     it('should clear all groups and active groups', () => {
-      registry.registerGroup(defaultGroup);
       registry.registerGroup(customGroup);
       registry.setActiveGroups(['custom']);
 
       registry.reset();
 
-      expect(registry.getRegisteredGroups()).toHaveLength(0);
+      expect(registry.getAllGroups()).toHaveLength(0);
       expect(registry.getActiveGroups()).toHaveLength(0);
     });
   });

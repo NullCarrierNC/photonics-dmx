@@ -27,7 +27,7 @@ const DmxPreview: React.FC = () => {
   const [_isIpcEnabled, setIsIpcEnabled] = useAtom(senderIpcEnabledAtom);
   const [dmxValues, setDmxValues] = useState<Record<number, number>>({});
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null);
-  const [registryType, setRegistryType] = useState<CueRegistryType>('YARG');
+  const [, setRegistryType] = useState<CueRegistryType>('YARG');
   const [selectedGroup, setSelectedGroup] = useState<string>('default');
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null);
   
@@ -55,6 +55,28 @@ const DmxPreview: React.FC = () => {
         const group = groups.find((g: CueGroup) => g.name === selectedGroup);
         if (group) {
           setCurrentGroup(group);
+          
+          // Fetch available effects for the new group
+          try {
+            const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', selectedGroup);
+            
+            // Reset the currently selected effect since we changed groups
+            setSelectedEffect(null);
+            
+            // If there are effects available, select the first one automatically
+            if (availableEffects && availableEffects.length > 0) {
+              const firstEffect = availableEffects[0];
+              setSelectedEffect({
+                id: firstEffect.id,
+                yargDescription: firstEffect.yargDescription,
+                rb3Description: firstEffect.rb3Description,
+                groupName: firstEffect.groupName
+              });
+              console.log(`Auto-selected first effect: ${firstEffect.id} from group ${selectedGroup}`);
+            }
+          } catch (error) {
+            console.error('Error fetching available effects for group:', error);
+          }
         }
       } catch (error) {
         console.error('Error fetching group info:', error);
@@ -133,10 +155,32 @@ const DmxPreview: React.FC = () => {
     // Future implementation: switch between YARG and RB3E registries
   };
 
-  const handleGroupChange = (groupName: string) => {
-    setSelectedGroup(groupName);
-    // This will trigger re-fetching of effects for this group
-  };
+  // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
+  const handleGroupChange = useCallback((groupNames: string[]) => {
+    // Set the selected group for the UI
+    if (groupNames.length > 0) {
+      const newSelectedGroup = groupNames[0];
+      // Only update state if the group actually changed
+      setSelectedGroup(prevSelectedGroup => {
+        if (prevSelectedGroup !== newSelectedGroup) {
+          console.log(`Group changed from ${prevSelectedGroup} to ${newSelectedGroup}`);
+          return newSelectedGroup;
+        }
+        return prevSelectedGroup;
+      });
+    }
+
+    // Set active groups in the backend
+    window.electron.ipcRenderer.invoke('set-active-cue-groups', groupNames)
+      .then(result => {
+        if (!result.success) {
+          console.error('Failed to set active group:', result.error);
+        }
+      })
+      .catch(err => {
+        console.error('Error setting active group:', err);
+      });
+  }, [setSelectedGroup]); // Dependency: setSelectedGroup (stable)
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
@@ -173,8 +217,9 @@ const DmxPreview: React.FC = () => {
       <div className="my-6">
         <h2 className="text-xl font-bold mb-4">Cue Selection</h2>
         <CueRegistrySelector 
-          onRegistryChange={handleRegistryChange} 
-          onGroupChange={handleGroupChange} 
+          onRegistryChange={handleRegistryChange}
+          onGroupChange={handleGroupChange}
+          useActiveGroupsOnly={true}
         />
         
         {currentGroup && (
@@ -225,21 +270,7 @@ const DmxPreview: React.FC = () => {
           </button>
         </div>
       </div>
-
-{/*
-      {selectedEffect && (
-        <div className="mt-4 p-4 bg-gray-200 dark:bg-gray-700 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2">Effect Description</h3>
-          <p className="text-md text-gray-700 dark:text-gray-300">
-            <strong>Name:</strong> {selectedEffect.id}<br />
-            <strong>Description:</strong> {selectedEffect.yargDescription ? selectedEffect.yargDescription : "No description available"}<br/>
-            {selectedEffect.rb3Description && selectedEffect.rb3Description !== "RB3E: Does not currently use cues, lights are set directly from passed LED colour values." && (
-              <span><strong>RB3 Information:</strong> {selectedEffect.rb3Description}</span>
-            )}
-          </p>
-        </div>
-      )}
- */}  
+  
       <hr className="my-6" />
      
       <CuePreview 

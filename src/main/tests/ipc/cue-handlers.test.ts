@@ -57,7 +57,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
 
   // Store the original handlers for each IPC endpoint
   let getCueGroupsHandler: (event: unknown, ...args: any[]) => Promise<any>;
-  let setActiveGroupHandler: (event: unknown, groupName: string) => Promise<any>;
+  let setActiveGroupsHandler: (event: unknown, groupNames: string[]) => Promise<any>;
   let getAvailableCuesHandler: (event: unknown, groupName?: string) => Promise<any>;
 
   beforeEach(() => {
@@ -68,8 +68,8 @@ describe('IPC Light Handlers for Cue Registry', () => {
     mockIpcMain.handle.mockImplementation((channel: string, handler: any) => {
       if (channel === 'get-cue-groups') {
         getCueGroupsHandler = handler;
-      } else if (channel === 'set-active-cue-group') {
-        setActiveGroupHandler = handler;
+      } else if (channel === 'set-active-cue-groups') {
+        setActiveGroupsHandler = handler;
       } else if (channel === 'get-available-cues') {
         getAvailableCuesHandler = handler;
       }
@@ -101,9 +101,10 @@ describe('IPC Light Handlers for Cue Registry', () => {
       ]),
     };
 
-    // Register the groups
+    // Register the groups AND set the default group
     registry.registerGroup(defaultGroup);
     registry.registerGroup(customGroup);
+    registry.setDefaultGroup(defaultGroup.name);
   });
 
   describe('get-cue-groups handler', () => {
@@ -141,12 +142,61 @@ describe('IPC Light Handlers for Cue Registry', () => {
     });
   });
 
-  describe('set-active-cue-group handler', () => {
-    it('should set the active group in the registry', async () => {
-      const result = await setActiveGroupHandler({}, 'custom');
+  describe('set-active-cue-groups handler', () => {
+    it('should set the active groups and include default', async () => {
+      const result = await setActiveGroupsHandler({}, ['custom']);
       
-      expect(result).toEqual({ success: true });
-      expect(registry.getActiveGroups()).toEqual(['custom']);
+      // Expect detailed response, including the default group
+      expect(result).toEqual({
+        success: true,
+        activeGroups: expect.arrayContaining(['custom', 'default']),
+        invalidGroups: undefined
+      });
+      expect(result.activeGroups).toHaveLength(2);
+      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']));
+      expect(registry.getActiveGroups()).toHaveLength(2);
+    });
+
+    it('should set multiple active groups correctly', async () => {
+      const result = await setActiveGroupsHandler({}, ['custom', 'default']);
+      
+      // Expect detailed response
+      expect(result).toEqual({
+        success: true,
+        activeGroups: expect.arrayContaining(['custom', 'default']),
+        invalidGroups: undefined
+      });
+      expect(result.activeGroups).toHaveLength(2);
+      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']));
+      expect(registry.getActiveGroups()).toHaveLength(2);
+    });
+
+    it('should return error for empty array', async () => {
+      await setActiveGroupsHandler({}, ['custom']); // Set one first
+      const result = await setActiveGroupsHandler({}, []);
+      
+      // Expect failure response
+      expect(result).toEqual({
+        success: false,
+        error: expect.stringContaining('No valid groups provided') // Check for error message
+      });
+      // Ensure registry didn't actually clear (due to handler validation)
+      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default'])); 
+    });
+
+    it('should ignore non-existent groups and return invalid ones', async () => {
+      const result = await setActiveGroupsHandler({}, ['custom', 'non-existent']);
+      
+      // Expect detailed response including default and the invalid group
+      expect(result).toEqual({
+        success: true,
+        activeGroups: expect.arrayContaining(['custom', 'default']),
+        invalidGroups: ['non-existent']
+      });
+      expect(result.activeGroups).toHaveLength(2);
+      // Verify registry state reflects only the valid + default group
+      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']));
+      expect(registry.getActiveGroups()).toHaveLength(2);
     });
   });
 

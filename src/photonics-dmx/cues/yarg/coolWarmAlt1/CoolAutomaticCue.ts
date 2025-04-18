@@ -11,6 +11,7 @@ export class CoolAutomaticCue implements ICue {
   description = 'Sequential pattern where front lights change one by one on beat, cycling through all positions';
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
+    console.log('ALT1 CoolAutomaticCue executing');
     // Get front lights in position order
     const frontLights = lightManager.getLights(['front'], 'all');
     const backLights = lightManager.getLights(['back'], 'all');

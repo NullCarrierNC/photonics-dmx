@@ -9,6 +9,9 @@ import { ICueImplementation } from './interfaces/ICueImplementation';
  * matching cue in the default group. This saves us from having to 
  * define common cues like Strobe repeatedly in each group.
  * 
+ * Registered Groups: Groups of cues known to the system.
+ * Active Groups: Groups that are currently active during gameplay.
+ * Enabled Groups: Groups that are enabled and can potentially be set as active.
  */
 export class CueRegistry {
   /** The singleton instance of the CueRegistry */
@@ -56,18 +59,40 @@ export class CueRegistry {
    */
   public registerGroup(group: ICueGroup): void {
     this.groups.set(group.name, group);
-    if (group.name === 'default') {
-      this.defaultGroup = group.name;
-    }
+    
     // Add to enabled groups by default
     this.enabledGroups.add(group.name);
   }
+
+  /**
+   * Set the default group.
+   * @param groupName The name of the group to set as default
+   * @returns Boolean indicating if the operation was successful
+   * @throws Error if the group doesn't exist
+   */
+  public setDefaultGroup(groupName: string): boolean {
+    // Verify that the group exists before setting it as default
+    if (!this.groups.has(groupName)) {
+      throw new Error(`Cannot set default group: group '${groupName}' not found`);
+    }
+    
+    // Set it as the new default group
+    this.defaultGroup = groupName;
+    
+    // Ensure the default group is always active
+    this.activeGroups.add(groupName);
+    
+    return true;
+  }
+
+
 
   /**
    * Get a cue implementation from the active groups.
    * Falls back to the default group if no implementation is found.
    * @param cueType The type of cue to get
    * @returns The cue implementation or null if not found
+   * @throws Error if no implementation is found in active groups and no default group is defined
    */
   public getCueImplementation(cueType: CueType): ICueImplementation | null {
     // Try active groups first
@@ -86,10 +111,83 @@ export class CueRegistry {
       if (defaultGroup?.cues.has(cueType)) {
         return defaultGroup.cues.get(cueType)!;
       }
+    } else {
+      // Throw an error if no default group is defined
+      throw new Error(`No default group defined to fall back to for cue: ${cueType}`);
     }
 
     console.error(`No implementation found for cue: ${cueType}`);
     return null;
+  }
+
+  /**
+   * Activate a single group by adding it to the active groups.
+   * Only enabled groups can be activated.
+   * @param groupName The name of the group to activate
+   * @returns True if the group was activated, false otherwise
+   */
+  public activateGroup(groupName: string): boolean {
+    if (this.groups.has(groupName) && this.enabledGroups.has(groupName)) {
+      this.activeGroups.add(groupName);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Deactivate a single group by removing it from the active groups.
+   * @param groupName The name of the group to deactivate
+   * @returns True if the group was deactivated, false otherwise
+   */
+  public deactivateGroup(groupName: string): boolean {
+    // Don't allow removing the default group
+    if (groupName === this.defaultGroup) {
+      console.warn("Cannot deactivate the default group");
+      return false;
+    }
+    
+    if (this.activeGroups.has(groupName)) {
+      this.activeGroups.delete(groupName);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Enable a single group by adding it to the enabled groups.
+   * @param groupName The name of the group to enable
+   * @returns True if the group was enabled, false otherwise
+   */
+  public enableGroup(groupName: string): boolean {
+    if (this.groups.has(groupName)) {
+      this.enabledGroups.add(groupName);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Disable a single group by removing it from the enabled groups.
+   * This will also deactivate the group if it was active.
+   * @param groupName The name of the group to disable
+   * @returns True if the group was disabled, false otherwise
+   */
+  public disableGroup(groupName: string): boolean {
+    // Don't allow disabling the default group
+    if (groupName === this.defaultGroup) {
+      console.warn("Cannot disable the default group");
+      return false;
+    }
+    
+    if (this.enabledGroups.has(groupName)) {
+      this.enabledGroups.delete(groupName);
+      // Also deactivate the group if it was active
+      if (this.activeGroups.has(groupName)) {
+        this.activeGroups.delete(groupName);
+      }
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -122,15 +220,16 @@ export class CueRegistry {
   }
 
   /**
-   * Get all registered group names.
-   * @returns Array of group names
+   * Get all registered group names, regardless of whether they're enabled or active.
+   * @returns Array of all registered group names
    */
-  public getRegisteredGroups(): string[] {
+  public getAllGroups(): string[] {
     return Array.from(this.groups.keys());
   }
 
   /**
    * Get the currently active group names.
+   * These are the groups that will be used during gameplay.
    * @returns Array of active group names
    */
   public getActiveGroups(): string[] {
@@ -146,7 +245,7 @@ export class CueRegistry {
   }
 
   /**
-   * Get a specific group by name
+   * Get a specific group by name, regardless of whether it's enabled or active.
    * @param groupName The name of the group to get
    * @returns The group or undefined if not found
    */

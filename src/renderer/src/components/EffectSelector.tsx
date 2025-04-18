@@ -21,6 +21,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
     console.log(`Fetching effects for group: ${groupName}`);
     try {
       setLoading(true);
+      // This retrieves cues from the specified group without changing the active group state
       const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', groupName);
       console.log('Available effects:', availableEffects);
       

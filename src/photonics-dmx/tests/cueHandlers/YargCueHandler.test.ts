@@ -4,16 +4,40 @@ import { ILightingController } from '../../controllers/sequencer/interfaces';
 import { CueData, CueType } from '../../cues/cueTypes';
 import { beforeEach, describe, jest, it, expect } from '@jest/globals';
 import { CueRegistry } from '../../cues/CueRegistry';
-import '../../cues/yarg'; // This will register the default cue group
+import { ICueGroup } from '../../cues/interfaces/ICueGroup';
+import { ICueImplementation } from '../../cues/interfaces/ICueImplementation';
+
+// Mock implementation for the test
+class MockCueImplementation implements ICueImplementation {
+  get name(): string { return 'mock'; }
+  get description(): string { return 'mock description'; }
+  async execute(): Promise<void> { /* no-op */ }
+}
 
 describe('YargCueHandler', () => {
   let cueHandler: YargCueHandler;
   let mockLightManager: jest.Mocked<DmxLightManager>;
   let mockSequencer: jest.Mocked<ILightingController>;
+  let registry: CueRegistry;
 
   beforeEach(() => {
-    // Reset the CueRegistry
-    CueRegistry.getInstance().reset();
+    // Get and reset the CueRegistry
+    registry = CueRegistry.getInstance();
+    registry.reset();
+
+    // Define and register a minimal mock default group for this test suite
+    const mockDefaultGroup: ICueGroup = {
+      name: 'mock-default',
+      description: 'Mock default group for testing',
+      cues: new Map([
+        // Include at least the cues needed for fallback tests
+        [CueType.Default, new MockCueImplementation()],
+        [CueType.Unknown, new MockCueImplementation()], // Handle the unknown cue test
+      ]),
+    };
+    registry.registerGroup(mockDefaultGroup);
+    registry.setDefaultGroup(mockDefaultGroup.name);
+    registry.activateGroup(mockDefaultGroup.name);
 
     // Create mock light manager
     mockLightManager = {

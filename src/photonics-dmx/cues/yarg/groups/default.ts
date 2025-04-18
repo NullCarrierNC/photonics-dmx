@@ -72,3 +72,5 @@ const defaultGroup: ICueGroup = {
 // Get the registry instance and register the default group
 const registry = CueRegistry.getInstance();
 registry.registerGroup(defaultGroup); 
+registry.setDefaultGroup(defaultGroup.name);
+registry.activateGroup(defaultGroup.name);
