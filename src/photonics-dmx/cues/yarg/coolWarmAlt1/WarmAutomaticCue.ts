@@ -3,50 +3,65 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
-import { getEffectSingleColor } from '../../../effects/effectSingleColor';
-import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors';
+import { getEffectSingleColor, getEffectCycleLights } from '../../../effects';
 import { YargCue } from '../YargCue';
+import { randomBetween } from '../../../helpers/utils';
 
 export class WarmAutomaticCue implements ICue {
   name = YargCue.WarmAutomatic;
-  description = 'Alternates red and yellow between front and back lights, triggered by measure events';
+  description = 'Sequential pattern where front lights change one by one on beat, cycling through all positions with warm colours';
 
-  async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const even = lightManager.getLights(['front'], 'all');
-    const odd = lightManager.getLights(['back'], 'all');
-    const all = lightManager.getLights(['front', 'back'], 'all');
-
+  async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
+    const frontLights = lightManager.getLights(['front'], 'all');
+    const backLights = lightManager.getLights(['back'], 'all');
+    
+    // Determine base color based on venue size from parameters
+    const isLargeVenue = parameters.venueSize === "Large";
     const red = getColor('red', 'medium');
     const yellow = getColor('yellow', 'medium');
+    const redLow = getColor('red', 'low');
+    const yellowLow = getColor('yellow', 'low');
+    const baseColor = isLargeVenue ? yellow : red;
+    const backBaseColor = isLargeVenue ? yellowLow : redLow;
+    const alternateColor = isLargeVenue ? red : yellow;
+    const numFrontLights = frontLights.length;
+    const numBackLights = backLights.length;
 
-    const baseLayer = getEffectSingleColor({
-      lights: all,
-      color: red,
-      duration: 100,
+    // Set all front lights to the base colour
+    if (numFrontLights > 0){
+      const frontBaseLayer = getEffectSingleColor({
+        lights: frontLights,
+        color: baseColor,
+        duration: 0, 
+        layer: 0,
+      });
+      sequencer.setEffect('warm-auto-front-base', frontBaseLayer);
+    }
+    
+    // Set all back lights to the base colour 
+    if (numBackLights > 0){
+      const backBaseLayer = getEffectSingleColor({
+        lights: backLights,
+        color: backBaseColor,
+        duration: 0, 
+        layer: 1,
+      });
+      sequencer.addEffect('warm-auto-back-base', backBaseLayer);
+    }
+
+    // Randomly reverse the lights direction 50% of the time
+    const shouldReverse = randomBetween(0, 1) === 1;
+    const orderedLights = shouldReverse ? [...frontLights].reverse() : frontLights;
+
+    // Create the cycling lights effect
+    const cycleEffect = getEffectCycleLights({
+      lights: orderedLights,
+      baseColor: baseColor,
+      activeColor: alternateColor,
+      transitionDuration: 100,
+      layer: 2
     });
 
-    const crossFadeEven = getEffectCrossFadeColors({
-      startColor: red,
-      crossFadeTrigger: 'measure',
-      afterStartWait: 0,
-      endColor: yellow,
-      afterEndColorWait: 0,
-      duration: 400,
-      lights: even,
-      layer: 1,
-    });
-    const crossFadeOdd = getEffectCrossFadeColors({
-      startColor: yellow,
-      crossFadeTrigger: 'measure',
-      afterStartWait: 0,
-      endColor: red,
-      afterEndColorWait: 0,
-      duration: 400,
-      lights: odd,
-      layer: 2,
-    });
-    sequencer.setEffect('warm_automatic-base', baseLayer);
-    sequencer.addEffect('warm_automatic-e', crossFadeEven);
-    sequencer.addEffect('warm_automatic-o', crossFadeOdd);
+    sequencer.addEffect('warm-auto-cycle', cycleEffect);
   }
 } 

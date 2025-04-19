@@ -2,54 +2,54 @@ import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue } from '../../interfaces/ICue';
-import { getColor } from '../../../helpers/dmxHelpers';
-import { getEffectSingleColor } from '../../../effects/effectSingleColor';
-import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors';
 import { YargCue } from '../YargCue';
+import { getColor } from '../../../helpers/dmxHelpers';
+import { getSweepEffect } from '../../../effects/sweepEffect';
+import { randomBetween } from '../../../helpers/utils';
+import { getEffectSingleColor } from '../../../effects';
 
 export class WarmManualCue implements ICue {
   name = YargCue.WarmManual;
-  description = 'Alternates between red and yellow on even/odd front lights triggered by measure events';
+  description = 'Creates a sweep like effect with red and yellow on the measure. Red is used as primary colour with yellow as the low colour on all the lights.';
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const even = lightManager.getLights(['front'], 'even');
-    const odd = lightManager.getLights(['front'], 'odd');
-    const all = lightManager.getLights(['front'], 'all');
-
     const red = getColor('red', 'medium');
     const yellow = getColor('yellow', 'medium');
+    const redLow = getColor('red', 'low');
+    const yellowLow = getColor('yellow', 'low');
+    const transparent = getColor('transparent', 'max');
 
-    const bps = parameters.beatsPerMinute / 60;
-    const duration = (1000 / bps);
+    const mainColor = parameters.venueSize == 'Large' ? redLow : yellowLow;
+    const highColor = parameters.venueSize == 'Large' ? yellow : red;
 
-    const baseLayer = getEffectSingleColor({
-      lights: all,
-      color: red,
-      duration: 100,
+    const lights = lightManager.getLights(['front'], 'all');
+
+    const dir = randomBetween(0, 1);
+    if (dir === 1) {
+      lights.reverse();
+    }
+
+    const solid = getEffectSingleColor({
+      lights: lights,
+      color: mainColor,
+      duration: 0,
+      layer: 0,
+    });
+   
+    sequencer.setEffect('alt-warm-manual-base', solid);
+
+    const sweep = getSweepEffect({
+      lights: lights,
+      high: highColor,
+      low: transparent,
+      sweepTime: 1400,
+      fadeInDuration: 500,
+      fadeOutDuration: 600,
+      lightOverlap: 90,
+      layer: 101,
+      waitFor: 'measure',
     });
 
-    const crossFadeEven = getEffectCrossFadeColors({
-      startColor: red,
-      crossFadeTrigger: 'measure',
-      afterStartWait: 0,
-      endColor: yellow,
-      afterEndColorWait: 0,
-      duration: duration,
-      lights: even,
-      layer: 1,
-    });
-    const crossFadeOdd = getEffectCrossFadeColors({
-      startColor: yellow,
-      crossFadeTrigger: 'measure',
-      afterStartWait: 0,
-      endColor: red,
-      afterEndColorWait: 0,
-      duration: duration,
-      lights: odd,
-      layer: 2,
-    });
-    sequencer.setEffect('warm_manual-base', baseLayer);
-    sequencer.addEffect('warm_manual-e', crossFadeEven);
-    sequencer.addEffect('warm_manual-o', crossFadeOdd);
+    sequencer.addEffectUnblockedName('sweep', sweep);
   }
 } 
