@@ -8,4 +8,5 @@ export { getEffectCrossFadeColors } from './effectCrossFadeColors';
 export { getEffectFadeInColorFadeOut } from './effectFadeInColorFadeOut';
 export { getEffectFlashColor } from './effectFlashColor';
 export { getEffectBlackout } from './effectBlackout';
-export { getSweepEffect } from './sweepEffect'; 
+export { getSweepEffect } from './sweepEffect';
+export { getEffectCycleLights } from './effectCycleLights'; 

@@ -63,6 +63,9 @@ interface SweepEffectGroupedParams extends SweepEffectBaseParams {
  * 
  * NOTE: Use addEffectUnblocked: unblocked waits for the current pass to end before triggering, 
  *  preventing the timing getting borked.
+ *
+ * NOTE: If waitFor is "beat" or "measure", the entire sweep will trigger on that event,
+ * then run across all light groups with proper sequencing.
  */
 export const getSweepEffect = ({
   lights,
@@ -123,6 +126,28 @@ export const getSweepEffect = ({
   }
 
   const transitions: EffectTransition[] = [];
+  
+  // Handle event-based triggering
+  if (waitFor === "beat" || waitFor === "measure") {
+    // If we're waiting for a beat or measure, add a trigger transition with an empty light list
+    // This will wait for the event but not change any lights
+    transitions.push({
+      lights: [],  // Empty array, so no lights change
+      layer: 200,  // Use a high layer that won't conflict with anything
+      waitFor: waitFor,  // Wait for beat or measure
+      forTime: 0,
+      transform: {
+        color: low,  // This doesn't matter since no lights are affected
+        easing: easing,
+        duration: 1,  // Minimal duration
+      },
+      waitUntil: "none",
+      untilTime: 0,
+    });
+    
+    // The rest of the transitions should run immediately after
+    // this trigger transition completes (no additional waiting)
+  }
 
   groups.forEach((group, index) => {
     // Each group's start delay is scaled by the effectiveDelayFactor.
@@ -134,15 +159,15 @@ export const getSweepEffect = ({
     transitions.push({
       lights: group,
       layer: groupLayer,
-      waitFor: waitFor,        // Use the provided waitFor condition
-      forTime: groupDelay,     // Delay before starting this group's fade in
+      waitFor: "delay",  // Always delay - if we need to wait for beat/measure, the trigger transition handles that
+      forTime: groupDelay,  // Delay before starting this group's fade in
       transform: {
         color: high,
         easing: easing,
         duration: actualFadeIn,
       },
       waitUntil: "delay",
-      untilTime: holdTime,     // Hold time at the high state (adjusted with additionalHold)
+      untilTime: holdTime,  // Hold time at the high state (adjusted with additionalHold)
     });
     
     // Calculate the total time used by the transitions for this group.
