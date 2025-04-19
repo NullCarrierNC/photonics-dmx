@@ -100,6 +100,7 @@ export class CueRegistry {
       for (const groupName of this.activeGroups) {
         const group = this.groups.get(groupName);
         if (group?.cues.has(cueType)) {
+         // console.log(`Found implementation for cue: ${cueType} in group: ${groupName}`);
           return group.cues.get(cueType)!;
         }
       }
@@ -109,6 +110,7 @@ export class CueRegistry {
     if (this.defaultGroup) {
       const defaultGroup = this.groups.get(this.defaultGroup);
       if (defaultGroup?.cues.has(cueType)) {
+      //  console.log(`Found implementation for cue: ${cueType} in default group: ${this.defaultGroup}`);
         return defaultGroup.cues.get(cueType)!;
       }
     } else {
