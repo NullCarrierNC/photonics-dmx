@@ -19,39 +19,21 @@ export class WarmAutomaticCue implements ICue {
     const isLargeVenue = parameters.venueSize === "Large";
     const red = getColor('red', 'medium');
     const yellow = getColor('yellow', 'medium');
-//    const redLow = getColor('red', 'low');
-//    const yellowLow = getColor('yellow', 'low');
+    const redLow = getColor('red', 'low');
+    const yellowLow = getColor('yellow', 'low');
     const baseColor = isLargeVenue ? yellow : red;
-  //  const backBaseColor = isLargeVenue ? yellowLow : redLow;
+    const backBaseColor = isLargeVenue ? yellowLow : redLow;
     const alternateColor = isLargeVenue ? red : yellow;
-    const numFrontLights = frontLights.length;
-  //  const numBackLights = backLights.length;
-
-    // Set all front lights to the base colour
-    if (numFrontLights > 0){
-      const frontBaseLayer = getEffectSingleColor({
-        lights: frontLights,
-        color: baseColor,
-        duration: 10, 
-        layer: 0,
-      });
-      sequencer.setEffect('warm-auto-front-base', frontBaseLayer);
-    }
     
-     // Back lights are flickering, need to investigate:   sequencer.addEffect('warm-auto-back-base', backBaseLayer);
-
-    // Set all back lights to the base colour 
-    /*if (numBackLights > 0){
-      const backBaseLayer = getEffectSingleColor({
-        lights: backLights,
-        color: backBaseColor,
-        duration: 100, 
-        layer: 1,
-      });
   
-    }
-*/
-
+    const backBaseLayer = getEffectSingleColor({
+      lights: backLights,
+      color: backBaseColor,
+      duration: 100, 
+      layer: 0,
+    });
+    sequencer.setEffect('warm-auto-base', backBaseLayer);
+    
     // Randomly reverse the lights direction 50% of the time
     const shouldReverse = randomBetween(0, 1) === 1;
     const orderedLights = shouldReverse ? [...frontLights].reverse() : frontLights;

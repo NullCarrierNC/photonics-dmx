@@ -22,7 +22,9 @@ export class CoolManualCue implements ICue {
     const mainColor = parameters.venueSize == 'Large' ? blueLow : greenLow;
     const highColor = parameters.venueSize == 'Large' ? green : blue;
 
-    const lights = lightManager.getLights(['front'], 'all');
+    const lights = lightManager.getLights(['front', 'back'], 'all');
+    const frontLights = lightManager.getLights(['front'], 'all');
+
 
     const dir = randomBetween(0, 1);
     if (dir === 1) {
@@ -39,7 +41,7 @@ export class CoolManualCue implements ICue {
     sequencer.setEffect('alt-cool-manual-base', solid);
 
     const sweep = getSweepEffect({
-      lights: lights,
+      lights: frontLights,
       high: highColor,
       low: transparent,
       sweepTime: 1400,
