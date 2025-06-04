@@ -1,5 +1,5 @@
 import { CueRegistry } from '../../../photonics-dmx/cues/CueRegistry';
-import { ICueImplementation } from '../../../photonics-dmx/cues/interfaces/ICueImplementation';
+import { ICue } from '../../../photonics-dmx/cues/interfaces/ICue';
 import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/ICueGroup';
 import { CueData, CueType } from '../../../photonics-dmx/cues/cueTypes';
 import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces';
@@ -28,7 +28,7 @@ const mockControllerManager = {
 };
 
 // Mock implementation with descriptions
-class MockCueImplementation implements ICueImplementation {
+class MockCueImplementation implements ICue {
   constructor(
     private _name: string,
     private _description?: string
@@ -37,8 +37,20 @@ class MockCueImplementation implements ICueImplementation {
   get name(): string { return this._name; }
   get description(): string | undefined { return this._description; }
   
-  execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): void {
+  async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // Mock implementation
+  }
+
+  onStop(): void {
+    // Mock lifecycle method
+  }
+
+  onPause(): void {
+    // Mock lifecycle method
+  }
+
+  onDestroy(): void {
+    // Mock lifecycle method
   }
 }
 

@@ -2,6 +2,7 @@ import { CueData, CueType } from '../cues/cueTypes';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { BaseCueHandler } from './BaseCueHandler';
+import { ICue } from '../cues/interfaces/ICue';
 
 
 // Import YARG cue set to register with registry
@@ -21,6 +22,9 @@ import '../cues/yarg';
  * addEffect will not clear other effects unless it's on the same layer.
  */
 class YargCueHandler extends BaseCueHandler {
+  private currentExecutingCue: ICue | null = null;
+  private currentExecutingCueType: CueType | null = null;
+
   constructor(
     lightManager: DmxLightManager,
     photonicsSequencer: ILightingController,
@@ -50,14 +54,17 @@ class YargCueHandler extends BaseCueHandler {
     // Special cases that need to be handled differently
     switch (cueType) {
       case CueType.Blackout_Fast:
+        this.stopCurrentCue();
         this._sequencer.blackout(0);
         this.emit('cueHandled', parameters);
         return;
       case CueType.Blackout_Slow:
+        this.stopCurrentCue();
         this._sequencer.blackout(1000);
         this.emit('cueHandled', parameters);
         return;
       case CueType.Blackout_Spotlight:
+        this.stopCurrentCue();
         this._sequencer.blackout(0);
         this.emit('cueHandled', parameters);
         return;
@@ -71,23 +78,48 @@ class YargCueHandler extends BaseCueHandler {
         this.emit('cueHandled', parameters);
         return;
       case CueType.NoCue:
+        this.stopCurrentCue();
         this._sequencer.blackout(0);
         this.emit('cueHandled', parameters);
         return;
       case CueType.Menu:
+        this.stopCurrentCue();
         this.registry.setActiveGroups([]);
         this.emit('cueHandled', parameters);
         break;
     }
 
     // Get implementation from registry
-    const implementation = this.registry.getCueImplementation(cueType);
-    if (implementation) {
-      await implementation.execute(parameters, this._sequencer, this._lightManager);
+    const cue = this.registry.getCueImplementation(cueType);
+    if (cue) {
+      // Always check for cue transitions first
+      if (this.currentExecutingCueType !== cueType) {
+        console.log(`[Lifecycle] Cue change detected: ${this.currentExecutingCueType} -> ${cueType}`);
+        this.stopCurrentCue();
+        
+        // Track the new executing cue
+        console.log(`[Lifecycle] Starting new cue: ${cue.name} (${cueType})`);
+        this.currentExecutingCue = cue;
+        this.currentExecutingCueType = cueType;
+      }
+      
+      await cue.execute(parameters, this._sequencer, this._lightManager);
       this.emit('cueHandled', parameters);
     } else {
       console.error(`No implementation found for cue: ${cueType}`);
       this.emit('cueHandled', parameters);
+    }
+  }
+
+  /**
+   * Stop the currently executing cue and call its onStop lifecycle method
+   */
+  private stopCurrentCue(): void {
+    if (this.currentExecutingCue) {
+      console.log(`[Lifecycle] Calling onStop for cue: ${this.currentExecutingCue.name}`);
+      this.currentExecutingCue.onStop?.();
+      this.currentExecutingCue = null;
+      this.currentExecutingCueType = null;
     }
   }
 
@@ -229,6 +261,23 @@ class YargCueHandler extends BaseCueHandler {
 
   protected async handleCueWarm_Manual(parameters: CueData): Promise<void> {
     await this.handleCue(CueType.Warm_Manual, parameters);
+  }
+
+  /**
+   * Clean up resources and call destroy lifecycle on any executing cue
+   */
+  public shutdown(): void {
+    console.log('[Lifecycle] YargCueHandler shutdown called');
+    // Call onDestroy on currently executing cue
+    if (this.currentExecutingCue) {
+      console.log(`[Lifecycle] Calling onDestroy for cue: ${this.currentExecutingCue.name}`);
+      this.currentExecutingCue.onDestroy?.();
+      this.currentExecutingCue = null;
+      this.currentExecutingCueType = null;
+    }
+    
+    // Call parent shutdown
+    super.shutdown();
   }
 }
 

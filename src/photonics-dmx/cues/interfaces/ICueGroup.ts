@@ -1,4 +1,4 @@
-import { ICueImplementation } from './ICueImplementation';
+import { ICue } from './ICue';
 import { CueType } from '../cueTypes';
 
 
@@ -14,5 +14,5 @@ export interface ICueGroup {
   /** Description of the cue group */
   description?: string;
   /** Map of cue types to their implementations in this group */
-  cues: Map<CueType, ICueImplementation>;
+  cues: Map<CueType, ICue>;
 } 

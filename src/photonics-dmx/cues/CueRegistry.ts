@@ -1,6 +1,6 @@
 import {  CueType } from './cueTypes';
 import { ICueGroup } from './interfaces/ICueGroup';
-import { ICueImplementation } from './interfaces/ICueImplementation';
+import { ICue } from './interfaces/ICue';
 
 /**
  * Registry for managing multiple sets of cue implementations.
@@ -85,8 +85,6 @@ export class CueRegistry {
     return true;
   }
 
-
-
   /**
    * Get a cue implementation from the active groups.
    * Falls back to the default group if no implementation is found.
@@ -94,7 +92,7 @@ export class CueRegistry {
    * @returns The cue implementation or null if not found
    * @throws Error if no implementation is found in active groups and no default group is defined
    */
-  public getCueImplementation(cueType: CueType): ICueImplementation | null {
+  public getCueImplementation(cueType: CueType): ICue | null {
     // Try active groups first
     if (this.activeGroups.size > 0) {
       for (const groupName of this.activeGroups) {

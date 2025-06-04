@@ -5,13 +5,25 @@ import { CueData, CueType } from '../../cues/cueTypes';
 import { beforeEach, describe, jest, it, expect } from '@jest/globals';
 import { CueRegistry } from '../../cues/CueRegistry';
 import { ICueGroup } from '../../cues/interfaces/ICueGroup';
-import { ICueImplementation } from '../../cues/interfaces/ICueImplementation';
+import { ICue } from '../../cues/interfaces/ICue';
 
 // Mock implementation for the test
-class MockCueImplementation implements ICueImplementation {
+class MockCueImplementation implements ICue {
   get name(): string { return 'mock'; }
   get description(): string { return 'mock description'; }
   async execute(): Promise<void> { /* no-op */ }
+
+  onStop(): void {
+    // Mock lifecycle method
+  }
+
+  onPause(): void {
+    // Mock lifecycle method
+  }
+
+  onDestroy(): void {
+    // Mock lifecycle method
+  }
 }
 
 describe('YargCueHandler', () => {

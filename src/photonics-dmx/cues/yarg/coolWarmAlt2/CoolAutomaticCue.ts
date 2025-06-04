@@ -10,6 +10,7 @@ import { Effect, EffectTransition } from '../../../types';
 
 // Static state to persist light colors between cue calls
 let lightStates: { [lightId: string]: 'red' | 'blue' } = {};
+let isNewSession = true; // Flag to track if this is we should reset the light states
 
 export class CoolAutomaticCue implements ICue {
   name = YargCue.CoolAutomatic;
@@ -23,8 +24,15 @@ export class CoolAutomaticCue implements ICue {
     const redHigh = getColor('red', 'high');
     const blueHigh = getColor('blue', 'high');
     
-    // If we don't have tracked state for the lights, randomly set each light either red or blue
-    if (Object.keys(lightStates).length === 0) {
+    console.log('[CoolAutomaticCue] Execute called, lightStates has', Object.keys(lightStates).length, 'lights, isNewSession:', isNewSession);
+    
+    // If this is a new session, randomly set each light either red or blue. If not, use the existing light states.
+    if (isNewSession) {
+      console.log('[CoolAutomaticCue] New session - initializing random colors for', allLights.length, 'lights');
+      
+      // Clear any existing state and initialize fresh
+      lightStates = {};
+      
       // Create a single effect with transitions for all lights on layer 0
       const baseTransitions: EffectTransition[] = [];
       
@@ -56,6 +64,11 @@ export class CoolAutomaticCue implements ICue {
       
       // Single addEffect call for all base colors on layer 0
       sequencer.addEffect('cool-auto-base-all', baseEffect);
+      
+      // Mark that we're no longer in fresh start mode
+      isNewSession = false;
+    } else {
+      //console.log('[CoolAutomaticCue] Continuing session - using existing lightStates:', lightStates);
     }
     
     // Pick a random light to invert (flash)
@@ -80,5 +93,15 @@ export class CoolAutomaticCue implements ICue {
     sequencer.addEffect('cool-auto-flash', flashEffect);
     
     // Cue ends here - next call will repeat the process
+  }
+
+  /**
+   * Clean up static state when the cue is stopped or replaced
+   */
+  onStop(): void {
+    // Clear the persistent light state when switching away from this cue
+    console.log('[CoolAutomaticCue] onStop called - clearing lightStates', Object.keys(lightStates).length, 'lights');
+    lightStates = {};
+    isNewSession = true;
   }
 } 

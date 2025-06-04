@@ -1,5 +1,5 @@
 import { CueRegistry } from '../../cues/CueRegistry';
-import { ICueImplementation } from '../../cues/interfaces/ICueImplementation';
+import { ICue } from '../../cues/interfaces/ICue';
 import { ICueGroup } from '../../cues/interfaces/ICueGroup';
 import { CueData, CueType } from '../../cues/cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
@@ -7,11 +7,23 @@ import { DmxLightManager } from '../../controllers/DmxLightManager';
 import { beforeEach, describe, it, expect } from '@jest/globals';
 
 // Mock implementations
-class MockCueImplementation implements ICueImplementation {
+class MockCueImplementation implements ICue {
   constructor(private _name: string) {}
   get name(): string { return this._name; }
   async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // Mock implementation
+  }
+
+  onStop(): void {
+    // Mock lifecycle method
+  }
+
+  onPause(): void {
+    // Mock lifecycle method
+  }
+
+  onDestroy(): void {
+    // Mock lifecycle method
   }
 }
 
