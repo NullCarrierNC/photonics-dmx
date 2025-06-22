@@ -1,4 +1,4 @@
-import { ConfigurationManager } from '../../photonics-dmx/controllers/ConfigurationManager';
+import { ConfigurationManager } from '../../services/configuration/ConfigurationManager';
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager';
 import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer';
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher';
@@ -58,7 +58,7 @@ export class ControllerManager {
    */
   private async initializeDmxManager(): Promise<void> {
     // Load configuration and set up DMX light manager
-    const layout = this.config.getLayout();
+    const layout = this.config.getLightingLayout();
     if (!layout) {
       console.error("Cannot start controllers without a valid configuration.");
       return;
@@ -96,7 +96,7 @@ export class ControllerManager {
   private async initializeListeners(): Promise<void> {
     if (!this.dmxLightManager || !this.effectsController) return;
     
-    const debouncePeriod = this.config.getPref('effectDebounce');
+    const debouncePeriod = this.config.getPreference('effectDebounce');
     
     // Create cue handler (default to YARG)
     this.cueHandler = new YargCueHandler(
@@ -159,7 +159,7 @@ export class ControllerManager {
     // If no cue handler is set up, create one for testing purposes
     if (!this.cueHandler) {
       console.log("Creating temporary YARG cue handler for testing");
-      const debouncePeriod = this.config.getPref('effectDebounce');
+      const debouncePeriod = this.config.getPreference('effectDebounce');
       this.cueHandler = new YargCueHandler(
         this.dmxLightManager,
         this.effectsController,
@@ -280,7 +280,7 @@ export class ControllerManager {
       this.cueHandler.shutdown();
     }
     
-    const debouncePeriod = this.config.getPref('effectDebounce');
+    const debouncePeriod = this.config.getPreference('effectDebounce');
     
     // Create YARG listener
     this.cueHandler = new YargCueHandler(
@@ -359,7 +359,7 @@ export class ControllerManager {
       this.cueHandler.shutdown();
     }
     
-    const debouncePeriod = this.config.getPref('effectDebounce');
+    const debouncePeriod = this.config.getPreference('effectDebounce');
     
     // Create Rb3 listener
     this.cueHandler = new Rb3CueHandler(

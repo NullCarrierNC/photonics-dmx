@@ -22,7 +22,7 @@ If you see the term `light` this is the virtual representation used within the l
 9. `SenderManager`: manages the various output senders that transmit DMX data to physical devices or other systems.
 10. `Senders`: provide the bridge to the real world. sACN for DMX over the network, EnttecPro for Enttec USB dongles, and IPC for sending DMX data to the application UI.
 
-Configuration is handled in the `ConfigurationManager`, which manages user preferences and fixture setup.
+Configuration is handled by the `ConfigurationManager` and related services, which manage user preferences and fixture setup.
 
 ### Additional Components
 
