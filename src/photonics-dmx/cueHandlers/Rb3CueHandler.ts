@@ -37,6 +37,8 @@ import { AbstractCueHandler } from './AbstractCueHandler';
 import { getSweepEffect } from '../effects/sweepEffect';
 import { Rb3GameState } from '../listeners/RB3/rb3eTypes';
 import { getEffectCrossFadeColors } from '../effects/effectCrossFadeColors';
+import { BaseCueHandler } from './BaseCueHandler';
+import { CueGroup } from '../types';
 
 
 
@@ -47,7 +49,7 @@ import { getEffectCrossFadeColors } from '../effects/effectCrossFadeColors';
  * YARG can use these, they just won't take advantage
  * of all the data.
  */
-class Rb3CueHandler extends AbstractCueHandler {
+class Rb3CueHandler extends BaseCueHandler {
   private _lastIndex:Number = 0;
   private _currentStrobeState: StrobeState = "Strobe_Off";
   private _currentLedColor: string = '';
@@ -1076,6 +1078,16 @@ class Rb3CueHandler extends AbstractCueHandler {
     });
     
     this._sequencer.addEffect('sustain', effect);
+  }
+
+  public getAvailableCueGroups(): CueGroup[] {
+    return [];
+  }
+
+  public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
+    // RB3 direct LED control is handled separately, cue logic will be expanded later.
+    console.log(`RB3 Cue received: ${cueType}`, parameters);
+    return Promise.resolve();
   }
 
 }

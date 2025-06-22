@@ -446,6 +446,16 @@ export type EffectSelector = {
   groupName?: string;
 };
 
+export interface CueGroup {
+  name: string;
+  description: string;
+}
+
+export type Easing = {
+  name: string;
+  f: EasingFunction;
+};
+
 // Mapping of easing names to easing functions
 export const easingFunctions: { [key: string]: EasingFunction } = {
   'sin.in': sinIn,

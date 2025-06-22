@@ -66,4 +66,31 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   ipcMain.handle('get-prefs', async () => {
     return controllerManager.getConfig().getAllPreferences();
   });
+
+  // Get enabled cue groups
+  ipcMain.handle('get-enabled-cue-groups', async () => {
+    const enabled = controllerManager.getConfig().getEnabledCueGroups();
+
+    // If the preference hasn't been set, default to all groups enabled
+    if (enabled === undefined) {
+      const allGroups = controllerManager.getCueHandler()?.getAvailableCueGroups() || [];
+      return allGroups.map(g => g.name);
+    }
+
+    return enabled;
+  });
+
+  // Set enabled cue groups
+  ipcMain.handle('set-enabled-cue-groups', async (_, groupNames: string[]) => {
+    try {
+      controllerManager.getConfig().setEnabledCueGroups(groupNames);
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting enabled cue groups:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
 } 
