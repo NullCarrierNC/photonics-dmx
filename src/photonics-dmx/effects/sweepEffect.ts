@@ -1,19 +1,47 @@
 import { Effect, EffectTransition, TrackedLight, RGBIP, WaitCondition } from "../types";
+import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
-interface SweepEffectParams {
-  // Accept a 1D array of TrackedLight or an array of arrays of TrackedLight.
-  lights: TrackedLight[] | TrackedLight[][]; 
-  high: RGBIP;           // On state colour
-  low: RGBIP;            // Off state colour
-  sweepTime: number;     // Total time (ms) for one complete sweep across all groups
-  fadeInDuration: number;// Desired fade‐in duration (ms)
-  fadeOutDuration: number;// Desired fade‐out duration (ms)
-  layer?: number;       
-  easing?: EasingType | string;
-  waitFor?: WaitCondition; // Wait condition for the fade‐in transition; defaults to "delay"
-  lightOverlap?: number; // Percentage (0 to 100) by which subsequent lights overlap. 0 means no overlap.
-  betweenSweepDelay?: number; // How long to wait until the next sweep can run
+/**
+ * Base interface for sweep effect parameters
+ */
+interface SweepEffectBaseParams {
+    /** On state colour */
+    high: RGBIP;
+    /** Off state colour */
+    low: RGBIP;
+    /** Total time (ms) for one complete sweep across all groups */
+    sweepTime: number;
+    /** Desired fade‐in duration (ms) */
+    fadeInDuration: number;
+    /** Desired fade‐out duration (ms) */
+    fadeOutDuration: number;
+    /** Percentage (0 to 100) by which subsequent lights overlap. 0 means no overlap */
+    lightOverlap?: number;
+    /** How long to wait until the next sweep can run */
+    betweenSweepDelay?: number;
+}
+
+/**
+ * Interface for sweep effect with single array of lights
+ */
+interface SweepEffectSingleParams extends IEffect, SweepEffectBaseParams {
+    /** Array of lights to sweep across */
+    lights: TrackedLight[];
+}
+
+/**
+ * Interface for sweep effect with grouped lights
+ */
+interface SweepEffectGroupedParams extends SweepEffectBaseParams {
+    /** Array of light groups to sweep across */
+    lights: TrackedLight[][];
+    /** The layer to apply the effect on */
+    layer?: number;
+    /** The easing function to use for the effect */
+    easing?: EasingType;
+    /** The condition that triggers the start of the effect */
+    waitFor?: WaitCondition;
 }
 
 /**
@@ -35,6 +63,9 @@ interface SweepEffectParams {
  * 
  * NOTE: Use addEffectUnblocked: unblocked waits for the current pass to end before triggering, 
  *  preventing the timing getting borked.
+ *
+ * NOTE: If waitFor is "beat" or "measure", the entire sweep will trigger on that event,
+ * then run across all light groups with proper sequencing.
  */
 export const getSweepEffect = ({
   lights,
@@ -48,7 +79,7 @@ export const getSweepEffect = ({
   waitFor = "delay",
   lightOverlap = 0,
   betweenSweepDelay = 0,
-}: SweepEffectParams): Effect => {
+}: SweepEffectSingleParams | SweepEffectGroupedParams): Effect => {
   
   // Normalize the lights into groups.
   // If lights[0] is an array, assume a 2D array was passed.
@@ -95,6 +126,28 @@ export const getSweepEffect = ({
   }
 
   const transitions: EffectTransition[] = [];
+  
+  // Handle event-based triggering
+  if (waitFor === "beat" || waitFor === "measure") {
+    // If we're waiting for a beat or measure, add a trigger transition with an empty light list
+    // This will wait for the event but not change any lights
+    transitions.push({
+      lights: [],  // Empty array, so no lights change
+      layer: 200,  // Use a high layer that won't conflict with anything
+      waitFor: waitFor,  // Wait for beat or measure
+      forTime: 0,
+      transform: {
+        color: low,  // This doesn't matter since no lights are affected
+        easing: easing,
+        duration: 1,  // Minimal duration
+      },
+      waitUntil: "none",
+      untilTime: 0,
+    });
+    
+    // The rest of the transitions should run immediately after
+    // this trigger transition completes (no additional waiting)
+  }
 
   groups.forEach((group, index) => {
     // Each group's start delay is scaled by the effectiveDelayFactor.
@@ -106,15 +159,15 @@ export const getSweepEffect = ({
     transitions.push({
       lights: group,
       layer: groupLayer,
-      waitFor: waitFor,        // Use the provided waitFor condition
-      forTime: groupDelay,     // Delay before starting this group's fade in
+      waitFor: "delay",  // Always delay - if we need to wait for beat/measure, the trigger transition handles that
+      forTime: groupDelay,  // Delay before starting this group's fade in
       transform: {
         color: high,
         easing: easing,
         duration: actualFadeIn,
       },
       waitUntil: "delay",
-      untilTime: holdTime,     // Hold time at the high state (adjusted with additionalHold)
+      untilTime: holdTime,  // Hold time at the high state (adjusted with additionalHold)
     });
     
     // Calculate the total time used by the transitions for this group.

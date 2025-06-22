@@ -1,6 +1,17 @@
-import { Effect } from "../types";
-import { EffectInterface } from "./ieffect";
+import { Effect, RGBIP } from "../types";
 import { EasingType } from "../easing";
+import { IEffect } from "./interfaces/IEffect";
+
+
+/**
+ * Interface for single color effect parameters, extending the base effect interface
+ */
+interface SingleColorEffectParams extends IEffect {
+    /** The colour to set the lights to */
+    color: RGBIP;
+    /** Duration of the effect */
+    duration: number;
+}
 
 /**
  * Creates a single color effect for all specified lights
@@ -18,7 +29,7 @@ export const getEffectSingleColor = ({
     lights,
     layer = 0,
     easing = EasingType.SIN_OUT
-}: EffectInterface): Effect => {
+}: SingleColorEffectParams): Effect => {
     const effect: Effect = {
         id: "single-color",
         description: "Turns all lights to a single color",

@@ -275,6 +275,11 @@ export class ControllerManager {
       this.disableRb3();
     }
     
+    // Shutdown existing cue handler to trigger lifecycle methods
+    if (this.cueHandler) {
+      this.cueHandler.shutdown();
+    }
+    
     const debouncePeriod = this.config.getPref('effectDebounce');
     
     // Create YARG listener
@@ -306,6 +311,11 @@ export class ControllerManager {
     if (this.yargListener) {
       this.yargListener.shutdown();
       this.yargListener = null;
+    }
+    
+    // Shutdown cue handler to trigger lifecycle methods
+    if (this.cueHandler) {
+      this.cueHandler.shutdown();
     }
     
     this.isYargEnabled = false;
@@ -344,6 +354,11 @@ export class ControllerManager {
       this.disableYarg();
     }
     
+    // Shutdown existing cue handler to trigger lifecycle methods
+    if (this.cueHandler) {
+      this.cueHandler.shutdown();
+    }
+    
     const debouncePeriod = this.config.getPref('effectDebounce');
     
     // Create Rb3 listener
@@ -377,6 +392,11 @@ export class ControllerManager {
       this.rb3eListener = null;
     }
     
+    // Shutdown cue handler to trigger lifecycle methods
+    if (this.cueHandler) {
+      this.cueHandler.shutdown();
+    }
+    
     this.isRb3Enabled = false;
   }
   
@@ -401,6 +421,17 @@ export class ControllerManager {
         console.log("ControllerManager shutdown: RB3 disabled");
       } catch (err) {
         console.error("Error disabling RB3:", err);
+      }
+      
+      // Ensure cue handler is shut down if it still exists
+      if (this.cueHandler) {
+        try {
+          this.cueHandler.shutdown();
+          this.cueHandler = null;
+          console.log("ControllerManager shutdown: cue handler stopped");
+        } catch (err) {
+          console.error("Error shutting down cue handler:", err);
+        }
       }
       
       if (this.effectsController) {
@@ -504,6 +535,11 @@ export class ControllerManager {
       
       if (this.dmxPublisher) {
         await this.dmxPublisher.shutdown();
+      }
+      
+      // Ensure cue handler lifecycle is handled
+      if (this.cueHandler) {
+        this.cueHandler.shutdown();
       }
       
       // Reset component references

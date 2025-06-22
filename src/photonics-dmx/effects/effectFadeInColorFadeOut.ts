@@ -1,20 +1,26 @@
-import { Effect, TrackedLight, RGBIP, } from "../types";
+import { Effect, RGBIP } from "../types";
+import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
-
-interface FadeInColorFadeOutEffectParams {
-    startColor:RGBIP,
-    waitBeforeFadeIn: number,
-    endColor:RGBIP,
-    fadeInDuration:number,
-    holdDuration: number,
-    fadeOutDuration: number,
-    waitAfterFadeOut: number,
-    lights: TrackedLight[];
-    layer?: number; 
-    easing?: EasingType; 
+/**
+ * Interface for fade in colour fade out effect parameters, extending the base effect interface
+ */
+interface FadeInColorFadeOutEffectParams extends IEffect {
+    /** The starting colour */
+    startColor: RGBIP;
+    /** The ending colour */
+    endColor: RGBIP;
+    /** Time to wait before starting the fade in */
+    waitBeforeFadeIn: number;
+    /** Duration of the fade in */
+    fadeInDuration: number;
+    /** Time to hold the end colour */
+    holdDuration: number;
+    /** Duration of the fade out */
+    fadeOutDuration: number;
+    /** Time to wait after the fade out */
+    waitAfterFadeOut: number;
 }
-
 
 export const getEffectFadeInColorFadeOut = ({
     startColor,
@@ -25,13 +31,13 @@ export const getEffectFadeInColorFadeOut = ({
     fadeOutDuration,
     waitAfterFadeOut,
     lights,
-    layer = 0, 
-    easing = EasingType.SIN_OUT, 
+    layer = 0,
+    easing = EasingType.SIN_OUT,
 }: FadeInColorFadeOutEffectParams): Effect => {
     
     const effect: Effect = {
         id: "cross-fade-colors",
-        description: "Cross-fades light from one color to another.",
+        description: "Cross-fades light from one colour to another.",
         transitions: [
             {
                 lights: lights,

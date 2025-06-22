@@ -4,7 +4,7 @@ import { SenderConfig } from '../../photonics-dmx/types';
 import { SacnSender } from '../../photonics-dmx/senders/SacnSender';
 import { IpcSender } from '../../photonics-dmx/senders/IpcSender';
 import { EnttecProSender } from '../../photonics-dmx/senders/EnttecProSender';
-import { CueTypeDescriptions } from '../../photonics-dmx/cues/cueTypes';
+import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
 
 /**
  * Set up light-related IPC handlers
@@ -62,9 +62,54 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   });
 
   // Get available light effects
-  ipcMain.handle('get-available-cues', async () => {
-    // Return the available cue types
-    return CueTypeDescriptions;
+  ipcMain.handle('get-available-cues', async (_, groupName?: string) => {
+    try {
+      // Get the registry instance
+      const registry = CueRegistry.getInstance();
+      
+      // Default to 'default' if no group name is provided
+      const targetGroupName = groupName || 'default';
+      
+      console.log(`Getting cues for group: ${targetGroupName}`);
+      
+       const group = registry.getGroup(targetGroupName);
+      if (!group) {
+        console.error(`Group not found: ${targetGroupName}`);
+        return []; // No group found, return empty array
+      }
+      
+      // Get only the cue types that are actually defined in this group
+      const availableCueTypes = Array.from(group.cues.keys());
+      console.log(`Found ${availableCueTypes.length} cue types in group ${targetGroupName}`);
+      
+      if (availableCueTypes.length === 0) {
+        console.error(`No cue types found in group: ${targetGroupName}`);
+        return [];
+      }
+      
+      // Create descriptions based on the implementations
+      const cueDescriptions = availableCueTypes.map(cueType => {
+        // Get the implementation for this cue
+        const implementation = group.cues.get(cueType);
+        
+        // Use only the implementation's description
+        const yargDescription = implementation?.description || 
+                              "No description available";
+        
+        return {
+          id: cueType,
+          yargDescription: yargDescription,
+          rb3Description: "RB3E: Does not currently use cues, lights are set directly from passed LED colour values.",
+          groupName: targetGroupName
+        };
+      });
+      
+      console.log(`Returning ${cueDescriptions.length} cue descriptions`);
+      return cueDescriptions;
+    } catch (error) {
+      console.error('Error getting available cues:', error);
+      return [];
+    }
   });
 
   // Start a test effect
@@ -140,6 +185,242 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       };
     } catch (error) {
       console.error('Error getting system status:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get available cue groups from registry
+  ipcMain.handle('get-cue-groups', async () => {
+    const registry = CueRegistry.getInstance();
+    const groupNames = registry.getAllGroups();
+    
+    // Get descriptions for each group
+    const groupInfo = groupNames.map(groupName => {
+      const group = registry.getGroup(groupName);
+      return {
+        name: groupName,
+        description: group?.description || `${groupName} cue group`,
+        // Get list of cue types defined in this group
+        cueTypes: group ? Array.from(group.cues.keys()) : []
+      };
+    });
+    
+    return groupInfo;
+  });
+  
+  // Get active cue groups
+  ipcMain.handle('get-active-cue-groups', async () => {
+    const registry = CueRegistry.getInstance();
+    const activeGroupNames = registry.getActiveGroups();
+    
+    console.log('Active group names:', activeGroupNames);
+    
+    // Get details for the active groups
+    const activeGroups = activeGroupNames.map(groupName => {
+      const group = registry.getGroup(groupName);
+      console.log(`Group ${groupName}:`, group ? 'found' : 'not found');
+      return {
+        name: groupName,
+        description: group?.description || `${groupName} cue group`,
+        // Get list of cue types defined in this group
+        cueTypes: group ? Array.from(group.cues.keys()) : []
+      };
+    });
+    
+    console.log(`Returning ${activeGroups.length} active groups`);
+    return activeGroups;
+  });
+  
+  // Activate a single cue group
+  ipcMain.handle('activate-cue-group', async (_, groupName: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Check if the group exists
+      const group = registry.getGroup(groupName);
+      if (!group) {
+        return { 
+          success: false, 
+          error: `Group '${groupName}' not found` 
+        };
+      }
+      
+      // Activate the group
+      const result = registry.activateGroup(groupName);
+      if (result) {
+        console.log(`Activated cue group: ${groupName}`);
+        return { success: true };
+      } else {
+        console.error(`Failed to activate group '${groupName}'. It may not be enabled.`);
+        return { 
+          success: false, 
+          error: `Failed to activate group '${groupName}'. It may not be enabled.` 
+        };
+      }
+    } catch (error) {
+      console.error('Error activating cue group:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  
+  // Deactivate a single cue group
+  ipcMain.handle('deactivate-cue-group', async (_, groupName: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Check if the group exists
+      const group = registry.getGroup(groupName);
+      if (!group) {
+        return { 
+          success: false, 
+          error: `Group '${groupName}' not found` 
+        };
+      }
+      
+      // Deactivate the group
+      const result = registry.deactivateGroup(groupName);
+      if (result) {
+        console.log(`Deactivated cue group: ${groupName}`);
+        return { success: true };
+      } else {
+        console.error(`Failed to deactivate group '${groupName}'. It may be the default group.`);
+        return { 
+          success: false, 
+          error: `Failed to deactivate group '${groupName}'. It may be the default group.` 
+        };
+      }
+    } catch (error) {
+      console.error('Error deactivating cue group:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  
+  // Enable a single cue group
+  ipcMain.handle('enable-cue-group', async (_, groupName: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Check if the group exists
+      const group = registry.getGroup(groupName);
+      if (!group) {
+        return { 
+          success: false, 
+          error: `Group '${groupName}' not found` 
+        };
+      }
+      
+      // Enable the group
+      const result = registry.enableGroup(groupName);
+      if (result) {
+        console.log(`Enabled cue group: ${groupName}`);
+        return { success: true };
+      } else {
+        console.error(`Failed to enable group '${groupName}'.`);
+        return { 
+          success: false, 
+          error: `Failed to enable group '${groupName}'.` 
+        };
+      }
+    } catch (error) {
+      console.error('Error enabling cue group:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  
+  // Disable a single cue group
+  ipcMain.handle('disable-cue-group', async (_, groupName: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Check if the group exists
+      const group = registry.getGroup(groupName);
+      if (!group) {
+        return { 
+          success: false, 
+          error: `Group '${groupName}' not found` 
+        };
+      }
+      
+      // Disable the group
+      const result = registry.disableGroup(groupName);
+      if (result) {
+        console.log(`Disabled cue group: ${groupName}`);
+        return { success: true };
+      } else {
+        console.error(`Failed to disable group '${groupName}'. It may be the default group.`);
+        return { 
+          success: false, 
+          error: `Failed to disable group '${groupName}'. It may be the default group.` 
+        };
+      }
+    } catch (error) {
+      console.error('Error disabling cue group:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  
+  // Set active cue groups for gameplay
+  ipcMain.handle('set-active-cue-groups', async (_, groupNames: string[]) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Validate that each group exists before setting them as active
+      const invalidGroups: string[] = [];
+      const validGroups: string[] = [];
+      
+      for (const groupName of groupNames) {
+        const group = registry.getGroup(groupName);
+        if (!group) {
+          invalidGroups.push(groupName);
+        } else {
+          validGroups.push(groupName);
+        }
+      }
+      
+      if (invalidGroups.length > 0) {
+        console.error(`Cannot set active groups: groups not found: ${invalidGroups.join(', ')}`);
+      }
+      
+      if (validGroups.length === 0) {
+        return { 
+          success: false, 
+          error: `No valid groups provided. Invalid groups: ${invalidGroups.join(', ')}`
+        };
+      }
+      
+      // Make sure the default group is always included
+      const defaultGroup = registry.getGroup('default');
+      if (defaultGroup && !validGroups.includes('default')) {
+        console.log('Adding default group to active groups');
+        validGroups.push('default');
+      }
+      
+      // Set the valid groups as active
+      registry.setActiveGroups(validGroups);
+      console.log(`Set active cue groups: ${validGroups.join(', ')}`);
+      
+      return { 
+        success: true,
+        activeGroups: validGroups,
+        invalidGroups: invalidGroups.length > 0 ? invalidGroups : undefined
+      };
+    } catch (error) {
+      console.error('Error setting active cue groups:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : String(error)

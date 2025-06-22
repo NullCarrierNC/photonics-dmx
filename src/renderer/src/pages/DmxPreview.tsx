@@ -12,12 +12,24 @@ import DmxSettingsAccordion from '@renderer/components/DmxSettingAccordion';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import CuePreview from '@renderer/components/CuePreview';
 import { useTimeoutEffect } from '../utils/useTimeout';
+import CueRegistrySelector from '@renderer/components/CueRegistrySelector';
+
+type CueRegistryType = 'YARG' | 'RB3E';
+
+type CueGroup = {
+  name: string;
+  description: string;
+  cueTypes: string[];
+};
 
 const DmxPreview: React.FC = () => {
   const [lightingConfig] = useAtom(activeDmxLightsConfigAtom);
   const [_isIpcEnabled, setIsIpcEnabled] = useAtom(senderIpcEnabledAtom);
   const [dmxValues, setDmxValues] = useState<Record<number, number>>({});
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null);
+  const [, setRegistryType] = useState<CueRegistryType>('YARG');
+  const [selectedGroup, setSelectedGroup] = useState<string>('default');
+  const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null);
   
   // State for manual simulation indicators
   const [showBeatIndicator, setShowBeatIndicator] = useState(false);
@@ -30,10 +42,51 @@ const DmxPreview: React.FC = () => {
   const resetKeyframeIndicator = useCallback(() => setShowKeyframeIndicator(false), []);
   
   // Set up auto-reset timeouts for indicators
-  // The delay is null when indicator is off, and set to 10ms when indicator is turned on
-  useTimeoutEffect(resetBeatIndicator, showBeatIndicator ? 10 : null);
-  useTimeoutEffect(resetMeasureIndicator, showMeasureIndicator ? 10 : null);
-  useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 10 : null);
+  // The delay is null when indicator is off, and set to 200ms when indicator is turned on
+  useTimeoutEffect(resetBeatIndicator, showBeatIndicator ? 200 : null);
+  useTimeoutEffect(resetMeasureIndicator, showMeasureIndicator ? 200 : null);
+  useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 200 : null);
+
+  // Fetch current group info when selected group changes
+  useEffect(() => {
+    const fetchGroupInfo = async () => {
+      try {
+        const groups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+        const group = groups.find((g: CueGroup) => g.name === selectedGroup);
+        if (group) {
+          setCurrentGroup(group);
+          
+          // Fetch available effects for the new group
+          try {
+            const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', selectedGroup);
+            
+            // Reset the currently selected effect since we changed groups
+            setSelectedEffect(null);
+            
+            // If there are effects available, select the first one automatically
+            if (availableEffects && availableEffects.length > 0) {
+              const firstEffect = availableEffects[0];
+              setSelectedEffect({
+                id: firstEffect.id,
+                yargDescription: firstEffect.yargDescription,
+                rb3Description: firstEffect.rb3Description,
+                groupName: firstEffect.groupName
+              });
+              console.log(`Auto-selected first effect: ${firstEffect.id} from group ${selectedGroup}`);
+            }
+          } catch (error) {
+            console.error('Error fetching available effects for group:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching group info:', error);
+      }
+    };
+    
+    if (selectedGroup) {
+      fetchGroupInfo();
+    }
+  }, [selectedGroup]);
 
   // Automatically enable IPC sender on mount and disable on unmount.
   useEffect(() => {
@@ -97,6 +150,38 @@ const DmxPreview: React.FC = () => {
     setShowMeasureIndicator(true);
   };
 
+  const handleRegistryChange = (type: CueRegistryType) => {
+    setRegistryType(type);
+    // Future implementation: switch between YARG and RB3E registries
+  };
+
+  // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
+  const handleGroupChange = useCallback((groupNames: string[]) => {
+    // Set the selected group for the UI
+    if (groupNames.length > 0) {
+      const newSelectedGroup = groupNames[0];
+      // Only update state if the group actually changed
+      setSelectedGroup(prevSelectedGroup => {
+        if (prevSelectedGroup !== newSelectedGroup) {
+          console.log(`Group changed from ${prevSelectedGroup} to ${newSelectedGroup}`);
+          return newSelectedGroup;
+        }
+        return prevSelectedGroup;
+      });
+    }
+
+    // Set active groups in the backend
+    window.electron.ipcRenderer.invoke('set-active-cue-groups', groupNames)
+      .then(result => {
+        if (!result.success) {
+          console.error('Failed to set active group:', result.error);
+        }
+      })
+      .catch(err => {
+        console.error('Error setting active group:', err);
+      });
+  }, [setSelectedGroup]); // Dependency: setSelectedGroup (stable)
+
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
       <h1 className="text-2xl font-bold mb-4">DMX Preview</h1>
@@ -129,50 +214,65 @@ const DmxPreview: React.FC = () => {
 
       <hr className="my-6" />
 
-      <div className="flex items-center mt-4">
-        <EffectsDropdown onSelect={(effect) => setSelectedEffect(effect)} />
-        <button
-          onClick={handleTestEffect}
-          className="ml-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Start Test Effect
-        </button>
-        <button
-          onClick={handleStopTestEffect}
-          className="ml-4 px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
-        >
-          Stop Test Effect
-        </button>
-        <button
-          onClick={handleSimulateBeat}
-          className="ml-4 px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
-        >
-          Simulate Beat
-        </button>
-        <button
-          onClick={handleSimulateMeasure}
-          className="ml-4 px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-        >
-          Simulate Measure
-        </button>
-        <button
-          onClick={handleSimulateKeyframe}
-          className="ml-4 px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600"
-        >
-          Simulate Keyframe
-        </button>
+      <div className="my-6">
+        <h2 className="text-xl font-bold mb-4">Cue Selection</h2>
+        <CueRegistrySelector 
+          onRegistryChange={handleRegistryChange}
+          onGroupChange={handleGroupChange}
+          useActiveGroupsOnly={true}
+        />
+        
+        {currentGroup && (
+          <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+            <strong>Group Description:</strong> {currentGroup.description}
+          </div>
+        )}
       </div>
 
-      {selectedEffect && (
-        <p className="mt-4 text-md text-gray-700 dark:text-gray-300">
-          {selectedEffect.yargDescription}<br/>
-          {selectedEffect.rb3Description} 
-        </p>
-      )}
-
+      <div className="flex items-center mt-4 flex-wrap gap-4">
+        <EffectsDropdown 
+          onSelect={(effect) => setSelectedEffect(effect)} 
+          groupName={selectedGroup}
+          value={selectedEffect?.id}
+        />
+        
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleTestEffect}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            disabled={!selectedEffect}
+          >
+            Start Test Effect
+          </button>
+          <button
+            onClick={handleStopTestEffect}
+            className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+          >
+            Stop Test Effect
+          </button>
+          <button
+            onClick={handleSimulateBeat}
+            className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+          >
+            Simulate Beat
+          </button>
+          <button
+            onClick={handleSimulateMeasure}
+            className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+          >
+            Simulate Measure
+          </button>
+          <button
+            onClick={handleSimulateKeyframe}
+            className="px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600"
+          >
+            Simulate Keyframe
+          </button>
+        </div>
+      </div>
+  
       <hr className="my-6" />
-
-      
+     
       <CuePreview 
         className="mb-6"
         showBeatIndicator={showBeatIndicator}

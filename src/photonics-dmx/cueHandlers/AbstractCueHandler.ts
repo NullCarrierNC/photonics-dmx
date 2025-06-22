@@ -3,7 +3,11 @@ import { CueData, CueType } from '../cues/cueTypes';
 import { LightTarget, LocationGroup,  TrackedLight } from '../types';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
-
+/** 
+ * TODO: WE're moving away from this class to use BaseCueHandler instead.
+ * The current RB3E cue handler is still using it pending refactor to use 
+ * external cue definitions.
+*/
 export abstract class AbstractCueHandler extends EventEmitter {
   protected _lightManager: DmxLightManager;
   /**
