@@ -84,6 +84,14 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   ipcMain.handle('set-enabled-cue-groups', async (_, groupNames: string[]) => {
     try {
       controllerManager.getConfig().setEnabledCueGroups(groupNames);
+      
+      // Update the CueRegistry with the new enabled groups
+      const { CueRegistry } = await import('../../photonics-dmx/cues/CueRegistry');
+      const registry = CueRegistry.getInstance();
+      registry.setEnabledGroups(groupNames);
+      
+      console.log('Updated CueRegistry enabled groups:', groupNames);
+      
       return { success: true };
     } catch (error) {
       console.error('Error setting enabled cue groups:', error);

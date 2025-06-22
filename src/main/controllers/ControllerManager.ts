@@ -48,6 +48,7 @@ export class ControllerManager {
     
     await this.initializeDmxManager();
     await this.initializeSequencer();
+    await this.initializeCueRegistry();
     await this.initializeListeners();
     
     this.isInitialized = true;
@@ -88,6 +89,26 @@ export class ControllerManager {
     
     // Set up error handling
     this.senderManager.onSendError(this.handleSenderError);
+  }
+  
+  /**
+   * Initialize the CueRegistry with enabled groups from configuration
+   */
+  private async initializeCueRegistry(): Promise<void> {
+    const { CueRegistry } = await import('../../photonics-dmx/cues/CueRegistry');
+    const registry = CueRegistry.getInstance();
+    
+    // Get enabled groups from configuration
+    const enabledGroups = this.config.getEnabledCueGroups();
+    if (enabledGroups) {
+      registry.setEnabledGroups(enabledGroups);
+      console.log('CueRegistry initialized with enabled groups:', enabledGroups);
+    } else {
+      // If no preference is set, enable all available groups
+      const allGroups = registry.getAllGroups();
+      registry.setEnabledGroups(allGroups);
+      console.log('CueRegistry initialized with all groups (no preference set):', allGroups);
+    }
   }
   
   /**

@@ -37,7 +37,6 @@ import { AbstractCueHandler } from './AbstractCueHandler';
 import { getSweepEffect } from '../effects/sweepEffect';
 import { Rb3GameState } from '../listeners/RB3/rb3eTypes';
 import { getEffectCrossFadeColors } from '../effects/effectCrossFadeColors';
-import { BaseCueHandler } from './BaseCueHandler';
 import { CueGroup } from '../types';
 
 
@@ -49,7 +48,7 @@ import { CueGroup } from '../types';
  * YARG can use these, they just won't take advantage
  * of all the data.
  */
-class Rb3CueHandler extends BaseCueHandler {
+class Rb3CueHandler extends AbstractCueHandler {
   private _lastIndex:Number = 0;
   private _currentStrobeState: StrobeState = "Strobe_Off";
   private _currentLedColor: string = '';

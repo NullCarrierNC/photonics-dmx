@@ -41,50 +41,32 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     // Fetch available cue groups when component mounts or registry type changes
     const fetchGroups = async () => {
       try {
-        console.log('Fetching cue groups...');
+        console.log('Fetching enabled cue groups...');
         
-        // Always fetch all available groups, regardless of the useActiveGroupsOnly setting
-        const availableGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+        // This will either get the user's preference or default to all groups
+        const enabledGroupNames = await window.electron.ipcRenderer.invoke('get-enabled-cue-groups');
         
-        console.log(`Available groups:`, availableGroups);
-        setGroups(availableGroups);
+        // We still need the full group objects for their descriptions
+        const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
         
-        // If useActiveGroupsOnly is true, we'll also get the currently active group
-        // to set as the selected option in the dropdown
-        if (useActiveGroupsOnly) {
-          try {
-            const activeGroups = await window.electron.ipcRenderer.invoke('get-active-cue-groups');
-            console.log('Active groups:', activeGroups);
-            
-            if (activeGroups.length > 0) {
-              // If there are active groups, use the first one as the currently selected
-              setSelectedGroup(activeGroups[0].name);
-              
-              // Only trigger callback on initial mount
-              if (isInitialMount.current) {
-                handleGroupChangeCallback(activeGroups[0].name);
-                isInitialMount.current = false;
-              }
-              return; // Skip the code below since we've already set a selected group
-            }
-          } catch (err) {
-            console.error('Error fetching active groups:', err);
-          }
-        }
+        const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupNames.includes(g.name));
+
+        console.log(`Enabled groups:`, enabledGroups);
+        setGroups(enabledGroups);
         
-        // If we get here, either useActiveGroupsOnly is false or we failed to get active groups
-        // Set default group if available, but only call onGroupChange once
-        if (availableGroups.length > 0) {
-          const defaultGroup = availableGroups.find(g => g.name === 'default') || availableGroups[0];
-          console.log('Setting default group:', defaultGroup.name);
+        // If the currently selected group is no longer enabled, select the first available one
+        if (!enabledGroupNames.includes(selectedGroup) && enabledGroups.length > 0) {
+          const newSelected = enabledGroups[0].name;
+          setSelectedGroup(newSelected);
+          handleGroupChangeCallback(newSelected);
+        } else if (isInitialMount.current && enabledGroups.length > 0) {
+          // On initial mount, ensure the callback is fired with the default active group
+          const defaultGroup = enabledGroups.find(g => g.name === 'default') || enabledGroups[0];
           setSelectedGroup(defaultGroup.name);
-          
-          // Only trigger callback on initial mount
-          if (isInitialMount.current) {
-            handleGroupChangeCallback(defaultGroup.name);
-            isInitialMount.current = false;
-          }
+          handleGroupChangeCallback(defaultGroup.name);
+          isInitialMount.current = false;
         }
+
       } catch (error) {
         console.error('Error fetching cue groups:', error);
       }
@@ -97,7 +79,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
       // Only re-fetch if registry type changed (not on initial mount)
       fetchGroups();
     }
-  }, [registryType, handleGroupChangeCallback, useActiveGroupsOnly]);
+  }, [registryType, handleGroupChangeCallback, selectedGroup]);
 
   const handleRegistryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newType = event.target.value as CueRegistryType;
