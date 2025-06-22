@@ -228,26 +228,38 @@ const DmxPreview: React.FC = () => {
 
       <div className="my-6">
         <h2 className="text-xl font-bold mb-4">Cue Selection</h2>
-        <CueRegistrySelector 
-          onRegistryChange={handleRegistryChange}
-          onGroupChange={handleGroupChange}
-          useActiveGroupsOnly={true}
-        />
+        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+          <div>
+            <CueRegistrySelector 
+              onRegistryChange={handleRegistryChange}
+              onGroupChange={handleGroupChange}
+              useActiveGroupsOnly={true}
+            />
+          </div>
+          <div className="lg:w-64">
+            <EffectsDropdown 
+              onSelect={(effect) => setSelectedEffect(effect)} 
+              groupName={selectedGroup}
+              value={selectedEffect?.id}
+            />
+          </div>
+        </div>
         
         {currentGroup && (
           <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
             <strong>Group Description:</strong> {currentGroup.description}
           </div>
         )}
+        
+        {selectedEffect && selectedEffect.yargDescription && 
+         selectedEffect.yargDescription !== "No description available" && (
+          <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+            <strong>Effect Description:</strong> {selectedEffect.yargDescription}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center mt-4 flex-wrap gap-4">
-        <EffectsDropdown 
-          onSelect={(effect) => setSelectedEffect(effect)} 
-          groupName={selectedGroup}
-          value={selectedEffect?.id}
-        />
-        
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleTestEffect}

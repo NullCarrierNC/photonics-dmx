@@ -82,7 +82,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div>
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
         Effect
       </label>
@@ -105,13 +105,6 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
           ))
         )}
       </select>
-      
-      {selectedEffect && selectedEffect.yargDescription && 
-       selectedEffect.yargDescription !== "No description available" && (
-        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          {selectedEffect.yargDescription}
-        </div>
-      )}
     </div>
   );
 };
