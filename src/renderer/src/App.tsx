@@ -14,6 +14,7 @@ import DmxPreview from './pages/DmxPreview';
 import { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types';
 import { IpcRendererEvent } from 'electron';
 import About from './pages/About';
+import Preferences from './pages/Preferences';
 import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
@@ -172,6 +173,8 @@ export const App = (): JSX.Element => {
       //  return <CueSequencer />;
       case Pages.NetworkDebug:
         return <NetworkDebug />;
+      case Pages.Preferences:
+        return <Preferences />;
       case Pages.About:
         return <About />;
       default:
