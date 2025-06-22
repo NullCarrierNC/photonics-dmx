@@ -63,7 +63,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   // Update effect debounce time
   ipcMain.on('update-effect-debounce', (_, debounceTime: number) => {
     // Save the debounce time to preferences
-    controllerManager.getConfig().savePref('effectDebounce', debounceTime);
+    controllerManager.getConfig().setPreference('effectDebounce', debounceTime);
     
     // Update the cue handler if it exists
     const cueHandler = controllerManager.getCueHandler();
@@ -77,6 +77,6 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   // Set cue style
   ipcMain.on('cue-style', (_, style: 'simple' | 'complex') => {
     // Save complex cue style preference
-    controllerManager.getConfig().savePref('complex', style === 'complex');
+    controllerManager.getConfig().setPreference('complex', style === 'complex');
   });
 } 

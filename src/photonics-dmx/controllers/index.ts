@@ -1,19 +1,20 @@
-import { ConfigurationManager } from '../../photonics-dmx/controllers/ConfigurationManager';
+import { ConfigurationManager } from '../../services/configuration/ConfigurationManager';
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager';
 import { Sequencer } from './sequencer/Sequencer';
-
 
 export class ControllerManager {
   private config: ConfigurationManager;
   private dmxLightManager: DmxLightManager | null = null;
   private sequencer: Sequencer | null = null;
 
-  
   constructor() {
     this.config = new ConfigurationManager();
     // lazy initialization for other controllers
   }
-  
+
+  /**
+   * Initialize all controllers and systems
+   */
   public async init(): Promise<void> {
     // Initialize controllers in the right order
     await this.initializeDmxManager();
@@ -36,19 +37,25 @@ export class ControllerManager {
   public async shutdown(): Promise<void> {
     // Shutdown in reverse order
   }
-  
-  // Getters for controllers
+
+  /**
+   * Get the configuration manager
+   */
   public getConfig(): ConfigurationManager {
     return this.config;
   }
-  
+
+  /**
+   * Get the DMX light manager
+   */
   public getDmxLightManager(): DmxLightManager | null {
     return this.dmxLightManager;
   }
-  
+
+  /**
+   * Get the sequencer
+   */
   public getLightingSequencer(): Sequencer | null {
     return this.sequencer;
   }
-  
- 
 }

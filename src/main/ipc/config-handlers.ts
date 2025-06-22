@@ -7,25 +7,25 @@ import { ControllerManager } from '../controllers/ControllerManager';
  * @param controllerManager The controller manager instance
  */
 export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  // Get light library
+  // Get light library (default templates)
   ipcMain.handle('get-light-library', async () => {
-    return controllerManager.getConfig().lightingConfig;
+    return controllerManager.getConfig().getLightLibrary();
   });
 
   // Get user's lights
   ipcMain.handle('get-my-lights', async () => {
-    return await controllerManager.getConfig().loadMyLights();
+    return controllerManager.getConfig().getUserLights();
   });
 
   // Save user's lights
   ipcMain.on('save-my-lights', (_, data) => {
-    controllerManager.getConfig().saveMyLights(data);
+    controllerManager.getConfig().updateUserLights(data);
   });
 
   // Get light layout
   ipcMain.handle('get-light-layout', async (_, filename: string) => {
     try {
-      return await controllerManager.getConfig().loadLightLayout();
+      return controllerManager.getConfig().getLightingLayout();
     } catch (error) {
       console.error(`Error fetching light layout for ${filename}:`, error);
       throw error;
@@ -36,7 +36,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   ipcMain.handle('save-light-layout', async (_, filename: string, data: any) => {
     try {
       // First save the layout
-      await controllerManager.getConfig().saveLightLayout(data);
+      controllerManager.getConfig().updateLightingLayout(data);
       
       // Then restart controllers to pick up the changes
       await controllerManager.restartControllers();
@@ -64,6 +64,6 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
   // Get app preferences
   ipcMain.handle('get-prefs', async () => {
-    return await controllerManager.getConfig().getPrefs();
+    return controllerManager.getConfig().getAllPreferences();
   });
 } 
