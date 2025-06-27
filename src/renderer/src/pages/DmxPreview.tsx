@@ -221,6 +221,19 @@ const DmxPreview: React.FC = () => {
           <hr className="my-6" />
 
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
+            Which cue groups are enabled is defined in the Preferences menu.
+          </p>
+          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
+            Active groups are a subset of enabled groups. Only cues in the active groups will be used in-game.
+          </p>
+          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
+            By default all enabled groups are active. Here you can select which groups are active, allowing you to 
+            isolate specific groups or cues for testing at runtime. The active toggles are not saved between sessions.
+          </p>
+
+          <hr className="my-6" />
+
+          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
             Testing a cue will give you an approximation of what it will look like in-game. Some effects require you to 
             manually simulate a beat or keyframe. If an effect uses a song's BPM value, the simulation will assume 120 BPM. 
             For YARG, some effects are modified by run-time data such as the notes being played. This is not currently simulated.

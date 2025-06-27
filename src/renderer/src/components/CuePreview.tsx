@@ -201,14 +201,14 @@ const CuePreview: React.FC<CuePreviewProps> = ({
 
     const getTitle = () => {
         if (cueSourceInfo?.groupName) {
-            return `Current Cue (${cueSourceInfo.groupName}${cueSourceInfo.isFromDefault ? ' - fallback' : ''})`;
+            return `Current Cue - ${cueSourceInfo.groupName}${cueSourceInfo.isFromDefault ? ' - fallback' : ''}`;
         }
         return 'Current Cue';
     };
 
     return (
-        <div className={`p-4 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
-            <h3 className="text-lg font-semibold mb-2">{getTitle()}</h3>
+        <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
+            <h3 className="text-lg font-semibold mb-1">{getTitle()}</h3>
             {currentCueData ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>

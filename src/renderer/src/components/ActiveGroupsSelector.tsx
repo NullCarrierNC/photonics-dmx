@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import  { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 
 interface CueGroup {
   name: string;
@@ -119,7 +119,10 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
           Active Cue Groups
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-          Select which enabled groups are currently active for cue resolution.
+          By default all enabled groups are active. To disable a group entirely, disable it in the Preferences menu.
+        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+          If the active groups are missing a cue the system will fallback to the Default group, even if it is disabled.
         </p>
         
         <div className="space-y-0">
