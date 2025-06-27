@@ -9,7 +9,7 @@ import { YargCue } from '../YargCue';
 
 export class BigRockEndingCue implements ICue {
   name = YargCue.BigRockEnding;
-  description = 'Chaotic, individual flashing of bright colors (red, green, blue, orange) on all lights with random timings for an intense finale effect';
+  description = 'Chaotic, individual flashing of bright colors (red, green, blue, orange) on all lights with random timings';
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const red = getColor('red', 'max');
