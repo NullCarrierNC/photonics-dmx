@@ -2,6 +2,11 @@ import { CueData } from '../cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../controllers/DmxLightManager';
 
+export enum CueStyle {
+  Primary = "primary",
+  Secondary = "secondary"
+}
+
 export interface ICue {
   /**
    * The name of the cue
@@ -12,6 +17,13 @@ export interface ICue {
    * Description of the cue effect's appearance
    */
   description?: string;
+
+  /**
+   * Style of the cue based on layer usage:
+   * - Primary: Sets values to layer 0 (main lighting effect)
+   * - Secondary: Only sets higher layers, skips layer 0 (overlay effects like sweep)
+   */
+  style: CueStyle;
 
   /**
    * Execute the cue with the given parameters

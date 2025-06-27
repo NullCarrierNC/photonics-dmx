@@ -1,5 +1,5 @@
 import { CueRegistry } from '../../cues/CueRegistry';
-import { ICue } from '../../cues/interfaces/ICue';
+import { ICue, CueStyle } from '../../cues/interfaces/ICue';
 import { ICueGroup } from '../../cues/interfaces/ICueGroup';
 import { CueData, CueType } from '../../cues/cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
@@ -15,6 +15,7 @@ class MockCueImplementation implements ICue {
   
   get name(): string { return this._name; }
   get description(): string | undefined { return this._description; }
+  style = CueStyle.Primary;
   
   async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // Mock implementation

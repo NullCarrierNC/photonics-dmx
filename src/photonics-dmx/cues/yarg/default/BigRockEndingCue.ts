@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { randomBetween } from '../../../helpers/utils';
@@ -10,6 +10,7 @@ import { YargCue } from '../YargCue';
 export class BigRockEndingCue implements ICue {
   name = YargCue.BigRockEnding;
   description = 'Chaotic, individual flashing of bright colors (red, green, blue, orange) on all lights with random timings';
+  style = CueStyle.Secondary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const red = getColor('red', 'max');

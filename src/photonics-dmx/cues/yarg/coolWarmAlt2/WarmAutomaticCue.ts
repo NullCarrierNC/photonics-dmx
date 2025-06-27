@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import {  getEffectFlashColor } from '../../../effects';
 import { YargCue } from '../YargCue';
@@ -14,7 +14,8 @@ let isNewSession = true; // Flag to track if this is we should reset the light s
 
 export class WarmAutomaticCue implements ICue {
   name = YargCue.WarmAutomatic;
-  description = 'Set each light to a random colour of red or yellow. On the beat randomly invert one of the lights with a flash.';
+  description = 'Automatic warm-toned lighting with intelligent color memory and beat-responsive highlights';
+  style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], 'all');

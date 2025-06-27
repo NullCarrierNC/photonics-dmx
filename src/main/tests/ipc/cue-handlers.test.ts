@@ -1,5 +1,5 @@
 import { CueRegistry } from '../../../photonics-dmx/cues/CueRegistry';
-import { ICue } from '../../../photonics-dmx/cues/interfaces/ICue';
+import { ICue, CueStyle } from '../../../photonics-dmx/cues/interfaces/ICue';
 import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/ICueGroup';
 import { CueData, CueType } from '../../../photonics-dmx/cues/cueTypes';
 import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces';
@@ -29,13 +29,9 @@ const mockControllerManager = {
 
 // Mock implementation with descriptions
 class MockCueImplementation implements ICue {
-  constructor(
-    private _name: string,
-    private _description?: string
-  ) {}
-  
+  constructor(private _name: string, public description?: string) {}
   get name(): string { return this._name; }
-  get description(): string | undefined { return this._description; }
+  style = CueStyle.Primary;
   
   async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // Mock implementation
@@ -100,7 +96,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
       description: 'Default cue group with standard effects',
       cues: new Map([
         [CueType.Default, new MockCueImplementation('default', 'Default yellow lighting on front lights')],
-        [CueType.Chorus, new MockCueImplementation('default-chorus', 'Chorus effect with color changes')],
+        [CueType.Chorus, new MockCueImplementation('default-chorus', 'Default chorus effect with color changes')],
       ]),
     };
 

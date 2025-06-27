@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
@@ -9,7 +9,8 @@ import { RGBIP } from '../../../types';
 
 export class StrobeSlowCue implements ICue {
   name = YargCue.Strobe_Slow;
-  description = 'Slow-paced white strobe effect with flashing timed to BPM/8 of the song';
+  description = 'Slow white strobe effect with flashing timed to BPM/8 of the song';
+  style = CueStyle.Secondary;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const white: RGBIP = getColor('white', 'max');

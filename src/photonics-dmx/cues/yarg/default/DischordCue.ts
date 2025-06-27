@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors';
@@ -13,6 +13,7 @@ import { YargCue } from '../YargCue';
 export class DischordCue implements ICue {
   name = YargCue.Dischord;
   description = 'Front lights alternate between green and blue on left/right halves with bright red or yellow flashes on the measure';
+  style = CueStyle.Primary;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const blue = getColor('blue', 'medium');

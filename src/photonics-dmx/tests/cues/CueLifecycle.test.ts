@@ -1,4 +1,4 @@
-import { ICue } from '../../cues/interfaces/ICue';
+import { ICue, CueStyle } from '../../cues/interfaces/ICue';
 import { CueData } from '../../cues/cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../controllers/DmxLightManager';
@@ -7,6 +7,7 @@ import { DmxLightManager } from '../../controllers/DmxLightManager';
 class TestLifecycleCue implements ICue {
   name = 'test-cue';
   description = 'Test cue for lifecycle';
+  style = CueStyle.Primary;
   onStopCalled = false;
   onPauseCalled = false;
   onDestroyCalled = false;

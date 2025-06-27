@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor, getEffectCycleLights } from '../../../effects';
 import { YargCue } from '../YargCue';
@@ -10,6 +10,7 @@ import { randomBetween } from '../../../helpers/utils';
 export class WarmAutomaticCue implements ICue {
   name = YargCue.WarmAutomatic;
   description = 'Sequential pattern where front lights change one by one on beat, cycling through all positions with warm colours';
+  style = CueStyle.Primary;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const frontLights = lightManager.getLights(['front'], 'all');
