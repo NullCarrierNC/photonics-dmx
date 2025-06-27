@@ -1,6 +1,6 @@
 import {  CueType } from './cueTypes';
 import { ICueGroup } from './interfaces/ICueGroup';
-import { ICue } from './interfaces/ICue';
+import { ICue, CueStyle } from './interfaces/ICue';
 
 /**
  * Registry for managing multiple sets of cue implementations.
@@ -29,6 +29,24 @@ export class CueRegistry {
   /** Name of the default group that provides fallback implementations */
   private defaultGroup: string | null = null;
 
+  /** Track last called primary cue and its source group */
+  private lastPrimaryCueName: string | null = null;
+  private lastPrimaryCueGroup: string | null = null;
+  
+  /** Track last called secondary cue and its source group */
+  private lastSecondaryCueName: string | null = null;
+  private lastSecondaryCueGroup: string | null = null;
+  
+  /** Counter for consecutive calls to the same primary cue */
+  private primaryCueCounter: number = 0;
+  
+  private primaryCueLimit: number = 100;
+
+  /** Counter for consecutive calls to the same secondary cue */
+  private secondaryCueCounter: number = 0;
+
+  private secondaryCueLimit: number = 50;
+
   private constructor() {}
 
   /**
@@ -40,6 +58,14 @@ export class CueRegistry {
     this.enabledGroups.clear();
     this.activeGroups.clear();
     this.defaultGroup = null;
+    
+    // Reset cue tracking state
+    this.lastPrimaryCueName = null;
+    this.lastPrimaryCueGroup = null;
+    this.lastSecondaryCueName = null;
+    this.lastSecondaryCueGroup = null;
+    this.primaryCueCounter = 0;
+    this.secondaryCueCounter = 0;
   }
 
   /**
@@ -85,19 +111,161 @@ export class CueRegistry {
   }
 
   /**
-   * Get a cue implementation from the active groups.
-   * Resolution order:
-   * 1. Try active groups first
-   * 2. If not found and default group exists, try default group as fallback
+   * Get a cue implementation with randomized selection for new cues.
+   * For the first call to a primary/secondary cue (or after counter resets),
+   * randomly selects from available groups. Subsequent calls use the same group.
    * @param cueType The type of cue to get
    * @returns The cue implementation or null if not found
    */
   public getCueImplementation(cueType: CueType): ICue | null {
+    // First, get any implementation to check the style
+    const tempCue = this.getAnyCueImplementation(cueType);
+    if (!tempCue) {
+      console.error(`No implementation found for cue: ${cueType}`);
+      return null;
+    }
+    
+    const isPrimary = tempCue.style === CueStyle.Primary;
+    const isSecondary = tempCue.style === CueStyle.Secondary;
+    
+    if (isPrimary) {
+      return this.handlePrimaryCue(cueType);
+    } else if (isSecondary) {
+      return this.handleSecondaryCue(cueType);
+    }
+    
+    // Fallback to default behavior for unknown styles
+    return this.getFallbackImplementation(cueType);
+  }
+
+  /**
+   * Handle primary cue selection logic.
+   * @param cueType The type of cue to get
+   * @returns The cue implementation or null if not found
+   */
+  private handlePrimaryCue(cueType: CueType): ICue | null {
+    const isNewCue = this.lastPrimaryCueName !== cueType;
+    const shouldReset = this.primaryCueCounter >= this.primaryCueLimit;
+    
+    if (isNewCue || shouldReset) {
+      // Reset counter and select new implementation
+      this.primaryCueCounter = 0;
+      const selectedGroup = this.selectRandomGroupWithCue(cueType);
+      
+      if (selectedGroup) {
+        this.lastPrimaryCueName = cueType;
+        this.lastPrimaryCueGroup = selectedGroup;
+        this.primaryCueCounter++;
+        return this.groups.get(selectedGroup)!.cues.get(cueType)!;
+      }
+    } else {
+      // Use same group as last time
+      this.primaryCueCounter++;
+      if (this.lastPrimaryCueGroup && this.groups.get(this.lastPrimaryCueGroup)?.cues.has(cueType)) {
+        return this.groups.get(this.lastPrimaryCueGroup)!.cues.get(cueType)!;
+      }
+    }
+    
+    // Fallback if previous logic failed
+    return this.getFallbackImplementation(cueType);
+  }
+
+  /**
+   * Handle secondary cue selection logic.
+   * @param cueType The type of cue to get
+   * @returns The cue implementation or null if not found
+   */
+  private handleSecondaryCue(cueType: CueType): ICue | null {
+    const isNewCue = this.lastSecondaryCueName !== cueType;
+    const shouldReset = this.secondaryCueCounter >= this.secondaryCueLimit;
+    
+    if (isNewCue || shouldReset) {
+      // Reset counter and select new implementation
+      this.secondaryCueCounter = 0;
+      const selectedGroup = this.selectRandomGroupWithCue(cueType);
+      
+      if (selectedGroup) {
+        this.lastSecondaryCueName = cueType;
+        this.lastSecondaryCueGroup = selectedGroup;
+        this.secondaryCueCounter++;
+        return this.groups.get(selectedGroup)!.cues.get(cueType)!;
+      }
+    } else {
+      // Use same group as last time
+      this.secondaryCueCounter++;
+      if (this.lastSecondaryCueGroup && this.groups.get(this.lastSecondaryCueGroup)?.cues.has(cueType)) {
+        return this.groups.get(this.lastSecondaryCueGroup)!.cues.get(cueType)!;
+      }
+    }
+    
+    // Fallback if previous logic failed
+    return this.getFallbackImplementation(cueType);
+  }
+
+  /**
+   * Get any available implementation of a cue to check its style.
+   * @param cueType The type of cue to get
+   * @returns The cue implementation or null if not found
+   */
+  private getAnyCueImplementation(cueType: CueType): ICue | null {
     // Try active groups first
     for (const groupName of this.activeGroups) {
       const group = this.groups.get(groupName);
       if (group?.cues.has(cueType)) {
-       // console.log(`Found implementation for cue: ${cueType} in active group: ${groupName}`);
+        return group.cues.get(cueType)!;
+      }
+    }
+    
+    // Try default group
+    if (this.defaultGroup) {
+      const defaultGroup = this.groups.get(this.defaultGroup);
+      if (defaultGroup?.cues.has(cueType)) {
+        return defaultGroup.cues.get(cueType)!;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Randomly select a group that has the specified cue type.
+   * @param cueType The type of cue to find
+   * @returns The selected group name or null if none found
+   */
+  private selectRandomGroupWithCue(cueType: CueType): string | null {
+    // Get all active groups that have this cue
+    const availableGroups: string[] = [];
+    
+    for (const groupName of this.activeGroups) {
+      const group = this.groups.get(groupName);
+      if (group?.cues.has(cueType)) {
+        availableGroups.push(groupName);
+      }
+    }
+    
+    if (availableGroups.length > 0) {
+      const randomIndex = Math.floor(Math.random() * availableGroups.length);
+      return availableGroups[randomIndex];
+    }
+    
+    // No active groups have it, try default as fallback
+    if (this.defaultGroup && this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
+      return this.defaultGroup;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Get a cue implementation using the original fallback logic.
+   * @param cueType The type of cue to get
+   * @returns The cue implementation or null if not found
+   */
+  private getFallbackImplementation(cueType: CueType): ICue | null {
+    // Try active groups first
+    for (const groupName of this.activeGroups) {
+      const group = this.groups.get(groupName);
+      if (group?.cues.has(cueType)) {
         return group.cues.get(cueType)!;
       }
     }
@@ -106,12 +274,10 @@ export class CueRegistry {
     if (this.defaultGroup && !this.activeGroups.has(this.defaultGroup)) {
       const defaultGroup = this.groups.get(this.defaultGroup);
       if (defaultGroup?.cues.has(cueType)) {
-       // console.log(`Found implementation for cue: ${cueType} in default group: ${this.defaultGroup} (fallback)`);
         return defaultGroup.cues.get(cueType)!;
       }
     }
 
-    console.error(`No implementation found for cue: ${cueType}`);
     return null;
   }
 
@@ -252,5 +418,79 @@ export class CueRegistry {
    */
   public getGroup(groupName: string): ICueGroup | undefined {
     return this.groups.get(groupName);
+  }
+
+  /**
+   * Get debugging information about the current cue selection state.
+   * @returns Object containing current selection state
+   */
+  public getDebugInfo(): {
+    lastPrimaryCue: { name: string | null; group: string | null; counter: number };
+    lastSecondaryCue: { name: string | null; group: string | null; counter: number };
+    activeGroups: string[];
+    enabledGroups: string[];
+    defaultGroup: string | null;
+  } {
+    return {
+      lastPrimaryCue: {
+        name: this.lastPrimaryCueName,
+        group: this.lastPrimaryCueGroup,
+        counter: this.primaryCueCounter
+      },
+      lastSecondaryCue: {
+        name: this.lastSecondaryCueName,
+        group: this.lastSecondaryCueGroup,
+        counter: this.secondaryCueCounter
+      },
+      activeGroups: Array.from(this.activeGroups),
+      enabledGroups: Array.from(this.enabledGroups),
+      defaultGroup: this.defaultGroup
+    };
+  }
+
+  /**
+   * Reset the cue selection counters and last selected groups.
+   * Useful for debugging or forcing fresh randomization.
+   */
+  public resetCueSelectionState(): void {
+    this.lastPrimaryCueName = null;
+    this.lastPrimaryCueGroup = null;
+    this.lastSecondaryCueName = null;
+    this.lastSecondaryCueGroup = null;
+    this.primaryCueCounter = 0;
+    this.secondaryCueCounter = 0;
+  }
+
+  /**
+   * Get information about which groups have implementations for a specific cue type.
+   * @param cueType The cue type to check
+   * @returns Object with group information
+   */
+  public getCueAvailability(cueType: CueType): {
+    activeGroupsWithCue: string[];
+    allGroupsWithCue: string[];
+    defaultHasCue: boolean;
+  } {
+    const activeGroupsWithCue: string[] = [];
+    const allGroupsWithCue: string[] = [];
+
+    for (const [groupName, group] of this.groups) {
+      if (group.cues.has(cueType)) {
+        allGroupsWithCue.push(groupName);
+        if (this.activeGroups.has(groupName)) {
+          activeGroupsWithCue.push(groupName);
+        }
+      }
+    }
+
+    const defaultHasCue = this.defaultGroup ? 
+      (this.groups.get(this.defaultGroup)?.cues.has(cueType) ?? false) : 
+      false;
+
+    return {
+      activeGroupsWithCue,
+      allGroupsWithCue,
+      defaultHasCue
+    };
   }
 } 
