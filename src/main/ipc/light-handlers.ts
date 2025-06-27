@@ -427,4 +427,44 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       };
     }
   });
+
+  // Get the source group for a specific cue
+  ipcMain.handle('get-cue-source-group', async (_, cueType: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // First check active groups (in order of priority)
+      const activeGroups = registry.getActiveGroups();
+      for (const groupName of activeGroups) {
+        const group = registry.getGroup(groupName);
+        if (group?.cues.has(cueType as any)) {
+          return {
+            groupName: group.name,
+            isFromDefault: false
+          };
+        }
+      }
+      
+      // If not found in active groups, check if it exists in default group
+      const defaultGroup = registry.getGroup('YARG Default');
+      if (defaultGroup?.cues.has(cueType as any)) {
+        return {
+          groupName: defaultGroup.name,
+          isFromDefault: true
+        };
+      }
+      
+      // If not found anywhere
+      return {
+        groupName: null,
+        isFromDefault: false
+      };
+    } catch (error) {
+      console.error('Error getting cue source group:', error);
+      return {
+        groupName: null,
+        isFromDefault: false
+      };
+    }
+  });
 } 

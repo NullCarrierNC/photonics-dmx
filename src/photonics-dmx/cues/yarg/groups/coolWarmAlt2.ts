@@ -2,6 +2,7 @@ import { CueRegistry } from '../../CueRegistry';
 import { CueType } from '../../cueTypes';
 import { ICueGroup } from '../../interfaces/ICueGroup';
 import { CoolAutomaticCue } from '../coolWarmAlt2/CoolAutomaticCue';
+import { WarmAutomaticCue } from '../default/WarmAutomaticCue';
 
 /**
  * Create and register the cool/warm alternative 1 cue group.
@@ -12,7 +13,7 @@ const group: ICueGroup = {
   cues: new Map([
     [CueType.Cool_Automatic, new CoolAutomaticCue()],
   //  [CueType.Cool_Manual, new CoolManualCue()],
-   // [CueType.Warm_Automatic, new WarmAutomaticCue()],
+    [CueType.Warm_Automatic, new WarmAutomaticCue()],
    // [CueType.Warm_Manual, new WarmManualCue()],
   ]),
 };

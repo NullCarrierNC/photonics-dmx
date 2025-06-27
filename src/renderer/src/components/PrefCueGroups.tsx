@@ -110,22 +110,24 @@ const PrefCueGroups: React.FC = () => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <h2 className="text-xl font-semibold mb-4 border-b pb-2">Enabled Cue Groups</h2>
+      <p className="mb-6">Note: Disabling the default group will prevent default cues from being selected during gameplay <em>unless no other groups contain the necessary cue</em>. 
+      I.e. if the system cannot find a cue in any other group, it will fallback to use the one from the default group.</p>
       <div className="space-y-4">
         {allGroups.map((group) => (
           <div key={group.name} className="border rounded-lg border-gray-200 dark:border-gray-600">
             {/* Group Header */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg">
+            <div 
+              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              onClick={() => handleAccordionToggle(group.name)}
+            >
               <div className="flex items-center flex-1">
-                <button
-                  onClick={() => handleAccordionToggle(group.name)}
-                  className="mr-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                >
+                <div className="mr-3 text-gray-600 dark:text-gray-400">
                   {group.isExpanded ? (
                     <FaChevronDown className="w-4 h-4" />
                   ) : (
                     <FaChevronRight className="w-4 h-4" />
                   )}
-                </button>
+                </div>
                 <div className="flex-1">
                   <h3 className="font-bold">{group.name}</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">{group.description}</p>
@@ -137,6 +139,7 @@ const PrefCueGroups: React.FC = () => {
                 checked={enabledGroupNames.includes(group.name)}
                 disabled={group.name === 'default'}
                 onChange={(e) => handleGroupToggle(group.name, e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
               />
             </div>
 

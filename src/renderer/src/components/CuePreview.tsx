@@ -12,6 +12,11 @@ interface CuePreviewProps {
     manualKeyframeType?: string;
 }
 
+interface CueSourceInfo {
+    groupName: string | null;
+    isFromDefault: boolean;
+}
+
 const CuePreview: React.FC<CuePreviewProps> = ({
     className = '',
     showBeatIndicator = false,
@@ -22,6 +27,7 @@ const CuePreview: React.FC<CuePreviewProps> = ({
     manualKeyframeType = 'Manual Keyframe'
 }) => {
     const [currentCueData, setCurrentCueData] = useState<CueData | null>(null);
+    const [cueSourceInfo, setCueSourceInfo] = useState<CueSourceInfo | null>(null);
 
     // State for beat and measure indicators
     const [beatReceived, setBeatReceived] = useState(false);
@@ -36,6 +42,25 @@ const CuePreview: React.FC<CuePreviewProps> = ({
     const prevBeatRef = useRef<string | null>(null);
     const prevMeasureRef = useRef<number | undefined>(undefined);
     const prevKeyframeRef = useRef<string | null>(null);
+
+    // Fetch cue source group information when cue changes
+    useEffect(() => {
+        const fetchCueSourceInfo = async () => {
+            if (currentCueData?.lightingCue && currentCueData.lightingCue !== 'None') {
+                try {
+                    const sourceInfo = await window.electron.ipcRenderer.invoke('get-cue-source-group', currentCueData.lightingCue);
+                    setCueSourceInfo(sourceInfo);
+                } catch (error) {
+                    console.error('Error fetching cue source info:', error);
+                    setCueSourceInfo(null);
+                }
+            } else {
+                setCueSourceInfo(null);
+            }
+        };
+
+        fetchCueSourceInfo();
+    }, [currentCueData?.lightingCue]);
 
     // Handle manual indicators via props
     useEffect(() => {
@@ -174,9 +199,16 @@ const CuePreview: React.FC<CuePreviewProps> = ({
         };
     }, []);
 
+    const getTitle = () => {
+        if (cueSourceInfo?.groupName) {
+            return `Current Cue (${cueSourceInfo.groupName}${cueSourceInfo.isFromDefault ? ' - fallback' : ''})`;
+        }
+        return 'Current Cue';
+    };
+
     return (
         <div className={`p-4 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
-            <h3 className="text-lg font-semibold mb-2">Current Cue</h3>
+            <h3 className="text-lg font-semibold mb-2">{getTitle()}</h3>
             {currentCueData ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
