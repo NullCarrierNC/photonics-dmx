@@ -374,19 +374,23 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     }
   });
   
-  // Set active cue groups for gameplay
+  // Set active cue groups
   ipcMain.handle('set-active-cue-groups', async (_, groupNames: string[]) => {
     try {
       const registry = CueRegistry.getInstance();
       
-      // Validate that each group exists before setting them as active
+      // Validate that each group exists and is enabled before setting them as active
       const invalidGroups: string[] = [];
+      const disabledGroups: string[] = [];
       const validGroups: string[] = [];
+      const enabledGroups = registry.getEnabledGroups();
       
       for (const groupName of groupNames) {
         const group = registry.getGroup(groupName);
         if (!group) {
           invalidGroups.push(groupName);
+        } else if (!enabledGroups.includes(groupName)) {
+          disabledGroups.push(groupName);
         } else {
           validGroups.push(groupName);
         }
@@ -396,18 +400,15 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         console.error(`Cannot set active groups: groups not found: ${invalidGroups.join(', ')}`);
       }
       
+      if (disabledGroups.length > 0) {
+        console.error(`Cannot set active groups: groups not enabled: ${disabledGroups.join(', ')}`);
+      }
+      
       if (validGroups.length === 0) {
         return { 
           success: false, 
-          error: `No valid groups provided. Invalid groups: ${invalidGroups.join(', ')}`
+          error: `No valid enabled groups provided. Invalid: ${invalidGroups.join(', ')}, Disabled: ${disabledGroups.join(', ')}`
         };
-      }
-      
-      // Make sure the default group is always included
-      const defaultGroup = registry.getGroup('default');
-      if (defaultGroup && !validGroups.includes('default')) {
-        console.log('Adding default group to active groups');
-        validGroups.push('default');
       }
       
       // Set the valid groups as active
@@ -417,7 +418,8 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       return { 
         success: true,
         activeGroups: validGroups,
-        invalidGroups: invalidGroups.length > 0 ? invalidGroups : undefined
+        invalidGroups: invalidGroups.length > 0 ? invalidGroups : undefined,
+        disabledGroups: disabledGroups.length > 0 ? disabledGroups : undefined
       };
     } catch (error) {
       console.error('Error setting active cue groups:', error);
@@ -432,26 +434,29 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   ipcMain.handle('get-cue-source-group', async (_, cueType: string) => {
     try {
       const registry = CueRegistry.getInstance();
-      
-      // First check active groups (in order of priority)
       const activeGroups = registry.getActiveGroups();
+      const defaultGroupName = registry.getDefaultGroupName();
+      
+      // Try active groups first
       for (const groupName of activeGroups) {
         const group = registry.getGroup(groupName);
         if (group?.cues.has(cueType as any)) {
           return {
             groupName: group.name,
-            isFromDefault: false
+            isFromDefault: group.name === defaultGroupName
           };
         }
       }
       
-      // If not found in active groups, check if it exists in default group
-      const defaultGroup = registry.getGroup('YARG Default');
-      if (defaultGroup?.cues.has(cueType as any)) {
-        return {
-          groupName: defaultGroup.name,
-          isFromDefault: true
-        };
+      // Fallback to default group if it exists and wasn't already checked in active groups
+      if (defaultGroupName && !activeGroups.includes(defaultGroupName)) {
+        const defaultGroup = registry.getGroup(defaultGroupName);
+        if (defaultGroup?.cues.has(cueType as any)) {
+          return {
+            groupName: defaultGroup.name,
+            isFromDefault: true // This is fallback behavior
+          };
+        }
       }
       
       // If not found anywhere

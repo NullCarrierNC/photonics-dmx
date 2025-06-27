@@ -22,5 +22,4 @@ const group: ICueGroup = {
 const registry = CueRegistry.getInstance();
 registry.registerGroup(group);
 
-// TODO: Temporarly activate the group. We need to add config controls later.
 registry.activateGroup(group.name);

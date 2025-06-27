@@ -10,8 +10,8 @@ import { ICue } from './interfaces/ICue';
  * define common cues like Strobe repeatedly in each group.
  * 
  * Registered Groups: Groups of cues known to the system.
- * Active Groups: Groups that are currently active during gameplay.
- * Enabled Groups: Groups that are enabled and can potentially be set as active.
+ * Enabled Groups: Groups that are enabled in user preferences (can be activated).
+ * Active Groups: Groups that are currently active during gameplay (subset of enabled).
  */
 export class CueRegistry {
   /** The singleton instance of the CueRegistry */
@@ -20,11 +20,11 @@ export class CueRegistry {
   /** Map of all registered cue groups by their name */
   private groups: Map<string, ICueGroup> = new Map();
   
+  /** Set of groups that are enabled in user preferences */
+  private enabledGroups: Set<string> = new Set();
+  
   /** Set of groups that are currently active during gameplay */
   private activeGroups: Set<string> = new Set();
-  
-  /** Set of groups that are enabled and can potentially be set as active */
-  private enabledGroups: Set<string> = new Set();
   
   /** Name of the default group that provides fallback implementations */
   private defaultGroup: string | null = null;
@@ -37,8 +37,8 @@ export class CueRegistry {
    */
   public reset(): void {
     this.groups.clear();
-    this.activeGroups.clear();
     this.enabledGroups.clear();
+    this.activeGroups.clear();
     this.defaultGroup = null;
   }
 
@@ -62,6 +62,8 @@ export class CueRegistry {
     
     // Add to enabled groups by default
     this.enabledGroups.add(group.name);
+    // Add to active groups by default (all enabled groups are active by default)
+    this.activeGroups.add(group.name);
   }
 
   /**
@@ -79,45 +81,77 @@ export class CueRegistry {
     // Set it as the new default group
     this.defaultGroup = groupName;
     
-    // Ensure the default group is always active
-    this.activeGroups.add(groupName);
-    
     return true;
   }
 
   /**
    * Get a cue implementation from the active groups.
-   * Falls back to the default group if no implementation is found.
+   * Resolution order:
+   * 1. Try active groups first
+   * 2. If not found and default group exists, try default group as fallback
    * @param cueType The type of cue to get
    * @returns The cue implementation or null if not found
-   * @throws Error if no implementation is found in active groups and no default group is defined
    */
   public getCueImplementation(cueType: CueType): ICue | null {
     // Try active groups first
-    if (this.activeGroups.size > 0) {
-      for (const groupName of this.activeGroups) {
-        const group = this.groups.get(groupName);
-        if (group?.cues.has(cueType)) {
-         // console.log(`Found implementation for cue: ${cueType} in group: ${groupName}`);
-          return group.cues.get(cueType)!;
-        }
+    for (const groupName of this.activeGroups) {
+      const group = this.groups.get(groupName);
+      if (group?.cues.has(cueType)) {
+       // console.log(`Found implementation for cue: ${cueType} in active group: ${groupName}`);
+        return group.cues.get(cueType)!;
       }
     }
-
-    // Fall back to default group
-    if (this.defaultGroup) {
+    
+    // Fallback to default group if it exists and wasn't already checked in active groups
+    if (this.defaultGroup && !this.activeGroups.has(this.defaultGroup)) {
       const defaultGroup = this.groups.get(this.defaultGroup);
       if (defaultGroup?.cues.has(cueType)) {
-      //  console.log(`Found implementation for cue: ${cueType} in default group: ${this.defaultGroup}`);
+       // console.log(`Found implementation for cue: ${cueType} in default group: ${this.defaultGroup} (fallback)`);
         return defaultGroup.cues.get(cueType)!;
       }
-    } else {
-      // Throw an error if no default group is defined
-      throw new Error(`No default group defined to fall back to for cue: ${cueType}`);
     }
 
     console.error(`No implementation found for cue: ${cueType}`);
     return null;
+  }
+
+  /**
+   * Enable a single group by adding it to the enabled groups.
+   * If the group was not previously enabled, it will also be activated.
+   * @param groupName The name of the group to enable
+   * @returns True if the group was enabled, false otherwise
+   */
+  public enableGroup(groupName: string): boolean {
+    if (this.groups.has(groupName)) {
+      const wasEnabled = this.enabledGroups.has(groupName);
+      this.enabledGroups.add(groupName);
+      
+      // If it wasn't enabled before, activate it by default
+      if (!wasEnabled) {
+        this.activeGroups.add(groupName);
+      }
+      
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Disable a single group by removing it from the enabled groups.
+   * This will also deactivate the group if it was active.
+   * @param groupName The name of the group to disable
+   * @returns True if the group was disabled, false otherwise
+   */
+  public disableGroup(groupName: string): boolean {
+    if (this.enabledGroups.has(groupName)) {
+      this.enabledGroups.delete(groupName);
+      // Also deactivate the group if it was active
+      if (this.activeGroups.has(groupName)) {
+        this.activeGroups.delete(groupName);
+      }
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -140,12 +174,6 @@ export class CueRegistry {
    * @returns True if the group was deactivated, false otherwise
    */
   public deactivateGroup(groupName: string): boolean {
-    // Don't allow removing the default group
-    if (groupName === this.defaultGroup) {
-      console.warn("Cannot deactivate the default group");
-      return false;
-    }
-    
     if (this.activeGroups.has(groupName)) {
       this.activeGroups.delete(groupName);
       return true;
@@ -154,40 +182,21 @@ export class CueRegistry {
   }
 
   /**
-   * Enable a single group by adding it to the enabled groups.
-   * @param groupName The name of the group to enable
-   * @returns True if the group was enabled, false otherwise
+   * Set which groups are enabled.
+   * All newly enabled groups will also be activated by default.
+   * @param groupNames The names of the groups to enable
    */
-  public enableGroup(groupName: string): boolean {
-    if (this.groups.has(groupName)) {
-      this.enabledGroups.add(groupName);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Disable a single group by removing it from the enabled groups.
-   * This will also deactivate the group if it was active.
-   * @param groupName The name of the group to disable
-   * @returns True if the group was disabled, false otherwise
-   */
-  public disableGroup(groupName: string): boolean {
-    // Don't allow disabling the default group
-    if (groupName === this.defaultGroup) {
-      console.warn("Cannot disable the default group");
-      return false;
-    }
+  public setEnabledGroups(groupNames: string[]): void {
+    this.enabledGroups.clear();
+    this.activeGroups.clear();
     
-    if (this.enabledGroups.has(groupName)) {
-      this.enabledGroups.delete(groupName);
-      // Also deactivate the group if it was active
-      if (this.activeGroups.has(groupName)) {
-        this.activeGroups.delete(groupName);
+    for (const name of groupNames) {
+      if (this.groups.has(name)) {
+        this.enabledGroups.add(name);
+        // All enabled groups are active by default
+        this.activeGroups.add(name);
       }
-      return true;
     }
-    return false;
   }
 
   /**
@@ -205,21 +214,6 @@ export class CueRegistry {
   }
 
   /**
-   * Set which groups are enabled.
-   * @param groupNames The names of the groups to enable
-   */
-  public setEnabledGroups(groupNames: string[]): void {
-    this.enabledGroups.clear();
-    for (const name of groupNames) {
-      if (this.groups.has(name)) {
-        this.enabledGroups.add(name);
-      }
-    }
-    // Ensure active groups are still valid
-    this.setActiveGroups(Array.from(this.activeGroups));
-  }
-
-  /**
    * Get all registered group names, regardless of whether they're enabled or active.
    * @returns Array of all registered group names
    */
@@ -228,8 +222,15 @@ export class CueRegistry {
   }
 
   /**
+   * Get the currently enabled group names.
+   * @returns Array of enabled group names
+   */
+  public getEnabledGroups(): string[] {
+    return Array.from(this.enabledGroups);
+  }
+
+  /**
    * Get the currently active group names.
-   * These are the groups that will be used during gameplay.
    * @returns Array of active group names
    */
   public getActiveGroups(): string[] {
@@ -237,11 +238,11 @@ export class CueRegistry {
   }
 
   /**
-   * Get the currently enabled group names.
-   * @returns Array of enabled group names
+   * Get the name of the default group.
+   * @returns The default group name or null if no default group is set
    */
-  public getEnabledGroups(): string[] {
-    return Array.from(this.enabledGroups);
+  public getDefaultGroupName(): string | null {
+    return this.defaultGroup;
   }
 
   /**

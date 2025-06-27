@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAtom } from 'jotai';
 import {
   activeDmxLightsConfigAtom,
@@ -14,6 +14,7 @@ import CuePreview from '@renderer/components/CuePreview';
 import { useTimeoutEffect } from '../utils/useTimeout';
 import CueRegistrySelector from '@renderer/components/CueRegistrySelector';
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa';
+import ActiveGroupsSelector, { ActiveGroupsSelectorRef } from '../components/ActiveGroupsSelector';
 
 type CueRegistryType = 'YARG' | 'RB3E';
 
@@ -48,6 +49,8 @@ const DmxPreview: React.FC = () => {
   useTimeoutEffect(resetBeatIndicator, showBeatIndicator ? 200 : null);
   useTimeoutEffect(resetMeasureIndicator, showMeasureIndicator ? 200 : null);
   useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 200 : null);
+
+  const activeGroupsSelectorRef = useRef<ActiveGroupsSelectorRef>(null);
 
   // Fetch current group info when selected group changes
   useEffect(() => {
@@ -159,30 +162,33 @@ const DmxPreview: React.FC = () => {
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
   const handleGroupChange = useCallback((groupNames: string[]) => {
-    // Set the selected group for the UI
+    // Set the selected group for the UI preview only
     if (groupNames.length > 0) {
       const newSelectedGroup = groupNames[0];
       // Only update state if the group actually changed
       setSelectedGroup(prevSelectedGroup => {
         if (prevSelectedGroup !== newSelectedGroup) {
-          console.log(`Group changed from ${prevSelectedGroup} to ${newSelectedGroup}`);
+          console.log(`Preview group changed from ${prevSelectedGroup} to ${newSelectedGroup}`);
           return newSelectedGroup;
         }
         return prevSelectedGroup;
       });
+      
+      // Set this group as the only active group for DMX preview
+      window.electron.ipcRenderer.invoke('set-active-cue-groups', [newSelectedGroup])
+        .then(result => {
+          if (result.success) {
+            // Directly refresh the ActiveGroupsSelector to reflect the change
+            activeGroupsSelectorRef.current?.refreshActiveGroups();
+          } else {
+            console.error('Failed to set active group for preview:', result.error);
+          }
+        })
+        .catch(err => {
+          console.error('Error setting active group for preview:', err);
+        });
     }
-
-    // Set active groups in the backend
-    window.electron.ipcRenderer.invoke('set-active-cue-groups', groupNames)
-      .then(result => {
-        if (!result.success) {
-          console.error('Failed to set active group:', result.error);
-        }
-      })
-      .catch(err => {
-        console.error('Error setting active group:', err);
-      });
-  }, [setSelectedGroup]); // Dependency: setSelectedGroup (stable)
+  }, [setSelectedGroup]);
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
@@ -192,7 +198,8 @@ const DmxPreview: React.FC = () => {
 
       <hr className="my-6" />
       
-      <div className="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
+      
+      <div className="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 mb-6">
         <button
           className="w-full px-4 py-3 text-left font-medium text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset rounded-t-lg flex items-center justify-between"
           onClick={() => setIsAboutOpen(!isAboutOpen)}
@@ -226,6 +233,8 @@ const DmxPreview: React.FC = () => {
       </div>
 
 
+      <ActiveGroupsSelector ref={activeGroupsSelectorRef} className="mb-6" />
+     
       <div className="my-6">
         <h2 className="text-xl font-bold mb-4">Cue Selection</h2>
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">
@@ -296,9 +305,10 @@ const DmxPreview: React.FC = () => {
       </div>
   
       <hr className="my-6" />
+
      
       <CuePreview 
-        className="mb-6"
+        className="mb-0"
         showBeatIndicator={showBeatIndicator}
         showMeasureIndicator={showMeasureIndicator}
         showKeyframeIndicator={showKeyframeIndicator}
