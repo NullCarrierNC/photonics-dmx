@@ -52,46 +52,7 @@ const DmxPreview: React.FC = () => {
 
   const activeGroupsSelectorRef = useRef<ActiveGroupsSelectorRef>(null);
 
-  // Fetch current group info when selected group changes
-  useEffect(() => {
-    const fetchGroupInfo = async () => {
-      try {
-        const groups = await window.electron.ipcRenderer.invoke('get-cue-groups');
-        const group = groups.find((g: CueGroup) => g.name === selectedGroup);
-        if (group) {
-          setCurrentGroup(group);
-          
-          // Fetch available effects for the new group
-          try {
-            const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', selectedGroup);
-            
-            // Reset the currently selected effect since we changed groups
-            setSelectedEffect(null);
-            
-            // If there are effects available, select the first one automatically
-            if (availableEffects && availableEffects.length > 0) {
-              const firstEffect = availableEffects[0];
-              setSelectedEffect({
-                id: firstEffect.id,
-                yargDescription: firstEffect.yargDescription,
-                rb3Description: firstEffect.rb3Description,
-                groupName: firstEffect.groupName
-              });
-              console.log(`Auto-selected first effect: ${firstEffect.id} from group ${selectedGroup}`);
-            }
-          } catch (error) {
-            console.error('Error fetching available effects for group:', error);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching group info:', error);
-      }
-    };
-    
-    if (selectedGroup) {
-      fetchGroupInfo();
-    }
-  }, [selectedGroup]);
+
 
   // Automatically enable IPC sender on mount and disable on unmount.
   useEffect(() => {
@@ -125,11 +86,41 @@ const DmxPreview: React.FC = () => {
     };
   }, []);
 
+  // Track initialization phases to avoid overriding active groups during startup
+  const isInitialMount = useRef(true);
+  const isFullyInitialized = useRef(false);
+
+  // Helper function to ensure active group matches the selected group when user interacts with effects
+  const ensureActiveGroupMatches = useCallback(async () => {
+    if (selectedGroup && isFullyInitialized.current) {
+      try {
+        const result = await window.electron.ipcRenderer.invoke('set-active-cue-groups', [selectedGroup]);
+        if (result.success) {
+          activeGroupsSelectorRef.current?.refreshActiveGroups();
+          console.log(`Set active group to match selected group: ${selectedGroup}`);
+        } else {
+          console.error('Failed to set active group to match selection:', result.error);
+        }
+      } catch (error) {
+        console.error('Error setting active group to match selection:', error);
+      }
+    }
+  }, [selectedGroup]);
+
+  const handleEffectSelect = useCallback(async (effect: EffectSelector) => {
+    setSelectedEffect(effect);
+    // When user selects an effect, ensure the active group matches the selected group
+    await ensureActiveGroupMatches();
+  }, [ensureActiveGroupMatches]);
+
   const handleTestEffect = async () => {
     if (!selectedEffect) {
       console.log('No effect selected');
       return;
     }
+
+    // Ensure the active group matches the selected group when testing an effect
+    await ensureActiveGroupMatches();
 
     console.log(`Test Cue for Effect: ${selectedEffect.id}`);
     await window.electron.ipcRenderer.invoke('start-test-effect', selectedEffect.id);
@@ -162,33 +153,120 @@ const DmxPreview: React.FC = () => {
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
   const handleGroupChange = useCallback((groupNames: string[]) => {
-    // Set the selected group for the UI preview only
+    // Handle both "All" selection (multiple groups) and single group selection
     if (groupNames.length > 0) {
-      const newSelectedGroup = groupNames[0];
-      // Only update state if the group actually changed
+      // For UI display, use "All" if multiple groups, otherwise the single group name
+      const displayName = groupNames.length > 1 ? 'All' : groupNames[0];
+      
+      // Only update state if the selection actually changed
       setSelectedGroup(prevSelectedGroup => {
-        if (prevSelectedGroup !== newSelectedGroup) {
-          console.log(`Preview group changed from ${prevSelectedGroup} to ${newSelectedGroup}`);
-          return newSelectedGroup;
+        if (prevSelectedGroup !== displayName) {
+          console.log(`Preview group changed from ${prevSelectedGroup} to ${displayName}`);
+          
+          // Don't override active groups during initial mount - let the startup registration stand
+          if (!isInitialMount.current) {
+            // Set the selected groups as active for DMX preview
+            window.electron.ipcRenderer.invoke('set-active-cue-groups', groupNames)
+              .then(result => {
+                if (result.success) {
+                  // Directly refresh the ActiveGroupsSelector to reflect the change
+                  activeGroupsSelectorRef.current?.refreshActiveGroups();
+                } else {
+                  console.error('Failed to set active groups for preview:', result.error);
+                }
+              })
+              .catch(err => {
+                console.error('Error setting active groups for preview:', err);
+              });
+            
+            // Mark as fully initialized after first user-initiated group change
+            isFullyInitialized.current = true;
+          } else {
+            console.log('Skipping active group override during initial mount');
+            isInitialMount.current = false;
+          }
+          
+          return displayName;
         }
         return prevSelectedGroup;
       });
-      
-      // Set this group as the only active group for DMX preview
-      window.electron.ipcRenderer.invoke('set-active-cue-groups', [newSelectedGroup])
-        .then(result => {
-          if (result.success) {
-            // Directly refresh the ActiveGroupsSelector to reflect the change
-            activeGroupsSelectorRef.current?.refreshActiveGroups();
-          } else {
-            console.error('Failed to set active group for preview:', result.error);
-          }
-        })
-        .catch(err => {
-          console.error('Error setting active group for preview:', err);
-        });
     }
   }, [setSelectedGroup]);
+
+  // Fetch current group info when selected group changes
+  useEffect(() => {
+    const fetchGroupInfo = async () => {
+      try {
+        if (selectedGroup === 'All') {
+          // For "All" selection, show a synthetic group description
+          setCurrentGroup({
+            name: 'All',
+            description: 'All enabled cue groups are active',
+            cueTypes: []
+          });
+          
+          // For effects dropdown, use the default group's effects
+          try {
+            const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', 'default');
+            
+            // Reset the currently selected effect since we changed groups
+            setSelectedEffect(null);
+            
+            // If there are effects available, select the first one automatically
+            if (availableEffects && availableEffects.length > 0) {
+              const firstEffect = availableEffects[0];
+              const effect = {
+                id: firstEffect.id,
+                yargDescription: firstEffect.yargDescription,
+                rb3Description: firstEffect.rb3Description,
+                groupName: firstEffect.groupName
+              };
+              setSelectedEffect(effect);
+              console.log(`Auto-selected first effect: ${firstEffect.id} from default group (All mode)`);
+            }
+          } catch (error) {
+            console.error('Error fetching available effects for All mode:', error);
+          }
+        } else {
+          // Single group selection
+          const groups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+          const group = groups.find((g: CueGroup) => g.name === selectedGroup);
+          if (group) {
+            setCurrentGroup(group);
+            
+            // Fetch available effects for the specific group
+            try {
+              const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', selectedGroup);
+              
+              // Reset the currently selected effect since we changed groups
+              setSelectedEffect(null);
+              
+              // If there are effects available, select the first one automatically
+              if (availableEffects && availableEffects.length > 0) {
+                const firstEffect = availableEffects[0];
+                const effect = {
+                  id: firstEffect.id,
+                  yargDescription: firstEffect.yargDescription,
+                  rb3Description: firstEffect.rb3Description,
+                  groupName: firstEffect.groupName
+                };
+                setSelectedEffect(effect);
+                console.log(`Auto-selected first effect: ${firstEffect.id} from group ${selectedGroup}`);
+              }
+            } catch (error) {
+              console.error('Error fetching available effects for group:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching group info:', error);
+      }
+    };
+    
+    if (selectedGroup) {
+      fetchGroupInfo();
+    }
+  }, [selectedGroup]);
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
@@ -249,19 +327,18 @@ const DmxPreview: React.FC = () => {
       <ActiveGroupsSelector ref={activeGroupsSelectorRef} className="mb-6" />
      
       <div className="my-6">
-        <h2 className="text-xl font-bold mb-4">Cue Selection</h2>
+        <h2 className="text-xl font-bold mb-4">Cue Simulation Selection</h2>
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">
           <div>
             <CueRegistrySelector 
               onRegistryChange={handleRegistryChange}
               onGroupChange={handleGroupChange}
-              useActiveGroupsOnly={true}
             />
           </div>
           <div className="lg:w-64">
             <EffectsDropdown 
-              onSelect={(effect) => setSelectedEffect(effect)} 
-              groupName={selectedGroup}
+              onSelect={handleEffectSelect}
+              groupName={selectedGroup === 'All' ? 'default' : selectedGroup}
               value={selectedEffect?.id}
             />
           </div>
@@ -285,32 +362,56 @@ const DmxPreview: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleTestEffect}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className={`px-4 py-2 rounded ${
+              !selectedEffect 
+                ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                : 'bg-blue-500 text-white hover:bg-blue-600'
+            }`}
             disabled={!selectedEffect}
           >
             Start Test Effect
           </button>
           <button
             onClick={handleStopTestEffect}
-            className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+            className={`px-4 py-2 rounded ${
+              !selectedEffect 
+                ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                : 'bg-orange-500 text-white hover:bg-orange-600'
+            }`}
+            disabled={!selectedEffect}
           >
             Stop Test Effect
           </button>
           <button
             onClick={handleSimulateBeat}
-            className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+            className={`px-4 py-2 rounded ${
+              !selectedEffect 
+                ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                : 'bg-purple-500 text-white hover:bg-purple-600'
+            }`}
+            disabled={!selectedEffect}
           >
             Simulate Beat
           </button>
           <button
             onClick={handleSimulateMeasure}
-            className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+            className={`px-4 py-2 rounded ${
+              !selectedEffect 
+                ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                : 'bg-yellow-500 text-white hover:bg-yellow-600'
+            }`}
+            disabled={!selectedEffect}
           >
             Simulate Measure
           </button>
           <button
             onClick={handleSimulateKeyframe}
-            className="px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600"
+            className={`px-4 py-2 rounded ${
+              !selectedEffect 
+                ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                : 'bg-emerald-500 text-white hover:bg-emerald-600'
+            }`}
+            disabled={!selectedEffect}
           >
             Simulate Keyframe
           </button>
