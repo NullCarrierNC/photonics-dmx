@@ -407,7 +407,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       if (validGroups.length === 0) {
         return { 
           success: false, 
-          error: `No valid enabled groups provided. Invalid: ${invalidGroups.join(', ')}, Disabled: ${disabledGroups.join(', ')}`
+          error: `No valid groups provided. Invalid: ${invalidGroups.join(', ')}, Disabled: ${disabledGroups.join(', ')}`
         };
       }
       

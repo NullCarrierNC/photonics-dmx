@@ -155,18 +155,17 @@ describe('IPC Light Handlers for Cue Registry', () => {
   });
 
   describe('set-active-cue-groups handler', () => {
-    it('should set the active groups and include default', async () => {
+    it('should set the active groups', async () => {
       const result = await setActiveGroupsHandler({}, ['custom']);
       
-      // Expect detailed response, including the default group
+      // Expect detailed response with only the groups explicitly set
       expect(result).toEqual({
         success: true,
-        activeGroups: expect.arrayContaining(['custom', 'default']),
-        invalidGroups: undefined
+        activeGroups: ['custom'],
+        invalidGroups: undefined,
+        disabledGroups: undefined
       });
-      expect(result.activeGroups).toHaveLength(2);
-      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']));
-      expect(registry.getActiveGroups()).toHaveLength(2);
+      expect(registry.getActiveGroups()).toEqual(['custom']);
     });
 
     it('should set multiple active groups correctly', async () => {
@@ -176,7 +175,8 @@ describe('IPC Light Handlers for Cue Registry', () => {
       expect(result).toEqual({
         success: true,
         activeGroups: expect.arrayContaining(['custom', 'default']),
-        invalidGroups: undefined
+        invalidGroups: undefined,
+        disabledGroups: undefined
       });
       expect(result.activeGroups).toHaveLength(2);
       expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']));
@@ -190,25 +190,24 @@ describe('IPC Light Handlers for Cue Registry', () => {
       // Expect failure response
       expect(result).toEqual({
         success: false,
-        error: expect.stringContaining('No valid groups provided') // Check for error message
+        error: 'No valid groups provided. Invalid: , Disabled: '
       });
       // Ensure registry didn't actually clear (due to handler validation)
-      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default'])); 
+      expect(registry.getActiveGroups()).toEqual(['custom']); 
     });
 
     it('should ignore non-existent groups and return invalid ones', async () => {
       const result = await setActiveGroupsHandler({}, ['custom', 'non-existent']);
       
-      // Expect detailed response including default and the invalid group
+      // Expect detailed response with only valid groups and the invalid group listed
       expect(result).toEqual({
         success: true,
-        activeGroups: expect.arrayContaining(['custom', 'default']),
-        invalidGroups: ['non-existent']
+        activeGroups: ['custom'],
+        invalidGroups: ['non-existent'],
+        disabledGroups: undefined
       });
-      expect(result.activeGroups).toHaveLength(2);
-      // Verify registry state reflects only the valid + default group
-      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']));
-      expect(registry.getActiveGroups()).toHaveLength(2);
+      // Verify registry state reflects only the valid groups
+      expect(registry.getActiveGroups()).toEqual(['custom']);
     });
   });
 
