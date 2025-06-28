@@ -9,7 +9,7 @@ import { randomBetween } from '../../../helpers/utils';
 
 export class CoolAutomaticCue implements ICue {
   name = YargCue.CoolAutomatic;
-  description = 'Sequential pattern where front lights change one by one on beat, cycling through all positions';
+  description = 'All lights get set green, front cycles each light to blue on beat in random direction. ';
   style = CueStyle.Primary;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {

@@ -129,7 +129,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
           {enabledGroups.map((group) => (
             <div
               key={group.name}
-              className="flex items-center justify-between p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
+              className="flex items-center justify-between pl-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
             >
               <div className="flex items-center gap-3 flex-1">
                 <input

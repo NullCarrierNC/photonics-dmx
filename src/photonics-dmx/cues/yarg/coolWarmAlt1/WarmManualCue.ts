@@ -10,7 +10,7 @@ import { getEffectSingleColor } from '../../../effects';
 
 export class WarmManualCue implements ICue {
   name = YargCue.WarmManual;
-  description = 'Manual red and yellow cross-fade with beat-triggered cycling';
+  description = 'Front lights set red, yellow sweep on measure.';
   style = CueStyle.Primary;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {

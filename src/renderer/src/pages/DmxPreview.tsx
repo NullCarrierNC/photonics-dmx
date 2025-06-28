@@ -327,7 +327,7 @@ const DmxPreview: React.FC = () => {
       <ActiveGroupsSelector ref={activeGroupsSelectorRef} className="mb-6" />
      
       <div className="my-6">
-        <h2 className="text-xl font-bold mb-4">Cue Simulation</h2>
+        <h2 className="text-xl font-bold mb-1">Cue Simulation</h2>
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">
           <div>
             <CueRegistrySelector 
