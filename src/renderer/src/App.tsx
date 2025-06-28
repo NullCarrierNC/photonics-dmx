@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, } from './atoms';
+import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo } from './atoms';
 import { Pages } from './types';
 import squareLogo from './assets/images/photonics-icon.png';
 import LeftMenu from './components/LeftMenu';
@@ -37,6 +37,7 @@ export const App = (): JSX.Element => {
   const [, setPrefs] = useAtom(lightingPrefsAtom);
   const setIsSenderError = useSetAtom(isSenderErrorAtom);
   const setSenderError = useSetAtom(senderErrorAtom);
+  const setCueState = useSetAtom(currentCueStateAtom);
   const [appVer, setAppVer] = useState('');
 
   // Create a clearErrorTimeout callback that will be used to reset error state
@@ -58,6 +59,11 @@ export const App = (): JSX.Element => {
     // Reset the error timeout (clears existing timeout and sets a new one)
     resetErrorTimeout();
   }, [setIsSenderError, setSenderError, resetErrorTimeout]);
+
+  // Handler for cue state updates
+  const handleCueStateUpdate = useCallback((_evt: IpcRendererEvent, cueState: CueStateInfo): void => {
+    setCueState(cueState);
+  }, [setCueState]);
 
   const toggleDarkMode = (): void => {
     setIsDarkMode((prevMode) => !prevMode);
@@ -140,6 +146,9 @@ export const App = (): JSX.Element => {
 
     // Set up event listener for sender errors
     addIpcListener('sender-error', handleSenderError);
+    
+    // Set up event listener for cue state updates
+    addIpcListener('cue-state-update', handleCueStateUpdate);
 
     const saveLightLayout = async () => {
       if (activeConfig) {
@@ -156,8 +165,9 @@ export const App = (): JSX.Element => {
     // Cleanup function
     return () => {
       removeIpcListener('sender-error', handleSenderError);
+      removeIpcListener('cue-state-update', handleCueStateUpdate);
     };
-  }, [activeConfig]);
+  }, [activeConfig, handleSenderError, handleCueStateUpdate]);
 
   const renderContent = () => {
     switch (currentPage) {

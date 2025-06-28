@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CueData } from '../../../photonics-dmx/cues/cueTypes';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { useAtom } from 'jotai';
+import { currentCueStateAtom } from '../atoms';
 
 interface CuePreviewProps {
     className?: string;
@@ -10,11 +12,6 @@ interface CuePreviewProps {
     manualBeatType?: string;
     manualMeasureType?: string;
     manualKeyframeType?: string;
-}
-
-interface CueSourceInfo {
-    groupName: string | null;
-    isFromDefault: boolean;
 }
 
 const CuePreview: React.FC<CuePreviewProps> = ({
@@ -27,7 +24,13 @@ const CuePreview: React.FC<CuePreviewProps> = ({
     manualKeyframeType = 'Manual Keyframe'
 }) => {
     const [currentCueData, setCurrentCueData] = useState<CueData | null>(null);
-    const [cueSourceInfo, setCueSourceInfo] = useState<CueSourceInfo | null>(null);
+    const [cueState] = useAtom(currentCueStateAtom);
+    
+    // Separate state for primary and secondary cues
+    const [primaryCueName, setPrimaryCueName] = useState<string>('');
+    const [primaryCueCounter, setPrimaryCueCounter] = useState<number>(0);
+    const [secondaryCueName, setSecondaryCueName] = useState<string>('');
+    const [secondaryCueCounter, setSecondaryCueCounter] = useState<number>(0);
 
     // State for beat and measure indicators
     const [beatReceived, setBeatReceived] = useState(false);
@@ -43,24 +46,25 @@ const CuePreview: React.FC<CuePreviewProps> = ({
     const prevMeasureRef = useRef<number | undefined>(undefined);
     const prevKeyframeRef = useRef<string | null>(null);
 
-    // Fetch cue source group information when cue changes
+    // Update primary/secondary cue display based on cue state changes
     useEffect(() => {
-        const fetchCueSourceInfo = async () => {
-            if (currentCueData?.lightingCue && currentCueData.lightingCue !== 'None') {
-                try {
-                    const sourceInfo = await window.electron.ipcRenderer.invoke('get-cue-source-group', currentCueData.lightingCue);
-                    setCueSourceInfo(sourceInfo);
-                } catch (error) {
-                    console.error('Error fetching cue source info:', error);
-                    setCueSourceInfo(null);
+        if (cueState?.cueType && cueState?.cueStyle) {
+            if (cueState.cueStyle === 'primary') {
+                // Clear secondary when a different primary cue starts (secondary cues are transient)
+                if (primaryCueName && primaryCueName !== cueState.cueType) {
+                    setSecondaryCueName('');
+                    setSecondaryCueCounter(0);
                 }
-            } else {
-                setCueSourceInfo(null);
+                setPrimaryCueName(cueState.cueType);
+                setPrimaryCueCounter(cueState.counter);
+            } else if (cueState.cueStyle === 'secondary') {
+                setSecondaryCueName(cueState.cueType);
+                setSecondaryCueCounter(cueState.counter);
             }
-        };
+        }
+    }, [cueState, primaryCueName]);
 
-        fetchCueSourceInfo();
-    }, [currentCueData?.lightingCue]);
+
 
     // Handle manual indicators via props
     useEffect(() => {
@@ -200,8 +204,8 @@ const CuePreview: React.FC<CuePreviewProps> = ({
     }, []);
 
     const getTitle = () => {
-        if (cueSourceInfo?.groupName) {
-            return `Current Cue - ${cueSourceInfo.groupName}${cueSourceInfo.isFromDefault ? ' - fallback' : ''}`;
+        if (cueState?.groupName) {
+            return `Current Cue - ${cueState.groupName}${cueState.isFallback ? ' - fallback' : ''}`;
         }
         return 'Current Cue';
     };
@@ -212,8 +216,8 @@ const CuePreview: React.FC<CuePreviewProps> = ({
             {currentCueData ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <p className="font-medium">Name:</p>
-                        <p>{currentCueData.lightingCue || 'None'}</p>
+                        <p><span className="font-medium">Primary:</span> {primaryCueName || 'None'} {primaryCueName && primaryCueCounter > 0 ? `(${primaryCueCounter})` : ''}</p>
+                        <p><span className="font-medium">Secondary:</span> {secondaryCueName || ''} {secondaryCueName && secondaryCueCounter > 0 ? `(${secondaryCueCounter})` : ''}</p>
                     </div>
 
                     <div>

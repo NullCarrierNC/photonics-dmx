@@ -68,7 +68,7 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
   );
 
   return (
-    <div className="p-6 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200 rounded-lg">
+    <div className="pt-6 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200 rounded-lg">
       {/* Front Lights Group */}
       {lightingConfig?.frontLights.length > 0 &&
         renderLightsGroup(lightingConfig.frontLights, 'Front Lights')}

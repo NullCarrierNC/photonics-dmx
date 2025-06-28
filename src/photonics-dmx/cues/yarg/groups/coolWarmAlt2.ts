@@ -2,7 +2,7 @@ import { CueRegistry } from '../../CueRegistry';
 import { CueType } from '../../cueTypes';
 import { ICueGroup } from '../../interfaces/ICueGroup';
 import { CoolAutomaticCue } from '../coolWarmAlt2/CoolAutomaticCue';
-import { WarmAutomaticCue } from '../default/WarmAutomaticCue';
+import { WarmAutomaticCue } from '../coolWarmAlt2/WarmAutomaticCue';
 
 /**
  * Create and register the cool/warm alternative 1 cue group.

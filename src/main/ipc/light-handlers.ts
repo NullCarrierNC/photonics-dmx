@@ -1,10 +1,10 @@
-import { IpcMain } from 'electron';
+import { IpcMain, BrowserWindow } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { SenderConfig } from '../../photonics-dmx/types';
 import { SacnSender } from '../../photonics-dmx/senders/SacnSender';
 import { IpcSender } from '../../photonics-dmx/senders/IpcSender';
 import { EnttecProSender } from '../../photonics-dmx/senders/EnttecProSender';
-import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
+import { CueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/CueRegistry';
 
 /**
  * Set up light-related IPC handlers
@@ -12,6 +12,19 @@ import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
  * @param controllerManager The controller manager instance
  */
 export function setupLightHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
+  // Send cue state updates to renderer
+  const sendCueStateUpdate = (cueState: CueStateUpdate) => {
+    const allWindows = BrowserWindow.getAllWindows();
+    const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
+    if (mainWindow) {
+      mainWindow.webContents.send('cue-state-update', cueState);
+    }
+  };
+  
+  // Set up the callback with the CueRegistry
+  const registry = CueRegistry.getInstance();
+  registry.setCueStateUpdateCallback(sendCueStateUpdate);
+
   // Enable a sender
   ipcMain.on('sender-enable', (_, data: SenderConfig) => {
     try {
@@ -435,15 +448,17 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     try {
       const registry = CueRegistry.getInstance();
       const activeGroups = registry.getActiveGroups();
+      const enabledGroups = registry.getEnabledGroups();
       const defaultGroupName = registry.getDefaultGroupName();
       
       // Try active groups first
       for (const groupName of activeGroups) {
         const group = registry.getGroup(groupName);
         if (group?.cues.has(cueType as any)) {
+          const isFallback = group.name === defaultGroupName && !enabledGroups.includes(defaultGroupName);
           return {
             groupName: group.name,
-            isFromDefault: group.name === defaultGroupName
+            isFallback
           };
         }
       }
@@ -454,7 +469,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         if (defaultGroup?.cues.has(cueType as any)) {
           return {
             groupName: defaultGroup.name,
-            isFromDefault: true // This is fallback behavior
+            isFallback: true // This is definitely fallback behavior
           };
         }
       }
@@ -462,13 +477,13 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       // If not found anywhere
       return {
         groupName: null,
-        isFromDefault: false
+        isFallback: false
       };
     } catch (error) {
       console.error('Error getting cue source group:', error);
       return {
         groupName: null,
-        isFromDefault: false
+        isFallback: false
       };
     }
   });

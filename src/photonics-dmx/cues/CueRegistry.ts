@@ -3,6 +3,18 @@ import { ICueGroup } from './interfaces/ICueGroup';
 import { ICue, CueStyle } from './interfaces/ICue';
 
 /**
+ * Interface for cue state updates sent to frontend
+ */
+export interface CueStateUpdate {
+  cueType: string;
+  groupName: string;
+  isFallback: boolean;
+  cueStyle: 'primary' | 'secondary';
+  counter: number;
+  limit: number;
+}
+
+/**
  * Registry for managing multiple sets of cue implementations.
  * Additional groups can define unique implementations for cues.
  * If a group doesn't define a specific cue we will fall back to the 
@@ -32,10 +44,12 @@ export class CueRegistry {
   /** Track last called primary cue and its source group */
   private lastPrimaryCueName: string | null = null;
   private lastPrimaryCueGroup: string | null = null;
+  private lastPrimaryIsFallback: boolean = false;
   
   /** Track last called secondary cue and its source group */
   private lastSecondaryCueName: string | null = null;
   private lastSecondaryCueGroup: string | null = null;
+  private lastSecondaryIsFallback: boolean = false;
   
   /** Counter for consecutive calls to the same primary cue */
   private primaryCueCounter: number = 0;
@@ -47,7 +61,47 @@ export class CueRegistry {
 
   private secondaryCueLimit: number = 50;
 
+  /** Optional callback for sending cue state updates to frontend */
+  private cueStateUpdateCallback: ((state: CueStateUpdate) => void) | null = null;
+
   private constructor() {}
+
+  /**
+   * Set callback for sending cue state updates to frontend
+   * @param callback Function to call when cue state changes
+   */
+  public setCueStateUpdateCallback(callback: (state: CueStateUpdate) => void): void {
+    this.cueStateUpdateCallback = callback;
+  }
+
+  /**
+   * Send cue state update to frontend if callback is set
+   * @param cueType The cue type that was selected
+   * @param groupName The group it came from
+   * @param isFallback Whether this is a fallback use of disabled default group
+   * @param cueStyle Primary or secondary
+   * @param counter Current counter value
+   * @param limit Counter limit
+   */
+  private emitCueStateUpdate(
+    cueType: string, 
+    groupName: string, 
+    isFallback: boolean, 
+    cueStyle: 'primary' | 'secondary',
+    counter: number,
+    limit: number
+  ): void {
+    if (this.cueStateUpdateCallback) {
+      this.cueStateUpdateCallback({
+        cueType,
+        groupName,
+        isFallback,
+        cueStyle,
+        counter,
+        limit
+      });
+    }
+  }
 
   /**
    * Reset the registry by clearing all groups.
@@ -62,8 +116,10 @@ export class CueRegistry {
     // Reset cue tracking state
     this.lastPrimaryCueName = null;
     this.lastPrimaryCueGroup = null;
+    this.lastPrimaryIsFallback = false;
     this.lastSecondaryCueName = null;
     this.lastSecondaryCueGroup = null;
+    this.lastSecondaryIsFallback = false;
     this.primaryCueCounter = 0;
     this.secondaryCueCounter = 0;
   }
@@ -134,7 +190,7 @@ export class CueRegistry {
       return this.handleSecondaryCue(cueType);
     }
     
-    // Fallback to default behavior for unknown styles
+    // Fallback to default behavior for missing styles
     return this.getFallbackImplementation(cueType);
   }
 
@@ -152,22 +208,44 @@ export class CueRegistry {
       this.primaryCueCounter = 0;
       const selectedGroup = this.selectRandomGroupWithCue(cueType);
       
-      if (selectedGroup) {
+                    if (selectedGroup) {
         this.lastPrimaryCueName = cueType;
         this.lastPrimaryCueGroup = selectedGroup;
+        this.lastPrimaryIsFallback = selectedGroup === this.defaultGroup && !this.enabledGroups.has(this.defaultGroup);
         this.primaryCueCounter++;
+        this.emitCueStateUpdate(cueType, selectedGroup, this.lastPrimaryIsFallback, 'primary', this.primaryCueCounter, this.primaryCueLimit);
         return this.groups.get(selectedGroup)!.cues.get(cueType)!;
       }
     } else {
       // Use same group as last time
       this.primaryCueCounter++;
       if (this.lastPrimaryCueGroup && this.groups.get(this.lastPrimaryCueGroup)?.cues.has(cueType)) {
+        this.emitCueStateUpdate(cueType, this.lastPrimaryCueGroup, this.lastPrimaryIsFallback, 'primary', this.primaryCueCounter, this.primaryCueLimit);
         return this.groups.get(this.lastPrimaryCueGroup)!.cues.get(cueType)!;
       }
     }
     
     // Fallback if previous logic failed
-    return this.getFallbackImplementation(cueType);
+    const fallbackCue = this.getFallbackImplementation(cueType);
+    if (fallbackCue) {
+      // Find which group provided the fallback
+      for (const groupName of this.activeGroups) {
+        const group = this.groups.get(groupName);
+        if (group?.cues.has(cueType)) {
+          const isFallback = groupName === this.defaultGroup && !this.enabledGroups.has(this.defaultGroup);
+          this.emitCueStateUpdate(cueType, groupName, isFallback, 'primary', 0, this.primaryCueLimit);
+          break;
+        }
+      }
+      // Check default group if not in active groups (this is definitely a fallback)
+      if (this.defaultGroup && !this.activeGroups.has(this.defaultGroup)) {
+        const defaultGroup = this.groups.get(this.defaultGroup);
+        if (defaultGroup?.cues.has(cueType)) {
+          this.emitCueStateUpdate(cueType, this.defaultGroup, true, 'primary', 0, this.primaryCueLimit);
+        }
+      }
+    }
+    return fallbackCue;
   }
 
   /**
@@ -187,19 +265,41 @@ export class CueRegistry {
       if (selectedGroup) {
         this.lastSecondaryCueName = cueType;
         this.lastSecondaryCueGroup = selectedGroup;
+        this.lastSecondaryIsFallback = selectedGroup === this.defaultGroup && !this.enabledGroups.has(this.defaultGroup);
         this.secondaryCueCounter++;
+        this.emitCueStateUpdate(cueType, selectedGroup, this.lastSecondaryIsFallback, 'secondary', this.secondaryCueCounter, this.secondaryCueLimit);
         return this.groups.get(selectedGroup)!.cues.get(cueType)!;
       }
     } else {
       // Use same group as last time
       this.secondaryCueCounter++;
       if (this.lastSecondaryCueGroup && this.groups.get(this.lastSecondaryCueGroup)?.cues.has(cueType)) {
+        this.emitCueStateUpdate(cueType, this.lastSecondaryCueGroup, this.lastSecondaryIsFallback, 'secondary', this.secondaryCueCounter, this.secondaryCueLimit);
         return this.groups.get(this.lastSecondaryCueGroup)!.cues.get(cueType)!;
       }
     }
     
     // Fallback if previous logic failed
-    return this.getFallbackImplementation(cueType);
+    const fallbackCue = this.getFallbackImplementation(cueType);
+    if (fallbackCue) {
+      // Find which group provided the fallback
+      for (const groupName of this.activeGroups) {
+        const group = this.groups.get(groupName);
+        if (group?.cues.has(cueType)) {
+          const isFallback = groupName === this.defaultGroup && !this.enabledGroups.has(this.defaultGroup);
+          this.emitCueStateUpdate(cueType, groupName, isFallback, 'secondary', 0, this.secondaryCueLimit);
+          break;
+        }
+      }
+      // Check default group if not in active groups (this is definitely a fallback)
+      if (this.defaultGroup && !this.activeGroups.has(this.defaultGroup)) {
+        const defaultGroup = this.groups.get(this.defaultGroup);
+        if (defaultGroup?.cues.has(cueType)) {
+          this.emitCueStateUpdate(cueType, this.defaultGroup, true, 'secondary', 0, this.secondaryCueLimit);
+        }
+      }
+    }
+    return fallbackCue;
   }
 
   /**
@@ -257,7 +357,7 @@ export class CueRegistry {
   }
 
   /**
-   * Get a cue implementation using the original fallback logic.
+   * Get a cue implementation using fallback logic.
    * @param cueType The type of cue to get
    * @returns The cue implementation or null if not found
    */
@@ -425,8 +525,8 @@ export class CueRegistry {
    * @returns Object containing current selection state
    */
   public getDebugInfo(): {
-    lastPrimaryCue: { name: string | null; group: string | null; counter: number };
-    lastSecondaryCue: { name: string | null; group: string | null; counter: number };
+    lastPrimaryCue: { name: string | null; group: string | null; counter: number; isFallback: boolean };
+    lastSecondaryCue: { name: string | null; group: string | null; counter: number; isFallback: boolean };
     activeGroups: string[];
     enabledGroups: string[];
     defaultGroup: string | null;
@@ -435,12 +535,14 @@ export class CueRegistry {
       lastPrimaryCue: {
         name: this.lastPrimaryCueName,
         group: this.lastPrimaryCueGroup,
-        counter: this.primaryCueCounter
+        counter: this.primaryCueCounter,
+        isFallback: this.lastPrimaryIsFallback
       },
       lastSecondaryCue: {
         name: this.lastSecondaryCueName,
         group: this.lastSecondaryCueGroup,
-        counter: this.secondaryCueCounter
+        counter: this.secondaryCueCounter,
+        isFallback: this.lastSecondaryIsFallback
       },
       activeGroups: Array.from(this.activeGroups),
       enabledGroups: Array.from(this.enabledGroups),
@@ -450,13 +552,14 @@ export class CueRegistry {
 
   /**
    * Reset the cue selection counters and last selected groups.
-   * Useful for debugging or forcing fresh randomization.
    */
   public resetCueSelectionState(): void {
     this.lastPrimaryCueName = null;
     this.lastPrimaryCueGroup = null;
+    this.lastPrimaryIsFallback = false;
     this.lastSecondaryCueName = null;
     this.lastSecondaryCueGroup = null;
+    this.lastSecondaryIsFallback = false;
     this.primaryCueCounter = 0;
     this.secondaryCueCounter = 0;
   }

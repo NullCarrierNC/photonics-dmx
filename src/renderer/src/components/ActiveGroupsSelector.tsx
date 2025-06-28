@@ -114,11 +114,11 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
     }
 
     return (
-      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md ${className}`}>
-        <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100 ">
+      <div className={`bg-white dark:bg-gray-800  ${className}`}>
+        <h3 className="text-lg font-semibold mb-1 text-gray-900 dark:text-gray-100 ">
           Active Cue Groups
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
           By default all enabled groups are active. To disable a group entirely, disable it in the Preferences menu.
         </p>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">

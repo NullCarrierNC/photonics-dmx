@@ -116,7 +116,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({
   );
 
   return (
-    <div className="mt-8 pt-3 pb-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
+    <div className="mt-4 pt-3 pb-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
       <div className="flex flex-col items-center">
         {/* Icon representing the lighting setup */}
         <div className="mb-1">
