@@ -8,7 +8,8 @@ import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors
 import { YargCue } from '../YargCue';
 
 export class WarmManualCue implements ICue {
-  name = YargCue.WarmManual;
+  id = 'default-warm-manual';
+  cueId = YargCue.WarmManual;
   description = 'Alternates between red and yellow on even/odd front lights triggered by measure events';
   style = CueStyle.Primary;
 

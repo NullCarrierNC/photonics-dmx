@@ -8,7 +8,8 @@ import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { RGBIP } from '../../../types';
 
 export class StrobeFastestCue implements ICue {
-  name = YargCue.Strobe_Fastest;
+  id = 'default-strobe-fastest';
+  cueId = YargCue.Strobe_Fastest;
   description = 'Extremely rapid white strobe effect with flashing timed to BPM/64 of the song';
   style = CueStyle.Secondary;
 

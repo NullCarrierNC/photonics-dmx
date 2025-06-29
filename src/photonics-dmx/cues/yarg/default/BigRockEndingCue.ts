@@ -8,7 +8,8 @@ import { randomBetween } from '../../../helpers/utils';
 import { YargCue } from '../YargCue';
 
 export class BigRockEndingCue implements ICue {
-  name = YargCue.BigRockEnding;
+  id = 'default-big-rock-ending';
+  cueId = YargCue.BigRockEnding;
   description = 'Chaotic, individual flashing of bright colors (red, green, blue, orange) on all lights with random timings';
   style = CueStyle.Secondary;
 

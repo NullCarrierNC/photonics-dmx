@@ -8,12 +8,16 @@ import { beforeEach, describe, it, expect } from '@jest/globals';
 
 // Mock implementations with descriptions
 class MockCueImplementation implements ICue {
+  private _id: string;
   constructor(
     private _name: string,
     private _description?: string
-  ) {}
+  ) {
+    this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`;
+  }
   
-  get name(): string { return this._name; }
+  get cueId(): string { return this._name; }
+  get id(): string { return this._id; }
   get description(): string | undefined { return this._description; }
   style = CueStyle.Primary;
   

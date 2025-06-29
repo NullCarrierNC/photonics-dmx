@@ -5,7 +5,8 @@ import { ICue, CueStyle } from '../../interfaces/ICue';
 import { YargCue } from '../YargCue';
 
 export class StrobeOffCue implements ICue {
-  name = YargCue.Strobe_Off;
+  id = 'default-strobe-off';
+  cueId = YargCue.Strobe_Off;
   description = 'Here for completeness, but YARG disables strobes by simply not turning them on.';
   style = CueStyle.Secondary;
 

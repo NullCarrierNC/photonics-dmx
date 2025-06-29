@@ -8,7 +8,8 @@ import { randomBetween } from '../../../helpers/utils';
 import { YargCue } from '../YargCue';
 
 export class SweepCue implements ICue {
-  name = YargCue.Sweep;
+  id = 'default-sweep';
+  cueId = YargCue.Sweep;
   description = 'Rapid sweep effect that moves a bright color (red/yellow or blue/green based on venue size) across front lights, either left-to-right or right-to-left';
   style = CueStyle.Secondary;
 

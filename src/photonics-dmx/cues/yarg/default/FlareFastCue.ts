@@ -8,7 +8,8 @@ import { randomBetween } from '../../../helpers/utils';
 import { YargCue } from '../YargCue';
 
 export class FlareFastCue implements ICue {
-  name = YargCue.FlareFast;
+  id = 'default-flare-fast';
+  cueId = YargCue.FlareFast;
   description = 'Quick, intense bursts of bright white light on individual front lights with randomized timing, resembling camera flashes';
   style = CueStyle.Secondary;
 

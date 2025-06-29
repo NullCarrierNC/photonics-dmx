@@ -8,8 +8,12 @@ import { beforeEach, describe, it, expect } from '@jest/globals';
 
 // Mock implementations
 class MockCueImplementation implements ICue {
-  constructor(private _name: string) {}
-  get name(): string { return this._name; }
+  private _id: string;
+  constructor(private _name: string) {
+    this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`;
+  }
+  get cueId(): string { return this._name; }
+  get id(): string { return this._id; }
   description = 'Mock cue for testing';
   style = CueStyle.Primary;
   async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
@@ -71,7 +75,7 @@ describe('CueRegistry', () => {
     it('should set default group when registering group named "default"', () => {
       const implementation = registry.getCueImplementation(CueType.Default);
       expect(implementation).toBeDefined();
-      expect((implementation as MockCueImplementation).name).toBe('default');
+      expect((implementation as MockCueImplementation).cueId).toBe('default');
     });
   });
 
@@ -92,7 +96,7 @@ describe('CueRegistry', () => {
       const implementation = registry.getCueImplementation(CueType.Default);
       expect(implementation).toBeDefined();
       expect(implementation).toBeInstanceOf(MockCueImplementation);
-      expect((implementation as MockCueImplementation).name).toBe('default');
+      expect((implementation as MockCueImplementation).cueId).toBe('default');
     });
 
     it('should return null if no implementation found', () => {

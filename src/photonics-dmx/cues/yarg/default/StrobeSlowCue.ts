@@ -8,7 +8,8 @@ import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { RGBIP } from '../../../types';
 
 export class StrobeSlowCue implements ICue {
-  name = YargCue.Strobe_Slow;
+  id = 'default-strobe-slow';
+  cueId = YargCue.Strobe_Slow;
   description = 'Slow white strobe effect with flashing timed to BPM/8 of the song';
   style = CueStyle.Secondary;
 

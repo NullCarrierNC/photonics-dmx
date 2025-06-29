@@ -7,7 +7,8 @@ import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 
 export class DefaultCue implements ICue {
-  name = YargCue.Default;
+  id = 'default-default';
+  cueId = YargCue.Default;
   description = 'Solid medium-yellow color on front lights for a warm, neutral stage ambience';
   style = CueStyle.Primary;
 

@@ -8,7 +8,8 @@ import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 
 export class ScoreCue implements ICue {
-  name = YargCue.Score;
+  id = 'default-score';
+  cueId = YargCue.Score;
   description = 'Solid medium-green color on all lights (front and back) to signify success or completion';
   style = CueStyle.Primary;
 

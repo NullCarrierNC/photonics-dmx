@@ -5,7 +5,8 @@ import { DmxLightManager } from '../../controllers/DmxLightManager';
 
 // Simple test for ICue lifecycle methods
 class TestLifecycleCue implements ICue {
-  name = 'test-cue';
+  cueId = 'test-cue';
+  id = `test-cue-${Math.random().toString(36).substring(2, 11)}`;
   description = 'Test cue for lifecycle';
   style = CueStyle.Primary;
   onStopCalled = false;

@@ -9,9 +9,14 @@ export enum CueStyle {
 
 export interface ICue {
   /**
-   * The name of the cue
+   * The YARG ID of the cue
    */
-  name: string;
+  cueId: string;
+
+  /**
+   * The Photonics ID of the cue instance
+   */
+  id: string;
 
   /**
    * Description of the cue effect's appearance

@@ -11,7 +11,8 @@ import { EasingType } from '../../../easing';
 import { YargCue } from '../YargCue';
 
 export class DischordCue implements ICue {
-  name = YargCue.Dischord;
+  id = 'default-dischord';
+  cueId = YargCue.Dischord;
   description = 'Front lights alternate between green and blue on left/right halves with bright red or yellow flashes on the measure';
   style = CueStyle.Primary;
 
