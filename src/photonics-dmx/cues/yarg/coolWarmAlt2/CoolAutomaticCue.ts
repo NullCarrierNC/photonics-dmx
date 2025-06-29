@@ -13,6 +13,7 @@ let lightStates: { [lightId: string]: 'green' | 'blue' } = {};
 let isNewSession = true; // Flag to track if this is we should reset the light states
 
 export class CoolAutomaticCue implements ICue {
+  id = 'alt-cool-auto-2';
   name = YargCue.CoolAutomatic;
   description = 'Lights get set green or blue, then flash one light in the opposite color.';
   style = CueStyle.Primary;
@@ -25,7 +26,6 @@ export class CoolAutomaticCue implements ICue {
     const greenHigh = getColor('green', 'high');
     const blueHigh = getColor('blue', 'high');
     
-    console.log('[CoolAutomaticCue] Execute called, lightStates has', Object.keys(lightStates).length, 'lights, isNewSession:', isNewSession);
     
     // If this is a new session, randomly set each light either green or blue. If not, use the existing light states.
     if (isNewSession) {
@@ -66,7 +66,6 @@ export class CoolAutomaticCue implements ICue {
       // Single addEffect call for all base colors on layer 0
       sequencer.addEffect('cool-auto-base-all', baseEffect);
       
-      // Mark that we're no longer in fresh start mode
       isNewSession = false;
     } else {
       //console.log('[CoolAutomaticCue] Continuing session - using existing lightStates:', lightStates);

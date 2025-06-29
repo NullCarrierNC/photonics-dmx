@@ -33,7 +33,7 @@ export class ConfigFile<T> {
     this.currentVersion = version;
     this.defaultData = defaultData;
     this.ensureConfigDirectory(configDir);
-    this.data = this.load(defaultData);
+    this.data = this.load();
   }
 
   /**
@@ -54,7 +54,7 @@ export class ConfigFile<T> {
   /**
    * Loads data from file or returns default if file doesn't exist
    */
-  private load(defaultData: T): T {
+  private load(): T {
     if (fs.existsSync(this.filePath)) {
       try {
         const fileContent = fs.readFileSync(this.filePath, 'utf-8');
@@ -90,13 +90,13 @@ export class ConfigFile<T> {
       } catch (error) {
         console.error(`Error loading configuration from ${this.filePath}:`, error);
         console.log('Using default configuration');
-        this.save(defaultData);
-        return defaultData;
+        this.save(this.defaultData);
+        return this.defaultData;
       }
     } else {
       console.log(`Configuration file not found: ${this.filePath}, creating default`);
-      this.save(defaultData);
-      return defaultData;
+      this.save(this.defaultData);
+      return this.defaultData;
     }
   }
 
@@ -129,7 +129,7 @@ export class ConfigFile<T> {
   /**
    * Applies a specific migration between versions
    */
-  private applyMigration(data: T, fromVersion: number, toVersion: number): T {
+  private applyMigration(data: T, _fromVersion: number, _toVersion: number): T {
     // Override this method in subclasses to implement specific migrations
     // For now, return the data as-is (no migrations defined)
     return data;

@@ -8,6 +8,7 @@ import { WarmAutomaticCue } from '../coolWarmAlt2/WarmAutomaticCue';
  * Create and register the cool/warm alternative 1 cue group.
  */
 const group: ICueGroup = {
+  id: 'coolWarmAlt2',
   name: 'Cool/Warm Alternative 2',
   description: 'Alt versions of the cool and warm cues, less frenetic than the defaults.',
   cues: new Map([
@@ -22,4 +23,4 @@ const group: ICueGroup = {
 const registry = CueRegistry.getInstance();
 registry.registerGroup(group);
 
-registry.activateGroup(group.name);
+registry.activateGroup(group.id);

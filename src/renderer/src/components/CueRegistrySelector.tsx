@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 type CueRegistryType = 'YARG' | 'RB3E';
 
 type CueGroup = {
+  id: string;
   name: string;
   description: string;
   cueTypes: string[];
@@ -10,7 +11,7 @@ type CueGroup = {
 
 interface CueRegistrySelectorProps {
   onRegistryChange: (registryType: CueRegistryType) => void;
-  onGroupChange: (groupNames: string[]) => void;
+  onGroupChange: (groupIds: string[]) => void;
   
   /**
    * When true, the component will initialize with the currently active group selected.
@@ -32,12 +33,15 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   // Wrap callback to avoid infinite loops
   const handleGroupChangeCallback = useCallback((groupName: string, allGroups?: CueGroup[]) => {
     if (groupName === 'All') {
-      // Pass all enabled group names for "All" selection
-      const enabledGroupNames = allGroups ? allGroups.map(g => g.name) : [];
-      onGroupChange(enabledGroupNames);
+      // Pass all enabled group IDs for "All" selection
+      const enabledGroupIds = allGroups ? allGroups.map(g => g.id) : [];
+      onGroupChange(enabledGroupIds);
     } else {
-      // Pass the selected group as an array for single group selection
-      onGroupChange([groupName]);
+      // Find the group and pass its ID
+      const group = allGroups?.find(g => g.name === groupName);
+      if (group) {
+        onGroupChange([group.id]);
+      }
     }
   }, [onGroupChange]);
 
@@ -48,12 +52,12 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
         console.log('Fetching enabled cue groups...');
         
         // This will either get the user's preference or default to all groups
-        const enabledGroupNames = await window.electron.ipcRenderer.invoke('get-enabled-cue-groups');
+        const enabledGroupIds = await window.electron.ipcRenderer.invoke('get-enabled-cue-groups');
         
         // We still need the full group objects for their descriptions
         const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
         
-        const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupNames.includes(g.name));
+        const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id));
 
         console.log(`Enabled groups:`, enabledGroups);
         setGroups(enabledGroups);
@@ -65,7 +69,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
             handleGroupChangeCallback('All', enabledGroups);
             isInitialMount.current = false;
           }
-        } else if (!enabledGroupNames.includes(selectedGroup) && enabledGroups.length > 0) {
+        } else if (!enabledGroups.some(g => g.name === selectedGroup) && enabledGroups.length > 0) {
           // If the currently selected group is no longer enabled, fallback to "All"
           setSelectedGroup('All');
           handleGroupChangeCallback('All', enabledGroups);

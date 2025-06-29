@@ -14,7 +14,7 @@ export interface AppPreferences {
     high: number;
     max: number;
   };
-  enabledCueGroups: string[];
+  enabledCueGroups: string[]; 
 }
 
 /**
@@ -30,7 +30,7 @@ export interface UserLightsConfig {
 const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
-  enabledCueGroups: ['default'],
+  enabledCueGroups: ['default', 'coolWarmAlt1', 'coolWarmAlt2'],
 };
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {
@@ -137,12 +137,10 @@ export class ConfigurationManager {
   }
 
   /**
-   * Sets the enabled cue groups
+   * Sets the enabled cue groups by their IDs
    */
-  setEnabledCueGroups(groupNames: string[]): void {
-    // Ensure 'default' is always included
-    const enabled = [...new Set(['default', ...groupNames])];
-    this.setPreference('enabledCueGroups', enabled);
+  setEnabledCueGroups(groupIds: string[]): void {
+    this.setPreference('enabledCueGroups', groupIds);
   }
 
   // User Lights Methods

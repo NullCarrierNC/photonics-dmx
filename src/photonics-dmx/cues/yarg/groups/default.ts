@@ -37,6 +37,7 @@ import { SearchlightsCue } from '../default/SearchlightsCue';
  * implementations for cues they don't define.
  */
 const defaultGroup: ICueGroup = {
+  id: 'default',
   name: 'YARG Default',
   description: 'The original set of YARG cues. If other groups don\'t define a cue, this group\'s cue will be used.',
   cues: new Map([
@@ -72,5 +73,5 @@ const defaultGroup: ICueGroup = {
 // Get the registry instance and register the default group
 const registry = CueRegistry.getInstance();
 registry.registerGroup(defaultGroup); 
-registry.setDefaultGroup(defaultGroup.name);
-registry.activateGroup(defaultGroup.name);
+registry.setDefaultGroup(defaultGroup.id);
+registry.activateGroup(defaultGroup.id);

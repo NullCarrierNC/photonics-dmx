@@ -16,7 +16,7 @@ interface GroupCueDetails extends CueGroup {
 
 const PrefCueGroups: React.FC = () => {
   const [allGroups, setAllGroups] = useState<GroupCueDetails[]>([]);
-  const [enabledGroupNames, setEnabledGroupNames] = useState<string[]>([]);
+  const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchGroups = useCallback(async () => {
@@ -35,7 +35,7 @@ const PrefCueGroups: React.FC = () => {
       }));
       
       setAllGroups(groupsWithDetails);
-      setEnabledGroupNames(enabled);
+      setEnabledGroupIds(enabled); 
     } catch (e) {
       if (e instanceof Error) {
         console.error("Failed to fetch cue groups:", e.message);
@@ -52,17 +52,19 @@ const PrefCueGroups: React.FC = () => {
   }, [fetchGroups]);
 
   const handleGroupToggle = (groupName: string, isEnabled: boolean) => {
-    let updatedEnabledGroups: string[];
+    const group = allGroups.find(g => g.name === groupName);
+    if (!group) return;
+    
+    let updatedEnabledGroupIds: string[];
   
     if (isEnabled) {
-      updatedEnabledGroups = [...new Set([...enabledGroupNames, groupName])];
+      updatedEnabledGroupIds = [...new Set([...enabledGroupIds, group.id])];
     } else {
-      if (groupName === 'default') return;
-      updatedEnabledGroups = enabledGroupNames.filter(name => name !== groupName);
+      updatedEnabledGroupIds = enabledGroupIds.filter(id => id !== group.id);
     }
     
-    setEnabledGroupNames(updatedEnabledGroups);
-    window.electron.ipcRenderer.invoke('set-enabled-cue-groups', updatedEnabledGroups);
+    setEnabledGroupIds(updatedEnabledGroupIds);
+    window.electron.ipcRenderer.invoke('set-enabled-cue-groups', updatedEnabledGroupIds);
   };
 
   const handleAccordionToggle = async (groupName: string) => {
@@ -72,7 +74,7 @@ const PrefCueGroups: React.FC = () => {
     // If expanding and cues haven't been loaded, fetch them
     if (!group.isExpanded && group.cues.length === 0) {
       try {
-        const cueDetails = await window.electron.ipcRenderer.invoke('get-available-cues', groupName);
+        const cueDetails = await window.electron.ipcRenderer.invoke('get-available-cues', group.id);
         
         // Update the group with cue details
         setAllGroups(prevGroups => 
@@ -136,8 +138,7 @@ const PrefCueGroups: React.FC = () => {
               <input
                 type="checkbox"
                 className="form-checkbox h-5 w-5 text-blue-600 rounded"
-                checked={enabledGroupNames.includes(group.name)}
-                disabled={group.name === 'default'}
+                checked={enabledGroupIds.includes(group.id)}
                 onChange={(e) => handleGroupToggle(group.name, e.target.checked)}
                 onClick={(e) => e.stopPropagation()}
               />

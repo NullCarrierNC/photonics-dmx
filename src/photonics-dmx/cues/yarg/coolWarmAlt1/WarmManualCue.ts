@@ -9,6 +9,7 @@ import { randomBetween } from '../../../helpers/utils';
 import { getEffectSingleColor } from '../../../effects';
 
 export class WarmManualCue implements ICue {
+  id = 'alt-warm-manual-1';
   name = YargCue.WarmManual;
   description = 'Front lights set red, yellow sweep on measure.';
   style = CueStyle.Primary;

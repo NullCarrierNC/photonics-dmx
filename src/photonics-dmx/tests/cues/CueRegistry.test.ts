@@ -40,6 +40,7 @@ describe('CueRegistry', () => {
 
     // Create default group
     defaultGroup = {
+      id: 'default',
       name: 'default',
       cues: new Map([
         [CueType.Default, new MockCueImplementation('default')],
@@ -49,6 +50,7 @@ describe('CueRegistry', () => {
 
     // Create custom group
     customGroup = {
+      id: 'custom',
       name: 'custom',
       cues: new Map([
         [CueType.Chorus, new MockCueImplementation('custom-chorus')],
@@ -58,7 +60,7 @@ describe('CueRegistry', () => {
     
     // Explicitly register and set the default group
     registry.registerGroup(defaultGroup);
-    registry.setDefaultGroup(defaultGroup.name);
+    registry.setDefaultGroup(defaultGroup.id);
   });
 
   describe('registerGroup', () => {

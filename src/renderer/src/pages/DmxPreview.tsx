@@ -19,6 +19,7 @@ import ActiveGroupsSelector, { ActiveGroupsSelectorRef } from '../components/Act
 type CueRegistryType = 'YARG' | 'RB3E';
 
 type CueGroup = {
+  id: string;
   name: string;
   description: string;
   cueTypes: string[];
@@ -152,11 +153,25 @@ const DmxPreview: React.FC = () => {
   };
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
-  const handleGroupChange = useCallback((groupNames: string[]) => {
+  const handleGroupChange = useCallback(async (groupIds: string[]) => {
     // Handle both "All" selection (multiple groups) and single group selection
-    if (groupNames.length > 0) {
-      // For UI display, use "All" if multiple groups, otherwise the single group name
-      const displayName = groupNames.length > 1 ? 'All' : groupNames[0];
+    if (groupIds.length > 0) {
+      // Get group details to determine display name
+      let displayName: string;
+      
+      if (groupIds.length > 1) {
+        displayName = 'All';
+      } else {
+        // Single group - need to get the group name for display
+        try {
+          const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+          const group = allGroups.find((g: CueGroup) => g.id === groupIds[0]);
+          displayName = group ? group.name : groupIds[0];
+        } catch (error) {
+          console.error('Error fetching group details:', error);
+          displayName = groupIds[0];
+        }
+      }
       
       // Only update state if the selection actually changed
       setSelectedGroup(prevSelectedGroup => {
@@ -165,8 +180,8 @@ const DmxPreview: React.FC = () => {
           
           // Don't override active groups during initial mount - let the startup registration stand
           if (!isInitialMount.current) {
-            // Set the selected groups as active for DMX preview
-            window.electron.ipcRenderer.invoke('set-active-cue-groups', groupNames)
+            // Set the selected group IDs as active for DMX preview
+            window.electron.ipcRenderer.invoke('set-active-cue-groups', groupIds)
               .then(result => {
                 if (result.success) {
                   // Directly refresh the ActiveGroupsSelector to reflect the change
@@ -200,6 +215,7 @@ const DmxPreview: React.FC = () => {
         if (selectedGroup === 'All') {
           // For "All" selection, show a synthetic group description
           setCurrentGroup({
+            id: 'all',
             name: 'All',
             description: 'All enabled cue groups are active',
             cueTypes: []

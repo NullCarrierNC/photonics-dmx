@@ -1,6 +1,7 @@
 import  { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 
 interface CueGroup {
+  id: string;
   name: string;
   description: string;
   cueTypes: string[];
@@ -17,18 +18,18 @@ export interface ActiveGroupsSelectorRef {
 const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSelectorProps>(
   ({ className = '' }, ref) => {
     const [enabledGroups, setEnabledGroups] = useState<CueGroup[]>([]);
-    const [activeGroupNames, setActiveGroupNames] = useState<string[]>([]);
+    const [activeGroupIds, setActiveGroupIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchActiveGroups = useCallback(async () => {
       try {
         const active = await window.electron.ipcRenderer.invoke('get-active-cue-groups');
-        const newActiveGroupNames = active.map((g: CueGroup) => g.name);
+        const newActiveGroupIds = active.map((g: CueGroup) => g.id);
         
-        setActiveGroupNames(prevActive => {
+        setActiveGroupIds(prevActive => {
           // Only update if actually different to avoid unnecessary re-renders
-          if (JSON.stringify(prevActive.sort()) !== JSON.stringify(newActiveGroupNames.sort())) {
-            return newActiveGroupNames;
+          if (JSON.stringify(prevActive.sort()) !== JSON.stringify(newActiveGroupIds.sort())) {
+            return newActiveGroupIds;
           }
           return prevActive;
         });
@@ -46,12 +47,12 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
         ]);
         
         // Get full group details for enabled groups
-        const enabledGroupNames = Array.isArray(enabled) ? enabled : [];
+        const enabledGroupIds = Array.isArray(enabled) ? enabled : [];
         const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
-        const enabledGroupDetails = allGroups.filter((g: CueGroup) => enabledGroupNames.includes(g.name));
+        const enabledGroupDetails = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id));
         
         setEnabledGroups(enabledGroupDetails);
-        setActiveGroupNames(active.map((g: CueGroup) => g.name));
+        setActiveGroupIds(active.map((g: CueGroup) => g.id));
       } catch (error) {
         console.error('Error fetching group data:', error);
       } finally {
@@ -68,23 +69,23 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
       fetchData();
     }, [fetchData]);
 
-    const handleGroupToggle = async (groupName: string, isActive: boolean) => {
+    const handleGroupToggle = async (groupId: string, isActive: boolean) => {
       try {
-        let updatedActiveGroups: string[];
+        let updatedActiveGroupIds: string[];
         
         if (isActive) {
           // Add to active groups
-          updatedActiveGroups = [...new Set([...activeGroupNames, groupName])];
+          updatedActiveGroupIds = [...new Set([...activeGroupIds, groupId])];
         } else {
           // Remove from active groups
-          updatedActiveGroups = activeGroupNames.filter(name => name !== groupName);
+          updatedActiveGroupIds = activeGroupIds.filter(id => id !== groupId);
         }
         
         // Update backend
-        const result = await window.electron.ipcRenderer.invoke('set-active-cue-groups', updatedActiveGroups);
+        const result = await window.electron.ipcRenderer.invoke('set-active-cue-groups', updatedActiveGroupIds);
         
         if (result.success) {
-          setActiveGroupNames(updatedActiveGroups);
+          setActiveGroupIds(updatedActiveGroupIds);
         } else {
           console.error('Failed to update active groups:', result.error);
           // Could show a toast notification here
@@ -135,8 +136,8 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
                 <input
                   type="checkbox"
                   className="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600"
-                  checked={activeGroupNames.includes(group.name)}
-                  onChange={(e) => handleGroupToggle(group.name, e.target.checked)}
+                  checked={activeGroupIds.includes(group.id)}
+                  onChange={(e) => handleGroupToggle(group.id, e.target.checked)}
                 />
                 <div className="flex-1 min-w-0">
                   <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -151,7 +152,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
           ))}
         </div>
         
-        {activeGroupNames.length === 0 && (
+        {activeGroupIds.length === 0 && (
           <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
             <p className="text-yellow-800 dark:text-yellow-200">
               <strong>Warning:</strong> No active groups selected. Cue resolution will only use the default group as fallback.

@@ -41,6 +41,7 @@ describe('YargCueHandler', () => {
 
     // Define and register a minimal mock default group for this test suite
     const mockDefaultGroup: ICueGroup = {
+      id: 'mock-default',
       name: 'mock-default',
       description: 'Mock default group for testing',
       cues: new Map([
@@ -50,8 +51,8 @@ describe('YargCueHandler', () => {
       ]),
     };
     registry.registerGroup(mockDefaultGroup);
-    registry.setDefaultGroup(mockDefaultGroup.name);
-    registry.activateGroup(mockDefaultGroup.name);
+    registry.setDefaultGroup(mockDefaultGroup.id);
+    registry.activateGroup(mockDefaultGroup.id);
 
     // Create mock light manager
     mockLightManager = {

@@ -92,6 +92,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
 
     // Create test groups
     defaultGroup = {
+      id: 'default',
       name: 'default',
       description: 'Default cue group with standard effects',
       cues: new Map([
@@ -101,6 +102,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
     };
 
     customGroup = {
+      id: 'custom',
       name: 'custom',
       description: 'Custom effects group',
       cues: new Map([
@@ -112,7 +114,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
     // Register the groups AND set the default group
     registry.registerGroup(defaultGroup);
     registry.registerGroup(customGroup);
-    registry.setDefaultGroup(defaultGroup.name);
+    registry.setDefaultGroup(defaultGroup.id);
   });
 
   describe('get-cue-groups handler', () => {
@@ -121,33 +123,20 @@ describe('IPC Light Handlers for Cue Registry', () => {
       
       expect(groupInfo).toHaveLength(2);
       expect(groupInfo).toContainEqual({
+        id: 'default',
         name: 'default',
         description: 'Default cue group with standard effects',
         cueTypes: [CueType.Default, CueType.Chorus]
       });
       expect(groupInfo).toContainEqual({
+        id: 'custom',
         name: 'custom',
         description: 'Custom effects group',
         cueTypes: [CueType.Chorus, CueType.Verse]
       });
     });
 
-    it('should use fallback description if group has no description', async () => {
-      // Add a group without a description
-      const noDescGroup: ICueGroup = {
-        name: 'no-desc',
-        cues: new Map([
-          [CueType.Default, new MockCueImplementation('no-desc-default')]
-        ])
-      };
-      registry.registerGroup(noDescGroup);
-      
-      const groupInfo = await getCueGroupsHandler({});
-      const noDescGroupInfo = groupInfo.find((g: any) => g.name === 'no-desc');
-      
-      expect(noDescGroupInfo).toBeDefined();
-      expect(noDescGroupInfo.description).toBe('no-desc cue group');
-    });
+
   });
 
   describe('set-active-cue-groups handler', () => {
@@ -224,25 +213,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
       }));
     });
 
-    it('should use "No description available" for cues without descriptions', async () => {
-      // Add a group with a cue that has no description
-      const noDescCueGroup: ICueGroup = {
-        name: 'no-desc-cue',
-        cues: new Map([
-          [CueType.Default, new MockCueImplementation('no-desc-cue-default')]
-        ])
-      };
-      registry.registerGroup(noDescCueGroup);
-      
-      const cues = await getAvailableCuesHandler({}, 'no-desc-cue');
-      
-      expect(cues).toHaveLength(1);
-      expect(cues[0]).toEqual(expect.objectContaining({
-        id: CueType.Default,
-        yargDescription: 'No description available',
-        groupName: 'no-desc-cue'
-      }));
-    });
+
 
     it('should default to "default" group if no group name provided', async () => {
       const cues = await getAvailableCuesHandler({});

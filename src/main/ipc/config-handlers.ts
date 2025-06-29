@@ -1,5 +1,7 @@
 import { IpcMain } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
+import '../../photonics-dmx/cues/yarg';
+import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
 
 /**
  * Set up configuration-related IPC handlers
@@ -73,24 +75,24 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
     // If the preference hasn't been set, default to all groups enabled
     if (enabled === undefined) {
-      const allGroups = controllerManager.getCueHandler()?.getAvailableCueGroups() || [];
-      return allGroups.map(g => g.name);
+      const registry = CueRegistry.getInstance();
+      return registry.getAllGroups();
     }
 
     return enabled;
   });
 
   // Set enabled cue groups
-  ipcMain.handle('set-enabled-cue-groups', async (_, groupNames: string[]) => {
+  ipcMain.handle('set-enabled-cue-groups', async (_, groupIds: string[]) => {
     try {
-      controllerManager.getConfig().setEnabledCueGroups(groupNames);
+      controllerManager.getConfig().setEnabledCueGroups(groupIds);
       
       // Update the CueRegistry with the new enabled groups
-      const { CueRegistry } = await import('../../photonics-dmx/cues/CueRegistry');
       const registry = CueRegistry.getInstance();
-      registry.setEnabledGroups(groupNames);
       
-      console.log('Updated CueRegistry enabled groups:', groupNames);
+      registry.setEnabledGroups(groupIds);
+      
+      console.log('Updated CueRegistry enabled groups:', groupIds);
       
       return { success: true };
     } catch (error) {

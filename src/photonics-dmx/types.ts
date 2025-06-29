@@ -447,6 +447,7 @@ export type EffectSelector = {
 };
 
 export interface CueGroup {
+  id: string;
   name: string;
   description: string;
 }

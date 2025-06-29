@@ -13,6 +13,7 @@ let lightStates: { [lightId: string]: 'red' | 'yellow' } = {};
 let isNewSession = true; // Flag to track if this is we should reset the light states
 
 export class WarmAutomaticCue implements ICue {
+  id = 'alt-warm-auto-2';
   name = YargCue.WarmAutomatic;
   description = 'Lights get set red or yellow, then flash one light in the opposite color.';
   style = CueStyle.Primary;
@@ -24,8 +25,6 @@ export class WarmAutomaticCue implements ICue {
     const yellow = getColor('yellow', 'medium');
     const redHigh = getColor('red', 'high');
     const yellowHigh = getColor('yellow', 'high');
-    
-    console.log('[CoolAutomaticCue] Execute called, lightStates has', Object.keys(lightStates).length, 'lights, isNewSession:', isNewSession);
     
     // If this is a new session, randomly set each light either red or yellow. If not, use the existing light states.
     if (isNewSession) {
@@ -65,8 +64,7 @@ export class WarmAutomaticCue implements ICue {
       
       // Single addEffect call for all base colors on layer 0
       sequencer.addEffect('cool-auto-base-all', baseEffect);
-      
-      // Mark that we're no longer in fresh start mode
+
       isNewSession = false;
     }
     

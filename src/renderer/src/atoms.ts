@@ -88,6 +88,7 @@ export const useComplexCuesAtom = atom<boolean>(false);
  */
 export interface CueStateInfo {
   cueType: string | null;
+  groupId: string | null;
   groupName: string | null;
   isFallback: boolean;
   cueStyle: 'primary' | 'secondary' | null;
@@ -97,6 +98,7 @@ export interface CueStateInfo {
 
 export const currentCueStateAtom = atom<CueStateInfo>({
   cueType: null,
+  groupId: null,
   groupName: null,
   isFallback: false,
   cueStyle: null,
