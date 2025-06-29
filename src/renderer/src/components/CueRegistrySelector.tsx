@@ -31,17 +31,14 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   const isInitialMount = useRef(true);
 
   // Wrap callback to avoid infinite loops
-  const handleGroupChangeCallback = useCallback((groupName: string, allGroups?: CueGroup[]) => {
-    if (groupName === 'All') {
+  const handleGroupChangeCallback = useCallback((groupId: string, allGroups?: CueGroup[]) => {
+    if (groupId === 'All') {
       // Pass all enabled group IDs for "All" selection
       const enabledGroupIds = allGroups ? allGroups.map(g => g.id) : [];
       onGroupChange(enabledGroupIds);
     } else {
-      // Find the group and pass its ID
-      const group = allGroups?.find(g => g.name === groupName);
-      if (group) {
-        onGroupChange([group.id]);
-      }
+      // Pass the group ID directly
+      onGroupChange([groupId]);
     }
   }, [onGroupChange]);
 
@@ -69,7 +66,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
             handleGroupChangeCallback('All', enabledGroups);
             isInitialMount.current = false;
           }
-        } else if (!enabledGroups.some(g => g.name === selectedGroup) && enabledGroups.length > 0) {
+        } else if (!enabledGroups.some(g => g.id === selectedGroup) && enabledGroups.length > 0) {
           // If the currently selected group is no longer enabled, fallback to "All"
           setSelectedGroup('All');
           handleGroupChangeCallback('All', enabledGroups);
@@ -100,9 +97,9 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   };
 
   const handleGroupChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const groupName = event.target.value;
-    setSelectedGroup(groupName);
-    handleGroupChangeCallback(groupName, groups);
+    const groupId = event.target.value;
+    setSelectedGroup(groupId);
+    handleGroupChangeCallback(groupId, groups);
   };
 
   return (
@@ -134,7 +131,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
         >
           <option value="All">All</option>
           {groups.map((group) => (
-            <option key={group.name} value={group.name}>
+            <option key={group.id} value={group.id}>
               {group.name}
             </option>
           ))}
