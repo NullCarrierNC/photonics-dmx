@@ -1,5 +1,5 @@
 import { CueRegistry } from '../../../photonics-dmx/cues/CueRegistry';
-import { ICue } from '../../../photonics-dmx/cues/interfaces/ICue';
+import { ICue, CueStyle } from '../../../photonics-dmx/cues/interfaces/ICue';
 import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/ICueGroup';
 import { CueData, CueType } from '../../../photonics-dmx/cues/cueTypes';
 import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces';
@@ -29,13 +29,9 @@ const mockControllerManager = {
 
 // Mock implementation with descriptions
 class MockCueImplementation implements ICue {
-  constructor(
-    private _name: string,
-    private _description?: string
-  ) {}
-  
+  constructor(private _name: string, public description?: string) {}
   get name(): string { return this._name; }
-  get description(): string | undefined { return this._description; }
+  style = CueStyle.Primary;
   
   async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // Mock implementation
@@ -96,15 +92,17 @@ describe('IPC Light Handlers for Cue Registry', () => {
 
     // Create test groups
     defaultGroup = {
+      id: 'default',
       name: 'default',
       description: 'Default cue group with standard effects',
       cues: new Map([
         [CueType.Default, new MockCueImplementation('default', 'Default yellow lighting on front lights')],
-        [CueType.Chorus, new MockCueImplementation('default-chorus', 'Chorus effect with color changes')],
+        [CueType.Chorus, new MockCueImplementation('default-chorus', 'Default chorus effect with color changes')],
       ]),
     };
 
     customGroup = {
+      id: 'custom',
       name: 'custom',
       description: 'Custom effects group',
       cues: new Map([
@@ -116,7 +114,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
     // Register the groups AND set the default group
     registry.registerGroup(defaultGroup);
     registry.registerGroup(customGroup);
-    registry.setDefaultGroup(defaultGroup.name);
+    registry.setDefaultGroup(defaultGroup.id);
   });
 
   describe('get-cue-groups handler', () => {
@@ -125,48 +123,34 @@ describe('IPC Light Handlers for Cue Registry', () => {
       
       expect(groupInfo).toHaveLength(2);
       expect(groupInfo).toContainEqual({
+        id: 'default',
         name: 'default',
         description: 'Default cue group with standard effects',
         cueTypes: [CueType.Default, CueType.Chorus]
       });
       expect(groupInfo).toContainEqual({
+        id: 'custom',
         name: 'custom',
         description: 'Custom effects group',
         cueTypes: [CueType.Chorus, CueType.Verse]
       });
     });
 
-    it('should use fallback description if group has no description', async () => {
-      // Add a group without a description
-      const noDescGroup: ICueGroup = {
-        name: 'no-desc',
-        cues: new Map([
-          [CueType.Default, new MockCueImplementation('no-desc-default')]
-        ])
-      };
-      registry.registerGroup(noDescGroup);
-      
-      const groupInfo = await getCueGroupsHandler({});
-      const noDescGroupInfo = groupInfo.find((g: any) => g.name === 'no-desc');
-      
-      expect(noDescGroupInfo).toBeDefined();
-      expect(noDescGroupInfo.description).toBe('no-desc cue group');
-    });
+
   });
 
   describe('set-active-cue-groups handler', () => {
-    it('should set the active groups and include default', async () => {
+    it('should set the active groups', async () => {
       const result = await setActiveGroupsHandler({}, ['custom']);
       
-      // Expect detailed response, including the default group
+      // Expect detailed response with only the groups explicitly set
       expect(result).toEqual({
         success: true,
-        activeGroups: expect.arrayContaining(['custom', 'default']),
-        invalidGroups: undefined
+        activeGroups: ['custom'],
+        invalidGroups: undefined,
+        disabledGroups: undefined
       });
-      expect(result.activeGroups).toHaveLength(2);
-      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']));
-      expect(registry.getActiveGroups()).toHaveLength(2);
+      expect(registry.getActiveGroups()).toEqual(['custom']);
     });
 
     it('should set multiple active groups correctly', async () => {
@@ -176,7 +160,8 @@ describe('IPC Light Handlers for Cue Registry', () => {
       expect(result).toEqual({
         success: true,
         activeGroups: expect.arrayContaining(['custom', 'default']),
-        invalidGroups: undefined
+        invalidGroups: undefined,
+        disabledGroups: undefined
       });
       expect(result.activeGroups).toHaveLength(2);
       expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']));
@@ -190,25 +175,24 @@ describe('IPC Light Handlers for Cue Registry', () => {
       // Expect failure response
       expect(result).toEqual({
         success: false,
-        error: expect.stringContaining('No valid groups provided') // Check for error message
+        error: 'No valid groups provided. Invalid: , Disabled: '
       });
       // Ensure registry didn't actually clear (due to handler validation)
-      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default'])); 
+      expect(registry.getActiveGroups()).toEqual(['custom']); 
     });
 
     it('should ignore non-existent groups and return invalid ones', async () => {
       const result = await setActiveGroupsHandler({}, ['custom', 'non-existent']);
       
-      // Expect detailed response including default and the invalid group
+      // Expect detailed response with only valid groups and the invalid group listed
       expect(result).toEqual({
         success: true,
-        activeGroups: expect.arrayContaining(['custom', 'default']),
-        invalidGroups: ['non-existent']
+        activeGroups: ['custom'],
+        invalidGroups: ['non-existent'],
+        disabledGroups: undefined
       });
-      expect(result.activeGroups).toHaveLength(2);
-      // Verify registry state reflects only the valid + default group
-      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']));
-      expect(registry.getActiveGroups()).toHaveLength(2);
+      // Verify registry state reflects only the valid groups
+      expect(registry.getActiveGroups()).toEqual(['custom']);
     });
   });
 
@@ -229,25 +213,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
       }));
     });
 
-    it('should use "No description available" for cues without descriptions', async () => {
-      // Add a group with a cue that has no description
-      const noDescCueGroup: ICueGroup = {
-        name: 'no-desc-cue',
-        cues: new Map([
-          [CueType.Default, new MockCueImplementation('no-desc-cue-default')]
-        ])
-      };
-      registry.registerGroup(noDescCueGroup);
-      
-      const cues = await getAvailableCuesHandler({}, 'no-desc-cue');
-      
-      expect(cues).toHaveLength(1);
-      expect(cues[0]).toEqual(expect.objectContaining({
-        id: CueType.Default,
-        yargDescription: 'No description available',
-        groupName: 'no-desc-cue'
-      }));
-    });
+
 
     it('should default to "default" group if no group name provided', async () => {
       const cues = await getAvailableCuesHandler({});

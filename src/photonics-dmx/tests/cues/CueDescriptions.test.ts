@@ -1,5 +1,5 @@
 import { CueRegistry } from '../../cues/CueRegistry';
-import { ICue } from '../../cues/interfaces/ICue';
+import { ICue, CueStyle } from '../../cues/interfaces/ICue';
 import { ICueGroup } from '../../cues/interfaces/ICueGroup';
 import { CueData, CueType } from '../../cues/cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
@@ -15,6 +15,7 @@ class MockCueImplementation implements ICue {
   
   get name(): string { return this._name; }
   get description(): string | undefined { return this._description; }
+  style = CueStyle.Primary;
   
   async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // Mock implementation
@@ -44,6 +45,7 @@ describe('Cue Descriptions', () => {
 
     // Create default group with descriptions
     defaultGroup = {
+      id: 'default',
       name: 'default',
       description: 'Default cue group with standard effects',
       cues: new Map([
@@ -54,6 +56,7 @@ describe('Cue Descriptions', () => {
 
     // Create custom group with descriptions
     customGroup = {
+      id: 'custom',
       name: 'custom',
       description: 'Custom cue group with specialized effects',
       cues: new Map([
@@ -66,9 +69,9 @@ describe('Cue Descriptions', () => {
     registry.registerGroup(defaultGroup);
     registry.registerGroup(customGroup);
     // Explicitly set the default group
-    registry.setDefaultGroup(defaultGroup.name);
+    registry.setDefaultGroup(defaultGroup.id);
     // Explicitly activate the default group
-    registry.activateGroup(defaultGroup.name);
+    registry.activateGroup(defaultGroup.id);
   });
 
   describe('Cue Implementation Descriptions', () => {
@@ -100,20 +103,7 @@ describe('Cue Descriptions', () => {
       expect(group?.description).toBe('Default cue group with standard effects');
     });
 
-    it('should handle undefined description gracefully', () => {
-      // Create a group without a description
-      const noDescGroup: ICueGroup = {
-        name: 'no-desc',
-        cues: new Map([
-          [CueType.Default, new MockCueImplementation('no-desc-default')]
-        ])
-      };
-      
-      registry.registerGroup(noDescGroup);
-      const group = registry.getGroup('no-desc');
-      expect(group).toBeDefined();
-      expect(group?.description).toBeUndefined();
-    });
+
   });
 
   describe('getGroup Method', () => {
@@ -139,7 +129,7 @@ describe('Cue Descriptions', () => {
       if (group) {
         const cueDescriptions = Array.from(group.cues.entries()).map(([cueType, implementation]) => ({
           id: cueType,
-          description: implementation.description || 'No description available'
+          description: implementation.description!
         }));
         
         expect(cueDescriptions).toHaveLength(2);

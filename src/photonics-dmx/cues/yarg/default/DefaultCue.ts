@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
@@ -9,6 +9,7 @@ import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 export class DefaultCue implements ICue {
   name = YargCue.Default;
   description = 'Solid medium-yellow color on front lights for a warm, neutral stage ambience';
+  style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const all = lightManager.getLights(['front'], 'all');

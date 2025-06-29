@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
@@ -9,7 +9,8 @@ import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 
 export class ScoreCue implements ICue {
   name = YargCue.Score;
-  description = 'Medium blue base color on front lights with periodic yellow flashes every 4 seconds for a celebratory score screen effect';
+  description = 'Solid medium-green color on all lights (front and back) to signify success or completion';
+  style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const all = lightManager.getLights(['front'], 'all');

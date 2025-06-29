@@ -9,25 +9,24 @@ import { randomBetween } from '../../../helpers/utils';
 import { Effect, EffectTransition } from '../../../types';
 
 // Static state to persist light colors between cue calls
-let lightStates: { [lightId: string]: 'green' | 'blue' } = {};
+let lightStates: { [lightId: string]: 'red' | 'yellow' } = {};
 let isNewSession = true; // Flag to track if this is we should reset the light states
 
-export class CoolAutomaticCue implements ICue {
-  id = 'alt-cool-auto-2';
-  name = YargCue.CoolAutomatic;
-  description = 'Lights get set green or blue, then flash one light in the opposite color.';
+export class WarmAutomaticCue implements ICue {
+  id = 'alt-warm-auto-2';
+  name = YargCue.WarmAutomatic;
+  description = 'Lights get set red or yellow, then flash one light in the opposite color.';
   style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], 'all');
     
-    const green = getColor('green', 'medium');
-    const blue = getColor('blue', 'medium');
-    const greenHigh = getColor('green', 'high');
-    const blueHigh = getColor('blue', 'high');
+    const red = getColor('red', 'medium');
+    const yellow = getColor('yellow', 'medium');
+    const redHigh = getColor('red', 'high');
+    const yellowHigh = getColor('yellow', 'high');
     
-    
-    // If this is a new session, randomly set each light either green or blue. If not, use the existing light states.
+    // If this is a new session, randomly set each light either red or yellow. If not, use the existing light states.
     if (isNewSession) {
       console.log('[CoolAutomaticCue] New session - initializing random colors for', allLights.length, 'lights');
       
@@ -38,10 +37,10 @@ export class CoolAutomaticCue implements ICue {
       const baseTransitions: EffectTransition[] = [];
       
       allLights.forEach((light) => {
-        const randomColor = randomBetween(0, 1) === 0 ? 'green' : 'blue';
+        const randomColor = randomBetween(0, 1) === 0 ? 'red' : 'yellow';
         lightStates[light.id] = randomColor;
         
-        const color = randomColor === 'green' ? green : blue;
+        const color = randomColor === 'red' ? red : yellow;
         baseTransitions.push({
           lights: [light],
           layer: 0,
@@ -59,16 +58,14 @@ export class CoolAutomaticCue implements ICue {
       
       const baseEffect: Effect = {
         id: 'cool-auto-base-colors',
-        description: 'Set all lights to random green or blue base colors',
+        description: 'Set all lights to random red or yellow base colors',
         transitions: baseTransitions,
       };
       
       // Single addEffect call for all base colors on layer 0
       sequencer.addEffect('cool-auto-base-all', baseEffect);
-      
+
       isNewSession = false;
-    } else {
-      //console.log('[CoolAutomaticCue] Continuing session - using existing lightStates:', lightStates);
     }
     
     // Pick a random light to invert (flash)
@@ -76,7 +73,7 @@ export class CoolAutomaticCue implements ICue {
     const currentState = lightStates[randomLight.id];
     
     // Determine the inverted colour for the flash
-    const invertedColor = currentState === 'green' ? blueHigh : greenHigh;
+    const invertedColor = currentState === 'red' ? yellowHigh : redHigh;
     
     // Wait for a beat, then flash the random light with the inverted colour and let it fade
     const flashEffect = getEffectFlashColor({
@@ -92,7 +89,6 @@ export class CoolAutomaticCue implements ICue {
     
     sequencer.addEffect('cool-auto-flash', flashEffect);
     
-    // Cue ends here - next call will repeat the process
   }
 
   /**

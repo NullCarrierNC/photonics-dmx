@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
@@ -9,8 +9,10 @@ import { randomBetween } from '../../../helpers/utils';
 import { getEffectSingleColor } from '../../../effects';
 
 export class CoolManualCue implements ICue {
+  id = 'alt-cool-manual-1';
   name = YargCue.CoolManual;
-  description = 'Creates a sweep like effect with blue and green on the measure. Blue is used as primary color with green as the low color on all the lights.';
+  description = 'Low blue on all lights, green sweep on front on measure.';
+  style = CueStyle.Primary;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const blue = getColor('blue', 'medium');

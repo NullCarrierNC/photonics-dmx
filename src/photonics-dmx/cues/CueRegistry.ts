@@ -1,6 +1,18 @@
-import {  CueType } from './cueTypes';
+import { CueType } from './cueTypes';
 import { ICueGroup } from './interfaces/ICueGroup';
-import { ICue } from './interfaces/ICue';
+import { ICue, CueStyle } from './interfaces/ICue';
+
+/**
+ * Interface for cue state updates sent to frontend
+ */
+export interface CueStateUpdate {
+  cueType: string;
+  groupId: string;
+  isFallback: boolean;
+  cueStyle: 'primary' | 'secondary';
+  counter: number;
+  limit: number;
+}
 
 /**
  * Registry for managing multiple sets of cue implementations.
@@ -10,26 +22,84 @@ import { ICue } from './interfaces/ICue';
  * define common cues like Strobe repeatedly in each group.
  * 
  * Registered Groups: Groups of cues known to the system.
- * Active Groups: Groups that are currently active during gameplay.
- * Enabled Groups: Groups that are enabled and can potentially be set as active.
+ * Enabled Groups: Groups that are enabled in user preferences (can be activated).
+ * Active Groups: Groups that are currently active during gameplay (subset of enabled).
  */
 export class CueRegistry {
   /** The singleton instance of the CueRegistry */
   private static instance: CueRegistry;
-  
+
   /** Map of all registered cue groups by their name */
   private groups: Map<string, ICueGroup> = new Map();
-  
+
+  /** Set of groups that are enabled in user preferences */
+  private enabledGroups: Set<string> = new Set();
+
   /** Set of groups that are currently active during gameplay */
   private activeGroups: Set<string> = new Set();
-  
-  /** Set of groups that are enabled and can potentially be set as active */
-  private enabledGroups: Set<string> = new Set();
-  
+
   /** Name of the default group that provides fallback implementations */
   private defaultGroup: string | null = null;
 
-  private constructor() {}
+  /** Track last called primary cue and its source group */
+  private lastPrimaryCueName: string | null = null;
+  private lastPrimaryCueGroup: string | null = null;
+  private lastPrimaryIsFallback: boolean = false;
+
+  /** Track last called secondary cue and its source group */
+  private lastSecondaryCueName: string | null = null;
+  private lastSecondaryCueGroup: string | null = null;
+  private lastSecondaryIsFallback: boolean = false;
+
+  /** Counter for consecutive calls to the same primary cue */
+  private primaryCueCounter: number = 0;
+  private primaryCueLimit: number = 100;
+
+  /** Counter for consecutive calls to the same secondary cue */
+  private secondaryCueCounter: number = 0;
+  private secondaryCueLimit: number = 50;
+
+  /** Optional callback for sending cue state updates to frontend */
+  private cueStateUpdateCallback: ((state: CueStateUpdate) => void) | null = null;
+
+  private constructor() { }
+
+  /**
+   * Set callback for sending cue state updates to frontend
+   * @param callback Function to call when cue state changes
+   */
+  public setCueStateUpdateCallback(callback: (state: CueStateUpdate) => void): void {
+    this.cueStateUpdateCallback = callback;
+  }
+
+  /**
+   * Send cue state update to frontend if callback is set
+   * @param cueType The cue type that was selected
+   * @param groupId The group it came from
+   * @param isFallback Whether this is a fallback use of disabled default group
+   * @param cueStyle Primary or secondary
+   * @param counter Current counter value
+   * @param limit Counter limit
+   */
+  private emitCueStateUpdate(
+    cueType: string,
+    groupId: string,
+    isFallback: boolean,
+    cueStyle: 'primary' | 'secondary',
+    counter: number,
+    limit: number
+  ): void {
+    if (this.cueStateUpdateCallback) {
+      this.cueStateUpdateCallback({
+        cueType,
+        groupId,
+        isFallback,
+        cueStyle,
+        counter,
+        limit
+      });
+    }
+  }
 
   /**
    * Reset the registry by clearing all groups.
@@ -37,9 +107,12 @@ export class CueRegistry {
    */
   public reset(): void {
     this.groups.clear();
-    this.activeGroups.clear();
     this.enabledGroups.clear();
+    this.activeGroups.clear();
     this.defaultGroup = null;
+
+    // Reset cue tracking state
+    this.resetCueSelectionState();
   }
 
   /**
@@ -58,109 +131,183 @@ export class CueRegistry {
    * @param group The group to register
    */
   public registerGroup(group: ICueGroup): void {
-    this.groups.set(group.name, group);
-    
+    this.groups.set(group.id, group);
+
     // Add to enabled groups by default
-    this.enabledGroups.add(group.name);
+    this.enabledGroups.add(group.id);
+    // Add to active groups by default (all enabled groups are active by default)
+    this.activeGroups.add(group.id);
   }
 
   /**
    * Set the default group.
    * @param groupName The name of the group to set as default
-   * @returns Boolean indicating if the operation was successful
    * @throws Error if the group doesn't exist
    */
-  public setDefaultGroup(groupName: string): boolean {
+  public setDefaultGroup(groupId: string): void {
     // Verify that the group exists before setting it as default
-    if (!this.groups.has(groupName)) {
-      throw new Error(`Cannot set default group: group '${groupName}' not found`);
+    if (!this.groups.has(groupId)) {
+      throw new Error(`Cannot set default group: group '${groupId}' not found`);
     }
-    
+
     // Set it as the new default group
-    this.defaultGroup = groupName;
-    
-    // Ensure the default group is always active
-    this.activeGroups.add(groupName);
-    
-    return true;
+    this.defaultGroup = groupId;
   }
 
   /**
-   * Get a cue implementation from the active groups.
-   * Falls back to the default group if no implementation is found.
+   * Get a cue implementation with randomized selection for new cues.
+   * For the first call to a primary/secondary cue (or after counter resets),
+   * randomly selects from available groups. Subsequent calls use the same group.
    * @param cueType The type of cue to get
    * @returns The cue implementation or null if not found
-   * @throws Error if no implementation is found in active groups and no default group is defined
    */
   public getCueImplementation(cueType: CueType): ICue | null {
-    // Try active groups first
-    if (this.activeGroups.size > 0) {
-      for (const groupName of this.activeGroups) {
-        const group = this.groups.get(groupName);
-        if (group?.cues.has(cueType)) {
-         // console.log(`Found implementation for cue: ${cueType} in group: ${groupName}`);
-          return group.cues.get(cueType)!;
-        }
-      }
+    // Check if any group has this cue to determine style
+    const tempSelection = this.getRandomCueFromActiveGroups(cueType);
+    if (!tempSelection) {
+      console.error(`No implementation found for cue: ${cueType}`);
+      return null;
     }
 
-    // Fall back to default group
-    if (this.defaultGroup) {
-      const defaultGroup = this.groups.get(this.defaultGroup);
-      if (defaultGroup?.cues.has(cueType)) {
-      //  console.log(`Found implementation for cue: ${cueType} in default group: ${this.defaultGroup}`);
-        return defaultGroup.cues.get(cueType)!;
+    const tempCue = this.groups.get(tempSelection.groupId)!.cues.get(cueType)!;
+    if (tempCue.style === CueStyle.Primary) {
+      return this.handlePrimaryCue(cueType, tempSelection);
+    } else {
+      return this.handleSecondaryCue(cueType, tempSelection);
+    }
+  }
+
+  /**
+   * Handle primary cue selection logic.
+   * @param cueType The type of cue to get
+   * @param preSelection Optional pre-selected group to avoid redundant selection
+   * @returns The cue implementation or null if not found
+   */
+  private handlePrimaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }): ICue | null {
+    const isNewCue = this.lastPrimaryCueName !== cueType;
+    const shouldReset = this.primaryCueCounter >= this.primaryCueLimit;
+
+    if (isNewCue || shouldReset) {
+      // Reset counter and select new implementation
+      this.primaryCueCounter = 0;
+      const selection = preSelection || this.getRandomCueFromActiveGroups(cueType);
+
+      if (selection) {
+        this.lastPrimaryCueName = cueType;
+        this.lastPrimaryCueGroup = selection.groupId;
+        this.lastPrimaryIsFallback = selection.isFallback;
+        this.primaryCueCounter++;
+        this.emitCueStateUpdate(cueType, selection.groupId, this.lastPrimaryIsFallback, 'primary', this.primaryCueCounter, this.primaryCueLimit);
+        return this.groups.get(selection.groupId)!.cues.get(cueType)!;
       }
     } else {
-      // Throw an error if no default group is defined
-      throw new Error(`No default group defined to fall back to for cue: ${cueType}`);
-    }
-
-    console.error(`No implementation found for cue: ${cueType}`);
+      // Use same group as last time
+      this.primaryCueCounter++;
+      if (this.lastPrimaryCueGroup && this.groups.get(this.lastPrimaryCueGroup)?.cues.has(cueType)) {
+        this.emitCueStateUpdate(cueType, this.lastPrimaryCueGroup, this.lastPrimaryIsFallback, 'primary', this.primaryCueCounter, this.primaryCueLimit);
+        return this.groups.get(this.lastPrimaryCueGroup)!.cues.get(cueType)!;
+      }
+        }
+    
     return null;
   }
 
   /**
-   * Activate a single group by adding it to the active groups.
-   * Only enabled groups can be activated.
-   * @param groupName The name of the group to activate
-   * @returns True if the group was activated, false otherwise
+   * Handle secondary cue selection logic.
+   * @param cueType The type of cue to get
+   * @param preSelection Optional pre-selected group to avoid redundant selection
+   * @returns The cue implementation or null if not found
    */
-  public activateGroup(groupName: string): boolean {
-    if (this.groups.has(groupName) && this.enabledGroups.has(groupName)) {
-      this.activeGroups.add(groupName);
-      return true;
-    }
-    return false;
+  private handleSecondaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }): ICue | null {
+    const isNewCue = this.lastSecondaryCueName !== cueType;
+    const shouldReset = this.secondaryCueCounter >= this.secondaryCueLimit;
+
+    if (isNewCue || shouldReset) {
+      // Reset counter and select new implementation
+      this.secondaryCueCounter = 0;
+      const selection = preSelection || this.getRandomCueFromActiveGroups(cueType);
+
+      if (selection) {
+        this.lastSecondaryCueName = cueType;
+        this.lastSecondaryCueGroup = selection.groupId;
+        this.lastSecondaryIsFallback = selection.isFallback;
+        this.secondaryCueCounter++;
+        this.emitCueStateUpdate(cueType, selection.groupId, this.lastSecondaryIsFallback, 'secondary', this.secondaryCueCounter, this.secondaryCueLimit);
+        return this.groups.get(selection.groupId)!.cues.get(cueType)!;
+      }
+    } else {
+      // Use same group as last time
+      this.secondaryCueCounter++;
+      if (this.lastSecondaryCueGroup && this.groups.get(this.lastSecondaryCueGroup)?.cues.has(cueType)) {
+        this.emitCueStateUpdate(cueType, this.lastSecondaryCueGroup, this.lastSecondaryIsFallback, 'secondary', this.secondaryCueCounter, this.secondaryCueLimit);
+        return this.groups.get(this.lastSecondaryCueGroup)!.cues.get(cueType)!;
+      }
+        }
+    
+    return null;
   }
 
+
+
   /**
-   * Deactivate a single group by removing it from the active groups.
-   * @param groupName The name of the group to deactivate
-   * @returns True if the group was deactivated, false otherwise
+   * Select a group that has the specified cue type following the priority logic:
+   * 1. Randomly select from any ACTIVE group that has the requested cue
+   * 2. If default is active, it's considered along with other active groups
+   * 3. If default is NOT active, it's normally not considered
+   * 4. But if no active group has the cue, use default as fallback (even if not active)
+   * @param cueType The type of cue to find
+   * @returns Object with group ID and whether it's a fallback, or null if not found
    */
-  public deactivateGroup(groupName: string): boolean {
-    // Don't allow removing the default group
-    if (groupName === this.defaultGroup) {
-      console.warn("Cannot deactivate the default group");
-      return false;
+  private getRandomCueFromActiveGroups(cueType: CueType): { groupId: string; isFallback: boolean } | null {
+    // Step 1 & 2: Get all active groups that have this cue (including default if active)
+    const availableGroups: string[] = [];
+
+    for (const groupId of this.activeGroups) {
+      const group = this.groups.get(groupId);
+      if (group?.cues.has(cueType)) {
+        availableGroups.push(groupId);
+      }
     }
-    
-    if (this.activeGroups.has(groupName)) {
-      this.activeGroups.delete(groupName);
-      return true;
+
+    // If we found active groups with the cue, randomly select one
+    if (availableGroups.length > 0) {
+      const randomIndex = Math.floor(Math.random() * availableGroups.length);
+      const selectedGroup = availableGroups[randomIndex];
+      return {
+        groupId: selectedGroup,
+        isFallback: false
+      };
     }
-    return false;
+
+    // Step 4: No active groups have it, try default as fallback (only if not already active)
+    if (this.defaultGroup &&
+      !this.activeGroups.has(this.defaultGroup) &&
+      this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
+      return {
+        groupId: this.defaultGroup,
+        isFallback: true
+      };
+    }
+
+    return null;
   }
 
   /**
    * Enable a single group by adding it to the enabled groups.
-   * @param groupName The name of the group to enable
+   * If the group was not previously enabled, it will also be activated.
+   * @param groupId The ID of the group to enable
    * @returns True if the group was enabled, false otherwise
    */
-  public enableGroup(groupName: string): boolean {
-    if (this.groups.has(groupName)) {
-      this.enabledGroups.add(groupName);
+  public enableGroup(groupId: string): boolean {
+    if (this.groups.has(groupId)) {
+      const wasEnabled = this.enabledGroups.has(groupId);
+      this.enabledGroups.add(groupId);
+
+      // If it wasn't enabled before, activate it by default
+      if (!wasEnabled) {
+        this.activeGroups.add(groupId);
+      }
+
       return true;
     }
     return false;
@@ -169,21 +316,15 @@ export class CueRegistry {
   /**
    * Disable a single group by removing it from the enabled groups.
    * This will also deactivate the group if it was active.
-   * @param groupName The name of the group to disable
+   * @param groupId The ID of the group to disable
    * @returns True if the group was disabled, false otherwise
    */
-  public disableGroup(groupName: string): boolean {
-    // Don't allow disabling the default group
-    if (groupName === this.defaultGroup) {
-      console.warn("Cannot disable the default group");
-      return false;
-    }
-    
-    if (this.enabledGroups.has(groupName)) {
-      this.enabledGroups.delete(groupName);
+  public disableGroup(groupId: string): boolean {
+    if (this.enabledGroups.has(groupId)) {
+      this.enabledGroups.delete(groupId);
       // Also deactivate the group if it was active
-      if (this.activeGroups.has(groupName)) {
-        this.activeGroups.delete(groupName);
+      if (this.activeGroups.has(groupId)) {
+        this.activeGroups.delete(groupId);
       }
       return true;
     }
@@ -191,65 +332,179 @@ export class CueRegistry {
   }
 
   /**
-   * Set which groups are currently active.
-   * Only enabled groups can be set as active.
-   * @param groupNames The names of the groups to activate
+   * Activate a single group by adding it to the active groups.
+   * Only enabled groups can be activated.
+   * @param groupId The ID of the group to activate
+   * @returns True if the group was activated, false otherwise
    */
-  public setActiveGroups(groupNames: string[]): void {
-    this.activeGroups.clear();
-    for (const name of groupNames) {
-      if (this.groups.has(name) && this.enabledGroups.has(name)) {
-        this.activeGroups.add(name);
-      }
+  public activateGroup(groupId: string): boolean {
+    if (this.groups.has(groupId) && this.enabledGroups.has(groupId)) {
+      this.activeGroups.add(groupId);
+      return true;
     }
+    return false;
+  }
+
+  /**
+   * Deactivate a single group by removing it from the active groups.
+   * @param groupId The ID of the group to deactivate
+   * @returns True if the group was deactivated, false otherwise
+   */
+  public deactivateGroup(groupId: string): boolean {
+    if (this.activeGroups.has(groupId)) {
+      this.activeGroups.delete(groupId);
+      return true;
+    }
+    return false;
   }
 
   /**
    * Set which groups are enabled.
-   * @param groupNames The names of the groups to enable
+   * All newly enabled groups will also be activated by default.
+   * @param groupIds The IDs of the groups to enable
    */
-  public setEnabledGroups(groupNames: string[]): void {
+  public setEnabledGroups(groupIds: string[]): void {
     this.enabledGroups.clear();
-    for (const name of groupNames) {
-      if (this.groups.has(name)) {
-        this.enabledGroups.add(name);
+    this.activeGroups.clear();
+
+    for (const id of groupIds) {
+      if (this.groups.has(id)) {
+        this.enabledGroups.add(id);
+        // All enabled groups are active by default
+        this.activeGroups.add(id);
       }
     }
-    // Ensure active groups are still valid
-    this.setActiveGroups(Array.from(this.activeGroups));
   }
 
   /**
-   * Get all registered group names, regardless of whether they're enabled or active.
-   * @returns Array of all registered group names
+   * Set which groups are currently active.
+   * Only enabled groups can be set as active.
+   * @param groupIds The IDs of the groups to activate
+   */
+  public setActiveGroups(groupIds: string[]): void {
+    this.activeGroups.clear();
+    for (const id of groupIds) {
+      if (this.groups.has(id) && this.enabledGroups.has(id)) {
+        this.activeGroups.add(id);
+      }
+    }
+  }
+
+  /**
+   * Get all registered group IDs, regardless of whether they're enabled or active.
+   * @returns Array of all registered group IDs
    */
   public getAllGroups(): string[] {
     return Array.from(this.groups.keys());
   }
 
   /**
-   * Get the currently active group names.
-   * These are the groups that will be used during gameplay.
-   * @returns Array of active group names
-   */
-  public getActiveGroups(): string[] {
-    return Array.from(this.activeGroups);
-  }
-
-  /**
-   * Get the currently enabled group names.
-   * @returns Array of enabled group names
+   * Get the currently enabled group IDs.
+   * @returns Array of enabled group IDs
    */
   public getEnabledGroups(): string[] {
     return Array.from(this.enabledGroups);
   }
 
   /**
-   * Get a specific group by name, regardless of whether it's enabled or active.
-   * @param groupName The name of the group to get
+   * Get the currently active group IDs.
+   * @returns Array of active group IDs
+   */
+  public getActiveGroups(): string[] {
+    return Array.from(this.activeGroups);
+  }
+
+  /**
+   * Get the ID of the default group.
+   * @returns The default group ID or null if no default group is set
+   */
+  public getDefaultGroupId(): string | null {
+    return this.defaultGroup;
+  }
+
+  /**
+   * Get a specific group by ID, regardless of whether it's enabled or active.
+   * @param groupId The ID of the group to get
    * @returns The group or undefined if not found
    */
-  public getGroup(groupName: string): ICueGroup | undefined {
-    return this.groups.get(groupName);
+  public getGroup(groupId: string): ICueGroup | undefined {
+    return this.groups.get(groupId);
+  }
+
+  /**
+   * Get debugging information about the current cue selection state.
+   * @returns Object containing current selection state
+   */
+  public getDebugInfo(): {
+    lastPrimaryCue: { name: string | null; group: string | null; counter: number; isFallback: boolean };
+    lastSecondaryCue: { name: string | null; group: string | null; counter: number; isFallback: boolean };
+    activeGroups: string[];
+    enabledGroups: string[];
+    defaultGroup: string | null;
+  } {
+    return {
+      lastPrimaryCue: {
+        name: this.lastPrimaryCueName,
+        group: this.lastPrimaryCueGroup,
+        counter: this.primaryCueCounter,
+        isFallback: this.lastPrimaryIsFallback
+      },
+      lastSecondaryCue: {
+        name: this.lastSecondaryCueName,
+        group: this.lastSecondaryCueGroup,
+        counter: this.secondaryCueCounter,
+        isFallback: this.lastSecondaryIsFallback
+      },
+      activeGroups: Array.from(this.activeGroups),
+      enabledGroups: Array.from(this.enabledGroups),
+      defaultGroup: this.defaultGroup
+    };
+  }
+
+  /**
+   * Reset the cue selection counters and last selected groups.
+   */
+  public resetCueSelectionState(): void {
+    this.lastPrimaryCueName = null;
+    this.lastPrimaryCueGroup = null;
+    this.lastPrimaryIsFallback = false;
+    this.lastSecondaryCueName = null;
+    this.lastSecondaryCueGroup = null;
+    this.lastSecondaryIsFallback = false;
+    this.primaryCueCounter = 0;
+    this.secondaryCueCounter = 0;
+  }
+
+  /**
+   * Get information about which groups have implementations for a specific cue type.
+   * @param cueType The cue type to check
+   * @returns Object with group information
+   */
+  public getCueAvailability(cueType: CueType): {
+    activeGroupsWithCue: string[];
+    allGroupsWithCue: string[];
+    defaultHasCue: boolean;
+  } {
+    const activeGroupsWithCue: string[] = [];
+    const allGroupsWithCue: string[] = [];
+
+    for (const [groupId, group] of this.groups) {
+      if (group.cues.has(cueType)) {
+        allGroupsWithCue.push(groupId);
+        if (this.activeGroups.has(groupId)) {
+          activeGroupsWithCue.push(groupId);
+        }
+      }
+    }
+
+    const defaultHasCue = this.defaultGroup ?
+      (this.groups.get(this.defaultGroup)?.cues.has(cueType) ?? false) :
+      false;
+
+    return {
+      activeGroupsWithCue,
+      allGroupsWithCue,
+      defaultHasCue
+    };
   }
 } 

@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
 import { TrackedLight, RGBIP } from '../../../types';
@@ -10,6 +10,7 @@ import { YargCue } from '../YargCue';
 export class MenuCue implements ICue {
   name = YargCue.Menu;
   description = 'Continuous blue sweep effect that moves around all lights in a circular pattern with a 2-second delay between passes';
+  style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const frontLights = lightManager.getLights(['front'], 'all');

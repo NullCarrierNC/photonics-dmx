@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { randomBetween } from '../../../helpers/utils';
@@ -10,6 +10,7 @@ import { YargCue } from '../YargCue';
 export class FlareFastCue implements ICue {
   name = YargCue.FlareFast;
   description = 'Quick, intense bursts of bright white light on individual front lights with randomized timing, resembling camera flashes';
+  style = CueStyle.Secondary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const white = getColor('white', 'max');

@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
@@ -9,8 +9,10 @@ import { randomBetween } from '../../../helpers/utils';
 import { getEffectSingleColor } from '../../../effects';
 
 export class WarmManualCue implements ICue {
+  id = 'alt-warm-manual-1';
   name = YargCue.WarmManual;
-  description = 'Creates a sweep like effect with red and yellow on the measure. Red is used as primary colour with yellow as the low colour on all the lights.';
+  description = 'Front lights set red, yellow sweep on measure.';
+  style = CueStyle.Primary;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const red = getColor('red', 'medium');

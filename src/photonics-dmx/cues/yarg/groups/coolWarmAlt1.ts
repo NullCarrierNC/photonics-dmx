@@ -11,6 +11,7 @@ import { WarmManualCue } from '../coolWarmAlt1/WarmManualCue';
  * Create and register the cool/warm alternative 1 cue group.
  */
 const group: ICueGroup = {
+  id: 'coolWarmAlt1',
   name: 'Cool/Warm Alternative 1',
   description: 'Alt versions of the cool and warm cues, less frenetic than the defaults.',
   cues: new Map([
@@ -25,5 +26,4 @@ const group: ICueGroup = {
 const registry = CueRegistry.getInstance();
 registry.registerGroup(group);
 
-// TODO: Temporarly activate the group. We need to add config controls later.
-registry.activateGroup(group.name);
+registry.activateGroup(group.id);

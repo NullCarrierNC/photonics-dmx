@@ -263,7 +263,6 @@ export class TransitionEngine implements ITransitionEngine {
         layer: baseTransitionConfig.layer,
       };
 
-      // Now set the transition with our careful state handling
       this.lightTransitionController.setTransition(
         light.id,
         transition.layer,

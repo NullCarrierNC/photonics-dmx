@@ -1,5 +1,5 @@
 import { CueRegistry } from '../../cues/CueRegistry';
-import { ICue } from '../../cues/interfaces/ICue';
+import { ICue, CueStyle } from '../../cues/interfaces/ICue';
 import { ICueGroup } from '../../cues/interfaces/ICueGroup';
 import { CueData, CueType } from '../../cues/cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
@@ -10,6 +10,8 @@ import { beforeEach, describe, it, expect } from '@jest/globals';
 class MockCueImplementation implements ICue {
   constructor(private _name: string) {}
   get name(): string { return this._name; }
+  description = 'Mock cue for testing';
+  style = CueStyle.Primary;
   async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // Mock implementation
   }
@@ -38,6 +40,7 @@ describe('CueRegistry', () => {
 
     // Create default group
     defaultGroup = {
+      id: 'default',
       name: 'default',
       cues: new Map([
         [CueType.Default, new MockCueImplementation('default')],
@@ -47,6 +50,7 @@ describe('CueRegistry', () => {
 
     // Create custom group
     customGroup = {
+      id: 'custom',
       name: 'custom',
       cues: new Map([
         [CueType.Chorus, new MockCueImplementation('custom-chorus')],
@@ -56,7 +60,7 @@ describe('CueRegistry', () => {
     
     // Explicitly register and set the default group
     registry.registerGroup(defaultGroup);
-    registry.setDefaultGroup(defaultGroup.name);
+    registry.setDefaultGroup(defaultGroup.id);
   });
 
   describe('registerGroup', () => {

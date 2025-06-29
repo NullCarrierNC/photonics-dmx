@@ -14,6 +14,7 @@ import { SenderError } from '../../photonics-dmx/senders/BaseSender';
 import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager';
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController';
 import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/cueTypes';
+import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
 
 export class ControllerManager {
   private config: ConfigurationManager;
@@ -48,6 +49,7 @@ export class ControllerManager {
     
     await this.initializeDmxManager();
     await this.initializeSequencer();
+    await this.initializeCueRegistry();
     await this.initializeListeners();
     
     this.isInitialized = true;
@@ -88,6 +90,25 @@ export class ControllerManager {
     
     // Set up error handling
     this.senderManager.onSendError(this.handleSenderError);
+  }
+  
+  /**
+   * Initialize the CueRegistry with enabled groups from configuration
+   */
+  private async initializeCueRegistry(): Promise<void> {
+    const registry = CueRegistry.getInstance();
+    
+    // Get enabled groups from configuration
+    const enabledGroupIds = this.config.getEnabledCueGroups();
+    if (enabledGroupIds) {
+      registry.setEnabledGroups(enabledGroupIds);
+      console.log('CueRegistry initialized with enabled groups:', enabledGroupIds);
+    } else {
+      // If no preference is set, enable all available groups
+      const allGroups = registry.getAllGroups();
+      registry.setEnabledGroups(allGroups);
+      console.log('CueRegistry initialized with all groups (no preference set):', allGroups);
+    }
   }
   
   /**

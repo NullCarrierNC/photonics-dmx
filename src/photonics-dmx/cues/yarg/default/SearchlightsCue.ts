@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
 import { TrackedLight, RGBIP } from '../../../types';
@@ -13,6 +13,7 @@ var ltr = true;
 export class SearchlightsCue implements ICue {
   name = YargCue.Searchlights;
   description = 'Slow sweeping effect of a random bright color (red, green, blue, or white) that alternates direction with each activation';
+  style = CueStyle.Secondary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const frontLights = lightManager.getLights(['front'], 'all');
@@ -50,7 +51,6 @@ export class SearchlightsCue implements ICue {
     // Use unblocked to avoid breaking the sweep timing.
     const didAdd = sequencer.addEffectUnblockedName('searchlights', sweep);
     if (didAdd) {
-      console.log(didAdd, ltr);
       ltr = !ltr;
     }
   }

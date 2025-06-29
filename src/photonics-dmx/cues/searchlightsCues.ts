@@ -47,7 +47,6 @@ export function cueSearchlightsChase(effectController: ILightingController, ligh
     // Use unblocked to avoid breaking the sweep timing.
     const didAdd = effectController.addEffectUnblockedName('searchlights', sweep);
     if (didAdd){
-        console.log(didAdd, ltr);
         ltr = !ltr;
     }
 }

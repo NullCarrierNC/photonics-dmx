@@ -5,5 +5,6 @@ export enum Pages {
   NetworkDebug = 'NetworkDebug',
   CuePreview = 'CuePreview',
   CueSequencer = 'CueSequencer',
+  Preferences = 'Preferences',
   About = 'About',
 }

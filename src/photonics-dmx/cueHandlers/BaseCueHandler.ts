@@ -3,7 +3,7 @@ import { CueData, CueType } from '../cues/cueTypes';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { CueRegistry } from '../cues/CueRegistry';
-import { LightTarget, LocationGroup, TrackedLight } from '../types';
+import { LightTarget, LocationGroup, TrackedLight, CueGroup } from '../types';
 
 /**
  * Base class for cue handlers that provides common registry functionality.
@@ -175,4 +175,11 @@ export abstract class BaseCueHandler extends EventEmitter {
   protected abstract handleCueVerse(parameters: CueData): Promise<void>;
   protected abstract handleCueWarm_Automatic(parameters: CueData): Promise<void>;
   protected abstract handleCueWarm_Manual(parameters: CueData): Promise<void>;
+
+  public getAvailableCueGroups(): CueGroup[] {
+    const groupNames = this.registry.getAllGroups();
+    const groups = groupNames.map(name => this.registry.getGroup(name)).filter(g => g);
+    // The type from the registry is ICueGroup, we need to cast it to CueGroup
+    return groups.map(g => ({ name: g!.name, description: g!.description })) as CueGroup[];
+  }
 } 

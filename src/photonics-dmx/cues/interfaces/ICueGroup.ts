@@ -9,6 +9,7 @@ import { CueType } from '../cueTypes';
  * can be randomly selected for variety.
  */
 export interface ICueGroup {
+  id:string;
   /** The name of the group */
   name: string;
   /** Description of the cue group */

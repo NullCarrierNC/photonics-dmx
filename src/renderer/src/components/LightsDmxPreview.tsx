@@ -91,10 +91,10 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({
    * Helper function to render people icons between front and back rows.
    */
   const renderPeople = () => (
-    <div className="flex justify-center mt-2">
+    <div className="flex justify-center mt-1">
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="mx-2 mt-2">
-          <FaUser size={24} className="text-gray-600 dark:text-gray-300" />
+        <div key={i} className="mx-2 ">
+          <FaUser size={20} className="text-gray-600 dark:text-gray-300" />
         </div>
       ))}
     </div>
@@ -116,17 +116,17 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({
   );
 
   return (
-    <div className="mt-8 pt-2 pb-4 bg-gray-200 dark:bg-gray-700 rounded-lg">
+    <div className="mt-4 pt-3 pb-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
       <div className="flex flex-col items-center">
         {/* Icon representing the lighting setup */}
-        <div className="mb-4">
-          <MdTv size={48} className="text-gray-600 dark:text-gray-300" />
+        <div className="mb-1">
+          <MdTv size={30} className="text-gray-600 dark:text-gray-300" />
         </div>
 
         {/* Render front lights */}
         {lightingConfig?.frontLights.length > 0 && (
           <div className="w-full flex flex-col items-center">
-            <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">Front</div>
+            <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Front</div>
             {renderLightRow(lightingConfig.frontLights)}
           </div>
         )}
@@ -140,8 +140,8 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({
 
         {/* Render back lights */}
         {lightingConfig?.backLights.length > 0 && (
-          <div className="w-full flex flex-col items-center mt-4">
-            <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">Back</div>
+          <div className="w-full flex flex-col items-center mt-3">
+            <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Back</div>
             {renderLightRow(lightingConfig.backLights)}
           </div>
         )}

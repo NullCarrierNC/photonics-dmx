@@ -1,7 +1,7 @@
 import { CueData } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue } from '../../interfaces/ICue';
+import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors';
 import { randomBetween } from '../../../helpers/utils';
@@ -10,6 +10,7 @@ import { YargCue } from '../YargCue';
 export class FrenzyCue implements ICue {
   name = YargCue.Frenzy;
   description = 'Rapid color cycling between high-intensity red, green, blue, and orange on all lights for an energetic, chaotic effect';
+  style = CueStyle.Secondary;
   private _lastIndex: number = 0;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {

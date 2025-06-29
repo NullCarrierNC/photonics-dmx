@@ -83,3 +83,26 @@ export const enttecProComPortAtom = atom<string>("");
 export const lightingPrefsAtom = atom<any>({});
 export const useComplexCuesAtom = atom<boolean>(false);
 
+/**
+ * Atoms for tracking current cue state (pushed from backend)
+ */
+export interface CueStateInfo {
+  cueType: string | null;
+  groupId: string | null;
+  groupName: string | null;
+  isFallback: boolean;
+  cueStyle: 'primary' | 'secondary' | null;
+  counter: number;
+  limit: number;
+}
+
+export const currentCueStateAtom = atom<CueStateInfo>({
+  cueType: null,
+  groupId: null,
+  groupName: null,
+  isFallback: false,
+  cueStyle: null,
+  counter: 0,
+  limit: 0
+});
+
