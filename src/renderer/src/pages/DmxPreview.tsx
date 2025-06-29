@@ -246,11 +246,11 @@ const DmxPreview: React.FC = () => {
         } else {
           // Single group selection
           const groups = await window.electron.ipcRenderer.invoke('get-cue-groups');
-          const group = groups.find((g: CueGroup) => g.name === selectedGroup);
+          const group = groups.find((g: CueGroup) => g.id === selectedGroup);
           if (group) {
             setCurrentGroup(group);
             
-            // Fetch available effects for the specific group
+            // Fetch available effects for the specific group using group ID
             try {
               const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', selectedGroup);
               
@@ -267,7 +267,7 @@ const DmxPreview: React.FC = () => {
                   groupName: firstEffect.groupName
                 };
                 setSelectedEffect(effect);
-                console.log(`Auto-selected first effect: ${firstEffect.id} from group ${selectedGroup}`);
+                console.log(`Auto-selected first effect: ${firstEffect.id} from group ${group.name} (ID: ${selectedGroup})`);
               }
             } catch (error) {
               console.error('Error fetching available effects for group:', error);
@@ -354,7 +354,7 @@ const DmxPreview: React.FC = () => {
           <div className="lg:w-64">
             <EffectsDropdown 
               onSelect={handleEffectSelect}
-              groupName={selectedGroup === 'All' ? 'default' : selectedGroup}
+              groupId={selectedGroup === 'All' ? 'default' : (currentGroup?.id || 'default')}
               value={selectedEffect?.id}
             />
           </div>

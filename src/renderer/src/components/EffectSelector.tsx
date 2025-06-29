@@ -2,13 +2,13 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { EffectSelector } from 'src/photonics-dmx/types';
 
 interface EffectsDropdownProps {
-  groupName: string;
+  groupId: string;
   onSelect: (effect: EffectSelector) => void;
   value?: string;
 }
 
 export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
-  groupName = 'default',
+  groupId = 'default',
   onSelect,
   value
 }) => {
@@ -18,11 +18,11 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
 
   // Use stable callback to avoid infinite loops
   const fetchEffects = useCallback(async () => {
-    console.log(`Fetching effects for group: ${groupName}`);
+    console.log(`Fetching effects for group: ${groupId}`);
     try {
       setLoading(true);
       // This retrieves cues from the specified group without changing the active group state
-      const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', groupName);
+      const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', groupId);
       console.log('Available effects:', availableEffects);
       
       if (Array.isArray(availableEffects) && availableEffects.length > 0) {
@@ -51,7 +51,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [groupName]);
+  }, [groupId]);
 
   // Fetch effects when group changes
   useEffect(() => {
