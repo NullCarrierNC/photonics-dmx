@@ -10,7 +10,7 @@ import {
     FixtureTypes
 } from '../../../photonics-dmx/types';
 import { v4 as uuidv4 } from 'uuid';
-import { activeDmxLightsConfigAtom, myValidDmxLightsAtom } from '@renderer/atoms';
+import { activeDmxLightsConfigAtom, myValidDmxLightsAtom, myDmxLightsAtom } from '@renderer/atoms';
 
 const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
     { id: 'front', label: 'Front' },
@@ -27,8 +27,12 @@ const LIGHT_COUNT_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const LightsLayout = () => {
     const [activeConfig, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom);
     const [myFixtures] = useAtom(myValidDmxLightsAtom);
+    const [myFixtureLibrary] = useAtom(myDmxLightsAtom);
    
-    const [selectedCount, setSelectedCount] = useState<number>(() => activeConfig?.numLights || 4);
+    const [selectedCount, setSelectedCount] = useState<number | null>(() => {
+        if (activeConfig?.numLights === 0) return null;
+        return activeConfig?.numLights || 4;
+    });
     const [selectedLayout, setSelectedLayout] = useState<string>(() => activeConfig?.lightLayout.id || 'front');
 
     const initialAssignedToBack = useMemo(() => {
@@ -70,7 +74,7 @@ const LightsLayout = () => {
     const availableLayouts = useMemo(() => {
         return LIGHT_LAYOUTS.filter((layout) => {
             if (layout.id === 'front') return true;
-            if (layout.id === 'front-back') return selectedCount >= 4;
+            if (layout.id === 'front-back') return (selectedCount || 0) >= 2;
             return false;
         });
     }, [selectedCount]);
@@ -129,7 +133,7 @@ const LightsLayout = () => {
           let updated = [...nonStrobeLights];
           if (updated.length === 0) {
             // If no non-strobe lights are assigned, create them using the first fixture.
-            if (myFixtures.length > 0) {
+            if (myFixtures.length > 0 && selectedCount) {
               const firstFixture = myFixtures[0];
               for (let i = 0; i < selectedCount; i++) {
                 updated.push({
@@ -152,11 +156,13 @@ const LightsLayout = () => {
             }
           } else {
             // Adjust the count only for non-strobe lights.
-            while (updated.length < selectedCount) {
-              updated.push(createLightInstance('front'));
-            }
-            while (updated.length > selectedCount) {
-              updated.pop();
+            if (selectedCount) {
+              while (updated.length < selectedCount) {
+                updated.push(createLightInstance('front'));
+              }
+              while (updated.length > selectedCount) {
+                updated.pop();
+              }
             }
           }
           // Recombine the non-strobe lights with the dedicated strobe lights.
@@ -169,7 +175,7 @@ const LightsLayout = () => {
 
     //  Front/Back Assignment
     useEffect(() => {
-      const { frontCount, backCount } = splitLights(selectedCount, assignedToBack);
+      const { frontCount, backCount } = splitLights(selectedCount || 0, assignedToBack);
     
       setAllPrimaryLights((prev) => {
         // Separate non-strobe lights from dedicated strobe lights.
@@ -395,7 +401,7 @@ const LightsLayout = () => {
         const strobeWithNewIds  = mapLightsToNewIds(finalStrobe, idMap);
 
         setActiveLightsConfig({
-            numLights: selectedCount,
+            numLights: selectedCount || 0,
             lightLayout:
                 availableLayouts.find((layout) => layout.id === selectedLayout) ||
                 LIGHT_LAYOUTS[0],
@@ -412,13 +418,13 @@ const LightsLayout = () => {
     // Build Dropdown Options for Assigned to Back
     const assignedToBackOptions = useMemo(() => {
         const opts = [{ value: 'None', label: 'None' }];
-        for (let i = 1; i < selectedCount; i++) {
+        for (let i = 1; i < (selectedCount || 0); i++) {
             opts.push({ value: i.toString(), label: `${i} Light${i > 1 ? 's' : ''}` });
         }
         return opts;
     }, [selectedCount]);
 
-    const { frontCount, backCount } = splitLights(selectedCount, assignedToBack);
+    const { frontCount, backCount } = splitLights(selectedCount || 0, assignedToBack);
 
    
    
@@ -439,10 +445,14 @@ const LightsLayout = () => {
                 Front 1 Master Dimmer to 11, your R/G/B channels automatically become 12/13/14.
             </p>
 
-            {/* If no lights are configured, show the fallback message */}
-            {allPrimaryLights.length === 0 ? (
+            {/* Check if any lights are configured at all */}
+            {myFixtureLibrary.length === 0 ? (
                 <div className="mt-8 text-center text-lg font-semibold text-red-600">
                     You need to configure some lights first.
+                </div>
+            ) : myFixtures.length === 0 ? (
+                <div className="mt-8 text-center text-lg font-semibold text-orange-600">
+                    You have configured lights, but they need valid channel assignments. <br/>Please go to My Lights and assign channel values greater than 0 to all channels for your lights.
                 </div>
             ) : (
                 <>
@@ -452,16 +462,17 @@ const LightsLayout = () => {
                             <label className="flex flex-col items-start flex-1 min-w-[200px]">
                                 <span className="mb-2">Number of Primary Lights</span>
                                 <select
-                                    value={selectedCount}
+                                    value={selectedCount || ''}
                                     onChange={(e) => {
-                                        const newCount = Number(e.target.value);
+                                        const newCount = e.target.value ? Number(e.target.value) : null;
                                         setSelectedCount(newCount);
-                                        if (assignedToBack !== 'None' && assignedToBack >= newCount) {
+                                        if (newCount && assignedToBack !== 'None' && assignedToBack >= newCount) {
                                             setAssignedToBack('None');
                                         }
                                     }}
                                     className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
                                 >
+                                    {!selectedCount && <option value="">Select</option>}
                                     {LIGHT_COUNT_OPTIONS.map((cnt) => (
                                         <option key={cnt} value={cnt}>
                                             {cnt} Light{cnt > 1 ? 's' : ''}
