@@ -11,6 +11,8 @@ import { YargCue } from '../YargCue';
 // Static state to persist between cue calls
 let currentActiveLight: TrackedLight | null = null;
 let isNewSession = true;
+let transitionStartTime: number | null = null;
+let transitionDuration: number = 0;
 
 export class SearchlightsAlt1Cue implements ICue {
   id = 'common-alt-1-searchlights';
@@ -31,6 +33,15 @@ export class SearchlightsAlt1Cue implements ICue {
     
     // Calculate fade duration for two beats
     const twoBeatsDuration = (2 * 60 * 1000) / parameters.beatsPerMinute;
+    
+    // Check if a transition is currently in progress
+    if (transitionStartTime !== null) {
+      const timeElapsed = Date.now() - transitionStartTime;
+      if (timeElapsed < transitionDuration) {
+        console.log(`[SearchlightsCue] Transition in progress (${timeElapsed}/${transitionDuration}ms), skipping execution`);
+        return; // Wait for current transition to complete
+      }
+    }
     
     // First run: set all lights to blue low
     if (isNewSession) {
@@ -70,6 +81,10 @@ export class SearchlightsAlt1Cue implements ICue {
     
     console.log(`[SearchlightsCue] Fading in light ${newLight.id} to ${brightness} brightness over ${twoBeatsDuration}ms`);
     
+    // Start tracking the new transition
+    transitionStartTime = Date.now();
+    transitionDuration = twoBeatsDuration;
+    
     // Fade in new light
     const fadeInEffect = getEffectSingleColor({
       lights: [newLight],
@@ -81,7 +96,7 @@ export class SearchlightsAlt1Cue implements ICue {
     
     // Fade out current active light if exists
     if (currentActiveLight) {
-      const lightToFadeOut = currentActiveLight; // Capture reference for type safety
+      const lightToFadeOut = currentActiveLight;
       console.log(`[SearchlightsCue] Fading out light ${lightToFadeOut.id} to low over ${twoBeatsDuration}ms`);
       const fadeOutEffect = getEffectSingleColor({
         lights: [lightToFadeOut],
@@ -91,8 +106,7 @@ export class SearchlightsAlt1Cue implements ICue {
       });
       sequencer.addEffect('searchlights-fadeout', fadeOutEffect);
     }
-    
-    // Update current active light
+
     currentActiveLight = newLight;
   }
   
@@ -101,5 +115,7 @@ export class SearchlightsAlt1Cue implements ICue {
     console.log('[SearchlightsCue] onStop called - clearing state');
     currentActiveLight = null;
     isNewSession = true;
+    transitionStartTime = null;
+    transitionDuration = 0;
   }
 } 

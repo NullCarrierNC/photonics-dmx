@@ -9,6 +9,7 @@ const group: ICueGroup = {
   description: 'Alt versions of common cues.',
   cues: new Map([
     [CueType.Searchlights, new SearchlightsAlt1Cue()],
+    [CueType.Dischord, new SearchlightsAlt1Cue()],
   ]),
 };
 
