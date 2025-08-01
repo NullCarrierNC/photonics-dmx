@@ -8,6 +8,14 @@ export interface AppPreferences {
   effectDebounce: number;
   complex: boolean;
   enttecProPort?: string;
+  artNetConfig?: {
+    host: string;
+    universe: number;
+    net: number;
+    subnet: number;
+    subuni: number;
+    port: number;
+  };
   brightness?: {
     low: number;
     medium: number;

@@ -21,8 +21,18 @@ const EnttecProToggle = () => {
     }
   };
 
-  const handlePortChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setComPort(e.target.value);
+  const handlePortChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPort = e.target.value;
+    setComPort(newPort);
+    
+    // Save the updated port to preferences
+    try {
+      await window.electron.ipcRenderer.invoke('save-prefs', {
+        enttecProPort: newPort
+      });
+    } catch (error) {
+      console.error('Failed to save EnttecPro port configuration:', error);
+    }
   };
 
   useEffect(()=>{

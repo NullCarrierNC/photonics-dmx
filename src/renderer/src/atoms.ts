@@ -80,6 +80,16 @@ export const effectDebounceTimeAtom = atom<number>(1600);
 export const senderEnttecProEnabledAtom = atom<boolean>(false);
 export const enttecProComPortAtom = atom<string>("");
 
+export const senderArtNetEnabledAtom = atom<boolean>(false);
+export const artNetConfigAtom = atom({
+  host: "127.0.0.1",
+  universe: 0,
+  net: 0,
+  subnet: 0,
+  subuni: 0,
+  port: 6454
+});
+
 export const lightingPrefsAtom = atom<any>({});
 export const useComplexCuesAtom = atom<boolean>(false);
 
