@@ -122,7 +122,7 @@ export class DmxPublisher {
                 value = Math.max(0, Math.min(255, value));
 
                 const dmxChannel: DmxChannel = {
-                    universe: dmxLight.universe ?? 1,
+                    universe: dmxLight.universe ?? 0,
                     channel: channelNumber,
                     value: value,
                 };
