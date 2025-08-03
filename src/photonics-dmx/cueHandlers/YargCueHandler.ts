@@ -4,10 +4,6 @@ import { DmxLightManager } from '../controllers/DmxLightManager';
 import { BaseCueHandler } from './BaseCueHandler';
 import { ICue } from '../cues/interfaces/ICue';
 
-
-// Import YARG cue set to register with registry
-import '../cues/yarg';
-
 /**
  * YargCueHandler handles the cues called by the YARG network listener.
  * 
