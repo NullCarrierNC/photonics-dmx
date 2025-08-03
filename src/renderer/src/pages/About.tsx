@@ -41,7 +41,6 @@ const About = () => {
 
         <p>Additional thanks to the creators of various libraries Photonics utilizes under the hood including:</p>
         <ul className="space-y-0 ml-4 mr-4">
-          <li className="text-left"><a href="https://github.com/k-yle/sACN" target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">sACN</a>: provides support for sACN out.</li>
           <li className="text-left"><a href="https://github.com/node-dmx/dmx-ts" target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">dmx-ts</a>: provides support for Enttec Pro out.</li>
         </ul>
 

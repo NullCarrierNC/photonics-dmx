@@ -1,5 +1,5 @@
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
@@ -9,7 +9,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
  */
 export class StageKitMenuCue implements ICue {
   id = 'stagekit-menu';
-  cueId = 'StageKitMenu';
+  cueId = CueType.Menu;
   description = 'StageKit menu pattern - blue lights rotating in sequence';
   style = CueStyle.Primary;
 

@@ -1,5 +1,5 @@
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
@@ -8,7 +8,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
  */
 export class StageKitStrobeFastestCue implements ICue {
   id = 'stagekit-strobefastest';
-  cueId = 'StageKitStrobeFastest';
+  cueId =  CueType.Strobe_Fastest;
   description = 'StageKit strobefastest pattern - stub implementation';
   style = CueStyle.Primary;
 

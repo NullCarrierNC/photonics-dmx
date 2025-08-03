@@ -1,5 +1,5 @@
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
@@ -8,7 +8,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
  */
 export class StageKitSweepCue implements ICue {
   id = 'stagekit-sweep';
-  cueId = 'StageKitSweep';
+  cueId = CueType.Sweep;
   description = 'StageKit sweep pattern - stub implementation';
   style = CueStyle.Primary;
 

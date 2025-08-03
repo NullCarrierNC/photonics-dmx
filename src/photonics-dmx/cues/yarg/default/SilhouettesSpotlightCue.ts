@@ -1,14 +1,13 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
-import { YargCue } from '../YargCue';
 
 export class SilhouettesSpotlightCue implements ICue {
   id = 'default-silhouettes-spotlight';
-  cueId = YargCue.SilhouettesSpotlight;
+  cueId = CueType.Silhouettes_Spotlight;
   description = 'Solid low-intensity blue color on all lights (front and back)';
   style = CueStyle.Primary;
 

@@ -1,5 +1,5 @@
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
@@ -8,7 +8,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
  */
 export class StageKitStrobeSlowCue implements ICue {
   id = 'stagekit-strobeslow';
-  cueId = 'StageKitStrobeSlow';
+  cueId = CueType.Strobe_Slow;
   description = 'StageKit strobeslow pattern - stub implementation';
   style = CueStyle.Primary;
 

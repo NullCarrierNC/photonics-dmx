@@ -1,5 +1,5 @@
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
@@ -8,7 +8,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
  */
 export class StageKitHarmonyCue implements ICue {
   id = 'stagekit-harmony';
-  cueId = 'StageKitHarmony';
+  cueId = CueType.Harmony;
   description = 'StageKit harmony pattern - stub implementation';
   style = CueStyle.Primary;
 

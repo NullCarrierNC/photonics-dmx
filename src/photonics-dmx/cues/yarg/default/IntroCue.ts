@@ -1,14 +1,13 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 
 export class IntroCue implements ICue {
   id = 'default-intro';
-  cueId = YargCue.Intro;
+  cueId = CueType.Intro;
   description = 'Solid medium-blue color on front lights for song introductions';
   style = CueStyle.Primary;
 

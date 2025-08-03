@@ -1,5 +1,5 @@
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
@@ -8,7 +8,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
  */
 export class StageKitSearchlightsCue implements ICue {
   id = 'stagekit-searchlights';
-  cueId = 'StageKitSearchlights';
+  cueId = CueType.Searchlights;
   description = 'StageKit searchlights pattern - stub implementation';
   style = CueStyle.Primary;
 

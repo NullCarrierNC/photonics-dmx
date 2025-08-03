@@ -1,5 +1,5 @@
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
@@ -9,7 +9,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
  */
 export class StageKitLoopWarmCue implements ICue {
   id = 'stagekit-loopwarm';
-  cueId = 'StageKitLoopWarm';
+  cueId = CueType.Warm_Manual;
   description = 'StageKit loopwarm pattern - stub implementation';
   style = CueStyle.Primary;
 

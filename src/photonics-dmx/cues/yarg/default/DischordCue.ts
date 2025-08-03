@@ -1,4 +1,4 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
@@ -8,11 +8,11 @@ import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { randomBetween } from '../../../helpers/utils';
 import { EasingType } from '../../../easing';
-import { YargCue } from '../YargCue';
+
 
 export class DischordCue implements ICue {
   id = 'default-dischord';
-  cueId = YargCue.Dischord;
+  cueId = CueType.Dischord;
   description = 'Front lights alternate between green and blue on left/right halves with bright red or yellow flashes on the measure';
   style = CueStyle.Primary;
 

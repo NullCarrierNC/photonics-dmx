@@ -51,8 +51,7 @@ Some libraries/assets are packaged with the source code have licenses that must 
 
 | Link        | Licence     | Use         |
 | ----------- | ----------- | ----------- |
-| [sACN](https://github.com/k-yle/sACN) | Apache-2.0 license | sACN Output |
-| [dmx-ts](https://github.com/node-dmx/dmx-ts)   | MIT license | Enttec Pro USB |
+| [dmx-ts](https://github.com/node-dmx/dmx-ts)   | MIT license | sACN, ArtNet, and Enttec Pro USB Support |
 
 
 

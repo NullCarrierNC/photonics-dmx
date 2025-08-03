@@ -1,4 +1,4 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
@@ -6,7 +6,6 @@ import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects';
 import { TrackedLight } from '../../../types';
 import { randomBetween } from '../../../helpers/utils';
-import { YargCue } from '../YargCue';
 
 // Static state to persist between cue calls
 let currentActiveLight: TrackedLight | null = null;
@@ -16,7 +15,7 @@ let transitionDuration: number = 0;
 
 export class SearchlightsAlt1Cue implements ICue {
   id = 'common-alt-1-searchlights';
-  cueId = YargCue.Searchlights;
+  cueId = CueType.Searchlights;
   description = 'Randomly cross fade brightness between two lights.';
   style = CueStyle.Secondary;
 

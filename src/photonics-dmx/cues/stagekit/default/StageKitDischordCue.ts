@@ -1,5 +1,5 @@
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
@@ -8,7 +8,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
  */
 export class StageKitDischordCue implements ICue {
   id = 'stagekit-dischord';
-  cueId = 'StageKitDischord';
+  cueId = CueType.Dischord;
   description = 'StageKit dischord pattern - stub implementation';
   style = CueStyle.Primary;
 

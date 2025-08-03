@@ -1,14 +1,13 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 
 export class DefaultCue implements ICue {
   id = 'default-default';
-  cueId = YargCue.Default;
+  cueId = CueType.Default;
   description = 'Solid medium-yellow color on front lights for a warm, neutral stage ambience';
   style = CueStyle.Primary;
 
