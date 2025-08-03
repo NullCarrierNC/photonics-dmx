@@ -4,6 +4,7 @@ import { SenderConfig } from '../../photonics-dmx/types';
 import { SacnSender } from '../../photonics-dmx/senders/SacnSender';
 import { IpcSender } from '../../photonics-dmx/senders/IpcSender';
 import { EnttecProSender } from '../../photonics-dmx/senders/EnttecProSender';
+import { ArtNetSender } from '../../photonics-dmx/senders/ArtNetSender';
 import { CueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/CueRegistry';
 
 /**
@@ -42,7 +43,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Enable a sender
   ipcMain.on('sender-enable', (_, data: SenderConfig) => {
     try {
-      const { sender, port } = data;
+      const { sender, port, host, universe, net, subnet, subuni, artNetPort } = data;
       
       if (!sender) {
         console.error('Sender name is required');
@@ -66,6 +67,23 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         }
         const enttecProSender = new EnttecProSender(port);
         senderManager.enableSender(sender, enttecProSender);
+      } else if (sender === 'artnet') {
+        // ArtNet configuration
+        const artNetHost = host || '127.0.0.1';
+        const artNetUniverse = universe !== undefined ? universe : 0;
+        const artNetNet = net !== undefined ? net : 0;
+        const artNetSubnet = subnet !== undefined ? subnet : 0;
+        const artNetSubuni = subuni !== undefined ? subuni : 0;
+        const artNetPortValue = artNetPort !== undefined ? artNetPort : 6454;
+        
+        const artNetSender = new ArtNetSender(artNetHost, {
+          universe: artNetUniverse,
+          net: artNetNet,
+          subnet: artNetSubnet,
+          subuni: artNetSubuni,
+          port: artNetPortValue
+        });
+        senderManager.enableSender(sender, artNetSender);
       }
     } catch (error) {
       console.error('Error enabling sender:', error);

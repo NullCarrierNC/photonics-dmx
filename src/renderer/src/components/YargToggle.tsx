@@ -47,7 +47,7 @@ const YargToggle = () => {
   };
 
   return (
-    <div className="flex items-center mb-4 w-[200px] justify-between">
+    <div className="flex items-center mb-4 w-[220px] justify-between">
       <label className="mr-4 text-lg font-semibold">Enable YARG</label>
       <button
         onClick={handleToggle}

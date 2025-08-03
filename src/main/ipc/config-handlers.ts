@@ -69,6 +69,20 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     return controllerManager.getConfig().getAllPreferences();
   });
 
+  // Save app preferences
+  ipcMain.handle('save-prefs', async (_, updates: any) => {
+    try {
+      controllerManager.getConfig().updatePreferences(updates);
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
   // Get enabled cue groups
   ipcMain.handle('get-enabled-cue-groups', async () => {
     const enabled = controllerManager.getConfig().getEnabledCueGroups();

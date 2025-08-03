@@ -471,9 +471,15 @@ export const easingFunctions: { [key: string]: EasingFunction } = {
   'cubic.inout': cubicInOut,
 };
 
-export type Senders = 'sacn' | 'ipc' | 'enttecpro';
+export type Senders = 'sacn' | 'ipc' | 'enttecpro' | 'artnet';
 export interface SenderConfig {
   sender: Senders
   port?: string
+  host?: string
+  universe?: number
+  net?: number
+  subnet?: number
+  subuni?: number
+  artNetPort?: number
 }
 
