@@ -7,10 +7,14 @@ import { CueRegistry } from '../../cues/CueRegistry';
 import { ICueGroup } from '../../cues/interfaces/ICueGroup';
 import { ICue, CueStyle } from '../../cues/interfaces/ICue';
 
-// Mock implementation for the test
+// Mock implementation for the test  
 class MockCueImplementation implements ICue {
-  constructor(private _name: string) {}
-  get name(): string { return this._name; }
+  private _id: string;
+  constructor(private _name: string) {
+    this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`;
+  }
+  get cueId(): string { return this._name; }
+  get id(): string { return this._id; }
   description = 'Mock cue for testing';
   style = CueStyle.Primary;
   async execute(): Promise<void> { /* no-op */ }

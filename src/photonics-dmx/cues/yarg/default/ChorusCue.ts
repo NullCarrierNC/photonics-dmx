@@ -9,7 +9,8 @@ import { YargCue } from '../YargCue';
 
 
 export class ChorusCue implements ICue {
-  name = YargCue.Chorus;
+  id = 'default-chorus';
+  cueId = YargCue.Chorus;
   description = 'Alternating randomly between Amber/Purple or Yellow/Red colors on all lights with timing based on song BPM';
   style = CueStyle.Primary;
 

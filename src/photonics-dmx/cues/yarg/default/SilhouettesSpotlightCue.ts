@@ -7,7 +7,8 @@ import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 import { YargCue } from '../YargCue';
 
 export class SilhouettesSpotlightCue implements ICue {
-  name = YargCue.SilhouettesSpotlight;
+  id = 'default-silhouettes-spotlight';
+  cueId = YargCue.SilhouettesSpotlight;
   description = 'Solid low-intensity blue color on all lights (front and back)';
   style = CueStyle.Primary;
 

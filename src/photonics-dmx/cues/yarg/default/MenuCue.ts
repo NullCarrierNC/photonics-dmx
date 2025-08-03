@@ -8,7 +8,8 @@ import { TrackedLight, RGBIP } from '../../../types';
 import { YargCue } from '../YargCue';
 
 export class MenuCue implements ICue {
-  name = YargCue.Menu;
+  id = 'default-menu';
+  cueId = YargCue.Menu;
   description = 'Continuous blue sweep effect that moves around all lights in a circular pattern with a 2-second delay between passes';
   style = CueStyle.Primary;
 

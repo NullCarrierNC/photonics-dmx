@@ -9,7 +9,8 @@ import { EasingType } from '../../../easing';
 import { YargCue } from '../YargCue';
 
 export class HarmonyCue implements ICue {
-  name = YargCue.Harmony;
+  id = 'default-harmony';
+  cueId = YargCue.Harmony;
   description = 'Interactive color cross-fade effect where colors are determined by drum hits (starting color) and guitar notes (ending color)';
   style = CueStyle.Primary;
 

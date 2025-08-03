@@ -32,6 +32,7 @@ const DmxPreview: React.FC = () => {
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null);
   const [, setRegistryType] = useState<CueRegistryType>('YARG');
   const [selectedGroup, setSelectedGroup] = useState<string>('default');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('default');
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   
@@ -161,15 +162,20 @@ const DmxPreview: React.FC = () => {
       
       if (groupIds.length > 1) {
         displayName = 'All';
+        setSelectedGroupId('default'); // Use default group for "All" mode
+        setSelectedEffect(null); // Clear selected effect immediately when group changes
       } else {
         // Single group - need to get the group name for display
+        const groupId = groupIds[0];
+        setSelectedGroupId(groupId); // Store the actual group ID
+        setSelectedEffect(null); // Clear selected effect immediately when group changes
         try {
           const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
-          const group = allGroups.find((g: CueGroup) => g.id === groupIds[0]);
-          displayName = group ? group.name : groupIds[0];
+          const group = allGroups.find((g: CueGroup) => g.id === groupId);
+          displayName = group ? group.name : groupId;
         } catch (error) {
           console.error('Error fetching group details:', error);
-          displayName = groupIds[0];
+          displayName = groupId;
         }
       }
       
@@ -225,9 +231,6 @@ const DmxPreview: React.FC = () => {
           try {
             const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', 'default');
             
-            // Reset the currently selected effect since we changed groups
-            setSelectedEffect(null);
-            
             // If there are effects available, select the first one automatically
             if (availableEffects && availableEffects.length > 0) {
               const firstEffect = availableEffects[0];
@@ -250,28 +253,25 @@ const DmxPreview: React.FC = () => {
           if (group) {
             setCurrentGroup(group);
             
-            // Fetch available effects for the specific group using group ID
-            try {
-              const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', selectedGroup);
-              
-              // Reset the currently selected effect since we changed groups
-              setSelectedEffect(null);
-              
-              // If there are effects available, select the first one automatically
-              if (availableEffects && availableEffects.length > 0) {
-                const firstEffect = availableEffects[0];
-                const effect = {
-                  id: firstEffect.id,
-                  yargDescription: firstEffect.yargDescription,
-                  rb3Description: firstEffect.rb3Description,
-                  groupName: firstEffect.groupName
-                };
-                setSelectedEffect(effect);
-                console.log(`Auto-selected first effect: ${firstEffect.id} from group ${group.name} (ID: ${selectedGroup})`);
-              }
-            } catch (error) {
-              console.error('Error fetching available effects for group:', error);
+                      // Fetch available effects for the specific group using group ID
+          try {
+            const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', selectedGroup);
+            
+            // If there are effects available, select the first one automatically
+            if (availableEffects && availableEffects.length > 0) {
+              const firstEffect = availableEffects[0];
+              const effect = {
+                id: firstEffect.id,
+                yargDescription: firstEffect.yargDescription,
+                rb3Description: firstEffect.rb3Description,
+                groupName: firstEffect.groupName
+              };
+              setSelectedEffect(effect);
+              console.log(`Auto-selected first effect: ${firstEffect.id} from group ${group.name} (ID: ${selectedGroup})`);
             }
+          } catch (error) {
+            console.error('Error fetching available effects for group:', error);
+          }
           }
         }
       } catch (error) {
@@ -354,7 +354,7 @@ const DmxPreview: React.FC = () => {
           <div className="lg:w-64">
             <EffectsDropdown 
               onSelect={handleEffectSelect}
-              groupId={selectedGroup === 'All' ? 'default' : (currentGroup?.id || 'default')}
+              groupId={selectedGroupId}
               value={selectedEffect?.id}
             />
           </div>

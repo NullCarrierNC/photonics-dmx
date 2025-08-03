@@ -14,7 +14,7 @@ let isNewSession = true; // Flag to track if this is we should reset the light s
 
 export class CoolAutomaticCue implements ICue {
   id = 'alt-cool-auto-2';
-  name = YargCue.CoolAutomatic;
+  cueId = YargCue.CoolAutomatic;
   description = 'Lights get set green or blue, then flash one light in the opposite color.';
   style = CueStyle.Primary;
 

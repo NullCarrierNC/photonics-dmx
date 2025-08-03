@@ -98,7 +98,7 @@ class YargCueHandler extends BaseCueHandler {
         this.stopCurrentCue();
         
         // Track the new executing cue
-        console.log(`[Lifecycle] Starting new cue: ${cue.name} (${cueType})`);
+        console.log(`[Lifecycle] Starting new cue: ${cue.cueId} (${cueType})`);
         this.currentExecutingCue = cue;
         this.currentExecutingCueType = cueType;
       }
@@ -116,7 +116,7 @@ class YargCueHandler extends BaseCueHandler {
    */
   private stopCurrentCue(): void {
     if (this.currentExecutingCue) {
-      console.log(`[Lifecycle] Calling onStop for cue: ${this.currentExecutingCue.name}`);
+      console.log(`[Lifecycle] Calling onStop for cue: ${this.currentExecutingCue.cueId}`);
       this.currentExecutingCue.onStop?.();
       this.currentExecutingCue = null;
       this.currentExecutingCueType = null;
@@ -270,7 +270,7 @@ class YargCueHandler extends BaseCueHandler {
     console.log('[Lifecycle] YargCueHandler shutdown called');
     // Call onDestroy on currently executing cue
     if (this.currentExecutingCue) {
-      console.log(`[Lifecycle] Calling onDestroy for cue: ${this.currentExecutingCue.name}`);
+      console.log(`[Lifecycle] Calling onDestroy for cue: ${this.currentExecutingCue.cueId}`);
       this.currentExecutingCue.onDestroy?.();
       this.currentExecutingCue = null;
       this.currentExecutingCueType = null;

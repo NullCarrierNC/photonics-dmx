@@ -7,7 +7,8 @@ import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 
 export class IntroCue implements ICue {
-  name = YargCue.Intro;
+  id = 'default-intro';
+  cueId = YargCue.Intro;
   description = 'Solid medium-blue color on front lights for song introductions';
   style = CueStyle.Primary;
 

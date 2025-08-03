@@ -29,8 +29,11 @@ const mockControllerManager = {
 
 // Mock implementation with descriptions
 class MockCueImplementation implements ICue {
-  constructor(private _name: string, public description?: string) {}
-  get name(): string { return this._name; }
+  private _id: string;
+  constructor(public cueId: string, public description?: string) {
+    this._id = `mock-${this.cueId}-${Math.random().toString(36).substring(2, 11)}`;
+  }
+  get id(): string { return this._id; }
   style = CueStyle.Primary;
   
   async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {

@@ -14,7 +14,7 @@ let isNewSession = true; // Flag to track if this is we should reset the light s
 
 export class WarmAutomaticCue implements ICue {
   id = 'alt-warm-auto-2';
-  name = YargCue.WarmAutomatic;
+  cueId = YargCue.WarmAutomatic;
   description = 'Lights get set red or yellow, then flash one light in the opposite color.';
   style = CueStyle.Primary;
 

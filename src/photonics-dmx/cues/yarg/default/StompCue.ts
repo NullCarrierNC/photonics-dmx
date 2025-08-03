@@ -8,7 +8,8 @@ import { EasingType } from '../../../easing';
 import { YargCue } from '../YargCue';
 
 export class StompCue implements ICue {
-  name = YargCue.Stomp;
+  id = 'default-stomp';
+  cueId = YargCue.Stomp;
   description = 'White flash effect on front lights with a moderate fade-out';
   style = CueStyle.Secondary;
 

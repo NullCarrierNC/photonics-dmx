@@ -8,7 +8,8 @@ import { randomBetween } from '../../../helpers/utils';
 import { YargCue } from '../YargCue';
 
 export class FrenzyCue implements ICue {
-  name = YargCue.Frenzy;
+  id = 'default-frenzy';
+  cueId = YargCue.Frenzy;
   description = 'Rapid color cycling between high-intensity red, green, blue, and orange on all lights for an energetic, chaotic effect';
   style = CueStyle.Secondary;
   private _lastIndex: number = 0;

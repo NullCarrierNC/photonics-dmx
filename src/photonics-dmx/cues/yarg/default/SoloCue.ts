@@ -7,7 +7,8 @@ import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 
 export class SoloCue implements ICue {
-  name = YargCue.Solo;
+  id = 'default-solo';
+  cueId = YargCue.Solo;
   description = 'Rapid alternating white and purple colors on all lights with short transitions for dramatic solo sections';
   style = CueStyle.Primary;
 

@@ -8,7 +8,8 @@ import { randomBetween } from '../../../helpers/utils';
 import { YargCue } from '../YargCue';
 
 export class VerseCue implements ICue {
-  name = YargCue.Verse;
+  id = 'default-verse';
+  cueId = YargCue.Verse;
   description = 'Randomized blue or yellow colors at varying intensities on all lights with timing based on song BPM';
   style = CueStyle.Primary;
 

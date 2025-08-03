@@ -8,7 +8,8 @@ import { randomBetween } from '../../../helpers/utils';
 import { YargCue } from '../YargCue';
 
 export class SilhouettesCue implements ICue {
-  name = YargCue.Silhouettes;
+  id = 'default-silhouettes';
+  cueId = YargCue.Silhouettes;
   description = 'Cool colors (green, blue, magenta, teal) cycling on back lights or front lights if no back lights are available';
   style = CueStyle.Primary;
 

@@ -9,7 +9,7 @@ import { randomBetween } from '../../../helpers/utils';
 
 export class CoolAutomaticCue implements ICue {
   id = 'alt-cool-auto-1';
-  name = YargCue.CoolAutomatic;
+  cueId = YargCue.CoolAutomatic;
   description = 'All lights get set green, front cycles each light to blue on beat in random direction. ';
   style = CueStyle.Primary;
 
