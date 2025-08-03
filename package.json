@@ -1,6 +1,6 @@
 {
   "name": "photonics-dmx",
-  "version": "0.0.21-alpha.1",
+  "version": "0.0.22-alpha.1-fix",
   "description": "A DMX sequencer for YARG and RB3E",
   "main": "./out/main/index.js",
   "author": "Null Carrier",
