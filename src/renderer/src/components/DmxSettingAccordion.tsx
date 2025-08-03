@@ -31,14 +31,14 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps ) => {
 
       {isOpen && (
         <div className="p-4">
-          <div className="flex flex-row gap-8 items-start">
+          <div className="flex flex-row gap-16 items-start">
             <YargToggle /> <Rb3Toggle />
           </div>
           
-          <div className="flex flex-row gap-8 items-start mt-2">
+          <div className="flex flex-row gap-16 items-start mt-2">
             <SacnToggle /> <EnttecProToggle />
           </div>
-          <div className="flex flex-row gap-8 items-start mt-2">
+          <div className="flex flex-row gap-16 items-start mt-2">
             <ArtNetToggle />
           </div>
           {/*

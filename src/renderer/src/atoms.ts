@@ -94,6 +94,14 @@ export const lightingPrefsAtom = atom<any>({});
 export const useComplexCuesAtom = atom<boolean>(false);
 
 /**
+ * Atom for storing DMX settings UI preferences
+ */
+export const dmxSettingsPrefsAtom = atom({
+  artNetExpanded: false,
+  enttecProExpanded: false
+});
+
+/**
  * Atoms for tracking current cue state (pushed from backend)
  */
 export interface CueStateInfo {
