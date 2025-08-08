@@ -4,7 +4,7 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
 /**
- * StageKit Harmony Cue - Harmony lighting with venue-dependent patterns
+ * StageKit Harmony Cue
  */
 export class StageKitHarmonyCue implements ICue {
   id = 'stagekit-harmony';

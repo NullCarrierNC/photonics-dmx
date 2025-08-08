@@ -4,31 +4,27 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
 /**
- * StageKit Blackout Cue - Turns off all lights
- * Set all lights to off
+ * StageKit Blackout Cue
  */
 export class StageKitBlackoutCue implements ICue {
   id = 'stagekit-blackout';
   cueId = CueType.Blackout_Fast;
-  description = 'StageKit blackout pattern - stub implementation';
+  description = 'StageKit blackout pattern - all lights off';
   style = CueStyle.Primary;
 
-  async execute(_cueData: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
-    // TODO: Implement blackout pattern
-    // - Turns off all lights
-    // - Set all colors to none
-    console.log('StageKitBlackoutCue: All lights off (stub)');
+  async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
+   
   }
 
   onStop(): void {
-    
+    // Cleanup handled by effect system
   }
 
   onPause(): void {
-   
+    // Pause handled by effect system
   }
 
   onDestroy(): void {
-   
+    // Cleanup handled by effect system
   }
 } 

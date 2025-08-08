@@ -4,7 +4,7 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
 /**
- * StageKit Strobe Slow Cue - Slow-paced strobe effect
+ * StageKit Strobe Slow Cue
  */
 export class StageKitStrobeSlowCue implements ICue {
   id = 'stagekit-strobeslow';

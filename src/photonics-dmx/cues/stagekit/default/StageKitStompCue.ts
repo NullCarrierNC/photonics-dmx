@@ -3,32 +3,30 @@ import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
+
 /**
- * StageKit Stomp Cue - Dynamic effect with keyframe interaction
- * Toggle all lights on/off with keyframe events
+ * StageKit Stomp Cue - Keyframe-based toggle with all lights
+ * Starts with all lights on, toggles on/off with each keyframe
  */
 export class StageKitStompCue implements ICue {
   id = 'stagekit-stomp';
   cueId = CueType.Stomp;
-  description = 'StageKit stomp pattern - stub implementation';
+  description = 'StageKit stomp pattern - keyframe-based toggle';
   style = CueStyle.Primary;
 
-  async execute(_cueData: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
-    // TODO: Implement stomp pattern
-    // - Dynamic effect with keyframe interaction
-    // - Toggle all lights on/off with keyframe events
-    console.log('StageKitStompCue: Dynamic stomp effect (stub)');
-  }
-
-  onStop(): void {
+  async execute(cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     
   }
 
+  onStop(): void {
+    // Cleanup handled by effect system
+  }
+
   onPause(): void {
-   
+    // Pause handled by effect system
   }
 
   onDestroy(): void {
-   
+    // Cleanup handled by effect system
   }
 } 

@@ -15,7 +15,7 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
   async execute(_cueData: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // TODO: Implement silhouettes spotlight pattern
     // - Dynamic effect with vocal interaction
-    // - Complex behavior based on previous cues
+    // - Behavior based on previous cues
     console.log('StageKitSilhouettesSpotlightCue: Silhouette spotlight effect (stub)');
   }
 

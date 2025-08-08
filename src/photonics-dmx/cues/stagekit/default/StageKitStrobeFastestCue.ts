@@ -4,7 +4,7 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
 /**
- * StageKit Strobe Fastest Cue - Extremely rapid strobe lighting
+ * StageKit Strobe Fastest Cue
  */
 export class StageKitStrobeFastestCue implements ICue {
   id = 'stagekit-strobefastest';

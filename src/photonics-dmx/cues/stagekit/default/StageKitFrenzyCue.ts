@@ -15,7 +15,6 @@ export class StageKitFrenzyCue implements ICue {
 
   async execute(_cueData: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
     // TODO: Implement frenzy pattern
-    // - Fast, chaotic lighting patterns
     // - Large venue: Red, blue, yellow patterns
     // - Small venue: Red, green, blue patterns
     console.log('StageKitFrenzyCue: Fast chaotic patterns (stub)');

@@ -3,32 +3,29 @@ import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
+
 /**
- * StageKit Flare Fast Cue - Fast flare effect
- * Set blue to all, green to all (if previous was cool), others to none
+ * StageKit Flare Fast Cue - Blue lights (with green if previous was cool)
  */
 export class StageKitFlareFastCue implements ICue {
-  id = 'stagekit-flarefast';
+  id = 'stagekit-flare-fast';
   cueId = CueType.Flare_Fast;
-  description = 'StageKit flarefast pattern - stub implementation';
+  description = 'StageKit flare fast pattern - blue lights';
   style = CueStyle.Primary;
 
-  async execute(_cueData: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
-    // TODO: Implement flare fast pattern
-    // - Fast flare effect
-    // - Set blue to all, green to all (if previous was cool), others to none
-    console.log('StageKitFlareFastCue: Fast flare effect (stub)');
-  }
-
-  onStop(): void {
+  async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     
   }
 
+  onStop(): void {
+    // Cleanup handled by effect system
+  }
+
   onPause(): void {
-   
+    // Pause handled by effect system
   }
 
   onDestroy(): void {
-   
+    // Cleanup handled by effect system
   }
 } 

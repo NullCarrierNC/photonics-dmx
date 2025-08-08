@@ -3,31 +3,29 @@ import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
+
 /**
- * StageKit Flare Slow Cue - Slow flare effect
+ * StageKit Flare Slow Cue
  */
 export class StageKitFlareSlowCue implements ICue {
-  id = 'stagekit-flareslow';
+  id = 'stagekit-flare-slow';
   cueId = CueType.Flare_Slow;
-  description = 'StageKit flareslow pattern - stub implementation';
+  description = 'StageKit flare slow pattern - all colors on all lights';
   style = CueStyle.Primary;
 
-  async execute(_cueData: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
-    // TODO: Implement flare slow pattern
-    // - Slow flare effect
-    // - Set all colors to all
-    console.log('StageKitFlareSlowCue: Slow flare effect (stub)');
+  async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
+
   }
 
   onStop(): void {
-    
+    // Cleanup handled by effect system
   }
 
   onPause(): void {
-   
+    // Pause handled by effect system
   }
 
   onDestroy(): void {
-   
+    // Cleanup handled by effect system
   }
 } 

@@ -4,7 +4,7 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 
 /**
- * StageKit Sweep Cue - Sweeping light patterns
+ * StageKit Sweep Cue
  */
 export class StageKitSweepCue implements ICue {
   id = 'stagekit-sweep';
