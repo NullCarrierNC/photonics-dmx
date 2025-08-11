@@ -1,16 +1,15 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../interfaces/ICue';
-import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
 import { randomBetween } from '../../../helpers/utils';
 import { getEffectSingleColor } from '../../../effects';
+import { CueStyle, ICue } from '../../interfaces/ICue';
 
 export class CoolManualCue implements ICue {
   id = 'alt-cool-manual-1';
-  cueId = YargCue.CoolManual;
+  cueId = CueType.Cool_Manual;
   description = 'Low blue on all lights, green sweep on front on measure.';
   style = CueStyle.Primary;
 

@@ -1,15 +1,14 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { RGBIP } from '../../../types';
 
 export class StrobeMediumCue implements ICue {
   id = 'default-strobe-medium';
-  cueId = YargCue.Strobe_Medium;
+  cueId = CueType.Strobe_Medium;
   description = 'Medium-paced white strobe effect with flashing timed to BPM/16 of the song';
   style = CueStyle.Secondary;
 

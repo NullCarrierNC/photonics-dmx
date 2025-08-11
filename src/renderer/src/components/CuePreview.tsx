@@ -205,9 +205,9 @@ const CuePreview: React.FC<CuePreviewProps> = ({
 
     const getTitle = () => {
         if (cueState?.groupName) {
-            return `Current Cue - ${cueState.groupName}${cueState.isFallback ? ' - fallback' : ''}`;
+            return `Current Group - ${cueState.groupName}${cueState.isFallback ? ' - fallback' : ''}`;
         }
-        return 'Current Cue';
+        return 'Current Group';
     };
 
     return (

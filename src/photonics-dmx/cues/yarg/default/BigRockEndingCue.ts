@@ -1,15 +1,15 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { randomBetween } from '../../../helpers/utils';
-import { YargCue } from '../YargCue';
+
 
 export class BigRockEndingCue implements ICue {
   id = 'default-big-rock-ending';
-  cueId = YargCue.BigRockEnding;
+  cueId = CueType.BigRockEnding;
   description = 'Chaotic, individual flashing of bright colors (red, green, blue, orange) on all lights with random timings';
   style = CueStyle.Secondary;
 

@@ -1,3 +1,4 @@
+import CuePreview from '@renderer/components/CuePreview';
 import DmxSettingsAccordion from '@renderer/components/DmxSettingAccordion';
 
 const Status = () => {
@@ -23,6 +24,11 @@ const Status = () => {
         </p>
       </div>
 
+      <hr className="mt-8 mb-8" />
+      
+      <div className="flex flex-col">
+        <CuePreview />
+      </div>
 
       {/*     Debounce is hidden as it shouldn't be needed. I'm not removing it yet in case it's 
         useful for testing down the road.

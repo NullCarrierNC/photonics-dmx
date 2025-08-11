@@ -1,4 +1,4 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
@@ -6,13 +6,12 @@ import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
 import { TrackedLight, RGBIP } from '../../../types';
 import { randomBetween } from '../../../helpers/utils';
-import { YargCue } from '../YargCue';
 
 var ltr = true;
 
 export class SearchlightsCue implements ICue {
   id = 'default-searchlights';
-  cueId = YargCue.Searchlights;
+  cueId = CueType.Searchlights;
   description = 'Slow sweeping effect of a random bright color (red, green, blue, or white) that alternates direction with each activation';
   style = CueStyle.Secondary;
 

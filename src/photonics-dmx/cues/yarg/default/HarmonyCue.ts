@@ -1,4 +1,4 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
@@ -6,11 +6,10 @@ import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors';
 import { randomBetween } from '../../../helpers/utils';
 import { EasingType } from '../../../easing';
-import { YargCue } from '../YargCue';
 
 export class HarmonyCue implements ICue {
   id = 'default-harmony';
-  cueId = YargCue.Harmony;
+  cueId = CueType.Harmony;
   description = 'Interactive color cross-fade effect where colors are determined by drum hits (starting color) and guitar notes (ending color)';
   style = CueStyle.Primary;
 

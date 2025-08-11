@@ -111,6 +111,7 @@ export type CueData = {
     Strobe_Medium = "Strobe_Medium",
     Strobe_Slow = "Strobe_Slow",
     Strobe_Off = "Strobe_Off",
+    Solo = "Solo",
     Sweep = "Sweep",
     Verse = "Verse",
     Warm_Automatic = "Warm_Automatic",

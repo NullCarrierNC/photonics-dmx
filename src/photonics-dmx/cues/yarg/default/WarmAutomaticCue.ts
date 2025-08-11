@@ -1,15 +1,14 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors';
-import { YargCue } from '../YargCue';
 
 export class WarmAutomaticCue implements ICue {
   id = 'default-warm-auto';
-  cueId = YargCue.WarmAutomatic;
+  cueId = CueType.Warm_Automatic;
   description = 'Alternates red and yellow between front and back lights, triggered by measure events';
   style = CueStyle.Primary;
 

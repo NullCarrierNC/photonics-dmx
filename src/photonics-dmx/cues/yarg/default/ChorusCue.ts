@@ -1,16 +1,16 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 import { randomBetween } from '../../../helpers/utils';
-import { YargCue } from '../YargCue';
+
 
 
 export class ChorusCue implements ICue {
   id = 'default-chorus';
-  cueId = YargCue.Chorus;
+  cueId = CueType.Chorus;
   description = 'Alternating randomly between Amber/Purple or Yellow/Red colors on all lights with timing based on song BPM';
   style = CueStyle.Primary;
 

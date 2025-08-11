@@ -1,15 +1,14 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { randomBetween } from '../../../helpers/utils';
-import { YargCue } from '../YargCue';
 
 export class FlareSlowCue implements ICue {
   id = 'default-flare-slow';
-  cueId = YargCue.FlareSlow;
+  cueId = CueType.Flare_Slow;
   description = 'Slow, sustained bursts of bright white light on individual front lights with extended timing, creating dramatic lighting moments';
   style = CueStyle.Secondary;
 

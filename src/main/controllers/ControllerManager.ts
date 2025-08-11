@@ -15,6 +15,8 @@ import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/Lig
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController';
 import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/cueTypes';
 import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
+// Import all cue sets to register with registry
+import '../../photonics-dmx/cues';
 
 export class ControllerManager {
   private config: ConfigurationManager;

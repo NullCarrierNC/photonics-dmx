@@ -1,6 +1,6 @@
 import { IpcMain } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
-import '../../photonics-dmx/cues/yarg';
+import '../../photonics-dmx/cues';
 import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
 
 /**

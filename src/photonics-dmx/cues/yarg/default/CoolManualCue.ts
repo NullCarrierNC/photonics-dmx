@@ -1,15 +1,14 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../effects/effectSingleColor';
 import { getEffectCrossFadeColors } from '../../../effects/effectCrossFadeColors';
-import { YargCue } from '../YargCue';
 
 export class CoolManualCue implements ICue {
   id = 'default-cool-manual';
-  cueId = YargCue.CoolManual;
+  cueId = CueType.Cool_Manual;
   description = 'Alternates between blue and green on even/odd front lights triggered by beat events';
   style = CueStyle.Primary;
 
