@@ -15,7 +15,8 @@ export class StageKitDefaultCue implements ICue {
   cueId = CueType.Default;
   description = 'StageKit default pattern - event-driven effects';
   style = CueStyle.Primary;
-
+  private isFirstRun = true;
+  
   async execute(cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const venueSize = cueData.venueSize;
     
@@ -27,17 +28,26 @@ export class StageKitDefaultCue implements ICue {
   }
 
   private async executeLargeVenueDefault(controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const allLights = lightManager.getLights(['front', 'back'], ['all']);
     const blueColor = getColor('blue', 'medium');
     const redColor = getColor('red', 'medium');
-     const transitions: EffectTransition[] = [
-      // Blue on keyframe
+    const blackColor = getColor('black', 'medium');
+
+    const blueLightsFront = lightManager.getLights(['front'], ['inner-half-major']);
+    const blueLightsBack = lightManager.getLights(['back'], ['inner-half-major']);
+    const redLightsFront = lightManager.getLights(['front'], ['outter-half-minor']);
+    const redLightsBack = lightManager.getLights(['back'], ['outter-half-minor']);
+    
+    const blueLights = [...blueLightsFront, ...blueLightsBack];
+    const redLights = [...redLightsFront, ...redLightsBack];
+
+    const blueTransitions: EffectTransition[] = [
+      // Blue, wait for keyframe
       {
-        lights: allLights,
+        lights: blueLights,
         layer: 0,
-        waitFor: 'keyframe',
+        waitFor: 'none',
         forTime: 0,
-        waitUntil: 'none',
+        waitUntil: 'keyframe',
         untilTime: 0,
         transform: {
           color: blueColor,
@@ -45,13 +55,44 @@ export class StageKitDefaultCue implements ICue {
           duration: 100
         }
       },
-      // Red on next keyframe
+      // Turn off, wait for keyframe
       {
-        lights: allLights,
+        lights: blueLights,
         layer: 0,
-        waitFor: 'keyframe',
+        waitFor: 'none',
         forTime: 0,
-        waitUntil: 'none',
+        waitUntil: 'keyframe',
+        untilTime: 0,
+        transform: {
+          color: blackColor,
+          easing: 'linear',
+          duration: 100
+        }
+      }
+    ];
+
+    const redTransitions: EffectTransition[] = [
+      // Blue, wait for keyframe
+      {
+        lights: redLights,
+        layer: 0,
+        waitFor: 'none',
+        forTime: 0,
+        waitUntil: 'keyframe',
+        untilTime: 0,
+        transform: {
+          color: blackColor,
+          easing: 'linear',
+          duration: 100
+        }
+      },
+      // Turn off, wait for keyframe
+      {
+        lights: redLights,
+        layer: 0,
+        waitFor: 'none',
+        forTime: 0,
+        waitUntil: 'keyframe',
         untilTime: 0,
         transform: {
           color: redColor,
@@ -61,22 +102,130 @@ export class StageKitDefaultCue implements ICue {
       }
     ];
     
-    const defaultEffect: Effect = {
-      id: 'stagekit-default-large',
-      description: 'Blue and red alternating on keyframes',
-      transitions: transitions
+    const blueEffect: Effect = {
+      id: 'stagekit-default-large-blue',
+      description: 'Blue alternating on keyframes',
+      transitions: blueTransitions
+    };
+
+    const redEffect: Effect = {
+      id: 'stagekit-default-large-red',
+      description: 'Red alternating on keyframes',
+      transitions: redTransitions
     };
     
-    await controller.setEffect('stagekit-default-large', defaultEffect, 0, true);
+    // Use firstRun to determine if we should set or add the effect
+    if (this.isFirstRun) {
+      await controller.setEffect('stagekit-default-large-blue', blueEffect, 0);
+      this.isFirstRun = false;
+    } else {
+      await controller.addEffect('stagekit-default-large-blue', blueEffect, 0);
+    }
+
+    await controller.addEffect('stagekit-default-large-red', redEffect, 0);
   }
 
+  // Inverts ted/blue order
   private async executeSmallVenueDefault(controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
+    const blueColor = getColor('blue', 'medium');
+    const redColor = getColor('red', 'medium');
+    const blackColor = getColor('black', 'medium');
 
+    const blueLightsFront = lightManager.getLights(['front'], ['inner-half-major']);
+    const blueLightsBack = lightManager.getLights(['back'], ['inner-half-major']);
+    const redLightsFront = lightManager.getLights(['front'], ['outter-half-minor']);
+    const redLightsBack = lightManager.getLights(['back'], ['outter-half-minor']);
     
+    const blueLights = [...blueLightsFront, ...blueLightsBack];
+    const redLights = [...redLightsFront, ...redLightsBack];
+
+    const blueTransitions: EffectTransition[] = [
+      // Red, wait for keyframe
+      {
+        lights: redLights,
+        layer: 0,
+        waitFor: 'none',
+        forTime: 0,
+        waitUntil: 'keyframe',
+        untilTime: 0,
+        transform: {
+          color: redColor,
+          easing: 'linear',
+          duration: 100
+        }
+      },
+      // Turn off, wait for keyframe
+      {
+        lights: redLights,
+        layer: 0,
+        waitFor: 'none',
+        forTime: 0,
+        waitUntil: 'keyframe',
+        untilTime: 0,
+        transform: {
+          color: blackColor,
+          easing: 'linear',
+          duration: 100
+        }
+      }
+    ];
+
+    const redTransitions: EffectTransition[] = [
+      // wait for keyframe
+      {
+        lights: blueLights,
+        layer: 0,
+        waitFor: 'none',
+        forTime: 0,
+        waitUntil: 'keyframe',
+        untilTime: 0,
+        transform: {
+          color: blackColor,
+          easing: 'linear',
+          duration: 100
+        }
+      },
+      // Turn on
+      {
+        lights: blueLights,
+        layer: 0,
+        waitFor: 'none',
+        forTime: 0,
+        waitUntil: 'keyframe',
+        untilTime: 0,
+        transform: {
+          color: blueColor,
+          easing: 'linear',
+          duration: 100
+        }
+      }
+    ];
+    
+    const blueEffect: Effect = {
+      id: 'stagekit-default-large-blue',
+      description: 'Blue alternating on keyframes',
+      transitions: blueTransitions
+    };
+
+    const redEffect: Effect = {
+      id: 'stagekit-default-large-red',
+      description: 'Red alternating on keyframes',
+      transitions: redTransitions
+    };
+    
+    // Use firstRun to determine if we should set or add the effect
+    if (this.isFirstRun) {
+      await controller.setEffect('stagekit-default-large-blue', blueEffect, 0);
+      this.isFirstRun = false;
+    } else {
+      await controller.addEffect('stagekit-default-large-blue', blueEffect, 0);
+    }
+
+    await controller.addEffect('stagekit-default-large-red', redEffect, 0);
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstRun = true;
   }
 
   onPause(): void {
