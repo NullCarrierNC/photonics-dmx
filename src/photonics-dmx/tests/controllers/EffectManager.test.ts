@@ -88,6 +88,35 @@ describe('EffectManager', () => {
           map.get(t.layer)?.push(t);
         });
         return map;
+      }) as any),
+      groupTransitionsByLayerAndLight: jest.fn().mockImplementation(((transitions: EffectTransition[]) => {
+        const map = new Map<number, Map<string, EffectTransition[]>>();
+        transitions.forEach(t => {
+          if (!map.has(t.layer)) {
+            map.set(t.layer, new Map<string, EffectTransition[]>());
+          }
+          const layerMap = map.get(t.layer)!;
+          t.lights.forEach(light => {
+            if (!layerMap.has(light.id)) {
+              layerMap.set(light.id, []);
+            }
+            layerMap.get(light.id)!.push(t);
+          });
+        });
+        return map;
+      }) as any),
+      expandTransitionsByLight: jest.fn().mockImplementation(((transitions: EffectTransition[]) => {
+        const expandedTransitions: EffectTransition[] = [];
+        transitions.forEach(t => {
+          t.lights.forEach(light => {
+            const lightTransition: EffectTransition = {
+              ...t,
+              lights: [light],
+            };
+            expandedTransitions.push(lightTransition);
+          });
+        });
+        return expandedTransitions;
       }) as any)
     } as unknown as jest.Mocked<EffectTransformer>;
 
@@ -164,14 +193,16 @@ describe('EffectManager', () => {
       // Note: setLayerLastUsed is called by TransitionEngine, not directly by EffectManager
       // So we don't expect it to be called here
 
-      // Verify effect was added to the layer
+      // Verify effect was added to the layer for the specific light
       expect(layerManager.addActiveEffect).toHaveBeenCalledWith(
         1,
+        'test-light-1',
         expect.objectContaining({
           name: 'test',
           effect: effect,
           transitions: expect.any(Array),
-          layer: 1
+          layer: 1,
+          lightId: 'test-light-1'
         })
       );
     });
@@ -252,12 +283,12 @@ describe('EffectManager', () => {
         effect: effect1,
         transitions: effect1.transitions,
         layer: layer,
-        trackedLights: [createMockTrackedLight()],
+        lightId: 'test-light-1',
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map(),
+        lastEndState: undefined,
         isPersistent: false
       });
 
@@ -267,10 +298,12 @@ describe('EffectManager', () => {
       // Verify the new effect was queued instead of replacing the existing one
       expect(layerManager.addQueuedEffect).toHaveBeenCalledWith(
         layer,
+        'test-light-1',
         expect.objectContaining({
           name: effectName,
           effect: effect2,
-          isPersistent: false
+          isPersistent: false,
+          lightId: 'test-light-1'
         })
       );
       
@@ -347,13 +380,13 @@ describe('EffectManager', () => {
         name: 'existing-effect',
         effect: { id: 'existing', description: 'Existing Effect', transitions: [] },
         transitions: [],
-        trackedLights: [],
+        lightId: 'test-light-1',
         layer: 1,
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map()
+        lastEndState: undefined
       });
 
       // Call setEffect
@@ -366,11 +399,13 @@ describe('EffectManager', () => {
       // Verify new effect was added
       expect(layerManager.addActiveEffect).toHaveBeenCalledWith(
         1,
+        'test-light-1',
         expect.objectContaining({
           name: 'test',
           effect: effect,
           transitions: expect.any(Array),
-          layer: 1
+          layer: 1,
+          lightId: 'test-light-1'
         })
       );
       
@@ -406,19 +441,21 @@ describe('EffectManager', () => {
 
       // Mock the getActiveEffects to return a map with an effect with the same name
       const activeEffectsMap = new Map();
-      activeEffectsMap.set(2, {
+      const lightMap = new Map();
+      lightMap.set('test-light-1', {
         name: effectName,
         effect: { id: 'other', description: 'Other Effect', transitions: [] },
         transitions: [],
         layer: 2,
-        trackedLights: [createMockTrackedLight()],
+        lightId: 'test-light-1',
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map(),
+        lastEndState: undefined,
         isPersistent: false
       });
+      activeEffectsMap.set(2, lightMap);
       layerManager.getActiveEffects.mockReturnValue(activeEffectsMap);
 
       // Call addEffectUnblockedName
@@ -468,9 +505,11 @@ describe('EffectManager', () => {
       
       expect(layerManager.addActiveEffect).toHaveBeenCalledWith(
         1,
+        'test-light-1',
         expect.objectContaining({
           name: effectName,
-          effect: effect
+          effect: effect,
+          lightId: 'test-light-1'
         })
       );
     });
@@ -501,19 +540,21 @@ describe('EffectManager', () => {
 
       // Mock the getActiveEffects to return a map with an effect with the same name
       const activeEffectsMap = new Map();
-      activeEffectsMap.set(2, {
+      const lightMap = new Map();
+      lightMap.set('test-light-1', {
         name: effectName,
         effect: { id: 'other', description: 'Other Effect', transitions: [] },
         transitions: [],
         layer: 2,
-        trackedLights: [createMockTrackedLight()],
+        lightId: 'test-light-1',
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map(),
+        lastEndState: undefined,
         isPersistent: false
       });
+      activeEffectsMap.set(2, lightMap);
       layerManager.getActiveEffects.mockReturnValue(activeEffectsMap);
 
       // Call setEffectUnblockedName
@@ -551,13 +592,13 @@ describe('EffectManager', () => {
         name: 'existing-effect',
         effect: { id: 'existing', description: 'Existing Effect', transitions: [] },
         transitions: [],
-        trackedLights: [],
+        lightId: 'test-light-1',
         layer: 1,
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map()
+        lastEndState: undefined
       });
 
       // Call setEffectUnblockedName
@@ -570,11 +611,13 @@ describe('EffectManager', () => {
       // Verify new effect was added
       expect(layerManager.addActiveEffect).toHaveBeenCalledWith(
         1,
+        'test-light-1',
         expect.objectContaining({
           name: 'test',
           effect: effect,
           transitions: expect.any(Array),
-          layer: 1
+          layer: 1,
+          lightId: 'test-light-1'
         })
       );
     });
@@ -586,25 +629,41 @@ describe('EffectManager', () => {
       const layer = 1;
       
       // Mock an existing active effect
-      layerManager.getActiveEffect.mockReturnValue({
+      const activeEffectsMap = new Map();
+      const lightMap = new Map();
+      lightMap.set('test-light-1', {
         name: effectName,
         effect: { id: 'test', description: 'Test Effect', transitions: [] },
-        transitions: [],
+        transitions: [{
+          lights: [createMockTrackedLight()],
+          layer: layer,
+          waitFor: 'none',
+          forTime: 0,
+          transform: {
+            color: createMockRGBIP(),
+            easing: 'linear',
+            duration: 1000
+          },
+          waitUntil: 'none',
+          untilTime: 0
+        }],
         layer: layer,
-        trackedLights: [createMockTrackedLight()],
+        lightId: 'test-light-1',
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map(),
+        lastEndState: undefined,
         isPersistent: false
       });
+      activeEffectsMap.set(layer, lightMap);
+      layerManager.getActiveEffects.mockReturnValue(activeEffectsMap);
 
       // Call removeEffect
       effectManager.removeEffect(effectName, layer);
 
-      // Verify effect was removed
-      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(layer);
+      // Verify effect was removed (removeEffect calls removeEffectByLayer which calls removeActiveEffect for each light)
+      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(layer, 'test-light-1');
     });
 
     it('should not remove an effect if name does not match', () => {
@@ -617,12 +676,12 @@ describe('EffectManager', () => {
         effect: { id: 'different', description: 'Different Effect', transitions: [] },
         transitions: [],
         layer: layer,
-        trackedLights: [createMockTrackedLight()],
+        lightId: 'test-light-1',
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map(),
+        lastEndState: undefined,
         isPersistent: false
       });
 

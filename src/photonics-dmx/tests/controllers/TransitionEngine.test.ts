@@ -12,7 +12,7 @@
 import { TransitionEngine } from '../../controllers/sequencer/TransitionEngine';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
 import { LayerManager } from '../../controllers/sequencer/LayerManager';
-import { ActiveEffect } from '../../controllers/sequencer/interfaces';
+import { LightEffectState } from '../../controllers/sequencer/interfaces';
 import { createMockRGBIP, createMockTrackedLight } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
 import { EffectTransition } from '../../types';
@@ -42,17 +42,17 @@ describe('TransitionEngine', () => {
   });
   
   // Helper to create a mock active effect
-  const createMockActiveEffect = (overrides?: Partial<ActiveEffect>): ActiveEffect => ({
+  const createMockActiveEffect = (overrides?: Partial<LightEffectState>): LightEffectState => ({
     name: 'test-effect',
     effect: { id: 'test', description: 'Test Effect', transitions: [] },
     transitions: [createMockEffectTransition()],
-    trackedLights: [createMockTrackedLight()],
     layer: 1,
+    lightId: 'test-light-1',
     currentTransitionIndex: 0,
     state: 'idle',
     transitionStartTime: 0,
     waitEndTime: 0,
-    lastEndStates: new Map(),
+    lastEndState: undefined,
     isPersistent: false,
     ...overrides
   });
@@ -162,8 +162,10 @@ describe('TransitionEngine', () => {
       const mockActiveEffect = createMockActiveEffect();
       
       // Set up the layerManager to return our mock effect
-      const activeEffectsMap = new Map<number, ActiveEffect>();
-      activeEffectsMap.set(1, mockActiveEffect);
+      const activeEffectsMap = new Map<number, Map<string, LightEffectState>>();
+      const lightMap = new Map<string, LightEffectState>();
+      lightMap.set('test-light-1', mockActiveEffect);
+      activeEffectsMap.set(1, lightMap);
       layerManager.getActiveEffects.mockReturnValue(activeEffectsMap);
       
       // Call updateTransitions
@@ -185,8 +187,10 @@ describe('TransitionEngine', () => {
       });
       
       // Set up the layerManager to return our mock effect
-      const activeEffectsMap = new Map<number, ActiveEffect>();
-      activeEffectsMap.set(1, mockActiveEffect);
+      const activeEffectsMap = new Map<number, Map<string, LightEffectState>>();
+      const lightMap = new Map<string, LightEffectState>();
+      lightMap.set('test-light-1', mockActiveEffect);
+      activeEffectsMap.set(1, lightMap);
       layerManager.getActiveEffects.mockReturnValue(activeEffectsMap);
       layerManager.getActiveEffect.mockReturnValue(mockActiveEffect);
       
@@ -194,7 +198,7 @@ describe('TransitionEngine', () => {
       transitionEngine.updateTransitions();
       
       // Verify the effect was removed since it completed all transitions
-      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1);
+      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1, 'test-light-1');
     });
   });
 
@@ -222,8 +226,7 @@ describe('TransitionEngine', () => {
       const mockEffect = createMockActiveEffect({
         state: 'transitioning',
         waitEndTime: now - 100,  // Time already passed
-        trackedLights: [createMockTrackedLight({ id: 'test-light' })],
-        lastEndStates: new Map<string, any>()
+        lightId: 'test-light'
       });
       
       const transition = mockEffect.transitions[0];
@@ -239,8 +242,8 @@ describe('TransitionEngine', () => {
         expect(mockEffect.currentTransitionIndex).toBe(1);  // Advanced to next transition
       }
       
-      // Verify last end states were updated
-      expect(mockEffect.lastEndStates?.has('test-light')).toBeTruthy();
+      // Verify last end state was updated (now single state instead of map)
+      expect(mockEffect.lastEndState).toBeDefined();
     });
     
     it('should handle the waitingUntil state correctly', () => {

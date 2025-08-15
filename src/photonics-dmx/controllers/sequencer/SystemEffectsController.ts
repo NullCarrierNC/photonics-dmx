@@ -64,8 +64,12 @@ export class SystemEffectsController implements ISystemEffectsController {
     }
     
     if (duration === 0) {
-      this.layerManager.getActiveEffects().clear();
-      this.layerManager.getEffectQueue().clear();
+      // Clear all active effects and queues for all layers
+      const allLayers = this.layerManager.getAllLayers();
+      for (const layer of allLayers) {
+        this.layerManager.removeActiveEffect(layer, 'all');
+        this.layerManager.removeQueuedEffect(layer, 'all');
+      }
       this.lightTransitionController.immediateBlackout();
       
       // Trigger the immediate blackout callback if registered
@@ -136,8 +140,11 @@ export class SystemEffectsController implements ISystemEffectsController {
         await Promise.all(transitionPromises);
 
         // Clear all effects and force black state
-        this.layerManager.getActiveEffects().clear();
-        this.layerManager.getEffectQueue().clear();
+        const allLayers = this.layerManager.getAllLayers();
+        for (const layer of allLayers) {
+          this.layerManager.removeActiveEffect(layer, 'all');
+          this.layerManager.removeQueuedEffect(layer, 'all');
+        }
         
         // Force immediate black state for all lights while preserving pan/tilt
         allLightIds.forEach(lightId => {

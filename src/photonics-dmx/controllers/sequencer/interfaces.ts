@@ -2,8 +2,27 @@ import { Effect, EffectTransition, RGBIP, TrackedLight } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
 
 /**
+ * @interface LightEffectState
+ * @description Holds the state for a single light's effect on a specific layer
+ */
+export interface LightEffectState {
+  name: string;
+  effect: Effect;
+  transitions: EffectTransition[];
+  lightId: string;
+  layer: number;
+  currentTransitionIndex: number;
+  state: 'idle' | 'waitingFor' | 'transitioning' | 'waitingUntil';
+  transitionStartTime: number;
+  waitEndTime: number;
+  lastEndState?: RGBIP;
+  isPersistent?: boolean;
+}
+
+/**
  * @interface ActiveEffect
- * @description Holds only the transitions for a single layer.
+ * @description Holds the transitions for a single layer, now tracking per-light states
+ * @deprecated Use LightEffectState for per-light tracking instead
  */
 export interface ActiveEffect {
   name: string;
@@ -21,11 +40,12 @@ export interface ActiveEffect {
 
 /**
  * @interface QueuedEffect
- * @description Represents an effect waiting to be activated
+ * @description Represents an effect waiting to be activated for a specific light
  */
 export interface QueuedEffect {
   name: string;
   effect: Effect;
+  lightId: string;
   isPersistent: boolean;
 }
 
@@ -35,23 +55,24 @@ export interface QueuedEffect {
  */
 export interface ILayerManager {
   setLayerLastUsed(layer: number, time: number): void;
-  getActiveEffects(): Map<number, ActiveEffect>;
-  getEffectQueue(): Map<number, QueuedEffect>;
+  getActiveEffects(): Map<number, Map<string, LightEffectState>>;
+  getEffectQueue(): Map<number, Map<string, QueuedEffect>>;
   
   /**
-   * Adds an active effect to a layer and automatically manages its state
-   * Populates the effect's lastEndStates with appropriate state information
+   * Adds an active effect for a specific light on a layer
+   * Populates the effect's lastEndState with appropriate state information
    * 
    * @param layer The layer number
-   * @param effect The active effect to add
+   * @param lightId The light ID
+   * @param effect The light effect state to add
    */
-  addActiveEffect(layer: number, effect: ActiveEffect): void;
+  addActiveEffect(layer: number, lightId: string, effect: LightEffectState): void;
   
-  removeActiveEffect(layer: number): void;
-  getActiveEffect(layer: number): ActiveEffect | undefined;
-  addQueuedEffect(layer: number, effect: QueuedEffect): void;
-  removeQueuedEffect(layer: number): void;
-  getQueuedEffect(layer: number): QueuedEffect | undefined;
+  removeActiveEffect(layer: number, lightId: string): void;
+  getActiveEffect(layer: number, lightId: string): LightEffectState | undefined;
+  addQueuedEffect(layer: number, lightId: string, effect: QueuedEffect): void;
+  removeQueuedEffect(layer: number, lightId: string): void;
+  getQueuedEffect(layer: number, lightId: string): QueuedEffect | undefined;
   cleanupUnusedLayers(now: number): void;
   getAllLayers(): number[];
   
@@ -68,6 +89,11 @@ export interface ILayerManager {
   getLightState(layer: number, lightId: string): RGBIP | undefined;
   clearLayerStates(layer: number): void;
   getLightTransitionController(): LightTransitionController;
+  
+  // Per-light effect management
+  getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
+  isLayerFreeForLight(layer: number, lightId: string): boolean;
+  isLayerFree(layer: number): boolean;
 }
 
 /**
@@ -95,11 +121,11 @@ export interface ITransitionEngine {
   startAnimationLoop(): void;
   stopAnimationLoop(): void;
   updateTransitions(): void;
-  prepareTransition(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void;
-  handleWaitingFor(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void;
-  startTransition(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void;
-  handleTransitioning(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void;
-  handleWaitingUntil(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void;
+  prepareTransition(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
+  handleWaitingFor(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
+  startTransition(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
+  handleTransitioning(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
+  handleWaitingUntil(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
   getLightTransitionController(): LightTransitionController;
   setEffectManager(effectManager: IEffectManager): void;
 }
@@ -128,8 +154,12 @@ export interface IEffectManager {
   removeAllEffects(): void;
   startEffect(name: string, effect: Effect, trackedLights: TrackedLight[], layer: number, transitions: EffectTransition[], isPersistent?: boolean): void;
   removeEffectByLayer(layer: number, shouldRemoveTransitions: boolean): void;
-  startNextEffectInQueue(layer: number): boolean;
+  startNextEffectInQueue(layer: number, lightId: string): boolean;
   setState(lights: TrackedLight[], color: RGBIP, time: number): void;
+  
+  // Per-light effect management
+  getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
+  isLayerFreeForLight(layer: number, lightId: string): boolean;
 }
 
 /**
@@ -160,6 +190,8 @@ export interface IDebugMonitor {
  */
 export interface IEffectTransformer {
   groupTransitionsByLayer(transitions: EffectTransition[]): Map<number, EffectTransition[]>;
+  expandTransitionsByLight(transitions: EffectTransition[]): EffectTransition[];
+  groupTransitionsByLayerAndLight(transitions: EffectTransition[]): Map<number, Map<string, EffectTransition[]>>;
 }
 
 /**
