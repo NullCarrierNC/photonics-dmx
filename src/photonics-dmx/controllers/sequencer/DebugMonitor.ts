@@ -129,7 +129,7 @@ export class DebugMonitor implements IDebugMonitor {
     // Create a map to store light positions by ID
     const lightPositions = new Map<string, number>();
     
-    this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
+    this.layerManager.getActiveEffects().forEach((layerMap, _layer) => {
       layerMap.forEach((effect, lightId) => {
         const light = effect.transitions[0].lights.find(l => l.id === lightId);
         if (light) {

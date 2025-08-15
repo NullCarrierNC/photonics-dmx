@@ -340,7 +340,7 @@ export class EffectManager implements IEffectManager {
     if (!activeEffects) return;
     
     // Find and remove effects with the matching name
-    activeEffects.forEach((activeEffect, lightId) => {
+    activeEffects.forEach((activeEffect, _lightId) => {
       if (activeEffect.name === name) {
         this.removeEffectByLayer(layer, true);
       }

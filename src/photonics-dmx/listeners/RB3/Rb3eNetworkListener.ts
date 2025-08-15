@@ -1,8 +1,8 @@
 import * as dgram from 'dgram';
 import { EventEmitter } from 'events';
 import { Rb3ePacketType, Rb3GameState, Rb3RightChannel, Rb3PlatformID, Rb3TrackType, Rb3Difficulty } from './rb3eTypes';
-import { CueData, CueType, defaultCueData, lightingCueMap, StrobeState } from '../../cues/cueTypes';
-import { AbstractCueHandler } from '../../cueHandlers/AbstractCueHandler';
+import { CueData, StrobeState } from '../../cues/cueTypes';
+import { StageKitDirectCueHandler } from '../../cueHandlers/StageKitDirectCueHandler';
 
 
 // Use the same port that RB3Enhanced sends to.
@@ -85,15 +85,25 @@ const DIFFICULTY_MAP: Record<number, Rb3Difficulty> = {
 export class Rb3eNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null;
   private listening = false;
-  private cueHandler: AbstractCueHandler;
+  private stageKitHandler: StageKitDirectCueHandler;
   private lastData: { header: any; payload: Buffer; cueData: CueData } | null = null;
   // Track the current LED brightness setting
   private _currentBrightness: 'low' | 'medium' | 'high' = 'medium';
 
-  constructor(cueHandler: AbstractCueHandler) {
+  constructor(stageKitHandler: StageKitDirectCueHandler) {
     super();
-    this.cueHandler = cueHandler;
-    console.log('RB3ENetworkListener initialized.');
+    
+    // Debug: Check what we're receiving
+    console.log('Rb3eNetworkListener constructor called with:', stageKitHandler);
+    console.log('Type of stageKitHandler:', typeof stageKitHandler);
+    console.log('Is StageKitDirectCueHandler instance?', stageKitHandler instanceof StageKitDirectCueHandler);
+    
+    if (stageKitHandler) {
+      console.log('Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(stageKitHandler)));
+    }
+    
+    this.stageKitHandler = stageKitHandler;
+    console.log('RB3ENetworkListener initialized with StageKitDirectCueHandler.');
   }
 
   public start() {
@@ -208,7 +218,46 @@ export class Rb3eNetworkListener extends EventEmitter {
         timestamp: Date.now()
       };
 
-      const cueData: CueData = { ...defaultCueData };
+      const cueData: CueData = {
+      datagramVersion: 1,
+      platform: "RB3E",
+      currentScene: "Unknown",
+      pauseState: "Unpaused",
+      venueSize: "NoVenue",
+      beatsPerMinute: 0,
+      songSection: "Unknown",
+      guitarNotes: [],
+      bassNotes: [],
+      drumNotes: [],
+      keysNotes: [],
+      vocalNote: 0,
+      harmony0Note: 0,
+      harmony1Note: 0,
+      harmony2Note: 0,
+      lightingCue: "NoCue",
+      postProcessing: "Default",
+      fogState: false,
+      strobeState: "Strobe_Off",
+      performer: 0,
+      beat: "Unknown",
+      keyframe: "Unknown",
+      bonusEffect: false,
+      ledColor: null,
+      rb3Platform: "Unknown",
+      rb3BuildTag: "",
+      rb3SongName: "",
+      rb3SongArtist: "",
+      rb3SongShortName: "",
+      rb3VenueName: "",
+      rb3ScreenName: "",
+      rb3BandInfo: { members: [] },
+      rb3ModData: { identifyValue: "", string: "" },
+      totalScore: 0,
+      memberScores: [],
+      stars: 0,
+      sustainDurationMs: 0,
+      measureOrBeat: 0
+    };
       
       // Store platform information from the packet header
       cueData.rb3Platform = PLATFORM_MAP[platform] || 'Unknown';
@@ -436,9 +485,7 @@ export class Rb3eNetworkListener extends EventEmitter {
 
     console.log(`RB3E_EVENT_STATE => ${gameState}`);
 
-    if (typeof this.cueHandler['handleGameState'] === 'function') {
-      this.cueHandler['handleGameState'](gameState);
-    }
+    // Game state changes are now handled by the main application
    
   }
 
@@ -490,167 +537,48 @@ export class Rb3eNetworkListener extends EventEmitter {
     const leftChannel = payload.readUInt8(0);
     const rightChannel = payload.readUInt8(1);
 
-    // Process the left channel command (lighting cues)
-    this.processLeftChannelCommand(leftChannel, _cueData);
+    // Debug: Check if stageKitHandler exists and has the expected method
+    if (!this.stageKitHandler) {
+      console.error('StageKitHandler is undefined!');
+      return;
+    }
     
-    // Process the right channel command (fog, strobe, LEDs)
-    this.processRightChannelCommand(rightChannel, _cueData);
+    if (typeof this.stageKitHandler.processLightData !== 'function') {
+      console.error('StageKitHandler.processLightData is not a function!');
+      console.error('StageKitHandler type:', typeof this.stageKitHandler);
+      console.error('StageKitHandler methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(this.stageKitHandler)));
+      return;
+    }
 
-  //  console.log(`RB3E_EVENT_STAGEKIT => left=${leftChannel}, right=${rightChannel}, fog=${_cueData.fogState}, strobe=${_cueData.strobeState}`);
+    // Update brightness based on left channel
+    this.updateBrightness(leftChannel);
+    
+    // Process the light data directly through StageKitDirectCueHandler
+    this.stageKitHandler.processLightData(leftChannel, rightChannel);
+
+    // Log the StageKit data for debugging
+    console.log(`RB3E_EVENT_STAGEKIT => left=${leftChannel}, right=${rightChannel}, brightness=${this._currentBrightness}`);
   }
 
   /**
-   * Process the left channel command from the StageKit packet
+   * Update brightness setting based on left channel values
    * @param leftChannel The left channel value from the StageKit packet
-   * @param cueData The cue data object to update with the left channel information
    */
-
-  private processLeftChannelCommand(leftChannel: number, cueData: CueData): void {
-    // Handle brightness settings first
+  private updateBrightness(leftChannel: number): void {
     if (leftChannel === 34) {
       this._currentBrightness = 'low';
- //     console.log(`Brightness set to: low (from left channel ${leftChannel})`);
-      return;
-    } else if (leftChannel === 68) {
+    } else if (leftChannel === 68 || leftChannel === 128) {
       this._currentBrightness = 'medium';
- //     console.log(`Brightness set to: medium (from left channel ${leftChannel})`);
-      return;
-    } else if (leftChannel === 128) {
-      this._currentBrightness = 'medium';
-//      console.log(`Brightness set to: medium (from left channel ${leftChannel})`);
-      return;
     } else if (leftChannel === 136) {
       this._currentBrightness = 'high';
- //     console.log(`Brightness set to: high (from left channel ${leftChannel})`);
-      return;
-    } else if(leftChannel === 255){ 
-      // Note: this value  not appear to be documented in the RB3E protocol, but it looks like it 
-      // should set everything white. Works well with Bulls on Parade for example.
-      // Using low for more contrast with Stomp, which is very similar.
-      const colorName = "white";
-   //   this._currentBrightness = 'low';
-      if (typeof this.cueHandler['handleLedColor'] === 'function') {
-        this.cueHandler['handleLedColor'](colorName + ":" + this._currentBrightness);
-      }
-     return;
-    }else if(leftChannel === 170){ 
-     // Note: this value does not appear to be documented in the RB3E protocol. 
-    }else if(leftChannel === 64){ 
-       // Note: this value does not appear to be documented in the RB3E protocol. 
-      // Could be an orange colour?
-      const colorName = "orange";
-      //this._currentBrightness = 'high'; //Seems to be an accent, used on certain hits
-      if (typeof this.cueHandler['handleLedColor'] === 'function') {
-        this.cueHandler['handleLedColor'](colorName + ":" + this._currentBrightness);
-      }
     }
-
-
-
-
-    // Map leftChannel to a lighting cue 
-    const lightingCue = lightingCueMap[leftChannel] || CueType.Unknown;
-    cueData.lightingCue = lightingCue;
-    
-  //  console.log(`Processing left channel command: ${leftChannel} -> ${lightingCue}`);
-    
-    if (lightingCue !== CueType.Unknown) {
-      this.cueHandler.handleCue(lightingCue, cueData);
-    } else {
-      console.log(`Unknown lighting cue for left channel value: ${leftChannel}`);
-    }
+    // Note: leftChannel values 64, 170, 255 are handled by the StageKitDirectCueHandler
   }
  
 
 
-  /**
-   * Process the right channel command from the StageKit packet
-   * @param rightChannel The right channel value from the StageKit packet
-   * @param cueData The cue data object to update with the right channel information
-   */
-  private processRightChannelCommand(rightChannel: number, cueData: CueData): void {
-    // Special case for disabling all effects
-    if (rightChannel === Rb3RightChannel.DisableAll || rightChannel === 255) {
-      this.handleDisableAll(cueData);
-      return;
-    }
-
-    // Handle fog control commands
-    if (rightChannel === Rb3RightChannel.FogOn) {
-      this.handleFog(true, cueData);
-      return;
-    } else if (rightChannel === Rb3RightChannel.FogOff) {
-      this.handleFog(false, cueData);
-      return;
-    }
-
-    // Handle strobe control commands
-    if (rightChannel >= Rb3RightChannel.StrobeSlow && rightChannel <= Rb3RightChannel.StrobeOff) {
-      let strobeState: StrobeState;
-      switch (rightChannel) {
-        case Rb3RightChannel.StrobeSlow:
-          strobeState = "Strobe_Slow" as StrobeState;
-          break;
-        case Rb3RightChannel.StrobeMedium:
-          strobeState = "Strobe_Medium" as StrobeState;
-          break;
-        case Rb3RightChannel.StrobeFast:
-          strobeState = "Strobe_Fast" as StrobeState;
-          break;
-        case Rb3RightChannel.StrobeFastest:
-          strobeState = "Strobe_Fastest" as StrobeState;
-          break;
-        case Rb3RightChannel.StrobeOff:
-        default:
-          strobeState = "Strobe_Off" as StrobeState;
-          break;
-      }
-      this.handleStrobe(strobeState, cueData);
-      return;
-    }
-
-    // Handle LED colour commands - extracting color bits
-    const redBit = (rightChannel & 0x80) !== 0;    // 0x80 = 128 (bit 7)
-    const greenBit = (rightChannel & 0x40) !== 0;  // 0x40 = 64 (bit 6)
-    const blueBit = (rightChannel & 0x20) !== 0;   // 0x20 = 32 (bit 5)
-    
-    // Only process if at least one color bit is set
-    if (redBit || greenBit || blueBit) {
-      let colorName: string;
-      
-      // Determine color based on bits (color mixing)
-      if (redBit && greenBit && blueBit) {
-        colorName = "white";
-      } else if (redBit && greenBit) {
-        colorName = "yellow"; // Red + Green = Yellow/Amber
-      } else if (redBit && blueBit) {
-        colorName = "purple"; // Red + Blue = Purple/Magenta
-      } else if (greenBit && blueBit) {
-        colorName = "teal";   // Green + Blue = Cyan/Teal
-      } else if (redBit) {
-        colorName = "red";
-      } else if (greenBit) {
-        colorName = "green";
-      } else if (blueBit) {
-        colorName = "blue";
-      } else {
-        console.log(`Unexpected LED color command: 0x${rightChannel.toString(16)}`);
-        return;
-      }
-      
-      // Set the LED color in cueData with brightness info
-      cueData.ledColor = colorName;
-      
-      // If the handler has a specific LED color handling method, call it with the color name
-      if (typeof this.cueHandler['handleLedColor'] === 'function') {
-        this.cueHandler['handleLedColor'](colorName + ":" + this._currentBrightness);
-      }
-      
-      return;
-    }
-
-    console.log(`Unhandled right channel command: 0x${rightChannel.toString(16)}`);
-  }
+  // Note: Right channel processing is now handled directly by StageKitDirectCueHandler
+  // which maps the right channel values to colors in its processLightData method
 
   /**
    * Handle fog state changes from the right channel
@@ -669,14 +597,7 @@ export class Rb3eNetworkListener extends EventEmitter {
   private handleStrobe(strobeState: StrobeState, cueData: CueData): void {
     cueData.strobeState = strobeState;
     console.log(`Strobe state changed to: ${strobeState}`);
-   
-    this.cueHandler.handleCue(CueType.Strobe, cueData);
-
-    /*
-    if (typeof this.cueHandler['handleStrobe'] === 'function') {
-      this.cueHandler['handleStrobe'](cueData);
-    }
-      */
+    // Note: Strobe processing is now handled by StageKitDirectCueHandler
   }
 
   /**
@@ -690,10 +611,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     this._currentBrightness = 'medium'; // Reset brightness to default
     console.log("Disabled all effects");
 
-    // Special case for RB3.
-    if (typeof this.cueHandler['handleDisableAll'] === 'function') {
-      this.cueHandler['handleDisableAll']();
-    }
+    // Note: DisableAll processing is now handled by StageKitDirectCueHandler
     
   }
 
@@ -778,7 +696,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     if (cueData.rb3VenueName) summary.push(`Venue: ${cueData.rb3VenueName}`);
     if (cueData.rb3ScreenName) summary.push(`Screen: ${cueData.rb3ScreenName}`);
     if (cueData.rb3ModData) summary.push(`Mod Data: ${JSON.stringify(cueData.rb3ModData)}`);
-    if (cueData.lightingCue !== CueType.Unknown) summary.push(`Lighting Cue: ${cueData.lightingCue}`);
+    if (cueData.lightingCue !== "NoCue") summary.push(`Lighting Cue: ${cueData.lightingCue}`);
     if (cueData.ledColor) summary.push(`LED Color: ${cueData.ledColor}`);
     if (cueData.strobeState) summary.push(`Strobe State: ${cueData.strobeState}`);
     if (cueData.fogState !== undefined) summary.push(`Fog State: ${cueData.fogState ? 'On' : 'Off'}`);

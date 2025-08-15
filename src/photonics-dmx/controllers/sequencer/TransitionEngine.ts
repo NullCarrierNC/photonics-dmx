@@ -221,14 +221,14 @@ export class TransitionEngine implements ITransitionEngine {
    */
   public startTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
     this.ensureLastEndState(activeEffect);
-    
+    /*
     const baseTransitionConfig = {
       transform: {
         ...transition.transform
       },
       layer: transition.layer
     };
-
+*/
     // Since this is a per-light effect, we work with the single light in the transition
     const light = transition.lights[0];
     

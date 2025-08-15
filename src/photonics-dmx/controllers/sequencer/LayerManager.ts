@@ -1,4 +1,4 @@
-import { ActiveEffect, ILayerManager, QueuedEffect, LightEffectState } from './interfaces';
+import { ILayerManager, QueuedEffect, LightEffectState } from './interfaces';
 import { LightTransitionController } from './LightTransitionController';
 import { RGBIP, TrackedLight } from '../../types';
 

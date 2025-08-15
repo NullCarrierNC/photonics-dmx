@@ -49,8 +49,8 @@ export class SongEventHandler implements ISongEventHandler {
   public handleEvent(eventType: 'beat' | 'measure' | 'keyframe'): void {
     const currentTime = performance.now();
     
-    this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
-      layerMap.forEach((activeEffect, lightId) => {
+    this.layerManager.getActiveEffects().forEach((layerMap, _layer) => {
+      layerMap.forEach((activeEffect, _lightId) => {
         const currentTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
         if (!currentTransition) return;
         
