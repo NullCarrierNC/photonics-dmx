@@ -1,6 +1,9 @@
 export type InstrumentNote = "None" | "Open" | "Green" | "Red" | "Yellow" | "Blue" | "Orange";
 export type DrumNote = "None" | "Kick" | "RedDrum" | "YellowDrum" | "BlueDrum" | "GreenDrum" | "YellowCymbal" | "BlueCymbal" | "GreenCymbal";
 
+// Import RB3E types
+import { Rb3Difficulty, Rb3TrackType } from '../listeners/RB3/rb3eTypes';
+
 
 export type SongSection = "None" | "Chorus" | "Verse" | "Unknown";
 export type PostProcessing = "Default" | "Bloom" | "Bright" | "Unknown";
@@ -45,6 +48,26 @@ export type CueData = {
     totalScore?: number;          
     memberScores?: number[];  
     stars?: number;  
+    
+    // Additional RB3E data fields
+    rb3Platform?: string;
+    rb3BuildTag?: string;
+    rb3SongName?: string;
+    rb3SongArtist?: string;
+    rb3SongShortName?: string;
+    rb3VenueName?: string;
+    rb3ScreenName?: string;
+    rb3BandInfo?: {
+      members: Array<{
+        exists: boolean;
+        difficulty: Rb3Difficulty;
+        trackType: Rb3TrackType;
+      }>;
+    };
+    rb3ModData?: {
+      identifyValue: string;
+      string: string;
+    };
   };
 
 
@@ -73,6 +96,25 @@ export type CueData = {
     keyframe: "Unknown",
     bonusEffect: false,
     ledColor: null,
+    rb3Platform: "Unknown",
+    rb3BuildTag: "",
+    rb3SongName: "",
+    rb3SongArtist: "",
+    rb3SongShortName: "",
+    rb3VenueName: "",
+    rb3ScreenName: "",
+    rb3BandInfo: {
+      members: [
+        { exists: false, difficulty: 'Unknown' as Rb3Difficulty, trackType: 'Unknown' as Rb3TrackType },
+        { exists: false, difficulty: 'Unknown' as Rb3Difficulty, trackType: 'Unknown' as Rb3TrackType },
+        { exists: false, difficulty: 'Unknown' as Rb3Difficulty, trackType: 'Unknown' as Rb3TrackType },
+        { exists: false, difficulty: 'Unknown' as Rb3Difficulty, trackType: 'Unknown' as Rb3TrackType }
+      ]
+    },
+    rb3ModData: {
+      identifyValue: "",
+      string: ""
+    }
   };
 
 
