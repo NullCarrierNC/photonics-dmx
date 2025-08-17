@@ -532,6 +532,7 @@ export class EffectManager implements IEffectManager {
     };
 
     // Use our existing mechanism to add the effect on layer 0
+    //console.log(`EffectManager: Adding effect ${effect.id} with transitions: ${effect.transitions.length}`,color);
     this.addEffect('setState', effect);
   }
 

@@ -1,8 +1,8 @@
 import * as dgram from 'dgram';
 import { EventEmitter } from 'events';
-import { Rb3ePacketType, Rb3GameState, Rb3RightChannel, Rb3PlatformID, Rb3TrackType, Rb3Difficulty } from './rb3eTypes';
+import { Rb3ePacketType, Rb3GameState, Rb3PlatformID, Rb3TrackType, Rb3Difficulty } from './rb3eTypes';
 import { CueData, StrobeState } from '../../cues/cueTypes';
-import { StageKitDirectCueHandler } from '../../cueHandlers/StageKitDirectCueHandler';
+import { StageKitLedMapper } from './StageKitLedMapper';
 
 
 // Use the same port that RB3Enhanced sends to.
@@ -85,25 +85,13 @@ const DIFFICULTY_MAP: Record<number, Rb3Difficulty> = {
 export class Rb3eNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null;
   private listening = false;
-  private stageKitHandler: StageKitDirectCueHandler;
   private lastData: { header: any; payload: Buffer; cueData: CueData } | null = null;
   // Track the current LED brightness setting
   private _currentBrightness: 'low' | 'medium' | 'high' = 'medium';
 
-  constructor(stageKitHandler: StageKitDirectCueHandler) {
+  constructor() {
     super();
-    
-    // Debug: Check what we're receiving
-    console.log('Rb3eNetworkListener constructor called with:', stageKitHandler);
-    console.log('Type of stageKitHandler:', typeof stageKitHandler);
-    console.log('Is StageKitDirectCueHandler instance?', stageKitHandler instanceof StageKitDirectCueHandler);
-    
-    if (stageKitHandler) {
-      console.log('Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(stageKitHandler)));
-    }
-    
-    this.stageKitHandler = stageKitHandler;
-    console.log('RB3ENetworkListener initialized with StageKitDirectCueHandler.');
+    console.log('Rb3eNetworkListener initialized as event emitter.');
   }
 
   public start() {
@@ -486,24 +474,52 @@ export class Rb3eNetworkListener extends EventEmitter {
     console.log(`RB3E_EVENT_STATE => ${gameState}`);
 
     // Game state changes are now handled by the main application
-   
+    
+    // Emit game state event for event processors to handle
+    this.emit('rb3e:gameState', {
+      gameState,
+      platform: this.lastData?.cueData?.rb3Platform || 'Unknown',
+      timestamp: Date.now()
+    });
+    
   }
 
   private handleSongName(payload: Buffer, cueData: CueData) {
     const name = this.readNullTerminatedString(payload);
     cueData.rb3SongName = name;
+    
+    // Emit song name event for event processors to handle
+    this.emit('rb3e:songName', {
+      songName: name,
+      timestamp: Date.now()
+    });
+    
     console.log(`RB3E_EVENT_SONG_NAME => ${name}`);
   }
 
   private handleSongArtist(payload: Buffer, cueData: CueData) {
     const artist = this.readNullTerminatedString(payload);
     cueData.rb3SongArtist = artist;
+    
+    // Emit song artist event for event processors to handle
+    this.emit('rb3e:songArtist', {
+      songArtist: artist,
+      timestamp: Date.now()
+    });
+    
     console.log(`RB3E_EVENT_SONG_ARTIST => ${artist}`);
   }
 
   private handleSongShortName(payload: Buffer, cueData: CueData) {
     const shortName = this.readNullTerminatedString(payload);
     cueData.rb3SongShortName = shortName;
+    
+    // Emit song short name event for event processors to handle
+    this.emit('rb3e:songShortName', {
+      songShortName: shortName,
+      timestamp: Date.now()
+    });
+    
     console.log(`RB3E_EVENT_SONG_SHORTNAME => ${shortName}`);
   }
 
@@ -525,6 +541,15 @@ export class Rb3eNetworkListener extends EventEmitter {
     _cueData.totalScore = totalScore;
     _cueData.memberScores = memberScores;
     _cueData.stars = stars;
+    
+    // Emit score event for event processors to handle
+    this.emit('rb3e:score', {
+      totalScore,
+      memberScores,
+      stars,
+      timestamp: Date.now()
+    });
+    
     console.log(`RB3E_EVENT_SCORE => totalScore=${totalScore}, stars=${stars}, memberScores=${memberScores}`);
   }
 
@@ -537,27 +562,41 @@ export class Rb3eNetworkListener extends EventEmitter {
     const leftChannel = payload.readUInt8(0);
     const rightChannel = payload.readUInt8(1);
 
-    // Debug: Check if stageKitHandler exists and has the expected method
-    if (!this.stageKitHandler) {
-      console.error('StageKitHandler is undefined!');
-      return;
-    }
-    
-    if (typeof this.stageKitHandler.processLightData !== 'function') {
-      console.error('StageKitHandler.processLightData is not a function!');
-      console.error('StageKitHandler type:', typeof this.stageKitHandler);
-      console.error('StageKitHandler methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(this.stageKitHandler)));
-      return;
-    }
-
     // Update brightness based on left channel
     this.updateBrightness(leftChannel);
     
-    // Process the light data directly through StageKitDirectCueHandler
-    this.stageKitHandler.processLightData(leftChannel, rightChannel);
+    // Get LED positions and color information for better logging
+    const stageKitMapper = new StageKitLedMapper();
+    const ledPositions = stageKitMapper.mapLeftChannelToLedPositions(leftChannel);
+    const leftColor = stageKitMapper.mapLeftChannelToColor(leftChannel);
+    const rightColor = stageKitMapper.mapRightChannelToColor(rightChannel);
+    
+    this.emit('rb3e:stagekit', {
+      leftChannel,
+      rightChannel,
+      brightness: this._currentBrightness,
+      timestamp: Date.now()
+    });
+    
 
-    // Log the StageKit data for debugging
-    console.log(`RB3E_EVENT_STAGEKIT => left=${leftChannel}, right=${rightChannel}, brightness=${this._currentBrightness}`);
+    // Enhanced logging with LED pattern information
+    const ledDescription = ledPositions.length > 0 
+      ? `LEDs: [${ledPositions.join(', ')}]` 
+      : 'No LEDs';
+    
+    console.log(`RB3E_EVENT_STAGEKIT => left=${leftChannel} (${leftColor}), right=${rightChannel} (${rightColor}), brightness=${this._currentBrightness}, ${ledDescription}`);
+    
+    // Log detailed information for debugging
+    console.log(`  Left Channel: ${stageKitMapper.getLeftChannelDescription(leftChannel)}`);
+    console.log(`  Right Channel: ${stageKitMapper.getRightChannelDescription(rightChannel)}`);
+    if (ledPositions.length > 0) {
+      const layout = StageKitLedMapper.getStageKitLedLayout();
+      const ledDetails = ledPositions.map(pos => {
+        const led = layout.find(l => l.position === pos);
+        return led ? `${pos}(${led.location})` : `${pos}(unknown)`;
+      }).join(', ');
+      console.log(`  LED Pattern: ${ledDetails}`);
+    }
   }
 
   /**
@@ -641,18 +680,39 @@ export class Rb3eNetworkListener extends EventEmitter {
     }
     
     cueData.rb3BandInfo = { members };
+    
+    // Emit band info event for event processors to handle
+    this.emit('rb3e:bandInfo', {
+      members,
+      timestamp: Date.now()
+    });
+    
     console.log(`RB3E_EVENT_BAND_INFO => members: ${JSON.stringify(members)}`);
   }
 
   private handleVenueName(payload: Buffer, cueData: CueData) {
     const venue = this.readNullTerminatedString(payload);
     cueData.rb3VenueName = venue;
+    
+    // Emit venue name event for event processors to handle
+    this.emit('rb3e:venueName', {
+      venueName: venue,
+      timestamp: Date.now()
+    });
+    
     console.log(`RB3E_EVENT_VENUE_NAME => ${venue}`);
   }
 
   private handleScreenName(payload: Buffer, cueData: CueData) {
     const screen = this.readNullTerminatedString(payload);
     cueData.rb3ScreenName = screen;
+    
+    // Emit screen name event for event processors to handle
+    this.emit('rb3e:screenName', {
+      screenName: screen,
+      timestamp: Date.now()
+    });
+    
     console.log(`RB3E_EVENT_SCREEN_NAME => ${screen}`);
   }
 
@@ -670,6 +730,13 @@ export class Rb3eNetworkListener extends EventEmitter {
       identifyValue,
       string
     };
+    
+    // Emit DX data event for event processors to handle
+    this.emit('rb3e:dxData', {
+      identifyValue,
+      string,
+      timestamp: Date.now()
+    });
     
     console.log(`RB3E_EVENT_DX_DATA => identifyValue: ${identifyValue}, string: ${string}`);
   }

@@ -7,6 +7,7 @@ import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetw
 import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetworkListener';
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
+import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
 import { BrowserWindow } from 'electron';
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces';
@@ -31,6 +32,7 @@ export class ControllerManager {
   private cueHandler: YargCueHandler | Rb3CueHandler | null = null;
   private yargListener: YargNetworkListener | null = null;
   private rb3eListener: Rb3eNetworkListener | null = null;
+  private processorManager: ProcessorManager | null = null;
   
   private testEffectInterval: NodeJS.Timeout | null = null;
   
@@ -384,24 +386,36 @@ export class ControllerManager {
     
     const debouncePeriod = this.config.getPreference('effectDebounce');
     
-    // Create Rb3 listener
+    // Create processor manager
+    console.log('ControllerManager: Creating ProcessorManager with mode: direct');
+    this.processorManager = new ProcessorManager(
+      this.dmxLightManager,
+      this.effectsController,
+      { mode: 'direct' }
+    );
+    console.log('ControllerManager: ProcessorManager created successfully');
+    
+    // Create traditional cue handler
     this.cueHandler = new Rb3CueHandler(
       this.dmxLightManager,
       this.effectsController,
       debouncePeriod
     );
     
-    // Shut down existing listener if any
-    this.rb3eListener?.shutdown();
+    // Set the cue handler in the processor manager
+    this.processorManager.setCueHandler(this.cueHandler);
     
-    // Create new listener
-    this.rb3eListener = new Rb3eNetworkListener(this.cueHandler);
+    // Create network listener (no cue handler dependency)
+    this.rb3eListener = new Rb3eNetworkListener();
     
-    // Start the listener
+    // Connect network listener to processor manager
+    this.processorManager.setNetworkListener(this.rb3eListener);
+    
+    // Start listening
     this.rb3eListener.start();
     
     this.isRb3Enabled = true;
-    console.log("RB3 listener enabled");
+    console.log("RB3 listener enabled in cue-based mode using event-driven architecture");
   }
   
   /**
@@ -415,12 +429,53 @@ export class ControllerManager {
       this.rb3eListener = null;
     }
     
+    // Shutdown processor manager to clean up event processors
+    if (this.processorManager) {
+      this.processorManager.destroy();
+      this.processorManager = null;
+    }
+    
     // Shutdown cue handler to trigger lifecycle methods
     if (this.cueHandler) {
       this.cueHandler.shutdown();
     }
     
     this.isRb3Enabled = false;
+  }
+
+  /**
+   * Switch RB3 processing mode between direct and cue-based
+   * @param mode The new processing mode ('direct' or 'cueBased')
+   */
+  public switchRb3Mode(mode: 'direct' | 'cueBased'): void {
+    if (!this.isRb3Enabled || !this.processorManager) {
+      console.log("Cannot switch RB3 mode: RB3 not enabled or processor manager not available");
+      return;
+    }
+
+    console.log(`Switching RB3 mode from ${this.processorManager.getCurrentMode()} to ${mode}`);
+    this.processorManager.switchMode(mode);
+    console.log(`RB3 mode switched to: ${this.processorManager.getCurrentMode()}`);
+  }
+
+  /**
+   * Get current RB3 processing mode
+   */
+  public getRb3Mode(): 'direct' | 'cueBased' | 'none' {
+    if (!this.isRb3Enabled || !this.processorManager) {
+      return 'none';
+    }
+    return this.processorManager.getCurrentMode();
+  }
+
+  /**
+   * Get RB3 processor statistics
+   */
+  public getRb3ProcessorStats() {
+    if (!this.isRb3Enabled || !this.processorManager) {
+      return null;
+    }
+    return this.processorManager.getProcessorStats();
   }
   
   /**
