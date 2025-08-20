@@ -11,7 +11,7 @@ export { ProcessorManager } from './ProcessorManager';
 
 // Export types
 export type { ProcessingMode, ProcessorManagerConfig } from './ProcessorManager';
-export type { Rb3eStageKitEvent } from './StageKitDirectProcessor';
+export type { StageKitData  } from './StageKitDirectProcessor';
 export type { 
   Rb3eStageKitEvent as Rb3eStageKitEventTraditional,
   Rb3eGameStateEvent,

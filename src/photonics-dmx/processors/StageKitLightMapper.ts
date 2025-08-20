@@ -1,7 +1,7 @@
 /**
- * DMX Light Distributor - Maps StageKit LED positions to DMX lights
+ * StageKitLightMapper - Maps StageKit LED positions to DMX lights
  * 
- * This class handles the distribution of StageKit's 8 LED positions to a varying
+ * This class handles the mapping of StageKit's 8 LED positions to a varying
  * number of DMX lights (4 or 8) using different mapping algorithms.
  * 
  *     0 (front)
@@ -10,13 +10,13 @@
  *   5     3
  *     4 (back)
  */
-export class DmxLightDistributor {
+export class StageKitLightMapper {
   private dmxLightCount: number;
   
   constructor(dmxLightCount: 4 | 8) {
     this.dmxLightCount = dmxLightCount;
   }
-  
+
   
   /**
    * Map StageKit LED positions to DMX light indices

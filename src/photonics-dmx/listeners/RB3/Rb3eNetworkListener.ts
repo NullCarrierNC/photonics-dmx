@@ -25,7 +25,7 @@ const PLATFORM_MAP: Record<number, string> = {
 // Track type mapping from RB3Enhanced
 const TRACK_TYPE_MAP: Record<number, Rb3TrackType> = {
   0: 'Guitar',
-  1: 'Bass', 
+  1: 'Bass',
   2: 'Drums',
   3: 'Vocals',
   4: 'Keys',
@@ -163,8 +163,8 @@ export class Rb3eNetworkListener extends EventEmitter {
 
       // Check "RB3E" magic
       const magic = buffer.subarray(0, 4);
-      if (!(magic[0] === PROTOCOL_MAGIC[0] && magic[1] === PROTOCOL_MAGIC[1] && 
-            magic[2] === PROTOCOL_MAGIC[2] && magic[3] === PROTOCOL_MAGIC[3])) {
+      if (!(magic[0] === PROTOCOL_MAGIC[0] && magic[1] === PROTOCOL_MAGIC[1] &&
+        magic[2] === PROTOCOL_MAGIC[2] && magic[3] === PROTOCOL_MAGIC[3])) {
         console.warn(`Invalid protocol magic: ${magic.toString('hex')}`);
         return;
       }
@@ -194,7 +194,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       }
 
       // Extract payload
-      const payload = buffer.slice(offset, offset + payloadSize);
+      const payload = buffer.subarray(offset, offset + payloadSize);
       offset += payloadSize;
 
       const header = {
@@ -207,46 +207,46 @@ export class Rb3eNetworkListener extends EventEmitter {
       };
 
       const cueData: CueData = {
-      datagramVersion: 1,
-      platform: "RB3E",
-      currentScene: "Unknown",
-      pauseState: "Unpaused",
-      venueSize: "NoVenue",
-      beatsPerMinute: 0,
-      songSection: "Unknown",
-      guitarNotes: [],
-      bassNotes: [],
-      drumNotes: [],
-      keysNotes: [],
-      vocalNote: 0,
-      harmony0Note: 0,
-      harmony1Note: 0,
-      harmony2Note: 0,
-      lightingCue: "NoCue",
-      postProcessing: "Default",
-      fogState: false,
-      strobeState: "Strobe_Off",
-      performer: 0,
-      beat: "Unknown",
-      keyframe: "Unknown",
-      bonusEffect: false,
-      ledColor: null,
-      rb3Platform: "Unknown",
-      rb3BuildTag: "",
-      rb3SongName: "",
-      rb3SongArtist: "",
-      rb3SongShortName: "",
-      rb3VenueName: "",
-      rb3ScreenName: "",
-      rb3BandInfo: { members: [] },
-      rb3ModData: { identifyValue: "", string: "" },
-      totalScore: 0,
-      memberScores: [],
-      stars: 0,
-      sustainDurationMs: 0,
-      measureOrBeat: 0
-    };
-      
+        datagramVersion: 1,
+        platform: "RB3E",
+        currentScene: "Unknown",
+        pauseState: "Unpaused",
+        venueSize: "NoVenue",
+        beatsPerMinute: 0,
+        songSection: "Unknown",
+        guitarNotes: [],
+        bassNotes: [],
+        drumNotes: [],
+        keysNotes: [],
+        vocalNote: 0,
+        harmony0Note: 0,
+        harmony1Note: 0,
+        harmony2Note: 0,
+        lightingCue: "NoCue",
+        postProcessing: "Default",
+        fogState: false,
+        strobeState: "Strobe_Off",
+        performer: 0,
+        beat: "Unknown",
+        keyframe: "Unknown",
+        bonusEffect: false,
+        ledColor: null,
+        rb3Platform: "Unknown",
+        rb3BuildTag: "",
+        rb3SongName: "",
+        rb3SongArtist: "",
+        rb3SongShortName: "",
+        rb3VenueName: "",
+        rb3ScreenName: "",
+        rb3BandInfo: { members: [] },
+        rb3ModData: { identifyValue: "", string: "" },
+        totalScore: 0,
+        memberScores: [],
+        stars: 0,
+        sustainDurationMs: 0,
+        measureOrBeat: 0
+      };
+
       // Store platform information from the packet header
       cueData.rb3Platform = PLATFORM_MAP[platform] || 'Unknown';
 
@@ -256,7 +256,7 @@ export class Rb3eNetworkListener extends EventEmitter {
           break;
 
         case Rb3ePacketType.EVENT_STATE:
-          this.handleState(payload, cueData);
+          this.handleGameState(payload, cueData);
           break;
 
         case Rb3ePacketType.EVENT_SONG_NAME:
@@ -305,10 +305,10 @@ export class Rb3eNetworkListener extends EventEmitter {
         return;
       }
       this.lastData = { header, payload, cueData };
-      
+
       // Emit the enhanced cue data for external consumers
       this.emit('rb3eData', cueData);
-      
+
       // Emit specific events for different data types
       if (cueData.rb3SongName) this.emit('rb3eSongName', cueData.rb3SongName);
       if (cueData.rb3SongArtist) this.emit('rb3eSongArtist', cueData.rb3SongArtist);
@@ -319,10 +319,10 @@ export class Rb3eNetworkListener extends EventEmitter {
       if (cueData.rb3ModData) this.emit('rb3eModData', cueData.rb3ModData);
       if (cueData.rb3Platform) this.emit('rb3ePlatform', cueData.rb3Platform);
       if (cueData.rb3BuildTag) this.emit('rb3eBuildTag', cueData.rb3BuildTag);
-      
+
       // Log summary of the data received
-      this.logDataSummary(cueData, packetType);
-      
+    //  this.logDataSummary(cueData, packetType);
+
     } catch (error) {
       console.error('Error processing RB3E packet:', error);
       console.error('Packet buffer:', buffer.toString('hex'));
@@ -403,7 +403,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     if (!this.lastData) return null;
     const data = this.lastData.cueData;
     if (!data.rb3SongName || !data.rb3SongArtist || !data.rb3SongShortName) return null;
-    
+
     return {
       name: data.rb3SongName,
       artist: data.rb3SongArtist,
@@ -419,7 +419,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     if (!this.lastData) return null;
     const data = this.lastData.cueData;
     if (data.totalScore === undefined || !data.memberScores || data.stars === undefined) return null;
-    
+
     return {
       totalScore: data.totalScore,
       memberScores: data.memberScores,
@@ -435,7 +435,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     if (!this.lastData) return null;
     const data = this.lastData.cueData;
     if (!data.rb3VenueName || !data.rb3ScreenName) return null;
-    
+
     return {
       venueName: data.rb3VenueName,
       screenName: data.rb3ScreenName
@@ -465,61 +465,60 @@ export class Rb3eNetworkListener extends EventEmitter {
     console.log(`RB3E_EVENT_ALIVE => ${txt}`);
   }
 
-  private handleState(payload: Buffer, _cueData: CueData) {
+
+  private handleGameState(payload: Buffer, _cueData: CueData) {
     // Single byte: 0 = menus, 1 = in‐game
     if (payload.length < 1) return;
     const stateByte = payload.readUInt8(0);
-    const gameState:Rb3GameState = stateByte === 0 ? 'Menus' : 'InGame';
+    const gameState: Rb3GameState = stateByte === 0 ? 'Menus' : 'InGame';
 
     console.log(`RB3E_EVENT_STATE => ${gameState}`);
 
-    // Game state changes are now handled by the main application
-    
-    // Emit game state event for event processors to handle
+    //TODO: Tie in game state to the rest of the system
     this.emit('rb3e:gameState', {
       gameState,
       platform: this.lastData?.cueData?.rb3Platform || 'Unknown',
       timestamp: Date.now()
     });
-    
+
   }
 
   private handleSongName(payload: Buffer, cueData: CueData) {
     const name = this.readNullTerminatedString(payload);
     cueData.rb3SongName = name;
-    
+
     // Emit song name event for event processors to handle
     this.emit('rb3e:songName', {
       songName: name,
       timestamp: Date.now()
     });
-    
+
     console.log(`RB3E_EVENT_SONG_NAME => ${name}`);
   }
 
   private handleSongArtist(payload: Buffer, cueData: CueData) {
     const artist = this.readNullTerminatedString(payload);
     cueData.rb3SongArtist = artist;
-    
+
     // Emit song artist event for event processors to handle
     this.emit('rb3e:songArtist', {
       songArtist: artist,
       timestamp: Date.now()
     });
-    
+
     console.log(`RB3E_EVENT_SONG_ARTIST => ${artist}`);
   }
 
   private handleSongShortName(payload: Buffer, cueData: CueData) {
     const shortName = this.readNullTerminatedString(payload);
     cueData.rb3SongShortName = shortName;
-    
+
     // Emit song short name event for event processors to handle
     this.emit('rb3e:songShortName', {
       songShortName: shortName,
       timestamp: Date.now()
     });
-    
+
     console.log(`RB3E_EVENT_SONG_SHORTNAME => ${shortName}`);
   }
 
@@ -541,7 +540,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     _cueData.totalScore = totalScore;
     _cueData.memberScores = memberScores;
     _cueData.stars = stars;
-    
+
     // Emit score event for event processors to handle
     this.emit('rb3e:score', {
       totalScore,
@@ -549,7 +548,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       stars,
       timestamp: Date.now()
     });
-    
+
     console.log(`RB3E_EVENT_SCORE => totalScore=${totalScore}, stars=${stars}, memberScores=${memberScores}`);
   }
 
@@ -562,97 +561,83 @@ export class Rb3eNetworkListener extends EventEmitter {
     const leftChannel = payload.readUInt8(0);
     const rightChannel = payload.readUInt8(1);
 
-    // Update brightness based on left channel
-    this.updateBrightness(leftChannel);
-    
     // Get LED positions and color information for better logging
     const stageKitMapper = new StageKitLedMapper();
     const ledPositions = stageKitMapper.mapLeftChannelToLedPositions(leftChannel);
     const leftColor = stageKitMapper.mapLeftChannelToColor(leftChannel);
     const rightColor = stageKitMapper.mapRightChannelToColor(rightChannel);
-    
-    this.emit('rb3e:stagekit', {
-      leftChannel,
-      rightChannel,
-      brightness: this._currentBrightness,
-      timestamp: Date.now()
-    });
-    
+
+    // Parse RB3E bytes into clean StageKit data
+    const stageKitData = this.parseStageKitData(leftChannel, rightChannel);
+
+    // Emit clean stagekit:data event for the new processor
+    this.emit('stagekit:data', stageKitData);
+   // console.log(`RB3E: Emitted stagekit:data event:`, stageKitData);
+
 
     // Enhanced logging with LED pattern information
-    const ledDescription = ledPositions.length > 0 
-      ? `LEDs: [${ledPositions.join(', ')}]` 
+    const ledDescription = ledPositions.length > 0
+      ? `LEDs: [${ledPositions.join(', ')}]`
       : 'No LEDs';
-    
-    console.log(`RB3E_EVENT_STAGEKIT => left=${leftChannel} (${leftColor}), right=${rightChannel} (${rightColor}), brightness=${this._currentBrightness}, ${ledDescription}`);
-    
+
+    //console.log(`RB3E_EVENT_STAGEKIT => left=${leftChannel} (${leftColor}), right=${rightChannel} (${rightColor}), brightness=${this._currentBrightness}, ${ledDescription}`);
+
     // Log detailed information for debugging
-    console.log(`  Left Channel: ${stageKitMapper.getLeftChannelDescription(leftChannel)}`);
-    console.log(`  Right Channel: ${stageKitMapper.getRightChannelDescription(rightChannel)}`);
+   // console.log(`  Left Channel: ${stageKitMapper.getLeftChannelDescription(leftChannel)}`);
+   // console.log(`  Right Channel: ${stageKitMapper.getRightChannelDescription(rightChannel)}`);
     if (ledPositions.length > 0) {
       const layout = StageKitLedMapper.getStageKitLedLayout();
       const ledDetails = ledPositions.map(pos => {
         const led = layout.find(l => l.position === pos);
         return led ? `${pos}(${led.location})` : `${pos}(unknown)`;
       }).join(', ');
-      console.log(`  LED Pattern: ${ledDetails}`);
+//      console.log(`  LED Pattern: ${ledDetails}`);
     }
   }
 
   /**
-   * Update brightness setting based on left channel values
-   * @param leftChannel The left channel value from the StageKit packet
+   * Parse RB3E StageKit bytes into local StageKit data structure
+   * @param leftChannel The left channel value (LED position bitmask)
+   * @param rightChannel The right channel value (color bank)
+   * @returns Clean StageKit data structure
    */
-  private updateBrightness(leftChannel: number): void {
-    if (leftChannel === 34) {
-      this._currentBrightness = 'low';
-    } else if (leftChannel === 68 || leftChannel === 128) {
-      this._currentBrightness = 'medium';
-    } else if (leftChannel === 136) {
-      this._currentBrightness = 'high';
+  private parseStageKitData(leftChannel: number, rightChannel: number): {
+    positions: number[];
+    color: string;
+    brightness: 'low' | 'medium' | 'high';
+    timestamp: number;
+  } {
+    // Parse left channel as LED position bitmask
+    const positions: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      const bit = 1 << i;
+      if (leftChannel & bit) {
+        positions.push(i);
+      }
     }
-    // Note: leftChannel values 64, 170, 255 are handled by the StageKitDirectCueHandler
-  }
- 
 
+    // Parse right channel as color bank
+    let color: string;
+    switch (rightChannel) {
+      case 32: color = 'blue'; break;     // Blue LEDs (0x20)
+      case 64: color = 'green'; break;    // Green LEDs (0x40)  
+      case 96: color = 'yellow'; break;   // Yellow LEDs (0x60)
+      case 128: color = 'red'; break;     // Red LEDs (0x80)
+      case 0: color = 'off'; break;       // No color
+      default: color = 'off'; break;      // Unknown color
+    }
 
-  // Note: Right channel processing is now handled directly by StageKitDirectCueHandler
-  // which maps the right channel values to colors in its processLightData method
-
-  /**
-   * Handle fog state changes from the right channel
-   * @param isEnabled Whether fog should be enabled
-   * @param cueData The cue data to update
-   */
-  private handleFog(_isEnabled: boolean, _cueData: CueData): void {
-    // We aren't handling fog
-  }
-
-  /**
-   * Handle strobe state changes from the right channel
-   * @param strobeState The strobe state to set
-   * @param cueData The cue data to update
-   */
-  private handleStrobe(strobeState: StrobeState, cueData: CueData): void {
-    cueData.strobeState = strobeState;
-    console.log(`Strobe state changed to: ${strobeState}`);
-    // Note: Strobe processing is now handled by StageKitDirectCueHandler
+    return {
+      positions,
+      color,
+      brightness: this._currentBrightness,
+      timestamp: Date.now()
+    };
   }
 
-  /**
-   * Handle the DisableAll command from the right channel
-   * @param cueData The cue data to update
-   */
-  private handleDisableAll(cueData: CueData): void {
-    cueData.fogState = false;
-    cueData.strobeState = "Strobe_Off" as StrobeState;
-    cueData.ledColor = null;
-    this._currentBrightness = 'medium'; // Reset brightness to default
-    console.log("Disabled all effects");
 
-    // Note: DisableAll processing is now handled by StageKitDirectCueHandler
-    
-  }
+
+
 
   private handleBandInfo(payload: Buffer, cueData: CueData) {
     // 3 arrays of 4 bytes each: existence, difficulty, trackType
@@ -660,59 +645,59 @@ export class Rb3eNetworkListener extends EventEmitter {
       console.warn(`Band info payload too short: expected >=12, got ${payload.length}`);
       return;
     }
-    
+
     const members: Array<{
       exists: boolean;
       difficulty: Rb3Difficulty;
       trackType: Rb3TrackType;
     }> = [];
-    
+
     for (let i = 0; i < 4; i++) {
       const exists = payload.readUInt8(i) !== 0;
       const difficulty = payload.readUInt8(4 + i);
       const trackType = payload.readUInt8(8 + i);
-      
+
       members.push({
         exists,
         difficulty: DIFFICULTY_MAP[difficulty] || 'Unknown',
         trackType: TRACK_TYPE_MAP[trackType] || 'Unknown'
       });
     }
-    
+
     cueData.rb3BandInfo = { members };
-    
+
     // Emit band info event for event processors to handle
     this.emit('rb3e:bandInfo', {
       members,
       timestamp: Date.now()
     });
-    
+
     console.log(`RB3E_EVENT_BAND_INFO => members: ${JSON.stringify(members)}`);
   }
 
   private handleVenueName(payload: Buffer, cueData: CueData) {
     const venue = this.readNullTerminatedString(payload);
     cueData.rb3VenueName = venue;
-    
+
     // Emit venue name event for event processors to handle
     this.emit('rb3e:venueName', {
       venueName: venue,
       timestamp: Date.now()
     });
-    
+
     console.log(`RB3E_EVENT_VENUE_NAME => ${venue}`);
   }
 
   private handleScreenName(payload: Buffer, cueData: CueData) {
     const screen = this.readNullTerminatedString(payload);
     cueData.rb3ScreenName = screen;
-    
+
     // Emit screen name event for event processors to handle
     this.emit('rb3e:screenName', {
       screenName: screen,
       timestamp: Date.now()
     });
-    
+
     console.log(`RB3E_EVENT_SCREEN_NAME => ${screen}`);
   }
 
@@ -722,22 +707,22 @@ export class Rb3eNetworkListener extends EventEmitter {
       console.warn(`DX data payload too short: expected >=10, got ${payload.length}`);
       return;
     }
-    
+
     const identifyValue = this.readNullTerminatedString(payload.subarray(0, 10));
     const string = this.readNullTerminatedString(payload.subarray(10));
-    
+
     cueData.rb3ModData = {
       identifyValue,
       string
     };
-    
+
     // Emit DX data event for event processors to handle
     this.emit('rb3e:dxData', {
       identifyValue,
       string,
       timestamp: Date.now()
     });
-    
+
     console.log(`RB3E_EVENT_DX_DATA => identifyValue: ${identifyValue}, string: ${string}`);
   }
 
@@ -772,68 +757,3 @@ export class Rb3eNetworkListener extends EventEmitter {
   }
 }
 
-
-/* Protocol details:
-
-RB3Enhanced UDP Left Channel Values
-
-Standard Lighting Cues (0-32)
-
-
-
-Direct LED Control Values
-These values provide direct control over LED hardware, bypassing the predefined cue system:
-Basic LED Color Controls
-| Value | Hex | Description |
-|-------|-----|-------------|
-| 32 | 0x20 | Blue LEDs (Base) |
-| 64 | 0x40 | Green LEDs (Base) |
-| 96 | 0x60 | Yellow LEDs (Base) |
-| 128 | 0x80 | Red LEDs (Base) |
-
-
-LED Modifiers and Combinations
-| Value | Hex | Description |
-|-------|-----|-------------|
-| 33-63 | 0x21-0x3F | Blue LEDs with various intensity/pattern modifiers |
-| 65-95 | 0x41-0x5F | Green LEDs with various intensity/pattern modifiers |
-| 97-127 | 0x61-0x7F | Yellow LEDs with various intensity/pattern modifiers |
-| 129-159 | 0x81-0x9F | Red LEDs with various intensity/pattern modifiers |
-
-
-Common Specific Values
-| Value | Hex | Description |
-|-------|-----|-------------|
-| 34 | 0x22 | Blue LEDs with intensity modifier (typically brighter) |
-| 68 | 0x44 | Green LEDs with intensity modifier (typically brighter) |
-| 136 | 0x88 | Red LEDs with intensity modifier (typically brighter) |
-| 160 | 0xA0 | Combined LED colors (custom effect) |
-| 192 | 0xC0 | Combined LED colors (custom effect) |
-| 224 | 0xE0 | Combined LED colors (custom effect) |
-
-
-Special Control Values
-| Value | Hex | Description |
-|-------|-----|-------------|
-| 255 | 0xFF | DisableAll - Turns off all lighting effects |
-| 240-254 | 0xF0-0xFE | Reserved for special control commands |
-
-
-Bit Structure for Direct LED Control
-For values 32 and above, the bit structure typically follows this pattern:
-bit
-When multiple color bits are set, they blend to create mixed colors:
-Red (0x80) + Green (0x40) = Yellow/Amber (0xC0)
-Red (0x80) + Blue (0x20) = Purple/Magenta (0xA0)
-Green (0x40) + Blue (0x20) = Cyan/Teal (0x60)
-Red + Green + Blue = White (0xE0)
-
-Usage Notes
-Cue Values (0-32): These trigger predefined lighting patterns with complex behavior and are the preferred way to create coordinated lighting effects.
-Direct Control Values (32+): These values bypass the cue system to provide direct hardware control. Use these for:
-Custom effects not available in predefined cues
-Fine-tuned control over specific LEDs
-Specialized hardware situations
-Implementation Variation: Different RB3Enhanced implementations may interpret the direct control values slightly differently based on their hardware capabilities.
-Mixed Usage: Some implementations might use a combination approach, where left channel values 0-32 trigger cues, while right channel values provide hardware-specific controls.
-*/
