@@ -33,7 +33,7 @@ export class StageKitDirectProcessor extends EventEmitter {
   private currentPassColors: Map<number, Set<string>> = new Map(); // DMX light index -> Set of colors active in current pass
   private colorToLights: Map<string, Set<number>> = new Map(); // Color -> Set of DMX light indices
   private pendingUpdates: Map<number, { colors: Set<string>; timeout: NodeJS.Timeout }> = new Map(); // DMX light index -> pending update
-  private readonly ACCUMULATION_DELAY_MS = 5; // 10ms accumulation delay
+  private readonly ACCUMULATION_DELAY_MS = 5; 
   
   // Track the last animation sequence to detect when to clear current pass colors
   private lastAnimationSequence: { positions: number[]; colors: Set<string> } | null = null;
