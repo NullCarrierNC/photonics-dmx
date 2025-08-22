@@ -1,7 +1,7 @@
 import * as dgram from 'dgram';
 import { EventEmitter } from 'events';
 import { Rb3ePacketType, Rb3GameState, Rb3PlatformID, Rb3TrackType, Rb3Difficulty } from './rb3eTypes';
-import { CueData, StrobeState } from '../../cues/cueTypes';
+import { CueData } from '../../cues/cueTypes';
 import { StageKitLedMapper } from './StageKitLedMapper';
 
 
@@ -88,6 +88,8 @@ export class Rb3eNetworkListener extends EventEmitter {
   private lastData: { header: any; payload: Buffer; cueData: CueData } | null = null;
   // Track the current LED brightness setting
   private _currentBrightness: 'low' | 'medium' | 'high' = 'medium';
+  // Packet counter for debugging
+  private packetCount = 0;
 
   constructor() {
     super();
@@ -99,11 +101,17 @@ export class Rb3eNetworkListener extends EventEmitter {
       console.warn('RB3ENetworkListener is already running.');
       return;
     }
+    console.log(`RB3ENetworkListener: Starting UDP server on port ${PORT}...`);
     this.server = dgram.createSocket('udp4');
     this.setupServerEvents();
     this.server.bind(PORT, () => {
       this.listening = true;
       console.log(`RB3ENetworkListener started and listening on port ${PORT}`);
+    });
+    
+    // Add error handling for bind failures
+    this.server.on('error', (err) => {
+      console.error(`RB3ENetworkListener: Bind error:`, err);
     });
   }
 
@@ -143,6 +151,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     });
 
     this.server.on('message', (msg) => {
+    ///  console.log(`RB3ENetworkListener: Received UDP message of ${msg.length} bytes`);
       try {
         this.deserializePacket(msg);
       } catch (error) {
@@ -181,7 +190,9 @@ export class Rb3eNetworkListener extends EventEmitter {
         console.warn(`Invalid packet type: ${packetType}`);
         return;
       }
-
+      
+            this.packetCount++;
+      
       // Validate payload size
       if (payloadSize > 255) {
         console.warn(`Invalid payload size: ${payloadSize}`);
@@ -302,6 +313,7 @@ export class Rb3eNetworkListener extends EventEmitter {
 
       // De‐duplicate repeated data
       if (this.lastData && this.isDataEqual(this.lastData, { header, payload, cueData })) {
+    //    console.log(`RB3E: Skipping duplicate data for packet type ${packetType}`);
         return;
       }
       this.lastData = { header, payload, cueData };
@@ -561,26 +573,21 @@ export class Rb3eNetworkListener extends EventEmitter {
     const leftChannel = payload.readUInt8(0);
     const rightChannel = payload.readUInt8(1);
 
-    // Get LED positions and color information for better logging
+    // Get LED positions for logging
     const stageKitMapper = new StageKitLedMapper();
     const ledPositions = stageKitMapper.mapLeftChannelToLedPositions(leftChannel);
-    const leftColor = stageKitMapper.mapLeftChannelToColor(leftChannel);
-    const rightColor = stageKitMapper.mapRightChannelToColor(rightChannel);
 
     // Parse RB3E bytes into clean StageKit data
     const stageKitData = this.parseStageKitData(leftChannel, rightChannel);
 
-    // Emit clean stagekit:data event for the new processor
     this.emit('stagekit:data', stageKitData);
-   // console.log(`RB3E: Emitted stagekit:data event:`, stageKitData);
-
-
+    
     // Enhanced logging with LED pattern information
     const ledDescription = ledPositions.length > 0
       ? `LEDs: [${ledPositions.join(', ')}]`
       : 'No LEDs';
 
-    //console.log(`RB3E_EVENT_STAGEKIT => left=${leftChannel} (${leftColor}), right=${rightChannel} (${rightColor}), brightness=${this._currentBrightness}, ${ledDescription}`);
+    //console.log(`RB3E_EVENT_STAGEKIT => left=${leftChannel}, right=${rightChannel}, brightness=${this._currentBrightness}, ${ledDescription}`);
 
     // Log detailed information for debugging
    // console.log(`  Left Channel: ${stageKitMapper.getLeftChannelDescription(leftChannel)}`);
@@ -598,13 +605,14 @@ export class Rb3eNetworkListener extends EventEmitter {
   /**
    * Parse RB3E StageKit bytes into local StageKit data structure
    * @param leftChannel The left channel value (LED position bitmask)
-   * @param rightChannel The right channel value (color bank)
+   * @param rightChannel The right channel value (color bank or effect control)
    * @returns Clean StageKit data structure
    */
   private parseStageKitData(leftChannel: number, rightChannel: number): {
     positions: number[];
     color: string;
     brightness: 'low' | 'medium' | 'high';
+    strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off';
     timestamp: number;
   } {
     // Parse left channel as LED position bitmask
@@ -616,21 +624,57 @@ export class Rb3eNetworkListener extends EventEmitter {
       }
     }
 
-    // Parse right channel as color bank
+    // Parse right channel for colors and effects
     let color: string;
+    let strobeEffect: 'slow' | 'medium' | 'fast' | 'fastest' | 'off' | undefined;
+    
+    // Check for strobe effects first
     switch (rightChannel) {
-      case 32: color = 'blue'; break;     // Blue LEDs (0x20)
-      case 64: color = 'green'; break;    // Green LEDs (0x40)  
-      case 96: color = 'yellow'; break;   // Yellow LEDs (0x60)
-      case 128: color = 'red'; break;     // Red LEDs (0x80)
-      case 0: color = 'off'; break;       // No color
-      default: color = 'off'; break;      // Unknown color
+      case 3: // StrobeSlow
+        strobeEffect = 'slow';
+        color = 'off';
+        break;
+      case 4: // StrobeMedium
+        strobeEffect = 'medium';
+        color = 'off';
+        break;
+      case 5: // StrobeFast
+        strobeEffect = 'fast';
+        color = 'off';
+        break;
+      case 6: // StrobeFastest
+        strobeEffect = 'fastest';
+        color = 'off';
+        break;
+      case 7: // StrobeOff
+        strobeEffect = 'off';
+        color = 'off';
+        break;
+      case 32: // Blue LEDs (0x20)
+        color = 'blue';
+        break;
+      case 64: // Green LEDs (0x40)
+        color = 'green';
+        break;
+      case 96: // Yellow LEDs (0x60)
+        color = 'yellow';
+        break;
+      case 128: // Red LEDs (0x80)
+        color = 'red';
+        break;
+      case 0: // No color
+        color = 'off';
+        break;
+      default:
+        color = 'off';
+        break;
     }
 
     return {
       positions,
       color,
       brightness: this._currentBrightness,
+      strobeEffect,
       timestamp: Date.now()
     };
   }

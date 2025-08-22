@@ -21,6 +21,7 @@ export interface StageKitData {
   positions: number[];        // LED positions [0,1,2,3,4,5,6,7]
   color: string;             // Color: 'red', 'green', 'blue', 'yellow', 'off'
   brightness: 'low' | 'medium' | 'high';
+  strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off';  // Strobe effect type
   timestamp: number;
 }
 
@@ -37,6 +38,17 @@ export class StageKitDirectProcessor extends EventEmitter {
   
   // Track the last animation sequence to detect when to clear current pass colors
   private lastAnimationSequence: { positions: number[]; colors: Set<string> } | null = null;
+  
+  // Track active strobe effects for cleanup
+  private activeStrobeEffects: Map<string, {
+    type: 'slow' | 'medium' | 'fast' | 'fastest';
+    positions: number[];
+    timestamp: number;
+    interval?: NodeJS.Timeout;
+  }> = new Map();
+  
+  // Bound event handler for proper cleanup
+  private boundHandleStageKitEvent: ((event: StageKitData) => void) | null = null;
 
   constructor(
     private lightManager: DmxLightManager,
@@ -94,9 +106,12 @@ export class StageKitDirectProcessor extends EventEmitter {
    * @param networkListener The network listener to listen to
    */
   public startListening(networkListener: EventEmitter): void {
- //   //console.log('StageKitDirectProcessor: startListening called with networkListener:', networkListener.constructor.name);
+    console.log('StageKitDirectProcessor: startListening called with networkListener:', networkListener.constructor.name);
     
-    networkListener.on('stagekit:data', this.handleStageKitEvent.bind(this));
+    // Use arrow function to preserve 'this' context
+    this.boundHandleStageKitEvent = this.handleStageKitEvent.bind(this);
+    networkListener.on('stagekit:data', this.boundHandleStageKitEvent);
+    console.log('StageKitDirectProcessor: Registered listener for stagekit:data events');
     
   }
 
@@ -105,29 +120,185 @@ export class StageKitDirectProcessor extends EventEmitter {
    * @param networkListener The network listener to stop listening to
    */
   public stopListening(networkListener: EventEmitter): void {
-    networkListener.off('stagekit:data', this.handleStageKitEvent.bind(this));
-//    //console.log('StageKitDirectProcessor stopped listening for stagekit:data events');
+    if (this.boundHandleStageKitEvent) {
+      networkListener.off('stagekit:data', this.boundHandleStageKitEvent);
+      this.boundHandleStageKitEvent = null;
+    }
+    console.log('StageKitDirectProcessor stopped listening for stagekit:data events');
   }
 
   /**
    * Handle StageKit events
    */
   private handleStageKitEvent(event: StageKitData): void {
-    const { positions, color } = event;
+    const { positions, color, strobeEffect } = event;
     
     // Log the StageKit data for debugging
- //   //console.log(`StageKit: Received positions: [${positions.join(', ')}], color: ${color}`);
+    //console.log(`StageKit: Received event - positions: [${positions.join(', ')}], color: ${color}, strobe: ${strobeEffect}`);
     
-    // Process the light data directly
-    this.applyLightData(positions, color);
+    // Handle strobe effects first
+    if (strobeEffect === 'off') {
+      // Turn off strobe effects for these positions
+      //console.log(`StageKit: Clearing strobe effects for positions [${positions.join(', ')}]`);
+      this.clearStrobeEffectsAtPositions(positions);
+    } else if (strobeEffect) {
+      //console.log(`StageKit: Applying strobe effect ${strobeEffect} to positions [${positions.join(', ')}]`);
+      this.applyStrobeEffect(strobeEffect, positions);
+    } else if (color !== 'off') {
+      // Process normal light data
+      //console.log(`StageKit: Processing color ${color} for positions [${positions.join(', ')}]`);
+      this.applyLightData(positions, color);
+    } else {
+      // No color or effect - clear the lights
+      //console.log(`StageKit: Clearing lights for positions [${positions.join(', ')}]`);
+      this.clearLightsAtPositions(positions);
+    }
     
     // Emit processed event for debugging/monitoring
     this.emit('stagekit:processed', {
       positions,
       color,
+      strobeEffect,
       timestamp: Date.now()
     });
+  }
 
+  /**
+   * Apply strobe effect to specific LED positions using setState
+   * @param strobeType The type of strobe effect to apply
+   * @param positions The LED positions to apply the strobe to
+   */
+  private applyStrobeEffect(strobeType: 'slow' | 'medium' | 'fast' | 'fastest', positions: number[]): void {
+    //console.log(`StageKit: applyStrobeEffect called with type: ${strobeType}, positions: [${positions.join(', ')}]`);
+    
+    // Get all available lights for strobe effects
+    const lights = this.lightManager.getLights(['strobe'], 'all');
+    if (!lights) {
+      console.log(`StageKit: No lights returned from lightManager`);
+      return;
+    }
+    
+    let targetLights: any[];
+    let dmxLightIndices: number[] = [];
+    
+    targetLights = lights;
+    dmxLightIndices = Array.from({ length: lights.length }, (_, i) => i);
+    
+    //console.log(`StageKit: Found ${targetLights.length} target lights for strobe effect`);
+    
+    // Create strobe effect using setState instead of sequencer effects
+    const white = getColor('white', 'max');
+    
+    // Calculate strobe timing based on type
+    let strobeInterval: number;
+    switch (strobeType) {
+      case 'slow':
+        strobeInterval = 200
+        break;
+      case 'medium':
+        strobeInterval = 100;
+        break;
+      case 'fast':
+        strobeInterval = 50;
+        break;
+      case 'fastest':
+        strobeInterval = 25;
+        break;
+      default:
+        strobeInterval = 100;
+    }
+    
+    // Store strobe state for this effect
+    const effectName = `stagekit-strobe-${strobeType}-${Date.now()}`;
+    this.activeStrobeEffects.set(effectName, {
+      type: strobeType,
+      positions: dmxLightIndices,
+      timestamp: Date.now()
+    });
+    
+    // Start the strobe effect using setState
+    this.startStrobeEffect(effectName, targetLights, white, strobeInterval);
+    
+    console.log(`StageKit: Started ${strobeType} strobe on ${targetLights.length} lights with ${strobeInterval}ms interval`);
+  }
+
+  /**
+   * Start a strobe effect using setState
+   * @param effectName Unique name for the strobe effect
+   * @param targetLights Array of lights to strobe
+   * @param color Color to use for the strobe
+   * @param interval Interval between strobe flashes in milliseconds
+   */
+  private startStrobeEffect(effectName: string, targetLights: any[], color: any, interval: number): void {
+    let isOn = false;
+    
+    const strobeInterval = setInterval(() => {
+      if (isOn) {
+        // Turn off strobe
+        this.photonicsSequencer.setState(targetLights, getColor('transparent', 'max'), 0);
+        isOn = false;
+      } else {
+        // Turn on strobe
+        this.photonicsSequencer.setState(targetLights, color, 0);
+        isOn = true;
+      }
+    }, interval);
+    
+    // Store the interval for cleanup
+    this.activeStrobeEffects.get(effectName)!.interval = strobeInterval;
+  }
+
+  /**
+   * Clear lights at specific LED positions
+   * @param positions The LED positions to clear
+   */
+  private async clearLightsAtPositions(positions: number[]): Promise<void> {
+    if (positions.length === 0) return;
+    
+    // Map LED positions to DMX lights
+    const dmxLightIndices = this.lightMapper.mapLedPositionsToDmxLights(positions);
+    
+    // Turn off the lights at these positions
+    for (const lightIndex of dmxLightIndices) {
+      await this.turnOffLight(lightIndex);
+    }
+  }
+
+  /**
+   * Clear strobe effects at specific LED positions
+   * @param positions The LED positions to clear strobe effects from
+   */
+  private clearStrobeEffectsAtPositions(positions: number[]): void {
+    // Find and remove strobe effects that affect these positions
+    const effectsToRemove: string[] = [];
+    
+    if (positions.length === 0) {
+      // Empty positions means clear all global strobe effects
+      for (const [effectName, _effectData] of this.activeStrobeEffects.entries()) {
+        effectsToRemove.push(effectName);
+      }
+    } else {
+      // Map LED positions to DMX lights
+      const dmxLightIndices = this.lightMapper.mapLedPositionsToDmxLights(positions);
+      
+      for (const [effectName, effectData] of this.activeStrobeEffects.entries()) {
+        // Check if this effect affects any of the target positions
+        const hasOverlap = effectData.positions.some(pos => dmxLightIndices.includes(pos));
+        if (hasOverlap) {
+          effectsToRemove.push(effectName);
+        }
+      }
+    }
+    
+    // Remove the effects and clean up intervals
+    for (const effectName of effectsToRemove) {
+      const effectData = this.activeStrobeEffects.get(effectName);
+      if (effectData && effectData.interval) {
+        clearInterval(effectData.interval);
+      }
+      this.activeStrobeEffects.delete(effectName);
+    }
+   
   }
 
   /**
@@ -183,9 +354,8 @@ export class StageKitDirectProcessor extends EventEmitter {
       // Clear current pass colors for the lights being updated to start fresh
       for (const lightIndex of newLightIndices) {
         if (this.currentPassColors.has(lightIndex)) {
-          const beforeClear = Array.from(this.currentPassColors.get(lightIndex)!);
           this.currentPassColors.get(lightIndex)!.clear();
-        //  console.log(`DEBUG: Light ${lightIndex} - cleared current pass (new animation sequence): [${beforeClear.join(', ')}] -> []`);
+        //  console.log(`DEBUG: Light ${lightIndex} - cleared current pass (new animation sequence)`);
         }
       }
       this.lastAnimationSequence = currentSequence;
@@ -197,8 +367,7 @@ export class StageKitDirectProcessor extends EventEmitter {
         this.currentPassColors.set(lightIndex, new Set());
       }
       
-      const currentColors = this.currentPassColors.get(lightIndex)!;
-   //   console.log(`DEBUG: Light ${lightIndex} - current pass colors before adding ${color}: [${Array.from(currentColors).join(', ')}]`);
+      //console.log(`DEBUG: Light ${lightIndex} - current pass colors before adding ${color}`);
     }
     
     // Apply this color to the new light positions
@@ -362,6 +531,14 @@ export class StageKitDirectProcessor extends EventEmitter {
         clearTimeout(pendingUpdate.timeout);
       }
       this.pendingUpdates.clear();
+      
+      // Clear all strobe effects and intervals
+      for (const [effectName, effectData] of this.activeStrobeEffects.entries()) {
+        if (effectData.interval) {
+          clearInterval(effectData.interval);
+        }
+      }
+      this.activeStrobeEffects.clear();
       
     } catch (error) {
       console.error('StageKitDirectProcessor: Error turning off all DMX lights:', error);
@@ -557,6 +734,8 @@ export class StageKitDirectProcessor extends EventEmitter {
     currentActiveLights: string[];
     hasActiveLights: boolean;
     activeLightCount: number;
+    activeStrobeEffects: string[];
+    hasActiveStrobeEffects: boolean;
   } {
     const activeLights: string[] = [];
     for (const [lightIndex, colors] of this.lightColorState.entries()) {
@@ -565,10 +744,17 @@ export class StageKitDirectProcessor extends EventEmitter {
       }
     }
     
+    const activeStrobeEffects: string[] = [];
+    for (const [effectName, effectData] of this.activeStrobeEffects.entries()) {
+      activeStrobeEffects.push(`${effectName}: ${effectData.type} strobe on positions [${effectData.positions.join(', ')}]`);
+    }
+    
     return {
       currentActiveLights: activeLights,
       hasActiveLights: activeLights.length > 0,
-      activeLightCount: activeLights.length
+      activeLightCount: activeLights.length,
+      activeStrobeEffects,
+      hasActiveStrobeEffects: activeStrobeEffects.length > 0
     };
   }
 
@@ -613,6 +799,14 @@ export class StageKitDirectProcessor extends EventEmitter {
     this.turnOffAllLights().catch(error => {
       console.error('StageKitDirectProcessor: Error clearing lights during destroy:', error);
     });
+    
+    // Clear all strobe effects and intervals
+    for (const [effectName, effectData] of this.activeStrobeEffects.entries()) {
+      if (effectData.interval) {
+        clearInterval(effectData.interval);
+      }
+    }
+    this.activeStrobeEffects.clear();
     
     this.removeAllListeners();
     //console.log('StageKitDirectProcessor destroyed');
