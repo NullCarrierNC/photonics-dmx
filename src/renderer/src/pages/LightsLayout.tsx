@@ -9,6 +9,7 @@ import {
     DmxLight,
     FixtureTypes
 } from '../../../photonics-dmx/types';
+import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers';
 import { v4 as uuidv4 } from 'uuid';
 import { activeDmxLightsConfigAtom, myValidDmxLightsAtom, myDmxLightsAtom } from '@renderer/atoms';
 
@@ -95,31 +96,52 @@ const LightsLayout = () => {
 
 
     //  Create a New Light Instance
-    const createLightInstance = useCallback(
-        (group: string): DmxLight => {
-            const totalExisting = allPrimaryLights.length;
-            const templateIndex = totalExisting % myFixtures.length;
-            const selectedFixture = myFixtures[templateIndex];
+    const createLightInstance = useCallback((group: 'front' | 'back' | 'strobe') => {
+        const totalExisting = allPrimaryLights.length;
+        const templateIndex = totalExisting % myFixtures.length;
+        const selectedFixture = myFixtures[templateIndex];
 
-            return {
-                id: uuidv4(),
-                fixtureId: selectedFixture.id!,
-                position: totalExisting + 1,
-                fixture: selectedFixture.fixture,
-                label: selectedFixture.label,
-                name: selectedFixture.name,
-                isStrobeEnabled: selectedFixture.isStrobeEnabled,
-                group,
-                channels: {
-                    ...selectedFixture.channels,
-                    masterDimmer: 1 + totalExisting * 10,
-                },
-                config: selectedFixture.config || undefined, // Include config if present (e.g. MH lights)
-                universe: selectedFixture.universe,
-            };
-        },
-        [allPrimaryLights.length, myFixtures]
-    );
+        // Calculate the new master dimmer channel
+        const newMasterDimmer = 1 + totalExisting * 10;
+        
+        // Calculate channel offsets from the template
+        const templateChannels = selectedFixture.channels;
+        const offsets: { [key: string]: number } = {};
+        Object.entries(templateChannels).forEach(([channelName, value]) => {
+            if (channelName !== 'masterDimmer') {
+                offsets[channelName] = value - templateChannels.masterDimmer;
+            }
+        });
+
+        // Recalculate all channels using the new master dimmer and template offsets
+        const recalculatedChannels: { [key: string]: number } = {};
+        Object.entries(templateChannels).forEach(([channelName, _]) => {
+            if (channelName === 'masterDimmer') {
+                recalculatedChannels[channelName] = newMasterDimmer;
+            } else {
+                recalculatedChannels[channelName] = newMasterDimmer + (offsets[channelName] || 0);
+            }
+        });
+
+        // Cast the channels to the correct type based on the fixture
+        const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels);
+
+        return {
+            id: uuidv4(),
+            fixtureId: selectedFixture.id!,
+            position: totalExisting + 1,
+            fixture: selectedFixture.fixture,
+            label: selectedFixture.label,
+            name: selectedFixture.name,
+            isStrobeEnabled: selectedFixture.isStrobeEnabled,
+            group,
+            channels: castChannels,
+            config: selectedFixture.config || undefined, // Include config if present (e.g. MH lights)
+            universe: selectedFixture.universe,
+        };
+    },
+    [allPrimaryLights.length, myFixtures]
+);
 
 
 
@@ -136,6 +158,31 @@ const LightsLayout = () => {
             if (myFixtures.length > 0 && selectedCount) {
               const firstFixture = myFixtures[0];
               for (let i = 0; i < selectedCount; i++) {
+                // Calculate the new master dimmer channel
+                const newMasterDimmer = 1 + i * 10;
+                
+                // Calculate channel offsets from the template
+                const templateChannels = firstFixture.channels;
+                const offsets: { [key: string]: number } = {};
+                Object.entries(templateChannels).forEach(([channelName, value]) => {
+                    if (channelName !== 'masterDimmer') {
+                        offsets[channelName] = value - templateChannels.masterDimmer;
+                    }
+                });
+
+                // Recalculate all channels using the new master dimmer and template offsets
+                const recalculatedChannels: { [key: string]: number } = {};
+                Object.entries(templateChannels).forEach(([channelName, _]) => {
+                    if (channelName === 'masterDimmer') {
+                        recalculatedChannels[channelName] = newMasterDimmer;
+                    } else {
+                        recalculatedChannels[channelName] = newMasterDimmer + (offsets[channelName] || 0);
+                    }
+                });
+
+                // Cast the channels to the correct type based on the fixture
+                const castChannels = castToChannelType(firstFixture.fixture, recalculatedChannels);
+
                 updated.push({
                   id: uuidv4(),
                   fixtureId: firstFixture.id!,
@@ -145,10 +192,7 @@ const LightsLayout = () => {
                   name: firstFixture.name,
                   isStrobeEnabled: firstFixture.isStrobeEnabled,
                   group: 'front',
-                  channels: {
-                    ...firstFixture.channels,
-                    masterDimmer: 1 + i * 10,
-                  },
+                  channels: castChannels,
                   config: firstFixture.config || undefined,
                   universe: firstFixture.universe,
                 });
