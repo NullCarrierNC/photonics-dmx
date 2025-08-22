@@ -32,7 +32,7 @@ export class StageKitScoreCue implements ICue {
     const blackColor = getColor('black', 'medium');
     
     // Create opposite pairs: (6,2), (1,5), (0,4), (7,3)
-    // Map to ring positions: [1,2,3,4,8,7,6,5]
+    // Map to ring positions: [1,2,3,4,5,6,7,8]
     const oppositePairs = [
       [allLights[5], allLights[1]], // (6,2) -> positions 6,2 in ring
       [allLights[0], allLights[4]], // (1,5) -> positions 1,5 in ring  
@@ -87,7 +87,7 @@ export class StageKitScoreCue implements ICue {
   private async executeSmallVenueScore(controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     // Small venue: Blue counter-clockwise rotation
     const frontLights = lightManager.getLights(['front'], ['all']);
-    const backLights = lightManager.getLights(['back'], ['all']).reverse();
+    const backLights = lightManager.getLights(['back'], ['all']); 
     const ringLights = [...frontLights, ...backLights];
     
     const blueColor = getColor('blue', 'medium');

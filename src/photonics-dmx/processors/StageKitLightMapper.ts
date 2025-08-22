@@ -90,27 +90,10 @@ export class StageKitLightMapper {
 
   /**
    * Direct 1:1 mapping from 8 StageKit LEDs to 8 DMX lights
-   * Accounts for DMX light configuration: front: 1,2,3,4, back: 5,6,7,8
-   * But RB3E expects back lights in reverse order: 8,7,6,5
    */
   private map8to8(ledPositions: number[]): number[] {
-    return ledPositions.map(ledPos => {
-      if (ledPos >= 0 && ledPos < 8) {
-        // Front lights (0,1,2,3) map directly to DMX 0,1,2,3
-        if (ledPos <= 3) {
-          return ledPos;
-        }
-        // Back lights (4,5,6,7) need to be reversed for DMX 4,5,6,7
-        // StageKit LED 4 (back) -> DMX 7 (back-right)
-        // StageKit LED 5 (back-left) -> DMX 6 (back-left) 
-        // StageKit LED 6 (left) -> DMX 5 (left)
-        // StageKit LED 7 (front-left) -> DMX 4 (front-left)
-        else {
-          return 7 - ledPos + 4; // This maps 4->7, 5->6, 6->5, 7->4
-        }
-      }
-      return -1; // Invalid position
-    }).filter(index => index !== -1);
+    // For 8-light mode, just filter valid positions and return unchanged
+    return ledPositions.filter(ledPos => ledPos >= 0 && ledPos < 8);
   }
   
   /**
@@ -121,7 +104,7 @@ export class StageKitLightMapper {
     
     ledPositions.forEach(ledPos => {
       if (ledPos >= 0 && ledPos < 8) {
-        const dmxIndex = this.mapSingleLedToDmx(ledPos);
+        const dmxIndex = this.mapSingleLedToDmx4Light(ledPos);
         if (dmxIndex >= 0 && dmxIndex < 4) {
           dmxIndices.add(dmxIndex);
         }
@@ -132,27 +115,23 @@ export class StageKitLightMapper {
   }
   
   /**
-   * Map a single StageKit LED position to a DMX light index
+   * Map a single StageKit LED position to a DMX light index for 4-light mode.
+   * LEDs 1-4 are mapped to DMX 1-4, and LEDs 5-8 are mapped to DMX 1-4.
+   * (Array data is zero indexed, so it's really 0-3 and 4-7, etc.)
    */
-  public mapSingleLedToDmx(ledPos: number): number {
-    //     0 (front)
-    //   7     1
-    //  6       2
-    //   5     3
-    //     4 (back)
+  public mapSingleLedToDmx4Light(ledPos: number): number {
+    if (ledPos < 0 || ledPos >= 8) {
+      return -1; // Invalid position
+    }
     
-    // Map to 4 DMX lights in a logical pattern:
-    // DMX 0: Front (LEDs 0, 1, 7)
-    // DMX 1: Right (LEDs 2, 3) 
-    // DMX 2: Back (LEDs 4, 5)
-    // DMX 3: Left (LEDs 6)
-    
-    if (ledPos === 0 || ledPos === 1 || ledPos === 7) return 0;      // Front
-    if (ledPos === 2 || ledPos === 3) return 1;      // Right
-    if (ledPos === 4 || ledPos === 5) return 2;      // Back
-    if (ledPos === 6) return 3;      // Left
-    
-    return -1; // Invalid position
+    // 4-light mode
+    if (ledPos <= 3) {
+      // First 4 positions: 0,1,2,3 → DMX array indices 0,1,2,3
+      return ledPos;
+    } else {
+      // Next 4 positions: 4,5,6,7 → DMX array indices 0,1,2,3
+      return (ledPos - 4); // Maps 4→0, 5→1, 6→2, 7→3
+    }
   }
   
   /**
@@ -174,9 +153,9 @@ export class StageKitLightMapper {
    */
   getMappingDescription(): string {
     if (this.dmxLightCount === 8) {
-      return 'Direct 1:1 mapping with reversed back lights (8 StageKit LEDs → 8 DMX lights: Front:1-4, Back:8-5)';
+      return 'Direct 1:1 mapping with natural ring progression (8 StageKit LEDs → 8 DMX lights: Front:1-4, Back:8-5)';
     } else {
-      return 'Grouped mapping (8 StageKit LEDs → 4 DMX lights: Front, Right, Back, Left)';
+      return 'Continuous chase mapping (8 StageKit LEDs → 4 DMX lights: 0→1→2→3→1→2→3→4 pattern, DMX 1-4)';
     }
   }
   
@@ -185,24 +164,24 @@ export class StageKitLightMapper {
    */
   getDmxLightMappingDetails(): Array<{ dmxIndex: number; stageKitLeds: number[]; description: string }> {
     if (this.dmxLightCount === 8) {
-      // 1:1 mapping with reversed back lights
+      // 1:1 mapping with natural ring progression
       return [
         { dmxIndex: 0, stageKitLeds: [0], description: 'Front (StageKit LED 0)' },
         { dmxIndex: 1, stageKitLeds: [1], description: 'Front-Right (StageKit LED 1)' },
         { dmxIndex: 2, stageKitLeds: [2], description: 'Right (StageKit LED 2)' },
         { dmxIndex: 3, stageKitLeds: [3], description: 'Back-Right (StageKit LED 3)' },
-        { dmxIndex: 4, stageKitLeds: [7], description: 'Front-Left (StageKit LED 7)' },
-        { dmxIndex: 5, stageKitLeds: [6], description: 'Left (StageKit LED 6)' },
-        { dmxIndex: 6, stageKitLeds: [5], description: 'Back-Left (StageKit LED 5)' },
-        { dmxIndex: 7, stageKitLeds: [4], description: 'Back (StageKit LED 4)' }
+        { dmxIndex: 4, stageKitLeds: [4], description: 'Back (StageKit LED 4)' },
+        { dmxIndex: 5, stageKitLeds: [5], description: 'Back-Left (StageKit LED 5)' },
+        { dmxIndex: 6, stageKitLeds: [6], description: 'Left (StageKit LED 6)' },
+        { dmxIndex: 7, stageKitLeds: [7], description: 'Front-Left (StageKit LED 7)' }
       ];
     } else {
-      // 4-light grouped mapping
+      // 4-light continuous chase mapping - ensures smooth progression around the ring
       return [
-        { dmxIndex: 0, stageKitLeds: [0, 1, 7], description: 'Front (LEDs 0, 1, 7)' },
-        { dmxIndex: 1, stageKitLeds: [2, 3], description: 'Right (LEDs 2, 3)' },
-        { dmxIndex: 2, stageKitLeds: [4, 5], description: 'Back (LEDs 4, 5)' },
-        { dmxIndex: 3, stageKitLeds: [6], description: 'Left (LED 6)' }
+        { dmxIndex: 0, stageKitLeds: [0, 4], description: 'Front (LEDs 0, 4) - DMX Label 1' },
+        { dmxIndex: 1, stageKitLeds: [1, 5], description: 'Right (LEDs 1, 5) - DMX Label 2' },
+        { dmxIndex: 2, stageKitLeds: [2, 6], description: 'Back (LEDs 2, 6) - DMX Label 3' },
+        { dmxIndex: 3, stageKitLeds: [3, 7], description: 'Left (LEDs 3, 7) - DMX Label 4' }
       ];
     }
   }
@@ -232,7 +211,7 @@ export class StageKitLightMapper {
     ];
     
     return ledPositions.map(ledPos => {
-      const dmxIndex = this.mapSingleLedToDmx(ledPos);
+      const dmxIndex = this.mapSingleLedToDmx4Light(ledPos);
       const ledName = layout[ledPos] || `Unknown(${ledPos})`;
       
       let dmxDescription = '';
@@ -240,7 +219,7 @@ export class StageKitLightMapper {
         // For 8-light configuration, show the actual DMX index and position
         const dmxPositions = [
           'Front (1)', 'Front-Right (2)', 'Right (3)', 'Back-Right (4)', 
-          'Front-Left (5)', 'Left (6)', 'Back-Left (7)', 'Back (8)'
+          'Back (5)', 'Back-Left (6)', 'Left (7)', 'Front-Left (8)'
         ];
         dmxDescription = dmxPositions[dmxIndex] || `Unknown DMX ${dmxIndex}`;
       } else {

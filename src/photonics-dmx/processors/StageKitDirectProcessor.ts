@@ -50,8 +50,35 @@ export class StageKitDirectProcessor extends EventEmitter {
       stageKitConfig
     }); 
     
+    this.lightManager = lightManager;
+    this.photonicsSequencer = photonicsSequencer;
     this.config = { ...DEFAULT_STAGEKIT_CONFIG, ...stageKitConfig };
-    this.lightMapper = new StageKitLightMapper(this.config.dmxLightCount);
+    
+
+    const numLights = this.lightManager.getTotalDmxLightCount();
+    
+    // StageKitLightMapper only supports 4 or 8 lights, so use fallback-to-minimum 
+    // This prevents out-of-bounds errors by never trying to access more lights than exist
+    let dmxLightCount: 4 | 8;
+    if (numLights < 4) {
+      // System doesn't work with less than 4 lights
+      throw new Error(`StageKit requires at least 4 DMX lights, but only ${numLights} are configured`);
+    } else if (numLights < 8) {
+      // 4-7 lights: fall back to 4-light mode
+      dmxLightCount = 4;
+    } else {
+      // 8+ lights: use 8-light mode
+      dmxLightCount = 8;
+    }
+    
+    console.log('StageKitDirectProcessor: Using DMX light count:', {
+      actualFromConfig: numLights,
+      fallbackFromDefault: this.config.dmxLightCount,
+      finalCount: dmxLightCount,
+      note: numLights < 8 ? 'Falling back to 4-light mode for safety' : 'Using 8-light mode'
+    });
+    
+    this.lightMapper = new StageKitLightMapper(dmxLightCount);
     
     // Initialize color tracking maps
     this.colorToLights.set('red', new Set());

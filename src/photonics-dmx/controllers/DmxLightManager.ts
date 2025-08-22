@@ -443,7 +443,12 @@ export class DmxLightManager {
     return lights.filter(light => !outterIds.has(light.id));
   }
 
-
+  /**
+   * Get the total number of DMX lights in the configuration
+   */
+  public getTotalDmxLightCount(): number {
+    return this.config.numLights;
+  }
 
   /**
    * Sets a new lighting configuration.

@@ -16,12 +16,8 @@ export class MenuCue implements ICue {
     const frontLights = lightManager.getLights(['front'], 'all');
     const backLights = lightManager.getLights(['back'], 'all');
 
-    const sortedFrontLights = frontLights.sort((a: TrackedLight, b: TrackedLight) => a.position - b.position);
-    // Sort backLights by position descending
-    const sortedBackLights = backLights.sort((a: TrackedLight, b: TrackedLight) => b.position - a.position);
-
     // Merge the sorted arrays into allLights
-    const allLights = [...sortedFrontLights, ...sortedBackLights];
+    const allLights = [...frontLights, ...backLights];
    
     const blue: RGBIP = getColor('blue', 'low');
     const brightBlue: RGBIP = getColor('blue', 'high');

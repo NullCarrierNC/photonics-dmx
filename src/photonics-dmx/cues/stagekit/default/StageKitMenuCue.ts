@@ -16,9 +16,8 @@ export class StageKitMenuCue implements ICue {
   style = CueStyle.Primary;
 
   async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    // Get lights in ring order: front [1,2,3,4] + back reversed [8,7,6,5]
     const frontLights = lightManager.getLights(['front'], ['all']);
-    const backLights = lightManager.getLights(['back'], ['all']).reverse();
+    const backLights = lightManager.getLights(['back'], ['all']); 
     const ringLights = [...frontLights, ...backLights];
     
     const blueColor = getColor('blue', 'medium');

@@ -94,7 +94,7 @@ export interface ColorMapping {
  */
 export const DEFAULT_STAGEKIT_CONFIG: StageKitConfig = {
   enabled: true,
-  dmxLightCount: 8,
+  dmxLightCount: 4,
   mappingMode: 'direct',
   brightnessScaling: true,
   colorCorrection: true,
