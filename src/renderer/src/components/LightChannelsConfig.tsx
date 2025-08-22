@@ -103,22 +103,32 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   const handleMasterDimmerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (light && localChannels) {
       const newMasterValue = Number(e.target.value);
-      const masterDimmerDifference = newMasterValue - (localChannels.masterDimmer || 0);
-
-      const updatedChannels: { [key: string]: number } = {};
-      Object.entries(localChannels).forEach(([channelName, value]) => {
-        if (channelName === 'masterDimmer') {
-          updatedChannels[channelName] = newMasterValue;
-        } else {
-          updatedChannels[channelName] = value + masterDimmerDifference;
-        }
-      });
-
+      
+      // Find the fixture template to get the original offsets
       const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId);
       if (!fixtureTemplate) {
         console.warn(`fixtureId (${light.fixtureId}) not found in myLights.`);
         return;
       }
+
+      // Calculate offsets from the fixture template (not the current light)
+      const templateChannels = fixtureTemplate.channels;
+      const offsets: { [key: string]: number } = {};
+      Object.entries(templateChannels).forEach(([channelName, value]) => {
+        if (channelName !== 'masterDimmer') {
+          offsets[channelName] = value - templateChannels.masterDimmer;
+        }
+      });
+
+      // Apply the new master dimmer value and recalculate all channels using template offsets
+      const updatedChannels: { [key: string]: number } = {};
+      Object.entries(templateChannels).forEach(([channelName, _]) => {
+        if (channelName === 'masterDimmer') {
+          updatedChannels[channelName] = newMasterValue;
+        } else {
+          updatedChannels[channelName] = newMasterValue + (offsets[channelName] || 0);
+        }
+      });
 
       const castChannels = castToChannelType(fixtureTemplate.fixture, updatedChannels);
       setLocalChannels({ ...castChannels });
