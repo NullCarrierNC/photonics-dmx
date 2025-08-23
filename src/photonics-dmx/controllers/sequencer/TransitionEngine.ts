@@ -1,7 +1,7 @@
 import { performance } from 'perf_hooks';
 import { EffectTransition, RGBIP } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
-import { ActiveEffect, ILayerManager, ITransitionEngine } from './interfaces';
+import { LightEffectState, ILayerManager, ITransitionEngine } from './interfaces';
 import { IEffectManager } from './interfaces';
 
 /**
@@ -38,12 +38,24 @@ export class TransitionEngine implements ITransitionEngine {
   }
 
   /**
-   * Helper method to ensure an ActiveEffect has a lastEndStates map
-   * @param effect The effect to ensure has lastEndStates
+   * Helper method to ensure a LightEffectState has a lastEndState
+   * @param effect The effect to ensure has lastEndState
    */
-  private ensureLastEndStates(effect: ActiveEffect): void {
-    if (!effect.lastEndStates) {
-      effect.lastEndStates = new Map<string, RGBIP>();
+  private ensureLastEndState(effect: LightEffectState): void {
+    if (!effect.lastEndState) {
+      // Get the current state for this light on this layer
+      const currentState = this.lightTransitionController.getLightState(effect.lightId, effect.layer);
+      if (currentState) {
+        effect.lastEndState = { ...currentState };
+      } else {
+        // Default black state if no current state exists
+        effect.lastEndState = {
+          red: 0, rp: 0,
+          green: 0, gp: 0,
+          blue: 0, bp: 0,
+          intensity: 0, ip: 0
+        };
+      }
     }
   }
 
@@ -84,71 +96,72 @@ export class TransitionEngine implements ITransitionEngine {
   public updateTransitions(): void {
     const currentTime = performance.now();
     const now = performance.now();
-    const layersToRemove: number[] = [];
+    const effectsToRemove: Array<{layer: number, lightId: string}> = [];
 
-    this.layerManager.getActiveEffects().forEach((activeEffect, layer) => {
-      if (activeEffect.currentTransitionIndex >= activeEffect.transitions.length) {
-        layersToRemove.push(layer);
-        return;
-      }
+    this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
       this.layerManager.setLayerLastUsed(layer, now);
+      
+      layerMap.forEach((lightEffect, lightId) => {
+        if (lightEffect.currentTransitionIndex >= lightEffect.transitions.length) {
+          effectsToRemove.push({layer, lightId});
+          return;
+        }
 
-      const currentTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
-      switch (activeEffect.state) {
-        case 'idle':
-          this.prepareTransition(activeEffect, currentTransition, currentTime);
-          break;
-        case 'waitingFor':
-          this.handleWaitingFor(activeEffect, currentTransition, currentTime);
-          break;
-        case 'transitioning':
-          this.handleTransitioning(activeEffect, currentTransition, currentTime);
-          break;
-        case 'waitingUntil':
-          this.handleWaitingUntil(activeEffect, currentTransition, currentTime);
-          break;
-        default:
-          console.warn(`Unknown state "${activeEffect.state}" for effect "${activeEffect.effect.id}".`);
-      }
+        const currentTransition = lightEffect.transitions[lightEffect.currentTransitionIndex];
+        switch (lightEffect.state) {
+          case 'idle':
+            this.prepareTransition(lightEffect, currentTransition, currentTime);
+            break;
+          case 'waitingFor':
+            this.handleWaitingFor(lightEffect, currentTransition, currentTime);
+            break;
+          case 'transitioning':
+            this.handleTransitioning(lightEffect, currentTransition, currentTime);
+            break;
+          case 'waitingUntil':
+            this.handleWaitingUntil(lightEffect, currentTransition, currentTime);
+            break;
+          default:
+            console.warn(`Unknown state "${lightEffect.state}" for effect "${lightEffect.effect.id}".`);
+        }
+      });
     });
 
     // Process completed effects by ensuring the next effect is queued before removing transitions
-    for (const layer of layersToRemove) {
-      const justFinishedEffect = this.layerManager.getActiveEffect(layer);
+    for (const {layer, lightId} of effectsToRemove) {
+      const justFinishedEffect = this.layerManager.getActiveEffect(layer, lightId);
       if (!justFinishedEffect) continue;
 
       // Capture final states using the layer manager
-      this.layerManager.captureFinalStates(layer, justFinishedEffect.trackedLights);
+      this.layerManager.captureFinalStates(layer, justFinishedEffect.transitions[0].lights);
       
       // Remove the effect from active effects
-      this.layerManager.removeActiveEffect(layer);
+      this.layerManager.removeActiveEffect(layer, lightId);
 
       // If the effect is persistent, add it to the queue
       if (justFinishedEffect.isPersistent) {
-        this.layerManager.addQueuedEffect(layer, {
+        this.layerManager.addQueuedEffect(layer, lightId, {
           name: justFinishedEffect.name,
           effect: justFinishedEffect.effect,
+          lightId: lightId,
           isPersistent: true
         });
       }
       
-      // Start the next queued effect for this layer immediately
-      const nextQueuedEffect = this.layerManager.getQueuedEffect(layer);
+      // Start the next queued effect for this light on this layer immediately
+      const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId);
       if (nextQueuedEffect) {
         // Start the next effect if we have an effect manager
         if (this.effectManager) {
-          this.effectManager.startNextEffectInQueue(layer);
+          this.effectManager.startNextEffectInQueue(layer, lightId);
         } else {
-          console.warn(`Cannot start next queued effect for layer ${layer} - no effect manager set`);
+          console.warn(`Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`);
         }
       } else {
         // Only if there's no next effect, remove transitions for non-base layers
         if (layer > 0) {
           // Only remove transitions if we've confirmed no new effect is queued
-          justFinishedEffect.trackedLights.forEach((light) => {
-            this.lightTransitionController.removeLightLayer(light.id, layer);
-          });
-          this.lightTransitionController.removeTransitionsByLayer(layer);
+          this.lightTransitionController.removeLightLayer(lightId, layer);
           
           // Only clear final states if there's no next effect and we've removed transitions
           this.layerManager.clearLayerStates(layer);
@@ -168,7 +181,7 @@ export class TransitionEngine implements ITransitionEngine {
    * @param transition The current transition to prepare
    * @param currentTime The current timestamp
    */
-  public prepareTransition(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void {
+  public prepareTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
     activeEffect.state = 'waitingFor';
     if (transition.waitFor === 'none') {
       this.startTransition(activeEffect, transition, currentTime);
@@ -189,7 +202,7 @@ export class TransitionEngine implements ITransitionEngine {
    * @param transition The current transition being waited on
    * @param currentTime The current timestamp
    */
-  public handleWaitingFor(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void {
+  public handleWaitingFor(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
     if (transition.waitFor === 'delay') {
       if (currentTime >= activeEffect.waitEndTime) {
         this.startTransition(activeEffect, transition, currentTime);
@@ -206,72 +219,65 @@ export class TransitionEngine implements ITransitionEngine {
    * @param transition The current transition to execute
    * @param currentTime The current timestamp
    */
-  public startTransition(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void {
-    this.ensureLastEndStates(activeEffect);
-    
+  public startTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
+    this.ensureLastEndState(activeEffect);
+    /*
     const baseTransitionConfig = {
       transform: {
         ...transition.transform
       },
       layer: transition.layer
     };
-
-    transition.lights.forEach(light => {
-      // First check if there's a saved state in the effect's lastEndStates
-      let startState: RGBIP | undefined = undefined;
-      
-      if (activeEffect.lastEndStates!.has(light.id)) {
-        // Use the effect's stored state if available - this is crucial for smooth transitions
-        startState = activeEffect.lastEndStates!.get(light.id);
-      }
-      
-      // If no state in the effect, check the layer manager for stored state
-      if (!startState) {
-        startState = this.layerManager.getLightState(transition.layer, light.id);
-      }
-      
-      // If still no state, check the current light state in the controller
-      if (!startState) {
-        startState = this.lightTransitionController.getLightState(light.id, transition.layer);
-      }
-      
-      // If all else fails, use a default black state
-      if (!startState) {
-        startState = { 
-          red: 0, rp: 0, 
-          green: 0, gp: 0, 
-          blue: 0, bp: 0, 
-          intensity: 0, ip: 0 
-        };
-      }
-
-      let color = { ...transition.transform.color };
-      if (light.config) {
-        if (color.pan === undefined) {
-          color.pan = light.config.panHome;
-        }
-        if (color.tilt === undefined) {
-          color.tilt = light.config.tiltHome;
-        }
-      }
-
-      const localTransitionConfig = {
-        transform: {
-          ...baseTransitionConfig.transform,
-          color,
-        },
-        layer: baseTransitionConfig.layer,
+*/
+    // Since this is a per-light effect, we work with the single light in the transition
+    const light = transition.lights[0];
+    
+    // First check if there's a saved state in the effect's lastEndState
+    let startState: RGBIP | undefined = undefined;
+    
+    if (activeEffect.lastEndState) {
+      // Use the effect's stored state if available - this is crucial for smooth transitions
+      startState = activeEffect.lastEndState;
+    }
+    
+    // If no state in the effect, check the layer manager for stored state
+    if (!startState) {
+      startState = this.layerManager.getLightState(transition.layer, light.id);
+    }
+    
+    // If still no state, check the current light state in the controller
+    if (!startState) {
+      startState = this.lightTransitionController.getLightState(light.id, transition.layer);
+    }
+    
+    // If all else fails, use a default black state
+    if (!startState) {
+      startState = { 
+        red: 0, rp: 0, 
+        green: 0, gp: 0, 
+        blue: 0, bp: 0, 
+        intensity: 0, ip: 0 
       };
+    }
 
-      this.lightTransitionController.setTransition(
-        light.id,
-        transition.layer,
-        startState,
-        localTransitionConfig.transform.color,
-        localTransitionConfig.transform.duration,
-        localTransitionConfig.transform.easing
-      );
-    });
+    let color = { ...transition.transform.color };
+    if (light.config) {
+      if (color.pan === undefined) {
+        color.pan = light.config.panHome;
+      }
+      if (color.tilt === undefined) {
+        color.tilt = light.config.tiltHome;
+      }
+    }
+
+    this.lightTransitionController.setTransition(
+      light.id,
+      transition.layer,
+      startState,
+      color,
+      transition.transform.duration,
+      transition.transform.easing
+    );
 
     activeEffect.state = 'transitioning';
     activeEffect.transitionStartTime = currentTime;
@@ -285,13 +291,12 @@ export class TransitionEngine implements ITransitionEngine {
    * @param transition The current transition being processed
    * @param currentTime The current timestamp
    */
-  public handleTransitioning(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void {
-    this.ensureLastEndStates(activeEffect);
+  public handleTransitioning(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
+    this.ensureLastEndState(activeEffect);
     
     if (currentTime >= activeEffect.waitEndTime) {
-      activeEffect.trackedLights.forEach((light) => {
-        activeEffect.lastEndStates!.set(light.id, transition.transform.color);
-      });
+      // Since this is a per-light effect, we just update the lastEndState directly
+      activeEffect.lastEndState = transition.transform.color;
       activeEffect.state = 'waitingUntil';
       if (transition.waitUntil === 'none') {
         activeEffect.currentTransitionIndex += 1;
@@ -313,7 +318,7 @@ export class TransitionEngine implements ITransitionEngine {
    * @param transition The current transition being processed
    * @param currentTime The current timestamp
    */
-  public handleWaitingUntil(activeEffect: ActiveEffect, transition: EffectTransition, currentTime: number): void {
+  public handleWaitingUntil(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
     if (transition.waitUntil === 'delay') {
       if (currentTime >= activeEffect.waitEndTime) {
         activeEffect.currentTransitionIndex += 1;

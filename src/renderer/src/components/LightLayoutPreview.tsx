@@ -110,7 +110,12 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
         {backCount > 0 && (
           <div className="w-full flex flex-col items-center mt-4">
             <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">Back</div>
-            {renderLightRow(frontCount + 1, frontCount + backCount)}
+            {/* Render back lights in reverse order to match new natural ring progression */}
+            <div className="flex justify-center gap-x-4 mb-4">
+              {Array.from({ length: backCount }, (_, i) => 
+                renderLightCircle(frontCount + backCount - i)
+              )}
+            </div>
           </div>
         )}
       </div>

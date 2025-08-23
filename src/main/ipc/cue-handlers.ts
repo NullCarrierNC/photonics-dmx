@@ -25,6 +25,21 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   ipcMain.on('rb3e-listener-disabled', () => {
     controllerManager.disableRb3();
   });
+
+  // RB3 mode switching
+  ipcMain.on('rb3e-switch-mode', (_, mode: 'direct' | 'cueBased') => {
+    controllerManager.switchRb3Mode(mode);
+  });
+
+  // Get RB3 current mode
+  ipcMain.handle('rb3e-get-mode', () => {
+    return controllerManager.getRb3Mode();
+  });
+
+  // Get RB3 processor statistics
+  ipcMain.handle('rb3e-get-stats', () => {
+    return controllerManager.getRb3ProcessorStats();
+  });
   
   // Send cue data to renderer
   const sendCueDebouncedData = (cueData: CueData) => {

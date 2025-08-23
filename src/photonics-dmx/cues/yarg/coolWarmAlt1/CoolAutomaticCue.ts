@@ -1,15 +1,14 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectSingleColor, getEffectCycleLights } from '../../../effects';
-import { YargCue } from '../YargCue';
 import { randomBetween } from '../../../helpers/utils';
 
 export class CoolAutomaticCue implements ICue {
   id = 'alt-cool-auto-1';
-  cueId = YargCue.CoolAutomatic;
+  cueId = CueType.Cool_Automatic;
   description = 'All lights get set green, front cycles each light to blue on beat in random direction. ';
   style = CueStyle.Primary;
 

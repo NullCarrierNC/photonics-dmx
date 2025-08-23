@@ -129,9 +129,12 @@ export class DebugMonitor implements IDebugMonitor {
     // Create a map to store light positions by ID
     const lightPositions = new Map<string, number>();
     
-    this.layerManager.getActiveEffects().forEach(effect => {
-      effect.trackedLights.forEach(light => {
-        lightPositions.set(light.id, light.position);
+    this.layerManager.getActiveEffects().forEach((layerMap, _layer) => {
+      layerMap.forEach((effect, lightId) => {
+        const light = effect.transitions[0].lights.find(l => l.id === lightId);
+        if (light) {
+          lightPositions.set(light.id, light.position);
+        }
       });
     });
 
@@ -144,24 +147,28 @@ export class DebugMonitor implements IDebugMonitor {
 
     // Get transition and effect info
     const layerInfo = new Map<number, string[]>();
-    this.layerManager.getActiveEffects().forEach((effect, layer) => {
-      const transitionIndex = effect.currentTransitionIndex;
-      const totalTransitions = effect.transitions.length;
-      const state = effect.state;
-      const waitFor = transitionIndex < totalTransitions
-        ? effect.transitions[transitionIndex].waitFor
-        : 'none';
-      const waitUntil = transitionIndex < totalTransitions
-        ? effect.transitions[transitionIndex].waitUntil
-        : 'none';
-      
-      layerInfo.set(layer, [
-        effect.name,
-        `${transitionIndex + 1}/${totalTransitions}`,
-        state,
-        waitFor,
-        waitUntil
-      ]);
+    this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
+      // For now, just get the first effect on this layer for display purposes
+      const firstEffect = Array.from(layerMap.values())[0];
+      if (firstEffect) {
+        const transitionIndex = firstEffect.currentTransitionIndex;
+        const totalTransitions = firstEffect.transitions.length;
+        const state = firstEffect.state;
+        const waitFor = transitionIndex < totalTransitions
+          ? firstEffect.transitions[transitionIndex].waitFor
+          : 'none';
+        const waitUntil = transitionIndex < totalTransitions
+          ? firstEffect.transitions[transitionIndex].waitUntil
+          : 'none';
+        
+        layerInfo.set(layer, [
+          firstEffect.name,
+          `${transitionIndex + 1}/${totalTransitions}`,
+          state,
+          waitFor,
+          waitUntil
+        ]);
+      }
     });
 
     // Define fixed width for table columns for formatting
@@ -175,10 +182,10 @@ export class DebugMonitor implements IDebugMonitor {
     
     // Check all RGBIP strings to ensure lightColWidth is sufficient
     // This prevents negative values in String.repeat() calls
-    this.layerManager.getActiveEffects().forEach(effect => {
-      effect.trackedLights.forEach(light => {
-        for (const layer of sortedLayers) {
-          const state = this.lightTransitionController.getLightState(light.id, layer);
+    this.layerManager.getActiveEffects().forEach((lightMap, _layer) => {
+      lightMap.forEach((_, lightId) => {
+        for (const layerNum of sortedLayers) {
+          const state = this.lightTransitionController.getLightState(lightId, layerNum);
           if (state) {
             const rgbip = `R:${state.red.toString().padStart(3)},G:${state.green.toString().padStart(3)},B:${state.blue.toString().padStart(3)},I:${state.intensity.toString().padStart(3)}`;
             // Add 4 for padding (2 on each side) + 2 for safety
@@ -187,7 +194,7 @@ export class DebugMonitor implements IDebugMonitor {
         }
         
         // Also check final state
-        const finalState = this.lightTransitionController.getFinalLightState(light.id);
+        const finalState = this.lightTransitionController.getFinalLightState(lightId);
         if (finalState) {
           const rgbip = `R:${finalState.red.toString().padStart(3)},G:${finalState.green.toString().padStart(3)},B:${finalState.blue.toString().padStart(3)},I:${finalState.intensity.toString().padStart(3)}`;
           // Add 4 for padding (2 on each side) + 2 for safety
@@ -311,16 +318,20 @@ export class DebugMonitor implements IDebugMonitor {
     
     // Print active effects information
     console.log('\nActive Effects:');
-    this.layerManager.getActiveEffects().forEach((effect, layer) => {
-      console.log(`  Layer ${layer}: ${effect.name} (${effect.currentTransitionIndex + 1}/${effect.transitions.length})`);
-      console.log(`    State: ${effect.state}`);
-      console.log(`    Lights: ${effect.trackedLights.map(l => l.id).join(', ')}`);
+    this.layerManager.getActiveEffects().forEach((lightMap, layer) => {
+      lightMap.forEach((effect, lightId) => {
+        console.log(`  Layer ${layer}, Light ${lightId}: ${effect.name} (${effect.currentTransitionIndex + 1}/${effect.transitions.length})`);
+        console.log(`    State: ${effect.state}`);
+        console.log(`    Light: ${lightId}`);
+      });
     });
     
     // Print queued effects
     console.log('\nQueued Effects:');
-    this.layerManager.getEffectQueue().forEach((effect, layer) => {
-      console.log(`  Layer ${layer}: ${effect.name} (Persistent: ${effect.isPersistent})`);
+    this.layerManager.getEffectQueue().forEach((lightMap, layer) => {
+      lightMap.forEach((effect, lightId) => {
+        console.log(`  Layer ${layer}, Light ${lightId}: ${effect.name} (Persistent: ${effect.isPersistent})`);
+      });
     });
   }
 }

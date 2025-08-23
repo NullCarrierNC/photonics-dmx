@@ -1,7 +1,26 @@
 
 export type Rb3GameState = 'InGame' | 'Menus';
 
+export type Rb3Platform = 'Xbox' | 'Xenia' | 'Wii' | 'Dolphin' | 'PS3' | 'RPCS3' | 'Unknown';
 
+export type Rb3TrackType = 'Guitar' | 'Bass' | 'Drums' | 'Vocals' | 'Keys' | 'Harmony' | 'Unknown';
+
+export type Rb3Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert' | 'Unknown';
+
+export interface Rb3BandMember {
+  exists: boolean;
+  difficulty: Rb3Difficulty;
+  trackType: Rb3TrackType;
+}
+
+export interface Rb3BandInfo {
+  members: Rb3BandMember[];
+}
+
+export interface Rb3ModData {
+  identifyValue: string;
+  string: string;
+}
 
 export enum Rb3ePacketType {
   EVENT_ALIVE          = 0, // string with build tag
@@ -16,8 +35,6 @@ export enum Rb3ePacketType {
   EVENT_SCREEN_NAME    = 9, // string
   EVENT_DX_DATA        = 10 // RB3E_EventModData struct
 }
-
-
 
 export enum Rb3RightChannel {
   FogOn = 0x01,
@@ -35,4 +52,14 @@ export enum Rb3RightChannel {
   RedLeds = 0x80,
   
   DisableAll = 0xFF
+}
+
+export enum Rb3PlatformID {
+  RB3E_PLATFORM_XBOX = 0,
+  RB3E_PLATFORM_XENIA = 1,
+  RB3E_PLATFORM_WII = 2,
+  RB3E_PLATFORM_DOLPHIN = 3,
+  RB3E_PLATFORM_PS3 = 4,
+  RB3E_PLATFORM_RPCS3 = 5,
+  RB3E_PLATFORM_UNKNOWN = 0xFF
 }

@@ -16,13 +16,14 @@ If you see the term `light` this is the virtual representation used within the l
 3. `Sequencer`: the central coordinator of the lighting system that manages the lifecycle of effects and transitions. It oversees the EffectManager and other components.
 4. `EffectManager`: receives effect data and orchestrates the creation and management of transitions. Handles effect queueing and scheduling.
 5. `LightTransitionController`: processes transitions and interpolates colour states over time, applying easing functions and handling transform timing.
-6. `LayerManager`: tracks each light's state on a per-layer basis and is responsible for calculating the final results when layers are flattened.
+6. `LayerManager`: tracks each light's state on a per-light-per-layer basis and is responsible for calculating the final results when layers are flattened.
 7. `DmxLightManager`: manages the virtual representation of the physical DMX fixtures. 
 8. `DmxPublisher`: maps the abstract light state to each fixture's specific DMX channels using the fixture profiles defined in the configuration.
 9. `SenderManager`: manages the various output senders that transmit DMX data to physical devices or other systems.
 10. `Senders`: provide the bridge to the real world. sACN for DMX over the network, EnttecPro for Enttec USB dongles, and IPC for sending DMX data to the application UI.
 
 Configuration is handled by the `ConfigurationManager` and related services, which manage user preferences and fixture setup.
+
 
 ### Additional Components
 
@@ -156,6 +157,8 @@ transition into another and prevents the lights turning off unexpectedly if ther
 Layer 0 will transition into the new effect. 
 `EffectManager.addEffect`: Adds the effect without clearing other layers. This lets us add effects on 
 top of running ones without clearing them inadvertently. 
+`EffectManager.getActiveEffectsForLight(lightId)`: Returns all active effects for a specific light across all layers
+`EffectManager.isLayerFreeForLight(layer, lightId)`: Checks if a specific layer is free for a specific light
 
 There are other methods for effect handling; look into `EffectManager` for more details.
 
@@ -219,6 +222,7 @@ When animating with fades, etc, this can create a conflict. Photonics handles th
 3. If there is already an effect of the same name in the queue, the new one replaces the one already in the queue.
 
 Effects on different layers don't impact each other outside of how their priorities calculate the final colour values.
+
 
 
 

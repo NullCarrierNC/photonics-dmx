@@ -49,30 +49,32 @@ export class SongEventHandler implements ISongEventHandler {
   public handleEvent(eventType: 'beat' | 'measure' | 'keyframe'): void {
     const currentTime = performance.now();
     
-    this.layerManager.getActiveEffects().forEach((activeEffect) => {
-      const currentTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
-      if (!currentTransition) return;
-      
-      if (activeEffect.state === 'waitingFor' && currentTransition.waitFor === eventType) {
-        // This transition is waiting for this event type, so it can start now
-        this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime);
-      }
-      
-      if (activeEffect.state === 'waitingUntil' && currentTransition.waitUntil === eventType) {
-        // This transition is waiting until this event type to end
-        // Move to the next transition and immediately prepare it
-        activeEffect.currentTransitionIndex += 1;
+    this.layerManager.getActiveEffects().forEach((layerMap, _layer) => {
+      layerMap.forEach((activeEffect, _lightId) => {
+        const currentTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
+        if (!currentTransition) return;
         
-        // Check if there's another transition and prepare it immediately
-        if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
-          const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
-          activeEffect.state = 'idle';
-          this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime);
-        } else {
-          // If no more transitions, just set to idle
-          activeEffect.state = 'idle';
+        if (activeEffect.state === 'waitingFor' && currentTransition.waitFor === eventType) {
+          // This transition is waiting for this event type, so it can start now
+          this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime);
         }
-      }
+        
+        if (activeEffect.state === 'waitingUntil' && currentTransition.waitUntil === eventType) {
+          // This transition is waiting until this event type to end
+          // Move to the next transition and immediately prepare it
+          activeEffect.currentTransitionIndex += 1;
+          
+          // Check if there's another transition and prepare it immediately
+          if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
+            const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
+            activeEffect.state = 'idle';
+            this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime);
+          } else {
+            // If no more transitions, just set to idle
+            activeEffect.state = 'idle';
+          }
+        }
+      });
     });
   }
 }

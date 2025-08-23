@@ -1,10 +1,9 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import {  getEffectFlashColor } from '../../../effects';
-import { YargCue } from '../YargCue';
 import { randomBetween } from '../../../helpers/utils';
 import { Effect, EffectTransition } from '../../../types';
 
@@ -14,7 +13,7 @@ let isNewSession = true; // Flag to track if this is we should reset the light s
 
 export class WarmAutomaticCue implements ICue {
   id = 'alt-warm-auto-2';
-  cueId = YargCue.WarmAutomatic;
+  cueId = CueType.Warm_Automatic;
   description = 'Lights get set red or yellow, then flash one light in the opposite color.';
   style = CueStyle.Primary;
 

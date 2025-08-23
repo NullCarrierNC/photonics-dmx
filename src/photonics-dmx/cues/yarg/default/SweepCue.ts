@@ -1,15 +1,14 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
 import { randomBetween } from '../../../helpers/utils';
-import { YargCue } from '../YargCue';
 
 export class SweepCue implements ICue {
   id = 'default-sweep';
-  cueId = YargCue.Sweep;
+  cueId = CueType.Sweep;
   description = 'Rapid sweep effect that moves a bright color (red/yellow or blue/green based on venue size) across front lights, either left-to-right or right-to-left';
   style = CueStyle.Secondary;
 

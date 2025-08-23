@@ -142,7 +142,10 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({
         {lightingConfig?.backLights.length > 0 && (
           <div className="w-full flex flex-col items-center mt-3">
             <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Back</div>
-            {renderLightRow(lightingConfig.backLights)}
+            {/* Render back lights in reverse order to match new natural ring progression */}
+            <div className="flex justify-center gap-x-4 mb-4">
+              {[...lightingConfig.backLights].reverse().map((light, index) => renderLightCircle(light, index))}
+            </div>
           </div>
         )}
       </div>

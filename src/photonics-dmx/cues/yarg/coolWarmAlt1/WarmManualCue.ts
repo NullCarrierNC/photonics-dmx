@@ -1,8 +1,7 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
-import { YargCue } from '../YargCue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
 import { randomBetween } from '../../../helpers/utils';
@@ -10,7 +9,7 @@ import { getEffectSingleColor } from '../../../effects';
 
 export class WarmManualCue implements ICue {
   id = 'alt-warm-manual-1';
-  cueId = YargCue.WarmManual;
+  cueId = CueType.Warm_Manual;
   description = 'Front lights set red, yellow sweep on measure.';
   style = CueStyle.Primary;
 

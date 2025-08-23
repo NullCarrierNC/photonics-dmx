@@ -1,15 +1,14 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { EasingType } from '../../../easing';
-import { YargCue } from '../YargCue';
 
 export class StompCue implements ICue {
   id = 'default-stomp';
-  cueId = YargCue.Stomp;
+  cueId = CueType.Stomp;
   description = 'White flash effect on front lights with a moderate fade-out';
   style = CueStyle.Secondary;
 

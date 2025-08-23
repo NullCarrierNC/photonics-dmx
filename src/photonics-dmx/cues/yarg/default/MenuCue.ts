@@ -1,15 +1,14 @@
-import { CueData } from '../../cueTypes';
+import { CueData, CueType } from '../../cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../interfaces/ICue';
 import { getColor } from '../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../effects/sweepEffect';
 import { TrackedLight, RGBIP } from '../../../types';
-import { YargCue } from '../YargCue';
 
 export class MenuCue implements ICue {
   id = 'default-menu';
-  cueId = YargCue.Menu;
+  cueId = CueType.Menu;
   description = 'Continuous blue sweep effect that moves around all lights in a circular pattern with a 2-second delay between passes';
   style = CueStyle.Primary;
 
@@ -17,12 +16,8 @@ export class MenuCue implements ICue {
     const frontLights = lightManager.getLights(['front'], 'all');
     const backLights = lightManager.getLights(['back'], 'all');
 
-    const sortedFrontLights = frontLights.sort((a: TrackedLight, b: TrackedLight) => a.position - b.position);
-    // Sort backLights by position descending
-    const sortedBackLights = backLights.sort((a: TrackedLight, b: TrackedLight) => b.position - a.position);
-
     // Merge the sorted arrays into allLights
-    const allLights = [...sortedFrontLights, ...sortedBackLights];
+    const allLights = [...frontLights, ...backLights];
    
     const blue: RGBIP = getColor('blue', 'low');
     const brightBlue: RGBIP = getColor('blue', 'high');
