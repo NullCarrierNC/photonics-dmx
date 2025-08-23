@@ -36,8 +36,7 @@ export class StageKitDirectProcessor extends EventEmitter {
   private pendingUpdates: Map<number, { colors: Set<string>; timeout: NodeJS.Timeout }> = new Map(); // DMX light index -> pending update
   private readonly ACCUMULATION_DELAY_MS = 5; 
   
-  // Track the last animation sequence to detect when to clear current pass colors
-  private lastAnimationSequence: { positions: number[]; colors: Set<string> } | null = null;
+
   
   // Track active strobe effects for cleanup
   private activeStrobeEffects: Map<string, {
@@ -342,24 +341,6 @@ export class StageKitDirectProcessor extends EventEmitter {
     // Clear the color tracking
     this.colorToLights.set(color, new Set());
     
-    // Check if this is a new animation sequence
-    // If positions or colors changed significantly, clear current pass colors to start fresh
-    const currentSequence = { positions: newLightIndices, colors: new Set([color]) };
-    const isNewSequence = this.isNewAnimationSequence(currentSequence);
-    
-  //  console.log(`DEBUG: Sequence check - current: ${JSON.stringify(currentSequence)}, last: ${JSON.stringify(this.lastAnimationSequence)}, isNew: ${isNewSequence}`);
-  //  console.log(`DEBUG: Color bank update - color: ${color}, target lights: [${newLightIndices.join(', ')}]`);
-    
-    if (isNewSequence) {
-      // Clear current pass colors for the lights being updated to start fresh
-      for (const lightIndex of newLightIndices) {
-        if (this.currentPassColors.has(lightIndex)) {
-          this.currentPassColors.get(lightIndex)!.clear();
-        //  console.log(`DEBUG: Light ${lightIndex} - cleared current pass (new animation sequence)`);
-        }
-      }
-      this.lastAnimationSequence = currentSequence;
-    }
     
     // Let colors accumulate naturally in current pass colors for proper blending
     for (const lightIndex of newLightIndices) {
@@ -533,7 +514,7 @@ export class StageKitDirectProcessor extends EventEmitter {
       this.pendingUpdates.clear();
       
       // Clear all strobe effects and intervals
-      for (const [effectName, effectData] of this.activeStrobeEffects.entries()) {
+      for (const [_effectName, effectData] of this.activeStrobeEffects.entries()) {
         if (effectData.interval) {
           clearInterval(effectData.interval);
         }
@@ -812,57 +793,5 @@ export class StageKitDirectProcessor extends EventEmitter {
     //console.log('StageKitDirectProcessor destroyed');
   }
 
-  /**
-   * Check if the current sequence represents a new animation sequence
-   * This helps determine when to clear current pass colors
-   */
-  private isNewAnimationSequence(currentSequence: { positions: number[]; colors: Set<string> }): boolean {
-    if (!this.lastAnimationSequence) {
-      return true; // First sequence
-    }
-    
-    // Check if positions changed significantly
-    const lastPositions = this.lastAnimationSequence.positions;
-    const currentPositions = currentSequence.positions;
-    
-    // For chasing patterns, we expect positions to change gradually
-    // Only clear if we get a completely different pattern (e.g., different number of lights)
-    if (lastPositions.length !== currentPositions.length) {
-      // Different number of lights - likely a new animation
-      return true;
-    }
-    
-    // If we have the same number of lights, check if they're completely different
-    // For chasing patterns, we expect some overlap or adjacent positions
-    let hasOverlap = false;
-    for (const pos of currentPositions) {
-      if (lastPositions.includes(pos)) {
-        hasOverlap = true;
-        break;
-      }
-    }
-    
-    // If no overlap at all, it might be a new animation
-    if (!hasOverlap && lastPositions.length > 0) {
-      return true;
-    }
-    
-    // Check if colors are significantly different
-    const lastColors = this.lastAnimationSequence.colors;
-    const currentColors = currentSequence.colors;
-    
-    // If we're adding a completely new color that wasn't in the last sequence, 
-    // and it's not a complementary color (like red/yellow), it might be a new sequence
-    for (const color of currentColors) {
-      if (!lastColors.has(color)) {
-        // This is a new color - check if it's part of the same animation
-        // For now, assume it's the same animation if positions have some overlap
-        // This allows red/yellow chasing patterns to work
-        return false;
-      }
-    }
-    
-    // Same positions and similar colors - likely the same animation sequence
-    return false;
-  }
+
 }
