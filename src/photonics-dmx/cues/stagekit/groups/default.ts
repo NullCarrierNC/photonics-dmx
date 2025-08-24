@@ -21,11 +21,7 @@ import { StageKitBigRockEndingCue } from '../default/StageKitBigRockEndingCue';
 import { StageKitFlareFastCue } from '../default/StageKitFlareFastCue';
 import { StageKitFlareSlowCue } from '../default/StageKitFlareSlowCue';
 import { StageKitBlackoutCue } from '../default/StageKitBlackoutCue';
-import { StageKitStrobeFastCue } from '../default/StageKitStrobeFastCue';
-import { StageKitStrobeFastestCue } from '../default/StageKitStrobeFastestCue';
-import { StageKitStrobeMediumCue } from '../default/StageKitStrobeMediumCue';
-import { StageKitStrobeOffCue } from '../default/StageKitStrobeOffCue';
-import { StageKitStrobeSlowCue } from '../default/StageKitStrobeSlowCue';
+
 
 /**
  * Create and register the StageKit default cue group.
@@ -56,11 +52,6 @@ const stagekitGroup: ICueGroup = {
     [CueType.Flare_Fast, new StageKitFlareFastCue()],
     [CueType.Flare_Slow, new StageKitFlareSlowCue()],
     [CueType.Blackout_Fast, new StageKitBlackoutCue()],
-    [CueType.Strobe_Fast, new StageKitStrobeFastCue()],
-    [CueType.Strobe_Fastest, new StageKitStrobeFastestCue()],
-    [CueType.Strobe_Medium, new StageKitStrobeMediumCue()],
-    [CueType.Strobe_Off, new StageKitStrobeOffCue()],
-    [CueType.Strobe_Slow, new StageKitStrobeSlowCue()],
   ]),
 };
 

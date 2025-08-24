@@ -113,6 +113,11 @@ export class ControllerManager {
       registry.setEnabledGroups(allGroups);
       console.log('CueRegistry initialized with all groups (no preference set):', allGroups);
     }
+    
+    // Load cue consistency window from configuration
+    const consistencyWindow = this.config.getCueConsistencyWindow();
+    registry.setCueConsistencyWindow(consistencyWindow);
+    console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms');
   }
   
   /**

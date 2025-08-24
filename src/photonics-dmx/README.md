@@ -223,6 +223,24 @@ When animating with fades, etc, this can create a conflict. Photonics handles th
 
 Effects on different layers don't impact each other outside of how their priorities calculate the final colour values.
 
+### Cue Groups
+
+Cue groups are comprised of differing implementations for the same cue call. E.g. different ways of rendering cool_automatic.
+Having multiple groups enabled allows for a wider range of visual effects during gameplay. 
+
+Which groups are active can be toggled in the Preferences area. 
+
+If a particular cue group only contains a subset of the in-game cues, and the game triggers a cue not found in that group, 
+the system will fall-back to the default group which is guaranteed to contain the cue implementation.
+
+
+### Cue Consistency Throttling
+
+The sequencer includes a consistency throttling mechanism to prevent rapid randomization changes when the same cue is called repeatedly within a short time window. This prevents visual inconsistencies when network data rapidly flips between different cues.
+
+E.g. The network tells us to show cool_automatic -> frenzy -> cool_automatic. If the second cool_automatic was triggered less than 2 seconds (default) 
+after the previous use of cool_automatic we will use the same implementation as the previous call. This helps maintain consistency if the game 
+switches back and forth between cues rapdily.
 
 
 
@@ -235,6 +253,8 @@ When creating effects the lights can be further divided by criteria like `even`,
 This allows the effects to be agnostic to the user's specific configuration. E.g. it doesn't matter if they 
 have 6 front lights and 3 back lights while someone else has 4 front and no back lights. The effects never try 
 to target any one specific light, so they run smoothly on all configurations.
+
+
 
 
 ## Debug Tools

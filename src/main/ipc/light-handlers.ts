@@ -6,6 +6,7 @@ import { IpcSender } from '../../photonics-dmx/senders/IpcSender';
 import { EnttecProSender } from '../../photonics-dmx/senders/EnttecProSender';
 import { ArtNetSender } from '../../photonics-dmx/senders/ArtNetSender';
 import { CueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/CueRegistry';
+import { CueType } from '../../photonics-dmx/cues/cueTypes';
 
 /**
  * Set up light-related IPC handlers
@@ -479,43 +480,88 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   ipcMain.handle('get-cue-source-group', async (_, cueType: string) => {
     try {
       const registry = CueRegistry.getInstance();
-      const activeGroups = registry.getActiveGroups();
-      const enabledGroups = registry.getEnabledGroups();
-      const defaultGroupId = registry.getDefaultGroupId();
+      const cueState = registry.getCueState(cueType as CueType);
       
-      // Try active groups first
-      for (const groupId of activeGroups) {
-        const group = registry.getGroup(groupId);
-        if (group?.cues.has(cueType as any)) {
-          const isFallback = group.id === defaultGroupId && !enabledGroups.includes(defaultGroupId);
-          return {
-            groupName: group.name,
-            isFallback
-          };
-        }
+      if (cueState) {
+        return { 
+          success: true,
+          cueType: cueState.cueType,
+          groupId: cueState.groupId,
+          cueStyle: cueState.cueStyle,
+          isFallback: cueState.isFallback,
+          counter: cueState.counter,
+          limit: cueState.limit
+        };
+      } else {
+        return { 
+          success: false, 
+          error: `No state found for cue: ${cueType}` 
+        };
       }
-      
-      // Fallback to default group if it exists and wasn't already checked in active groups
-      if (defaultGroupId && !activeGroups.includes(defaultGroupId)) {
-        const defaultGroup = registry.getGroup(defaultGroupId);
-        if (defaultGroup?.cues.has(cueType as any)) {
-          return {
-            groupName: defaultGroup.name,
-            isFallback: true // This is definitely fallback behavior
-          };
-        }
-      }
-      
-      // If not found anywhere
-      return {
-        groupName: null,
-        isFallback: false
-      };
     } catch (error) {
       console.error('Error getting cue source group:', error);
-      return {
-        groupName: null,
-        isFallback: false
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Set the cue consistency window
+  ipcMain.handle('set-cue-consistency-window', async (_, windowMs: number) => {
+    try {
+      // Update the configuration
+      controllerManager.getConfig().setCueConsistencyWindow(windowMs);
+      
+      // Also update the CueRegistry to apply the change immediately
+      const registry = CueRegistry.getInstance();
+      registry.setCueConsistencyWindow(windowMs);
+      
+      return { 
+        success: true, 
+        windowMs: windowMs 
+      };
+    } catch (error) {
+      console.error('Error setting cue consistency window:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  });
+
+  // Get the cue consistency window
+  ipcMain.handle('get-cue-consistency-window', async () => {
+    try {
+      const windowMs = controllerManager.getConfig().getCueConsistencyWindow();
+      return { 
+        success: true, 
+        windowMs: windowMs 
+      };
+    } catch (error) {
+      console.error('Error getting cue consistency window:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  });
+
+  // Get the current consistency status
+  ipcMain.handle('get-consistency-status', async () => {
+    try {
+      const registry = CueRegistry.getInstance();
+      const status = registry.getConsistencyStatus();
+      
+      return { 
+        success: true,
+        status
+      };
+    } catch (error) {
+      console.error('Error getting consistency status:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   });
