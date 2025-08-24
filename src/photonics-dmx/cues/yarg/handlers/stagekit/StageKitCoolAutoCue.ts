@@ -6,13 +6,13 @@ import { getColor } from '../../../../helpers/dmxHelpers';
 import { Effect, EffectTransition } from '../../../../types';
 
 /**
- * StageKit Warm Manual Cue 
- * 2x red, 1x yellow. Red animating clockwise, yellow animating counter-clockwise.
+ * StageKit Cool Auto Cue 
+ * 2x blue, 1x green. Blue animating clockwise, green animating counter-clockwise.
  */
-export class StageKitWarmManualCue implements ICue {
-  id = 'stagekit-warmManual';
-  cueId = CueType.Warm_Manual;
-  description = 'StageKit Warm Manual - 2x red, 1x yellow. Red animating clockwise, yellow animating counter-clockwise';
+export class StageKitCoolAutoCue implements ICue {
+  id = 'stagekit-coolAuto';
+  cueId = CueType.Cool_Automatic;
+  description = 'StageKit Cool Auto - 2x blue, 1x green. Blue animating clockwise, green animating counter-clockwise';
   style = CueStyle.Primary;
 
   // Track whether this is the first execution or a repeat
@@ -20,9 +20,9 @@ export class StageKitWarmManualCue implements ICue {
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
-    const redColor = getColor('red', 'medium');
-    const yellowColor = getColor('yellow', 'max');
-    yellowColor.ip = 128; //Semi-transparent so we can blend with red
+    const blueColor = getColor('blue', 'medium');
+    const greenColor = getColor('green', 'max');
+    greenColor.ip = 128; //Semi-transparent so we can blend with blue
 
     const blackColor = getColor('black', 'medium');
     const transparentColor = getColor('transparent', 'medium');
@@ -85,7 +85,7 @@ export class StageKitWarmManualCue implements ICue {
             waitFor: 'none',
             forTime: 0,
             transform: {
-                color: redColor,
+                color: blueColor,
                 easing: 'linear',
                 duration: 100,
             },
@@ -99,7 +99,7 @@ export class StageKitWarmManualCue implements ICue {
             waitFor: 'none',
             forTime: 0,
             transform: {
-                color: redColor,
+                color: blueColor,
                 easing: 'linear',
                 duration: 100,
             },
@@ -173,7 +173,7 @@ export class StageKitWarmManualCue implements ICue {
             waitFor: 'none',
             forTime: 0,
             transform: {
-                color: redColor,
+                color: blueColor,
                 easing: 'linear',
                 duration: 100,
             },
@@ -237,7 +237,7 @@ export class StageKitWarmManualCue implements ICue {
             waitFor: 'none',
             forTime: 0,
             transform: {
-                color: yellowColor,
+                color: greenColor,
                 easing: 'linear',
                 duration: 0,
             },
@@ -266,28 +266,28 @@ export class StageKitWarmManualCue implements ICue {
     
     // Create the red effect
     const redEffect: Effect = {
-        id: "warm-manual-red",
-        description: "Warm manual pattern - red pairs stepping clockwise",
+        id: "cool-auto-blue",
+        description: "Cool auto pattern - blue pairs stepping clockwise",
         transitions: redTransitions
     };
     
     // Create the yellow effect
     const yellowEffect: Effect = {
-        id: "warm-manual-yellow",
-        description: "Warm manual pattern - yellow light stepping counter-clockwise",
+        id: "cool-auto-green",
+        description: "Cool auto pattern - green light stepping counter-clockwise",
         transitions: yellowTransitions
     };
     
     // Add both effects to the sequencer
     if (this.isFirstExecution) {
       // First time: use setEffect to clear any existing effects and start fresh
-      await sequencer.setEffect('warm-manual-red', redEffect);
-      await sequencer.addEffect('warm-manual-yellow', yellowEffect);
+      await sequencer.setEffect('cool-auto-blue', redEffect);
+      await sequencer.addEffect('cool-auto-green', yellowEffect);
       this.isFirstExecution = false;
     } else {
       // Repeat call: use addEffect to add to existing effects
-      sequencer.addEffect('warm-manual-red', redEffect);
-      sequencer.addEffect('warm-manual-yellow', yellowEffect);
+      sequencer.addEffect('cool-auto-blue', redEffect);
+      sequencer.addEffect('cool-auto-green', yellowEffect);
     }
   }
 
