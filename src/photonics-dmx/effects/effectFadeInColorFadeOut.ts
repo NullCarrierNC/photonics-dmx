@@ -33,6 +33,8 @@ export const getEffectFadeInColorFadeOut = ({
     lights,
     layer = 0,
     easing = EasingType.SIN_OUT,
+    waitFor = 'none',
+    waitUntil = 'none',
 }: FadeInColorFadeOutEffectParams): Effect => {
     
     const effect: Effect = {
@@ -42,40 +44,40 @@ export const getEffectFadeInColorFadeOut = ({
             {
                 lights: lights,
                 layer: layer,
-                waitFor: 'delay',
+                waitFor: waitFor,
                 forTime: 0,
                 transform: {
                     color: startColor,
                     easing: easing,
                     duration: 0,
                 },
-                waitUntil: 'delay',
+                waitUntil: waitUntil,
                 untilTime: waitBeforeFadeIn
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: 'delay',
+                waitFor: waitFor,
                 forTime: 0,
                 transform: {
                     color: endColor,
                     easing: easing,
                     duration: fadeInDuration,
                 },
-                waitUntil: 'delay',
+                waitUntil: waitUntil,
                 untilTime: holdDuration
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: 'delay',
+                waitFor: waitFor,
                 forTime: 0,
                 transform: {
                     color: startColor,
                     easing: easing,
                     duration: fadeOutDuration,
                 },
-                waitUntil: 'delay',
+                waitUntil: 'none',
                 untilTime: waitAfterFadeOut
             },
         ]

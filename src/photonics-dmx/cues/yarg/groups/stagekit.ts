@@ -5,8 +5,6 @@ import { ICueGroup } from '../../interfaces/ICueGroup';
 // Import StageKit group cues
 import { StageKitMenuCue } from '../handlers/stagekit/StageKitMenuCue';
 import { StageKitScoreCue } from '../handlers/stagekit/StageKitScoreCue';
-import { StageKitLoopWarmCue } from '../handlers/stagekit/StageKitLoopWarmCue';
-import { StageKitLoopCoolCue } from '../handlers/stagekit/StageKitLoopCoolCue';
 import { StageKitDefaultCue } from '../handlers/stagekit/StageKitDefaultCue';
 import { StageKitStompCue } from '../handlers/stagekit/StageKitStompCue';
 import { StageKitDischordCue } from '../handlers/stagekit/StageKitDischordCue';
@@ -17,10 +15,10 @@ import { StageKitFrenzyCue } from '../handlers/stagekit/StageKitFrenzyCue';
 import { StageKitSearchlightsCue } from '../handlers/stagekit/StageKitSearchlightsCue';
 import { StageKitSilhouettesCue } from '../handlers/stagekit/StageKitSilhouettesCue';
 import { StageKitSilhouettesSpotlightCue } from '../handlers/stagekit/StageKitSilhouettesSpotlightCue';
-import { StageKitBigRockEndingCue } from '../handlers/stagekit/StageKitBigRockEndingCue';
 import { StageKitFlareFastCue } from '../handlers/stagekit/StageKitFlareFastCue';
 import { StageKitFlareSlowCue } from '../handlers/stagekit/StageKitFlareSlowCue';
-import { StageKitBlackoutCue } from '../handlers/stagekit/StageKitBlackoutCue';
+import { StageKitWarmManualCue } from '../handlers/stagekit/StageKitWarmManualCue';
+import { StageKitCoolManualCue } from '../handlers/stagekit/StageKitCoolManualCue';
 
 
 /**
@@ -31,13 +29,13 @@ import { StageKitBlackoutCue } from '../handlers/stagekit/StageKitBlackoutCue';
  */
 const stagekitGroup: ICueGroup = {
   id: 'stagekit',
-  name: 'StageKit Default',
-  description: 'StageKit cues that mimic the original Stage Kit visual effects',
+  name: 'StageKit',
+  description: 'Stage Kit cues that mimic the original Stage Kit visual effects',
   cues: new Map([
     [CueType.Menu, new StageKitMenuCue()],
     [CueType.Score, new StageKitScoreCue()],
-    [CueType.Warm_Manual, new StageKitLoopWarmCue()],
-    [CueType.Cool_Manual, new StageKitLoopCoolCue()],
+    [CueType.Warm_Manual, new StageKitWarmManualCue()],
+    [CueType.Cool_Manual, new StageKitCoolManualCue()],
     [CueType.Default, new StageKitDefaultCue()],
     [CueType.Stomp, new StageKitStompCue()],
     [CueType.Dischord, new StageKitDischordCue()],
@@ -48,10 +46,8 @@ const stagekitGroup: ICueGroup = {
     [CueType.Searchlights, new StageKitSearchlightsCue()],
     [CueType.Silhouettes, new StageKitSilhouettesCue()],
     [CueType.Silhouettes_Spotlight, new StageKitSilhouettesSpotlightCue()],
-    [CueType.BigRockEnding, new StageKitBigRockEndingCue()],
     [CueType.Flare_Fast, new StageKitFlareFastCue()],
     [CueType.Flare_Slow, new StageKitFlareSlowCue()],
-    [CueType.Blackout_Fast, new StageKitBlackoutCue()],
   ]),
 };
 
