@@ -221,7 +221,7 @@ export class CueRegistry {
     const lastExecutionTime = this.lastCueExecutionTime.get(cueType);
     const lastSelection = this.lastCueGroupSelection.get(cueType);
 
-    console.log(`[Consistency] Checking ${cueType}: lastExecution=${lastExecutionTime}, lastSelection=${lastSelection ? lastSelection.groupId : 'none'}, window=${this.cueConsistencyWindow}ms`);
+  //  console.log(`[Consistency] Checking ${cueType}: lastExecution=${lastExecutionTime}, lastSelection=${lastSelection ? lastSelection.groupId : 'none'}, window=${this.cueConsistencyWindow}ms`);
 
     // If we have a previous selection and it's within the consistency window, validate it's still available
     if (lastExecutionTime && lastSelection && (now - lastExecutionTime) < this.cueConsistencyWindow) {
@@ -239,12 +239,12 @@ export class CueRegistry {
         
         if (activeGroupHasCue) {
           // An active group now has this cue, so we shouldn't use the fallback
-          console.log(`[Consistency] Active group now has ${cueType}, clearing fallback consistency`);
+    //      console.log(`[Consistency] Active group now has ${cueType}, clearing fallback consistency`);
           this.clearCueConsistencyTracking(cueType);
           return null;
         } else {
           // No active group has this cue, so the fallback is still valid
-          console.log(`[Consistency] No active group has ${cueType}, fallback is still valid`);
+     //     console.log(`[Consistency] No active group has ${cueType}, fallback is still valid`);
         }
         }
         
@@ -254,7 +254,7 @@ export class CueRegistry {
         return lastSelection;
       } else {
         // The group or cue is no longer available, clear the tracking
-        console.log(`[Consistency] Group ${lastSelection.groupId} no longer available for ${cueType}, clearing tracking`);
+    //    console.log(`[Consistency] Group ${lastSelection.groupId} no longer available for ${cueType}, clearing tracking`);
         this.clearCueConsistencyTracking(cueType);
         return null;
       }
@@ -272,7 +272,7 @@ export class CueRegistry {
     const now = Date.now();
     this.lastCueExecutionTime.set(cueType, now);
     this.lastCueGroupSelection.set(cueType, selection);
-    console.log(`[Consistency] Recorded execution of ${cueType} with group ${selection.groupId} at ${now}`);
+  //  console.log(`[Consistency] Recorded execution of ${cueType} with group ${selection.groupId} at ${now}`);
   }
 
   /**
@@ -548,7 +548,7 @@ export class CueRegistry {
   public clearConsistencyTracking(): void {
     this.lastCueExecutionTime.clear();
     this.lastCueGroupSelection.clear();
-    console.log('[Consistency] Cleared all consistency tracking data');
+  //  console.log('[Consistency] Cleared all consistency tracking data');
   }
 
   /**
@@ -558,7 +558,7 @@ export class CueRegistry {
   public clearCueConsistencyTracking(cueType: CueType): void {
     this.lastCueExecutionTime.delete(cueType);
     this.lastCueGroupSelection.delete(cueType);
-    console.log(`[Consistency] Cleared tracking for cue: ${cueType}`);
+  //  console.log(`[Consistency] Cleared tracking for cue: ${cueType}`);
   }
 
   /**
@@ -578,9 +578,7 @@ export class CueRegistry {
       }
     }
     
-    if (clearedCount > 0) {
-      console.log(`[Consistency] Cleared tracking for ${clearedCount} cues in group: ${groupId}`);
-    }
+    
   }
 
   /**
