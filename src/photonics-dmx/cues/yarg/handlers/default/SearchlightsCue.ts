@@ -4,7 +4,7 @@ import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../../effects/sweepEffect';
-import { TrackedLight, RGBIP } from '../../../../types';
+import {  RGBIP } from '../../../../types';
 import { randomBetween } from '../../../../helpers/utils';
 
 var ltr = true;

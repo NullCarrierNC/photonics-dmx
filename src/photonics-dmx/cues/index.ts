@@ -1,6 +1,8 @@
-// Import all cue group initializations to ensure they run
+// Import all cue groups to ensure they are registered with the CueRegistry
 import './yarg';
-import './yarg/handlers/stagekit';
 
-// Export the registry for use by other modules
-export { CueRegistry } from './CueRegistry'; 
+// Export the main cue types and registry
+export { CueRegistry } from './CueRegistry';
+export * from './cueTypes';
+export * from './interfaces/ICue';
+export * from './interfaces/ICueGroup';
