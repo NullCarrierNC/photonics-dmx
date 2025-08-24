@@ -59,6 +59,11 @@ export class CueRegistry {
   private secondaryCueCounter: number = 0;
   private secondaryCueLimit: number = 50;
 
+  /** Cue consistency throttling to prevent rapid randomization changes */
+  private cueConsistencyWindow: number = 2000; // 2 seconds in milliseconds
+  private lastCueExecutionTime: Map<CueType, number> = new Map();
+  private lastCueGroupSelection: Map<CueType, { groupId: string; isFallback: boolean }> = new Map();
+
   /** Optional callback for sending cue state updates to frontend */
   private cueStateUpdateCallback: ((state: CueStateUpdate) => void) | null = null;
 
@@ -102,17 +107,25 @@ export class CueRegistry {
   }
 
   /**
-   * Reset the registry by clearing all groups.
-   * This should be called when switching between different cue sets (e.g. YARG to RB3).
+   * Reset the registry to its initial state.
    */
   public reset(): void {
-    this.groups.clear();
     this.enabledGroups.clear();
     this.activeGroups.clear();
     this.defaultGroup = null;
-
-    // Reset cue tracking state
-    this.resetCueSelectionState();
+    this.lastPrimaryCueName = null;
+    this.lastPrimaryCueGroup = null;
+    this.lastPrimaryIsFallback = false;
+    this.lastSecondaryCueName = null;
+    this.lastSecondaryCueGroup = null;
+    this.lastSecondaryIsFallback = false;
+    this.primaryCueCounter = 0;
+    this.secondaryCueCounter = 0;
+    
+    // Clear consistency tracking
+    this.clearConsistencyTracking();
+    
+    console.log('CueRegistry reset to initial state');
   }
 
   /**
@@ -158,6 +171,10 @@ export class CueRegistry {
    * Get a cue implementation with randomized selection for new cues.
    * For the first call to a primary/secondary cue (or after counter resets),
    * randomly selects from available groups. Subsequent calls use the same group.
+   * 
+   * Cue consistency throttling: If the same cue is called within the consistency window
+   * (default 2 seconds), it will use the same group selection as the previous call
+   * to prevent rapid randomization changes.
    * @param cueType The type of cue to get
    * @returns The cue implementation or null if not found
    */
@@ -178,12 +195,112 @@ export class CueRegistry {
   }
 
   /**
+   * Set the cue consistency window to prevent rapid randomization changes.
+   * @param windowMs The consistency window in milliseconds (default: 2000ms)
+   */
+  public setCueConsistencyWindow(windowMs: number): void {
+    this.cueConsistencyWindow = Math.max(0, windowMs);
+    console.log(`Cue consistency window set to ${this.cueConsistencyWindow}ms`);
+  }
+
+  /**
+   * Get the current cue consistency window setting.
+   * @returns The consistency window in milliseconds
+   */
+  public getCueConsistencyWindow(): number {
+    return this.cueConsistencyWindow;
+  }
+
+  /**
+   * Check if a cue should use consistent group selection based on the consistency window.
+   * @param cueType The type of cue to check
+   * @returns Object with group ID and fallback flag if consistency should be maintained, null otherwise
+   */
+  private shouldUseConsistentSelection(cueType: CueType): { groupId: string; isFallback: boolean } | null {
+    const now = Date.now();
+    const lastExecutionTime = this.lastCueExecutionTime.get(cueType);
+    const lastSelection = this.lastCueGroupSelection.get(cueType);
+
+  //  console.log(`[Consistency] Checking ${cueType}: lastExecution=${lastExecutionTime}, lastSelection=${lastSelection ? lastSelection.groupId : 'none'}, window=${this.cueConsistencyWindow}ms`);
+
+    // If we have a previous selection and it's within the consistency window, validate it's still available
+    if (lastExecutionTime && lastSelection && (now - lastExecutionTime) < this.cueConsistencyWindow) {
+      // Validate that the group still exists and has the cue implementation
+      const group = this.groups.get(lastSelection.groupId);
+      if (group && group.cues.has(cueType)) {
+        // Check if this is a fallback group - if so, ensure it's still valid as fallback
+        if (lastSelection.isFallback) {
+                  // For fallback groups, we need to ensure no active groups have this cue
+        // If an active group now has it, we should use that instead
+        const activeGroupHasCue = Array.from(this.activeGroups).some(groupId => {
+          const activeGroup = this.groups.get(groupId);
+          return activeGroup?.cues.has(cueType);
+        });
+        
+        if (activeGroupHasCue) {
+          // An active group now has this cue, so we shouldn't use the fallback
+    //      console.log(`[Consistency] Active group now has ${cueType}, clearing fallback consistency`);
+          this.clearCueConsistencyTracking(cueType);
+          return null;
+        } else {
+          // No active group has this cue, so the fallback is still valid
+     //     console.log(`[Consistency] No active group has ${cueType}, fallback is still valid`);
+        }
+        }
+        
+      //  console.log(`[Consistency] Using consistent selection for ${cueType} (${now - lastExecutionTime}ms since last execution)`);
+        // Update the execution time to prevent infinite loops
+        this.lastCueExecutionTime.set(cueType, now);
+        return lastSelection;
+      } else {
+        // The group or cue is no longer available, clear the tracking
+    //    console.log(`[Consistency] Group ${lastSelection.groupId} no longer available for ${cueType}, clearing tracking`);
+        this.clearCueConsistencyTracking(cueType);
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Record the execution of a cue for consistency tracking.
+   * @param cueType The type of cue that was executed
+   * @param selection The group selection that was used
+   */
+  private recordCueExecution(cueType: CueType, selection: { groupId: string; isFallback: boolean }): void {
+    const now = Date.now();
+    this.lastCueExecutionTime.set(cueType, now);
+    this.lastCueGroupSelection.set(cueType, selection);
+  //  console.log(`[Consistency] Recorded execution of ${cueType} with group ${selection.groupId} at ${now}`);
+  }
+
+  /**
    * Handle primary cue selection logic.
    * @param cueType The type of cue to get
    * @param preSelection Optional pre-selected group to avoid redundant selection
    * @returns The cue implementation or null if not found
    */
   private handlePrimaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }): ICue | null {
+    // Check consistency throttling first - if we should use the same selection as last time
+    const consistentSelection = this.shouldUseConsistentSelection(cueType);
+    if (consistentSelection) {
+      // Double-check that the group and cue are still available before using
+      const group = this.groups.get(consistentSelection.groupId);
+      const cue = group?.cues.get(cueType);
+      
+      if (group && cue) {
+        // Use the consistent selection and increment counter
+        this.primaryCueCounter++;
+        this.emitCueStateUpdate(cueType, consistentSelection.groupId, consistentSelection.isFallback, 'primary', this.primaryCueCounter, this.primaryCueLimit);
+        return cue;
+      } else {
+        // Something went wrong with the consistent selection, clear it and fall through to normal logic
+        console.warn(`[Consistency] Consistent selection validation failed for ${cueType}, falling back to normal selection`);
+        this.clearCueConsistencyTracking(cueType);
+      }
+    }
+
     const isNewCue = this.lastPrimaryCueName !== cueType;
     const shouldReset = this.primaryCueCounter >= this.primaryCueLimit;
 
@@ -197,6 +314,10 @@ export class CueRegistry {
         this.lastPrimaryCueGroup = selection.groupId;
         this.lastPrimaryIsFallback = selection.isFallback;
         this.primaryCueCounter++;
+        
+        // Record this execution for consistency tracking
+        this.recordCueExecution(cueType, selection);
+        
         this.emitCueStateUpdate(cueType, selection.groupId, this.lastPrimaryIsFallback, 'primary', this.primaryCueCounter, this.primaryCueLimit);
         return this.groups.get(selection.groupId)!.cues.get(cueType)!;
       }
@@ -207,7 +328,7 @@ export class CueRegistry {
         this.emitCueStateUpdate(cueType, this.lastPrimaryCueGroup, this.lastPrimaryIsFallback, 'primary', this.primaryCueCounter, this.primaryCueLimit);
         return this.groups.get(this.lastPrimaryCueGroup)!.cues.get(cueType)!;
       }
-        }
+    }
     
     return null;
   }
@@ -219,6 +340,25 @@ export class CueRegistry {
    * @returns The cue implementation or null if not found
    */
   private handleSecondaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }): ICue | null {
+    // Check consistency throttling first - if we should use the same selection as last time
+    const consistentSelection = this.shouldUseConsistentSelection(cueType);
+    if (consistentSelection) {
+      // Double-check that the group and cue are still available before using
+      const group = this.groups.get(consistentSelection.groupId);
+      const cue = group?.cues.get(cueType);
+      
+      if (group && cue) {
+        // Use the consistent selection and increment counter
+        this.secondaryCueCounter++;
+        this.emitCueStateUpdate(cueType, consistentSelection.groupId, consistentSelection.isFallback, 'secondary', this.secondaryCueCounter, this.secondaryCueLimit);
+        return cue;
+      } else {
+        // Something went wrong with the consistent selection, clear it and fall through to normal logic
+        console.warn(`[Consistency] Consistent selection validation failed for ${cueType}, falling back to normal selection`);
+        this.clearCueConsistencyTracking(cueType);
+      }
+    }
+
     const isNewCue = this.lastSecondaryCueName !== cueType;
     const shouldReset = this.secondaryCueCounter >= this.secondaryCueLimit;
 
@@ -232,6 +372,10 @@ export class CueRegistry {
         this.lastSecondaryCueGroup = selection.groupId;
         this.lastSecondaryIsFallback = selection.isFallback;
         this.secondaryCueCounter++;
+        
+        // Record this execution for consistency tracking
+        this.recordCueExecution(cueType, selection);
+        
         this.emitCueStateUpdate(cueType, selection.groupId, this.lastSecondaryIsFallback, 'secondary', this.secondaryCueCounter, this.secondaryCueLimit);
         return this.groups.get(selection.groupId)!.cues.get(cueType)!;
       }
@@ -242,7 +386,7 @@ export class CueRegistry {
         this.emitCueStateUpdate(cueType, this.lastSecondaryCueGroup, this.lastSecondaryIsFallback, 'secondary', this.secondaryCueCounter, this.secondaryCueLimit);
         return this.groups.get(this.lastSecondaryCueGroup)!.cues.get(cueType)!;
       }
-        }
+    }
     
     return null;
   }
@@ -254,7 +398,7 @@ export class CueRegistry {
    * 1. Randomly select from any ACTIVE group that has the requested cue
    * 2. If default is active, it's considered along with other active groups
    * 3. If default is NOT active, it's normally not considered
-   * 4. But if no active group has the cue, use default as fallback (even if not active)
+   * 4. But if no active group has the cue, use default as fallback (even if active)
    * @param cueType The type of cue to find
    * @returns Object with group ID and whether it's a fallback, or null if not found
    */
@@ -279,10 +423,8 @@ export class CueRegistry {
       };
     }
 
-    // Step 4: No active groups have it, try default as fallback (only if not already active)
-    if (this.defaultGroup &&
-      !this.activeGroups.has(this.defaultGroup) &&
-      this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
+    // Step 4: No active groups have it, try default as fallback (regardless of whether it's active)
+    if (this.defaultGroup && this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
       return {
         groupId: this.defaultGroup,
         isFallback: true
@@ -326,6 +468,10 @@ export class CueRegistry {
       if (this.activeGroups.has(groupId)) {
         this.activeGroups.delete(groupId);
       }
+      
+      // Clear any consistency tracking for this group
+      this.clearGroupConsistencyTracking(groupId);
+      
       return true;
     }
     return false;
@@ -377,17 +523,62 @@ export class CueRegistry {
   }
 
   /**
-   * Set which groups are currently active.
-   * Only enabled groups can be set as active.
-   * @param groupIds The IDs of the groups to activate
+   * Set the active groups for cue selection.
+   * @param groupIds Array of group IDs to set as active
    */
   public setActiveGroups(groupIds: string[]): void {
+    // Clear consistency tracking when active groups change
+    this.clearConsistencyTracking();
+    
     this.activeGroups.clear();
-    for (const id of groupIds) {
-      if (this.groups.has(id) && this.enabledGroups.has(id)) {
-        this.activeGroups.add(id);
+    for (const groupId of groupIds) {
+      if (this.enabledGroups.has(groupId)) {
+        this.activeGroups.add(groupId);
+      } else {
+        console.warn(`Cannot activate group '${groupId}': group not enabled`);
       }
     }
+    console.log(`Active groups set to: ${Array.from(this.activeGroups)}`);
+  }
+
+  /**
+   * Clear all consistency tracking data.
+   * This should be called when active groups change or when a reset is needed.
+   */
+  public clearConsistencyTracking(): void {
+    this.lastCueExecutionTime.clear();
+    this.lastCueGroupSelection.clear();
+  //  console.log('[Consistency] Cleared all consistency tracking data');
+  }
+
+  /**
+   * Clear consistency tracking for a specific cue type.
+   * @param cueType The type of cue to clear tracking for
+   */
+  public clearCueConsistencyTracking(cueType: CueType): void {
+    this.lastCueExecutionTime.delete(cueType);
+    this.lastCueGroupSelection.delete(cueType);
+  //  console.log(`[Consistency] Cleared tracking for cue: ${cueType}`);
+  }
+
+  /**
+   * Clear consistency tracking for a specific group.
+   * This should be called when a group is disabled or removed.
+   * @param groupId The ID of the group to clear tracking for
+   */
+  public clearGroupConsistencyTracking(groupId: string): void {
+    let clearedCount = 0;
+    
+    // Find all cues that were tracked for this group and clear them
+    for (const [cueType, selection] of this.lastCueGroupSelection.entries()) {
+      if (selection.groupId === groupId) {
+        this.lastCueExecutionTime.delete(cueType);
+        this.lastCueGroupSelection.delete(cueType);
+        clearedCount++;
+      }
+    }
+    
+    
   }
 
   /**
@@ -505,6 +696,91 @@ export class CueRegistry {
       activeGroupsWithCue,
       allGroupsWithCue,
       defaultHasCue
+    };
+  }
+
+  /**
+   * Get the current state of a specific cue.
+   * @param cueType The type of cue to get state for
+   * @returns The cue state or null if not found
+   */
+  public getCueState(cueType: CueType): CueStateUpdate | null {
+    // Check if this is a primary or secondary cue by getting a temporary implementation
+    const tempSelection = this.getRandomCueFromActiveGroups(cueType);
+    if (!tempSelection) {
+      return null;
+    }
+
+    const tempCue = this.groups.get(tempSelection.groupId)!.cues.get(cueType)!;
+    const isPrimary = tempCue.style === CueStyle.Primary;
+
+    if (isPrimary) {
+      if (this.lastPrimaryCueName === cueType) {
+        return {
+          cueType,
+          groupId: this.lastPrimaryCueGroup!,
+          isFallback: this.lastPrimaryIsFallback,
+          cueStyle: 'primary',
+          counter: this.primaryCueCounter,
+          limit: this.primaryCueLimit
+        };
+      }
+    } else {
+      if (this.lastSecondaryCueName === cueType) {
+        return {
+          cueType,
+          groupId: this.lastSecondaryCueGroup!,
+          isFallback: this.lastSecondaryIsFallback,
+          cueStyle: 'secondary',
+          counter: this.secondaryCueCounter,
+          limit: this.secondaryCueLimit
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get the current consistency status for debugging and monitoring.
+   * @returns Object containing consistency tracking information
+   */
+  public getConsistencyStatus(): {
+    windowMs: number;
+    trackedCues: Array<{
+      cueType: CueType;
+      lastExecutionTime: number;
+      lastGroupId: string;
+      timeSinceLastExecution: number;
+      isWithinWindow: boolean;
+    }>;
+  } {
+    const now = Date.now();
+    const trackedCues: Array<{
+      cueType: CueType;
+      lastExecutionTime: number;
+      lastGroupId: string;
+      timeSinceLastExecution: number;
+      isWithinWindow: boolean;
+    }> = [];
+
+    for (const [cueType, executionTime] of this.lastCueExecutionTime.entries()) {
+      const lastSelection = this.lastCueGroupSelection.get(cueType);
+      if (lastSelection) {
+        const timeSinceLastExecution = now - executionTime;
+        trackedCues.push({
+          cueType,
+          lastExecutionTime: executionTime,
+          lastGroupId: lastSelection.groupId,
+          timeSinceLastExecution,
+          isWithinWindow: timeSinceLastExecution < this.cueConsistencyWindow,
+        });
+      }
+    }
+
+    return {
+      windowMs: this.cueConsistencyWindow,
+      trackedCues,
     };
   }
 } 

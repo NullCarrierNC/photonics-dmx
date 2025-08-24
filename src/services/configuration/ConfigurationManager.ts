@@ -22,7 +22,8 @@ export interface AppPreferences {
     high: number;
     max: number;
   };
-  enabledCueGroups: string[]; 
+  enabledCueGroups: string[];
+  cueConsistencyWindow: number;
 }
 
 /**
@@ -39,6 +40,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
   enabledCueGroups: ['default', 'coolWarmAlt1', 'coolWarmAlt2'],
+  cueConsistencyWindow: 2000,
 };
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {
@@ -149,6 +151,20 @@ export class ConfigurationManager {
    */
   setEnabledCueGroups(groupIds: string[]): void {
     this.setPreference('enabledCueGroups', groupIds);
+  }
+
+  /**
+   * Gets the cue consistency window preference
+   */
+  getCueConsistencyWindow(): number {
+    return this.preferences.get().cueConsistencyWindow;
+  }
+
+  /**
+   * Sets the cue consistency window preference
+   */
+  setCueConsistencyWindow(windowMs: number): void {
+    this.setPreference('cueConsistencyWindow', windowMs);
   }
 
   // User Lights Methods

@@ -87,6 +87,7 @@ class YargCueHandler extends BaseCueHandler {
 
     // Get implementation from registry
     const cue = this.registry.getCueImplementation(cueType);
+  
     if (cue) {
       // Always check for cue transitions first
       if (this.currentExecutingCueType !== cueType) {
@@ -123,8 +124,7 @@ class YargCueHandler extends BaseCueHandler {
    * Handle keyframe navigation
    */
   public handleKeyframe(): void {
-    // TODO: Implement keyframe handling
-    console.warn('Keyframe handling not implemented');
+    this._sequencer.onKeyframe();
   }
 
   protected async handleCueBigRockEnding(parameters: CueData): Promise<void> {

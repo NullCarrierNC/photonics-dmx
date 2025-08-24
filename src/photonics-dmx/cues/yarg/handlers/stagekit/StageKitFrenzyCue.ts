@@ -1,0 +1,34 @@
+import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { CueData, CueType } from '../../../cueTypes';
+import { ILightingController } from '../../../../controllers/sequencer/interfaces';
+import { DmxLightManager } from '../../../../controllers/DmxLightManager';
+
+/**
+ * StageKit Frenzy Cue - Fast, chaotic lighting patterns
+ * Venue-dependent frenzy patterns
+ */
+export class StageKitFrenzyCue implements ICue {
+  id = 'stagekit-frenzy';
+  cueId = CueType.Frenzy
+  description = 'StageKit frenzy pattern - stub implementation';
+  style = CueStyle.Primary;
+
+  async execute(_cueData: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
+    // TODO: Implement frenzy pattern
+    // - Large venue: Red, blue, yellow patterns
+    // - Small venue: Red, green, blue patterns
+    console.log('StageKitFrenzyCue: Fast chaotic patterns (stub)');
+  }
+
+  onStop(): void {
+    
+  }
+
+  onPause(): void {
+   
+  }
+
+  onDestroy(): void {
+   
+  }
+} 

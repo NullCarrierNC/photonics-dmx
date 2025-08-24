@@ -3,32 +3,32 @@ import { CueType } from '../../cueTypes';
 import { ICueGroup } from '../../interfaces/ICueGroup';
 
 // Import default group cues
-import { DefaultCue } from '../default/DefaultCue';
-import { DischordCue } from '../default/DischordCue';
-import { ChorusCue } from '../default/ChorusCue';
-import { CoolManualCue } from '../default/CoolManualCue';
-import { StompCue } from '../default/StompCue';
-import { VerseCue } from '../default/VerseCue';
-import { WarmManualCue } from '../default/WarmManualCue';
-import { BigRockEndingCue } from '../default/BigRockEndingCue';
-import { CoolAutomaticCue } from '../default/CoolAutomaticCue';
-import { FlareFastCue } from '../default/FlareFastCue';
-import { FlareSlowCue } from '../default/FlareSlowCue';
-import { FrenzyCue } from '../default/FrenzyCue';
-import { IntroCue } from '../default/IntroCue';
-import { HarmonyCue } from '../default/HarmonyCue';
-import { SilhouettesCue } from '../default/SilhouettesCue';
-import { SilhouettesSpotlightCue } from '../default/SilhouettesSpotlightCue';
-import { SweepCue } from '../default/SweepCue';
-import { WarmAutomaticCue } from '../default/WarmAutomaticCue';
-import { ScoreCue } from '../default/ScoreCue';
-import { StrobeFastCue } from '../default/StrobeFastCue';
-import { StrobeFastestCue } from '../default/StrobeFastestCue';
-import { StrobeMediumCue } from '../default/StrobeMediumCue';
-import { StrobeOffCue } from '../default/StrobeOffCue';
-import { StrobeSlowCue } from '../default/StrobeSlowCue';
-import { MenuCue } from '../default/MenuCue';
-import { SearchlightsCue } from '../default/SearchlightsCue';
+import { DefaultCue } from '../handlers/default/DefaultCue';
+import { DischordCue } from '../handlers/default/DischordCue';
+import { ChorusCue } from '../handlers/default/ChorusCue';
+import { CoolManualCue } from '../handlers/default/CoolManualCue';
+import { StompCue } from '../handlers/default/StompCue';
+import { VerseCue } from '../handlers/default/VerseCue';
+import { WarmManualCue } from '../handlers/default/WarmManualCue';
+import { BigRockEndingCue } from '../handlers/default/BigRockEndingCue';
+import { CoolAutomaticCue } from '../handlers/default/CoolAutomaticCue';
+import { FlareFastCue } from '../handlers/default/FlareFastCue';
+import { FlareSlowCue } from '../handlers/default/FlareSlowCue';
+import { FrenzyCue } from '../handlers/default/FrenzyCue';
+import { IntroCue } from '../handlers/default/IntroCue';
+import { HarmonyCue } from '../handlers/default/HarmonyCue';
+import { SilhouettesCue } from '../handlers/default/SilhouettesCue';
+import { SilhouettesSpotlightCue } from '../handlers/default/SilhouettesSpotlightCue';
+import { SweepCue } from '../handlers/default/SweepCue';
+import { WarmAutomaticCue } from '../handlers/default/WarmAutomaticCue';
+import { ScoreCue } from '../handlers/default/ScoreCue';
+import { StrobeFastCue } from '../handlers/default/StrobeFastCue';
+import { StrobeFastestCue } from '../handlers/default/StrobeFastestCue';
+import { StrobeMediumCue } from '../handlers/default/StrobeMediumCue';
+import { StrobeOffCue } from '../handlers/default/StrobeOffCue';
+import { StrobeSlowCue } from '../handlers/default/StrobeSlowCue';
+import { MenuCue } from '../handlers/default/MenuCue';
+import { SearchlightsCue } from '../handlers/default/SearchlightsCue';
 
 /**
  * Create and register the default cue group.

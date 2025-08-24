@@ -113,6 +113,11 @@ export class ControllerManager {
       registry.setEnabledGroups(allGroups);
       console.log('CueRegistry initialized with all groups (no preference set):', allGroups);
     }
+    
+    // Load cue consistency window from configuration
+    const consistencyWindow = this.config.getCueConsistencyWindow();
+    registry.setCueConsistencyWindow(consistencyWindow);
+    console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms');
   }
   
   /**
@@ -330,8 +335,20 @@ export class ControllerManager {
   /**
    * Disable YARG listener
    */
-  public disableYarg(): void {
+  public async disableYarg(): Promise<void> {
     if (!this.isYargEnabled) return;
+    
+    // Clear all running effects before shutting down
+    if (this.effectsController) {
+      try {
+        this.effectsController.removeAllEffects();
+        // Use blackout to properly fade out all lights
+        await this.effectsController.blackout(500); // 500ms fade out
+        console.log('ControllerManager: Cleared all running effects and initiated blackout when disabling YARG');
+      } catch (error) {
+        console.error('Error clearing effects when disabling YARG:', error);
+      }
+    }
     
     if (this.yargListener) {
       this.yargListener.shutdown();
@@ -349,7 +366,7 @@ export class ControllerManager {
   /**
    * Enable Rb3 listener
    */
-  public enableRb3(): void {
+  public async enableRb3(): Promise<void> {
     // Check if the system is initialized, initialize if needed
     if (!this.isInitialized) {
       console.log("Initializing system before enabling RB3");
@@ -362,13 +379,13 @@ export class ControllerManager {
       return;
     }
     
-    this.enableRb3Internal();
+    await this.enableRb3Internal();
   }
   
   /**
    * Internal method to enable RB3 without initialization checks
    */
-  private enableRb3Internal(): void {
+  private async enableRb3Internal(): Promise<void> {
     if (this.isRb3Enabled || !this.effectsController || !this.dmxLightManager) {
       console.log("Cannot enable RB3: already enabled or missing required components");
       return;
@@ -376,7 +393,7 @@ export class ControllerManager {
     
     // Disable YARG if it's enabled
     if (this.isYargEnabled) {
-      this.disableYarg();
+      await this.disableYarg();
     }
     
     // Shutdown existing cue handler to trigger lifecycle methods
@@ -421,8 +438,20 @@ export class ControllerManager {
   /**
    * Disable Rb3 listener
    */
-  public disableRb3(): void {
+  public async disableRb3(): Promise<void> {
     if (!this.isRb3Enabled) return;
+    
+    // Clear all running effects before shutting down
+    if (this.effectsController) {
+      try {
+        this.effectsController.removeAllEffects();
+        // Use blackout to properly fade out all lights
+        await this.effectsController.blackout(500); // 500ms fade out
+        console.log('ControllerManager: Cleared all running effects and initiated blackout when disabling RB3');
+      } catch (error) {
+        console.error('Error clearing effects when disabling RB3:', error);
+      }
+    }
     
     if (this.rb3eListener) {
       this.rb3eListener.shutdown();
@@ -447,7 +476,7 @@ export class ControllerManager {
    * Switch RB3 processing mode between direct and cue-based
    * @param mode The new processing mode ('direct' or 'cueBased')
    */
-  public switchRb3Mode(mode: 'direct' | 'cueBased'): void {
+  public async switchRb3Mode(mode: 'direct' | 'cueBased'): Promise<void> {
     if (!this.isRb3Enabled || !this.processorManager) {
       console.log("Cannot switch RB3 mode: RB3 not enabled or processor manager not available");
       return;
@@ -488,14 +517,14 @@ export class ControllerManager {
 
       // Shutdown in reverse order of initialization
       try {
-        this.disableYarg();
+        await this.disableYarg();
         console.log("ControllerManager shutdown: YARG disabled");
       } catch (err) {
         console.error("Error disabling YARG:", err);
       }
       
       try {
-        this.disableRb3();
+        await this.disableRb3();
         console.log("ControllerManager shutdown: RB3 disabled");
       } catch (err) {
         console.error("Error disabling RB3:", err);
@@ -599,11 +628,11 @@ export class ControllerManager {
     try {
       // First disable any active listeners
       if (this.isYargEnabled) {
-        this.disableYarg();
+        await this.disableYarg();
       }
       
       if (this.isRb3Enabled) {
-        this.disableRb3();
+        await this.disableRb3();
       }
       
       // Then shutdown other components

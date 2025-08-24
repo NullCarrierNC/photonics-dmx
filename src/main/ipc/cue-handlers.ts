@@ -14,21 +14,49 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
     controllerManager.enableYarg();
   });
 
-  ipcMain.on('yarg-listener-disabled', () => {
-    controllerManager.disableYarg();
+  ipcMain.on('yarg-listener-disabled', async () => {
+    await controllerManager.disableYarg();
   });
 
   ipcMain.on('rb3e-listener-enabled', () => {
     controllerManager.enableRb3();
   });
 
-  ipcMain.on('rb3e-listener-disabled', () => {
-    controllerManager.disableRb3();
+  ipcMain.on('rb3e-listener-disabled', async () => {
+    await controllerManager.disableRb3();
+  });
+
+  // Disable YARG
+  ipcMain.handle('disable-yarg', async () => {
+    try {
+      await controllerManager.disableYarg();
+      return { success: true };
+    } catch (error) {
+      console.error('Error disabling YARG:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  });
+
+  // Disable RB3
+  ipcMain.handle('disable-rb3', async () => {
+    try {
+      await controllerManager.disableRb3();
+      return { success: true };
+    } catch (error) {
+      console.error('Error disabling RB3:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
   });
 
   // RB3 mode switching
-  ipcMain.on('rb3e-switch-mode', (_, mode: 'direct' | 'cueBased') => {
-    controllerManager.switchRb3Mode(mode);
+  ipcMain.on('rb3e-switch-mode', async (_, mode: 'direct' | 'cueBased') => {
+    await controllerManager.switchRb3Mode(mode);
   });
 
   // Get RB3 current mode

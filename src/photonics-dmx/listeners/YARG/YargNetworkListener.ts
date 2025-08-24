@@ -290,7 +290,8 @@ export class YargNetworkListener extends EventEmitter {
         1 + // Performer
         1 + // Beat
         1 + // Keyframe
-        1; // Bonus Effect
+        1 + // Bonus Effect
+        1; // AutoGen Track
 
       if (buffer.length < expectedLength) {
         console.warn(`Received packet is too short: ${buffer.length} bytes`);
@@ -330,6 +331,10 @@ export class YargNetworkListener extends EventEmitter {
       const keyframeValue = buffer.readUInt8(offset); offset += 1;
       const bonusEffect = buffer.readUInt8(offset) === 1;
       offset += 1;
+      
+      // AutoGen track field (byte 24)
+      const autoGenTrack = buffer.readUInt8(offset) === 1;
+      offset += 1;
 
       const lightingCue = lightingCueMap[lightingCueValue] || `Unknown (${lightingCueValue})`;
 
@@ -354,11 +359,12 @@ export class YargNetworkListener extends EventEmitter {
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
         performer,
+        autoGenTrack,
         beat: this.getBeatDescription(beatValue),
         keyframe: this.getKeyframeDescription(keyframeValue),
         bonusEffect,
       };
-
+//console.log("Keyframe:", YargCueData.keyframe);
       // Change Detection: Compare with lastData (excluding timestamp)
       if (this.lastData && this.isDataEqual(this.lastData, YargCueData)) {
         // console.log("Received identical packet, skipping processing.");
@@ -404,6 +410,15 @@ export class YargNetworkListener extends EventEmitter {
           break;
       }
 
+      // Handle keyframe events
+      switch (YargCueData.keyframe) {
+        case "First":
+        case "Next":
+        case "Previous":
+          this.cueHandler.handleKeyframe();
+          break;
+      }
+
       // Handle known lighting cue by emitting an event
       const cueType = lightingCue; //lightingCueMap[lightingCueValue];
       if (cueType) {
@@ -411,6 +426,30 @@ export class YargNetworkListener extends EventEmitter {
         this.cueHandler.handleCue(cueType, YargCueData)
       } else {
         console.warn(`Unknown lighting cue value received: ${lightingCue}`);
+      }
+
+      // Handle strobe state changes
+      if (YargCueData.strobeState && YargCueData.strobeState !== "Strobe_Off") {
+        console.log(`[YARG] Strobe state change: ${YargCueData.strobeState}`);
+        // Convert strobe state to cue type and handle it
+        let strobeCueType: CueType;
+        switch (YargCueData.strobeState) {
+          case "Strobe_Slow":
+            strobeCueType = CueType.Strobe_Slow;
+            break;
+          case "Strobe_Medium":
+            strobeCueType = CueType.Strobe_Medium;
+            break;
+          case "Strobe_Fast":
+            strobeCueType = CueType.Strobe_Fast;
+            break;
+          case "Strobe_Fastest":
+            strobeCueType = CueType.Strobe_Fastest;
+            break;
+          default:
+            return; // Unknown strobe state
+        }
+        this.cueHandler.handleCue(strobeCueType, YargCueData);
       }
 
       
