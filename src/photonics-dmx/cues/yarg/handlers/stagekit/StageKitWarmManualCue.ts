@@ -15,6 +15,9 @@ export class StageKitWarmManualCue implements ICue {
   description = 'StageKit Warm Manual - 2x red, 1x yellow. Red animating clockwise, yellow animating counter-clockwise';
   style = CueStyle.Primary;
 
+  // Track whether this is the first execution or a repeat
+  private isFirstExecution: boolean = true;
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
     const redColor = getColor('red', 'medium');
@@ -276,11 +279,21 @@ export class StageKitWarmManualCue implements ICue {
     };
     
     // Add both effects to the sequencer
-    sequencer.addEffect('warm-manual-red', redEffect);
-    sequencer.addEffect('warm-manual-yellow', yellowEffect);
+    if (this.isFirstExecution) {
+      // First time: use setEffect to clear any existing effects and start fresh
+      await sequencer.setEffect('warm-manual-red', redEffect);
+      await sequencer.addEffect('warm-manual-yellow', yellowEffect);
+      this.isFirstExecution = false;
+    } else {
+      // Repeat call: use addEffect to add to existing effects
+      sequencer.addEffect('warm-manual-red', redEffect);
+      sequencer.addEffect('warm-manual-yellow', yellowEffect);
+    }
   }
 
   onStop(): void {
+    // Reset the first execution flag so next time this cue runs it will use setEffect
+    this.isFirstExecution = true;
     // Cleanup handled by effect system
   }
 
