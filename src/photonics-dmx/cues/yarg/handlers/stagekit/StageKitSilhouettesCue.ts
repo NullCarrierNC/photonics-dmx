@@ -41,7 +41,7 @@ export class StageKitSilhouettesCue implements ICue {
       transitions: transitions
     };
     
-    await controller.setEffect('stagekit-silhouettes', silhouettesEffect, 0, false); // Not persistent
+    await controller.setEffect('stagekit-silhouettes', silhouettesEffect);
   }
 
   onStop(): void {

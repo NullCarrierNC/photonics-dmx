@@ -2,6 +2,7 @@ import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
+import { Sequencer } from '../../../../controllers/sequencer/Sequencer';
 
 /**
  * StageKit Silhouettes Spotlight Cue - Silhouette spotlight with vocal interaction
@@ -12,11 +13,8 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
   description = 'StageKit silhouettesspotlight pattern - stub implementation';
   style = CueStyle.Primary;
 
-  async execute(_cueData: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
-    // TODO: Implement silhouettes spotlight pattern
-    // - Dynamic effect with vocal interaction
-    // - Behavior based on previous cues
-    console.log('StageKitSilhouettesSpotlightCue: Silhouette spotlight effect (stub)');
+  async execute(_cueData: CueData, sequencer: ILightingController, _lightManager: DmxLightManager): Promise<void> {
+    sequencer.blackout(0);
   }
 
   onStop(): void {

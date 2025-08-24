@@ -115,7 +115,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
           style={{ width: '200px' }}
         >
           <option value="YARG">YARG</option>
-          <option value="RB3E" disabled>RB3E (Coming Soon)</option>
+          <option value="RB3E" disabled>RB3E (Uses direct)</option>
         </select>
       </div>
 

@@ -19,6 +19,8 @@ import { StageKitFlareFastCue } from '../handlers/stagekit/StageKitFlareFastCue'
 import { StageKitFlareSlowCue } from '../handlers/stagekit/StageKitFlareSlowCue';
 import { StageKitWarmManualCue } from '../handlers/stagekit/StageKitWarmManualCue';
 import { StageKitCoolAutoCue } from '../handlers/stagekit/StageKitCoolAutoCue';
+import { StageKitCoolManualCue } from '../handlers/stagekit/StageKitCoolManualCue';
+import { StageKitWarmAutoCue } from '../handlers/stagekit/StageKitWarmAutoCue';
 
 
 /**
@@ -35,7 +37,9 @@ const stagekitGroup: ICueGroup = {
     [CueType.Menu, new StageKitMenuCue()],
     [CueType.Score, new StageKitScoreCue()],
     [CueType.Warm_Manual, new StageKitWarmManualCue()],
+    [CueType.Cool_Manual, new StageKitCoolManualCue()],
     [CueType.Cool_Automatic, new StageKitCoolAutoCue()],
+    [CueType.Warm_Automatic, new StageKitWarmAutoCue()],
     [CueType.Default, new StageKitDefaultCue()],
     [CueType.Stomp, new StageKitStompCue()],
     [CueType.Dischord, new StageKitDischordCue()],
