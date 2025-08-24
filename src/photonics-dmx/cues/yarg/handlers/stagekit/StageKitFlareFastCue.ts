@@ -24,7 +24,7 @@ export class StageKitFlareFastCue implements ICue {
       waitFor: 'none',
       forTime: 0,
       color: blueColor,
-      duration: 1000,
+      duration: 100,
       waitUntil: 'none',
       untilTime: 0,
     });

@@ -91,11 +91,20 @@ const NetworkDebug = () => {
     return (
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontFamily: 'Courier New, monospace', fontSize: '0.8rem' }}>
         {Object.entries(data).map(([key, value]) => {
-          // Join array values into a comma-separated string.
-          const displayValue = Array.isArray(value) ? value.join(', ') : value;
-          // Bold and style lightingCue and strobeState.
-          if (key === 'lightingCue' || key === 'strobeState' || key == 'beat' || key == 'songSection' 
-            || key == 'beatsPerMinute' || key == 'pauseState' || key == 'venueSize') {
+          // Handle different value types for better display
+          let displayValue: string;
+          if (Array.isArray(value)) {
+            displayValue = value.join(', ');
+          } else if (typeof value === 'boolean') {
+            // Format boolean values with better styling
+            displayValue = value ? 'true' : 'false';
+          } else {
+            displayValue = String(value);
+          }
+
+          // Bold and style important fields
+          if (key === 'lightingCue' || key === 'strobeState' || key === 'beat' || key === 'songSection' 
+            || key === 'beatsPerMinute' || key === 'pauseState' || key === 'venueSize') {
             return (
               <li key={key}>
                 <strong>{key}:</strong>{' '}
@@ -105,6 +114,23 @@ const NetworkDebug = () => {
               </li>
             );
           }
+          
+          // Special styling for boolean fields
+          if (key === 'autoGenTrack') {
+            return (
+              <li key={key}>
+                <strong>{key}:</strong>{' '}
+                <span style={{ 
+                  fontFamily: 'Courier New, monospace',
+                  color: value ? '#10b981' : '#ef4444', // Green for true, red for false
+                  fontWeight: 'bold'
+                }}>
+                  {displayValue}
+                </span>
+              </li>
+            );
+          }
+          
           return (
             <li key={key}>
               {key}: {displayValue}

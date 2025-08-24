@@ -290,7 +290,8 @@ export class YargNetworkListener extends EventEmitter {
         1 + // Performer
         1 + // Beat
         1 + // Keyframe
-        1; // Bonus Effect
+        1 + // Bonus Effect
+        1; // AutoGen Track
 
       if (buffer.length < expectedLength) {
         console.warn(`Received packet is too short: ${buffer.length} bytes`);
@@ -330,6 +331,10 @@ export class YargNetworkListener extends EventEmitter {
       const keyframeValue = buffer.readUInt8(offset); offset += 1;
       const bonusEffect = buffer.readUInt8(offset) === 1;
       offset += 1;
+      
+      // AutoGen track field (byte 24)
+      const autoGenTrack = buffer.readUInt8(offset) === 1;
+      offset += 1;
 
       const lightingCue = lightingCueMap[lightingCueValue] || `Unknown (${lightingCueValue})`;
 
@@ -354,11 +359,12 @@ export class YargNetworkListener extends EventEmitter {
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
         performer,
+        autoGenTrack,
         beat: this.getBeatDescription(beatValue),
         keyframe: this.getKeyframeDescription(keyframeValue),
         bonusEffect,
       };
-
+//console.log("Keyframe:", YargCueData.keyframe);
       // Change Detection: Compare with lastData (excluding timestamp)
       if (this.lastData && this.isDataEqual(this.lastData, YargCueData)) {
         // console.log("Received identical packet, skipping processing.");

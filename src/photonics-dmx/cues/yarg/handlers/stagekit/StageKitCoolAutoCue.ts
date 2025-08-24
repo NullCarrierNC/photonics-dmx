@@ -21,10 +21,10 @@ export class StageKitCoolAutoCue implements ICue {
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
     const blueColor = getColor('blue', 'medium');
-    const greenColor = getColor('green', 'max');
-    greenColor.ip = 128; //Semi-transparent so we can blend with blue
+    const greenColor = getColor('green', 'medium');
+    greenColor.gp = 128; //Semi-transparent so we can blend with blue
 
-    const blackColor = getColor('black', 'medium');
+    //const blackColor = getColor('black', 'medium');
     const transparentColor = getColor('transparent', 'medium');
     
     // Calculate number of light pairs and steps
@@ -45,7 +45,7 @@ export class StageKitCoolAutoCue implements ICue {
         // Calculate when this pair should be active
         const stepsUntilActive = pairIndex;
         
-        // Add transparent transitions before red (to wait for the right keyframe)
+        // Add transparent transitions before red (to wait for the right beat)
         for (let i = 0; i < stepsUntilActive; i++) {
             // Light 1 transparent
             redTransitions.push({
@@ -54,11 +54,11 @@ export class StageKitCoolAutoCue implements ICue {
                 waitFor: 'none',
                 forTime: 0,
                 transform: {
-                    color: blackColor,
+                    color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
+                waitUntil: 'beat',
                 untilTime: 0
             });
             
@@ -69,11 +69,11 @@ export class StageKitCoolAutoCue implements ICue {
                 waitFor: 'none',
                 forTime: 0,
                 transform: {
-                    color: blackColor,
+                    color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
+                waitUntil: 'beat',
                 untilTime: 0
             });
         }
@@ -89,7 +89,7 @@ export class StageKitCoolAutoCue implements ICue {
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'keyframe',
+            waitUntil: 'beat',
             untilTime: 0
         });
         
@@ -103,7 +103,7 @@ export class StageKitCoolAutoCue implements ICue {
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'keyframe',
+            waitUntil: 'beat',
             untilTime: 0
         });
         
@@ -117,11 +117,11 @@ export class StageKitCoolAutoCue implements ICue {
                 waitFor: 'none',
                 forTime: 0,
                 transform: {
-                    color: blackColor,
+                    color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
+                waitUntil: 'beat',
                 untilTime: 0
             });
             
@@ -132,11 +132,11 @@ export class StageKitCoolAutoCue implements ICue {
                 waitFor: 'none',
                 forTime: 0,
                 transform: {
-                    color: blackColor,
+                    color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
+                waitUntil: 'beat',
                 untilTime: 0
             });
         }
@@ -149,7 +149,7 @@ export class StageKitCoolAutoCue implements ICue {
         // Center light follows pair 0 timing
         const stepsUntilActive = 0;
         
-        // Add transparent transitions before red (to wait for the right keyframe)
+        // Add transparent transitions before red (to wait for the right beat)
         for (let i = 0; i < stepsUntilActive; i++) {
             redTransitions.push({
                 lights: [centerLight],
@@ -157,11 +157,11 @@ export class StageKitCoolAutoCue implements ICue {
                 waitFor: 'none',
                 forTime: 0,
                 transform: {
-                    color: blackColor,
+                    color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
+                waitUntil: 'beat',
                 untilTime: 0
             });
         }
@@ -177,7 +177,7 @@ export class StageKitCoolAutoCue implements ICue {
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'keyframe',
+            waitUntil: 'beat',
             untilTime: 0
         });
         
@@ -190,11 +190,11 @@ export class StageKitCoolAutoCue implements ICue {
                 waitFor: 'none',
                 forTime: 0,
                 transform: {
-                    color: blackColor,
+                    color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
+                waitUntil: 'beat',
                 untilTime: 0
             });
         }
@@ -213,7 +213,7 @@ export class StageKitCoolAutoCue implements ICue {
         const yellowStartIndex = Math.floor(allLights.length / 4);
         const stepsUntilYellow = (yellowStartIndex - lightIndex + allLights.length) % allLights.length;
         
-        // Add transparent transitions before yellow (to wait for the right keyframe)
+        // Add transparent transitions before yellow (to wait for the right beat)
         for (let i = 0; i < stepsUntilYellow; i++) {
             yellowTransitions.push({
                 lights: [light],
@@ -225,7 +225,7 @@ export class StageKitCoolAutoCue implements ICue {
                     easing: 'linear',
                     duration: 0,
                 },
-                waitUntil: 'keyframe',
+                waitUntil: 'beat',
                 untilTime: 0
             });
         }
@@ -241,7 +241,7 @@ export class StageKitCoolAutoCue implements ICue {
                 easing: 'linear',
                 duration: 0,
             },
-            waitUntil: 'keyframe',
+            waitUntil: 'beat',
             untilTime: 0
         });
         
@@ -258,7 +258,7 @@ export class StageKitCoolAutoCue implements ICue {
                     easing: 'linear',
                     duration: 0,
                 },
-                waitUntil: 'keyframe',
+                waitUntil: 'beat',
                 untilTime: 0
             });
         }
