@@ -221,6 +221,8 @@ export class CueRegistry {
     const lastExecutionTime = this.lastCueExecutionTime.get(cueType);
     const lastSelection = this.lastCueGroupSelection.get(cueType);
 
+    console.log(`[Consistency] Checking ${cueType}: lastExecution=${lastExecutionTime}, lastSelection=${lastSelection ? lastSelection.groupId : 'none'}, window=${this.cueConsistencyWindow}ms`);
+
     // If we have a previous selection and it's within the consistency window, validate it's still available
     if (lastExecutionTime && lastSelection && (now - lastExecutionTime) < this.cueConsistencyWindow) {
       // Validate that the group still exists and has the cue implementation
@@ -228,19 +230,22 @@ export class CueRegistry {
       if (group && group.cues.has(cueType)) {
         // Check if this is a fallback group - if so, ensure it's still valid as fallback
         if (lastSelection.isFallback) {
-          // For fallback groups, we need to ensure no active groups have this cue
-          // If an active group now has it, we should use that instead
-          const activeGroupHasCue = Array.from(this.activeGroups).some(groupId => {
-            const activeGroup = this.groups.get(groupId);
-            return activeGroup?.cues.has(cueType);
-          });
-          
-          if (activeGroupHasCue) {
-            // An active group now has this cue, so we shouldn't use the fallback
-            console.log(`[Consistency] Active group now has ${cueType}, clearing fallback consistency`);
-            this.clearCueConsistencyTracking(cueType);
-            return null;
-          }
+                  // For fallback groups, we need to ensure no active groups have this cue
+        // If an active group now has it, we should use that instead
+        const activeGroupHasCue = Array.from(this.activeGroups).some(groupId => {
+          const activeGroup = this.groups.get(groupId);
+          return activeGroup?.cues.has(cueType);
+        });
+        
+        if (activeGroupHasCue) {
+          // An active group now has this cue, so we shouldn't use the fallback
+          console.log(`[Consistency] Active group now has ${cueType}, clearing fallback consistency`);
+          this.clearCueConsistencyTracking(cueType);
+          return null;
+        } else {
+          // No active group has this cue, so the fallback is still valid
+          console.log(`[Consistency] No active group has ${cueType}, fallback is still valid`);
+        }
         }
         
       //  console.log(`[Consistency] Using consistent selection for ${cueType} (${now - lastExecutionTime}ms since last execution)`);

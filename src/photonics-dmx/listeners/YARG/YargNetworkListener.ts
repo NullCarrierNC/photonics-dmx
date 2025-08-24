@@ -404,6 +404,15 @@ export class YargNetworkListener extends EventEmitter {
           break;
       }
 
+      // Handle keyframe events
+      switch (YargCueData.keyframe) {
+        case "First":
+        case "Next":
+        case "Previous":
+          this.cueHandler.handleKeyframe();
+          break;
+      }
+
       // Handle known lighting cue by emitting an event
       const cueType = lightingCue; //lightingCueMap[lightingCueValue];
       if (cueType) {
@@ -411,6 +420,30 @@ export class YargNetworkListener extends EventEmitter {
         this.cueHandler.handleCue(cueType, YargCueData)
       } else {
         console.warn(`Unknown lighting cue value received: ${lightingCue}`);
+      }
+
+      // Handle strobe state changes
+      if (YargCueData.strobeState && YargCueData.strobeState !== "Strobe_Off") {
+        console.log(`[YARG] Strobe state change: ${YargCueData.strobeState}`);
+        // Convert strobe state to cue type and handle it
+        let strobeCueType: CueType;
+        switch (YargCueData.strobeState) {
+          case "Strobe_Slow":
+            strobeCueType = CueType.Strobe_Slow;
+            break;
+          case "Strobe_Medium":
+            strobeCueType = CueType.Strobe_Medium;
+            break;
+          case "Strobe_Fast":
+            strobeCueType = CueType.Strobe_Fast;
+            break;
+          case "Strobe_Fastest":
+            strobeCueType = CueType.Strobe_Fastest;
+            break;
+          default:
+            return; // Unknown strobe state
+        }
+        this.cueHandler.handleCue(strobeCueType, YargCueData);
       }
 
       
