@@ -1,6 +1,6 @@
 import { performance } from 'perf_hooks';
 import {
-  RGBIP,
+  RGBIO,
   Transition,
 } from '../../types';
 
@@ -16,8 +16,8 @@ import { Clock } from './Clock';
  */
 type TransitionData = {
   layer: number;
-  startState: RGBIP;
-  endState: RGBIP;
+  startState: RGBIO;
+  endState: RGBIO;
   startTime: number;
   transition: Transition;  // transform info, etc.
 };
@@ -39,12 +39,12 @@ export class LightTransitionController {
   /**
    * Tracks the per-layer interpolated colour for each light. 
    */
-  private _currentLayerStates: Map<string, Map<number, RGBIP>>;
+  private _currentLayerStates: Map<string, Map<number, RGBIO>>;
 
   /**
    * The final merged color per light, after layering. 
    */
-  private _finalColors: Map<string, RGBIP>;
+  private _finalColors: Map<string, RGBIO>;
 
   private _transitionLock = false;
   private clock: Clock | null = null;
@@ -92,11 +92,11 @@ export class LightTransitionController {
   public setTransition(
     lightId: string,
     layer: number,
-    startState: RGBIP | undefined,
-    endState: RGBIP,
+    startState: RGBIO | undefined,
+    endState: RGBIO,
     duration: number,
     easing: string,
-    initialState?: RGBIP
+    initialState?: RGBIO
   ): void {
     // Initialize our map for this light if it doesn't exist
     if (!this._transitionsByLight.has(lightId)) {
@@ -104,7 +104,7 @@ export class LightTransitionController {
     }
 
     // Get the current light state if startState is undefined
-    let effectiveStartState: RGBIP;
+    let effectiveStartState: RGBIO;
     if (initialState) {
       // If we have an initial state override, use that
       effectiveStartState = { ...initialState };
@@ -117,12 +117,14 @@ export class LightTransitionController {
       if (currentState) {
         effectiveStartState = { ...currentState };
       } else {
-        // Create a default black RGBIP with all required properties
+        // Create a default black RGBIP
         effectiveStartState = {
-          red: 0, rp: 0,
-          green: 0, gp: 0,
-          blue: 0, bp: 0,
-          intensity: 0, ip: 0
+          red: 0,
+          green: 0,
+          blue: 0,
+          intensity: 0,
+          opacity: 0.0,
+          blendMode: 'replace'
         };
       }
     }
@@ -148,7 +150,7 @@ export class LightTransitionController {
     
     // Update current layer state immediately to the start state
     if (!this._currentLayerStates.has(lightId)) {
-      this._currentLayerStates.set(lightId, new Map<number, RGBIP>());
+      this._currentLayerStates.set(lightId, new Map<number, RGBIO>());
     }
     this._currentLayerStates.get(lightId)!.set(layer, { ...effectiveStartState });
   }
@@ -197,7 +199,7 @@ export class LightTransitionController {
    * Returns the last interpolated color for the specified (light, layer).
    * If not found, returns a transparent (all 0) color instead of null.
    */
-  public getLightState(lightId: string, layer: number): RGBIP {
+  public getLightState(lightId: string, layer: number): RGBIO {
     const layerMap = this._currentLayerStates.get(lightId);
     if (!layerMap) {
       return this.transparentColor();
@@ -231,11 +233,13 @@ export class LightTransitionController {
       const currentState = this._lightStateManager.getLightState(lightId);
       
       // Create a black state, only including pan/tilt if fixture uses them
-      const blackState: RGBIP = {
-        red: 0, rp: 0, 
-        green: 0, gp: 0, 
-        blue: 0, bp: 0, 
-        intensity: 0, ip: 0
+      const blackState: RGBIO = {
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 0.0,
+        blendMode: 'replace'
       };
       
       // Check if this fixture has pan/tilt
@@ -288,7 +292,7 @@ export class LightTransitionController {
           // Process transitions for this light by layer
           const perLightLayerStates = this._currentLayerStates.has(lightId) 
             ? this._currentLayerStates.get(lightId)!
-            : new Map<number, RGBIP>();
+            : new Map<number, RGBIO>();
 
           layerTransitions.forEach((transitionData, layer) => {
             const { startState, endState, startTime, transition } = transitionData;
@@ -303,15 +307,13 @@ export class LightTransitionController {
             const easedProgress = this.getEasingValue(progress, easing);
 
             // Calculate the new state based on interpolation
-            const newState: RGBIP = {
+            const newState: RGBIO = {
               red: this.interpolate(startState.red, endState.red, easedProgress),
               green: this.interpolate(startState.green, endState.green, easedProgress),
               blue: this.interpolate(startState.blue, endState.blue, easedProgress),
               intensity: this.interpolate(startState.intensity, endState.intensity, easedProgress),
-              rp: this.interpolate(startState.rp, endState.rp, easedProgress),
-              gp: this.interpolate(startState.gp, endState.gp, easedProgress),
-              bp: this.interpolate(startState.bp, endState.bp, easedProgress),
-              ip: this.interpolate(startState.ip, endState.ip, easedProgress),
+              opacity: endState.opacity,
+              blendMode: endState.blendMode,
             };
 
             // Handle optional properties
@@ -385,57 +387,122 @@ export class LightTransitionController {
   }
 
   /**
-   * Priority acts like a layer transparency. 255 means the higher 
-   * layer is used 100% and the lower layer(s) ignored.
-   * A priority of less than 255 means the higher layer is 
-   * blended on top of the layers below. 
-   * Each channel has its own priority, including intensity which 
-   * applies to the master dimmer.
+   * Blends colors using opacity and blend modes
    */
-  private blendPriority(current: RGBIP, newState: RGBIP): RGBIP {
-    // Special case for full ip priority
-    if (newState.ip === 255 && newState.rp === 255 && newState.gp === 255 && newState.bp === 255) {
-      return newState;
-    }
+  private blendWithOpacity(current: RGBIO, newState: RGBIO): RGBIO {
+    const opacity = newState.opacity ?? 1.0;
+    const blendMode = newState.blendMode ?? 'replace';
     
-    // Calculate alpha values for each channel based on its own priority
-    const alphaRed = newState.rp / 255;
-    const alphaGreen = newState.gp / 255;
-    const alphaBlue = newState.bp / 255;
-    const masterDimmerIntensity = newState.ip / 255;
-    
-    const out: RGBIP = {
-      red: this.blendChannel(current.red, newState.red, alphaRed),
-      rp: newState.rp,
-      green: this.blendChannel(current.green, newState.green, alphaGreen),
-      gp: newState.gp,
-      blue: this.blendChannel(current.blue, newState.blue, alphaBlue),
-      bp: newState.bp,
-      intensity: this.blendChannel(current.intensity, newState.intensity, masterDimmerIntensity),
-      ip: newState.ip,
+    const out: RGBIO = {
+      red: 0,
+      green: 0,
+      blue: 0,
+      intensity: 0,
+      opacity: 1.0, // Final result should always be fully opaque
+      blendMode: blendMode,
     };
     
+    // Apply blend mode per channel
+    switch (blendMode) {
+      case 'replace':
+        // For replace mode: opacity controls the intensity of the replacement color
+        // When opacity = 0.0: layer is transparent, show underlying color
+        // When opacity = 1.0: layer completely replaces underlying color at full intensity
+        // When opacity = 0.5: layer completely replaces underlying color at 50% intensity
+        if (opacity <= 0.0) {
+          // Transparent layer - show underlying color
+          out.red = current.red;
+          out.green = current.green;
+          out.blue = current.blue;
+          out.intensity = current.intensity;
+        } else {
+          // Any opacity > 0 means the layer replaces the underlying color
+          // The opacity controls the intensity of the replacement
+          out.red = Math.round(newState.red * opacity);
+          out.green = Math.round(newState.green * opacity);
+          out.blue = Math.round(newState.blue * opacity);
+          out.intensity = Math.round(newState.intensity * opacity);
+        }
+        break;
+        
+      case 'add':
+        if (opacity <= 0.0) {
+          // Transparent layer - show underlying color
+          out.red = current.red;
+          out.green = current.green;
+          out.blue = current.blue;
+          out.intensity = current.intensity;
+        } else if (opacity >= 1.0) {
+          // Fully opaque - add colors together
+          out.red = Math.min(255, current.red + newState.red);
+          out.green = Math.min(255, current.green + newState.green);
+          out.blue = Math.min(255, current.blue + newState.blue);
+          out.intensity = Math.min(255, current.intensity + newState.intensity);
+        } else {
+          // Partial opacity - higher layer overrides lower layer for each channel
+          out.red = newState.red;
+          out.green = newState.green;
+          out.blue = newState.blue;
+          out.intensity = newState.intensity;
+        }
+        break;
+        
+      case 'multiply':
+        out.red = Math.round((current.red * newState.red * opacity) / 255);
+        out.green = Math.round((current.green * newState.green * opacity) / 255);
+        out.blue = Math.round((current.blue * newState.blue * opacity) / 255);
+        out.intensity = Math.round((current.intensity * newState.intensity * opacity) / 255);
+        break;
+        
+      case 'overlay':
+        out.red = this.blendOverlay(current.red, newState.red, opacity);
+        out.green = this.blendOverlay(current.green, newState.green, opacity);
+        out.blue = this.blendOverlay(current.blue, newState.blue, opacity);
+        out.intensity = this.blendOverlay(current.intensity, newState.intensity, opacity);
+        break;
+    }
+    
+    // Handle optional properties
     if (newState.pan !== undefined) out.pan = newState.pan;
     if (newState.tilt !== undefined) out.tilt = newState.tilt;
+    
     return out;
   }
+  
+
+
 
   /**
-   * Weighted channel blend
+   * Overlay blend mode - combines multiply and screen blending
    */
-  private blendChannel(oldVal: number, newVal: number, alpha: number): number {
-    return Math.round(oldVal * (1 - alpha) + newVal * alpha);
+  private blendOverlay(base: number, blend: number, opacity: number): number {
+    const normalizedBlend = blend / 255;
+    const normalizedBase = base / 255;
+    
+    let result: number;
+    if (normalizedBase < 0.5) {
+      // Multiply blend for dark areas
+      result = 2 * normalizedBase * normalizedBlend;
+    } else {
+      // Screen blend for light areas
+      result = 1 - 2 * (1 - normalizedBase) * (1 - normalizedBlend);
+    }
+    
+    // Apply opacity and convert back to 0-255 range
+    return Math.round(result * 255 * opacity);
   }
 
   /**
    * Returns a "transparent" color with all channels = 0.
    */
-  private transparentColor(): RGBIP {
+  private transparentColor(): RGBIO {
     return {
-      red: 0, rp: 0,
-      green: 0, gp: 0,
-      blue: 0, bp: 0,
-      intensity: 0, ip: 0
+      red: 0,
+      green: 0,
+      blue: 0,
+      intensity: 0,
+      opacity: 0.0,
+      blendMode: 'replace'
     };
   }
 
@@ -445,11 +512,13 @@ export class LightTransitionController {
   public resetLightStates(): void {
     // Force all lights to black state first
     const allLightIds = this._lightStateManager.getTrackedLightIds();
-    const blackState: RGBIP = {
-        red: 0, rp: 255,
-        green: 0, gp: 255,
-        blue: 0, bp: 255,
-        intensity: 0, ip: 255
+    const blackState: RGBIO = {
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 1.0,
+        blendMode: 'replace'
     };
 
     allLightIds.forEach(lightId => {
@@ -483,7 +552,7 @@ export class LightTransitionController {
    * @param lightId The ID of the light to get the state for
    * @returns The final light state or null if not found
    */
-  public getFinalLightState(lightId: string): RGBIP | null {
+  public getFinalLightState(lightId: string): RGBIO | null {
     return this._lightStateManager.getLightState(lightId);
   }
 
@@ -507,14 +576,14 @@ export class LightTransitionController {
     }
 
     const layerStates = this._currentLayerStates.get(lightId)!;
-    let finalColor: RGBIP = this.transparentColor();
+    let finalColor: RGBIO = this.transparentColor();
     
     // Convert Map to array, sort by layer number, then process
     const sortedLayers = Array.from(layerStates.entries())
       .sort(([layerA], [layerB]) => layerA - layerB);
       
     for (const [_, layerColor] of sortedLayers) {
-      finalColor = this.blendPriority(finalColor, layerColor);
+      finalColor = this.blendWithOpacity(finalColor, layerColor);
     }
     
     // Store the final color

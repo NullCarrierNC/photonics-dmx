@@ -85,7 +85,7 @@ export const getEffectFlashColor = ({
 }: GetSingleColorEffectParams): Effect => {
     const effect: Effect = {
         id: "flash-color",
-        description: "Sets the light a color then quickly fades it out with Priority",
+        description: "Sets the light a color then quickly fades it out",
         transitions: [
             {
                 lights: lights,
@@ -108,13 +108,11 @@ export const getEffectFlashColor = ({
                 transform: {
                     color: {
                         red: 0,
-                        rp: 0,
                         green: 0,
-                        gp: 0,
                         blue: 0,
-                        bp: 0,
                         intensity: 0,
-                        ip: 0,
+                        opacity: 0.0,
+                        blendMode: 'replace',
                     },
                     easing: easing,
                     duration: durationOut,
@@ -138,7 +136,8 @@ The stomp transitions consists of two transforms:
 Note the `color` object: RGB are, as expected, the primary colour channels. `Intensity` maps to 
 the `Master Dimmer` on your DMX fixture.
 
-`*p` channels are `priority`. These act like alpha transparency to the layer below.
+`opacity` and `blendMode` control how colors blend with layers below. `opacity` ranges from 0.0 to 1.0,
+where 0.0 is completely transparent and 1.0 is fully opaque. `blendMode` determines the blending algorithm.
 See examples below.
 
 
@@ -164,49 +163,44 @@ There are other methods for effect handling; look into `EffectManager` for more 
 
 
 In order to output the final light state the layers are collapsed and the final values calculated. 
-`Priority` plays a key role in how this works:
+`Opacity` and `blendMode` play a key role in how this works:
 
 Example 1:
 
-Layer 10:   R:255,  G:255,  B:255,  I: 255,   P: 0
-Layer 0:    R:255,  G: 0,   B: 0    I: 255,   P: 255
+Layer 10:   R:255,  G:255,  B:255,  I: 255,   Opacity: 0.0, BlendMode: 'add'
+Layer 0:    R:255,  G: 0,   B: 0    I: 255,   Opacity: 1.0, BlendMode: 'replace'
 
 This would result in the lights being red only. The full white of 255, including the 
-intensity (master dimmer) value of 255 don't matter, since the priority of 0 means this 
+intensity (master dimmer) value of 255 don't matter, since the opacity of 0.0 means this 
 layer is transparent.
 
 
 Example 2:
 
-Layer 10:   R:255,  G:255,  B:255,  I: 255,   P: 128
-Layer 0:    R:255,  G: 0,   B: 0    I: 255,   P: 255
+Layer 10:   R:255,  G:255,  B:255,  I: 255,   Opacity: 0.5, BlendMode: 'add'
+Layer 0:    R:255,  G: 0,   B: 0    I: 255,   Opacity: 1.0, BlendMode: 'replace'
 
-Now that Layer 10's priority is 128, it will apply 50% of its value to the layer below.
+Now that Layer 10's opacity is 0.5, it will apply 50% of its value to the layer below.
 As full on is 255, the Red channel is capped at 255. While the Green and Blue result in 127.
 
 
-*NOTE:* Each colour channel & intensity (master dimmer) has a matching priority channel. I.e.:
+The system uses `opacity` and `blendMode` for color blending:
 
 ```Typescript
 export type RGBIP = {
   red: number; // 0-255
-  rp: number; // 0-255
-
   green: number; // 0-255
-  gp: number; // 0-255
-
   blue: number; // 0-255
-  bp: number; // 0-255
-
   intensity: number; // 0-255
-  ip: number; // 0-255
-
+  opacity: number; // 0.0-1.0, required
+  blendMode: BlendMode; // required, enum: 'replace', 'add', 'multiply', 'overlay'
+  
   pan?: number;
   tilt?: number;
 }; 
 ```
-The final colour calculation will take these individually channel priorities into account.
 
+The final colour calculation takes these opacity and blend mode values into account to determine how colors interact between layers.
 
 
 ## Effects and Queuing
@@ -221,7 +215,7 @@ When animating with fades, etc, this can create a conflict. Photonics handles th
 2. If the new effect is the same as the previous effect, the new effect is queued to run when the current one finishes.
 3. If there is already an effect of the same name in the queue, the new one replaces the one already in the queue.
 
-Effects on different layers don't impact each other outside of how their priorities calculate the final colour values.
+Effects on different layers don't impact each other outside of how their opacity and blend modes calculate the final colour values.
 
 ### Cue Groups
 

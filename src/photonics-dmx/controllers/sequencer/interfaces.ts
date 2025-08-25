@@ -1,4 +1,4 @@
-import { Effect, EffectTransition, RGBIP, TrackedLight } from '../../types';
+import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
 
 /**
@@ -15,7 +15,7 @@ export interface LightEffectState {
   state: 'idle' | 'waitingFor' | 'transitioning' | 'waitingUntil';
   transitionStartTime: number;
   waitEndTime: number;
-  lastEndState?: RGBIP;
+  lastEndState?: RGBIO;
   isPersistent?: boolean;
 }
 
@@ -67,9 +67,9 @@ export interface ILayerManager {
   resetLayerTracking(layer: number): void;
   
   // State management methods
-  captureInitialStates(layer: number, lights: TrackedLight[]): Map<string, RGBIP>;
+  captureInitialStates(layer: number, lights: TrackedLight[]): Map<string, RGBIO>;
   captureFinalStates(layer: number, lights: TrackedLight[]): void;
-  getLightState(layer: number, lightId: string): RGBIP | undefined;
+  getLightState(layer: number, lightId: string): RGBIO | undefined;
   clearLayerStates(layer: number): void;
   getLightTransitionController(): LightTransitionController;
   
@@ -111,7 +111,7 @@ export interface ITransitionEngine {
   startTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
   handleTransitioning(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
   handleWaitingUntil(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
-  getFinalState(lightId: string, layer: number): RGBIP | undefined;
+  getFinalState(lightId: string, layer: number): RGBIO | undefined;
   clearFinalStates(layer: number): void;
   getLightTransitionController(): LightTransitionController;
   
@@ -133,7 +133,7 @@ export interface IEffectManager {
   startNextEffectInQueue(layer: number, lightId: string): boolean;
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
   isLayerFreeForLight(layer: number, lightId: string): boolean;
-  setState(lights: TrackedLight[], color: RGBIP, time: number): void;
+  setState(lights: TrackedLight[], color: RGBIO, time: number): void;
 }
 
 /**
@@ -191,7 +191,7 @@ export interface ILightingController {
   removeAllEffects(): void;
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
   isLayerFreeForLight(layer: number, lightId: string): boolean;
-  setState(lights: TrackedLight[], color: RGBIP, time: number): void;
+  setState(lights: TrackedLight[], color: RGBIO, time: number): void;
   
   // Song event handling methods
   onBeat(): void;

@@ -1,4 +1,4 @@
-import { Effect, EffectTransition, RGBIP, TrackedLight } from '../../types';
+import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types';
 import {
   IEffectManager,
   IEffectTransformer,
@@ -498,7 +498,7 @@ export class EffectManager implements IEffectManager {
    * @param color Target colour to transition to
    * @param time Duration of the transition in milliseconds
    */
-  public setState(lights: TrackedLight[], color: RGBIP, time: number): void {
+  public setState(lights: TrackedLight[], color: RGBIO, time: number): void {
     if (lights.length === 0) {
       console.warn('No lights provided to setState');
       return;

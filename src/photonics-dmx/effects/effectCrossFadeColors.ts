@@ -1,4 +1,4 @@
-import { Effect, RGBIP, WaitCondition } from "../types";
+import { Effect, RGBIO, WaitCondition } from "../types";
 import { EasingType } from "../easing";
 import { IEffect } from "./interfaces/IEffect";
 
@@ -7,9 +7,9 @@ import { IEffect } from "./interfaces/IEffect";
  */
 interface CrossFadeColorsEffectParams extends IEffect {
     /** The starting colour for the cross-fade */
-    startColor: RGBIP;
+    startColor: RGBIO;
     /** The ending colour for the cross-fade */
-    endColor: RGBIP;
+    endColor: RGBIO;
     /** Time to wait after the start colour is applied */
     afterStartWait: number;
     /** Time to wait after the end colour is applied */

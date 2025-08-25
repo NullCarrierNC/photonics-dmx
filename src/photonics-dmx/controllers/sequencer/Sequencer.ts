@@ -1,4 +1,4 @@
-import { Effect, RGBIP, TrackedLight } from '../../types';
+import { Effect, RGBIO, TrackedLight } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
 import { DebugMonitor } from './DebugMonitor';
 import { EffectManager } from './EffectManager';
@@ -175,7 +175,7 @@ export class Sequencer implements ILightingController {
    * @param color Target colour to transition to
    * @param time Duration of the transition in milliseconds
    */
-  public setState(lights: TrackedLight[], color: RGBIP, time: number): void {
+  public setState(lights: TrackedLight[], color: RGBIO, time: number): void {
     this.effectManager.setState(lights, color, time);
   }
 

@@ -1,5 +1,5 @@
 import { performance } from 'perf_hooks';
-import { EffectTransition, RGBIP } from '../../types';
+import { EffectTransition, RGBIO } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
 import { LightEffectState, ILayerManager, ITransitionEngine } from './interfaces';
 import { IEffectManager } from './interfaces';
@@ -94,10 +94,12 @@ export class TransitionEngine implements ITransitionEngine {
       } else {
         // Default black state if no current state exists
         effect.lastEndState = {
-          red: 0, rp: 0,
-          green: 0, gp: 0,
-          blue: 0, bp: 0,
-          intensity: 0, ip: 0
+          red: 0,
+          green: 0,
+          blue: 0,
+          intensity: 0,
+          opacity: 1.0,
+          blendMode: 'replace'
         };
       }
     }
@@ -258,7 +260,7 @@ export class TransitionEngine implements ITransitionEngine {
     const light = transition.lights[0];
     
     // First check if there's a saved state in the effect's lastEndState
-    let startState: RGBIP | undefined = undefined;
+    let startState: RGBIO | undefined = undefined;
     
     if (activeEffect.lastEndState) {
       // Use the effect's stored state if available - this is crucial for smooth transitions
@@ -278,10 +280,12 @@ export class TransitionEngine implements ITransitionEngine {
     // If all else fails, use a default black state
     if (!startState) {
       startState = { 
-        red: 0, rp: 0, 
-        green: 0, gp: 0, 
-        blue: 0, bp: 0, 
-        intensity: 0, ip: 0 
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 1.0,
+        blendMode: 'replace'
       };
     }
 
@@ -359,7 +363,7 @@ export class TransitionEngine implements ITransitionEngine {
    * @param layer The layer number
    * @returns The final state of the light on that layer, or undefined if not found
    */
-  public getFinalState(lightId: string, layer: number): RGBIP | undefined {
+  public getFinalState(lightId: string, layer: number): RGBIO | undefined {
     return this.layerManager.getLightState(layer, lightId);
   }
 

@@ -4,7 +4,7 @@ import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../../effects/sweepEffect';
-import { RGBIP } from '../../../../types';
+import { RGBIO } from '../../../../types';
 
 export class MenuCue implements ICue {
   id = 'default-menu';
@@ -19,8 +19,8 @@ export class MenuCue implements ICue {
     // Merge the sorted arrays into allLights
     const allLights = [...frontLights, ...backLights];
    
-    const blue: RGBIP = getColor('blue', 'low');
-    const brightBlue: RGBIP = getColor('blue', 'high');
+    const blue: RGBIO = getColor('blue', 'low');
+    const brightBlue: RGBIO = getColor('blue', 'high');
 
     const sweep = getSweepEffect({
       lights: allLights,

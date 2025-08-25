@@ -1,4 +1,4 @@
-import { Effect, RGBIP } from "../types";
+import { Effect, RGBIO } from "../types";
 import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
@@ -7,9 +7,9 @@ import { EasingType } from "../easing";
  */
 interface FadeInColorFadeOutEffectParams extends IEffect {
     /** The starting colour */
-    startColor: RGBIP;
+    startColor: RGBIO;
     /** The ending colour */
-    endColor: RGBIP;
+    endColor: RGBIO;
     /** Time to wait before starting the fade in */
     waitBeforeFadeIn: number;
     /** Duration of the fade in */

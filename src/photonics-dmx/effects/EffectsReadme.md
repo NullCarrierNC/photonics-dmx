@@ -122,7 +122,7 @@ interface SweepEffectParams extends IEffect {
 ```typescript
 const effect = getEffectSingleColor({
     lights: ['light1', 'light2'],
-    color: { red: 255, green: 0, blue: 0, intensity: 255 },
+    color: { red: 255, green: 0, blue: 0, intensity: 255, opacity: 1.0, blendMode: 'replace' },
     duration: 1000,
     easing: EasingType.SIN_OUT
 });

@@ -4,7 +4,7 @@ import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectFlashColor } from '../../../../effects/effectFlashColor';
-import { RGBIP } from '../../../../types';
+import { RGBIO } from '../../../../types';
 
 export class StrobeMediumCue implements ICue {
   id = 'default-strobe-medium';
@@ -13,7 +13,7 @@ export class StrobeMediumCue implements ICue {
   style = CueStyle.Secondary;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const white: RGBIP = getColor('white', 'max');
+    const white: RGBIO = getColor('white', 'max');
     const strobes = lightManager.getLights(['strobe'], 'all');
     const flash = getEffectFlashColor({
       color: white,

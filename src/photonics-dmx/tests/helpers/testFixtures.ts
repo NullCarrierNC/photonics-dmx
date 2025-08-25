@@ -1,4 +1,4 @@
-import { DmxFixture, LightingConfiguration, TrackedLight, RGBIP, FixtureTypes, DmxLight } from '../../types';
+import { DmxFixture, LightingConfiguration, TrackedLight, RGBIO, FixtureTypes, DmxLight } from '../../types';
 import { ConfigStrobeType } from '../../types';
 
 export const createMockDmxFixture = (overrides?: Partial<DmxFixture>): DmxFixture => ({
@@ -50,14 +50,12 @@ export const createMockTrackedLight = (overrides?: Partial<TrackedLight>): Track
   ...overrides
 });
 
-export const createMockRGBIP = (overrides?: Partial<RGBIP>): RGBIP => ({
+export const createMockRGBIP = (overrides?: Partial<RGBIO>): RGBIO => ({
   red: 0,
   green: 0,
   blue: 0,
   intensity: 255,
-  rp: 255,
-  gp: 255,
-  bp: 255,
-  ip: 255,
+  opacity: 1.0,
+  blendMode: 'replace',
   ...overrides
 }); 

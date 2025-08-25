@@ -1,4 +1,4 @@
-import { Brightness, Color, FixtureTypes, RgbDmxChannels, RGBIP, RgbMovingHeadDmxChannels, RgbStrobeDmxChannels, RgbwDmxChannels, RgbwMovingHeadDmxChannels, RgbwStrobeDmxCannels, StrobeDmxChannels } from "../types";
+import { BlendMode, Brightness, Color, FixtureTypes, RgbDmxChannels, RGBIO, RgbMovingHeadDmxChannels, RgbStrobeDmxChannels, RgbwDmxChannels, RgbwMovingHeadDmxChannels, RgbwStrobeDmxCannels, StrobeDmxChannels } from "../types";
 
 /**
  * Generates an RGBIP object based on the specified color and brightness.
@@ -9,8 +9,9 @@ import { Brightness, Color, FixtureTypes, RgbDmxChannels, RGBIP, RgbMovingHeadDm
  */
 export const getColor = (
   color: Color,
-  brightness: Brightness
-): RGBIP => {
+  brightness: Brightness,
+  blendMode: BlendMode = 'replace'
+): RGBIO => {
   const colorMap: { [key in typeof color]: { r: number; g: number; b: number } } = {
     red:        { r: 255, g: 0,   b: 0 },
     blue:       { r: 0,   g: 0,   b: 255 },
@@ -39,14 +40,14 @@ export const getColor = (
   if (color === 'black') {
     return {
       red: 0, green: 0, blue: 0, intensity: 0,
-      rp: 255, gp: 255, bp: 255, ip: 255, // Priority is 255 so that the RGBI values forcibly set 0 (black)
+      opacity: 1.0, blendMode: blendMode,
     };
   }
   
   if (color === 'transparent') {
     return {
       red: 0, green: 0, blue: 0, intensity: 0,
-      rp: 0, gp: 0, bp: 0, ip: 0, // Priority all zeroed out, otherwise it would be black.
+      opacity: 0.0, blendMode: blendMode,
     };
   }
 
@@ -56,13 +57,12 @@ export const getColor = (
   // Construct the RGBIP object
   return {
     red: selectedColor.r,
-    rp: 255, 
     green: selectedColor.g,
-    gp: 255, 
     blue: selectedColor.b,
-    bp: 255, 
     intensity: selectedIntensity,
-    ip: 255, 
+    
+    opacity: 1.0,
+    blendMode: blendMode,
   };
 };
 

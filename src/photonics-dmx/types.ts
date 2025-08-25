@@ -8,6 +8,11 @@ export type Color =  'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'purple' |
 'white' | 'black' | 'transparent';
 
 /**
+ * Represents how a color should blend with colors on lower layers
+ */
+export type BlendMode = 'replace' | 'add' | 'multiply' | 'overlay';
+
+/**
  * Represents brightness levels for lights
  */
 export type Brightness = 'low' | 'medium' | 'high' | 'max';
@@ -15,21 +20,17 @@ export type Brightness = 'low' | 'medium' | 'high' | 'max';
 /**
  * Interface representing RGB, Intensity, Pan/Tilt values for a light
  */
-export interface RGBIP {
+export interface RGBIO {
   red: number; // 0-255
-  rp: number; // 0-255
-
   green: number; // 0-255
-  gp: number; // 0-255
-
   blue: number; // 0-255
-  bp: number; // 0-255
-
   intensity: number; // 0-255
-  ip: number; // 0-255
 
   pan?: number;
   tilt?: number;
+  
+  opacity: number; // 0.0 to 1.0, controls overall contribution strength
+  blendMode: BlendMode; // How this color should blend with lower layers
 }
 
 /**
@@ -37,7 +38,7 @@ export interface RGBIP {
  */
 export interface LightLayer {
   layer: number;
-  value: RGBIP;
+  value: RGBIO;
 }
 
 /**
@@ -53,7 +54,7 @@ export interface VirtualLight {
  */
 export interface LightState {
   id: string;
-  value: RGBIP;
+  value: RGBIO;
 }
 
 /**
@@ -61,7 +62,7 @@ export interface LightState {
  */
 export interface Transition {
   transform: {
-    color: RGBIP;
+    color: RGBIO;
     easing: string; // e.g., "sin.in"
     duration: number; // in milliseconds
   };
@@ -103,7 +104,7 @@ export interface EffectTransition {
   waitFor: WaitCondition;
   forTime: number; // in milliseconds
   transform: {
-    color: RGBIP;
+    color: RGBIO;
     easing: string;
     duration: number; // in milliseconds
   };

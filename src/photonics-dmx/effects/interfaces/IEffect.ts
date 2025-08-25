@@ -1,4 +1,4 @@
-import { RGBIP, TrackedLight, WaitCondition } from "../../types";
+import { RGBIO, TrackedLight, WaitCondition } from "../../types";
 import { EasingType } from "../../easing";
 
 /**
@@ -15,7 +15,7 @@ export interface IEffect {
   
   /** The colour configuration for the effect. Optional as some effects may use
    * multiple colours (e.g. start/end colours) or may not use a single colour value. */
-  color?: RGBIP;
+  color?: RGBIO;
   
   /** Duration of the effect (in ms). Optional as some effects may have multiple durations
    * (e.g. fade in/out durations) or may not use a single duration value. */

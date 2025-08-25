@@ -13,7 +13,7 @@
 import '@jest/globals';
 import { Sequencer } from '../../controllers/sequencer/Sequencer';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
-import { Effect, RGBIP, TrackedLight } from '../../types';
+import { Effect, RGBIO, TrackedLight } from '../../types';
 import { createMockTrackedLight, createMockRGBIP } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
 
@@ -122,7 +122,7 @@ describe('Sequencer', () => {
       
       // Create test data
       const lights: TrackedLight[] = [createMockTrackedLight()];
-      const color: RGBIP = createMockRGBIP();
+      const color: RGBIO = createMockRGBIP();
       const time = 1000;
 
       // Call the method

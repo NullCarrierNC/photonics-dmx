@@ -4,7 +4,7 @@ import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../../effects/sweepEffect';
-import {  RGBIP } from '../../../../types';
+import {  RGBIO } from '../../../../types';
 import { randomBetween } from '../../../../helpers/utils';
 
 var ltr = true;
@@ -25,7 +25,7 @@ export class SearchlightsCue implements ICue {
       allLights.reverse();
     }
 
-    const transparent: RGBIP = getColor('transparent', 'low');
+    const transparent: RGBIO = getColor('transparent', 'low');
     const highRed = getColor('red', 'high');
     const highGreen = getColor('green', 'high');
     const highBlue = getColor('blue', 'high');

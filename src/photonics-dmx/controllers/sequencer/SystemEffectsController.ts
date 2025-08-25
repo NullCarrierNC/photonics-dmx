@@ -1,4 +1,4 @@
-import { RGBIP, Transition } from '../../types';
+import { RGBIO, Transition } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
 import { ILayerManager, ISystemEffectsController, IEventScheduler } from './interfaces';
 
@@ -97,11 +97,13 @@ export class SystemEffectsController implements ISystemEffectsController {
             const currentLightState = this.lightTransitionController.getFinalLightState(lightId);
 
             // Create a base blackout color without pan/tilt
-            const blackoutColor: RGBIP = {
-              red: 0, rp: 255,
-              green: 0, gp: 255,
-              blue: 0, bp: 255,
-              intensity: 0, ip: 255
+            const blackoutColor: RGBIO = {
+              red: 0,
+              green: 0,
+              blue: 0,
+              intensity: 0,
+              opacity: 1.0,
+              blendMode: 'replace'
             };
             
             // Only preserve pan/tilt for fixtures that already have them
@@ -152,11 +154,13 @@ export class SystemEffectsController implements ISystemEffectsController {
           const currentLightState = this.lightTransitionController.getFinalLightState(lightId);
           
           // Create a base black state
-          const blackState: RGBIP = {
-            red: 0, rp: 255,
-            green: 0, gp: 255,
-            blue: 0, bp: 255,
-            intensity: 0, ip: 255
+          const blackState: RGBIO = {
+            red: 0,
+            green: 0,
+            blue: 0,
+            intensity: 0,
+            opacity: 1.0,
+            blendMode: 'replace'
           };
           
           // Only preserve pan/tilt for fixtures that already have them
