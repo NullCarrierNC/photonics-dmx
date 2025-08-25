@@ -17,8 +17,8 @@ export class DischordCue implements ICue {
   style = CueStyle.Primary;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const blue = getColor('blue', 'medium');
-    const green = getColor('green', 'medium');
+    const blue = getColor('blue', 'medium', 'replace');
+    const green = getColor('green', 'medium', 'replace');
 
     const all = lightManager.getLights(['front'], 'all');
     const even = lightManager.getLights(['front'], 'half-1');
@@ -52,8 +52,8 @@ export class DischordCue implements ICue {
       layer: 2,
     });
     const allLights = lightManager.getLights(['front'], 'all');
-    const yellow = getColor('yellow', 'high');
-    const red = getColor('red', 'high');
+    const yellow = getColor('yellow', 'high', 'replace');
+    const red = getColor('red', 'high', 'replace');
     const rnd = randomBetween(1, 2);
     const flashYellowOnBeat = getEffectFlashColor({
       color: rnd === 1 ? red : yellow,

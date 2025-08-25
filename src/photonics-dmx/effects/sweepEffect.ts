@@ -1,4 +1,4 @@
-import { Effect, EffectTransition, TrackedLight, RGBIP, WaitCondition } from "../types";
+import { Effect, EffectTransition, TrackedLight, RGBIO, WaitCondition } from "../types";
 import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
@@ -7,9 +7,9 @@ import { EasingType } from "../easing";
  */
 interface SweepEffectBaseParams {
     /** On state colour */
-    high: RGBIP;
+    high: RGBIO;
     /** Off state colour */
-    low: RGBIP;
+    low: RGBIO;
     /** Total time (ms) for one complete sweep across all groups */
     sweepTime: number;
     /** Desired fade‐in duration (ms) */

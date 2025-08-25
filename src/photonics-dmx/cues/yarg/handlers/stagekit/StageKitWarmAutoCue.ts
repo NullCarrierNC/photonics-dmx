@@ -20,10 +20,9 @@ export class StageKitWarmAutoCue implements ICue {
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
-    const red = getColor('red', 'medium');
-    const yellow = getColor('yellow', 'max');
-    yellow.ip = 128; // Semi-transparent so we can blend with red
-
+    const red = getColor('red', 'medium', 'add');
+    const yellow = getColor('yellow', 'medium', 'add');
+    
     //const blackColor = getColor('black', 'medium');
     const transparentColor = getColor('transparent', 'medium');
     

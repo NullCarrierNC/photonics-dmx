@@ -28,10 +28,12 @@ describe('LayerManager', () => {
       removeTransitionsByLayer: jest.fn(),
       removeLightLayer: jest.fn(),
       getLightState: jest.fn().mockReturnValue({
-        red: 0, rp: 0,
-        green: 0, gp: 0,
-        blue: 0, bp: 0,
-        intensity: 0, ip: 0
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 1.0,
+        blendMode: 'replace'
       })
     } as unknown as jest.Mocked<LightTransitionController>;
     

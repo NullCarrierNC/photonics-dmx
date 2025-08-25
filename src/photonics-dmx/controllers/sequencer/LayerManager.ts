@@ -1,6 +1,6 @@
 import { ILayerManager, QueuedEffect, LightEffectState } from './interfaces';
 import { LightTransitionController } from './LightTransitionController';
-import { RGBIP, TrackedLight } from '../../types';
+import { RGBIO, TrackedLight } from '../../types';
 
 /**
  * @class LayerManager
@@ -34,7 +34,7 @@ export class LayerManager implements ILayerManager {
   private _lightTransitionController: LightTransitionController;
   
   // New property for storing layer states
-  private _layerStates: Map<number, Map<string, RGBIP>> = new Map();
+  private _layerStates: Map<number, Map<string, RGBIO>> = new Map();
 
   /**
    * Creates a new LayerManager instance
@@ -286,8 +286,8 @@ export class LayerManager implements ILayerManager {
    * @param lights The lights to capture state for
    * @returns A map of light IDs to their current states
    */
-  public captureInitialStates(layer: number, lights: TrackedLight[]): Map<string, RGBIP> {
-    const stateMap = new Map<string, RGBIP>();
+  public captureInitialStates(layer: number, lights: TrackedLight[]): Map<string, RGBIO> {
+    const stateMap = new Map<string, RGBIO>();
     
     lights.forEach(light => {
       // First check if we have a stored state for this light/layer
@@ -303,10 +303,12 @@ export class LayerManager implements ILayerManager {
         } else {
           // Default black state if no current state exists
           stateMap.set(light.id, {
-            red: 0, rp: 0,
-            green: 0, gp: 0,
-            blue: 0, bp: 0,
-            intensity: 0, ip: 0
+            red: 0,
+            green: 0,
+            blue: 0,
+            intensity: 0,
+            opacity: 1.0,
+            blendMode: 'replace'
           });
         }
       }
@@ -324,7 +326,7 @@ export class LayerManager implements ILayerManager {
    */
   public captureFinalStates(layer: number, lights: TrackedLight[]): void {
     if (!this._layerStates.has(layer)) {
-      this._layerStates.set(layer, new Map<string, RGBIP>());
+      this._layerStates.set(layer, new Map<string, RGBIO>());
     }
     
     const layerStates = this._layerStates.get(layer)!;
@@ -353,7 +355,7 @@ export class LayerManager implements ILayerManager {
    * @param lightId The light ID to get state for
    * @returns The state if found, undefined otherwise
    */
-  public getLightState(layer: number, lightId: string): RGBIP | undefined {
+  public getLightState(layer: number, lightId: string): RGBIO | undefined {
     const layerStates = this._layerStates.get(layer);
     if (layerStates) {
       return layerStates.get(lightId);

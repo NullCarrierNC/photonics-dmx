@@ -1,12 +1,12 @@
 import { EventEmitter } from 'events';
-import { LightState, RGBIP } from '../../types';
+import { LightState, RGBIO } from '../../types';
 
 /**
  * The LightStateManager stores the current state of each light.
  * State is published for handling by external listeners. 
  */
 class LightStateManager extends EventEmitter {
-  private _finalStates: Map<string, RGBIP>;
+  private _finalStates: Map<string, RGBIO>;
   private _publishInterval: NodeJS.Timeout | null;
 
   constructor() {
@@ -21,7 +21,7 @@ class LightStateManager extends EventEmitter {
    * @param lightId 
    * @param finalColor 
    */
-  public setLightState(lightId: string, finalColor: RGBIP): void {
+  public setLightState(lightId: string, finalColor: RGBIO): void {
     this._finalStates.set(lightId, finalColor);
   }
 
@@ -31,7 +31,7 @@ class LightStateManager extends EventEmitter {
    * @param lightId 
    * @returns 
    */
-  public getLightState(lightId: string): RGBIP | null {
+  public getLightState(lightId: string): RGBIO | null {
     return this._finalStates.get(lightId) || null;
   }
 

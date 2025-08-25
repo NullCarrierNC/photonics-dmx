@@ -1,4 +1,4 @@
-import { Effect, RGBIP, WaitCondition } from "../types";
+import { Effect, RGBIO, WaitCondition } from "../types";
 import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
@@ -7,7 +7,7 @@ import { EasingType } from "../easing";
  */
 interface FlashColorEffectParams extends IEffect {
     /** The colour to flash to */
-    color: RGBIP;
+    color: RGBIO;
     /** The condition that triggers the start of the flash */
     startTrigger: WaitCondition;
     /** Time to wait before starting the flash */
@@ -62,13 +62,11 @@ export const getEffectFlashColor = ({
                 transform: {
                     color: {
                         red: 0,
-                        rp: 0,
                         green: 0,
-                        gp: 0,
                         blue: 0,
-                        bp: 0,
                         intensity: 0,
-                        ip: 0,
+                        opacity: 0.0,
+                        blendMode: 'replace',
                     },
                     easing: easing,
                     duration: durationOut,

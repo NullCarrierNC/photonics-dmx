@@ -13,7 +13,7 @@ export class StompCue implements ICue {
   style = CueStyle.Secondary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const white = getColor('white', 'max');
+    const white = getColor('white', 'max', 'add');
     const lights = lightManager.getLights(['front'], 'all');
     const flash = getEffectFlashColor({
       color: white,

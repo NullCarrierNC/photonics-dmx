@@ -1,4 +1,4 @@
-import { Effect, RGBIP } from "../types";
+import { Effect, RGBIO } from "../types";
 import { EasingType } from "../easing";
 import { IEffect } from "./interfaces/IEffect";
 
@@ -16,15 +16,13 @@ export const getEffectBlackout = ({
     layer = 0,
     easing = EasingType.SIN_OUT,
 }: BlackoutEffectParams): Effect => {
-    const black: RGBIP = {
+    const black: RGBIO = {
         red: 0,
-        rp: 255,
         green: 0,
-        gp: 255,
         blue: 0,
-        bp: 255,
         intensity: 0,
-        ip: 255,
+        opacity: 1.0,
+        blendMode: 'replace',
     };
 
     const blackoutEffect: Effect = {

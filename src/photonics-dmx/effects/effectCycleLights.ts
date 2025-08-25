@@ -1,4 +1,4 @@
-import { Effect, EffectTransition, TrackedLight, RGBIP, WaitCondition } from "../types";
+import { Effect, EffectTransition, TrackedLight, RGBIO, WaitCondition } from "../types";
 import { IEffect } from "./interfaces/IEffect";
 
 /**
@@ -8,9 +8,9 @@ export interface CycleLightsEffectParams extends IEffect {
   /** Array of lights to cycle through */
   lights: TrackedLight[];
   /** Base color for lights not currently active */
-  baseColor: RGBIP;
+  baseColor: RGBIO;
   /** Color for the active light */
-  activeColor: RGBIP;
+  activeColor: RGBIO;
   /** Duration in ms for color transitions */
   transitionDuration?: number;
   /** The layer to apply the effect on */

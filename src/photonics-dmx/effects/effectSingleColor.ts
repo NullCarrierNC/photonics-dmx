@@ -1,4 +1,4 @@
-import { Effect, RGBIP } from "../types";
+import { Effect, RGBIO } from "../types";
 import { EasingType } from "../easing";
 import { IEffect } from "./interfaces/IEffect";
 
@@ -8,7 +8,7 @@ import { IEffect } from "./interfaces/IEffect";
  */
 interface SingleColorEffectParams extends IEffect {
     /** The colour to set the lights to */
-    color: RGBIP;
+    color: RGBIO;
     /** Duration of the effect */
     duration: number;
 }

@@ -21,7 +21,9 @@
     "build:linux": "electron-vite build && electron-builder --linux",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "c8 --reporter=lcov --reporter=text npm test"
+    "test:coverage": "c8 --reporter=lcov --reporter=text npm test",
+    "test:color-blending": "npx ts-node src/photonics-dmx/tests/runColorBlendingTest.ts",
+    "test:color-analysis": "npx ts-node src/photonics-dmx/tests/runColorAnalysis.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "3.0.1",
