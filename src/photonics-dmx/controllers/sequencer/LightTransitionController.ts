@@ -9,6 +9,7 @@ import {
 } from '../../easing';
 
 import { LightStateManager } from './LightStateManager';
+import { Clock } from './Clock';
 
 /**
  * Holds data for each layer's transition on a specific light.
@@ -45,40 +46,36 @@ export class LightTransitionController {
    */
   private _finalColors: Map<string, RGBIP>;
 
-  /**
-   * An interval for the main animation loop, ~60fps.
-   */
-  private _animationIntervalId: NodeJS.Timeout | null = null;
-
   private _transitionLock = false;
+  private clock: Clock | null = null;
+  private updateCallback: (deltaTime: number) => void;
 
   constructor(lightStateManager: LightStateManager) {
     this._lightStateManager = lightStateManager;
     this._transitionsByLight = new Map();
     this._currentLayerStates = new Map();
     this._finalColors = new Map();
-
-    this.startAnimationLoop();
+    
+    // Create the update callback bound to this instance
+    this.updateCallback = this.updateTransitions.bind(this);
   }
 
   /**
-   * Starts the update loop for transitions and layer merges.
+   * Register this component with the clock
+   * @param clock The clock instance
    */
-  private startAnimationLoop(): void {
-    if (!this._animationIntervalId) {
-      this._animationIntervalId = setInterval(() => {
-        this.updateTransitions();
-      }, 1000 / 60);
-    }
+  public registerWithClock(clock: Clock): void {
+    this.clock = clock;
+    clock.onTick(this.updateCallback);
   }
 
   /**
-   * Stops the animation loop.
+   * Unregister from the clock
    */
-  private stopAnimationLoop(): void {
-    if (this._animationIntervalId) {
-      clearInterval(this._animationIntervalId);
-      this._animationIntervalId = null;
+  public unregisterFromClock(): void {
+    if (this.clock) {
+      this.clock.offTick(this.updateCallback);
+      this.clock = null;
     }
   }
 
@@ -260,15 +257,17 @@ export class LightTransitionController {
 
   /**
    * Updates all active transitions.
-   * This is called from the animation loop.
+   * This is called from the timing manager.
    * 
    * Process:
    *   1) Lock to prevent concurrent updates.
    *   2) Calculate new state for each transition.
    *   3) Mark completed transitions.
    *   4) Set final colour in LightStateManager.
+   * 
+   * @param deltaTime The time elapsed since last update in milliseconds
    */
-  private updateTransitions(): Promise<void> {
+  private updateTransitions(deltaTime: number = 0): Promise<void> {
     return new Promise((resolve) => {
       if (this._transitionLock) {
         // If already processing transitions, queue this update for the next frame
@@ -470,7 +469,7 @@ export class LightTransitionController {
    * Shuts down the LTC, stopping intervals and clearing data.
    */
   public shutdown(): void {
-    this.stopAnimationLoop();
+    this.unregisterFromClock();
     this._transitionsByLight.clear();
     this._currentLayerStates.clear();
     this._finalColors.clear();

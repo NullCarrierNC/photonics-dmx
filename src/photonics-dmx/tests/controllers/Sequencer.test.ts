@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals
 // Mock all dependencies that Sequencer relies on
 jest.mock('../../controllers/sequencer/LightTransitionController');
 jest.mock('../../controllers/sequencer/EffectTransformer');
-jest.mock('../../controllers/sequencer/TimeoutManager');
+jest.mock('../../controllers/sequencer/EventScheduler');
 jest.mock('../../controllers/sequencer/LayerManager');
 jest.mock('../../controllers/sequencer/TransitionEngine');
 jest.mock('../../controllers/sequencer/SystemEffectsController');
@@ -40,7 +40,9 @@ describe('Sequencer', () => {
       setTransition: jest.fn(),
       removeTransitionsByLayer: jest.fn(),
       removeLightLayer: jest.fn(),
-      getFinalLightState: jest.fn()
+      getFinalLightState: jest.fn(),
+      registerWithClock: jest.fn(),
+      unregisterFromClock: jest.fn()
     } as unknown as jest.Mocked<LightTransitionController>;
 
     // Create Sequencer with mocked LightTransitionController
@@ -200,15 +202,15 @@ describe('Sequencer', () => {
   });
 
   describe('shutdown', () => {
-    it('should stop the animation loop and perform cleanup', () => {
-      // Setup spy on TransitionEngine
-      const stopAnimationLoopSpy = jest.spyOn((sequencer as any).transitionEngine, 'stopAnimationLoop');
+    it('should stop the clock and perform cleanup', () => {
+      // Setup spy on Clock
+      const clockStopSpy = jest.spyOn((sequencer as any).clock, 'stop');
       
       // Call the method
       sequencer.shutdown();
 
-      // Verify transition engine was stopped
-      expect(stopAnimationLoopSpy).toHaveBeenCalled();
+      // Verify clock was stopped
+      expect(clockStopSpy).toHaveBeenCalled();
     });
   });
 }); 

@@ -77,6 +77,9 @@ describe('AbstractCueHandler', () => {
       cancelBlackout: jest.fn(),
       enableDebug: jest.fn(),
       debugLightLayers: jest.fn(),
+      removeEffectByLayer: jest.fn(),
+      getActiveEffectsForLight: jest.fn(),
+      isLayerFreeForLight: jest.fn(),
       shutdown: jest.fn()
     } as ILightingController;
     
@@ -111,6 +114,7 @@ describe('AbstractCueHandler', () => {
         fogState: false,
         strobeState: 'Strobe_Off',
         performer: 0,
+        autoGenTrack: false,
         beat: 'Off',
         keyframe: 'Off',
         bonusEffect: false

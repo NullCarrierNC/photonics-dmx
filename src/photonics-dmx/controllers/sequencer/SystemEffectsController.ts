@@ -1,6 +1,6 @@
 import { RGBIP, Transition } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
-import { ILayerManager, ISystemEffectsController, ITimeoutManager } from './interfaces';
+import { ILayerManager, ISystemEffectsController, IEventScheduler } from './interfaces';
 
 /**
  * @class SystemEffectsController
@@ -9,7 +9,7 @@ import { ILayerManager, ISystemEffectsController, ITimeoutManager } from './inte
 export class SystemEffectsController implements ISystemEffectsController {
   private lightTransitionController: LightTransitionController;
   private layerManager: ILayerManager;
-  private timeoutManager: ITimeoutManager;
+  private timeoutManager: IEventScheduler;
   private isBlackingOut: boolean = false;
   private _blackoutLayersUnder: number = 200;
   
@@ -25,7 +25,7 @@ export class SystemEffectsController implements ISystemEffectsController {
   constructor(
     lightTransitionController: LightTransitionController,
     layerManager: ILayerManager,
-    timeoutManager: ITimeoutManager
+    timeoutManager: IEventScheduler
   ) {
     this.lightTransitionController = lightTransitionController;
     this.layerManager = layerManager;

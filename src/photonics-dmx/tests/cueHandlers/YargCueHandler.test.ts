@@ -84,6 +84,9 @@ describe('YargCueHandler', () => {
       cancelBlackout: jest.fn(),
       enableDebug: jest.fn(),
       debugLightLayers: jest.fn(),
+      removeEffectByLayer: jest.fn(),
+      getActiveEffectsForLight: jest.fn(),
+      isLayerFreeForLight: jest.fn(),
       shutdown: jest.fn(),
     } as any;
 
@@ -128,6 +131,7 @@ describe('YargCueHandler', () => {
       fogState: false,
       strobeState: 'Strobe_Off',
       performer: 0,
+      autoGenTrack: false,
       beat: 'Strong',
       keyframe: 'Off',
       bonusEffect: false,
