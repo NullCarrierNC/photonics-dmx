@@ -11,8 +11,8 @@ If you see the term `light` this is the virtual representation used within the l
 
 ## Architecture Overview
 
-1. `Listeners`: listen for game data over the network. Specific implementations for YARG and RB3E. When a lighting cue is received the matching Cue Handler is called.
-2. `Cue Handlers`: receive light cue calls from the listener and generates lighting effects. These are handled somewhat differently between YARG and RB3E.
+1. `Listeners`: listen for game data over the network. Specific implementations for YARG and RB3E. When a lighting cue is received the matching processor is called.
+2. `Processors`: handle game events and convert them to lighting effects. YARG uses cue-based processing while RB3E uses a Processor Manager to select between direct DMX control and cue-based processing. Currently only direct is active.
 3. `Sequencer`: the central coordinator of the lighting system that manages the lifecycle of effects and transitions. It oversees the EffectManager and other components.
 4. `EffectManager`: receives effect data and orchestrates the creation and management of transitions. Handles effect queueing and scheduling.
 5. `LightTransitionController`: processes transitions and interpolates colour states over time, applying easing functions and handling transform timing.
@@ -20,9 +20,38 @@ If you see the term `light` this is the virtual representation used within the l
 7. `DmxLightManager`: manages the virtual representation of the physical DMX fixtures. 
 8. `DmxPublisher`: maps the abstract light state to each fixture's specific DMX channels using the fixture profiles defined in the configuration.
 9. `SenderManager`: manages the various output senders that transmit DMX data to physical devices or other systems.
-10. `Senders`: provide the bridge to the real world. sACN for DMX over the network, EnttecPro for Enttec USB dongles, and IPC for sending DMX data to the application UI.
+10. `Senders`: provide the bridge to the real world. sACN/ArtNet for DMX over the network, EnttecPro for Enttec USB dongles, and IPC for sending DMX data to the application UI.
 
 Configuration is handled by the `ConfigurationManager` and related services, which manage user preferences and fixture setup.
+
+## Processing Architecture
+
+Photonics uses different processing approaches for YARG and RB3E:
+
+### YARG Processing
+YARG uses **cue-based processing** where network cue events are directly converted to lighting cues through the `YargNetworkListener`. 
+
+
+### RB3E Processing
+RB3E uses a **Processor Manager** that can switch between two processing modes:
+
+#### Direct Mode (Default)
+The `StageKitDirectProcessor` provides direct DMX control by:
+- Receiving StageKit light data (4 color banks: Blue, Green, Yellow, Red with 8 positions each)
+- Mapping StageKit positions directly to DMX lights
+- Supporting color blending and accumulation
+- Handling strobe effects
+
+
+#### Cue-Based Mode
+The `CueBasedProcessor` provides cue-based lighting by converting RB3E events to lighting cues.
+This is NOT current accessible. RB3E currently only implements the StageKit direct processing.
+
+
+### Processor Selection
+The system automatically selects the appropriate processor:
+- **YARG**: Always uses cue-based processing
+- **RB3E**: Defaults to direct mode
 
 
 ### Additional Components
@@ -32,9 +61,18 @@ The sequencing system contains several other components, though these are mainly
 - `TransitionEngine`: Handles the animation and timing of transitions between light states.
 - `SongEventHandler`: Processes beat, measure, and other musical events.
 - `SystemEffectsController`: Manages system-level effects blackout, which don't act like normal cue/effects.
-- `TimeoutManager`: Handles scheduling and management of timed events within the system.
+- `EventScheduler`: Handles scheduling and management of timed events within the system using the centralized clock.
+- `Clock`: Provides centralized timing control with 1ms precision for all system components.
 - `EffectTransformer`: Transforms generic effect definitions into concrete transition specifications.
 - `DebugMonitor`: Provides real-time monitoring and debugging capabilities (when enabled in the Cue Handler).
+
+### Processing Components
+
+- `ProcessorManager`: Manages switching between direct DMX control and cue-based processing for RB3E.
+- `StageKitDirectProcessor`: Provides direct StageKit-to-DMX mapping for real-time lighting control.
+- `StageKitLightMapper`: Maps StageKit light positions to DMX light configurations.
+- `CueBasedProcessor`: Handles cue-based lighting for RB3E.
+
 
 
 
@@ -55,7 +93,7 @@ Consider the `stomp` cue: the lights all flash bright white and fade down. This 
 
 ```Typescript
 protected handleCueStomp(_parameters: CueData): Promise<void> {
-    const white: RGBIP = getColor('white', 'max');
+    const white: RGBIO = getColor('white', 'max');
     const lights = this.getLights(['front'], 'all');
     const flash = getEffectFlashColor({
       color: white,
@@ -165,29 +203,61 @@ There are other methods for effect handling; look into `EffectManager` for more 
 In order to output the final light state the layers are collapsed and the final values calculated. 
 `Opacity` and `blendMode` play a key role in how this works:
 
-Example 1:
+## Blend Mode Examples
 
-Layer 10:   R:255,  G:255,  B:255,  I: 255,   Opacity: 0.0, BlendMode: 'add'
-Layer 0:    R:255,  G: 0,   B: 0    I: 255,   Opacity: 1.0, BlendMode: 'replace'
+### Example 1: Replace Mode (Default)
+```
+Layer 10: R:255, G:255, B:255, I:255, Opacity: 0.0, BlendMode: 'replace'
+Layer 0:  R:255, G:0,   B:0,   I:255, Opacity: 1.0, BlendMode: 'replace'
+Result: R:255, G:0, B:0 (Red only)
+```
+Layer 10 has 0.0 opacity (completely transparent), so it contributes nothing. Only Layer 0's red color is visible.
 
-This would result in the lights being red only. The full white of 255, including the 
-intensity (master dimmer) value of 255 don't matter, since the opacity of 0.0 means this 
-layer is transparent.
+### Example 2: Add Mode with Opacity
+```
+Layer 10: R:255, G:255, B:255, I:255, Opacity: 0.5, BlendMode: 'add'
+Layer 0:  R:255, G:0,   B:0,   I:255, Opacity: 1.0, BlendMode: 'add'
+Result: R:255, G:127, B:127 (Red + 50% White)
+```
+With `'add'` blend mode and 0.5 opacity:
+- Red: `255 + (255 * 0.5) = 255 + 127.5 = 382` → capped at 255
+- Green: `0 + (255 * 0.5) = 0 + 127.5 = 127.5` → 127
+- Blue: `0 + (255 * 0.5) = 0 + 127.5 = 127.5` → 127
 
+### Example 3: Replace Mode with Opacity
+```
+Layer 10: R:255, G:255, B:255, I:255, Opacity: 0.5, BlendMode: 'replace'
+Layer 0:  R:255, G:0,   B:0,   I:255, Opacity: 1.0, BlendMode: 'replace'
+Result: R:255, G:127, B:127 (50% White over Red)
+```
+With `'replace'` blend mode and 0.5 opacity:
+- Red: `255` (unchanged, fully opaque)
+- Green: `255 * 0.5 = 127.5` → 127
+- Blue: `255 * 0.5 = 127.5` → 127
 
-Example 2:
+### Example 4: Mixed Blend Modes
+```
+Layer 10: R:255, G:255, B:255, I:255, Opacity: 0.5, BlendMode: 'add'
+Layer 0:  R:255, G:0,   B:0,   I:255, Opacity: 1.0, BlendMode: 'replace'
+Result: R:255, G:127, B:127 (Red + 50% White)
+```
+When mixing blend modes, the system applies the blend mode first, then the opacity:
+- Red: `255` (Layer 0 is fully opaque with 'replace')
+- Green: `0 + (255 * 0.5) = 127.5` → 127 (Layer 10 adds 50% white)
+- Blue: `0 + (255 * 0.5) = 127.5` → 127 (Layer 10 adds 50% white)
 
-Layer 10:   R:255,  G:255,  B:255,  I: 255,   Opacity: 0.5, BlendMode: 'add'
-Layer 0:    R:255,  G: 0,   B: 0    I: 255,   Opacity: 1.0, BlendMode: 'replace'
+## Available Blend Modes
 
-Now that Layer 10's opacity is 0.5, it will apply 50% of its value to the layer below.
-As full on is 255, the Red channel is capped at 255. While the Green and Blue result in 127.
+- **`replace`**: Overwrites lower layer colors (default behavior)
+- **`add`**: Adds to lower layer colors (good for additive blending)
+- **`multiply`**: Multiplies with lower layer colors (good for darkening)
+- **`overlay`**: Combines multiply and screen blending (good for contrast)
 
 
 The system uses `opacity` and `blendMode` for color blending:
 
 ```Typescript
-export type RGBIP = {
+export type RGBIO = {
   red: number; // 0-255
   green: number; // 0-255
   blue: number; // 0-255
