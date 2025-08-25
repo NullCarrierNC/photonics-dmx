@@ -12,7 +12,7 @@
 import { SystemEffectsController } from '../../controllers/sequencer/SystemEffectsController';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
 import { LayerManager } from '../../controllers/sequencer/LayerManager';
-import { TimeoutManager } from '../../controllers/sequencer/TimeoutManager';
+import { EventScheduler } from '../../controllers/sequencer/EventScheduler';
 import { Sequencer } from '../../controllers/sequencer/Sequencer';
 import { createMockRGBIP } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
@@ -20,13 +20,13 @@ import { DmxFixture, FixtureTypes } from '../../types';
 
 jest.mock('../../controllers/sequencer/LightTransitionController');
 jest.mock('../../controllers/sequencer/LayerManager');
-jest.mock('../../controllers/sequencer/TimeoutManager');
+jest.mock('../../controllers/sequencer/EventScheduler');
 jest.mock('../../controllers/sequencer/Sequencer');
 
 describe('SystemEffectsController', () => {
   let lightTransitionController: jest.Mocked<LightTransitionController>;
   let layerManager: jest.Mocked<LayerManager>;
-  let timeoutManager: jest.Mocked<TimeoutManager>;
+  let eventScheduler: jest.Mocked<EventScheduler>;
   let systemEffectsController: SystemEffectsController;
   let sequencer: jest.Mocked<Sequencer>;
 
@@ -68,19 +68,19 @@ describe('SystemEffectsController', () => {
       getActiveEffects: jest.fn().mockReturnValue(new Map())
     } as unknown as jest.Mocked<LayerManager>;
     
-    timeoutManager = {
+    eventScheduler = {
       setTimeout: jest.fn((callback: () => void, delay: number) => {
-        return setTimeout(callback, delay) as unknown as NodeJS.Timeout;
-      }) as any,
+        return 'mock-event-id';
+      }),
       clearAllTimeouts: jest.fn(),
       removeTimeout: jest.fn()
-    } as unknown as jest.Mocked<TimeoutManager>;
+    } as unknown as jest.Mocked<EventScheduler>;
     
     // Create SystemEffectsController instance with mocked dependencies
     systemEffectsController = new SystemEffectsController(
       lightTransitionController,
       layerManager,
-      timeoutManager
+      eventScheduler
     );
     
     // Create a mocked Sequencer that would use this SystemEffectsController

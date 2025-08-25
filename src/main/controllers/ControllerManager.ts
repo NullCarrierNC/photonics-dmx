@@ -255,6 +255,7 @@ export class ControllerManager {
       fogState: false,
       strobeState: strobe,
       performer: 0,
+      autoGenTrack: false,
       beat: 'Off',
       keyframe: 'Off',
       bonusEffect: false,

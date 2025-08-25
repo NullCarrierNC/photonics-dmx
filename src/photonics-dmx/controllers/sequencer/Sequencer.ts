@@ -4,11 +4,12 @@ import { DebugMonitor } from './DebugMonitor';
 import { EffectManager } from './EffectManager';
 import { EffectTransformer } from './EffectTransformer';
 import { SongEventHandler } from './SongEventHandler';
-import { ILightingController } from './interfaces';
+import { ILightingController, LightEffectState } from './interfaces';
 import { LayerManager } from './LayerManager';
 import { SystemEffectsController } from './SystemEffectsController';
-import { TimeoutManager } from './TimeoutManager';
+import { EventScheduler } from './EventScheduler';
 import { TransitionEngine } from './TransitionEngine';
+import { Clock } from './Clock';
 
 /**
  * @class Sequencer
@@ -23,20 +24,22 @@ export class Sequencer implements ILightingController {
   private layerManager: LayerManager;
   private transitionEngine: TransitionEngine;
   private effectTransformer: EffectTransformer;
-  private timeoutManager: TimeoutManager;
+  private eventScheduler: EventScheduler;
   private effectManager: EffectManager;
   private eventHandler: SongEventHandler;
   private systemEffectsController: SystemEffectsController;
   private debugMonitor: DebugMonitor;
+  private clock: Clock;
 
   /**
    * @constructor
    * @param lightTransitionController The underlying light transition controller
    */
   constructor(lightTransitionController: LightTransitionController) {
+    this.clock = new Clock();
     this.lightTransitionController = lightTransitionController;
     this.effectTransformer = new EffectTransformer();
-    this.timeoutManager = new TimeoutManager();
+    this.eventScheduler = new EventScheduler();
     this.layerManager = new LayerManager(this.lightTransitionController);
     this.transitionEngine = new TransitionEngine(
       this.lightTransitionController, 
@@ -45,20 +48,25 @@ export class Sequencer implements ILightingController {
     this.systemEffectsController = new SystemEffectsController(
       this.lightTransitionController,
       this.layerManager,
-      this.timeoutManager
+      this.eventScheduler
     );
     this.effectManager = new EffectManager(
       this.layerManager,
       this.transitionEngine,
       this.effectTransformer,
-      this.timeoutManager,
+      this.eventScheduler,
       this.systemEffectsController
     );
     this.eventHandler = new SongEventHandler(this.layerManager, this.transitionEngine);
     this.debugMonitor = new DebugMonitor(this.lightTransitionController, this.layerManager);
 
-    // Start the animation loop
-    this.transitionEngine.startAnimationLoop();
+    // Register components with the clock
+    this.transitionEngine.registerWithClock(this.clock);
+    this.lightTransitionController.registerWithClock(this.clock);
+    this.eventScheduler.registerWithClock(this.clock);
+
+    // Start the centralized timing system
+    this.clock.start();
   }
 
   /**
@@ -130,6 +138,34 @@ export class Sequencer implements ILightingController {
    */
   public removeAllEffects(): void {
     this.effectManager.removeAllEffects();
+  }
+
+  /**
+   * Removes an effect from a specific layer
+   * @param layer The layer from which to remove the effect
+   * @param shouldRemoveTransitions Whether to remove transition data as well
+   */
+  public removeEffectByLayer(layer: number, shouldRemoveTransitions: boolean = false): void {
+    this.effectManager.removeEffectByLayer(layer, shouldRemoveTransitions);
+  }
+
+  /**
+   * Gets all active effects for a specific light across all layers
+   * @param lightId The ID of the light
+   * @returns A map from layer number to LightEffectState
+   */
+  public getActiveEffectsForLight(lightId: string): Map<number, LightEffectState> {
+    return this.effectManager.getActiveEffectsForLight(lightId);
+  }
+
+  /**
+   * Checks if a specific layer is free for a specific light
+   * @param layer The layer number to check
+   * @param lightId The ID of the light
+   * @returns True if the layer is free for the light, false otherwise
+   */
+  public isLayerFreeForLight(layer: number, lightId: string): boolean {
+    return this.effectManager.isLayerFreeForLight(layer, lightId);
   }
 
   /**
@@ -205,14 +241,22 @@ export class Sequencer implements ILightingController {
     console.log('PhotonicsSequencer shutdown: starting');
     
     try {
-      // Stop the animation loop
-      this.transitionEngine.stopAnimationLoop();
+      // Stop the clock
+      this.clock.stop();
+      
+      // Unregister components from clock
+      this.transitionEngine.unregisterFromClock();
+      this.lightTransitionController.unregisterFromClock();
+      this.eventScheduler.unregisterFromClock();
       
       // Clear all timeouts
-      this.timeoutManager.clearAllTimeouts();
+      this.eventScheduler.clearAllTimeouts();
       
       // Remove all effects
       this.removeAllEffects();
+      
+      // Clean up other resources
+      this.eventScheduler.destroy();
       
       console.log('PhotonicsSequencer shutdown: completed');
     } catch (error) {

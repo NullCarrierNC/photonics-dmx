@@ -229,9 +229,6 @@ export class ProcessorManager extends EventEmitter {
     console.log('ProcessorManager: Cue-based mode started');
   }
 
-  // Note: Hybrid mode removed to prevent conflicting DMX light states
-  // Only one processor can be active at a time to ensure consistent light control
-
   /**
    * Stop all processors
    */

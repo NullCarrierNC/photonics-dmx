@@ -538,7 +538,7 @@ export class CueRegistry {
         console.warn(`Cannot activate group '${groupId}': group not enabled`);
       }
     }
-    console.log(`Active groups set to: ${Array.from(this.activeGroups)}`);
+  //  console.log(`Active groups set to: ${Array.from(this.activeGroups)}`);
   }
 
   /**

@@ -1,10 +1,10 @@
 import { Effect, EffectTransition, RGBIP, TrackedLight } from '../../types';
-import { 
-  IEffectManager, 
-  IEffectTransformer, 
-  ILayerManager, 
-  ISystemEffectsController, 
-  ITimeoutManager, 
+import {
+  IEffectManager,
+  IEffectTransformer,
+  ILayerManager,
+  ISystemEffectsController,
+  IEventScheduler,
   ITransitionEngine,
   LightEffectState
 } from './interfaces';
@@ -32,7 +32,7 @@ export class EffectManager implements IEffectManager {
   private layerManager: ILayerManager;
   private transitionEngine: ITransitionEngine;
   private effectTransformer: IEffectTransformer;
-  private timeoutManager: ITimeoutManager;
+  private timeoutManager: IEventScheduler;
   private systemEffects: ISystemEffectsController;
   private _lastCalled0LayerEffect: string = ""; // Tracks the last effect name that targeted layer 0
 
@@ -48,7 +48,7 @@ export class EffectManager implements IEffectManager {
     layerManager: ILayerManager,
     transitionEngine: ITransitionEngine,
     effectTransformer: IEffectTransformer,
-    timeoutManager: ITimeoutManager,
+    timeoutManager: IEventScheduler,
     systemEffects: ISystemEffectsController
   ) {
     this.layerManager = layerManager;

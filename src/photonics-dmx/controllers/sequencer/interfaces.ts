@@ -19,24 +19,7 @@ export interface LightEffectState {
   isPersistent?: boolean;
 }
 
-/**
- * @interface ActiveEffect
- * @description Holds the transitions for a single layer, now tracking per-light states
- * @deprecated Use LightEffectState for per-light tracking instead
- */
-export interface ActiveEffect {
-  name: string;
-  effect: Effect;
-  transitions: EffectTransition[];
-  trackedLights: TrackedLight[];
-  layer: number;
-  currentTransitionIndex: number;
-  state: 'idle' | 'waitingFor' | 'transitioning' | 'waitingUntil';
-  transitionStartTime: number;
-  waitEndTime: number;
-  lastEndStates?: Map<string, RGBIP>;
-  isPersistent?: boolean;
-}
+
 
 /**
  * @interface QueuedEffect
@@ -97,41 +80,73 @@ export interface ILayerManager {
 }
 
 /**
- * @interface ITimeoutManager
- * @description Manages scheduled operations and timeouts
+ * @interface IEventScheduler
+ * @description Centralized tracking of scheduled events
  */
-export interface ITimeoutManager {
-  /** Sets a timeout and tracks it */
-  setTimeout(callback: () => void, delay: number): NodeJS.Timeout;
-  
-  /** Clears all tracked timeouts */
+export interface IEventScheduler {
+  setTimeout(callback: () => void, delay: number): string;
   clearAllTimeouts(): void;
+  removeTimeout(timeoutId: string): void;
   
-  /** Removes a specific timeout from tracking */
-  removeTimeout(timeoutId: NodeJS.Timeout): void;
+  // Clock integration
+  registerWithClock(clock: any): void;
+  unregisterFromClock(): void;
   
-
+  // Additional scheduling methods
+  scheduleEventAt(targetTime: number, callback: () => void): string;
+  scheduleRepeatingEvent(callback: () => void, interval: number, initialDelay?: number): string;
+  removeEvent(eventId: string): void;
+  destroy(): void;
 }
 
 /**
  * @interface ITransitionEngine
- * @description Handles the animation loop and transition states
+ * @description Handles moving effect transitions through their states
  */
 export interface ITransitionEngine {
-  startAnimationLoop(): void;
-  stopAnimationLoop(): void;
-  updateTransitions(): void;
-  prepareTransition(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
-  handleWaitingFor(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
-  startTransition(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
-  handleTransitioning(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
-  handleWaitingUntil(lightEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
-  getLightTransitionController(): LightTransitionController;
   setEffectManager(effectManager: IEffectManager): void;
+  updateTransitions(deltaTime?: number): void;
+  prepareTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
+  handleWaitingFor(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
+  startTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
+  handleTransitioning(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
+  handleWaitingUntil(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
+  getFinalState(lightId: string, layer: number): RGBIP | undefined;
+  clearFinalStates(layer: number): void;
+  getLightTransitionController(): LightTransitionController;
+  
+  // Clock integration
+  registerWithClock(clock: any): void;
+  unregisterFromClock(): void;
 }
 
 /**
- * @interface IEventHandler
+ * @interface IEffectManager
+ * @description Coordinates the addition, removal, and updating of effects
+ */
+export interface IEffectManager {
+  addEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): void;
+  setEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): Promise<void>;
+  addEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
+  setEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
+  removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;
+  startNextEffectInQueue(layer: number, lightId: string): boolean;
+  getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
+  isLayerFreeForLight(layer: number, lightId: string): boolean;
+  setState(lights: TrackedLight[], color: RGBIP, time: number): void;
+}
+
+/**
+ * @interface IEffectTransformer
+ * @description Transforms effects into transitions grouped by layer and light
+ */
+export interface IEffectTransformer {
+  groupTransitionsByLayerAndLight(transitions: EffectTransition[]): Map<number, Map<string, EffectTransition[]>>;
+  expandTransitionsByLight(transitions: EffectTransition[]): EffectTransition[];
+}
+
+/**
+ * @interface ISongEventHandler
  * @description Processes beat/measure/keyframe events
  */
 export interface ISongEventHandler {
@@ -142,35 +157,13 @@ export interface ISongEventHandler {
 }
 
 /**
- * @interface IEffectManager
- * @description Manages the lifecycle of effects
- */
-export interface IEffectManager {
-  addEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): void;
-  setEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): Promise<void>;
-  addEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
-  setEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
-  removeEffect(name: string, layer: number): void;
-  removeAllEffects(): void;
-  startEffect(name: string, effect: Effect, trackedLights: TrackedLight[], layer: number, transitions: EffectTransition[], isPersistent?: boolean): void;
-  removeEffectByLayer(layer: number, shouldRemoveTransitions: boolean): void;
-  startNextEffectInQueue(layer: number, lightId: string): boolean;
-  setState(lights: TrackedLight[], color: RGBIP, time: number): void;
-  
-  // Per-light effect management
-  getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
-  isLayerFreeForLight(layer: number, lightId: string): boolean;
-}
-
-/**
  * @interface ISystemEffectsController
- * @description Handles special lighting effects
+ * @description Controls system-wide effects like blackouts
  */
 export interface ISystemEffectsController {
-  blackout(duration: number): Promise<void>;
-  cancelBlackout(): void;
   isBlackoutActive(): boolean;
-  getBlackoutLayersUnder(): number;
+  cancelBlackout(): void;
+  setOnBlackoutCompleteCallback(callback: () => void): void;
 }
 
 /**
@@ -185,37 +178,34 @@ export interface IDebugMonitor {
 }
 
 /**
- * @interface IEffectTransformer
- * @description Transforms effect definitions into transitions
- */
-export interface IEffectTransformer {
-  groupTransitionsByLayer(transitions: EffectTransition[]): Map<number, EffectTransition[]>;
-  expandTransitionsByLight(transitions: EffectTransition[]): EffectTransition[];
-  groupTransitionsByLayerAndLight(transitions: EffectTransition[]): Map<number, Map<string, EffectTransition[]>>;
-}
-
-/**
  * @interface ILightingController
- * @description Defines the public API for lighting effects controllers
- *  
- * This is the primary interface that external components such as CueHandlers
- * should use to interact with the lighting system. It serves as a façade for the 
- * underlying EffectManager and other components.
+ * @description Main interface for the lighting system
  */
 export interface ILightingController {
   addEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): void;
   setEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): Promise<void>;
   addEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
   setEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
+  removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;
   removeEffect(name: string, layer: number): void;
   removeAllEffects(): void;
+  getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
+  isLayerFreeForLight(layer: number, lightId: string): boolean;
   setState(lights: TrackedLight[], color: RGBIP, time: number): void;
+  
+  // Song event handling methods
   onBeat(): void;
   onMeasure(): void;
   onKeyframe(): void;
+  
+  // System effects methods
   blackout(duration: number): Promise<void>;
   cancelBlackout(): void;
+  
+  // Debug methods
   enableDebug(enable: boolean, refreshRateMs?: number): void;
   debugLightLayers(): void;
+  
+  // Lifecycle methods
   shutdown(): void;
 }

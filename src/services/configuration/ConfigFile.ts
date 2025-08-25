@@ -145,7 +145,6 @@ export class ConfigFile<T> {
         data: data
       };
       fs.writeFileSync(this.filePath, JSON.stringify(versionedData, null, 2));
-      // Removed verbose save logging - only log errors
     } catch (error) {
       console.error(`Error saving configuration to ${this.filePath}:`, error);
       throw new Error(`Failed to save configuration: ${error}`);
