@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo } from './atoms';
+import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, dmxOutputPrefsAtom, enttecProComPortAtom } from './atoms';
 import { Pages } from './types';
 import squareLogo from './assets/images/photonics-icon.png';
 import LeftMenu from './components/LeftMenu';
@@ -38,6 +38,8 @@ export const App = (): JSX.Element => {
   const setIsSenderError = useSetAtom(isSenderErrorAtom);
   const setSenderError = useSetAtom(senderErrorAtom);
   const setCueState = useSetAtom(currentCueStateAtom);
+  const setDmxOutputPrefs = useSetAtom(dmxOutputPrefsAtom);
+  const setEnttecProComPort = useSetAtom(enttecProComPortAtom);
   const [appVer, setAppVer] = useState('');
 
   // Create a clearErrorTimeout callback that will be used to reset error state
@@ -138,7 +140,38 @@ export const App = (): JSX.Element => {
     const getPrefs = async () => {
       const prefs = await window.electron.ipcRenderer.invoke('get-prefs');
       console.log("\n Prefs", prefs);
-      setPrefs(prefs)
+      setPrefs(prefs);
+      
+      // Initialize DMX output preferences from saved preferences or default values
+      if (prefs.dmxOutputConfig) {
+        console.log('Initializing DMX output preferences from saved config:', prefs.dmxOutputConfig);
+        setDmxOutputPrefs(prefs.dmxOutputConfig);
+      } else {
+        // If no saved preferences, initialize with default values (all disabled)
+        const defaultConfig = {
+          sacnEnabled: false,
+          artNetEnabled: false,
+          enttecProEnabled: false
+        };
+        console.log('No saved DMX output config, using defaults:', defaultConfig);
+        setDmxOutputPrefs(defaultConfig);
+      }
+
+      // Initialize Enttec Pro COM port from saved preferences or default values
+      if (prefs.enttecProPort) {
+        console.log('Initializing Enttec Pro COM port from saved config:', prefs.enttecProPort);
+        setEnttecProComPort(prefs.enttecProPort);
+      } else {
+        // If no saved preferences, initialize with default value (empty string)
+        console.log('No saved Enttec Pro COM port, using default (empty string)');
+        setEnttecProComPort('');
+      }
+      
+      // Debug: Log the complete preferences object to see what we're working with
+      console.log('Complete preferences loaded:', prefs);
+      console.log('DMX Output Config:', prefs.dmxOutputConfig);
+      console.log('Enttec Pro Port:', prefs.enttecProPort);
+      console.log('Enttec Pro COM Port:', prefs.enttecProComPort);
     }
 
     fetchAppVersion();

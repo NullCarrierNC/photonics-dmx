@@ -94,11 +94,38 @@ export const lightingPrefsAtom = atom<any>({});
 export const useComplexCuesAtom = atom<boolean>(false);
 
 /**
+ * Atom for storing DMX output configuration (enabled/disabled state)
+ * This is separate from the active sender state - it controls which outputs are available
+ */
+export const dmxOutputConfigAtom = atom({
+  sacnEnabled: false,
+  artNetEnabled: false,
+  enttecProEnabled: false
+});
+
+/**
+ * Atom for storing DMX output configuration preferences (persisted separately)
+ * This avoids conflicts with the global lightingPrefsAtom
+ */
+export const dmxOutputPrefsAtom = atom({
+  sacnEnabled: false,
+  artNetEnabled: false,
+  enttecProEnabled: false
+});
+
+/**
  * Atom for storing DMX settings UI preferences
  */
 export const dmxSettingsPrefsAtom = atom({
   artNetExpanded: false,
   enttecProExpanded: false
+});
+
+/**
+ * Atom for storing Stage Kit preferences
+ */
+export const stageKitPrefsAtom = atom({
+  yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never'
 });
 
 /**

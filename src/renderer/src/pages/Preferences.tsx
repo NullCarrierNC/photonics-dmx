@@ -1,14 +1,19 @@
 import React from 'react';
 import PrefCueGroups from '../components/PrefCueGroups';
 import CueConsistencySettings from '../components/CueConsistencySettings';
+import DmxOutputSettings from '../components/DmxOutputSettings';
+import StageKitModeSettings from '../components/StageKitModeSettings';
 
 const Preferences: React.FC = () => {
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-2">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Preferences</h1>
+      <DmxOutputSettings />
+      <StageKitModeSettings />
       
       <PrefCueGroups />
       <CueConsistencySettings />
+     
     </div>
   );
 };
