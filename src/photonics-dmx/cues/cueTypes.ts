@@ -42,6 +42,7 @@ export type CueData = {
   
     // Optional RB3E-specific properties
     ledColor?: string | null;
+    ledPositions?: number[];
     
     sustainDurationMs?: number;
     measureOrBeat?: number;

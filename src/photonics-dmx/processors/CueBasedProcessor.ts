@@ -252,6 +252,9 @@ export class CueBasedProcessor extends EventEmitter {
       this.currentCueData.ledColor = colorName;
       this.callLedColorHandler(colorName + ":" + this._currentBrightness);
     }
+    
+    // Emit cue data for network debugging
+    this.emitCueDataForNetworkDebug();
   }
 
   /**
@@ -272,6 +275,9 @@ export class CueBasedProcessor extends EventEmitter {
     
     // Emit processed event
     this.emit('gameState:processed', event);
+    
+    // Emit cue data for network debugging
+    this.emitCueDataForNetworkDebug();
   }
 
   /**
@@ -372,6 +378,14 @@ export class CueBasedProcessor extends EventEmitter {
    */
   public getCurrentBrightness(): 'low' | 'medium' | 'high' {
     return this._currentBrightness;
+  }
+
+  /**
+   * Emit current cue data for network debugging
+   */
+  private emitCueDataForNetworkDebug(): void {
+    // Emit the current cue data for network debugging
+    this.emit('cueHandled', this.currentCueData);
   }
 
   /**

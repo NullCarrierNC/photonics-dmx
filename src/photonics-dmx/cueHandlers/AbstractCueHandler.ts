@@ -131,6 +131,7 @@ export abstract class AbstractCueHandler extends EventEmitter {
     this.off('cueHandled', listener);
   }
 
+  /*
   public addCueDebouncedListener(listener: (data: CueData) => void): void {
     this.on('cueDebounced', listener);
   }
@@ -138,6 +139,7 @@ export abstract class AbstractCueHandler extends EventEmitter {
   public removeCueDebouncedListener(listener: (data: CueData) => void): void {
     this.off('cueDebounced', listener);
   }
+  */
 
   public setEffectDebouncePeriod(time: number): void {
     this.debouncePeriod = time;
@@ -185,7 +187,7 @@ export abstract class AbstractCueHandler extends EventEmitter {
         if (this.lastDebouncedCueCallback) {
           this.lastDebouncedCueCallback();
         }
-        this.emit('cueDebounced', parameters);
+        // this.emit('cueDebounced', parameters); // Commented out as debounced cues are unnecessary
         this.handleStrobe(parameters);
         return;
       }

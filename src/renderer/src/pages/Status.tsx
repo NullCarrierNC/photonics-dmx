@@ -1,4 +1,4 @@
-import CuePreview from '@renderer/components/CuePreview';
+
 import DmxSettingsAccordion from '@renderer/components/DmxSettingAccordion';
 
 const Status = () => {
@@ -71,7 +71,7 @@ const Status = () => {
         <p className="mb-4 mt-3 italic font-bold text-orange-400">
           Light show effects are preliminary in this version.
         </p>
-              */}
+        */}
     </div>
 
 

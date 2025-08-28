@@ -73,21 +73,15 @@ export abstract class BaseCueHandler extends EventEmitter {
     this.off('cueHandled', listener);
   }
 
-  /**
-   * Add a listener for debounced cues
-   * @param listener The listener function
-   */
+  /*
   public addCueDebouncedListener(listener: (data: CueData) => void): void {
     this.on('cueDebounced', listener);
   }
 
-  /**
-   * Remove a listener for debounced cues
-   * @param listener The listener function
-   */
   public removeCueDebouncedListener(listener: (data: CueData) => void): void {
     this.off('cueDebounced', listener);
   }
+  */
 
   /**
    * Set the debounce period for effects
