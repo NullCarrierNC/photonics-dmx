@@ -12,6 +12,18 @@ const Status = () => {
       <hr className="mt-8 mb-8" />
 
       <div className="flex flex-col">
+        <h2 className="text-xl font-bold mb-4">DMX Output</h2>
+        <p className="mb-4">
+          sACN support is enabled by default. Visit preferences to enable other output methods.
+        </p>
+        <p className="mb-4">
+          You will need to configure your lights in My Lights and Light Layout before they will be available for use.
+        </p>
+      </div>
+      
+      <hr className="mt-8 mb-8" />
+
+      <div className="flex flex-col">
         <h2 className="text-xl font-bold mb-4">A Note About Custom Songs</h2>
         <p className="mb-4">
           If you are using custom or converted songs the venue track for driving the
@@ -26,9 +38,7 @@ const Status = () => {
 
       <hr className="mt-8 mb-8" />
       
-      <div className="flex flex-col">
-        <CuePreview />
-      </div>
+      
 
       {/*     Debounce is hidden as it shouldn't be needed. I'm not removing it yet in case it's 
         useful for testing down the road.

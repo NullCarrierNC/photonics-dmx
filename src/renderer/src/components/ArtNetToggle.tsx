@@ -2,16 +2,13 @@ import { useAtom } from 'jotai';
 import { 
   senderArtNetEnabledAtom, 
   artNetConfigAtom,
-  lightingPrefsAtom,
-  dmxOutputPrefsAtom
+  lightingPrefsAtom
 } from '../atoms';
-import { useEffect } from 'react';
 
 const ArtNetToggle = () => {
   const [isArtNetEnabled, setIsArtNetEnabled] = useAtom(senderArtNetEnabledAtom);
   const [artNetConfig] = useAtom(artNetConfigAtom);
   const [prefs] = useAtom(lightingPrefsAtom);
-  const [dmxOutputPrefs] = useAtom(dmxOutputPrefsAtom);
 
   const handleToggle = () => {
     const newState = !isArtNetEnabled;
@@ -29,20 +26,10 @@ const ArtNetToggle = () => {
     }
   };
 
-  useEffect(() => {
-    if (prefs.artNetConfig) {
-      // ArtNet config is now loaded in preferences, but we still need it for the sender
-    }
-  }, [prefs]);
 
-  useEffect(() => {
-    if (prefs.dmxOutputPrefs) {
-      // DMX output config is now loaded in preferences
-    }
-  }, [prefs]);
 
   // Only show the toggle if ArtNet is enabled in preferences
-  if (!dmxOutputPrefs?.artNetEnabled) {
+  if (!prefs.dmxOutputConfig?.artNetEnabled) {
     return null;
   }
 

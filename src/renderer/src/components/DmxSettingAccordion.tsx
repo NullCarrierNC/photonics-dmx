@@ -17,7 +17,7 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps ) => {
 
   useEffect(()=>{
     setIsOpen(startOpen);
-  },[])
+  },[startOpen])
 
   return (
     <div className=" rounded-lg shadow-sm mb-8">
@@ -25,7 +25,7 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps ) => {
         className="flex flex-row gap-4 items-center  text-left font-semibold bg-gray-100 dark:bg-gray-800"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span>DMX Settings</span>
+        <span>Game Settings</span>
         {isOpen ? <FaChevronCircleDown size={20} /> : <FaChevronCircleRight size={20} />}
       </button>
 

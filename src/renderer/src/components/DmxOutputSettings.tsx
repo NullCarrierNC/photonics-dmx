@@ -6,9 +6,7 @@ import {
   senderEnttecProEnabledAtom,
   artNetConfigAtom,
   enttecProComPortAtom,
-  lightingPrefsAtom,
-  dmxSettingsPrefsAtom,
-  dmxOutputPrefsAtom
+  lightingPrefsAtom
 } from '../atoms';
 
 const DmxOutputSettings: React.FC = () => {
@@ -17,9 +15,7 @@ const DmxOutputSettings: React.FC = () => {
   const [isEnttecProEnabled, setIsEnttecProEnabled] = useAtom(senderEnttecProEnabledAtom);
   const [artNetConfig, setArtNetConfig] = useAtom(artNetConfigAtom);
   const [comPort, setComPort] = useAtom(enttecProComPortAtom);
-  const [prefs] = useAtom(lightingPrefsAtom);
-  const [dmxSettingsPrefs, setDmxSettingsPrefs] = useAtom(dmxSettingsPrefsAtom);
-  const [dmxOutputPrefs, setDmxOutputPrefs] = useAtom(dmxOutputPrefsAtom);
+  const [prefs, setPrefs] = useAtom(lightingPrefsAtom);
 
   const [artNetExpanded, setArtNetExpanded] = useState(false);
   const [enttecProExpanded, setEnttecProExpanded] = useState(false);
@@ -37,77 +33,61 @@ const DmxOutputSettings: React.FC = () => {
     if (prefs.enttecProPort) {
       setComPort(prefs.enttecProPort);
     }
-    if (prefs.dmxSettingsPrefs) {
-      setDmxSettingsPrefs(prev => ({
-        ...prev,
-        ...prefs.dmxSettingsPrefs
-      }));
-    }
-  }, [prefs, setArtNetConfig, setComPort, setDmxSettingsPrefs]);
+    // dmxSettingsPrefs are now handled centrally in App.tsx
+  }, [prefs, setArtNetConfig, setComPort]);
 
   // Load DMX output configuration independently
   useEffect(() => {
     console.log('Checking DMX output configuration state');
-    console.log('Current dmxOutputPrefs:', dmxOutputPrefs);
     console.log('Preferences dmxOutputConfig:', prefs.dmxOutputConfig);
     
-    // Check if the atom is in its default state (all false)
-    const isDefaultState = dmxOutputPrefs.sacnEnabled === false && 
-                          dmxOutputPrefs.artNetEnabled === false && 
-                          dmxOutputPrefs.enttecProEnabled === false;
-    
-    if (isDefaultState) {
-      console.log('Atom is in default state, loading from preferences or initializing');
+    // Check if preferences need to be initialized
+    if (!prefs.dmxOutputConfig) {
+      console.log('No DMX output config in preferences, initializing from sender states');
       
-      // Try to load from preferences first
-      if (prefs.dmxOutputConfig) {
-        console.log('Loading dmxOutputConfig from preferences:', prefs.dmxOutputConfig);
-        setDmxOutputPrefs(prefs.dmxOutputConfig);
-      } else {
-        // Initialize from current sender states
-        const initialConfig = {
-          sacnEnabled: isSacnEnabled,
-          artNetEnabled: isArtNetEnabled,
-          enttecProEnabled: isEnttecProEnabled
-        };
-        
-        console.log('Initializing dmxOutputPrefs from sender states:', initialConfig);
-        setDmxOutputPrefs(initialConfig);
-        
-        // Save the initial configuration to preferences
-        window.electron.ipcRenderer.invoke('save-prefs', {
-          dmxOutputConfig: initialConfig
-        }).catch(error => {
-          console.error('Failed to save initial DMX output configuration:', error);
-        });
-      }
-    } else {
-      console.log('Atom already has state, not reloading from preferences');
+      // Initialize from current sender states
+      const initialConfig = {
+        sacnEnabled: isSacnEnabled,
+        artNetEnabled: isArtNetEnabled,
+        enttecProEnabled: isEnttecProEnabled
+      };
+      
+      console.log('Initializing dmxOutputConfig from sender states:', initialConfig);
+      
+      // Save the initial configuration to preferences
+      setPrefs(prev => ({
+        ...prev,
+        dmxOutputConfig: initialConfig
+      }));
+      
+      window.electron.ipcRenderer.invoke('save-prefs', {
+        dmxOutputConfig: initialConfig
+      }).catch(error => {
+        console.error('Failed to save initial DMX output configuration:', error);
+      });
     }
-  }, [prefs.dmxOutputConfig, isSacnEnabled, isArtNetEnabled, isEnttecProEnabled, setDmxOutputPrefs, dmxOutputPrefs]);
+  }, [prefs.dmxOutputConfig, isSacnEnabled, isArtNetEnabled, isEnttecProEnabled, setPrefs]);
 
-  // Debug logging for state changes
-  useEffect(() => {
-    console.log('dmxOutputPrefs changed:', dmxOutputPrefs);
-  }, [dmxOutputPrefs]);
 
-  // Debug logging for preferences loading
-  useEffect(() => {
-    console.log('Preferences loaded');
-  }, [prefs]);
 
   const handleSacnToggle = async () => {
-    console.log('sACN toggle clicked, current state:', dmxOutputPrefs.sacnEnabled);
-    const newState = !dmxOutputPrefs.sacnEnabled;
+    const currentState = prefs.dmxOutputConfig?.sacnEnabled || false;
+    console.log('sACN toggle clicked, current state:', currentState);
+    const newState = !currentState;
     const newConfig = {
-      ...dmxOutputPrefs,
-      sacnEnabled: newState
+      ...prefs.dmxOutputConfig,
+      sacnEnabled: newState,
+      artNetEnabled: prefs.dmxOutputConfig?.artNetEnabled || false,
+      enttecProEnabled: prefs.dmxOutputConfig?.enttecProEnabled || false
     };
     
     console.log('Setting new config:', newConfig);
     
-    // Update the local atom state
-    setDmxOutputPrefs(newConfig);
+    // Update the global preferences
+    setPrefs(prev => ({
+      ...prev,
+      dmxOutputConfig: newConfig
+    }));
     
     // If disabling sACN, stop the sender if it's running and turn off the toggle
     if (!newState && isSacnEnabled) {
@@ -127,17 +107,23 @@ const DmxOutputSettings: React.FC = () => {
   };
 
   const handleArtNetToggle = async () => {
-    console.log('ArtNet toggle clicked, current state:', dmxOutputPrefs.artNetEnabled);
-    const newState = !dmxOutputPrefs.artNetEnabled;
+    const currentState = prefs.dmxOutputConfig?.artNetEnabled || false;
+    console.log('ArtNet toggle clicked, current state:', currentState);
+    const newState = !currentState;
     const newConfig = {
-      ...dmxOutputPrefs,
-      artNetEnabled: newState
+      ...prefs.dmxOutputConfig,
+      artNetEnabled: newState,
+      sacnEnabled: prefs.dmxOutputConfig?.sacnEnabled || false,
+      enttecProEnabled: prefs.dmxOutputConfig?.enttecProEnabled || false
     };
     
     console.log('Setting new config:', newConfig);
     
-    // Update the local atom state
-    setDmxOutputPrefs(newConfig);
+    // Update the global preferences
+    setPrefs(prev => ({
+      ...prev,
+      dmxOutputConfig: newConfig
+    }));
     
     // If disabling ArtNet, stop the sender if it's running and turn off the toggle
     if (!newState && isArtNetEnabled) {
@@ -157,17 +143,23 @@ const DmxOutputSettings: React.FC = () => {
   };
 
   const handleEnttecProToggle = async () => {
-    console.log('Enttec Pro toggle clicked, current state:', dmxOutputPrefs.enttecProEnabled);
-    const newState = !dmxOutputPrefs.enttecProEnabled;
+    const currentState = prefs.dmxOutputConfig?.enttecProEnabled || false;
+    console.log('Enttec Pro toggle clicked, current state:', currentState);
+    const newState = !currentState;
     const newConfig = {
-      ...dmxOutputPrefs,
-      enttecProEnabled: newState
+      ...prefs.dmxOutputConfig,
+      enttecProEnabled: newState,
+      sacnEnabled: prefs.dmxOutputConfig?.sacnEnabled || false,
+      artNetEnabled: prefs.dmxOutputConfig?.artNetEnabled || false
     };
     
     console.log('Setting new config:', newConfig);
     
-    // Update the local atom state
-    setDmxOutputPrefs(newConfig);
+    // Update the global preferences
+    setPrefs(prev => ({
+      ...prev,
+      dmxOutputConfig: newConfig
+    }));
     
     // If disabling Enttec Pro, stop the sender if it's running and turn off the toggle
     if (!newState && isEnttecProEnabled) {
@@ -235,7 +227,7 @@ const DmxOutputSettings: React.FC = () => {
           <label className="flex items-center space-x-2">
             <input
               type="checkbox"
-              checked={dmxOutputPrefs.sacnEnabled}
+              checked={prefs.dmxOutputConfig?.sacnEnabled || false}
               onChange={handleSacnToggle}
               className="form-checkbox h-4 w-4 text-blue-600 rounded"
             />
@@ -245,7 +237,7 @@ const DmxOutputSettings: React.FC = () => {
           <label className="flex items-center space-x-2">
             <input
               type="checkbox"
-              checked={dmxOutputPrefs.artNetEnabled}
+              checked={prefs.dmxOutputConfig?.artNetEnabled || false}
               onChange={handleArtNetToggle}
               className="form-checkbox h-4 w-4 text-blue-600 rounded"
             />
@@ -255,7 +247,7 @@ const DmxOutputSettings: React.FC = () => {
           <label className="flex items-center space-x-2">
             <input
               type="checkbox"
-              checked={dmxOutputPrefs.enttecProEnabled}
+              checked={prefs.dmxOutputConfig?.enttecProEnabled || false}
               onChange={handleEnttecProToggle}
               className="form-checkbox h-4 w-4 text-blue-600 rounded"
             />

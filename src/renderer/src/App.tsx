@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, dmxOutputPrefsAtom, enttecProComPortAtom } from './atoms';
+import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom } from './atoms';
 import { Pages } from './types';
 import squareLogo from './assets/images/photonics-icon.png';
 import LeftMenu from './components/LeftMenu';
@@ -38,7 +38,6 @@ export const App = (): JSX.Element => {
   const setIsSenderError = useSetAtom(isSenderErrorAtom);
   const setSenderError = useSetAtom(senderErrorAtom);
   const setCueState = useSetAtom(currentCueStateAtom);
-  const setDmxOutputPrefs = useSetAtom(dmxOutputPrefsAtom);
   const setEnttecProComPort = useSetAtom(enttecProComPortAtom);
   const [appVer, setAppVer] = useState('');
 
@@ -143,10 +142,7 @@ export const App = (): JSX.Element => {
       setPrefs(prefs);
       
       // Initialize DMX output preferences from saved preferences or default values
-      if (prefs.dmxOutputConfig) {
-        console.log('Initializing DMX output preferences from saved config:', prefs.dmxOutputConfig);
-        setDmxOutputPrefs(prefs.dmxOutputConfig);
-      } else {
+      if (!prefs.dmxOutputConfig) {
         // If no saved preferences, initialize with default values (all disabled)
         const defaultConfig = {
           sacnEnabled: false,
@@ -154,7 +150,10 @@ export const App = (): JSX.Element => {
           enttecProEnabled: false
         };
         console.log('No saved DMX output config, using defaults:', defaultConfig);
-        setDmxOutputPrefs(defaultConfig);
+        setPrefs(prev => ({
+          ...prev,
+          dmxOutputConfig: defaultConfig
+        }));
       }
 
       // Initialize Enttec Pro COM port from saved preferences or default values
@@ -167,11 +166,38 @@ export const App = (): JSX.Element => {
         setEnttecProComPort('');
       }
       
+      // Initialize Stage Kit preferences if not present
+      if (!prefs.stageKitPrefs) {
+        const defaultStageKitPrefs = {
+          yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never'
+        };
+        console.log('No saved Stage Kit preferences, using defaults:', defaultStageKitPrefs);
+        setPrefs(prev => ({
+          ...prev,
+          stageKitPrefs: defaultStageKitPrefs
+        }));
+      }
+      
+      // Initialize DMX settings preferences if not present
+      if (!prefs.dmxSettingsPrefs) {
+        const defaultDmxSettingsPrefs = {
+          artNetExpanded: false,
+          enttecProExpanded: false
+        };
+        console.log('No saved DMX settings preferences, using defaults:', defaultDmxSettingsPrefs);
+        setPrefs(prev => ({
+          ...prev,
+          dmxSettingsPrefs: defaultDmxSettingsPrefs
+        }));
+      }
+      
       // Debug: Log the complete preferences object to see what we're working with
       console.log('Complete preferences loaded:', prefs);
       console.log('DMX Output Config:', prefs.dmxOutputConfig);
       console.log('Enttec Pro Port:', prefs.enttecProPort);
       console.log('Enttec Pro COM Port:', prefs.enttecProComPort);
+      console.log('Stage Kit Prefs:', prefs.stageKitPrefs);
+      console.log('DMX Settings Prefs:', prefs.dmxSettingsPrefs);
     }
 
     fetchAppVersion();

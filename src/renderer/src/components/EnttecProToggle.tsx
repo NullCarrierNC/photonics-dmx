@@ -1,21 +1,10 @@
 import { useAtom } from 'jotai';
-import { enttecProComPortAtom, lightingPrefsAtom, senderEnttecProEnabledAtom, dmxOutputPrefsAtom } from '../atoms';
-
-import { useEffect } from 'react';
+import { enttecProComPortAtom, senderEnttecProEnabledAtom, lightingPrefsAtom } from '../atoms';
 
 const EnttecProToggle = () => {
   const [isEnttecProEnabled, setIsEnttecProEnabled] = useAtom(senderEnttecProEnabledAtom);
   const [comPort] = useAtom(enttecProComPortAtom);
   const [prefs] = useAtom(lightingPrefsAtom);
-  const [dmxOutputPrefs] = useAtom(dmxOutputPrefsAtom);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('EnttecProToggle - comPort:', comPort);
-    console.log('EnttecProToggle - comPort.length:', comPort.length);
-    console.log('EnttecProToggle - dmxOutputPrefs:', dmxOutputPrefs);
-    console.log('EnttecProToggle - will be disabled:', comPort.length < 3);
-  }, [comPort, dmxOutputPrefs]);
 
   const handleToggle = () => {
     const newState = !isEnttecProEnabled;
@@ -30,20 +19,10 @@ const EnttecProToggle = () => {
     }
   };
 
-  useEffect(()=>{
-    if (prefs.enttecProPort) {
-      // COM port is now loaded in preferences, but we still need it for the sender
-    }
-  },[prefs]);
 
-  useEffect(() => {
-    if (prefs.dmxOutputPrefs) {
-      // DMX output config is now loaded in preferences
-    }
-  }, [prefs]);
 
   // Only show the toggle if Enttec Pro is enabled in preferences
-  if (!dmxOutputPrefs?.enttecProEnabled) {
+  if (!prefs.dmxOutputConfig?.enttecProEnabled) {
     return null;
   }
 

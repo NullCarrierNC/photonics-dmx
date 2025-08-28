@@ -90,43 +90,51 @@ export const artNetConfigAtom = atom({
   port: 6454
 });
 
-export const lightingPrefsAtom = atom<any>({});
+/**
+ * Interface for lighting preferences stored in the frontend
+ * This extends the backend AppPreferences with frontend-specific properties
+ */
+export interface LightingPreferences {
+  // Backend preferences
+  effectDebounce?: number;
+  complex?: boolean;
+  enttecProPort?: string;
+  artNetConfig?: {
+    host: string;
+    universe: number;
+    net: number;
+    subnet: number;
+    subuni: number;
+    port: number;
+  };
+  brightness?: {
+    low: number;
+    medium: number;
+    high: number;
+    max: number;
+  };
+  enabledCueGroups?: string[];
+  cueConsistencyWindow?: number;
+  
+  // Frontend-specific preferences
+  dmxOutputConfig?: {
+    sacnEnabled: boolean;
+    artNetEnabled: boolean;
+    enttecProEnabled: boolean;
+  };
+  stageKitPrefs?: {
+    yargPriority: 'prefer-for-tracked' | 'random' | 'never';
+  };
+  dmxSettingsPrefs?: {
+    artNetExpanded: boolean;
+    enttecProExpanded: boolean;
+  };
+}
+
+export const lightingPrefsAtom = atom<LightingPreferences>({});
 export const useComplexCuesAtom = atom<boolean>(false);
 
-/**
- * Atom for storing DMX output configuration (enabled/disabled state)
- * This is separate from the active sender state - it controls which outputs are available
- */
-export const dmxOutputConfigAtom = atom({
-  sacnEnabled: false,
-  artNetEnabled: false,
-  enttecProEnabled: false
-});
 
-/**
- * Atom for storing DMX output configuration preferences (persisted separately)
- * This avoids conflicts with the global lightingPrefsAtom
- */
-export const dmxOutputPrefsAtom = atom({
-  sacnEnabled: false,
-  artNetEnabled: false,
-  enttecProEnabled: false
-});
-
-/**
- * Atom for storing DMX settings UI preferences
- */
-export const dmxSettingsPrefsAtom = atom({
-  artNetExpanded: false,
-  enttecProExpanded: false
-});
-
-/**
- * Atom for storing Stage Kit preferences
- */
-export const stageKitPrefsAtom = atom({
-  yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never'
-});
 
 /**
  * Atoms for tracking current cue state (pushed from backend)

@@ -1,10 +1,10 @@
 
 import { useAtom } from 'jotai';
-import { senderSacnEnabledAtom, dmxOutputPrefsAtom } from '../atoms';
+import { senderSacnEnabledAtom, lightingPrefsAtom } from '../atoms';
 
 const SacnToggle = () => {
   const [isSacnEnabled, setIsSacnEnabled] = useAtom(senderSacnEnabledAtom);
-  const [dmxOutputPrefs] = useAtom(dmxOutputPrefsAtom);
+  const [prefs] = useAtom(lightingPrefsAtom);
 
   const handleToggle = () => {
     const newState = !isSacnEnabled;
@@ -20,7 +20,7 @@ const SacnToggle = () => {
   };
 
   // Only show the toggle if sACN is enabled in preferences
-  if (!dmxOutputPrefs?.sacnEnabled) {
+  if (!prefs.dmxOutputConfig?.sacnEnabled) {
     return null;
   }
 

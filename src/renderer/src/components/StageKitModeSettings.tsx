@@ -1,31 +1,29 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useAtom } from 'jotai';
-import { lightingPrefsAtom, stageKitPrefsAtom } from '../atoms';
+import { lightingPrefsAtom } from '../atoms';
 
 const StageKitModeSettings: React.FC = () => {
-  const [prefs] = useAtom(lightingPrefsAtom);
-  const [stageKitPrefs, setStageKitPrefs] = useAtom(stageKitPrefsAtom);
+  const [prefs, setPrefs] = useAtom(lightingPrefsAtom);
 
-  useEffect(() => {
-    if (prefs.stageKitPrefs) {
-      setStageKitPrefs(prev => ({
-        ...prev,
-        ...prefs.stageKitPrefs
-      }));
-    }
-  }, [prefs, setStageKitPrefs]);
+
+
+
 
   const handlePriorityChange = async (priority: 'prefer-for-tracked' | 'random' | 'never') => {
-    const newPrefs = {
-      ...stageKitPrefs,
+    const newStageKitPrefs = {
       yargPriority: priority
     };
     
-    setStageKitPrefs(newPrefs);
+    // Update the global preferences
+    setPrefs(prev => ({
+      ...prev,
+      stageKitPrefs: newStageKitPrefs
+    }));
     
     try {
+      // Save to backend
       await window.electron.ipcRenderer.invoke('save-prefs', {
-        stageKitPrefs: newPrefs
+        stageKitPrefs: newStageKitPrefs
       });
     } catch (error) {
       console.error('Failed to save Stage Kit preferences:', error);
@@ -73,7 +71,7 @@ const StageKitModeSettings: React.FC = () => {
             </label>
             <select
               id="stagekit-priority"
-              value={stageKitPrefs.yargPriority}
+              value={prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked'}
               onChange={(e) => handlePriorityChange(e.target.value as 'prefer-for-tracked' | 'random' | 'never')}
               className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
@@ -84,7 +82,7 @@ const StageKitModeSettings: React.FC = () => {
               ))}
             </select>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              {getPriorityDescription(stageKitPrefs.yargPriority)}
+              {getPriorityDescription(prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked')}
             </p>
           </div>
         </div>
