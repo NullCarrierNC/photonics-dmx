@@ -24,6 +24,20 @@ export interface AppPreferences {
   };
   enabledCueGroups: string[];
   cueConsistencyWindow: number;
+  
+  // Frontend-specific preferences
+  dmxOutputConfig?: {
+    sacnEnabled: boolean;
+    artNetEnabled: boolean;
+    enttecProEnabled: boolean;
+  };
+  stageKitPrefs?: {
+    yargPriority: 'prefer-for-tracked' | 'random' | 'never';
+  };
+  dmxSettingsPrefs?: {
+    artNetExpanded: boolean;
+    enttecProExpanded: boolean;
+  };
 }
 
 /**
@@ -41,6 +55,20 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   complex: true,
   enabledCueGroups: ['default', 'coolWarmAlt1', 'coolWarmAlt2'],
   cueConsistencyWindow: 2000,
+  
+  // Frontend-specific preferences defaults
+  dmxOutputConfig: {
+    sacnEnabled: true,
+    artNetEnabled: false,
+    enttecProEnabled: false
+  },
+  stageKitPrefs: {
+    yargPriority: 'prefer-for-tracked'
+  },
+  dmxSettingsPrefs: {
+    artNetExpanded: false,
+    enttecProExpanded: false
+  }
 };
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {

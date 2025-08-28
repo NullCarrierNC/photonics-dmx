@@ -90,16 +90,51 @@ export const artNetConfigAtom = atom({
   port: 6454
 });
 
-export const lightingPrefsAtom = atom<any>({});
+/**
+ * Interface for lighting preferences stored in the frontend
+ * This extends the backend AppPreferences with frontend-specific properties
+ */
+export interface LightingPreferences {
+  // Backend preferences
+  effectDebounce?: number;
+  complex?: boolean;
+  enttecProPort?: string;
+  artNetConfig?: {
+    host: string;
+    universe: number;
+    net: number;
+    subnet: number;
+    subuni: number;
+    port: number;
+  };
+  brightness?: {
+    low: number;
+    medium: number;
+    high: number;
+    max: number;
+  };
+  enabledCueGroups?: string[];
+  cueConsistencyWindow?: number;
+  
+  // Frontend-specific preferences
+  dmxOutputConfig?: {
+    sacnEnabled: boolean;
+    artNetEnabled: boolean;
+    enttecProEnabled: boolean;
+  };
+  stageKitPrefs?: {
+    yargPriority: 'prefer-for-tracked' | 'random' | 'never';
+  };
+  dmxSettingsPrefs?: {
+    artNetExpanded: boolean;
+    enttecProExpanded: boolean;
+  };
+}
+
+export const lightingPrefsAtom = atom<LightingPreferences>({});
 export const useComplexCuesAtom = atom<boolean>(false);
 
-/**
- * Atom for storing DMX settings UI preferences
- */
-export const dmxSettingsPrefsAtom = atom({
-  artNetExpanded: false,
-  enttecProExpanded: false
-});
+
 
 /**
  * Atoms for tracking current cue state (pushed from backend)

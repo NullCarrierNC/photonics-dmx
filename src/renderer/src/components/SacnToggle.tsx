@@ -1,9 +1,10 @@
 
 import { useAtom } from 'jotai';
-import { senderSacnEnabledAtom } from '../atoms';
+import { senderSacnEnabledAtom, lightingPrefsAtom } from '../atoms';
 
 const SacnToggle = () => {
   const [isSacnEnabled, setIsSacnEnabled] = useAtom(senderSacnEnabledAtom);
+  const [prefs] = useAtom(lightingPrefsAtom);
 
   const handleToggle = () => {
     const newState = !isSacnEnabled;
@@ -13,10 +14,15 @@ const SacnToggle = () => {
       window.electron.ipcRenderer.send('sender-enable', {sender: 'sacn'});
       console.log('sACN enabled');
     } else {
-      window.electron.ipcRenderer.send('sender-disable',  {sender: 'sacn'} );
+      window.electron.ipcRenderer.send('sender-disable', {sender: 'sacn'});
       console.log('sACN disabled');
     }
   };
+
+  // Only show the toggle if sACN is enabled in preferences
+  if (!prefs.dmxOutputConfig?.sacnEnabled) {
+    return null;
+  }
 
   return (
     <div className="flex items-center mb-4  w-[220px] justify-between">
