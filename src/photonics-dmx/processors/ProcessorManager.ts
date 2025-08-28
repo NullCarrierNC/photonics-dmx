@@ -5,8 +5,8 @@
  * traditional cue mode, hybrid mode) and manages their lifecycle.
  */
 import { EventEmitter } from 'events';
-import { StageKitDirectProcessor } from './StageKitDirectProcessor';
-import { CueBasedProcessor } from './CueBasedProcessor';
+import { Rb3StageKitDirectProcessor } from './Rb3StageKitDirectProcessor';
+import { Rb3CueBasedProcessor } from './Rb3CueBasedProcessor';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { AbstractCueHandler } from '../cueHandlers/AbstractCueHandler';
@@ -43,8 +43,8 @@ export class ProcessorManager extends EventEmitter {
   private networkListener: EventEmitter | null = null;
   
   // Processors
-  private stageKitDirectProcessor: StageKitDirectProcessor | null = null;
-  private cueProcessor: CueBasedProcessor | null = null;
+  private stageKitDirectProcessor: Rb3StageKitDirectProcessor | null = null;
+  private cueProcessor: Rb3CueBasedProcessor | null = null;
   
   // Dependencies
   private lightManager: DmxLightManager;
@@ -104,7 +104,7 @@ export class ProcessorManager extends EventEmitter {
     // Recreate traditional processor if it exists
     if (this.cueProcessor) {
       this.cueProcessor.destroy();
-      this.cueProcessor = new CueBasedProcessor(cueHandler);
+      this.cueProcessor = new Rb3CueBasedProcessor(cueHandler);
       
       // Listen for cue data events from the processor
       this.cueProcessor.on('cueHandled', (cueData: CueData) => {
@@ -206,7 +206,7 @@ export class ProcessorManager extends EventEmitter {
     
     if (!this.stageKitDirectProcessor) {
       console.log('ProcessorManager: Creating new StageKitDirectProcessor...');
-      this.stageKitDirectProcessor = new StageKitDirectProcessor(
+      this.stageKitDirectProcessor = new Rb3StageKitDirectProcessor(
         this.lightManager,
         this.photonicsSequencer,
         this.config.stageKitConfig
@@ -236,7 +236,7 @@ export class ProcessorManager extends EventEmitter {
     }
     
     if (!this.cueProcessor) {
-      this.cueProcessor = new CueBasedProcessor(this.cueHandler);
+      this.cueProcessor = new Rb3CueBasedProcessor(this.cueHandler);
     }
     
     // Listen for cue data events from the processor
@@ -267,14 +267,14 @@ export class ProcessorManager extends EventEmitter {
   /**
    * Get StageKit direct processor (for direct access if needed)
    */
-  public getStageKitDirectProcessor(): StageKitDirectProcessor | null {
+  public getStageKitDirectProcessor(): Rb3StageKitDirectProcessor | null {
     return this.stageKitDirectProcessor;
   }
 
   /**
    * Get traditional cue processor (for direct access if needed)
    */
-  public getCueBasedProcessor(): CueBasedProcessor | null {
+  public getCueBasedProcessor(): Rb3CueBasedProcessor | null {
     return this.cueProcessor;
   }
 

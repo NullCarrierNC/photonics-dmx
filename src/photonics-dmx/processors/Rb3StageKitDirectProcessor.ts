@@ -26,7 +26,7 @@ export interface StageKitData {
   timestamp: number;
 }
 
-export class StageKitDirectProcessor extends EventEmitter {
+export class Rb3StageKitDirectProcessor extends EventEmitter {
   private lightMapper: StageKitLightMapper;
   private config: StageKitConfig;
   
