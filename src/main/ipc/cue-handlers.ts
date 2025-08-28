@@ -69,16 +69,6 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
     return controllerManager.getRb3ProcessorStats();
   });
   
-  // Send cue data to renderer
-  const sendCueDebouncedData = (cueData: CueData) => {
-    // Get all windows and send data to the first one
-    const allWindows = BrowserWindow.getAllWindows();
-    const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-    if (mainWindow) {
-      mainWindow.webContents.send('cue-debounced', cueData);
-    }
-  };
-  
   // Send handled cue data to renderer
   const sendCueHandledData = (cueData: CueData) => {
     // Get all windows and send data to the first one
@@ -91,15 +81,29 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   
   // Listen for cue data
   ipcMain.on('set-listen-cue-data', (_, shouldListen: boolean) => {
-    const cueHandler = controllerManager.getCueHandler();
-    if (!cueHandler) return;
-    
     if (shouldListen) {
-      cueHandler.addCueDebouncedListener(sendCueDebouncedData);
-      cueHandler.addCueHandledListener(sendCueHandledData);
+      // Listen to cue handler if it exists
+      const cueHandler = controllerManager.getCueHandler();
+      if (cueHandler) {
+        cueHandler.addCueHandledListener(sendCueHandledData);
+      }
+      
+      // Also listen to ProcessorManager for RB3E direct mode
+      const processorManager = controllerManager.getProcessorManager();
+      if (processorManager) {
+        processorManager.on('cueHandled', sendCueHandledData);
+      }
     } else {
-      cueHandler.removeCueDebouncedListener(sendCueDebouncedData);
-      cueHandler.removeCueHandledListener(sendCueHandledData);
+      // Remove listeners
+      const cueHandler = controllerManager.getCueHandler();
+      if (cueHandler) {
+        cueHandler.removeCueHandledListener(sendCueHandledData);
+      }
+      
+      const processorManager = controllerManager.getProcessorManager();
+      if (processorManager) {
+        processorManager.off('cueHandled', sendCueHandledData);
+      }
     }
   });
 
@@ -121,5 +125,15 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   ipcMain.on('cue-style', (_, style: 'simple' | 'complex') => {
     // Save complex cue style preference
     controllerManager.getConfig().setPreference('complex', style === 'complex');
+  });
+
+  // Get YARG enabled state
+  ipcMain.handle('get-yarg-enabled', () => {
+    return controllerManager.getIsYargEnabled();
+  });
+
+  // Get RB3 enabled state
+  ipcMain.handle('get-rb3-enabled', () => {
+    return controllerManager.getIsRb3Enabled();
   });
 } 

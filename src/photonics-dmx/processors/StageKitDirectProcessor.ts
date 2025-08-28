@@ -13,6 +13,7 @@ import { ILightingController } from '../controllers/sequencer/interfaces';
 import { StageKitLightMapper } from './StageKitLightMapper';
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes';
 import { getColor } from '../helpers/dmxHelpers';
+import { CueData } from '../cues/cueTypes';
 
 /**
  * StageKit data structure
@@ -160,6 +161,9 @@ export class StageKitDirectProcessor extends EventEmitter {
       strobeEffect,
       timestamp: Date.now()
     });
+
+    // Emit cue data for network debugging
+    this.emitCueDataForStageKit(event);
   }
 
   /**
@@ -771,6 +775,65 @@ export class StageKitDirectProcessor extends EventEmitter {
     await this.turnOffAllLights();
   }
 
+
+  /**
+   * Create and emit CueData for network debugging
+   * @param event The StageKit event data
+   */
+  private emitCueDataForStageKit(event: StageKitData): void {
+    const { positions, color, strobeEffect } = event;
+    
+    // Create cue data from StageKit event
+    const cueData: CueData = {
+      datagramVersion: 1,
+      platform: "RB3E",
+      currentScene: "Gameplay",
+      pauseState: "Unpaused",
+      venueSize: "Large",
+      beatsPerMinute: 120,
+      songSection: "Verse",
+      guitarNotes: [],
+      bassNotes: [],
+      drumNotes: [],
+      keysNotes: [],
+      vocalNote: 0,
+      harmony0Note: 0,
+      harmony1Note: 0,
+      harmony2Note: 0,
+      lightingCue: "StageKitDirect",
+      postProcessing: "Default",
+      fogState: false,
+      strobeState: strobeEffect === 'off' ? "Strobe_Off" : 
+                   strobeEffect === 'slow' ? "Strobe_Slow" :
+                   strobeEffect === 'medium' ? "Strobe_Medium" :
+                   strobeEffect === 'fast' ? "Strobe_Fast" :
+                   strobeEffect === 'fastest' ? "Strobe_Fastest" : "Strobe_Off",
+      performer: 0,
+      autoGenTrack: false,
+      beat: "Strong",
+      keyframe: "Off",
+      bonusEffect: false,
+      ledColor: color === 'off' ? '' : color,
+      ledPositions: positions,
+      rb3Platform: "RB3E",
+      rb3BuildTag: "",
+      rb3SongName: "",
+      rb3SongArtist: "",
+      rb3SongShortName: "",
+      rb3VenueName: "",
+      rb3ScreenName: "",
+      rb3BandInfo: { members: [] },
+      rb3ModData: { identifyValue: "", string: "" },
+      totalScore: 0,
+      memberScores: [],
+      stars: 0,
+      sustainDurationMs: 0,
+      measureOrBeat: 0
+    };
+
+    // Emit the cue data for network debugging
+    this.emit('cueHandled', cueData);
+  }
 
   /**
    * Clean up resources

@@ -11,6 +11,7 @@ import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { AbstractCueHandler } from '../cueHandlers/AbstractCueHandler';
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes';
+import { CueData } from '../cues/cueTypes';
 
 /**
  * Available processing modes
@@ -105,6 +106,11 @@ export class ProcessorManager extends EventEmitter {
       this.cueProcessor.destroy();
       this.cueProcessor = new CueBasedProcessor(cueHandler);
       
+      // Listen for cue data events from the processor
+      this.cueProcessor.on('cueHandled', (cueData: CueData) => {
+        this.emitCueData(cueData);
+      });
+      
       if (this.networkListener && this.currentMode !== 'direct') {
         this.cueProcessor.startListening(this.networkListener);
       }
@@ -177,6 +183,9 @@ export class ProcessorManager extends EventEmitter {
       return;
     }
 
+    // Set up event listeners for processors
+    this.setupProcessorEventListeners();
+
     switch (this.currentMode) {
       case 'direct':
         this.startDirectMode();
@@ -207,6 +216,11 @@ export class ProcessorManager extends EventEmitter {
       console.log('ProcessorManager: Using existing StageKitDirectProcessor');
     }
     
+    // Listen for cue data events from the processor
+    this.stageKitDirectProcessor.on('cueHandled', (cueData: CueData) => {
+      this.emitCueData(cueData);
+    });
+    
     console.log('ProcessorManager: Starting StageKitDirectProcessor listening...');
     this.stageKitDirectProcessor.startListening(this.networkListener!);
     console.log('ProcessorManager: Direct mode started');
@@ -224,6 +238,11 @@ export class ProcessorManager extends EventEmitter {
     if (!this.cueProcessor) {
       this.cueProcessor = new CueBasedProcessor(this.cueHandler);
     }
+    
+    // Listen for cue data events from the processor
+    this.cueProcessor.on('cueHandled', (cueData: CueData) => {
+      this.emitCueData(cueData);
+    });
     
     this.cueProcessor.startListening(this.networkListener!);
     console.log('ProcessorManager: Cue-based mode started');
@@ -281,6 +300,34 @@ export class ProcessorManager extends EventEmitter {
       traditionalProcessorActive: !!this.cueProcessor,
       networkListenerActive: !!this.networkListener
     };
+  }
+
+  /**
+   * Set up event listeners for processors
+   */
+  private setupProcessorEventListeners(): void {
+    // Set up event listeners for StageKit direct processor
+    if (this.stageKitDirectProcessor) {
+      this.stageKitDirectProcessor.on('cueHandled', (cueData: CueData) => {
+        this.emitCueData(cueData);
+      });
+    }
+    
+    // Set up event listeners for cue-based processor
+    if (this.cueProcessor) {
+      this.cueProcessor.on('cueHandled', (cueData: CueData) => {
+        this.emitCueData(cueData);
+      });
+    }
+  }
+
+  /**
+   * Emit cue data for network debugging
+   * @param cueData The cue data to emit
+   */
+  private emitCueData(cueData: CueData): void {
+    // Emit the cue data for network debugging
+    this.emit('cueHandled', cueData);
   }
 
   /**

@@ -3,9 +3,9 @@ import { CueData } from 'src/photonics-dmx/cues/cueTypes';
 import DmxSettingsAccordion from '@renderer/components/DmxSettingAccordion';
 import { useIpcListener } from '@renderer/utils/ipcHelpers';
 
+
 const NetworkDebug = () => {
   // Local state for latest cue data from IPC events.
-  const [debouncedCue, setDebouncedCue] = useState<CueData | null>(null);
   const [handledCue, setHandledCue] = useState<CueData | null>(null);
   const [previousHandledCue, setPreviousHandledCue] = useState<string | null>(null);
   const [previousLedColor, setPreviousLedColor] = useState<string | null>(null);
@@ -18,41 +18,29 @@ const NetworkDebug = () => {
   const currentLedColorRef = useRef<string | null>(null);
   const previousLedColorRef = useRef<string | null>(null);
   
-  // Counters for the events.
-  const [debouncedCount, setDebouncedCount] = useState(0);
+  // Counter for the events.
   const [handledCount, setHandledCount] = useState(0);
+  
+  // Track enabled listeners for re-registration
+  const [yargEnabled, setYargEnabled] = useState(false);
+  const [rb3Enabled, setRb3Enabled] = useState(false);
 
 
   useEffect(() => {
-    // Reset counters on mount.
-    setDebouncedCount(0);
+    // Reset counter on mount.
     setHandledCount(0);
 
     // Tell the main process to start sending cue data
     window.electron.ipcRenderer.send('set-listen-cue-data', true);
 
-    // Handler for the cue-debounced event.
-    const handleCueDebounced = (_event: any, cueData: CueData) => {
-      console.log('Received cue-debounced:', cueData);
-      setDebouncedCue(cueData);
-      setDebouncedCount((prev) => prev + 1);
-    };
-
     // Handler for the cue-handled event.
     const handleCueHandled = (_event: any, cueData: CueData) => {
-      console.log('Received cue-handled:', cueData);
-      
       // Get the LED color from the cue data
       const currentLedColorValue = cueData.ledColor || '';
       
     
       // Only update cue history if this is a different cue
       if (currentHandledCueRef.current && currentHandledCueRef.current !== cueData.lightingCue) {
-        console.log('Updating cue history with LED colors:', {
-          moving_to_third: previousLedColorRef.current,
-          moving_to_previous: currentLedColorRef.current
-        });
-        
         // Move current to previous, and previous to third
         setThirdHandledCue(previousHandledCueRef.current);
         setThirdLedColor(previousLedColorRef.current);
@@ -72,7 +60,6 @@ const NetworkDebug = () => {
     };
 
     // Use our custom IPC listener utility to register handlers
-    const cleanupDebounced = useIpcListener('cue-debounced', handleCueDebounced);
     const cleanupHandled = useIpcListener('cue-handled', handleCueHandled);
 
     return () => {
@@ -81,10 +68,41 @@ const NetworkDebug = () => {
       window.electron.ipcRenderer.send('set-listen-cue-data', false);
       
       // Clean up our event listeners 
-      cleanupDebounced();
       cleanupHandled();
     };
-  }, []); 
+  }, []);
+
+  // Monitor enabled listeners and re-register when they change
+  useEffect(() => {
+    const checkEnabledState = async () => {
+      try {
+        const yargState = await window.electron.ipcRenderer.invoke('get-yarg-enabled');
+        const rb3State = await window.electron.ipcRenderer.invoke('get-rb3-enabled');
+        
+        const yargWasEnabled = yargEnabled;
+        const rb3WasEnabled = rb3Enabled;
+        
+        setYargEnabled(yargState);
+        setRb3Enabled(rb3State);
+        
+        // If listeners were enabled while we were already mounted, re-register
+        if ((yargState && !yargWasEnabled) || (rb3State && !rb3WasEnabled)) {
+          console.log('Listener state changed, re-registering cue data listeners');
+          window.electron.ipcRenderer.send('set-listen-cue-data', true);
+        }
+      } catch (error) {
+        console.error('Error checking listener state:', error);
+      }
+    };
+
+    // Check initial state
+    checkEnabledState();
+    
+    // Set up interval to check for changes
+    const interval = setInterval(checkEnabledState, 1000);
+    
+    return () => clearInterval(interval);
+  }, [yargEnabled, rb3Enabled]); 
 
 
   const renderCueData = (data: CueData) => {
@@ -141,7 +159,6 @@ const NetworkDebug = () => {
     );
   };
 
-  const debouncedCueName = debouncedCue ? debouncedCue.lightingCue : '';
   const handledCueName = handledCue ? handledCue.lightingCue : '';
   const strobeState = handledCue ? handledCue.strobeState : '';
   const ledColor = handledCue?.ledColor || '';
@@ -156,12 +173,12 @@ const NetworkDebug = () => {
       <hr className="mt-8 mb-8" />
 
       <h2 className="text-lg font-bold mb-4">Network Lighting Cue Data</h2>
-      <p className="mb-8">This window will display the raw light data sent over the network by YARG/RB3E. 
-       Enable either YARG or RB3E above and start a song in the game. You should see the network data appear below. 
-       If nothing happens, verify your network connections, and ensure that all elements are on the same network / subnet.
-       You can also try navigating to a different page then returning to this one.</p>
-       
-
+        <p className="mb-8">
+          This window will display the raw light data sent over the network by YARG/RB3E. 
+          Enable either YARG or RB3E above and start a song in the game. You should see the network data appear below. 
+          If nothing happens, verify your network connections, and ensure that all elements are on the same network / subnet.
+          Payloads are different between YARG and RB3E, some fields only apply to one or the other.
+        </p>
       <div
         style={{
           display: 'flex',
@@ -198,7 +215,8 @@ const NetworkDebug = () => {
           )}
         </div>
 
-        {/* Debounced Cue Panel */}
+        {/* Debounced Cue Panel  */}
+        {/* 
         <div style={{ flex: '1 1 300px' }}>
           <h3 className="text-md font-semibold mb-4">
             Debounced Cue ({debouncedCount}): {debouncedCueName}
@@ -209,6 +227,7 @@ const NetworkDebug = () => {
             <p>No debounced cues received yet.</p>
           )}
         </div>
+        */}
       </div>
     </div>
   );

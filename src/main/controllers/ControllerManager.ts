@@ -598,6 +598,10 @@ export class ControllerManager {
     return this.cueHandler;
   }
 
+  public getProcessorManager(): any | null {
+    return this.processorManager;
+  }
+
   public getDmxPublisher(): DmxPublisher | null {
     return this.dmxPublisher;
   }

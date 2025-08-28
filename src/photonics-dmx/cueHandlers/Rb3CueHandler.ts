@@ -1086,6 +1086,10 @@ class Rb3CueHandler extends AbstractCueHandler {
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
     // RB3 direct LED control is handled separately, cue logic will be expanded later.
     console.log(`RB3 Cue received: ${cueType}`, parameters);
+    
+    // Emit events for network debugging
+    this.emit('cueHandled', parameters);
+    
     return Promise.resolve();
   }
 
