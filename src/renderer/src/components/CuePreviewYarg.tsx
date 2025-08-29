@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CueData } from '../../../photonics-dmx/cues/cueTypes';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import { useAtom } from 'jotai';
-import { currentCueStateAtom } from '../atoms';
+import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms';
 
 interface CuePreviewYargProps {
     className?: string;
@@ -25,6 +25,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 }) => {
     const [currentCueData, setCurrentCueData] = useState<CueData | null>(null);
     const [cueState] = useAtom(currentCueStateAtom);
+    const [yargListenerEnabled] = useAtom(yargListenerEnabledAtom);
     
     // Separate state for primary and secondary cues
     const [primaryCueName, setPrimaryCueName] = useState<string>('');
@@ -110,8 +111,24 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         return undefined;
     }, [showMeasureIndicator, manualMeasureType]);
 
-    // Listen for cue events
+    // Listen for cue events when YARG listener is enabled
     useEffect(() => {
+        if (!yargListenerEnabled) {
+            // Clear data when listener is disabled
+            setCurrentCueData(null);
+            setPrimaryCueName('');
+            setPrimaryCueCounter(0);
+            setSecondaryCueName('');
+            setSecondaryCueCounter(0);
+            setBeatReceived(false);
+            setMeasureReceived(false);
+            setKeyframeReceived(false);
+            setLastBeatType(null);
+            setLastMeasureType(null);
+            setLastKeyframeType(null);
+            return;
+        }
+
         // Tell the main process to start sending cue data
         window.electron.ipcRenderer.send('set-listen-cue-data', true);
 
@@ -196,18 +213,32 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             // Clean up
             removeIpcListener('cue-handled', handleCueData);
         };
-    }, []);
+    }, [yargListenerEnabled]);
 
     const getTitle = () => {
         if (cueState?.groupName) {
-            return `Current Group - ${cueState.groupName}${cueState.isFallback ? ' - fallback' : ''}`;
+            return `Current Cue Group: ${cueState.groupName}${cueState.isFallback ? ' - fallback' : ''}`;
         }
-        return 'Current Group';
+        return 'Current Cue Group';
+    };
+
+    const getAutoGenStatus = () => {
+        if (currentCueData?.autoGenTrack !== undefined) {
+            return currentCueData.autoGenTrack ? 'Auto-Generated' : 'Tracked';
+        }
+        return null;
     };
 
     return (
         <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
-            <h3 className="text-lg font-semibold mb-1">{getTitle()}</h3>
+            <div className="flex justify-between items-center mb-1">
+                <h3 className="text-lg font-semibold">{getTitle()}</h3>
+                {getAutoGenStatus() && (
+                    <span className="text-sm font-medium px-2 py-1 rounded bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                        {getAutoGenStatus()}
+                    </span>
+                )}
+            </div>
             {currentCueData ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>

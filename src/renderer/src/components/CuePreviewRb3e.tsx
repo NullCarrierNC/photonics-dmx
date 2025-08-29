@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CueData } from '../../../photonics-dmx/cues/cueTypes';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { useAtom } from 'jotai';
+import { rb3eListenerEnabledAtom } from '../atoms';
 
 interface CuePreviewRb3eProps {
     className?: string;
@@ -23,9 +25,22 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({
         blue: [],
         yellow: []
     });
+    const [rb3eListenerEnabled] = useAtom(rb3eListenerEnabledAtom);
 
-    // Listen for cue events
+    // Listen for cue events when RB3E listener is enabled
     useEffect(() => {
+        if (!rb3eListenerEnabled) {
+            // Clear data when listener is disabled
+            setCurrentCueData(null);
+            setColorBanks({
+                red: [],
+                green: [],
+                blue: [],
+                yellow: []
+            });
+            return;
+        }
+
         // Tell the main process to start sending cue data
         window.electron.ipcRenderer.send('set-listen-cue-data', true);
 
@@ -58,7 +73,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({
             // Clean up
             removeIpcListener('cue-handled', handleCueData);
         };
-    }, []);
+    }, [rb3eListenerEnabled]);
 
     const getTitle = () => {
         return 'RB3E StageKit Status';
@@ -115,8 +130,6 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({
                         );
                     })}
                 </div>
-
-                {/* Current LED Positions Summary - REMOVED */}
             </div>
         );
     };
