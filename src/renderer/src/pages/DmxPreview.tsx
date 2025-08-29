@@ -9,6 +9,8 @@ import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPrev
 import { DmxChannel } from '../../../photonics-dmx/types';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
+import CuePreview from '@renderer/components/CuePreview';
+import ActiveGroupsSelector from '@renderer/components/ActiveCueGroupsSelector';
 
 const DmxPreview: React.FC = () => {
   const [lightingConfig] = useAtom(activeDmxLightsConfigAtom);
@@ -63,9 +65,10 @@ const DmxPreview: React.FC = () => {
         </p>
         <hr className="my-6" />
         <DmxSettingsAccordion startOpen={true} />
-     
-      <LightsDmxPreview lightingConfig={lightingConfig!} dmxValues={dmxValues} />
-      <LightsDmxChannelsPreview lightingConfig={lightingConfig!} dmxValues={dmxValues} />
+        <ActiveGroupsSelector />
+        <CuePreview />
+        <LightsDmxPreview lightingConfig={lightingConfig!} dmxValues={dmxValues} />
+        <LightsDmxChannelsPreview lightingConfig={lightingConfig!} dmxValues={dmxValues} />
     </div>
   );
 };

@@ -1,14 +1,17 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAtom } from 'jotai';
-import { senderIpcEnabledAtom } from '@renderer/atoms';
-import { EffectSelector } from '../../../photonics-dmx/types';
+import { senderIpcEnabledAtom, activeDmxLightsConfigAtom } from '@renderer/atoms';
+import { EffectSelector, DmxChannel } from '../../../photonics-dmx/types';
 import EffectsDropdown from '../components/EffectSelector';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
-import CuePreview from '@renderer/components/CuePreview';
+import CuePreviewYarg from '@renderer/components/CuePreviewYarg';
+import LightsDmxPreview from '@renderer/components/LightsDmxPreview';
+import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview';
 import { useTimeoutEffect } from '../utils/useTimeout';
 import CueRegistrySelector from '@renderer/components/CueRegistrySelector';
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa';
-import ActiveGroupsSelector, { ActiveGroupsSelectorRef } from '../components/ActiveGroupsSelector';
+import ActiveGroupsSelector, { ActiveGroupsSelectorRef } from '../components/ActiveCueGroupsSelector';
+import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 
 type CueRegistryType = 'YARG' | 'RB3E';
 
@@ -21,12 +24,14 @@ type CueGroup = {
 
 const CueSimulation: React.FC = () => {
   const [_isIpcEnabled, setIsIpcEnabled] = useAtom(senderIpcEnabledAtom);
+  const [lightingConfig] = useAtom(activeDmxLightsConfigAtom);
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null);
   const [, setRegistryType] = useState<CueRegistryType>('YARG');
   const [selectedGroup, setSelectedGroup] = useState<string>('default');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('default');
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [dmxValues, setDmxValues] = useState<Record<number, number>>({});
   
   // State for manual simulation indicators
   const [showBeatIndicator, setShowBeatIndicator] = useState(false);
@@ -59,18 +64,47 @@ const CueSimulation: React.FC = () => {
     };
   }, [setIsIpcEnabled]);
 
+  // Listen for IPC messages to receive DMX values.
+  useEffect(() => {
+    const handleDmxValues = (_: unknown, channels: DmxChannel[]) => {
+      const values = channels.reduce<Record<number, number>>((acc, channel) => {
+        acc[channel.channel] = channel.value;
+        return acc;
+      }, {});
+      setDmxValues(values);
+    };
+
+    // Add the listener
+    addIpcListener('dmxValues', handleDmxValues);
+
+    return () => {
+      // Remove the listener
+      removeIpcListener('dmxValues', handleDmxValues);
+    };
+  }, []);
+
+  // Cleanup effect: stop any running test effects when component unmounts
+  useEffect(() => {
+    return () => {
+      // Stop any running test effects when leaving the page
+      window.electron.ipcRenderer.invoke('stop-test-effect').catch(error => {
+        console.error('Error stopping test effect on unmount:', error);
+      });
+    };
+  }, []);
+
   // Track initialization phases to avoid overriding active groups during startup
   const isInitialMount = useRef(true);
   const isFullyInitialized = useRef(false);
 
   // Helper function to ensure active group matches the selected group when user interacts with effects
   const ensureActiveGroupMatches = useCallback(async () => {
-    if (selectedGroup && isFullyInitialized.current) {
+    if (selectedGroupId && isFullyInitialized.current) {
       try {
-        const result = await window.electron.ipcRenderer.invoke('set-active-cue-groups', [selectedGroup]);
+        const result = await window.electron.ipcRenderer.invoke('set-active-cue-groups', [selectedGroupId]);
         if (result.success) {
           activeGroupsSelectorRef.current?.refreshActiveGroups();
-          console.log(`Set active group to match selected group: ${selectedGroup}`);
+          console.log(`Set active group to match selected group: ${selectedGroupId}`);
         } else {
           console.error('Failed to set active group to match selection:', result.error);
         }
@@ -78,7 +112,7 @@ const CueSimulation: React.FC = () => {
         console.error('Error setting active group to match selection:', error);
       }
     }
-  }, [selectedGroup]);
+  }, [selectedGroupId]);
 
   const handleEffectSelect = useCallback(async (effect: EffectSelector) => {
     setSelectedEffect(effect);
@@ -400,7 +434,7 @@ const CueSimulation: React.FC = () => {
   
       <hr className="my-6" />
 
-      <CuePreview 
+      <CuePreviewYarg 
         className="mb-0"
         showBeatIndicator={showBeatIndicator}
         showMeasureIndicator={showMeasureIndicator}
@@ -408,7 +442,13 @@ const CueSimulation: React.FC = () => {
         manualBeatType="Manual Beat"
         manualMeasureType="Manual Measure"
         manualKeyframeType="Manual Keyframe"
+        simulationMode={true}
       />
+
+      <hr className="my-6" />
+
+      <LightsDmxPreview lightingConfig={lightingConfig!} dmxValues={dmxValues} />
+      <LightsDmxChannelsPreview lightingConfig={lightingConfig!} dmxValues={dmxValues} />
     </div>
   );
 };

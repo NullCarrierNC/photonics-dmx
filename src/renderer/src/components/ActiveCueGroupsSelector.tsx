@@ -1,4 +1,6 @@
 import  { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { useAtom } from 'jotai';
+import { rb3eListenerEnabledAtom } from '../atoms';
 
 interface CueGroup {
   id: string;
@@ -20,6 +22,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
     const [enabledGroups, setEnabledGroups] = useState<CueGroup[]>([]);
     const [activeGroupIds, setActiveGroupIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
+    const [rb3eListenerEnabled] = useAtom(rb3eListenerEnabledAtom);
 
     const fetchActiveGroups = useCallback(async () => {
       try {
@@ -115,44 +118,55 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
     }
 
     return (
-      <div className={`bg-white dark:bg-gray-800  ${className}`}>
+      <div className={`bg-white dark:bg-gray-800 mb-4  ${className}`}>
         <h3 className="text-lg font-semibold mb-1 text-gray-900 dark:text-gray-100 ">
           Active Cue Groups
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-          By default all enabled groups are active. To disable a group entirely, disable it in the Preferences menu.
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-          If the active groups are missing a cue the system will fallback to the Default group, even if it is disabled.
-        </p>
-        
-        <div className="space-y-0">
-          {enabledGroups.map((group) => (
-            <div
-              key={group.id}
-              className="flex items-center justify-between pl-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <input
-                  type="checkbox"
-                  className="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600"
-                  checked={activeGroupIds.includes(group.id)}
-                  onChange={(e) => handleGroupToggle(group.id, e.target.checked)}
-                />
-                <div className="flex-1 min-w-0">
-                  <span className="font-medium text-gray-900 dark:text-gray-100">
-                    {group.name}
-                  </span>
-                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                    ({group.cueTypes.length} cues)
-                  </span>
-                </div>
+        {rb3eListenerEnabled ? (
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            RB3E does not use cues, the lights are driven directly.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+              By default all enabled cue groups are active. To disable a group entirely, disable it in the Preferences menu. 
+              Disabling it here is temporary.
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              If the active groups are missing a cue the system will fallback to the Default group, even if it is disabled.
+            </p>
+            
+            <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
+              <div className="space-y-2">
+                {enabledGroups.map((group) => (
+                  <div
+                    key={group.id}
+                    className="flex items-center justify-between pl-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      <input
+                        type="checkbox"
+                        className="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600"
+                        checked={activeGroupIds.includes(group.id)}
+                        onChange={(e) => handleGroupToggle(group.id, e.target.checked)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                          {group.name}
+                        </span>
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                          ({group.cueTypes.length} cues)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+          </>
+        )}
         
-        {activeGroupIds.length === 0 && (
+        {!rb3eListenerEnabled && activeGroupIds.length === 0 && (
           <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
             <p className="text-yellow-800 dark:text-yellow-200">
               <strong>Warning:</strong> No active groups selected. Cue resolution will only use the default group as fallback.

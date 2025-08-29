@@ -12,6 +12,7 @@ interface CuePreviewYargProps {
     manualBeatType?: string;
     manualMeasureType?: string;
     manualKeyframeType?: string;
+    simulationMode?: boolean;
 }
 
 const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
@@ -21,7 +22,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     showKeyframeIndicator = false,
     manualBeatType = 'Manual Beat',
     manualMeasureType = 'Manual Measure',
-    manualKeyframeType = 'Manual Keyframe'
+    manualKeyframeType = 'Manual Keyframe',
+    simulationMode = false
 }) => {
     const [currentCueData, setCurrentCueData] = useState<CueData | null>(null);
     const [cueState] = useAtom(currentCueStateAtom);
@@ -111,10 +113,10 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         return undefined;
     }, [showMeasureIndicator, manualMeasureType]);
 
-    // Listen for cue events when YARG listener is enabled
+    // Listen for cue events when YARG listener is enabled or in simulation mode
     useEffect(() => {
-        if (!yargListenerEnabled) {
-            // Clear data when listener is disabled
+        if (!yargListenerEnabled && !simulationMode) {
+            // Clear data when listener is disabled and not in simulation mode
             setCurrentCueData(null);
             setPrimaryCueName('');
             setPrimaryCueCounter(0);
@@ -129,12 +131,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             return;
         }
 
-        // Tell the main process to start sending cue data
-        window.electron.ipcRenderer.send('set-listen-cue-data', true);
+        // Only tell the main process to start sending cue data if not in simulation mode
+        if (!simulationMode) {
+            window.electron.ipcRenderer.send('set-listen-cue-data', true);
+        }
 
         const handleCueData = (_: unknown, cueData: CueData) => {
-            console.log('Received YARG cue data:', cueData);
-
             // Beat detection - check for beat values in the beat property
             if (cueData.beat && cueData.beat !== 'Unknown') {
                 if (cueData.beat !== prevBeatRef.current) {
@@ -223,6 +225,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     };
 
     const getAutoGenStatus = () => {
+        if (simulationMode) {
+            return 'Simulation';
+        }
         if (currentCueData?.autoGenTrack !== undefined) {
             return currentCueData.autoGenTrack ? 'Auto-Generated' : 'Tracked';
         }
@@ -234,13 +239,18 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             <div className="flex justify-between items-center mb-1">
                 <h3 className="text-lg font-semibold">{getTitle()}</h3>
                 {getAutoGenStatus() && (
-                    <span className="text-sm font-medium px-2 py-1 rounded bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                    <span className={`text-sm font-medium px-2 py-1 rounded ${
+                        getAutoGenStatus() === 'Simulation' 
+                            ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
+                            : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                    }`}>
                         {getAutoGenStatus()}
                     </span>
                 )}
             </div>
             {currentCueData ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* First row - 4 columns */}
                     <div>
                         <p><span className="font-medium">Primary:</span> {primaryCueName || 'None'} {primaryCueName && primaryCueCounter > 0 ? `(${primaryCueCounter})` : ''}</p>
                         <p><span className="font-medium">Secondary:</span> {secondaryCueName || ''} {secondaryCueName && secondaryCueCounter > 0 ? `(${secondaryCueCounter})` : ''}</p>
@@ -251,12 +261,17 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
                         <p>{currentCueData.strobeState || 'None'}</p>
                     </div>
 
-                    {/* Measure/Beat counter */}
                     <div>
                         <p className="font-medium">BPM:</p>
                         <p>{currentCueData.beatsPerMinute}</p>
                     </div>
+
+                    <div>
+                        <p className="font-medium">Auto-Gen:</p>
+                        <p>{currentCueData.autoGenTrack !== undefined ? (currentCueData.autoGenTrack ? 'Yes' : 'No') : 'Unknown'}</p>
+                    </div>
                     
+                    {/* Second row - 4 columns */}
                     {currentCueData.measureOrBeat !== undefined && (
                         <div>
                             <p className="font-medium">Current Measure:</p>
@@ -294,6 +309,14 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
                                 <p className="font-bold">{lastKeyframeType}</p> :
                                 <p>Off</p>
                             }
+                        </div>
+                    </div>
+
+                    {/* Venue Size */}
+                    <div>
+                        <p className="font-medium">Venue Size:</p>
+                        <div className="p-2 rounded bg-gray-100 dark:bg-gray-600">
+                            <p>{currentCueData.venueSize || 'Unknown'}</p>
                         </div>
                     </div>
                 </div>

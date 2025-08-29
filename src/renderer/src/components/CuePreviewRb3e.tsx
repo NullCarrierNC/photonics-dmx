@@ -83,15 +83,43 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({
         return (
             <div className="space-y-4">
                 {/* Color Bank Rows - Always Visible */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                     {(['red', 'green', 'blue', 'yellow'] as const).map(color => {
                         const positions = colorBanks[color];
                         const isActive = positions.length > 0;
                         const colorConfig = {
-                            red: { bg: 'bg-red-500', border: 'border-red-600', text: 'text-red-900' },
-                            green: { bg: 'bg-green-500', border: 'border-green-600', text: 'text-green-900' },
-                            blue: { bg: 'bg-blue-500', border: 'border-blue-600', text: 'text-blue-900' },
-                            yellow: { bg: 'bg-yellow-400', border: 'border-yellow-500', text: 'text-yellow-900' }
+                            red: { 
+                                bg: 'bg-[#ff0000]', 
+                                border: 'border-[#cc0000]', 
+                                text: 'text-white',
+                                inactiveBg: 'bg-red-950',
+                                inactiveBorder: 'border-red-950',
+                                inactiveText: 'text-red-400'
+                            },
+                            green: { 
+                                bg: 'bg-[#00ff00]', 
+                                border: 'border-[#00cc00]', 
+                                text: 'text-black',
+                                inactiveBg: 'bg-green-950',
+                                inactiveBorder: 'border-green-950',
+                                inactiveText: 'text-green-400'
+                            },
+                            blue: { 
+                                bg: 'bg-[#0000ff]', 
+                                border: 'border-[#0000cc]', 
+                                text: 'text-white',
+                                inactiveBg: 'bg-blue-950',
+                                inactiveBorder: 'border-blue-950',
+                                inactiveText: 'text-blue-400'
+                            },
+                            yellow: { 
+                                bg: 'bg-[#ffff00]', 
+                                border: 'border-[#cccc00]', 
+                                text: 'text-black',
+                                inactiveBg: 'bg-yellow-950',
+                                inactiveBorder: 'border-yellow-950',
+                                inactiveText: 'text-yellow-300'
+                            }
                         };
                         const config = colorConfig[color];
 
@@ -112,7 +140,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({
                                                     className={`w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-bold ${
                                                         isLit 
                                                             ? `${config.bg} ${config.border} ${config.text}` 
-                                                            : 'bg-gray-200 border-gray-300 text-gray-400'
+                                                            : `${config.inactiveBg} ${config.inactiveBorder} ${config.inactiveText}`
                                                     }`}
                                                 >
                                                     {i + 1}
@@ -129,6 +157,83 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({
                             </div>
                         );
                     })}
+                </div>
+
+                {/* Horizontal separator */}
+                <hr className="border-gray-600 dark:border-gray-500 my-2" />
+
+                {/* Blended Color Row */}
+                <div className="space-y-2">
+                    <div className="flex items-center space-x-4">
+                        <div className="w-20">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Blended
+                            </span>
+                        </div>
+                        <div className="flex-1">
+                            <div className="grid grid-cols-8 gap-1">
+                                {Array.from({ length: 8 }, (_, i) => {
+                                    // Calculate which colors are active for this LED position
+                                    const activeColors = ['red', 'green', 'blue', 'yellow'].filter(color => 
+                                        colorBanks[color as keyof ColorBankState].includes(i)
+                                    );
+                                    
+                                    const isBlended = activeColors.length > 0;
+                                    let blendedText = 'text-gray-400';
+                                    let blendColor = 'rgb(0, 0, 0)';
+                                    let darkerBlendColor = 'rgb(0, 0, 0)';
+                                    
+                                    if (isBlended) {
+                                        if (activeColors.length === 1) {
+                                            // Single color - use that color
+                                            const color = activeColors[0];
+                                            const colorConfig = {
+                                                red: { color: 'rgb(255, 0, 0)', border: 'rgb(204, 0, 0)', text: 'text-white' },
+                                                green: { color: 'rgb(0, 255, 0)', border: 'rgb(0, 204, 0)', text: 'text-black' },
+                                                blue: { color: 'rgb(0, 0, 255)', border: 'rgb(0, 0, 204)', text: 'text-white' },
+                                                yellow: { color: 'rgb(255, 255, 0)', border: 'rgb(204, 204, 0)', text: 'text-black' }
+                                            };
+                                            blendColor = colorConfig[color as keyof typeof colorConfig].color;
+                                            darkerBlendColor = colorConfig[color as keyof typeof colorConfig].border;
+                                            blendedText = colorConfig[color as keyof typeof colorConfig].text;
+                                        } else {
+                                            // Multiple colors - calculate actual additive blend
+                                            let r = 0, g = 0, b = 0;
+                                            
+                                            if (activeColors.includes('red')) r = 255;
+                                            if (activeColors.includes('green')) g = 255;
+                                            if (activeColors.includes('blue')) b = 255;
+                                            if (activeColors.includes('yellow')) { r = 255; g = 255; }
+                                            
+                                            // Create custom CSS color for the blend
+                                            blendColor = `rgb(${r}, ${g}, ${b})`;
+                                            darkerBlendColor = `rgb(${Math.floor(r * 0.8)}, ${Math.floor(g * 0.8)}, ${Math.floor(b * 0.8)})`;
+                                            
+                                            blendedText = r + g + b > 255 ? 'text-black' : 'text-white';
+                                        }
+                                    }
+                                    
+                                    return (
+                                        <div
+                                            key={i}
+                                            className={`w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-bold ${blendedText}`}
+                                            style={{
+                                                backgroundColor: isBlended ? blendColor : 'rgb(17, 24, 39)', // bg-gray-950
+                                                borderColor: isBlended ? darkerBlendColor : 'rgb(17, 24, 39)' // bg-gray-950
+                                            }}
+                                        >
+                                            {i + 1}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="w-16 text-right">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                Blended
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -157,10 +262,10 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({
                         <div>
                             <p className="font-medium text-gray-700 dark:text-gray-300">Strobe State:</p>
                             <div className="flex items-center space-x-2">
-                                <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+                                <div className={`w-16 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
                                     currentCueData.strobeState && currentCueData.strobeState !== 'Strobe_Off'
-                                        ? 'bg-yellow-400 border-yellow-600 text-yellow-900' 
-                                        : 'bg-gray-300 border-gray-400 text-gray-600'
+                                        ? 'bg-white border-gray-300 text-black' 
+                                        : 'bg-gray-800 border-gray-600 text-white'
                                 }`}>
                                     {currentCueData.strobeState === 'Strobe_Off' ? 'OFF' : 'ON'}
                                 </div>
