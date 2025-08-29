@@ -33,7 +33,7 @@ export class StageKitStompCue implements ICue {
       waitAfterFadeOut: 0,
       waitUntil: 'keyframe',
     });
-    sequencer.setEffect('stagekit-stomp', effect, 0, true);
+    sequencer.setEffect('stagekit-stomp', effect);
   }
 
   onStop(): void {

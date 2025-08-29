@@ -41,7 +41,7 @@ export class StageKitIntroCue implements ICue {
       transitions: transitions
     };
     
-    await controller.setEffect('stagekit-intro', introEffect, 0, false); // Not persistent
+    await controller.setEffect('stagekit-intro', introEffect);
   }
 
   onStop(): void {
