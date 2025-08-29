@@ -2,7 +2,11 @@
 import { useAtom } from 'jotai';
 import { senderSacnEnabledAtom, lightingPrefsAtom } from '../atoms';
 
-const SacnToggle = () => {
+interface SacnToggleProps {
+  disabled?: boolean;
+}
+
+const SacnToggle = ({ disabled = false }: SacnToggleProps) => {
   const [isSacnEnabled, setIsSacnEnabled] = useAtom(senderSacnEnabledAtom);
   const [prefs] = useAtom(lightingPrefsAtom);
 
@@ -26,12 +30,19 @@ const SacnToggle = () => {
 
   return (
     <div className="flex items-center mb-4  w-[220px] justify-between">
-      <label className="mr-4 text-lg font-semibold">sACN Out</label>
+      <label className={`mr-4 text-lg font-semibold ${
+        disabled ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
+      }`}>
+        sACN Out
+      </label>
       <button
         onClick={handleToggle}
+        disabled={disabled}
         className={`w-12 h-6 rounded-full ${
           isSacnEnabled ? 'bg-green-500' : 'bg-gray-400'
-        } relative focus:outline-none`}
+        } relative focus:outline-none ${
+          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+        }`}
       >
         <div
           className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${

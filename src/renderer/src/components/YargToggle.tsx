@@ -1,10 +1,15 @@
 import { useAtom } from 'jotai';
 import { useEffect } from 'react';
-import { yargListenerEnabledAtom } from '../atoms';
+import { yargListenerEnabledAtom, rb3eListenerEnabledAtom } from '../atoms';
 import { useIpcListener } from '../utils/ipcHelpers';
 
-const YargToggle = () => {
+interface YargToggleProps {
+  disabled?: boolean;
+}
+
+const YargToggle = ({ disabled = false }: YargToggleProps) => {
   const [isYargEnabled, setIsYargEnabled] = useAtom(yargListenerEnabledAtom);
+  const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom);
 
   useEffect(() => {
     // Initialize toggle state from system status
@@ -48,12 +53,19 @@ const YargToggle = () => {
 
   return (
     <div className="flex items-center mb-4 w-[220px] justify-between">
-      <label className="mr-4 text-lg font-semibold">Enable YARG</label>
+      <label className={`mr-4 text-lg font-semibold ${
+        (isRb3Enabled || disabled) ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
+      }`}>
+        Enable YARG
+      </label>
       <button
         onClick={handleToggle}
+        disabled={isRb3Enabled || disabled}
         className={`w-12 h-6 rounded-full ${
           isYargEnabled ? 'bg-green-500' : 'bg-gray-400'
-        } relative focus:outline-none`}
+        } relative focus:outline-none ${
+          (isRb3Enabled || disabled) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+        }`}
       >
         <div
           className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${

@@ -265,6 +265,12 @@ export class ControllerManager {
     if (cue !== undefined) {
       try {
         this.cueHandler.handleCue(cue, data);
+        
+        // Emit cue-handled event for UI preview components
+        const mainWindow = BrowserWindow.getFocusedWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send('cue-handled', data);
+        }
       } catch (error) {
         console.error("Error handling cue:", error);
       }
@@ -343,8 +349,8 @@ export class ControllerManager {
     if (this.effectsController) {
       try {
         this.effectsController.removeAllEffects();
-        // Use blackout to properly fade out all lights
-        await this.effectsController.blackout(500); // 500ms fade out
+        // Use blackout for immediate light shutdown
+        await this.effectsController.blackout(0); // Immediate blackout
         console.log('ControllerManager: Cleared all running effects and initiated blackout when disabling YARG');
       } catch (error) {
         console.error('Error clearing effects when disabling YARG:', error);
@@ -446,8 +452,8 @@ export class ControllerManager {
     if (this.effectsController) {
       try {
         this.effectsController.removeAllEffects();
-        // Use blackout to properly fade out all lights
-        await this.effectsController.blackout(500); // 500ms fade out
+        // Use blackout for immediate light shutdown
+        await this.effectsController.blackout(0); // Immediate blackout
         console.log('ControllerManager: Cleared all running effects and initiated blackout when disabling RB3');
       } catch (error) {
         console.error('Error clearing effects when disabling RB3:', error);

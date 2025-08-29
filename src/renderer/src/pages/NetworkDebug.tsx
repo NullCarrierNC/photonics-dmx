@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { CueData } from 'src/photonics-dmx/cues/cueTypes';
-import DmxSettingsAccordion from '@renderer/components/DmxSettingAccordion';
+import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 import { useIpcListener } from '@renderer/utils/ipcHelpers';
 
 

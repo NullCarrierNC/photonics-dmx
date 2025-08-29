@@ -1,5 +1,5 @@
 
-import DmxSettingsAccordion from '@renderer/components/DmxSettingAccordion';
+import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 
 const Status = () => {
   return (
