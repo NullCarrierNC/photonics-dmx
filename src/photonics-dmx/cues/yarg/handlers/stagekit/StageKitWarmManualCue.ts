@@ -45,8 +45,8 @@ export class StageKitWarmManualCue implements ICue {
         const stepsUntilActive = pairIndex;
         
         // Add transparent transitions before red (to wait for the right keyframe)
-        for (let i = 0; i < stepsUntilActive; i++) {
-            // Light 1 transparent
+        if (stepsUntilActive > 0) {
+            // Light 1 transparent - wait for stepsUntilActive keyframes
             redTransitions.push({
                 lights: [light1],
                 layer: 0,
@@ -58,10 +58,11 @@ export class StageKitWarmManualCue implements ICue {
                     duration: 100,
                 },
                 waitUntilCondition: 'keyframe',
-                waitUntilTime: 0
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
             });
             
-            // Light 2 transparent
+            // Light 2 transparent - wait for stepsUntilActive keyframes
             redTransitions.push({
                 lights: [light2],
                 layer: 0,
@@ -73,7 +74,8 @@ export class StageKitWarmManualCue implements ICue {
                     duration: 100,
                 },
                 waitUntilCondition: 'keyframe',
-                waitUntilTime: 0
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
             });
         }
         
@@ -108,8 +110,8 @@ export class StageKitWarmManualCue implements ICue {
         
         // Add transparent transitions after red (to wait until the cycle completes)
         const stepsAfterRed = lightPairs - stepsUntilActive - 1;
-        for (let i = 0; i < stepsAfterRed; i++) {
-            // Light 1 transparent
+        if (stepsAfterRed > 0) {
+            // Light 1 transparent - wait for stepsAfterRed keyframes
             redTransitions.push({
                 lights: [light1],
                 layer: 0,
@@ -121,10 +123,11 @@ export class StageKitWarmManualCue implements ICue {
                     duration: 100,
                 },
                 waitUntilCondition: 'keyframe',
-                waitUntilTime: 0
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterRed
             });
             
-            // Light 2 transparent
+            // Light 2 transparent - wait for stepsAfterRed keyframes
             redTransitions.push({
                 lights: [light2],
                 layer: 0,
@@ -136,7 +139,8 @@ export class StageKitWarmManualCue implements ICue {
                     duration: 100,
                 },
                 waitUntilCondition: 'keyframe',
-                waitUntilTime: 0
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterRed
             });
         }
     }
@@ -149,7 +153,7 @@ export class StageKitWarmManualCue implements ICue {
         const stepsUntilActive = 0;
         
         // Add transparent transitions before red (to wait for the right keyframe)
-        for (let i = 0; i < stepsUntilActive; i++) {
+        if (stepsUntilActive > 0) {
             redTransitions.push({
                 lights: [centerLight],
                 layer: 0,
@@ -161,7 +165,8 @@ export class StageKitWarmManualCue implements ICue {
                     duration: 100,
                 },
                 waitUntilCondition: 'keyframe',
-                waitUntilTime: 0
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
             });
         }
         
@@ -182,7 +187,7 @@ export class StageKitWarmManualCue implements ICue {
         
         // Add transparent transitions after red (to wait until the cycle completes)
         const stepsAfterRed = lightPairs - stepsUntilActive - 1;
-        for (let i = 0; i < stepsAfterRed; i++) {
+        if (stepsAfterRed > 0) {
             redTransitions.push({
                 lights: [centerLight],
                 layer: 0,
@@ -194,7 +199,8 @@ export class StageKitWarmManualCue implements ICue {
                     duration: 100,
                 },
                 waitUntilCondition: 'keyframe',
-                waitUntilTime: 0
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterRed
             });
         }
     }
@@ -213,7 +219,7 @@ export class StageKitWarmManualCue implements ICue {
         const stepsUntilYellow = (yellowStartIndex - lightIndex + allLights.length) % allLights.length;
         
         // Add transparent transitions before yellow (to wait for the right keyframe)
-        for (let i = 0; i < stepsUntilYellow; i++) {
+        if (stepsUntilYellow > 0) {
             yellowTransitions.push({
                 lights: [light],
                 layer: 5,
@@ -225,7 +231,8 @@ export class StageKitWarmManualCue implements ICue {
                     duration: 0,
                 },
                 waitUntilCondition: 'keyframe',
-                waitUntilTime: 0
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilYellow
             });
         }
         
@@ -246,7 +253,7 @@ export class StageKitWarmManualCue implements ICue {
         
         // Add transparent transitions after yellow (to wait until the cycle completes)
         const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
-        for (let i = 0; i < stepsAfterYellow; i++) {
+        if (stepsAfterYellow > 0) {
             yellowTransitions.push({
                 lights: [light],
                 layer: 5,
@@ -258,7 +265,8 @@ export class StageKitWarmManualCue implements ICue {
                     duration: 0,
                 },
                 waitUntilCondition: 'keyframe',
-                waitUntilTime: 0
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterYellow
             });
         }
     }
