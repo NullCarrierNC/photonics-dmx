@@ -139,9 +139,8 @@ export class EventScheduler implements IEventScheduler {
 
   /**
    * Update method called by the clock
-   * @param deltaTime The time elapsed since last update in milliseconds
    */
-  private update(deltaTime: number): void {
+  private update(): void {
     const currentTime = this.getCurrentTime();
     const eventsToRemove: string[] = [];
     const eventsToReschedule: ScheduledEvent[] = [];
