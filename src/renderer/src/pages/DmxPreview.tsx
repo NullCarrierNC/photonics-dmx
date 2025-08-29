@@ -8,7 +8,7 @@ import LightsDmxPreview from '@renderer/components/LightsDmxPreview';
 import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview';
 import { DmxChannel, EffectSelector } from '../../../photonics-dmx/types';
 import EffectsDropdown from '../components/EffectSelector';
-import DmxSettingsAccordion from '@renderer/components/DmxSettingAccordion';
+import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import CuePreview from '@renderer/components/CuePreview';
 import { useTimeoutEffect } from '../utils/useTimeout';
