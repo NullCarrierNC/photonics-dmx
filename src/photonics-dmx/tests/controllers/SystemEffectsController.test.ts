@@ -69,7 +69,7 @@ describe('SystemEffectsController', () => {
     } as unknown as jest.Mocked<LayerManager>;
     
     eventScheduler = {
-      setTimeout: jest.fn((callback: () => void, delay: number) => {
+      setTimeout: jest.fn((_callback: () => void, _delay: number) => {
         return 'mock-event-id';
       }),
       clearAllTimeouts: jest.fn(),

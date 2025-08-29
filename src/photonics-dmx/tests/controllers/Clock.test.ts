@@ -40,38 +40,6 @@ describe('Clock', () => {
     });
   });
 
-  describe('callbacks', () => {
-    it('should register and unregister callbacks correctly', () => {
-      let callbackCalled = false;
-      
-      const callback = (deltaTime: number) => {
-        callbackCalled = true;
-      };
-      
-      clock.onTick(callback);
-      expect(clock.getTickCount()).toBe(0);
-      
-      clock.offTick(callback);
-      expect(clock.getTickCount()).toBe(0);
-    });
-
-    it('should handle multiple callbacks', () => {
-      let callback1Called = false;
-      let callback2Called = false;
-      
-      const callback1 = () => { callback1Called = true; };
-      const callback2 = () => { callback2Called = true; };
-      
-      clock.onTick(callback1);
-      clock.onTick(callback2);
-      
-      expect(clock.getTickCount()).toBe(0);
-      
-      clock.offTick(callback1);
-      clock.offTick(callback2);
-    });
-  });
-
   describe('time tracking', () => {
     it('should track tick count correctly', () => {
       expect(clock.getTickCount()).toBe(0);

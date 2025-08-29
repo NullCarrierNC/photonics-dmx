@@ -1,9 +1,7 @@
-import { getColor } from '../helpers/dmxHelpers';
-import { RGBIO } from '../types';
+import { RGBIO } from '../../types';
 
 /**
  * Detailed analysis of color blending calculations using opacity and blend modes
- * This helps diagnose issues with the blending algorithm
  */
 export class ColorBlendingAnalysis {
   
@@ -18,6 +16,9 @@ export class ColorBlendingAnalysis {
     console.log(`\n📥 Input Colors:`);
     console.log(`Layer ${layer1}:`, this.formatColor(color1));
     console.log(`Layer ${layer2}:`, this.formatColor(color2));
+    
+    // Analyze opacity values and their impact
+    this.analyzeOpacityValues(color1, color2);
     
     // Analyze opacity-based blending
     this.analyzeOpacityBlending(color1, color2);
@@ -103,17 +104,20 @@ export class ColorBlendingAnalysis {
     const blendMode1 = color1.blendMode ?? 'replace';
     const blendMode2 = color2.blendMode ?? 'replace';
     
+    // Use the existing method to get the expected result
+    const expectedResult = this.calculateExpectedBlending(color1, color2);
+    
     if (blendMode1 === 'add' && blendMode2 === 'add') {
-      console.log(`🔴 Red: ${color1.red} × ${opacity1} + ${color2.red} × ${opacity2} = ${Math.round(color1.red * opacity1 + color2.red * opacity2)}`);
-      console.log(`🟢 Green: ${color1.green} × ${opacity1} + ${color2.green} × ${opacity2} = ${Math.round(color1.green * opacity1 + color2.green * opacity2)}`);
-      console.log(`🔵 Blue: ${color1.blue} × ${opacity1} + ${color2.blue} × ${opacity2} = ${Math.round(color1.blue * opacity1 + color2.blue * opacity2)}`);
-      console.log(`💡 Intensity: ${color1.intensity} × ${opacity1} + ${color2.intensity} × ${opacity2} = ${Math.round(color1.intensity * opacity1 + color2.intensity * opacity2)}`);
+      console.log(`🔴 Red: ${color1.red} × ${opacity1} + ${color2.red} × ${opacity2} = ${expectedResult.red}`);
+      console.log(`🟢 Green: ${color1.green} × ${opacity1} + ${color2.green} × ${opacity2} = ${expectedResult.green}`);
+      console.log(`🔵 Blue: ${color1.blue} × ${opacity1} + ${color2.blue} × ${opacity2} = ${expectedResult.blue}`);
+      console.log(`💡 Intensity: ${color1.intensity} × ${opacity1} + ${color2.intensity} × ${opacity2} = ${expectedResult.intensity}`);
     } else if (blendMode1 === 'replace' || blendMode2 === 'replace') {
       console.log(`🔄 Replace mode detected - Layer 2 will override Layer 1`);
-      console.log(`🔴 Red: ${color2.red}`);
-      console.log(`🟢 Green: ${color2.green}`);
-      console.log(`🔵 Blue: ${color2.blue}`);
-      console.log(`💡 Intensity: ${color2.intensity}`);
+      console.log(`🔴 Red: ${expectedResult.red}`);
+      console.log(`🟢 Green: ${expectedResult.green}`);
+      console.log(`🔵 Blue: ${expectedResult.blue}`);
+      console.log(`💡 Intensity: ${expectedResult.intensity}`);
     } else {
       console.log(`🔄 Mixed blend modes: ${blendMode1} + ${blendMode2}`);
       console.log(`Complex interaction - check individual channel behavior`);
@@ -134,20 +138,9 @@ export class ColorBlendingAnalysis {
     console.log(`Layer 1: opacity ${opacity1}, blendMode ${blendMode1}`);
     console.log(`Layer 2: opacity ${opacity2}, blendMode ${blendMode2}`);
     
-    // Calculate expected result based on blend modes
-    if (blendMode1 === 'add' && blendMode2 === 'add') {
-      console.log(`\n🔄 Additive Blending (${blendMode1} + ${blendMode2}):`);
-      console.log(`Red: ${color1.red} × ${opacity1} + ${color2.red} × ${opacity2} = ${Math.round(color1.red * opacity1 + color2.red * opacity2)}`);
-      console.log(`Green: ${color1.green} × ${opacity1} + ${color2.green} × ${opacity2} = ${Math.round(color1.green * opacity1 + color2.green * opacity2)}`);
-      console.log(`Blue: ${color1.blue} × ${opacity1} + ${color2.blue} × ${opacity2} = ${Math.round(color1.blue * opacity1 + color2.blue * opacity2)}`);
-      console.log(`Intensity: ${color1.intensity} × ${opacity1} + ${color2.intensity} × ${opacity2} = ${Math.round(color1.intensity * opacity1 + color2.intensity * opacity2)}`);
-    } else if (blendMode1 === 'replace' || blendMode2 === 'replace') {
-      console.log(`\n🔄 Replace Blending: Higher layer overrides lower layer`);
-      console.log(`Final result will be dominated by the higher layer`);
-    } else {
-      console.log(`\n🔄 Mixed Blending Modes: ${blendMode1} + ${blendMode2}`);
-      console.log(`Complex interaction - check individual channel behavior`);
-    }
+    // Use the existing method to calculate expected result
+    const expectedResult = this.calculateExpectedBlending(color1, color2);
+    console.log(`\n🎯 Expected Result:`, this.formatColor(expectedResult));
     
     // Show blending steps
     this.showBlendingSteps(color1, color2);
