@@ -47,7 +47,7 @@ export interface Rb3eBandInfoEvent {
   timestamp: number;
 }
 
-export class CueBasedProcessor extends EventEmitter {
+export class Rb3CueBasedProcessor extends EventEmitter {
   private cueHandler: AbstractCueHandler;
   private currentCueData: CueData;
   private _currentBrightness: 'low' | 'medium' | 'high' = 'medium';

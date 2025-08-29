@@ -3,7 +3,7 @@ import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers';
-import { getEffectFadeInColorFadeOut, getEffectFlashColor } from '../../../../effects';
+import { getEffectFadeInColorFadeOut } from '../../../../effects';
 
 
 /**

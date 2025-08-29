@@ -26,7 +26,7 @@ export interface StageKitData {
   timestamp: number;
 }
 
-export class StageKitDirectProcessor extends EventEmitter {
+export class Rb3StageKitDirectProcessor extends EventEmitter {
   private lightMapper: StageKitLightMapper;
   private config: StageKitConfig;
   
@@ -143,7 +143,7 @@ export class StageKitDirectProcessor extends EventEmitter {
       this.clearStrobeEffectsAtPositions(positions);
     } else if (strobeEffect) {
       //console.log(`StageKit: Applying strobe effect ${strobeEffect} to positions [${positions.join(', ')}]`);
-      this.applyStrobeEffect(strobeEffect, positions);
+      this.applyStrobeEffect(strobeEffect);
     } else if (color !== 'off') {
       // Process normal light data
       //console.log(`StageKit: Processing color ${color} for positions [${positions.join(', ')}]`);
@@ -167,12 +167,12 @@ export class StageKitDirectProcessor extends EventEmitter {
   }
 
   /**
-   * Apply strobe effect to specific LED positions using setState
+   * Apply strobe effect to specific LED positions
    * @param strobeType The type of strobe effect to apply
    * @param positions The LED positions to apply the strobe to
    */
-  private applyStrobeEffect(strobeType: 'slow' | 'medium' | 'fast' | 'fastest', positions: number[]): void {
-    //console.log(`StageKit: applyStrobeEffect called with type: ${strobeType}, positions: [${positions.join(', ')}]`);
+  private applyStrobeEffect(strobeType: 'slow' | 'medium' | 'fast' | 'fastest'): void {
+    //console.log(`StageKit: applyStrobeEffect called with type: ${strobeType});
     
     // Get all available lights for strobe effects
     const lights = this.lightManager.getLights(['strobe'], 'all');
@@ -189,7 +189,7 @@ export class StageKitDirectProcessor extends EventEmitter {
     
     //console.log(`StageKit: Found ${targetLights.length} target lights for strobe effect`);
     
-    // Create strobe effect using setState instead of sequencer effects
+
     const white = getColor('white', 'max');
     
     // Calculate strobe timing based on type

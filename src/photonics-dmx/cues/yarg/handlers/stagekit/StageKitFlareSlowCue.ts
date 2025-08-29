@@ -13,7 +13,7 @@ export class StageKitFlareSlowCue implements ICue {
   description = 'StageKit flare slow pattern - all colors on all lights';
   style = CueStyle.Primary;
 
-  async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
+  async execute(_cueData: CueData, _sequencer: ILightingController, _lightManager: DmxLightManager): Promise<void> {
 
   }
 
