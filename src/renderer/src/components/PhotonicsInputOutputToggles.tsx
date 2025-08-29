@@ -25,7 +25,7 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps ) => {
   const hasInvalidConfig = useMemo(() => validDmxLights.length === 0, [validDmxLights.length]);
 
   return (
-    <div className=" rounded-lg shadow-sm mb-8">
+    <div className=" rounded-lg shadow-sm mb-4">
       <button
         className="flex flex-row gap-4 items-center  text-left font-semibold bg-gray-100 dark:bg-gray-800"
         onClick={() => setIsOpen(!isOpen)}
@@ -40,10 +40,10 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps ) => {
             <YargToggle disabled={hasInvalidConfig} /> <Rb3Toggle disabled={hasInvalidConfig} />
           </div>
           
-          <div className="flex flex-row gap-16 items-start mt-2">
+          <div className="flex flex-row gap-16 items-start">
             <SacnToggle disabled={hasInvalidConfig} /> <EnttecProToggle disabled={hasInvalidConfig} />
           </div>
-          <div className="flex flex-row gap-16 items-start mt-2">
+          <div className="flex flex-row gap-16 items-start ">
             <ArtNetToggle disabled={hasInvalidConfig} />
           </div>
           

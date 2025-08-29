@@ -11,6 +11,7 @@ import LightsLayout from './pages/LightsLayout';
 import NetworkDebug from './pages/NetworkDebug';
 import StatusBar from './components/StatusBar';
 import DmxPreview from './pages/DmxPreview';
+import CueSimulation from './pages/CueSimulation';
 import { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types';
 import { IpcRendererEvent } from 'electron';
 import About from './pages/About';
@@ -238,6 +239,8 @@ export const App = (): JSX.Element => {
         return <LightsLayout />;
       case Pages.CuePreview:
         return <DmxPreview />;
+      case Pages.CueSimulation:
+        return <CueSimulation />;
       case Pages.CueSequencer:
       //  return <CueSequencer />;
       case Pages.NetworkDebug:

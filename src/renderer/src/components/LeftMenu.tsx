@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { FaMoon, FaSun, FaLightbulb, FaPlay } from 'react-icons/fa';
+import { FaMoon, FaSun, FaLightbulb, FaPlay, FaInfinity } from 'react-icons/fa';
 import { FiActivity, FiLayout, FiCpu, FiInfo, FiSliders } from 'react-icons/fi';
 import { useAtom, useSetAtom } from 'jotai';
 import { Pages } from './../types';
@@ -66,7 +66,14 @@ const LeftMenu: React.FC<LeftMenuProps> = ({ isDarkMode, toggleDarkMode }) => {
           <span className="text-[12pt]">DMX Preview</span>
         </button>
 
-
+        {/* Cue Simulation Button */}
+        <button
+          onClick={() => handleMenuClick(Pages.CueSimulation)}
+          className={buttonClasses(Pages.CueSimulation)}
+        >
+          <FaInfinity className="text-xl" />
+          <span className="text-[12pt]">Cue Simulation</span>
+        </button>
 
         {/* Network Debug Button */}
         <button
