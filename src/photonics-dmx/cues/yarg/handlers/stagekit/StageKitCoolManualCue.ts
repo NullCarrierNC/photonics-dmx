@@ -45,35 +45,37 @@ export class StageKitCoolManualCue implements ICue {
         const stepsUntilActive = pairIndex;
         
         // Add transparent transitions before blue (to wait for the right keyframe)
-        for (let i = 0; i < stepsUntilActive; i++) {
-            // Light 1 transparent
+        if (stepsUntilActive > 0) {
+            // Light 1 transparent - wait for stepsUntilActive keyframes
             blueTransitions.push({
                 lights: [light1],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
             });
             
-            // Light 2 transparent
+            // Light 2 transparent - wait for stepsUntilActive keyframes
             blueTransitions.push({
                 lights: [light2],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
             });
         }
         
@@ -81,62 +83,64 @@ export class StageKitCoolManualCue implements ICue {
         blueTransitions.push({
             lights: [light1],
             layer: 0,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: blue,
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'keyframe',
-            untilTime: 0
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
         });
         
         blueTransitions.push({
             lights: [light2],
             layer: 0,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: blue,
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'keyframe',
-            untilTime: 0
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
         });
         
         // Add transparent transitions after blue (to wait until the cycle completes)
         const stepsAfterBlue = lightPairs - stepsUntilActive - 1;
-        for (let i = 0; i < stepsAfterBlue; i++) {
-            // Light 1 transparent
+        if (stepsAfterBlue > 0) {
+            // Light 1 transparent - wait for stepsAfterBlue keyframes
             blueTransitions.push({
                 lights: [light1],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterBlue
             });
             
-            // Light 2 transparent
+            // Light 2 transparent - wait for stepsAfterBlue keyframes
             blueTransitions.push({
                 lights: [light2],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterBlue
             });
         }
     }
@@ -149,19 +153,20 @@ export class StageKitCoolManualCue implements ICue {
         const stepsUntilActive = 0;
         
         // Add transparent transitions before blue (to wait for the right keyframe)
-        for (let i = 0; i < stepsUntilActive; i++) {
+        if (stepsUntilActive > 0) {
             blueTransitions.push({
                 lights: [centerLight],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
             });
         }
         
@@ -169,32 +174,33 @@ export class StageKitCoolManualCue implements ICue {
         blueTransitions.push({
             lights: [centerLight],
             layer: 0,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: blue,
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'keyframe',
-            untilTime: 0
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
         });
         
         // Add transparent transitions after blue (to wait until the cycle completes)
         const stepsAfterBlue = lightPairs - stepsUntilActive - 1;
-        for (let i = 0; i < stepsAfterBlue; i++) {
+        if (stepsAfterBlue > 0) {
             blueTransitions.push({
                 lights: [centerLight],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterBlue
             });
         }
     }
@@ -207,25 +213,26 @@ export class StageKitCoolManualCue implements ICue {
     for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
         const light = allLights[lightIndex];
         
-        // Calculate when this light should be yellow based on its position
-        // Yellow starts at 90 degrees (1/4 of ring) and steps counter-clockwise
-        const yellowStartIndex = Math.floor(allLights.length / 4);
-        const stepsUntilYellow = (yellowStartIndex - lightIndex + allLights.length) % allLights.length;
+        // Calculate when this light should be green based on its position
+        // Green starts at 90 degrees (1/4 of ring) and steps counter-clockwise
+        const greenStartIndex = Math.floor(allLights.length / 4);
+        const stepsUntilGreen = (greenStartIndex - lightIndex + allLights.length) % allLights.length;
         
-        // Add transparent transitions before yellow (to wait for the right keyframe)
-        for (let i = 0; i < stepsUntilYellow; i++) {
+        // Add transparent transitions before green (to wait for the right keyframe)
+        if (stepsUntilGreen > 0) {
             greenTransitions.push({
                 lights: [light],
                 layer: 5,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 0,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilGreen
             });
         }
         
@@ -233,32 +240,33 @@ export class StageKitCoolManualCue implements ICue {
         greenTransitions.push({
             lights: [light],
             layer: 5,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: green,
                 easing: 'linear',
                 duration: 0,
             },
-            waitUntil: 'keyframe',
-            untilTime: 0
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
         });
         
-        // Add transparent transitions after yellow (to wait until the cycle completes)
-        const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
-        for (let i = 0; i < stepsAfterYellow; i++) {
+        // Add transparent transitions after green (to wait until the cycle completes)
+        const stepsAfterGreen = allLights.length - stepsUntilGreen - 1;
+        if (stepsAfterGreen > 0) {
             greenTransitions.push({
                 lights: [light],
                 layer: 5,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 0,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterGreen
             });
         }
     }

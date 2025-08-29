@@ -38,28 +38,28 @@ export const getEffectCrossFadeColors = ({
             {
                 lights: lights,
                 layer: layer,
-                waitFor: waitFor,
-                forTime: afterStartWait,
+                waitForCondition: waitFor,
+                waitForTime: afterStartWait,
                 transform: {
                     color: startColor,
                     easing: easing,
                     duration: duration,
                 },
-                waitUntil: crossFadeTrigger,
-                untilTime: 0
+                waitUntilCondition: crossFadeTrigger,
+                waitUntilTime: 0
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: 'delay',
-                forTime: afterEndColorWait,
+                waitForCondition: 'delay',
+                waitForTime: afterEndColorWait,
                 transform: {
                     color: endColor,
                     easing: easing,
                     duration: duration,
                 },
-                waitUntil: crossFadeTrigger,
-                untilTime: 0
+                waitUntilCondition: crossFadeTrigger,
+                waitUntilTime: 0
             },
         ]
     };

@@ -32,15 +32,15 @@ export const getEffectBlackout = ({
             {
                 lights: lights,
                 layer: layer,
-                waitFor: "none",
-                forTime: 0,
+                waitForCondition: "none",
+                waitForTime: 0,
                 transform: {
                     color: black,
                     easing: easing,
                     duration: duration,
                 },
-                waitUntil: "none",
-                untilTime: 0,
+                waitUntilCondition: "none",
+                waitUntilTime: 0,
             },
         ],
     };

@@ -43,15 +43,15 @@ export class WarmAutomaticCue implements ICue {
         baseTransitions.push({
           lights: [light],
           layer: 0,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: color,
             easing: 'linear',
             duration: 100,
           },
-          waitUntil: 'none',
-          untilTime: 0,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0,
         });
       });
       

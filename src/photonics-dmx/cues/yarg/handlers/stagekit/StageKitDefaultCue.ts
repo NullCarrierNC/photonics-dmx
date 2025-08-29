@@ -45,10 +45,10 @@ export class StageKitDefaultCue implements ICue {
       {
         lights: blueLights,
         layer: 0,
-        waitFor: 'none',
-        forTime: 0,
-        waitUntil: 'keyframe',
-        untilTime: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0,
         transform: {
           color: blueColor,
           easing: 'linear',
@@ -59,10 +59,10 @@ export class StageKitDefaultCue implements ICue {
       {
         lights: blueLights,
         layer: 0,
-        waitFor: 'none',
-        forTime: 0,
-        waitUntil: 'keyframe',
-        untilTime: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0,
         transform: {
           color: blackColor,
           easing: 'linear',
@@ -76,10 +76,10 @@ export class StageKitDefaultCue implements ICue {
       {
         lights: redLights,
         layer: 0,
-        waitFor: 'none',
-        forTime: 0,
-        waitUntil: 'keyframe',
-        untilTime: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0,
         transform: {
           color: blackColor,
           easing: 'linear',
@@ -90,10 +90,10 @@ export class StageKitDefaultCue implements ICue {
       {
         lights: redLights,
         layer: 0,
-        waitFor: 'none',
-        forTime: 0,
-        waitUntil: 'keyframe',
-        untilTime: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0,
         transform: {
           color: redColor,
           easing: 'linear',
@@ -144,10 +144,10 @@ export class StageKitDefaultCue implements ICue {
       {
         lights: redLights,
         layer: 0,
-        waitFor: 'none',
-        forTime: 0,
-        waitUntil: 'keyframe',
-        untilTime: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0,
         transform: {
           color: redColor,
           easing: 'linear',
@@ -158,10 +158,10 @@ export class StageKitDefaultCue implements ICue {
       {
         lights: redLights,
         layer: 0,
-        waitFor: 'none',
-        forTime: 0,
-        waitUntil: 'keyframe',
-        untilTime: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0,
         transform: {
           color: blackColor,
           easing: 'linear',
@@ -175,10 +175,10 @@ export class StageKitDefaultCue implements ICue {
       {
         lights: blueLights,
         layer: 0,
-        waitFor: 'none',
-        forTime: 0,
-        waitUntil: 'keyframe',
-        untilTime: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0,
         transform: {
           color: blackColor,
           easing: 'linear',
@@ -189,10 +189,10 @@ export class StageKitDefaultCue implements ICue {
       {
         lights: blueLights,
         layer: 0,
-        waitFor: 'none',
-        forTime: 0,
-        waitUntil: 'keyframe',
-        untilTime: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0,
         transform: {
           color: blueColor,
           easing: 'linear',

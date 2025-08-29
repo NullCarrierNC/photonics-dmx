@@ -128,21 +128,21 @@ export const getEffectFlashColor = ({
             {
                 lights: lights,
                 layer: layer,
-                waitFor: startTrigger,
-                forTime: startWait,
+                waitForCondition: startTrigger,
+                waitForTime: startWait,
                 transform: {
                     color: color,
                     easing: easing,
                     duration: durationIn,
                 },
-                waitUntil: "delay",
-                untilTime: holdTime,
+                waitUntilCondition: "delay",
+                waitUntilTime: holdTime,
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: endTrigger,
-                forTime: endWait,
+                waitForCondition: endTrigger,
+                waitForTime: endWait,
                 transform: {
                     color: {
                         red: 0,
@@ -155,8 +155,8 @@ export const getEffectFlashColor = ({
                     easing: easing,
                     duration: durationOut,
                 },
-                waitUntil: "delay",
-                untilTime: holdTime,
+                waitUntilCondition: "delay",
+                waitUntilTime: holdTime,
             },
         ],
     };
@@ -169,7 +169,34 @@ The stomp transitions consists of two transforms:
 1. Fade in to full white over 40ms, hold for 0ms.
 2. Fade out to transparent over 150ms.
 
-`Triggers` allow you to wait for specific game events like Beat and Measure (YARG only).
+**Wait Conditions** allow you to wait for specific game events like Beat, Measure, or Keyframe before starting or ending transitions.
+
+### Event Count Properties
+
+The system supports count-based waiting using `waitForConditionCount` and `waitUntilConditionCount` properties. These allow you to wait for a specific number of events to occur before proceeding.
+
+- **`waitForConditionCount`**: Number of events to wait for before starting the transition
+- **`waitUntilConditionCount`**: Number of events to wait for before ending the transition
+
+For example, to wait for 3 keyframes before starting:
+```typescript
+{
+    lights: [light],
+    layer: 0,
+    waitForCondition: 'keyframe',
+    waitForTime: 0,
+    waitForConditionCount: 3,  // Wait for 3 keyframes
+    transform: { color: blue, easing: 'linear', duration: 100 },
+    waitUntilCondition: 'none',
+    waitUntilTime: 0
+}
+```
+
+**Count Values:**
+- **`0`**: Don't wait (start/end immediately)
+- **`1`**: Wait for 1 event
+- **`2`**: Wait for 2 events
+- etc.
 
 Note the `color` object: RGB are, as expected, the primary colour channels. `Intensity` maps to 
 the `Master Dimmer` on your DMX fixture.

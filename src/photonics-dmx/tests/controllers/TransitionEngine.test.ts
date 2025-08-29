@@ -29,15 +29,15 @@ describe('TransitionEngine', () => {
   const createMockEffectTransition = (overrides?: Partial<EffectTransition>): EffectTransition => ({
     lights: [createMockTrackedLight()],
     layer: 1,
-    waitFor: 'none',
-    forTime: 0,
+    waitForCondition: 'none',
+    waitForTime: 0,
     transform: {
       color: createMockRGBIP({ red: 255 }),
       easing: 'linear',
       duration: 1000
     },
-    waitUntil: 'none',
-    untilTime: 0,
+    waitUntilCondition: 'none',
+    waitUntilTime: 0,
     ...overrides
   });
   
@@ -219,7 +219,7 @@ describe('TransitionEngine', () => {
       transitionEngine.updateTransitions(150); // Advance past the waitEndTime
       
       // Verify state changed to waitingUntil if untilTime > 0
-      if (transition.untilTime > 0) {
+      if (transition.waitUntilTime > 0) {
         expect(mockEffect.state).toBe('waitingUntil');
       } else {
         expect(mockEffect.state).toBe('idle');
@@ -239,7 +239,7 @@ describe('TransitionEngine', () => {
       });
       
       const transition = createMockEffectTransition({
-        untilTime: 500
+        waitUntilTime: 500
       });
       
       // Call handleWaitingUntil

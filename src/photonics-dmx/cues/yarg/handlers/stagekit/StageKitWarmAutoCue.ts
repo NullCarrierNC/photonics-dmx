@@ -45,35 +45,37 @@ export class StageKitWarmAutoCue implements ICue {
         const stepsUntilActive = pairIndex;
         
         // Add transparent transitions before red (to wait for the right beat)
-        for (let i = 0; i < stepsUntilActive; i++) {
-            // Light 1 transparent
+        if (stepsUntilActive > 0) {
+            // Light 1 transparent - wait for stepsUntilActive beats
             redTransitions.push({
                 lights: [light1],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'beat',
-                untilTime: 0
+                waitUntilCondition: 'beat',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
             });
             
-            // Light 2 transparent
+            // Light 2 transparent - wait for stepsUntilActive beats
             redTransitions.push({
                 lights: [light2],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'beat',
-                untilTime: 0
+                waitUntilCondition: 'beat',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
             });
         }
         
@@ -81,62 +83,64 @@ export class StageKitWarmAutoCue implements ICue {
         redTransitions.push({
             lights: [light1],
             layer: 0,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: red,
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'beat',
-            untilTime: 0
+            waitUntilCondition: 'beat',
+            waitUntilTime: 0
         });
         
         redTransitions.push({
             lights: [light2],
             layer: 0,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: red,
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'beat',
-            untilTime: 0
+            waitUntilCondition: 'beat',
+            waitUntilTime: 0
         });
         
         // Add transparent transitions after red (to wait until the cycle completes)
         const stepsAfterRed = lightPairs - stepsUntilActive - 1;
-        for (let i = 0; i < stepsAfterRed; i++) {
-            // Light 1 transparent
+        if (stepsAfterRed > 0) {
+            // Light 1 transparent - wait for stepsAfterRed beats
             redTransitions.push({
                 lights: [light1],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'beat',
-                untilTime: 0
+                waitUntilCondition: 'beat',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterRed
             });
             
-            // Light 2 transparent
+            // Light 2 transparent - wait for stepsAfterRed beats
             redTransitions.push({
                 lights: [light2],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'beat',
-                untilTime: 0
+                waitUntilCondition: 'beat',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterRed
             });
         }
     }
@@ -149,19 +153,20 @@ export class StageKitWarmAutoCue implements ICue {
         const stepsUntilActive = 0;
         
         // Add transparent transitions before red (to wait for the right beat)
-        for (let i = 0; i < stepsUntilActive; i++) {
+        if (stepsUntilActive > 0) {
             redTransitions.push({
                 lights: [centerLight],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'beat',
-                untilTime: 0
+                waitUntilCondition: 'beat',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
             });
         }
         
@@ -169,32 +174,33 @@ export class StageKitWarmAutoCue implements ICue {
         redTransitions.push({
             lights: [centerLight],
             layer: 0,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: red,
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'beat',
-            untilTime: 0
+            waitUntilCondition: 'beat',
+            waitUntilTime: 0
         });
         
         // Add transparent transitions after red (to wait until the cycle completes)
         const stepsAfterRed = lightPairs - stepsUntilActive - 1;
-        for (let i = 0; i < stepsAfterRed; i++) {
+        if (stepsAfterRed > 0) {
             redTransitions.push({
                 lights: [centerLight],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'beat',
-                untilTime: 0
+                waitUntilCondition: 'beat',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterRed
             });
         }
     }
@@ -213,19 +219,20 @@ export class StageKitWarmAutoCue implements ICue {
         const stepsUntilYellow = (yellowStartIndex - lightIndex + allLights.length) % allLights.length;
         
         // Add transparent transitions before yellow (to wait for the right beat)
-        for (let i = 0; i < stepsUntilYellow; i++) {
+        if (stepsUntilYellow > 0) {
             yellowTransitions.push({
                 lights: [light],
                 layer: 5,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 0,
                 },
-                waitUntil: 'beat',
-                untilTime: 0
+                waitUntilCondition: 'beat',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilYellow
             });
         }
         
@@ -233,32 +240,33 @@ export class StageKitWarmAutoCue implements ICue {
         yellowTransitions.push({
             lights: [light],
             layer: 5,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: yellow,
                 easing: 'linear',
                 duration: 0,
             },
-            waitUntil: 'beat',
-            untilTime: 0
+            waitUntilCondition: 'beat',
+            waitUntilTime: 0
         });
         
         // Add transparent transitions after yellow (to wait until the cycle completes)
         const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
-        for (let i = 0; i < stepsAfterYellow; i++) {
+        if (stepsAfterYellow > 0) {
             yellowTransitions.push({
                 lights: [light],
                 layer: 5,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 0,
                 },
-                waitUntil: 'beat',
-                untilTime: 0
+                waitUntilCondition: 'beat',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterYellow
             });
         }
     }

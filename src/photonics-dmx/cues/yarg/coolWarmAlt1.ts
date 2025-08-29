@@ -1,10 +1,10 @@
-import { CueRegistry } from '../../CueRegistry';
-import { CueType } from '../../cueTypes';
-import { ICueGroup } from '../../interfaces/ICueGroup';
-import { CoolAutomaticCue } from '../handlers/coolWarmAlt1/CoolAutomaticCue';
-import { CoolManualCue } from '../handlers/coolWarmAlt1/CoolManualCue';
-import { WarmAutomaticCue } from '../handlers/coolWarmAlt1/WarmAutomaticCue';
-import { WarmManualCue } from '../handlers/coolWarmAlt1/WarmManualCue';
+import { CueRegistry } from '../CueRegistry';
+import { CueType } from '../cueTypes';
+import { ICueGroup } from '../interfaces/ICueGroup';
+import { CoolAutomaticCue } from './handlers/coolWarmAlt1/CoolAutomaticCue';
+import { CoolManualCue } from './handlers/coolWarmAlt1/CoolManualCue';
+import { WarmAutomaticCue } from './handlers/coolWarmAlt1/WarmAutomaticCue';
+import { WarmManualCue } from './handlers/coolWarmAlt1/WarmManualCue';
 
 
 /**
