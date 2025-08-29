@@ -574,33 +574,10 @@ export class Rb3eNetworkListener extends EventEmitter {
     const leftChannel = payload.readUInt8(0);
     const rightChannel = payload.readUInt8(1);
 
-    // Get LED positions for logging
-    const stageKitMapper = new StageKitLedMapper();
-    const ledPositions = stageKitMapper.mapLeftChannelToLedPositions(leftChannel);
-
     // Parse RB3E bytes into clean StageKit data
     const stageKitData = this.parseStageKitData(leftChannel, rightChannel);
 
     this.emit('stagekit:data', stageKitData);
-    
-    // Enhanced logging with LED pattern information
-    const ledDescription = ledPositions.length > 0
-      ? `LEDs: [${ledPositions.join(', ')}]`
-      : 'No LEDs';
-
-    //console.log(`RB3E_EVENT_STAGEKIT => left=${leftChannel}, right=${rightChannel}, brightness=${this._currentBrightness}, ${ledDescription}`);
-
-    // Log detailed information for debugging
-   // console.log(`  Left Channel: ${stageKitMapper.getLeftChannelDescription(leftChannel)}`);
-   // console.log(`  Right Channel: ${stageKitMapper.getRightChannelDescription(rightChannel)}`);
-    if (ledPositions.length > 0) {
-      const layout = StageKitLedMapper.getStageKitLedLayout();
-      const ledDetails = ledPositions.map(pos => {
-        const led = layout.find(l => l.position === pos);
-        return led ? `${pos}(${led.location})` : `${pos}(unknown)`;
-      }).join(', ');
-//      console.log(`  LED Pattern: ${ledDetails}`);
-    }
   }
 
   /**
