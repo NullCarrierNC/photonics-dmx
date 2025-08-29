@@ -54,24 +54,57 @@ export class SongEventHandler implements ISongEventHandler {
         const currentTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
         if (!currentTransition) return;
         
+        // Handle waitForCondition with count-based logic
         if (activeEffect.state === 'waitingFor' && currentTransition.waitForCondition === eventType) {
-          // This transition is waiting for this event type, so it can start now
-          this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime);
+          // Check if we need to decrement the count
+          if (currentTransition.waitForConditionCount !== undefined && currentTransition.waitForConditionCount > 0) {
+            currentTransition.waitForConditionCount--;
+            
+            // If count reaches 0, start the transition
+            if (currentTransition.waitForConditionCount === 0) {
+              this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime);
+            }
+          } else {
+            // No count specified, start transition immediately
+            this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime);
+          }
         }
         
+        // Handle waitUntilCondition with count-based logic
         if (activeEffect.state === 'waitingUntil' && currentTransition.waitUntilCondition === eventType) {
-          // This transition is waiting until this event type to end
-          // Move to the next transition and immediately prepare it
-          activeEffect.currentTransitionIndex += 1;
-          
-          // Check if there's another transition and prepare it immediately
-          if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
-            const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
-            activeEffect.state = 'idle';
-            this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime);
+          // Check if we need to decrement the count
+          if (currentTransition.waitUntilConditionCount !== undefined && currentTransition.waitUntilConditionCount > 0) {
+            currentTransition.waitUntilConditionCount--;
+            
+            // If count reaches 0, move to next transition
+            if (currentTransition.waitUntilConditionCount === 0) {
+              // Move to the next transition and immediately prepare it
+              activeEffect.currentTransitionIndex += 1;
+              
+              // Check if there's another transition and prepare it immediately
+              if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
+                const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
+                activeEffect.state = 'idle';
+                this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime);
+              } else {
+                // If no more transitions, just set to idle
+                activeEffect.state = 'idle';
+              }
+            }
           } else {
-            // If no more transitions, just set to idle
-            activeEffect.state = 'idle';
+            // No count specified, move to next transition immediately
+            // Move to the next transition and immediately prepare it
+            activeEffect.currentTransitionIndex += 1;
+            
+            // Check if there's another transition and prepare it immediately
+            if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
+              const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
+              activeEffect.state = 'idle';
+              this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime);
+            } else {
+              // If no more transitions, just set to idle
+              activeEffect.state = 'idle';
+            }
           }
         }
       });

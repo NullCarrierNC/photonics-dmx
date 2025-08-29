@@ -103,6 +103,7 @@ export interface EffectTransition {
 
   waitForCondition: WaitCondition;
   waitForTime: number; // in milliseconds
+  waitForConditionCount?: number;
   transform: {
     color: RGBIO;
     easing: string;
@@ -110,6 +111,7 @@ export interface EffectTransition {
   };
   waitUntilCondition: WaitCondition;
   waitUntilTime: number; // in milliseconds
+  waitUntilConditionCount?: number; 
 }
 
 /**
