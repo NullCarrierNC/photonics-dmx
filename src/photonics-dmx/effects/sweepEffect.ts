@@ -134,15 +134,15 @@ export const getSweepEffect = ({
     transitions.push({
       lights: [],  // Empty array, so no lights change
       layer: 200,  // Use a high layer that won't conflict with anything
-      waitFor: waitFor,  // Wait for beat or measure
-      forTime: 0,
+      waitForCondition: waitFor,  // Wait for beat or measure
+      waitForTime: 0,
       transform: {
         color: low,  // This doesn't matter since no lights are affected
         easing: easing,
         duration: 1,  // Minimal duration
       },
-      waitUntil: "none",
-      untilTime: 0,
+      waitUntilCondition: "none",
+      waitUntilTime: 0,
     });
     
     // The rest of the transitions should run immediately after
@@ -159,15 +159,15 @@ export const getSweepEffect = ({
     transitions.push({
       lights: group,
       layer: groupLayer,
-      waitFor: "delay",  // Always delay - if we need to wait for beat/measure, the trigger transition handles that
-      forTime: groupDelay,  // Delay before starting this group's fade in
+      waitForCondition: "delay",  // Always delay - if we need to wait for beat/measure, the trigger transition handles that
+      waitForTime: groupDelay,  // Delay before starting this group's fade in
       transform: {
         color: high,
         easing: easing,
         duration: actualFadeIn,
       },
-      waitUntil: "delay",
-      untilTime: holdTime,  // Hold time at the high state (adjusted with additionalHold)
+      waitUntilCondition: "delay",
+      waitUntilTime: holdTime,  // Hold time at the high state (adjusted with additionalHold)
     });
     
     // Calculate the total time used by the transitions for this group.
@@ -189,30 +189,30 @@ export const getSweepEffect = ({
     transitions.push({
       lights: group,
       layer: groupLayer,
-      waitFor: "none",
-      forTime: 0,           
+      waitForCondition: "none",
+      waitForTime: 0,           
       transform: {
         color: low,
         easing: easing,
         duration: finalFadeOutDuration,
       },
-      waitUntil: fadeOutWaitUntil,
-      untilTime: fadeOutWaitTime,
+      waitUntilCondition: fadeOutWaitUntil,
+      waitUntilTime: fadeOutWaitTime,
     });
 
     if(betweenSweepDelay > 0){
       transitions.push({
         lights: group,
         layer: groupLayer,
-        waitFor: "none",
-        forTime: 0,
+        waitForCondition: "none",
+        waitForTime: 0,
         transform: {
           color: low,
           easing: easing,
           duration: 1,
         },
-        waitUntil: "delay",
-        untilTime: betweenSweepDelay,
+        waitUntilCondition: "delay",
+        waitUntilTime: betweenSweepDelay,
       })
     }
   });

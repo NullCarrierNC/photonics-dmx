@@ -169,15 +169,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [mockLight],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: mockColor,
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 
@@ -217,15 +217,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [createMockTrackedLight()],
           layer: 1, // Below 200
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP(),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 
@@ -247,15 +247,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [createMockTrackedLight()],
           layer: layer,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP(),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 
@@ -265,15 +265,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [createMockTrackedLight()],
           layer: layer,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP(),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 
@@ -318,15 +318,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [createMockTrackedLight()],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP(),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 
@@ -361,15 +361,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [mockLight],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: mockColor,
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 
@@ -419,15 +419,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [createMockTrackedLight()],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP(),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 
@@ -468,15 +468,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [createMockTrackedLight()],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP(),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 
@@ -518,15 +518,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [createMockTrackedLight()],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP(),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 
@@ -567,15 +567,15 @@ describe('EffectManager', () => {
         transitions: [{
           lights: [mockLight],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: mockColor,
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }]
       };
 

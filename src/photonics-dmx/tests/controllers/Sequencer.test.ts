@@ -69,15 +69,15 @@ describe('Sequencer', () => {
           {
             lights: [createMockTrackedLight()],
             layer: 1,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
               color: createMockRGBIP(),
               easing: 'linear',
               duration: 1000
             },
-            waitUntil: 'none',
-            untilTime: 0
+            waitUntilCondition: 'none',
+            waitUntilTime: 0
           }
         ]
       };

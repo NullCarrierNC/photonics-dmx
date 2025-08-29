@@ -23,10 +23,10 @@ export class StageKitIntroCue implements ICue {
       {
         lights: allLights,
         layer: 0,
-        waitFor: 'none',
-        forTime: 0,
-        waitUntil: 'none',
-        untilTime: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'none',
+        waitUntilTime: 0,
         transform: {
           color: greenColor,
           easing: 'linear',

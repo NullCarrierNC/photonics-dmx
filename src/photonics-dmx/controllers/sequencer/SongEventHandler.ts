@@ -54,12 +54,12 @@ export class SongEventHandler implements ISongEventHandler {
         const currentTransition = activeEffect.transitions[activeEffect.currentTransitionIndex];
         if (!currentTransition) return;
         
-        if (activeEffect.state === 'waitingFor' && currentTransition.waitFor === eventType) {
+        if (activeEffect.state === 'waitingFor' && currentTransition.waitForCondition === eventType) {
           // This transition is waiting for this event type, so it can start now
           this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime);
         }
         
-        if (activeEffect.state === 'waitingUntil' && currentTransition.waitUntil === eventType) {
+        if (activeEffect.state === 'waitingUntil' && currentTransition.waitUntilCondition === eventType) {
           // This transition is waiting until this event type to end
           // Move to the next transition and immediately prepare it
           activeEffect.currentTransitionIndex += 1;

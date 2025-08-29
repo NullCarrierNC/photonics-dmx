@@ -44,21 +44,21 @@ export const getEffectFlashColor = ({
             {
                 lights: lights,
                 layer: layer,
-                waitFor: startTrigger,
-                forTime: startWait,
+                waitForCondition: startTrigger,
+                waitForTime: startWait,
                 transform: {
                     color: color,
                     easing: easing,
                     duration: durationIn,
                 },
-                waitUntil: "delay",
-                untilTime: holdTime,
+                waitUntilCondition: "delay",
+                waitUntilTime: holdTime,
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: endTrigger,
-                forTime: endWait,
+                waitForCondition: endTrigger,
+                waitForTime: endWait,
                 transform: {
                     color: {
                         red: 0,
@@ -71,8 +71,8 @@ export const getEffectFlashColor = ({
                     easing: easing,
                     duration: durationOut,
                 },
-                waitUntil: "delay",
-                untilTime: holdTime,
+                waitUntilCondition: "delay",
+                waitUntilTime: holdTime,
             },
         ],
     };

@@ -37,15 +37,15 @@ export const getEffectSingleColor = ({
             {
                 lights,
                 layer,
-                waitFor,
-                forTime,
+                waitForCondition: waitFor,
+                waitForTime: forTime,
                 transform: {
                     color,
                     easing,
                     duration,
                 },
-                waitUntil,
-                untilTime,
+                waitUntilCondition: waitUntil,
+                waitUntilTime: untilTime,
             },
         ],
     };

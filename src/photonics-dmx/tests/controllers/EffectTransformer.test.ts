@@ -44,41 +44,41 @@ describe('EffectTransformer', () => {
         {
           lights: [lights[0]],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP({ red: 255 }),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         },
         {
           lights: [lights[1]],
           layer: 2,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP({ green: 255 }),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         },
         {
           lights: [lights[2]],
           layer: 1, // Same layer as first transition
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP({ blue: 255 }),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }
       ];
       
@@ -114,28 +114,28 @@ describe('EffectTransformer', () => {
         {
           lights: [lights[0]],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP({ red: 255 }),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         },
         {
           lights: [lights[1]],
           layer: 1,
-          waitFor: 'none',
-          forTime: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
           transform: {
             color: createMockRGBIP({ green: 255 }),
             easing: 'linear',
             duration: 1000
           },
-          waitUntil: 'none',
-          untilTime: 0
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
         }
       ];
       

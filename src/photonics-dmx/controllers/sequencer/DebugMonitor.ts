@@ -155,10 +155,10 @@ export class DebugMonitor implements IDebugMonitor {
         const totalTransitions = firstEffect.transitions.length;
         const state = firstEffect.state;
         const waitFor = transitionIndex < totalTransitions
-          ? firstEffect.transitions[transitionIndex].waitFor
+          ? firstEffect.transitions[transitionIndex].waitForCondition
           : 'none';
         const waitUntil = transitionIndex < totalTransitions
-          ? firstEffect.transitions[transitionIndex].waitUntil
+          ? firstEffect.transitions[transitionIndex].waitUntilCondition
           : 'none';
         
         layerInfo.set(layer, [

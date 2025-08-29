@@ -1,7 +1,7 @@
-import { CueRegistry } from '../../CueRegistry';
-import { CueType } from '../../cueTypes';
-import { ICueGroup } from '../../interfaces/ICueGroup';
-import { SearchlightsAlt1Cue } from '../handlers/commonAlt1/SearchlightsAlt1Cue';
+import { CueRegistry } from '../CueRegistry';
+import { CueType } from '../cueTypes';
+import { ICueGroup } from '../interfaces/ICueGroup';
+import { SearchlightsAlt1Cue } from './handlers/commonAlt1/SearchlightsAlt1Cue';
 
 const group: ICueGroup = {
   id: 'commonAlt1',

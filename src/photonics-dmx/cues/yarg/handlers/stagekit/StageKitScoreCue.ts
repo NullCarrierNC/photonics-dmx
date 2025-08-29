@@ -46,10 +46,10 @@ export class StageKitScoreCue implements ICue {
       transitions.push({
         lights: pair,
         layer: 0,
-        waitFor: 'delay',
-        forTime: index * 250, // 1 second cycle, 4 steps = 250ms each
-        waitUntil: 'none',
-        untilTime: 0,
+        waitForCondition: 'delay',
+        waitForTime: index * 250, // 1 second cycle, 4 steps = 250ms each
+        waitUntilCondition: 'none',
+        waitUntilTime: 0,
         transform: {
           color: redColor,
           easing: 'linear',
@@ -62,10 +62,10 @@ export class StageKitScoreCue implements ICue {
         transitions.push({
           lights: oppositePairs[index - 1],
           layer: 0,
-          waitFor: 'delay',
-          forTime: index * 250,
-          waitUntil: 'none',
-          untilTime: 0,
+          waitForCondition: 'delay',
+          waitForTime: index * 250,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0,
           transform: {
             color: blackColor,
             easing: 'linear',

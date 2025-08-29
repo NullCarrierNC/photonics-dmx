@@ -44,41 +44,41 @@ export const getEffectFadeInColorFadeOut = ({
             {
                 lights: lights,
                 layer: layer,
-                waitFor: waitFor,
-                forTime: 0,
+                waitForCondition: waitFor,
+                waitForTime: 0,
                 transform: {
                     color: startColor,
                     easing: easing,
                     duration: 0,
                 },
-                waitUntil: waitUntil,
-                untilTime: waitBeforeFadeIn
+                waitUntilCondition: waitUntil,
+                waitUntilTime: waitBeforeFadeIn
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: waitFor,
-                forTime: 0,
+                waitForCondition: waitFor,
+                waitForTime: 0,
                 transform: {
                     color: endColor,
                     easing: easing,
                     duration: fadeInDuration,
                 },
-                waitUntil: waitUntil,
-                untilTime: holdDuration
+                waitUntilCondition: waitUntil,
+                waitUntilTime: holdDuration
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: waitFor,
-                forTime: 0,
+                waitForCondition: waitFor,
+                waitForTime: 0,
                 transform: {
                     color: startColor,
                     easing: easing,
                     duration: fadeOutDuration,
                 },
-                waitUntil: 'none',
-                untilTime: waitAfterFadeOut
+                waitUntilCondition: 'none',
+                waitUntilTime: waitAfterFadeOut
             },
         ]
     };

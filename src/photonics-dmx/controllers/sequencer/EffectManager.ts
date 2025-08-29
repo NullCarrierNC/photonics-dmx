@@ -513,15 +513,15 @@ export class EffectManager implements IEffectManager {
     const transitions: EffectTransition[] = [{
       lights: lights,
       layer: 0, 
-      waitFor: 'none',
-      forTime: 0,
+      waitForCondition: 'none',
+      waitForTime: 0,
       transform: {
         color: color,
         easing: 'linear',
         duration: time
       },
-      waitUntil: 'none',
-      untilTime: 0
+      waitUntilCondition: 'none',
+      waitUntilTime: 0
     }];
 
     // Create an effect

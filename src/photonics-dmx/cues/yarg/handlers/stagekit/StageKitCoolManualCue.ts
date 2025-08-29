@@ -50,30 +50,30 @@ export class StageKitCoolManualCue implements ICue {
             blueTransitions.push({
                 lights: [light1],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0
             });
             
             // Light 2 transparent
             blueTransitions.push({
                 lights: [light2],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0
             });
         }
         
@@ -81,29 +81,29 @@ export class StageKitCoolManualCue implements ICue {
         blueTransitions.push({
             lights: [light1],
             layer: 0,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: blue,
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'keyframe',
-            untilTime: 0
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
         });
         
         blueTransitions.push({
             lights: [light2],
             layer: 0,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: blue,
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'keyframe',
-            untilTime: 0
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
         });
         
         // Add transparent transitions after blue (to wait until the cycle completes)
@@ -113,30 +113,30 @@ export class StageKitCoolManualCue implements ICue {
             blueTransitions.push({
                 lights: [light1],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0
             });
             
             // Light 2 transparent
             blueTransitions.push({
                 lights: [light2],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0
             });
         }
     }
@@ -153,15 +153,15 @@ export class StageKitCoolManualCue implements ICue {
             blueTransitions.push({
                 lights: [centerLight],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0
             });
         }
         
@@ -169,15 +169,15 @@ export class StageKitCoolManualCue implements ICue {
         blueTransitions.push({
             lights: [centerLight],
             layer: 0,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: blue,
                 easing: 'linear',
                 duration: 100,
             },
-            waitUntil: 'keyframe',
-            untilTime: 0
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
         });
         
         // Add transparent transitions after blue (to wait until the cycle completes)
@@ -186,15 +186,15 @@ export class StageKitCoolManualCue implements ICue {
             blueTransitions.push({
                 lights: [centerLight],
                 layer: 0,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: blackColor,
                     easing: 'linear',
                     duration: 100,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0
             });
         }
     }
@@ -217,15 +217,15 @@ export class StageKitCoolManualCue implements ICue {
             greenTransitions.push({
                 lights: [light],
                 layer: 5,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 0,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0
             });
         }
         
@@ -233,15 +233,15 @@ export class StageKitCoolManualCue implements ICue {
         greenTransitions.push({
             lights: [light],
             layer: 5,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
                 color: green,
                 easing: 'linear',
                 duration: 0,
             },
-            waitUntil: 'keyframe',
-            untilTime: 0
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
         });
         
         // Add transparent transitions after yellow (to wait until the cycle completes)
@@ -250,15 +250,15 @@ export class StageKitCoolManualCue implements ICue {
             greenTransitions.push({
                 lights: [light],
                 layer: 5,
-                waitFor: 'none',
-                forTime: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
                 transform: {
                     color: transparentColor,
                     easing: 'linear',
                     duration: 0,
                 },
-                waitUntil: 'keyframe',
-                untilTime: 0
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0
             });
         }
     }

@@ -212,12 +212,12 @@ export class TransitionEngine implements ITransitionEngine {
    */
   public prepareTransition(activeEffect: LightEffectState, transition: EffectTransition): void {
     activeEffect.state = 'waitingFor';
-    if (transition.waitFor === 'none') {
+    if (transition.waitForCondition === 'none') {
       this.startTransition(activeEffect, transition);
     } else {
       activeEffect.transitionStartTime = this.currentTime;
-      if (transition.waitFor === 'delay') {
-        activeEffect.waitEndTime = this.currentTime + transition.forTime;
+      if (transition.waitForCondition === 'delay') {
+        activeEffect.waitEndTime = this.currentTime + transition.waitForTime;
       } else {
         activeEffect.waitEndTime = this.currentTime;
       }
@@ -231,11 +231,11 @@ export class TransitionEngine implements ITransitionEngine {
    * @param transition The current transition being waited on
    */
   public handleWaitingFor(activeEffect: LightEffectState, transition: EffectTransition): void {
-    if (transition.waitFor === 'delay') {
+    if (transition.waitForCondition === 'delay') {
       if (this.currentTime >= activeEffect.waitEndTime) {
         this.startTransition(activeEffect, transition);
       }
-    } else if (transition.waitFor === 'none') {
+    } else if (transition.waitForCondition === 'none') {
       this.startTransition(activeEffect, transition);
     }
   }
@@ -326,12 +326,12 @@ export class TransitionEngine implements ITransitionEngine {
       // Since this is a per-light effect, we just update the lastEndState directly
       activeEffect.lastEndState = transition.transform.color;
       activeEffect.state = 'waitingUntil';
-      if (transition.waitUntil === 'none') {
+      if (transition.waitUntilCondition === 'none') {
         activeEffect.currentTransitionIndex += 1;
         activeEffect.state = 'idle';
-      } else if (transition.waitUntil === 'delay') {
+      } else if (transition.waitUntilCondition === 'delay') {
         activeEffect.transitionStartTime = this.currentTime;
-        activeEffect.waitEndTime = this.currentTime + transition.untilTime;
+        activeEffect.waitEndTime = this.currentTime + transition.waitUntilTime;
       } else {
         activeEffect.transitionStartTime = this.currentTime;
         activeEffect.waitEndTime = this.currentTime;
@@ -346,12 +346,12 @@ export class TransitionEngine implements ITransitionEngine {
    * @param transition The current transition being processed
    */
   public handleWaitingUntil(activeEffect: LightEffectState, transition: EffectTransition): void {
-    if (transition.waitUntil === 'delay') {
+    if (transition.waitUntilCondition === 'delay') {
       if (this.currentTime >= activeEffect.waitEndTime) {
         activeEffect.currentTransitionIndex += 1;
         activeEffect.state = 'idle';
       }
-    } else if (transition.waitUntil === 'none') {
+    } else if (transition.waitUntilCondition === 'none') {
       activeEffect.currentTransitionIndex += 1;
       activeEffect.state = 'idle';
     }

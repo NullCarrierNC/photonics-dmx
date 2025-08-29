@@ -101,15 +101,15 @@ export interface EffectTransition {
   lights: TrackedLight[];
   layer: number;
 
-  waitFor: WaitCondition;
-  forTime: number; // in milliseconds
+  waitForCondition: WaitCondition;
+  waitForTime: number; // in milliseconds
   transform: {
     color: RGBIO;
     easing: string;
     duration: number; // in milliseconds
   };
-  waitUntil: WaitCondition;
-  untilTime: number; // in milliseconds
+  waitUntilCondition: WaitCondition;
+  waitUntilTime: number; // in milliseconds
 }
 
 /**

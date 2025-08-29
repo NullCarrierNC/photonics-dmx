@@ -47,10 +47,10 @@ export const getEffectCycleLights = ({
   sequenceTransitions.push({
     lights: [lights[0]],
     layer: layer,
-    waitFor: waitFor, // Wait for the specified trigger
-    forTime: 0, 
-    waitUntil: 'none',
-    untilTime: 0,
+    waitForCondition: waitFor, // Wait for the specified trigger
+    waitForTime: 0, 
+    waitUntilCondition: 'none',
+    waitUntilTime: 0,
     transform: { 
       color: activeColor,
       easing: 'linear',
@@ -64,10 +64,10 @@ export const getEffectCycleLights = ({
     sequenceTransitions.push({
       lights: [lights[i-1]], // Target the previous light
       layer: layer,
-      waitFor: waitFor, 
-      forTime: 0, 
-      waitUntil: 'none',
-      untilTime: 0,
+      waitForCondition: waitFor, 
+      waitForTime: 0, 
+      waitUntilCondition: 'none',
+      waitUntilTime: 0,
       transform: { 
         color: baseColor, 
         easing: 'linear',
@@ -79,10 +79,10 @@ export const getEffectCycleLights = ({
     sequenceTransitions.push({
       lights: [lights[i]], // Target the current light
       layer: layer,
-      waitFor: 'none', 
-      forTime: 0, 
-      waitUntil: 'none',
-      untilTime: 0,
+      waitForCondition: 'none', 
+      waitForTime: 0, 
+      waitUntilCondition: 'none',
+      waitUntilTime: 0,
       transform: { 
         color: activeColor, // Change to active
         easing: 'linear',
@@ -95,10 +95,10 @@ export const getEffectCycleLights = ({
   sequenceTransitions.push({
     lights: [lights[numLights - 1]], // Target the last light
     layer: layer,
-    waitFor: waitFor, // Wait for the specified trigger
-    forTime: 0, 
-    waitUntil: 'none',
-    untilTime: 0,
+    waitForCondition: waitFor, // Wait for the specified trigger
+    waitForTime: 0, 
+    waitUntilCondition: 'none',
+    waitUntilTime: 0,
     transform: { 
       color: baseColor, // Revert to base
       easing: 'linear',
