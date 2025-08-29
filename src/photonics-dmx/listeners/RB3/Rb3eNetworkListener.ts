@@ -2,7 +2,6 @@ import * as dgram from 'dgram';
 import { EventEmitter } from 'events';
 import { Rb3ePacketType, Rb3GameState, Rb3PlatformID, Rb3TrackType, Rb3Difficulty } from './rb3eTypes';
 import { CueData } from '../../cues/cueTypes';
-import { StageKitLedMapper } from './StageKitLedMapper';
 
 
 // Use the same port that RB3Enhanced sends to.
@@ -757,6 +756,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     return buf.toString('utf8');
   }
 
+  /* 
   private logDataSummary(cueData: CueData, packetType: number) {
     const summary: string[] = [];
     if (cueData.rb3Platform) summary.push(`Platform: ${cueData.rb3Platform}`);
@@ -777,5 +777,6 @@ export class Rb3eNetworkListener extends EventEmitter {
 
     console.log(`Received RB3E packet type ${packetType} with summary: ${summary.join(', ')}`);
   }
+    */
 }
 

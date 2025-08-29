@@ -1,6 +1,6 @@
-import { RGBIO } from '../types';
-import { LightTransitionController } from '../controllers/sequencer/LightTransitionController';
-import { LightStateManager } from '../controllers/sequencer/LightStateManager';
+import { RGBIO } from '../../types';
+import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
+import { LightStateManager } from '../../controllers/sequencer/LightStateManager';
 
 /**
  * Test suite for testing replace blend mode with fading effects
@@ -197,7 +197,7 @@ describe('Replace Blend Mode with Fading Effects', () => {
       // Test different fade levels
       const fadeLevels = [1.0, 0.75, 0.5, 0.25, 0.0];
       
-      fadeLevels.forEach((fadeLevel, index) => {
+      fadeLevels.forEach((fadeLevel, _index) => {
         const greenFading: RGBIO = {
           red: 0, green: 255, blue: 0, intensity: 255,
           opacity: fadeLevel,
@@ -284,6 +284,9 @@ describe('Replace Blend Mode with Fading Effects', () => {
         (lightTransitionController as any).calculateFinalColorForLight(lightId);
         
         const result = mockLightStateManager.setLightState.mock.calls[0][1] as RGBIO;
+
+        // Use description in test output for better debugging
+        console.log(`Testing: ${description}`);
 
         // Verify the highest layer wins
         expect(result.red).toBe(expected.red);

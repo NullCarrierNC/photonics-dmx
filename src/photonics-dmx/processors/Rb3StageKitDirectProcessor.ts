@@ -845,7 +845,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     });
     
     // Clear all strobe effects and intervals
-    for (const [effectName, effectData] of this.activeStrobeEffects.entries()) {
+    for (const [_effectName, effectData] of this.activeStrobeEffects.entries()) {
       if (effectData.interval) {
         clearInterval(effectData.interval);
       }
