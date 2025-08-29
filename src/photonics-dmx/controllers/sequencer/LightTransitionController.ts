@@ -49,6 +49,7 @@ export class LightTransitionController {
   private _transitionLock = false;
   private clock: Clock | null = null;
   private updateCallback: (deltaTime: number) => void;
+  private accumulatedTime: number = 0;
 
   constructor(lightStateManager: LightStateManager) {
     this._lightStateManager = lightStateManager;
@@ -66,6 +67,8 @@ export class LightTransitionController {
    */
   public registerWithClock(clock: Clock): void {
     this.clock = clock;
+    // Initialize accumulated time with current clock time for consistency
+    this.accumulatedTime = clock.getCurrentTimeMs();
     clock.onTick(this.updateCallback);
   }
 
@@ -134,7 +137,7 @@ export class LightTransitionController {
       layer,
       startState: effectiveStartState,
       endState: { ...endState },
-      startTime: performance.now(),
+      startTime: this.clock ? this.clock.getCurrentTimeMs() : this.accumulatedTime,
       transition: {
         transform: {
           color: endState,
@@ -260,18 +263,17 @@ export class LightTransitionController {
   }
 
   /**
-   * Updates all active transitions.
-   * This is called from the timing manager.
+   * Update method called by the clock
    * 
-   * Process:
-   *   1) Lock to prevent concurrent updates.
-   *   2) Calculate new state for each transition.
-   *   3) Mark completed transitions.
+   * This method:
+   *   1) Processes all active transitions using deltaTime.
+   *   2) Interpolates per-layer colours based on elapsed time.
+   *   3) Merges layer colours using blend modes.
    *   4) Set final colour in LightStateManager.
    * 
    * @param deltaTime The time elapsed since last update in milliseconds
    */
-  private updateTransitions(deltaTime: number = 0): Promise<void> {
+  private updateTransitions(deltaTime: number): Promise<void> {
     return new Promise((resolve) => {
       if (this._transitionLock) {
         // If already processing transitions, queue this update for the next frame
@@ -282,8 +284,9 @@ export class LightTransitionController {
       this._transitionLock = true;
 
       try {
-        const now = performance.now();
-
+        // Accumulate delta time for smooth transitions
+        this.accumulatedTime += deltaTime;
+        
         // Track which lights have active transitions and need final color calculations
         const activeTransitionLights = new Set<string>();
 
@@ -296,7 +299,9 @@ export class LightTransitionController {
 
           layerTransitions.forEach((transitionData, layer) => {
             const { startState, endState, startTime, transition } = transitionData;
-            const elapsed = now - startTime;
+            
+            // Use accumulated time from Clock system for consistent timing
+            const elapsed = this.accumulatedTime - startTime;
             const duration = transition.transform.duration;
             
             // Calculate progress (0 to 1)
@@ -591,5 +596,29 @@ export class LightTransitionController {
     
     // Update the light state manager
     this._lightStateManager.setLightState(lightId, finalColor);
+  }
+
+  /**
+   * Get the current accumulated time from the Clock system
+   * Useful for debugging timing issues
+   */
+  public getAccumulatedTime(): number {
+    return this.accumulatedTime;
+  }
+
+  /**
+   * Reset the accumulated time counter
+   * Useful when you want to reset timing state or force immediate processing
+   */
+  public resetAccumulatedTime(): void {
+    this.accumulatedTime = 0;
+  }
+
+  /**
+   * Get the current time from the Clock system
+   * Falls back to accumulated time if clock is not available
+   */
+  public getCurrentTime(): number {
+    return this.clock ? this.clock.getCurrentTimeMs() : this.accumulatedTime;
   }
 }
