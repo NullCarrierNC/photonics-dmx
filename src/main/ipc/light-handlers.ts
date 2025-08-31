@@ -217,6 +217,96 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     return false;
   });
 
+  // Simulate an instrument note
+  ipcMain.handle('simulate-instrument-note', async (_, data: { instrument: string; noteType: string }) => {
+    try {
+      const { instrument, noteType } = data;
+      console.log(`Simulating ${instrument} note: ${noteType}`);
+      
+      // Get the cue handler to simulate the note
+      const cueHandler = controllerManager.getCueHandler();
+      if (cueHandler) {
+        // Create a mock cue data object for simulation
+        const mockCueData: any = {
+          platform: 'YARG',
+          currentScene: 'InGame',
+          pauseState: 'Playing',
+          venueSize: 'Small',
+          beatsPerMinute: 120,
+          songSection: 'Verse',
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 'None',
+          harmony0Note: 'None',
+          harmony1Note: 'None',
+          harmony2Note: 'None',
+          lightingCue: 'None',
+          postProcessing: 'None',
+          fogState: 'Off',
+          strobeState: 'Strobe_Off',
+          performer: 'None',
+          autoGenTrack: false,
+          beat: 'Unknown',
+          keyframe: 'Unknown',
+          bonusEffect: 'None',
+          ledPositions: [],
+          ledColor: 'off',
+          timestamp: Date.now()
+        };
+
+        // Update the mock cue data with the simulated note
+        switch (instrument) {
+          case 'guitar':
+            mockCueData.guitarNotes = [noteType];
+            if ('handleGuitarNote' in cueHandler) {
+              cueHandler.handleGuitarNote(noteType as any, mockCueData);
+            }
+            break;
+          case 'bass':
+            mockCueData.bassNotes = [noteType];
+            if ('handleBassNote' in cueHandler) {
+              cueHandler.handleBassNote(noteType as any, mockCueData);
+            }
+            break;
+          case 'keys':
+            mockCueData.keysNotes = [noteType];
+            if ('handleKeysNote' in cueHandler) {
+              cueHandler.handleKeysNote(noteType as any, mockCueData);
+            }
+            break;
+          case 'drums':
+            mockCueData.drumNotes = [noteType];
+            if ('handleDrumNote' in cueHandler) {
+              cueHandler.handleDrumNote(noteType as any, mockCueData);
+            }
+            break;
+          default:
+            console.warn(`Unknown instrument: ${instrument}`);
+            return { success: false, error: `Unknown instrument: ${instrument}` };
+        }
+        
+        // Send the simulated cue data to the frontend
+        const allWindows = BrowserWindow.getAllWindows();
+        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
+        if (mainWindow) {
+          mainWindow.webContents.send('cue-handled', mockCueData);
+        }
+        
+        return { success: true };
+      } else {
+        return { success: false, error: 'No cue handler available' };
+      }
+    } catch (error) {
+      console.error('Error simulating instrument note:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  });
+
   // Get the system status
   ipcMain.handle('get-system-status', async () => {
     try {

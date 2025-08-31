@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAtom } from 'jotai';
 import { senderIpcEnabledAtom, activeDmxLightsConfigAtom } from '@renderer/atoms';
 import { EffectSelector, DmxChannel } from '../../../photonics-dmx/types';
+import { InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/cueTypes';
 import EffectsDropdown from '../components/EffectSelector';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 import CuePreviewYarg from '@renderer/components/CuePreviewYarg';
@@ -34,6 +35,9 @@ const CueSimulation: React.FC = () => {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [dmxValues, setDmxValues] = useState<Record<number, number>>({});
   const [selectedVenueSize, setSelectedVenueSize] = useState<'NoVenue' | 'Small' | 'Large'>('Large');
+  
+  // State for instrument simulation
+  const [selectedInstrument, setSelectedInstrument] = useState<'guitar' | 'bass' | 'keys' | 'drums'>('guitar');
   
   // State for manual simulation indicators
   const [showBeatIndicator, setShowBeatIndicator] = useState(false);
@@ -163,6 +167,17 @@ const CueSimulation: React.FC = () => {
   const handleSimulateMeasure = async () => {
     await window.electron.ipcRenderer.invoke('simulate-measure');
     setShowMeasureIndicator(true);
+  };
+
+  const handleSimulateInstrumentNote = async (noteType: string) => {
+    try {
+      await window.electron.ipcRenderer.invoke('simulate-instrument-note', {
+        instrument: selectedInstrument,
+        noteType: noteType
+      });
+    } catch (error) {
+      console.error('Error simulating instrument note:', error);
+    }
   };
 
   const handleRegistryChange = (type: CueRegistryType) => {
@@ -406,6 +421,80 @@ const CueSimulation: React.FC = () => {
           >
             Simulate Keyframe
           </button>
+        </div>
+      </div>
+
+      {/* Instrument Simulation */}
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold mb-3">Instrument Simulation</h3>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Instrument
+            </label>
+            <select
+              value={selectedInstrument}
+              onChange={(e) => setSelectedInstrument(e.target.value as 'guitar' | 'bass' | 'keys' | 'drums')}
+              className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
+              style={{ width: '150px' }}
+              disabled={!selectedGroupId}
+            >
+              <option value="bass">Bass</option>
+              <option value="drums">Drums</option>
+              <option value="guitar">Guitar</option>
+              <option value="keys">Keys</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Notes
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {selectedInstrument === 'drums' ? (
+                // Drum notes - ordered as Green, Red, Yellow, Blue, then cymbals, then kick
+                [DrumNoteType.GreenDrum, DrumNoteType.RedDrum, DrumNoteType.YellowDrum, DrumNoteType.BlueDrum, DrumNoteType.GreenCymbal, DrumNoteType.YellowCymbal, DrumNoteType.BlueCymbal, DrumNoteType.Kick]
+                  .map((note) => (
+                    <button
+                      key={note}
+                      onClick={() => handleSimulateInstrumentNote(note)}
+                      className={`px-3 py-1 text-xs rounded hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        note === DrumNoteType.GreenDrum || note === DrumNoteType.GreenCymbal ? 'bg-green-500 text-white' :
+                        note === DrumNoteType.RedDrum ? 'bg-red-500 text-white' :
+                        note === DrumNoteType.YellowDrum || note === DrumNoteType.YellowCymbal ? 'bg-yellow-500 text-white' :
+                        note === DrumNoteType.BlueDrum || note === DrumNoteType.BlueCymbal ? 'bg-blue-500 text-white' :
+                        note === DrumNoteType.Kick ? 'bg-orange-500 text-white' :
+                        'bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200'
+                      }`}
+                      disabled={!selectedGroupId}
+                    >
+                      {note}
+                    </button>
+                  ))
+              ) : (
+                // Guitar, Bass, Keys notes - ordered as Green, Red, Yellow, Blue, Orange
+                [InstrumentNoteType.Green, InstrumentNoteType.Red, InstrumentNoteType.Yellow, InstrumentNoteType.Blue, InstrumentNoteType.Orange]
+                  .map((note) => (
+                    <button
+                      key={note}
+                      onClick={() => handleSimulateInstrumentNote(note)}
+                      className={`px-3 py-1 text-xs rounded hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        note === InstrumentNoteType.Green ? 'bg-green-500 text-white' :
+                        note === InstrumentNoteType.Red ? 'bg-red-500 text-white' :
+                        note === InstrumentNoteType.Yellow ? 'bg-yellow-500 text-white' :
+                        note === InstrumentNoteType.Blue ? 'bg-blue-500 text-white' :
+                        note === InstrumentNoteType.Orange ? 'bg-orange-500 text-white' :
+                        note === InstrumentNoteType.Open ? 'bg-gray-500 text-white' :
+                        'bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200'
+                      }`}
+                      disabled={!selectedGroupId}
+                    >
+                      {note}
+                    </button>
+                  ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
   

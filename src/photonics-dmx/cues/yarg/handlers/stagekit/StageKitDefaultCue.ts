@@ -15,7 +15,7 @@ import { EasingType } from '../../../../easing';
 export class StageKitDefaultCue implements ICue {
   id = 'stagekit-default';
   cueId = CueType.Default;
-  description = 'Large venue: Blue/red alternating on keyframes, small venue: Red/blue alternating on keyframes and yellow flash on beat.';
+  description = 'Large venue: Blue/red alternating on keyframes, small venue: Red/blue alternating on keyframes and yellow flash on red drum.';
   style = CueStyle.Primary;
   private isFirstRun = true;
   
@@ -138,7 +138,7 @@ export class StageKitDefaultCue implements ICue {
 
     const flashYellowOnBeat = getEffectFlashColor({
       color: yellowColor,
-      startTrigger: 'beat',
+      startTrigger: 'drum-red',
       durationIn: 0,
       holdTime: 120,
       durationOut: 200,
