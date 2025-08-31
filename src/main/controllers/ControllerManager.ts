@@ -35,6 +35,7 @@ export class ControllerManager {
   private processorManager: ProcessorManager | null = null;
   
   private testEffectInterval: NodeJS.Timeout | null = null;
+  private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large';
   
   private isInitialized = false;
   private isYargEnabled = false;
@@ -154,13 +155,20 @@ export class ControllerManager {
   /**
    * Start a test effect
    * @param effectId The effect ID to test
+   * @param venueSize The venue size to use for testing
    */
-  public startTestEffect(effectId: string): void {
+  public startTestEffect(effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large'): void {
+    console.log(`ControllerManager.startTestEffect called with effectId: ${effectId}, venueSize: ${venueSize}`);
+    
     // If an existing test interval is running, clear it
     if (this.testEffectInterval) {
       clearInterval(this.testEffectInterval);
       this.testEffectInterval = null;
     }
+    
+    // Store the venue size for use in testCue
+    this.testVenueSize = venueSize || 'Large';
+    console.log(`Set testVenueSize to: ${this.testVenueSize}`);
     
     // If system is not initialized, initialize it first
     if (!this.isInitialized) {
@@ -222,12 +230,15 @@ export class ControllerManager {
    * @param cueId The cue ID to test
    */
   private testCue(cueId: string): void {
+    console.log(`ControllerManager.testCue called with cueId: ${cueId}, testVenueSize: ${this.testVenueSize}`);
+    
     if (!this.cueHandler) {
       console.error("No cue handler available. Make sure YARG or RB3 is enabled.");
       return;
     }
     
     const cue = getCueTypeFromId(cueId);
+    console.log(`Found cue: ${cue ? cue : 'undefined'}`);
     
     let strobe: StrobeState = 'Strobe_Off' as StrobeState;
     if (cueId.indexOf("Strobe") > -1) {
@@ -239,7 +250,7 @@ export class ControllerManager {
       platform: 'Windows',
       currentScene: 'Gameplay',
       pauseState: 'Unpaused',
-      venueSize: 'Large',
+      venueSize: this.testVenueSize,
       beatsPerMinute: 120,
       songSection: 'Verse',
       guitarNotes: [],
@@ -261,6 +272,8 @@ export class ControllerManager {
       bonusEffect: false,
       ledColor: '',
     };
+    
+    console.log(`Created test data with venueSize: ${data.venueSize}`);
     
     if (cue !== undefined) {
       try {

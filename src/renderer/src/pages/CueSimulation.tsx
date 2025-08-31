@@ -12,6 +12,7 @@ import CueRegistrySelector from '@renderer/components/CueRegistrySelector';
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa';
 import ActiveGroupsSelector, { ActiveGroupsSelectorRef } from '../components/ActiveCueGroupsSelector';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { startTestEffect, stopTestEffect } from '../ipcApi';
 
 type CueRegistryType = 'YARG' | 'RB3E';
 
@@ -32,6 +33,7 @@ const CueSimulation: React.FC = () => {
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [dmxValues, setDmxValues] = useState<Record<number, number>>({});
+  const [selectedVenueSize, setSelectedVenueSize] = useState<'NoVenue' | 'Small' | 'Large'>('Large');
   
   // State for manual simulation indicators
   const [showBeatIndicator, setShowBeatIndicator] = useState(false);
@@ -115,6 +117,7 @@ const CueSimulation: React.FC = () => {
   }, [selectedGroupId]);
 
   const handleEffectSelect = useCallback(async (effect: EffectSelector) => {
+    console.log('Effect selected:', effect);
     setSelectedEffect(effect);
     // When user selects an effect, ensure the active group matches the selected group
     await ensureActiveGroupMatches();
@@ -128,13 +131,22 @@ const CueSimulation: React.FC = () => {
 
     // Ensure the active group matches the selected group when testing an effect
     await ensureActiveGroupMatches();
-
-    console.log(`Test Cue for Effect: ${selectedEffect.id}`);
-    await window.electron.ipcRenderer.invoke('start-test-effect', selectedEffect.id);
+    try {
+      const result = await startTestEffect(selectedEffect.id, selectedVenueSize);
+      if (!result.success) {
+        console.error('Failed to start test effect:', result.error);
+      }
+    } catch (error) {
+      console.error('Error starting test effect:', error);
+    }
   };
 
   const handleStopTestEffect = async () => {
-    await window.electron.ipcRenderer.invoke('stop-test-effect');
+    try {
+      await stopTestEffect();
+    } catch (error) {
+      console.error('Error stopping test effect:', error);
+    }
   };
 
   const handleSimulateBeat = async () => {
@@ -255,9 +267,7 @@ const CueSimulation: React.FC = () => {
 
       <hr className="my-6" />
 
-      {/* Active Cue Groups */}
-      <ActiveGroupsSelector ref={activeGroupsSelectorRef} className="mb-6" />
-
+    
       <div className="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 mb-6">
         <button
           className="w-full px-4 py-3 text-left font-medium text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset rounded-t-lg flex items-center justify-between"
@@ -269,20 +279,13 @@ const CueSimulation: React.FC = () => {
         <div className={`px-4 pb-4 ${isAboutOpen ? '' : 'hidden'}`}>
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
             Cue Simulation allows you to test and preview lighting effects before using them in-game. 
-            You can select different cue groups, choose specific effects, and manually simulate beats, 
-            measures, and keyframes to see how the effects respond.
+            You can select different cue groups, choose specific cues, and manually simulate beats, 
+            measures, and keyframes to see how the cues respond.
           </p>
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
             Which cue groups are enabled is defined in the Preferences menu.
           </p>
-          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
-            Active groups are a subset of enabled groups. Only cues in the active groups will be used in-game.
-          </p>
-          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
-            By default all enabled groups are active. Here you can select which groups are active, allowing you to 
-            isolate specific groups or cues for testing at runtime. The active toggles are not saved between sessions.
-          </p>
-
+         
           <hr className="my-6" />
 
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
@@ -298,7 +301,7 @@ const CueSimulation: React.FC = () => {
       </div>
      
       <div className="my-6">
-        <h2 className="text-xl font-bold mb-1">Effect Selection</h2>
+        <h2 className="text-xl font-bold mb-1">Cue Selection</h2>
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">
           <div>
             <CueRegistrySelector 
@@ -313,6 +316,22 @@ const CueSimulation: React.FC = () => {
               value={selectedEffect?.id}
               disabled={!selectedGroupId}
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Venue Size
+            </label>
+            <select
+              value={selectedVenueSize}
+              onChange={(e) => setSelectedVenueSize(e.target.value as 'NoVenue' | 'Small' | 'Large')}
+              className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
+              style={{ width: '200px' }}
+              disabled={!selectedGroupId}
+            >
+              <option value="NoVenue">No Venue</option>
+              <option value="Small">Small</option>
+              <option value="Large">Large</option>
+            </select>
           </div>
         </div>
         
@@ -341,7 +360,7 @@ const CueSimulation: React.FC = () => {
             }`}
             disabled={!selectedEffect || !selectedGroupId}
           >
-            Start Test Effect
+            Start Test Cue
           </button>
           <button
             onClick={handleStopTestEffect}
@@ -352,7 +371,7 @@ const CueSimulation: React.FC = () => {
             }`}
             disabled={!selectedEffect || !selectedGroupId}
           >
-            Stop Test Effect
+            Stop Test Cue
           </button>
           <button
             onClick={handleSimulateBeat}

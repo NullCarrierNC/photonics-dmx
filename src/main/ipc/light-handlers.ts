@@ -148,8 +148,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           groupName: group.name 
         };
       });
-      
-      console.log(`Returning ${cueDescriptions.length} cue descriptions`);
+
       return cueDescriptions;
     } catch (error) {
       console.error('Error getting available cues:', error);
@@ -158,7 +157,8 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   });
 
   // Start a test effect
-  ipcMain.handle('start-test-effect', async (_, effectId: string) => {
+  ipcMain.handle('start-test-effect', async (_, effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large') => {
+    console.log(`IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}`);
     try {
       // Check if the controller is initialized
       if (!controllerManager.getIsInitialized()) {
@@ -166,8 +166,8 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         await controllerManager.init();
       }
       
-      // Use the controller manager to start the test effect
-      controllerManager.startTestEffect(effectId);
+      // Use the controller manager to start the test effect with venue size
+      controllerManager.startTestEffect(effectId, venueSize);
       return { success: true };
     } catch (error) {
       console.error('Error starting test effect:', error);
