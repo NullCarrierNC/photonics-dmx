@@ -11,7 +11,7 @@ import { getEffectSingleColor } from '../../../../effects';
 export class StageKitFlareFastCue implements ICue {
   id = 'stagekit-flare-fast';
   cueId = CueType.Flare_Fast;
-  description = 'StageKit flare fast pattern - blue lights';
+  description = 'Solid blue on all. Does not yet support green if previous was cool.';
   style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
