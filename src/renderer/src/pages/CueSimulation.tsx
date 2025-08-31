@@ -35,6 +35,7 @@ const CueSimulation: React.FC = () => {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [dmxValues, setDmxValues] = useState<Record<number, number>>({});
   const [selectedVenueSize, setSelectedVenueSize] = useState<'NoVenue' | 'Small' | 'Large'>('Large');
+  const [selectedBpm, setSelectedBpm] = useState<number>(120);
   
   // State for instrument simulation
   const [selectedInstrument, setSelectedInstrument] = useState<'guitar' | 'bass' | 'keys' | 'drums'>('guitar');
@@ -136,7 +137,7 @@ const CueSimulation: React.FC = () => {
     // Ensure the active group matches the selected group when testing an effect
     await ensureActiveGroupMatches();
     try {
-      const result = await startTestEffect(selectedEffect.id, selectedVenueSize);
+      const result = await startTestEffect(selectedEffect.id, selectedVenueSize, selectedBpm);
       if (!result.success) {
         console.error('Failed to start test effect:', result.error);
       }
@@ -154,18 +155,33 @@ const CueSimulation: React.FC = () => {
   };
 
   const handleSimulateBeat = async () => {
-    await window.electron.ipcRenderer.invoke('simulate-beat');
+    await window.electron.ipcRenderer.invoke('simulate-beat', {
+      venueSize: selectedVenueSize,
+      bpm: selectedBpm,
+      cueGroup: selectedGroupId,
+      effectId: selectedEffect?.id || null
+    });
     // Simply turn on the indicator, the useTimeoutEffect will reset it
     setShowBeatIndicator(true);
   };
 
   const handleSimulateKeyframe = async () => {
-    await window.electron.ipcRenderer.invoke('simulate-keyframe');
+    await window.electron.ipcRenderer.invoke('simulate-keyframe', {
+      venueSize: selectedVenueSize,
+      bpm: selectedBpm,
+      cueGroup: selectedGroupId,
+      effectId: selectedEffect?.id || null
+    });
     setShowKeyframeIndicator(true);
   };
 
   const handleSimulateMeasure = async () => {
-    await window.electron.ipcRenderer.invoke('simulate-measure');
+    await window.electron.ipcRenderer.invoke('simulate-measure', {
+      venueSize: selectedVenueSize,
+      bpm: selectedBpm,
+      cueGroup: selectedGroupId,
+      effectId: selectedEffect?.id || null
+    });
     setShowMeasureIndicator(true);
   };
 
@@ -173,7 +189,11 @@ const CueSimulation: React.FC = () => {
     try {
       await window.electron.ipcRenderer.invoke('simulate-instrument-note', {
         instrument: selectedInstrument,
-        noteType: noteType
+        noteType: noteType,
+        venueSize: selectedVenueSize,
+        bpm: selectedBpm,
+        cueGroup: selectedGroupId,
+        effectId: selectedEffect?.id || null
       });
     } catch (error) {
       console.error('Error simulating instrument note:', error);
@@ -305,7 +325,7 @@ const CueSimulation: React.FC = () => {
 
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
             Testing a cue will give you an approximation of what it will look like in-game. Some effects require you to 
-            manually simulate a beat or keyframe. If an effect uses a song's BPM value, the simulation will assume 120 BPM. 
+            manually simulate a beat or keyframe. You can adjust the BPM value to test how effects respond to different tempos. 
             For YARG, some effects are modified by run-time data such as the notes being played. This is not currently simulated.
           </p>
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
@@ -316,7 +336,41 @@ const CueSimulation: React.FC = () => {
       </div>
      
       <div className="my-6">
-        <h2 className="text-xl font-bold mb-1">Cue Selection</h2>
+        <h2 className="text-xl font-bold mb-1">Simulation Settings</h2>
+        <div className="flex flex-wrap gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Venue Size
+            </label>
+            <select
+              value={selectedVenueSize}
+              onChange={(e) => setSelectedVenueSize(e.target.value as 'NoVenue' | 'Small' | 'Large')}
+              className="p-2 pr-8 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
+              style={{ width: '150px' }}
+              disabled={!selectedGroupId}
+            >
+              <option value="NoVenue">No Venue</option>
+              <option value="Small">Small</option>
+              <option value="Large">Large</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              BPM
+            </label>
+            <input
+              type="number"
+              min="60"
+              max="200"
+              value={selectedBpm}
+              onChange={(e) => setSelectedBpm(parseInt(e.target.value) || 120)}
+              className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
+              style={{ width: '80px' }}
+              disabled={!selectedGroupId}
+            />
+          </div>
+        </div>
+        
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">
           <div>
             <CueRegistrySelector 
@@ -331,22 +385,6 @@ const CueSimulation: React.FC = () => {
               value={selectedEffect?.id}
               disabled={!selectedGroupId}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Venue Size
-            </label>
-            <select
-              value={selectedVenueSize}
-              onChange={(e) => setSelectedVenueSize(e.target.value as 'NoVenue' | 'Small' | 'Large')}
-              className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
-              style={{ width: '200px' }}
-              disabled={!selectedGroupId}
-            >
-              <option value="NoVenue">No Venue</option>
-              <option value="Small">Small</option>
-              <option value="Large">Large</option>
-            </select>
           </div>
         </div>
         

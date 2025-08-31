@@ -157,8 +157,8 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   });
 
   // Start a test effect
-  ipcMain.handle('start-test-effect', async (_, effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large') => {
-    console.log(`IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}`);
+  ipcMain.handle('start-test-effect', async (_, effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large', bpm?: number) => {
+    console.log(`IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}`);
     try {
       // Check if the controller is initialized
       if (!controllerManager.getIsInitialized()) {
@@ -166,8 +166,8 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         await controllerManager.init();
       }
       
-      // Use the controller manager to start the test effect with venue size
-      controllerManager.startTestEffect(effectId, venueSize);
+      // Use the controller manager to start the test effect with venue size and BPM
+      controllerManager.startTestEffect(effectId, venueSize, bpm);
       return { success: true };
     } catch (error) {
       console.error('Error starting test effect:', error);
@@ -191,48 +191,23 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   });
 
   // Simulate a beat
-  ipcMain.handle('simulate-beat', async () => {
+  ipcMain.handle('simulate-beat', async (_, data?: { 
+    venueSize?: 'NoVenue' | 'Small' | 'Large';
+    bpm?: number;
+    cueGroup?: string;
+    effectId?: string | null;
+  }) => {
     if (controllerManager.getLightingController()) {
-      controllerManager.getLightingController()?.onBeat();
-      return true;
-    }
-    return false;
-  });
-
-  // Simulate a keyframe
-  ipcMain.handle('simulate-keyframe', async () => {
-    if (controllerManager.getLightingController()) {
-      controllerManager.getLightingController()?.onKeyframe();
-      return true;
-    }
-    return false;
-  });
-
-  // Simulate a measure
-  ipcMain.handle('simulate-measure', async () => {
-    if (controllerManager.getLightingController()) {
-      controllerManager.getLightingController()?.onMeasure();
-      return true;
-    }
-    return false;
-  });
-
-  // Simulate an instrument note
-  ipcMain.handle('simulate-instrument-note', async (_, data: { instrument: string; noteType: string }) => {
-    try {
-      const { instrument, noteType } = data;
-      console.log(`Simulating ${instrument} note: ${noteType}`);
-      
-      // Get the cue handler to simulate the note
-      const cueHandler = controllerManager.getCueHandler();
-      if (cueHandler) {
-        // Create a mock cue data object for simulation
+      // Create mock cue data with simulation settings
+      if (data) {
+        const { venueSize = 'Small', bpm = 120, cueGroup, effectId } = data;
+        
         const mockCueData: any = {
           platform: 'YARG',
           currentScene: 'InGame',
           pauseState: 'Playing',
-          venueSize: 'Small',
-          beatsPerMinute: 120,
+          venueSize: venueSize,
+          beatsPerMinute: bpm,
           songSection: 'Verse',
           guitarNotes: [],
           bassNotes: [],
@@ -242,7 +217,205 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           harmony0Note: 'None',
           harmony1Note: 'None',
           harmony2Note: 'None',
-          lightingCue: 'None',
+          lightingCue: effectId || 'None',
+          postProcessing: 'None',
+          fogState: 'Off',
+          strobeState: 'Strobe_Off',
+          performer: 'None',
+          autoGenTrack: false,
+          beat: 'Strong',
+          keyframe: 'Unknown',
+          bonusEffect: 'None',
+          ledPositions: [],
+          ledColor: 'off',
+          timestamp: Date.now()
+        };
+        
+        // Set active cue group if specified
+        if (cueGroup) {
+          try {
+            const registry = CueRegistry.getInstance();
+            registry.setActiveGroups([cueGroup]);
+          } catch (error) {
+            console.warn(`Failed to set active cue group: ${error}`);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend
+        const allWindows = BrowserWindow.getAllWindows();
+        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
+        if (mainWindow) {
+          mainWindow.webContents.send('cue-handled', mockCueData);
+        }
+      }
+      
+      controllerManager.getLightingController()?.onBeat();
+      return true;
+    }
+    return false;
+  });
+
+  // Simulate a keyframe
+  ipcMain.handle('simulate-keyframe', async (_, data?: { 
+    venueSize?: 'NoVenue' | 'Small' | 'Large';
+    bpm?: number;
+    cueGroup?: string;
+    effectId?: string | null;
+  }) => {
+    if (controllerManager.getLightingController()) {
+      // Create mock cue data with simulation settings
+      if (data) {
+        const { venueSize = 'Small', bpm = 120, cueGroup, effectId } = data;
+        
+        const mockCueData: any = {
+          platform: 'YARG',
+          currentScene: 'InGame',
+          pauseState: 'Playing',
+          venueSize: venueSize,
+          beatsPerMinute: bpm,
+          songSection: 'Verse',
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 'None',
+          harmony0Note: 'None',
+          harmony1Note: 'None',
+          harmony2Note: 'None',
+          lightingCue: effectId || 'None',
+          postProcessing: 'None',
+          fogState: 'Off',
+          strobeState: 'Strobe_Off',
+          performer: 'None',
+          autoGenTrack: false,
+          beat: 'Unknown',
+          keyframe: 'On',
+          bonusEffect: 'None',
+          ledPositions: [],
+          ledColor: 'off',
+          timestamp: Date.now()
+        };
+        
+        // Set active cue group if specified
+        if (cueGroup) {
+          try {
+            const registry = CueRegistry.getInstance();
+            registry.setActiveGroups([cueGroup]);
+          } catch (error) {
+            console.warn(`Failed to set active cue group: ${error}`);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend
+        const allWindows = BrowserWindow.getAllWindows();
+        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
+        if (mainWindow) {
+          mainWindow.webContents.send('cue-handled', mockCueData);
+        }
+      }
+      
+      controllerManager.getLightingController()?.onKeyframe();
+      return true;
+    }
+    return false;
+  });
+
+  // Simulate a measure
+  ipcMain.handle('simulate-measure', async (_, data?: { 
+    venueSize?: 'NoVenue' | 'Small' | 'Large';
+    bpm?: number;
+    cueGroup?: string;
+    effectId?: string | null;
+  }) => {
+    if (controllerManager.getLightingController()) {
+      // Create mock cue data with simulation settings
+      if (data) {
+        const { venueSize = 'Small', bpm = 120, cueGroup, effectId } = data;
+        
+        const mockCueData: any = {
+          platform: 'YARG',
+          currentScene: 'InGame',
+          pauseState: 'Playing',
+          venueSize: venueSize,
+          beatsPerMinute: bpm,
+          songSection: 'Verse',
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 'None',
+          harmony0Note: 'None',
+          harmony1Note: 'None',
+          harmony2Note: 'None',
+          lightingCue: effectId || 'None',
+          postProcessing: 'None',
+          fogState: 'Off',
+          strobeState: 'Strobe_Off',
+          performer: 'None',
+          autoGenTrack: false,
+          beat: 'Unknown',
+          keyframe: 'Unknown',
+          bonusEffect: 'None',
+          ledPositions: [],
+          ledColor: 'off',
+          timestamp: Date.now()
+        };
+        
+        // Set active cue group if specified
+        if (cueGroup) {
+          try {
+            const registry = CueRegistry.getInstance();
+            registry.setActiveGroups([cueGroup]);
+          } catch (error) {
+            console.warn(`Failed to set active cue group: ${error}`);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+          mainWindow.webContents.send('cue-handled', mockCueData);
+        }
+      }
+      
+      controllerManager.getLightingController()?.onMeasure();
+      return true;
+    }
+    return false;
+  });
+
+  // Simulate an instrument note
+  ipcMain.handle('simulate-instrument-note', async (_, data: { 
+    instrument: string; 
+    noteType: string; 
+    venueSize?: 'NoVenue' | 'Small' | 'Large';
+    bpm?: number;
+    cueGroup?: string;
+    effectId?: string | null;
+  }) => {
+    try {
+      const { instrument, noteType, venueSize = 'Small', bpm = 120, cueGroup, effectId } = data;
+      
+      // Get the cue handler to simulate the note
+      const cueHandler = controllerManager.getCueHandler();
+      if (cueHandler) {
+        // Create a mock cue data object for simulation
+        const mockCueData: any = {
+          platform: 'YARG',
+          currentScene: 'InGame',
+          pauseState: 'Playing',
+          venueSize: venueSize,
+          beatsPerMinute: bpm,
+          songSection: 'Verse',
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 'None',
+          harmony0Note: 'None',
+          harmony1Note: 'None',
+          harmony2Note: 'None',
+          lightingCue: effectId || 'None',
           postProcessing: 'None',
           fogState: 'Off',
           strobeState: 'Strobe_Off',
@@ -285,6 +458,16 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           default:
             console.warn(`Unknown instrument: ${instrument}`);
             return { success: false, error: `Unknown instrument: ${instrument}` };
+        }
+        
+        // Set active cue group if specified
+        if (cueGroup) {
+          try {
+            const registry = CueRegistry.getInstance();
+            registry.setActiveGroups([cueGroup]);
+          } catch (error) {
+            console.warn(`Failed to set active cue group: ${error}`);
+          }
         }
         
         // Send the simulated cue data to the frontend

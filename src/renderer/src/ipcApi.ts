@@ -105,8 +105,8 @@ export const updateEffectDebounce = (value: number) =>
   window.electron.ipcRenderer.send('update-effect-debounce', value);
 
 // Test effects
-export const startTestEffect = (effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large') => 
-  window.electron.ipcRenderer.invoke('start-test-effect', effectId, venueSize);
+export const startTestEffect = (effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large', bpm?: number) => 
+  window.electron.ipcRenderer.invoke('start-test-effect', effectId, venueSize, bpm);
 
 export const stopTestEffect = () => 
   window.electron.ipcRenderer.invoke('stop-test-effect');
