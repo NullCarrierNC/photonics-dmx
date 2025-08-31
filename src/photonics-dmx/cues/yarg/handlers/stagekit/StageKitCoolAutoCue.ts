@@ -12,7 +12,7 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitCoolAutoCue implements ICue {
   id = 'stagekit-coolAuto';
   cueId = CueType.Cool_Automatic;
-  description = 'StageKit Cool Auto - 2x blue, 1x green. Blue animating clockwise, green animating counter-clockwise';
+  description = '2x blue, 1x green. Blue animating clockwise, green animating counter-clockwise, on beat.';
   style = CueStyle.Primary;
 
   // Track whether this is the first execution or a repeat
