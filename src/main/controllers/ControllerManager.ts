@@ -230,15 +230,12 @@ export class ControllerManager {
    * @param cueId The cue ID to test
    */
   private testCue(cueId: string): void {
-    console.log(`ControllerManager.testCue called with cueId: ${cueId}, testVenueSize: ${this.testVenueSize}`);
-    
     if (!this.cueHandler) {
       console.error("No cue handler available. Make sure YARG or RB3 is enabled.");
       return;
     }
     
     const cue = getCueTypeFromId(cueId);
-    console.log(`Found cue: ${cue ? cue : 'undefined'}`);
     
     let strobe: StrobeState = 'Strobe_Off' as StrobeState;
     if (cueId.indexOf("Strobe") > -1) {
@@ -272,8 +269,6 @@ export class ControllerManager {
       bonusEffect: false,
       ledColor: '',
     };
-    
-    console.log(`Created test data with venueSize: ${data.venueSize}`);
     
     if (cue !== undefined) {
       try {
