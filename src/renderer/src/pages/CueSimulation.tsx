@@ -10,7 +10,7 @@ import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPrev
 import { useTimeoutEffect } from '../utils/useTimeout';
 import CueRegistrySelector from '@renderer/components/CueRegistrySelector';
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa';
-import ActiveGroupsSelector, { ActiveGroupsSelectorRef } from '../components/ActiveCueGroupsSelector';
+import { ActiveGroupsSelectorRef } from '../components/ActiveCueGroupsSelector';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import { startTestEffect, stopTestEffect } from '../ipcApi';
 

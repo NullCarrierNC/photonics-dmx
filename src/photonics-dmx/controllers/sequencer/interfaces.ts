@@ -1,4 +1,5 @@
 import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types';
+import { InstrumentNoteType, DrumNoteType } from '../../cues/cueTypes';
 import { LightTransitionController } from './LightTransitionController';
 
 /**
@@ -153,7 +154,15 @@ export interface ISongEventHandler {
   onBeat(): void;
   onMeasure(): void;
   onKeyframe(): void;
-  handleEvent(eventType: 'beat' | 'measure' | 'keyframe'): void;
+  onDrumNote(noteType: DrumNoteType): void;
+  onGuitarNote(noteType: InstrumentNoteType): void;
+  onBassNote(noteType: InstrumentNoteType): void;
+  onKeysNote(noteType: InstrumentNoteType): void;
+  handleEvent(eventType: 'beat' | 'measure' | 'keyframe' | 
+    'drum-kick' | 'drum-red' | 'drum-yellow' | 'drum-blue' | 'drum-green' | 'drum-yellow-cymbal' | 'drum-blue-cymbal' | 'drum-green-cymbal' |
+    'guitar-open' | 'guitar-green' | 'guitar-red' | 'guitar-yellow' | 'guitar-blue' | 'guitar-orange' |
+    'bass-open' | 'bass-green' | 'bass-red' | 'bass-yellow' | 'bass-blue' | 'bass-orange' |
+    'keys-open' | 'keys-green' | 'keys-red' | 'keys-yellow' | 'keys-blue' | 'keys-orange'): void;
 }
 
 /**
@@ -197,6 +206,10 @@ export interface ILightingController {
   onBeat(): void;
   onMeasure(): void;
   onKeyframe(): void;
+  onDrumNote(noteType: DrumNoteType): void;
+  onGuitarNote(noteType: InstrumentNoteType): void;
+  onBassNote(noteType: InstrumentNoteType): void;
+  onKeysNote(noteType: InstrumentNoteType): void;
   
   // System effects methods
   blackout(duration: number): Promise<void>;

@@ -1,12 +1,35 @@
 export type InstrumentNote = "None" | "Open" | "Green" | "Red" | "Yellow" | "Blue" | "Orange";
 export type DrumNote = "None" | "Kick" | "RedDrum" | "YellowDrum" | "BlueDrum" | "GreenDrum" | "YellowCymbal" | "BlueCymbal" | "GreenCymbal";
 
+// Enums for note types to avoid string literal mistakes
+export enum InstrumentNoteType {
+  None = "None",
+  Open = "Open",
+  Green = "Green",
+  Red = "Red",
+  Yellow = "Yellow",
+  Blue = "Blue",
+  Orange = "Orange"
+}
+
+export enum DrumNoteType {
+  None = "None",
+  Kick = "Kick",
+  RedDrum = "RedDrum",
+  YellowDrum = "YellowDrum",
+  BlueDrum = "BlueDrum",
+  GreenDrum = "GreenDrum",
+  YellowCymbal = "YellowCymbal",
+  BlueCymbal = "BlueCymbal",
+  GreenCymbal = "GreenCymbal"
+}
+
 // Import RB3E types
 import { Rb3Difficulty, Rb3TrackType } from '../listeners/RB3/rb3eTypes';
 
 
 export type SongSection = "None" | "Chorus" | "Verse" | "Unknown";
-export type PostProcessing = "Default" | "Bloom" | "Bright" | "Unknown";
+export type PostProcessing = "Default" | "Bloom" | "Bright" | "Saturation" | "Contrast" | "Sharpness" | "Vignette" | "ChromaticAberration" | "MotionBlur" | "DepthOfField" | "AmbientOcclusion" | "Unknown";
 export type Beat = "Measure" | "Strong" | "Weak" | "Off" | "Unknown";
 export type StrobeState = "Strobe_Fastest" | "Strobe_Fast" | "Strobe_Medium" | "Strobe_Slow" | "Strobe_Off" | "Unknown";
 
@@ -21,10 +44,10 @@ export type CueData = {
     venueSize: "NoVenue" | "Small" | "Large";
     beatsPerMinute: number;
     songSection: SongSection;
-    guitarNotes: InstrumentNote[];
-    bassNotes: InstrumentNote[];
-    drumNotes: DrumNote[];
-    keysNotes: InstrumentNote[];
+    guitarNotes: InstrumentNoteType[];
+    bassNotes: InstrumentNoteType[];
+    drumNotes: DrumNoteType[];
+    keysNotes: InstrumentNoteType[];
     vocalNote: number;
     harmony0Note: number;
     harmony1Note: number;

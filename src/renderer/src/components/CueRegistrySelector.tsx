@@ -31,7 +31,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   const isInitialMount = useRef(true);
 
   // Wrap callback to avoid infinite loops
-  const handleGroupChangeCallback = useCallback((groupId: string, allGroups?: CueGroup[]) => {
+  const handleGroupChangeCallback = useCallback((groupId: string) => {
     // Pass the group ID directly
     onGroupChange([groupId]);
   }, [onGroupChange]);
@@ -59,17 +59,17 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
           if (enabledGroups.length > 0 && isInitialMount.current) {
             const firstGroup = enabledGroups[0];
             setSelectedGroup(firstGroup.id);
-            handleGroupChangeCallback(firstGroup.id, enabledGroups);
+            handleGroupChangeCallback(firstGroup.id);
             isInitialMount.current = false;
           }
         } else if (!enabledGroups.some(g => g.id === selectedGroup) && enabledGroups.length > 0) {
           // If the currently selected group is no longer enabled, fallback to first group
           const firstGroup = enabledGroups[0];
           setSelectedGroup(firstGroup.id);
-          handleGroupChangeCallback(firstGroup.id, enabledGroups);
+          handleGroupChangeCallback(firstGroup.id);
         } else if (isInitialMount.current && enabledGroups.length > 0) {
           // On initial mount with a specific group selected, fire the callback
-          handleGroupChangeCallback(selectedGroup, enabledGroups);
+          handleGroupChangeCallback(selectedGroup);
           isInitialMount.current = false;
         }
 
@@ -96,7 +96,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   const handleGroupChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const groupId = event.target.value;
     setSelectedGroup(groupId);
-    handleGroupChangeCallback(groupId, groups);
+    handleGroupChangeCallback(groupId);
   };
 
   return (

@@ -3,14 +3,14 @@ import { EventEmitter } from 'events';
 
 import {
   CueData,
-  InstrumentNote,
-  DrumNote,
   SongSection,
   PostProcessing,
   Beat,
   StrobeState,
   CueType,
-  lightingCueMap
+  lightingCueMap,
+  InstrumentNoteType,
+  DrumNoteType
 } from '../../cues/cueTypes';
 
 
@@ -75,7 +75,14 @@ enum PostProcessingByte {
   Default = 0,
   Bloom = 1,
   Bright = 2,
-  // Extend as needed...
+  Saturation = 3,
+  Contrast = 4,
+  Sharpness = 5,
+  Vignette = 6,
+  ChromaticAberration = 7,
+  MotionBlur = 8,
+  DepthOfField = 9,
+  AmbientOcclusion = 10,
 }
 
 enum KeyFrameByte {
@@ -171,64 +178,6 @@ export class YargNetworkListener extends EventEmitter {
         this.server = null;
       });
     }
-  }
-
-  /**
- * Adds a listener for the 'handleCue' event.
- * @param listener - The callback function to handle the event.
- */
-  public addHandleCueListener(listener: (cueType: CueType, data: CueData ) => void): void {
-    this.on('handleCue', listener);
-  }
-
-  /**
-   * Removes a listener for the 'handleCue' event.
-   * @param listener - The callback function to remove.
-   */
-  public removeHandleCueListener(listener: (cueType: CueType, data: CueData ) => void): void {
-    this.off('handleCue', listener);
-  }
-
-  /**
-   * Adds a listener for the 'handleBeat' event.
-   * @param listener - The callback function to handle the event.
-   */
-  public addHandleBeatListener(listener: () => void): void {
-    this.on('handleBeat', listener);
-  }
-
-  /**
-   * Removes a listener for the 'handleBeat' event.
-   * @param listener - The callback function to remove.
-   */
-  public removeHandleBeatListener(listener: () => void): void {
-    this.off('handleBeat', listener);
-  }
-
-  /**
-   * Adds a listener for the 'handleMeasure' event.
-   * @param listener - The callback function to handle the event.
-   */
-  public addHandleMeasureListener(listener: () => void): void {
-    this.on('handleMeasure', listener);
-  }
-
-  /**
-   * Removes a listener for the 'handleMeasure' event.
-   * @param listener - The callback function to remove.
-   */
-  public removeHandleMeasureListener(listener: () => void): void {
-    this.off('handleMeasure', listener);
-  }
-
-
-
-
-  /**
-   * Removes all listeners for all events.
-   */
-  public removeAllEventListeners(): void {
-    this.removeAllListeners();
   }
 
   public shutdown() {
@@ -452,6 +401,34 @@ export class YargNetworkListener extends EventEmitter {
         this.cueHandler.handleCue(strobeCueType, YargCueData);
       }
 
+      // Handle individual drum notes
+      YargCueData.drumNotes.forEach(note => {
+        if (note !== DrumNoteType.None) {
+          this.cueHandler.handleDrumNote(note, YargCueData);
+        }
+      });
+
+      // Handle individual guitar notes
+      YargCueData.guitarNotes.forEach(note => {
+        if (note !== InstrumentNoteType.None) {
+          this.cueHandler.handleGuitarNote(note, YargCueData);
+        }
+      });
+
+      // Handle individual bass notes
+      YargCueData.bassNotes.forEach(note => {
+        if (note !== InstrumentNoteType.None) {
+          this.cueHandler.handleBassNote(note, YargCueData);
+        }
+      });
+
+      // Handle individual keys notes
+      YargCueData.keysNotes.forEach(note => {
+        if (note !== InstrumentNoteType.None) {
+          this.cueHandler.handleKeysNote(note, YargCueData);
+        }
+      });
+
       
       // Update lastData (exclude timestamp)
       this.lastData = YargCueData;
@@ -578,82 +555,98 @@ export class YargNetworkListener extends EventEmitter {
         return "Bloom";
       case PostProcessingByte.Bright:
         return "Bright";
+      case PostProcessingByte.Saturation:
+        return "Saturation";
+      case PostProcessingByte.Contrast:
+        return "Contrast";
+      case PostProcessingByte.Sharpness:
+        return "Sharpness";
+      case PostProcessingByte.Vignette:
+        return "Vignette";
+      case PostProcessingByte.ChromaticAberration:
+        return "ChromaticAberration";
+      case PostProcessingByte.MotionBlur:
+        return "MotionBlur";
+      case PostProcessingByte.DepthOfField:
+        return "DepthOfField";
+      case PostProcessingByte.AmbientOcclusion:
+        return "AmbientOcclusion";
       default:
         return "Unknown";
     }
   }
 
   /**
-   * Converts a byte value to an array of InstrumentNote string literals.
+   * Converts a byte value to an array of InstrumentNoteType enum values.
    * @param byteValue - The numeric byte value representing instrument notes
-   * @returns An array of InstrumentNote strings
+   * @returns An array of InstrumentNoteType enum values
    * @private
    */
-  private getInstrumentNotes(byteValue: number): InstrumentNote[] {
+  private getInstrumentNotes(byteValue: number): InstrumentNoteType[] {
     if (byteValue === GuitarBassKeyboardNotesByte.None) {
       return [];
     }
 
-    const notes: InstrumentNote[] = [];
+    const notes: InstrumentNoteType[] = [];
 
     if ((byteValue & GuitarBassKeyboardNotesByte.Open) === GuitarBassKeyboardNotesByte.Open) {
-      notes.push("Open");
+      notes.push(InstrumentNoteType.Open);
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Green) === GuitarBassKeyboardNotesByte.Green) {
-      notes.push("Green");
+      notes.push(InstrumentNoteType.Green);
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Red) === GuitarBassKeyboardNotesByte.Red) {
-      notes.push("Red");
+      notes.push(InstrumentNoteType.Red);
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Yellow) === GuitarBassKeyboardNotesByte.Yellow) {
-      notes.push("Yellow");
+      notes.push(InstrumentNoteType.Yellow);
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Blue) === GuitarBassKeyboardNotesByte.Blue) {
-      notes.push("Blue");
+      notes.push(InstrumentNoteType.Blue);
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Orange) === GuitarBassKeyboardNotesByte.Orange) {
-      notes.push("Orange");
+      notes.push(InstrumentNoteType.Orange);
     }
 
     return notes;
   }
 
   /**
-   * Converts a byte value to an array of DrumNote string literals.
+   * Converts a byte value to an array of DrumNoteType enum values.
    * @param byteValue - The numeric byte value representing drum notes
-   * @returns An array of DrumNote strings
+   * @returns An array of DrumNoteType enum values
    * @private
    */
-  private getDrumNotes(byteValue: number): DrumNote[] {
+  private getDrumNotes(byteValue: number): DrumNoteType[] {
     if (byteValue === DrumNotesByte.None) {
       return [];
     }
 
-    const notes: DrumNote[] = [];
+    const notes: DrumNoteType[] = [];
 
     if ((byteValue & DrumNotesByte.Kick) === DrumNotesByte.Kick) {
-      notes.push("Kick");
+      notes.push(DrumNoteType.Kick);
     }
     if ((byteValue & DrumNotesByte.RedDrum) === DrumNotesByte.RedDrum) {
-      notes.push("RedDrum");
+      notes.push(DrumNoteType.RedDrum);
     }
     if ((byteValue & DrumNotesByte.YellowDrum) === DrumNotesByte.YellowDrum) {
-      notes.push("YellowDrum");
+      notes.push(DrumNoteType.YellowDrum);
     }
     if ((byteValue & DrumNotesByte.BlueDrum) === DrumNotesByte.BlueDrum) {
-      notes.push("BlueDrum");
+      notes.push(DrumNoteType.BlueDrum);
     }
     if ((byteValue & DrumNotesByte.GreenDrum) === DrumNotesByte.GreenDrum) {
-      notes.push("GreenDrum");
+      notes.push(DrumNoteType.GreenDrum);
     }
     if ((byteValue & DrumNotesByte.YellowCymbal) === DrumNotesByte.YellowCymbal) {
-      notes.push("YellowCymbal");
+      notes.push(DrumNoteType.YellowCymbal);
     }
     if ((byteValue & DrumNotesByte.BlueCymbal) === DrumNotesByte.BlueCymbal) {
-      notes.push("BlueCymbal");
+      notes.push(DrumNoteType.BlueCymbal);
     }
     if ((byteValue & DrumNotesByte.GreenCymbal) === DrumNotesByte.GreenCymbal) {
-      notes.push("GreenCymbal");
+      notes.push(DrumNoteType.GreenCymbal);
     }
 
     return notes;
