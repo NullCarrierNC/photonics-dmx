@@ -4,6 +4,8 @@ import { ILightingController } from '../../../../controllers/sequencer/interface
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectCycleLights } from '../../../../effects/effectCycleLights';
+import { RGBIO } from '../../../../types';
+import { getSweepEffect } from '../../../../effects';
 
 /**
  * StageKit Menu Cue - Blue lights rotating in sequence
@@ -15,24 +17,29 @@ export class StageKitMenuCue implements ICue {
   description = 'StageKit menu pattern - blue lights rotating in sequence';
   style = CueStyle.Primary;
 
-  async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const frontLights = lightManager.getLights(['front'], ['all']);
-    const backLights = lightManager.getLights(['back'], ['all']); 
-    const ringLights = [...frontLights, ...backLights];
-    
-    const blueColor = getColor('blue', 'medium');
-    const blackColor = getColor('black', 'medium');
-    
-    const menuEffect = getEffectCycleLights({
-      lights: ringLights,
-      baseColor: blackColor,
-      activeColor: blueColor,
-      transitionDuration: 250, // 2 seconds / 8 lights = 250ms per light
-      waitFor: 'delay',
-      layer: 0
+  async execute(_cueData: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
+    const frontLights = lightManager.getLights(['front'], 'all');
+    const backLights = lightManager.getLights(['back'], 'all');
+
+    // Merge the sorted arrays into allLights
+    const allLights = [...frontLights, ...backLights];
+   
+    const blue: RGBIO = getColor('blue', 'low');
+    const brightBlue: RGBIO = getColor('blue', 'high');
+
+    const sweep = getSweepEffect({
+      lights: allLights,
+      high: brightBlue,
+      low: blue,
+      sweepTime: 2000,
+      fadeInDuration: 0,
+      fadeOutDuration: 0,
+      lightOverlap: 0,
+      betweenSweepDelay: 0,
+      layer: 0,
     });
-    
-    await controller.setEffect('stagekit-menu', menuEffect, 0, true); // Persistent effect
+    // Use unblocked to avoid breaking the sweep timing.
+    sequencer.addEffectUnblockedName('menu', sweep, 0, true);
   }
 
   onStop(): void {

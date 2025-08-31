@@ -80,7 +80,7 @@ class YargCueHandler extends BaseCueHandler {
         return;
       case CueType.Menu:
         this.stopCurrentCue();
-        this.registry.setActiveGroups([]);
+        //this.registry.setActiveGroups([]);
         this.emit('cueHandled', parameters);
         break;
     }

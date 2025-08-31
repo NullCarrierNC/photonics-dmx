@@ -12,7 +12,7 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitIntroCue implements ICue {
   id = 'stagekit-intro';
   cueId = CueType.Intro;
-  description = 'StageKit intro pattern - all green lights';
+  description = 'All green lights';
   style = CueStyle.Primary;
 
   async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
