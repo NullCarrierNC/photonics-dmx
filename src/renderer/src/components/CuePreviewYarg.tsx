@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CueData } from '../../../photonics-dmx/cues/cueTypes';
+import { CueData, InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/cueTypes';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import { useAtom } from 'jotai';
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms';
@@ -43,11 +43,49 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     // State for keyframe indicator
     const [keyframeReceived, setKeyframeReceived] = useState(false);
     const [lastKeyframeType, setLastKeyframeType] = useState<string | null>(null);
+    
+    // State for instrument note indicators
+    const [activeInstrumentNotes, setActiveInstrumentNotes] = useState<{
+        guitar: Set<InstrumentNoteType>;
+        bass: Set<InstrumentNoteType>;
+        keys: Set<InstrumentNoteType>;
+        drums: Set<DrumNoteType>;
+    }>({
+        guitar: new Set<InstrumentNoteType>(),
+        bass: new Set<InstrumentNoteType>(),
+        keys: new Set<InstrumentNoteType>(),
+        drums: new Set<DrumNoteType>()
+    });
 
     // Refs to track previous values for comparison
     const prevBeatRef = useRef<string | null>(null);
     const prevMeasureRef = useRef<number | undefined>(undefined);
     const prevKeyframeRef = useRef<string | null>(null);
+
+    const labelForInstrumentNote = (note: InstrumentNoteType) => {
+        switch (note) {
+            case InstrumentNoteType.Green: return 'G';
+            case InstrumentNoteType.Red: return 'R';
+            case InstrumentNoteType.Yellow: return 'Y';
+            case InstrumentNoteType.Blue: return 'B';
+            case InstrumentNoteType.Orange: return 'O';
+            default: return '';
+        }
+    };
+
+    const labelForDrumNote = (note: DrumNoteType) => {
+        if (note === DrumNoteType.Kick) return 'KD';
+        switch (note) {
+            case DrumNoteType.GreenDrum: return 'G'
+            case DrumNoteType.GreenCymbal: return 'GC';
+            case DrumNoteType.RedDrum: return 'R';
+            case DrumNoteType.YellowDrum: return 'Y';
+            case DrumNoteType.YellowCymbal: return 'YC';
+            case DrumNoteType.BlueDrum: return 'B';
+            case DrumNoteType.BlueCymbal: return 'BC';
+            default: return '';
+        }
+    };
 
     // Update primary/secondary cue display based on cue state changes
     useEffect(() => {
@@ -133,7 +171,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
         // Only tell the main process to start sending cue data if not in simulation mode
         if (!simulationMode) {
-            window.electron.ipcRenderer.send('set-listen-cue-data', true);
+            window?.electron?.ipcRenderer?.send('set-listen-cue-data', true);
         }
 
         const handleCueData = (_: unknown, cueData: CueData) => {
@@ -202,6 +240,71 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
                 prevKeyframeRef.current = cueData.keyframe;
             }
 
+            // Handle instrument notes
+            if (cueData.guitarNotes && cueData.guitarNotes.length > 0) {
+                const guitarNotes = cueData.guitarNotes.filter(note => note !== InstrumentNoteType.None);
+                setActiveInstrumentNotes(prev => ({
+                    ...prev,
+                    guitar: new Set(guitarNotes.map(note => note))
+                }));
+
+                // Clear guitar notes after 100ms
+                setTimeout(() => {
+                    setActiveInstrumentNotes(prev => ({
+                        ...prev,
+                        guitar: new Set<InstrumentNoteType>()
+                    }));
+                }, 100);
+            }
+
+            if (cueData.bassNotes && cueData.bassNotes.length > 0) {
+                const bassNotes = cueData.bassNotes.filter(note => note !== InstrumentNoteType.None);
+                setActiveInstrumentNotes(prev => ({
+                    ...prev,
+                    bass: new Set(bassNotes.map(note => note))
+                }));
+
+                // Clear bass notes after 100ms
+                setTimeout(() => {
+                    setActiveInstrumentNotes(prev => ({
+                        ...prev,
+                        bass: new Set<InstrumentNoteType>()
+                    }));
+                }, 100);
+            }
+
+            if (cueData.keysNotes && cueData.keysNotes.length > 0) {
+                const keysNotes = cueData.keysNotes.filter(note => note !== InstrumentNoteType.None);
+                setActiveInstrumentNotes(prev => ({
+                    ...prev,
+                    keys: new Set(keysNotes.map(note => note))
+                }));
+
+                // Clear keys notes after 100ms
+                setTimeout(() => {
+                    setActiveInstrumentNotes(prev => ({
+                        ...prev,
+                        keys: new Set<InstrumentNoteType>()
+                    }));
+                }, 100);
+            }
+
+            if (cueData.drumNotes && cueData.drumNotes.length > 0) {
+                const drumNotes = cueData.drumNotes.filter(note => note !== DrumNoteType.None);
+                setActiveInstrumentNotes(prev => ({
+                    ...prev,
+                    drums: new Set(drumNotes.map(note => note))
+                }));
+
+                // Clear drum notes after 100ms
+                setTimeout(() => {
+                    setActiveInstrumentNotes(prev => ({
+                        ...prev,
+                        drums: new Set<DrumNoteType>()
+                    }));
+                }, 100);
+            }
+
             setCurrentCueData(cueData);
         };
 
@@ -210,12 +313,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
         return () => {
             // Tell the main process to stop sending cue data
-            window.electron.ipcRenderer.send('set-listen-cue-data', false);
+            window?.electron?.ipcRenderer?.send('set-listen-cue-data', false);
 
             // Clean up
             removeIpcListener('cue-handled', handleCueData);
         };
-    }, [yargListenerEnabled]);
+    }, [yargListenerEnabled, simulationMode]);
 
     const getTitle = () => {
         if (cueState?.groupName) {
@@ -234,21 +337,23 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         return null;
     };
 
+    const autoGenStatus = getAutoGenStatus();
     return (
         <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
             <div className="flex justify-between items-center mb-1">
                 <h3 className="text-lg font-semibold">{getTitle()}</h3>
-                {getAutoGenStatus() && (
+                {autoGenStatus && (
                     <span className={`text-sm font-medium px-2 py-1 rounded ${
-                        getAutoGenStatus() === 'Simulation' 
+                        autoGenStatus === 'Simulation' 
                             ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
                             : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
                     }`}>
-                        {getAutoGenStatus()}
+                        {autoGenStatus}
                     </span>
                 )}
             </div>
             {currentCueData ? (
+                <>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {/* First row - 4 columns */}
                     <div>
@@ -320,6 +425,129 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
                         </div>
                     </div>
                 </div>
+                
+                {/* Instrument Notes Section */}
+                <div className="mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* Guitar */}
+                        <div>
+                            <p className="font-medium mb-1">Guitar</p>
+                            <div className="flex flex-wrap gap-1">
+                                {[InstrumentNoteType.Green, InstrumentNoteType.Red, InstrumentNoteType.Yellow, InstrumentNoteType.Blue, InstrumentNoteType.Orange].map((note) => (
+                                    <div
+                                        key={String(note)}
+                                        className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
+                                            activeInstrumentNotes.guitar.has(note)
+                                                ? 'text-white' +
+                                                  (note === InstrumentNoteType.Green ? ' bg-green-500' :
+                                                   note === InstrumentNoteType.Red ? ' bg-red-500' :
+                                                   note === InstrumentNoteType.Yellow ? ' bg-yellow-500' :
+                                                   note === InstrumentNoteType.Blue ? ' bg-blue-500' :
+                                                   note === InstrumentNoteType.Orange ? ' bg-orange-500' : '')
+                                                : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
+                                        }`}
+                                    >
+                                        {labelForInstrumentNote(note)}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        {/* Bass */}
+                        <div>
+                            <p className="font-medium mb-1">Bass</p>
+                            <div className="flex flex-wrap gap-1">
+                                {[InstrumentNoteType.Green, InstrumentNoteType.Red, InstrumentNoteType.Yellow, InstrumentNoteType.Blue, InstrumentNoteType.Orange].map((note) => (
+                                    <div
+                                        key={String(note)}
+                                        className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
+                                            activeInstrumentNotes.bass.has(note)
+                                                ? 'text-white' +
+                                                  (note === InstrumentNoteType.Green ? ' bg-green-500' :
+                                                   note === InstrumentNoteType.Red ? ' bg-red-500' :
+                                                   note === InstrumentNoteType.Yellow ? ' bg-yellow-500' :
+                                                   note === InstrumentNoteType.Blue ? ' bg-blue-500' :
+                                                   note === InstrumentNoteType.Orange ? ' bg-orange-500' : '')
+                                                : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
+                                        }`}
+                                    >
+                                        {labelForInstrumentNote(note)}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        {/* Keys */}
+                        <div>
+                            <p className="font-medium mb-1">Keys</p>
+                            <div className="flex flex-wrap gap-1">
+                                {[InstrumentNoteType.Green, InstrumentNoteType.Red, InstrumentNoteType.Yellow, InstrumentNoteType.Blue, InstrumentNoteType.Orange].map((note) => (
+                                    <div
+                                        key={String(note)}
+                                        className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
+                                            activeInstrumentNotes.keys.has(note)
+                                                ? 'text-white' +
+                                                  (note === InstrumentNoteType.Green ? ' bg-green-500' :
+                                                   note === InstrumentNoteType.Red ? ' bg-red-500' :
+                                                   note === InstrumentNoteType.Yellow ? ' bg-yellow-500' :
+                                                   note === InstrumentNoteType.Blue ? ' bg-blue-500' :
+                                                   note === InstrumentNoteType.Orange ? ' bg-orange-500' : '')
+                                                : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
+                                        }`}
+                                    >
+                                        {labelForInstrumentNote(note)}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        {/* Drums */}
+                        <div>
+                            <p className="font-medium mb-1">Drums</p>
+                            <div className="space-y-2">
+                                {/* GRYB Drum Colors */}
+                                <div className="flex flex-wrap gap-1">
+                                    {[DrumNoteType.GreenDrum, DrumNoteType.RedDrum, DrumNoteType.YellowDrum, DrumNoteType.BlueDrum].map((note) => (
+                                        <div
+                                            key={String(note)}
+                                            className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
+                                                activeInstrumentNotes.drums.has(note)
+                                                    ? 'text-white' +
+                                                      (note === DrumNoteType.GreenDrum ? ' bg-green-500' :
+                                                       note === DrumNoteType.RedDrum ? ' bg-red-500' :
+                                                       note === DrumNoteType.YellowDrum ? ' bg-yellow-500' :
+                                                       note === DrumNoteType.BlueDrum ? ' bg-blue-500' : '')
+                                                    : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
+                                            }`}
+                                        >
+                                            {labelForDrumNote(note)}
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Cymbals and Kick */}
+                                <div className="flex flex-wrap gap-1">
+                                    {[DrumNoteType.GreenCymbal, DrumNoteType.YellowCymbal, DrumNoteType.BlueCymbal, DrumNoteType.Kick].map((note) => (
+                                        <div
+                                            key={String(note)}
+                                            className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
+                                                activeInstrumentNotes.drums.has(note)
+                                                    ? 'text-white' +
+                                                      (note === DrumNoteType.GreenCymbal ? ' bg-green-500' :
+                                                       note === DrumNoteType.YellowCymbal ? ' bg-yellow-500' :
+                                                                                                          note === DrumNoteType.BlueCymbal ? ' bg-blue-500' :
+                                                   note === DrumNoteType.Kick ? ' bg-orange-500' : '')
+                                                    : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
+                                            }`}
+                                        >
+                                            {labelForDrumNote(note)}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </>
             ) : (
                 <p className="text-gray-500 dark:text-gray-400">No active YARG cue</p>
             )}

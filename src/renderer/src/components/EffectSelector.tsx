@@ -5,12 +5,14 @@ interface EffectsDropdownProps {
   groupId: string;
   onSelect: (effect: EffectSelector) => void;
   value?: string;
+  disabled?: boolean;
 }
 
 export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
   groupId = 'default',
   onSelect,
-  value
+  value,
+  disabled = false
 }) => {
   const [effects, setEffects] = useState<EffectSelector[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,12 +20,18 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
 
   // Use stable callback to avoid infinite loops
   const fetchEffects = useCallback(async () => {
-    console.log(`Fetching effects for group: ${groupId}`);
+    if (!groupId) {
+      // No group selected
+      setEffects([]);
+      setSelectedEffect(null);
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
       // This retrieves cues from the specified group without changing the active group state
       const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', groupId);
-      console.log('Available effects:', availableEffects);
       
       if (Array.isArray(availableEffects) && availableEffects.length > 0) {
         setEffects(availableEffects);
@@ -37,8 +45,9 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
         } 
         // Otherwise select the first effect if there's no current selection
         else if (!selectedEffect && availableEffects.length > 0) {
-          setSelectedEffect(availableEffects[0]);
-          onSelect(availableEffects[0]);
+          const firstEffect = availableEffects[0];
+          setSelectedEffect(firstEffect);
+          onSelect(firstEffect);
         }
       } else {
         setEffects([]);
@@ -51,7 +60,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [groupId]);
+  }, [groupId, value, onSelect]); // Keep only essential dependencies
 
   // Fetch effects when group changes
   useEffect(() => {
@@ -84,17 +93,19 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-        Effect
+        Cue
       </label>
       <select
         onChange={handleChange}
         className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
         value={value || selectedEffect?.id || ''}
         style={{ width: '200px' }}
-        disabled={loading || effects.length === 0}
+        disabled={loading || effects.length === 0 || disabled}
       >
         {loading ? (
           <option value="" disabled>Loading effects...</option>
+        ) : !groupId ? (
+          <option value="" disabled>Select a group first</option>
         ) : effects.length === 0 ? (
           <option value="" disabled>No effects available</option>
         ) : (

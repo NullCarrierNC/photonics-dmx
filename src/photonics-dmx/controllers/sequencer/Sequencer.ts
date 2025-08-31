@@ -1,4 +1,5 @@
 import { Effect, RGBIO, TrackedLight } from '../../types';
+import { InstrumentNoteType, DrumNoteType } from '../../cues/cueTypes';
 import { LightTransitionController } from './LightTransitionController';
 import { DebugMonitor } from './DebugMonitor';
 import { EffectManager } from './EffectManager';
@@ -198,6 +199,34 @@ export class Sequencer implements ILightingController {
    */
   public onKeyframe(): void {
     this.eventHandler.onKeyframe();
+  }
+
+  /**
+   * Handle individual drum note events
+   */
+  public onDrumNote(noteType: DrumNoteType): void {
+    this.eventHandler.onDrumNote(noteType);
+  }
+
+  /**
+   * Handle individual guitar note events
+   */
+  public onGuitarNote(noteType: InstrumentNoteType): void {
+    this.eventHandler.onGuitarNote(noteType);
+  }
+
+  /**
+   * Handle individual bass note events
+   */
+  public onBassNote(noteType: InstrumentNoteType): void {
+    this.eventHandler.onBassNote(noteType);
+  }
+
+  /**
+   * Handle individual keys note events
+   */
+  public onKeysNote(noteType: InstrumentNoteType): void {
+    this.eventHandler.onKeysNote(noteType);
   }
 
   /**

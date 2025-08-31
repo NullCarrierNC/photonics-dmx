@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAtom } from 'jotai';
 import { senderIpcEnabledAtom, activeDmxLightsConfigAtom } from '@renderer/atoms';
 import { EffectSelector, DmxChannel } from '../../../photonics-dmx/types';
+import { InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/cueTypes';
 import EffectsDropdown from '../components/EffectSelector';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 import CuePreviewYarg from '@renderer/components/CuePreviewYarg';
@@ -10,8 +11,9 @@ import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPrev
 import { useTimeoutEffect } from '../utils/useTimeout';
 import CueRegistrySelector from '@renderer/components/CueRegistrySelector';
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa';
-import ActiveGroupsSelector, { ActiveGroupsSelectorRef } from '../components/ActiveCueGroupsSelector';
+import { ActiveGroupsSelectorRef } from '../components/ActiveCueGroupsSelector';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { startTestEffect, stopTestEffect } from '../ipcApi';
 
 type CueRegistryType = 'YARG' | 'RB3E';
 
@@ -27,11 +29,16 @@ const CueSimulation: React.FC = () => {
   const [lightingConfig] = useAtom(activeDmxLightsConfigAtom);
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null);
   const [, setRegistryType] = useState<CueRegistryType>('YARG');
-  const [selectedGroup, setSelectedGroup] = useState<string>('default');
-  const [selectedGroupId, setSelectedGroupId] = useState<string>('default');
+  const [selectedGroup, setSelectedGroup] = useState<string>('Select');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [dmxValues, setDmxValues] = useState<Record<number, number>>({});
+  const [selectedVenueSize, setSelectedVenueSize] = useState<'NoVenue' | 'Small' | 'Large'>('Large');
+  const [selectedBpm, setSelectedBpm] = useState<number>(120);
+  
+  // State for instrument simulation
+  const [selectedInstrument, setSelectedInstrument] = useState<'guitar' | 'bass' | 'keys' | 'drums'>('guitar');
   
   // State for manual simulation indicators
   const [showBeatIndicator, setShowBeatIndicator] = useState(false);
@@ -115,6 +122,7 @@ const CueSimulation: React.FC = () => {
   }, [selectedGroupId]);
 
   const handleEffectSelect = useCallback(async (effect: EffectSelector) => {
+    console.log('Effect selected:', effect);
     setSelectedEffect(effect);
     // When user selects an effect, ensure the active group matches the selected group
     await ensureActiveGroupMatches();
@@ -128,29 +136,68 @@ const CueSimulation: React.FC = () => {
 
     // Ensure the active group matches the selected group when testing an effect
     await ensureActiveGroupMatches();
-
-    console.log(`Test Cue for Effect: ${selectedEffect.id}`);
-    await window.electron.ipcRenderer.invoke('start-test-effect', selectedEffect.id);
+    try {
+      const result = await startTestEffect(selectedEffect.id, selectedVenueSize, selectedBpm);
+      if (!result.success) {
+        console.error('Failed to start test effect:', result.error);
+      }
+    } catch (error) {
+      console.error('Error starting test effect:', error);
+    }
   };
 
   const handleStopTestEffect = async () => {
-    await window.electron.ipcRenderer.invoke('stop-test-effect');
+    try {
+      await stopTestEffect();
+    } catch (error) {
+      console.error('Error stopping test effect:', error);
+    }
   };
 
   const handleSimulateBeat = async () => {
-    await window.electron.ipcRenderer.invoke('simulate-beat');
+    await window.electron.ipcRenderer.invoke('simulate-beat', {
+      venueSize: selectedVenueSize,
+      bpm: selectedBpm,
+      cueGroup: selectedGroupId,
+      effectId: selectedEffect?.id || null
+    });
     // Simply turn on the indicator, the useTimeoutEffect will reset it
     setShowBeatIndicator(true);
   };
 
   const handleSimulateKeyframe = async () => {
-    await window.electron.ipcRenderer.invoke('simulate-keyframe');
+    await window.electron.ipcRenderer.invoke('simulate-keyframe', {
+      venueSize: selectedVenueSize,
+      bpm: selectedBpm,
+      cueGroup: selectedGroupId,
+      effectId: selectedEffect?.id || null
+    });
     setShowKeyframeIndicator(true);
   };
 
   const handleSimulateMeasure = async () => {
-    await window.electron.ipcRenderer.invoke('simulate-measure');
+    await window.electron.ipcRenderer.invoke('simulate-measure', {
+      venueSize: selectedVenueSize,
+      bpm: selectedBpm,
+      cueGroup: selectedGroupId,
+      effectId: selectedEffect?.id || null
+    });
     setShowMeasureIndicator(true);
+  };
+
+  const handleSimulateInstrumentNote = async (noteType: string) => {
+    try {
+      await window.electron.ipcRenderer.invoke('simulate-instrument-note', {
+        instrument: selectedInstrument,
+        noteType: noteType,
+        venueSize: selectedVenueSize,
+        bpm: selectedBpm,
+        cueGroup: selectedGroupId,
+        effectId: selectedEffect?.id || null
+      });
+    } catch (error) {
+      console.error('Error simulating instrument note:', error);
+    }
   };
 
   const handleRegistryChange = (type: CueRegistryType) => {
@@ -160,62 +207,56 @@ const CueSimulation: React.FC = () => {
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
   const handleGroupChange = useCallback(async (groupIds: string[]) => {
-    // Handle both "All" selection (multiple groups) and single group selection
-    if (groupIds.length > 0) {
+    // Handle group selection - only single groups are supported
+    if (groupIds.length === 1) {
+      const groupId = groupIds[0];
+      setSelectedGroupId(groupId); // Store the actual group ID
+      // Don't clear selectedEffect here - let the EffectsDropdown handle it
+      
       // Get group details to determine display name
-      let displayName: string;
-      
-      if (groupIds.length > 1) {
-        displayName = 'All';
-        setSelectedGroupId('default'); // Use default group for "All" mode
-        setSelectedEffect(null); // Clear selected effect immediately when group changes
-      } else {
-        // Single group - need to get the group name for display
-        const groupId = groupIds[0];
-        setSelectedGroupId(groupId); // Store the actual group ID
-        setSelectedEffect(null); // Clear selected effect immediately when group changes
-        try {
-          const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
-          const group = allGroups.find((g: CueGroup) => g.id === groupId);
-          displayName = group ? group.name : groupId;
-        } catch (error) {
-          console.error('Error fetching group details:', error);
-          displayName = groupId;
-        }
-      }
-      
-      // Only update state if the selection actually changed
-      setSelectedGroup(prevSelectedGroup => {
-        if (prevSelectedGroup !== displayName) {
-          console.log(`Preview group changed from ${prevSelectedGroup} to ${displayName}`);
-          
-          // Don't override active groups during initial mount - let the startup registration stand
-          if (!isInitialMount.current) {
-            // Set the selected group IDs as active for DMX preview
-            window.electron.ipcRenderer.invoke('set-active-cue-groups', groupIds)
-              .then(result => {
-                if (result.success) {
-                  // Directly refresh the ActiveGroupsSelector to reflect the change
-                  activeGroupsSelectorRef.current?.refreshActiveGroups();
-                } else {
-                  console.error('Failed to set active groups for preview:', result.error);
-                }
-              })
-              .catch(err => {
-                console.error('Error setting active groups for preview:', err);
-              });
+      try {
+        const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+        const group = allGroups.find((g: CueGroup) => g.id === groupId);
+        const displayName = group ? group.name : groupId;
+        
+        // Only update state if the selection actually changed
+        setSelectedGroup(prevSelectedGroup => {
+          if (prevSelectedGroup !== displayName) {
+            // Don't override active groups during initial mount - let the startup registration stand
+            if (!isInitialMount.current) {
+              // Set the selected group IDs as active for DMX preview
+              window.electron.ipcRenderer.invoke('set-active-cue-groups', groupIds)
+                .then(result => {
+                  if (result.success) {
+                    // Directly refresh the ActiveGroupsSelector to reflect the change
+                    activeGroupsSelectorRef.current?.refreshActiveGroups();
+                  } else {
+                    console.error('Failed to set active groups for preview:', result.error);
+                  }
+                })
+                .catch(err => {
+                  console.error('Error setting active groups for preview:', err);
+                });
+              
+              // Mark as fully initialized after first user-initiated group change
+              isFullyInitialized.current = true;
+            } else {
+              isInitialMount.current = false;
+            }
             
-            // Mark as fully initialized after first user-initiated group change
-            isFullyInitialized.current = true;
-          } else {
-            console.log('Skipping active group override during initial mount');
-            isInitialMount.current = false;
+            return displayName;
           }
-          
-          return displayName;
-        }
-        return prevSelectedGroup;
-      });
+          return prevSelectedGroup;
+        });
+      } catch (error) {
+        console.error('Error fetching group details:', error);
+        setSelectedGroup(groupId);
+      }
+    } else {
+      // No group selected - reset to empty state
+      setSelectedGroup('');
+      setSelectedGroupId('');
+      setSelectedEffect(null);
     }
   }, [setSelectedGroup]);
 
@@ -223,60 +264,23 @@ const CueSimulation: React.FC = () => {
   useEffect(() => {
     const fetchGroupInfo = async () => {
       try {
-        if (selectedGroup === 'All') {
-          // For "All" selection, show a synthetic group description
+        if (!selectedGroupId) {
+          // For no group selected state, show a synthetic group description
           setCurrentGroup({
-            id: 'all',
-            name: 'All',
-            description: 'All enabled cue groups are active',
+            id: 'none',
+            name: 'No Group Selected',
+            description: 'Please select a cue group to view its effects.',
             cueTypes: []
           });
-          
-          // For effects dropdown, use the default group's effects
-          try {
-            const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', 'default');
-            
-            // If there are effects available, select the first one automatically
-            if (availableEffects && availableEffects.length > 0) {
-              const firstEffect = availableEffects[0];
-              const effect = {
-                id: firstEffect.id,
-                yargDescription: firstEffect.yargDescription,
-                rb3Description: firstEffect.rb3Description,
-                groupName: firstEffect.groupName
-              };
-              setSelectedEffect(effect);
-              console.log(`Auto-selected first effect: ${firstEffect.id} from default group (All mode)`);
-            }
-          } catch (error) {
-            console.error('Error fetching available effects for All mode:', error);
-          }
+          setSelectedEffect(null); // Clear selected effect when no group is selected
         } else {
           // Single group selection
           const groups = await window.electron.ipcRenderer.invoke('get-cue-groups');
-          const group = groups.find((g: CueGroup) => g.id === selectedGroup);
+          const group = groups.find((g: CueGroup) => g.id === selectedGroupId);
           if (group) {
             setCurrentGroup(group);
             
-            // Fetch available effects for the specific group using group ID
-            try {
-              const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', selectedGroup);
-              
-              // If there are effects available, select the first one automatically
-              if (availableEffects && availableEffects.length > 0) {
-                const firstEffect = availableEffects[0];
-                const effect = {
-                  id: firstEffect.id,
-                  yargDescription: firstEffect.yargDescription,
-                  rb3Description: firstEffect.rb3Description,
-                  groupName: firstEffect.groupName
-                };
-                setSelectedEffect(effect);
-                console.log(`Auto-selected first effect: ${firstEffect.id} from group ${group.name} (ID: ${selectedGroup})`);
-              }
-            } catch (error) {
-              console.error('Error fetching available effects for group:', error);
-            }
+            // Don't fetch effects here - let the EffectsDropdown handle it
           }
         }
       } catch (error) {
@@ -298,9 +302,7 @@ const CueSimulation: React.FC = () => {
 
       <hr className="my-6" />
 
-      {/* Active Cue Groups */}
-      <ActiveGroupsSelector ref={activeGroupsSelectorRef} className="mb-6" />
-
+    
       <div className="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 mb-6">
         <button
           className="w-full px-4 py-3 text-left font-medium text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset rounded-t-lg flex items-center justify-between"
@@ -312,25 +314,18 @@ const CueSimulation: React.FC = () => {
         <div className={`px-4 pb-4 ${isAboutOpen ? '' : 'hidden'}`}>
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
             Cue Simulation allows you to test and preview lighting effects before using them in-game. 
-            You can select different cue groups, choose specific effects, and manually simulate beats, 
-            measures, and keyframes to see how the effects respond.
+            You can select different cue groups, choose specific cues, and manually simulate beats, 
+            measures, and keyframes to see how the cues respond.
           </p>
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
             Which cue groups are enabled is defined in the Preferences menu.
           </p>
-          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
-            Active groups are a subset of enabled groups. Only cues in the active groups will be used in-game.
-          </p>
-          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
-            By default all enabled groups are active. Here you can select which groups are active, allowing you to 
-            isolate specific groups or cues for testing at runtime. The active toggles are not saved between sessions.
-          </p>
-
+         
           <hr className="my-6" />
 
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
             Testing a cue will give you an approximation of what it will look like in-game. Some effects require you to 
-            manually simulate a beat or keyframe. If an effect uses a song's BPM value, the simulation will assume 120 BPM. 
+            manually simulate a beat or keyframe. You can adjust the BPM value to test how effects respond to different tempos. 
             For YARG, some effects are modified by run-time data such as the notes being played. This is not currently simulated.
           </p>
           <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
@@ -341,7 +336,41 @@ const CueSimulation: React.FC = () => {
       </div>
      
       <div className="my-6">
-        <h2 className="text-xl font-bold mb-1">Effect Selection</h2>
+        <h2 className="text-xl font-bold mb-1">Simulation Settings</h2>
+        <div className="flex flex-wrap gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Venue Size
+            </label>
+            <select
+              value={selectedVenueSize}
+              onChange={(e) => setSelectedVenueSize(e.target.value as 'NoVenue' | 'Small' | 'Large')}
+              className="p-2 pr-8 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
+              style={{ width: '150px' }}
+              disabled={!selectedGroupId}
+            >
+              <option value="NoVenue">No Venue</option>
+              <option value="Small">Small</option>
+              <option value="Large">Large</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              BPM
+            </label>
+            <input
+              type="number"
+              min="60"
+              max="200"
+              value={selectedBpm}
+              onChange={(e) => setSelectedBpm(parseInt(e.target.value) || 120)}
+              className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
+              style={{ width: '80px' }}
+              disabled={!selectedGroupId}
+            />
+          </div>
+        </div>
+        
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">
           <div>
             <CueRegistrySelector 
@@ -354,6 +383,7 @@ const CueSimulation: React.FC = () => {
               onSelect={handleEffectSelect}
               groupId={selectedGroupId}
               value={selectedEffect?.id}
+              disabled={!selectedGroupId}
             />
           </div>
         </div>
@@ -377,58 +407,132 @@ const CueSimulation: React.FC = () => {
           <button
             onClick={handleTestEffect}
             className={`px-4 py-2 rounded ${
-              !selectedEffect 
+              !selectedEffect || !selectedGroupId
                 ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
                 : 'bg-blue-500 text-white hover:bg-blue-600'
             }`}
-            disabled={!selectedEffect}
+            disabled={!selectedEffect || !selectedGroupId}
           >
-            Start Test Effect
+            Start Test Cue
           </button>
           <button
             onClick={handleStopTestEffect}
             className={`px-4 py-2 rounded ${
-              !selectedEffect 
+              !selectedEffect || !selectedGroupId
                 ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
                 : 'bg-orange-500 text-white hover:bg-orange-600'
             }`}
-            disabled={!selectedEffect}
+            disabled={!selectedEffect || !selectedGroupId}
           >
-            Stop Test Effect
+            Stop Test Cue
           </button>
           <button
             onClick={handleSimulateBeat}
             className={`px-4 py-2 rounded ${
-              !selectedEffect 
+              !selectedEffect || !selectedGroupId
                 ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
                 : 'bg-purple-500 text-white hover:bg-purple-600'
             }`}
-            disabled={!selectedEffect}
+            disabled={!selectedEffect || !selectedGroupId}
           >
             Simulate Beat
           </button>
           <button
             onClick={handleSimulateMeasure}
             className={`px-4 py-2 rounded ${
-              !selectedEffect 
+              !selectedEffect || !selectedGroupId
                 ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
                 : 'bg-yellow-500 text-white hover:bg-yellow-600'
             }`}
-            disabled={!selectedEffect}
+            disabled={!selectedEffect || !selectedGroupId}
           >
             Simulate Measure
           </button>
           <button
             onClick={handleSimulateKeyframe}
             className={`px-4 py-2 rounded ${
-              !selectedEffect 
+              !selectedEffect || !selectedGroupId
                 ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
                 : 'bg-emerald-500 text-white hover:bg-emerald-600'
             }`}
-            disabled={!selectedEffect}
+            disabled={!selectedEffect || !selectedGroupId}
           >
             Simulate Keyframe
           </button>
+        </div>
+      </div>
+
+      {/* Instrument Simulation */}
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold mb-3">Instrument Simulation</h3>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Instrument
+            </label>
+            <select
+              value={selectedInstrument}
+              onChange={(e) => setSelectedInstrument(e.target.value as 'guitar' | 'bass' | 'keys' | 'drums')}
+              className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
+              style={{ width: '150px' }}
+              disabled={!selectedGroupId}
+            >
+              <option value="bass">Bass</option>
+              <option value="drums">Drums</option>
+              <option value="guitar">Guitar</option>
+              <option value="keys">Keys</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Notes
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {selectedInstrument === 'drums' ? (
+                // Drum notes - ordered as Green, Red, Yellow, Blue, then cymbals, then kick
+                [DrumNoteType.GreenDrum, DrumNoteType.RedDrum, DrumNoteType.YellowDrum, DrumNoteType.BlueDrum, DrumNoteType.GreenCymbal, DrumNoteType.YellowCymbal, DrumNoteType.BlueCymbal, DrumNoteType.Kick]
+                  .map((note) => (
+                    <button
+                      key={note}
+                      onClick={() => handleSimulateInstrumentNote(note)}
+                      className={`px-3 py-1 text-xs rounded hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        note === DrumNoteType.GreenDrum || note === DrumNoteType.GreenCymbal ? 'bg-green-500 text-white' :
+                        note === DrumNoteType.RedDrum ? 'bg-red-500 text-white' :
+                        note === DrumNoteType.YellowDrum || note === DrumNoteType.YellowCymbal ? 'bg-yellow-500 text-white' :
+                        note === DrumNoteType.BlueDrum || note === DrumNoteType.BlueCymbal ? 'bg-blue-500 text-white' :
+                        note === DrumNoteType.Kick ? 'bg-orange-500 text-white' :
+                        'bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200'
+                      }`}
+                      disabled={!selectedGroupId}
+                    >
+                      {note}
+                    </button>
+                  ))
+              ) : (
+                // Guitar, Bass, Keys notes - ordered as Green, Red, Yellow, Blue, Orange
+                [InstrumentNoteType.Green, InstrumentNoteType.Red, InstrumentNoteType.Yellow, InstrumentNoteType.Blue, InstrumentNoteType.Orange]
+                  .map((note) => (
+                    <button
+                      key={note}
+                      onClick={() => handleSimulateInstrumentNote(note)}
+                      className={`px-3 py-1 text-xs rounded hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        note === InstrumentNoteType.Green ? 'bg-green-500 text-white' :
+                        note === InstrumentNoteType.Red ? 'bg-red-500 text-white' :
+                        note === InstrumentNoteType.Yellow ? 'bg-yellow-500 text-white' :
+                        note === InstrumentNoteType.Blue ? 'bg-blue-500 text-white' :
+                        note === InstrumentNoteType.Orange ? 'bg-orange-500 text-white' :
+                        note === InstrumentNoteType.Open ? 'bg-gray-500 text-white' :
+                        'bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200'
+                      }`}
+                      disabled={!selectedGroupId}
+                    >
+                      {note}
+                    </button>
+                  ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
   

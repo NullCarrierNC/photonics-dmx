@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { CueData, CueType } from '../cues/cueTypes';
+import { CueData, CueType, InstrumentNoteType, DrumNoteType } from '../cues/cueTypes';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { CueRegistry } from '../cues/CueRegistry';
@@ -109,6 +109,48 @@ export abstract class BaseCueHandler extends EventEmitter {
   public handleMeasure(): void {
     this._sequencer.onBeat();
     this._sequencer.onMeasure();
+  }
+
+
+
+  /**
+   * Handle individual drum note events
+   * @param noteType The type of drum note
+   * @param data The cue data associated with the note
+   */
+  public handleDrumNote(noteType: DrumNoteType, _data: CueData): void {
+    // Call the sequencer method for drum notes
+    this._sequencer.onDrumNote(noteType);
+  }
+
+  /**
+   * Handle individual guitar note events
+   * @param noteType The type of guitar note
+   * @param data The cue data associated with the note
+   */
+  public handleGuitarNote(noteType: InstrumentNoteType, _data: CueData): void {
+    // Call the sequencer method for guitar notes
+    this._sequencer.onGuitarNote(noteType);
+  }
+
+  /**
+   * Handle individual bass note events
+   * @param noteType The type of bass note
+   * @param data The cue data associated with the note
+   */
+  public handleBassNote(noteType: InstrumentNoteType, _data: CueData): void {
+    // Call the sequencer method for bass notes
+    this._sequencer.onBassNote(noteType);
+  }
+
+  /**
+   * Handle individual keys note events
+   * @param noteType The type of keys note
+   * @param data The cue data associated with the note
+   */
+  public handleKeysNote(noteType: InstrumentNoteType, _data: CueData): void {
+    // Call the sequencer method for keys notes
+    this._sequencer.onKeysNote(noteType);
   }
 
   public handleSustain(ms: number): void {

@@ -88,11 +88,12 @@ export type WaitCondition =
   | 'measure'
   | 'half-beat'
   | 'keyframe'
-  | 'green'
-  | 'red'
-  | 'yellow'
-  | 'blue'
-  | 'orange';
+  // Instrument note events (matching SongEventHandler)
+  | 'guitar-open' | 'guitar-green' | 'guitar-red' | 'guitar-yellow' | 'guitar-blue' | 'guitar-orange'
+  | 'bass-open' | 'bass-green' | 'bass-red' | 'bass-yellow' | 'bass-blue' | 'bass-orange'
+  | 'keys-open' | 'keys-green' | 'keys-red' | 'keys-yellow' | 'keys-blue' | 'keys-orange'
+  | 'drum-kick' | 'drum-red' | 'drum-yellow' | 'drum-blue' | 'drum-green'
+  | 'drum-yellow-cymbal' | 'drum-blue-cymbal' | 'drum-green-cymbal';
 
 /**
  * Interface defining a transition within an effect

@@ -26,20 +26,14 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
 }) => {
   const [registryType, setRegistryType] = useState<CueRegistryType>('YARG');
   const [groups, setGroups] = useState<CueGroup[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<string>('All');
+  const [selectedGroup, setSelectedGroup] = useState<string>('');
   const isMounted = useRef(false);
   const isInitialMount = useRef(true);
 
   // Wrap callback to avoid infinite loops
-  const handleGroupChangeCallback = useCallback((groupId: string, allGroups?: CueGroup[]) => {
-    if (groupId === 'All') {
-      // Pass all enabled group IDs for "All" selection
-      const enabledGroupIds = allGroups ? allGroups.map(g => g.id) : [];
-      onGroupChange(enabledGroupIds);
-    } else {
-      // Pass the group ID directly
-      onGroupChange([groupId]);
-    }
+  const handleGroupChangeCallback = useCallback((groupId: string) => {
+    // Pass the group ID directly
+    onGroupChange([groupId]);
   }, [onGroupChange]);
 
   useEffect(() => {
@@ -60,19 +54,22 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
         setGroups(enabledGroups);
         
         // Handle group selection logic
-        if (selectedGroup === 'All') {
-          // If "All" is selected and we have groups, maintain "All" selection
+        if (selectedGroup === '') {
+          // If no group is selected and we have groups, auto-select the first one
           if (enabledGroups.length > 0 && isInitialMount.current) {
-            handleGroupChangeCallback('All', enabledGroups);
+            const firstGroup = enabledGroups[0];
+            setSelectedGroup(firstGroup.id);
+            handleGroupChangeCallback(firstGroup.id);
             isInitialMount.current = false;
           }
         } else if (!enabledGroups.some(g => g.id === selectedGroup) && enabledGroups.length > 0) {
-          // If the currently selected group is no longer enabled, fallback to "All"
-          setSelectedGroup('All');
-          handleGroupChangeCallback('All', enabledGroups);
+          // If the currently selected group is no longer enabled, fallback to first group
+          const firstGroup = enabledGroups[0];
+          setSelectedGroup(firstGroup.id);
+          handleGroupChangeCallback(firstGroup.id);
         } else if (isInitialMount.current && enabledGroups.length > 0) {
           // On initial mount with a specific group selected, fire the callback
-          handleGroupChangeCallback(selectedGroup, enabledGroups);
+          handleGroupChangeCallback(selectedGroup);
           isInitialMount.current = false;
         }
 
@@ -99,7 +96,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   const handleGroupChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const groupId = event.target.value;
     setSelectedGroup(groupId);
-    handleGroupChangeCallback(groupId, groups);
+    handleGroupChangeCallback(groupId);
   };
 
   return (
@@ -129,7 +126,6 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
           className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
           style={{ width: '200px' }}
         >
-          <option value="All">All</option>
           {groups.map((group) => (
             <option key={group.id} value={group.id}>
               {group.name}

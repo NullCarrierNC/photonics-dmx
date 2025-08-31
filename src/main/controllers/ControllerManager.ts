@@ -35,6 +35,8 @@ export class ControllerManager {
   private processorManager: ProcessorManager | null = null;
   
   private testEffectInterval: NodeJS.Timeout | null = null;
+  private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large';
+  private testBpm: number = 120;
   
   private isInitialized = false;
   private isYargEnabled = false;
@@ -154,13 +156,22 @@ export class ControllerManager {
   /**
    * Start a test effect
    * @param effectId The effect ID to test
+   * @param venueSize The venue size to use for testing
+   * @param bpm The BPM to use for testing
    */
-  public startTestEffect(effectId: string): void {
+  public startTestEffect(effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large', bpm?: number): void {
+    console.log(`ControllerManager.startTestEffect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}`);
+    
     // If an existing test interval is running, clear it
     if (this.testEffectInterval) {
       clearInterval(this.testEffectInterval);
       this.testEffectInterval = null;
     }
+    
+    // Store the venue size and BPM for use in testCue
+    this.testVenueSize = venueSize || 'Large';
+    this.testBpm = bpm || 120;
+    console.log(`Set testVenueSize to: ${this.testVenueSize}, testBpm to: ${this.testBpm}`);
     
     // If system is not initialized, initialize it first
     if (!this.isInitialized) {
@@ -239,8 +250,8 @@ export class ControllerManager {
       platform: 'Windows',
       currentScene: 'Gameplay',
       pauseState: 'Unpaused',
-      venueSize: 'Large',
-      beatsPerMinute: 120,
+      venueSize: this.testVenueSize,
+      beatsPerMinute: this.testBpm,
       songSection: 'Verse',
       guitarNotes: [],
       bassNotes: [],
