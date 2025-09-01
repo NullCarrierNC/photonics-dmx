@@ -21,12 +21,16 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
   ({ className = '' }, ref) => {
     const [enabledGroups, setEnabledGroups] = useState<CueGroup[]>([]);
     const [activeGroupIds, setActiveGroupIds] = useState<string[]>([]);
+    const [stageKitPriority, setStageKitPriority] = useState<string>('prefer-for-tracked');
     const [loading, setLoading] = useState(true);
     const [rb3eListenerEnabled] = useAtom(rb3eListenerEnabledAtom);
 
     const fetchActiveGroups = useCallback(async () => {
       try {
-        const active = await window.electron.ipcRenderer.invoke('get-active-cue-groups');
+        const [active, priority] = await Promise.all([
+          window.electron.ipcRenderer.invoke('get-active-cue-groups'),
+          window.electron.ipcRenderer.invoke('get-stage-kit-priority')
+        ]);
         const newActiveGroupIds = active.map((g: CueGroup) => g.id);
         
         setActiveGroupIds(prevActive => {
@@ -36,6 +40,8 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
           }
           return prevActive;
         });
+        
+        setStageKitPriority(priority || 'prefer-for-tracked');
       } catch (error) {
         console.error('Error fetching active groups:', error);
       }
@@ -44,9 +50,10 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
     const fetchData = useCallback(async () => {
       try {
         setLoading(true);
-        const [enabled, active] = await Promise.all([
+        const [enabled, active, priority] = await Promise.all([
           window.electron.ipcRenderer.invoke('get-enabled-cue-groups'),
-          window.electron.ipcRenderer.invoke('get-active-cue-groups')
+          window.electron.ipcRenderer.invoke('get-active-cue-groups'),
+          window.electron.ipcRenderer.invoke('get-stage-kit-priority')
         ]);
         
         // Get full group details for enabled groups
@@ -56,6 +63,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
         
         setEnabledGroups(enabledGroupDetails);
         setActiveGroupIds(active.map((g: CueGroup) => g.id));
+        setStageKitPriority(priority || 'prefer-for-tracked');
       } catch (error) {
         console.error('Error fetching group data:', error);
       } finally {
@@ -118,7 +126,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
     }
 
     return (
-      <div className={`bg-white dark:bg-gray-800 mb-4  ${className}`}>
+      <div className={`bg-white dark:bg-gray-800 mb-6  ${className}`}>
         <h3 className="text-lg font-semibold mb-1 text-gray-900 dark:text-gray-100 ">
           Active Cue Groups
         </h3>
@@ -135,6 +143,19 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
               If the active groups are missing a cue the system will fallback to the Default group, even if it is disabled.
             </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              If Stage Kit Priority Mode is set to Prefer for Tracked, only the Stage Kit group will be used if the song has tracked lighting data.
+            </p>
+            <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg mb-3">
+              <div className="flex items-center justify-start gap-3">
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  Stage Kit Priority Mode:
+                </span>
+                <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                  {stageKitPriority.replace(/-/g, ' ')}
+                </span>
+              </div>
+            </div>
             
             <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
               <div className="space-y-2">

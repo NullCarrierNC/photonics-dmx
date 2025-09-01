@@ -26,7 +26,7 @@ class TestCueHandler extends BaseCueHandler {
       await this.handleCueDefault(parameters);
     }
   }
-  public handleCueNoCue = jest.fn(async (parameters: CueData): Promise<void> => {});
+  public handleCueNoCue = jest.fn(async (_: CueData): Promise<void> => {});
   protected handleCueDischord = jest.fn(async (_: CueData): Promise<void> => {});
   protected handleCueChorus = jest.fn(async (_: CueData): Promise<void> => {});
   protected handleCueCool_Manual = jest.fn(async (_: CueData): Promise<void> => {});

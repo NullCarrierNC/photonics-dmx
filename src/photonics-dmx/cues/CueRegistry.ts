@@ -41,6 +41,12 @@ export class CueRegistry {
   /** Name of the default group that provides fallback implementations */
   private defaultGroup: string | null = null;
 
+  /** Name of the stage kit group for special stage kit handling */
+  private stageKitGroup: string | null = null;
+
+  /** Current stage kit priority preference */
+  private stageKitPriority: 'prefer-for-tracked' | 'random' | 'never' = 'prefer-for-tracked';
+
   /** Track last called primary cue and its source group */
   private lastPrimaryCueName: string | null = null;
   private lastPrimaryCueGroup: string | null = null;
@@ -113,6 +119,8 @@ export class CueRegistry {
     this.enabledGroups.clear();
     this.activeGroups.clear();
     this.defaultGroup = null;
+    this.stageKitGroup = null;
+    this.stageKitPriority = 'prefer-for-tracked';
     this.lastPrimaryCueName = null;
     this.lastPrimaryCueGroup = null;
     this.lastPrimaryIsFallback = false;
@@ -175,11 +183,45 @@ export class CueRegistry {
    * Cue consistency throttling: If the same cue is called within the consistency window
    * (default 2 seconds), it will use the same group selection as the previous call
    * to prevent rapid randomization changes.
+   * 
+   * Stage Kit Priority: When autoGen is false and stageKitPriority is 'prefer-for-tracked',
+   * the stageKitGroup will be preferred over random selection.
    * @param cueType The type of cue to get
+   * @param autoGen Whether the song is auto-generated (affects stage kit priority)
    * @returns The cue implementation or null if not found
    */
-  public getCueImplementation(cueType: CueType): ICue | null {
-    // Check if any group has this cue to determine style
+  public getCueImplementation(cueType: CueType, autoGen: boolean = false): ICue | null {
+    // Check if we should prefer stage kit group based on priority and autoGen state
+    // When autoGen=false (tracked lighting data), prefer stage kit group if priority is set
+    if (!autoGen && this.stageKitPriority === 'prefer-for-tracked' && this.stageKitGroup) {
+      const stageKitGroup = this.groups.get(this.stageKitGroup);
+      if (stageKitGroup?.cues.has(cueType)) {
+        // Stage kit group has this cue and should be preferred
+        const cue = stageKitGroup.cues.get(cueType)!;
+        if (cue.style === CueStyle.Primary) {
+          return this.handlePrimaryCue(cueType, { groupId: this.stageKitGroup, isFallback: false }, autoGen);
+        } else {
+          return this.handleSecondaryCue(cueType, { groupId: this.stageKitGroup, isFallback: false }, autoGen);
+        }
+      }
+    }
+
+    // Check consistency first before getting a new random selection
+    const consistentSelection = this.shouldUseConsistentSelection(cueType, autoGen);
+    if (consistentSelection) {
+      // Use the consistent selection
+      const group = this.groups.get(consistentSelection.groupId);
+      const cue = group?.cues.get(cueType);
+      if (group && cue) {
+        if (cue.style === CueStyle.Primary) {
+          return this.handlePrimaryCue(cueType, consistentSelection, autoGen);
+        } else {
+          return this.handleSecondaryCue(cueType, consistentSelection, autoGen);
+        }
+      }
+    }
+
+    // No consistent selection available, get a new random selection
     const tempSelection = this.getRandomCueFromActiveGroups(cueType);
     if (!tempSelection) {
       console.error(`No implementation found for cue: ${cueType}`);
@@ -188,9 +230,9 @@ export class CueRegistry {
 
     const tempCue = this.groups.get(tempSelection.groupId)!.cues.get(cueType)!;
     if (tempCue.style === CueStyle.Primary) {
-      return this.handlePrimaryCue(cueType, tempSelection);
+      return this.handlePrimaryCue(cueType, tempSelection, autoGen);
     } else {
-      return this.handleSecondaryCue(cueType, tempSelection);
+      return this.handleSecondaryCue(cueType, tempSelection, autoGen);
     }
   }
 
@@ -214,9 +256,19 @@ export class CueRegistry {
   /**
    * Check if a cue should use consistent group selection based on the consistency window.
    * @param cueType The type of cue to check
+   * @param autoGen Whether the song is auto-generated (affects stage kit priority)
    * @returns Object with group ID and fallback flag if consistency should be maintained, null otherwise
    */
-  private shouldUseConsistentSelection(cueType: CueType): { groupId: string; isFallback: boolean } | null {
+  private shouldUseConsistentSelection(cueType: CueType, autoGen: boolean = false): { groupId: string; isFallback: boolean } | null {
+    // If stage kit priority should be used, don't use consistency tracking
+    // When autoGen=false (tracked lighting data), prefer stage kit group if priority is set
+    if (!autoGen && this.stageKitPriority === 'prefer-for-tracked' && this.stageKitGroup) {
+      const stageKitGroup = this.groups.get(this.stageKitGroup);
+      if (stageKitGroup?.cues.has(cueType)) {
+        return null;
+      }
+    }
+
     const now = Date.now();
     const lastExecutionTime = this.lastCueExecutionTime.get(cueType);
     const lastSelection = this.lastCueGroupSelection.get(cueType);
@@ -279,11 +331,29 @@ export class CueRegistry {
    * Handle primary cue selection logic.
    * @param cueType The type of cue to get
    * @param preSelection Optional pre-selected group to avoid redundant selection
+   * @param autoGen Whether the song is auto-generated (affects stage kit priority)
    * @returns The cue implementation or null if not found
    */
-  private handlePrimaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }): ICue | null {
-    // Check consistency throttling first - if we should use the same selection as last time
-    const consistentSelection = this.shouldUseConsistentSelection(cueType);
+  private handlePrimaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }, autoGen: boolean = false): ICue | null {
+    // If we have a pre-selection, use it directly
+    if (preSelection) {
+      const group = this.groups.get(preSelection.groupId);
+      const cue = group?.cues.get(cueType);
+      
+      if (group && cue) {
+        // Use the pre-selection and increment counter
+        this.primaryCueCounter++;
+        this.emitCueStateUpdate(cueType, preSelection.groupId, preSelection.isFallback, 'primary', this.primaryCueCounter, this.primaryCueLimit);
+        
+        // Record this execution for consistency tracking
+        this.recordCueExecution(cueType, preSelection);
+        
+        return cue;
+      }
+    }
+
+    // Check consistency throttling if no pre-selection
+    const consistentSelection = this.shouldUseConsistentSelection(cueType, autoGen);
     if (consistentSelection) {
       // Double-check that the group and cue are still available before using
       const group = this.groups.get(consistentSelection.groupId);
@@ -337,11 +407,29 @@ export class CueRegistry {
    * Handle secondary cue selection logic.
    * @param cueType The type of cue to get
    * @param preSelection Optional pre-selected group to avoid redundant selection
+   * @param autoGen Whether the song is auto-generated (affects stage kit priority)
    * @returns The cue implementation or null if not found
    */
-  private handleSecondaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }): ICue | null {
-    // Check consistency throttling first - if we should use the same selection as last time
-    const consistentSelection = this.shouldUseConsistentSelection(cueType);
+  private handleSecondaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }, autoGen: boolean = false): ICue | null {
+    // If we have a pre-selection (from stage kit priority), use it directly and bypass consistency
+    if (preSelection) {
+      const group = this.groups.get(preSelection.groupId);
+      const cue = group?.cues.get(cueType);
+      
+      if (group && cue) {
+        // Use the pre-selection and increment counter
+        this.secondaryCueCounter++;
+        this.emitCueStateUpdate(cueType, preSelection.groupId, preSelection.isFallback, 'secondary', this.secondaryCueCounter, this.secondaryCueLimit);
+        
+        // Record this execution for consistency tracking
+        this.recordCueExecution(cueType, preSelection);
+        
+        return cue;
+      }
+    }
+
+    // Check consistency throttling if no pre-selection
+    const consistentSelection = this.shouldUseConsistentSelection(cueType, autoGen);
     if (consistentSelection) {
       // Double-check that the group and cue are still available before using
       const group = this.groups.get(consistentSelection.groupId);
@@ -614,6 +702,43 @@ export class CueRegistry {
   }
 
   /**
+   * Get the ID of the stage kit group.
+   * @returns The stage kit group ID or null if no stage kit group is set
+   */
+  public getStageKitGroupId(): string | null {
+    return this.stageKitGroup;
+  }
+
+  /**
+   * Set the stage kit group.
+   * @param groupId The ID of the group to set as the stage kit group
+   * @throws Error if the group doesn't exist
+   */
+  public setStageKitGroup(groupId: string): void {
+    if (!this.groups.has(groupId)) {
+      throw new Error(`Cannot set stage kit group: group '${groupId}' not found`);
+    }
+    this.stageKitGroup = groupId;
+  }
+
+  /**
+   * Set the stage kit priority preference.
+   * @param preference 'prefer-for-tracked', 'random', or 'never'
+   */
+  public setStageKitPriority(preference: 'prefer-for-tracked' | 'random' | 'never'): void {
+    this.stageKitPriority = preference;
+    console.log(`Stage kit priority set to: ${preference}`);
+  }
+
+  /**
+   * Get the current stage kit priority preference.
+   * @returns The current stage kit priority preference
+   */
+  public getStageKitPriority(): 'prefer-for-tracked' | 'random' | 'never' {
+    return this.stageKitPriority;
+  }
+
+  /**
    * Get a specific group by ID, regardless of whether it's enabled or active.
    * @param groupId The ID of the group to get
    * @returns The group or undefined if not found
@@ -632,6 +757,8 @@ export class CueRegistry {
     activeGroups: string[];
     enabledGroups: string[];
     defaultGroup: string | null;
+    stageKitGroup: string | null;
+    stageKitPriority: 'prefer-for-tracked' | 'random' | 'never';
   } {
     return {
       lastPrimaryCue: {
@@ -648,7 +775,9 @@ export class CueRegistry {
       },
       activeGroups: Array.from(this.activeGroups),
       enabledGroups: Array.from(this.enabledGroups),
-      defaultGroup: this.defaultGroup
+      defaultGroup: this.defaultGroup,
+      stageKitGroup: this.stageKitGroup,
+      stageKitPriority: this.stageKitPriority
     };
   }
 

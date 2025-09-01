@@ -34,18 +34,20 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
       const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', groupId);
       
       if (Array.isArray(availableEffects) && availableEffects.length > 0) {
-        setEffects(availableEffects);
+        // Sort effects by ID in ascending order for consistent display
+        const sortedEffects = availableEffects.sort((a, b) => a.id.localeCompare(b.id));
+        setEffects(sortedEffects);
         
         // If we have a value prop, select that effect
         if (value) {
-          const selectedEffect = availableEffects.find(effect => effect.id === value);
+          const selectedEffect = sortedEffects.find(effect => effect.id === value);
           if (selectedEffect) {
             setSelectedEffect(selectedEffect);
           }
         } 
         // Otherwise select the first effect if there's no current selection
-        else if (!selectedEffect && availableEffects.length > 0) {
-          const firstEffect = availableEffects[0];
+        else if (!selectedEffect && sortedEffects.length > 0) {
+          const firstEffect = sortedEffects[0];
           setSelectedEffect(firstEffect);
           onSelect(firstEffect);
         }

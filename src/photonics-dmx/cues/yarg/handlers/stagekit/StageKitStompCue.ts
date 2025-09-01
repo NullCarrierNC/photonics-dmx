@@ -3,37 +3,96 @@ import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers';
-import { getEffectFadeInColorFadeOut } from '../../../../effects';
+
 
 
 /**
- * StageKit Stomp Cue - Keyframe-based toggle with all lights
- * Starts with all lights on, toggles on/off with each keyframe
+ * StageKit Stomp Cue - Keyframe-based toggle with outer yellow and inner green
+ * Starts with outer half yellow, inner half green, toggles on/off with each keyframe
  */
 export class StageKitStompCue implements ICue {
   id = 'stagekit-stomp';
   cueId = CueType.Stomp;
-  description = 'StageKit stomp pattern - keyframe-based toggle';
+  description = 'Starts with front outer yellow, back outer red, inner green, toggles on/off with each keyframe.';
   style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const allLights = lightManager.getLights(['front', 'back'], ['all']);
-    const blackColor = getColor('black', 'medium');
+    const frontOuterLights = lightManager.getLights(['front'], 'outter-half-major');
+    const backOuterLights = lightManager.getLights(['back'], 'outter-half-major');
+    const innerLights = lightManager.getLights(['front', 'back'], 'inner-half-minor');
     const yellowColor = getColor('yellow', 'high');
+    const redColor = getColor('red', 'high');
+    const greenColor = getColor('green', 'high');
+    const blackColor = getColor('black', 'medium');
 
-    const effect = getEffectFadeInColorFadeOut({
-      lights: allLights,
-      layer: 0,
-      startColor: yellowColor,
-      endColor: blackColor,
-      waitBeforeFadeIn: 0,
-      fadeInDuration: 50,
-      holdDuration: 100,
-      fadeOutDuration: 50,
-      waitAfterFadeOut: 0,
-      waitUntil: 'keyframe',
+    // Set initial state and create toggle effect
+    await sequencer.setEffect('stagekit-stomp-toggle', {
+      id: 'stagekit-stomp-toggle',
+      description: 'Stomp pattern - front outer yellow, back outer red, inner green, keyframe toggle',
+      transitions: [
+        // Initial state: front outer yellow, back outer red, inner green
+        {
+          lights: frontOuterLights,
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: yellowColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0
+        },
+        {
+          lights: backOuterLights,
+          layer: 2,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: redColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0
+        },
+        {
+          lights: innerLights,
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: greenColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0
+        },
+        // Turn off front outer lights on keyframe
+        {
+          lights: frontOuterLights,
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0,
+          waitUntilConditionCount: 1
+        },
+        // Turn off back outer lights on keyframe
+        {
+          lights: backOuterLights,
+          layer: 2,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0,
+          waitUntilConditionCount: 1
+        },
+        // Turn off inner lights on keyframe
+        {
+          lights: innerLights,
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0,
+          waitUntilConditionCount: 1
+        }
+      ]
     });
-    sequencer.setEffect('stagekit-stomp', effect);
   }
 
   onStop(): void {

@@ -357,8 +357,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {/* First row - 4 columns */}
                     <div>
-                        <p><span className="font-medium">Primary:</span> {primaryCueName || 'None'} <span className="text-xs text-gray-500">{primaryCueName && primaryCueCounter > 0 ? `(${primaryCueCounter})` : ''}</span></p>
-                        <p><span className="font-medium">Secondary:</span> {secondaryCueName || ''} <span className="text-xs text-gray-500">{secondaryCueName && secondaryCueCounter > 0 ? `(${secondaryCueCounter})` : ''}</span></p>
+                        <p><span className="font-medium">Primary:</span> {primaryCueName || 'None'}</p>
+                        <p><span className="font-medium">Secondary:</span> {secondaryCueName || ''}</p>
                     </div>
 
                     <div>

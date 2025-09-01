@@ -93,6 +93,16 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return registry.getAllGroups();
     }
 
+    // Initialize stage kit priority in the registry if not already set
+    const registry = CueRegistry.getInstance();
+    const prefs = controllerManager.getConfig().getAllPreferences();
+    const currentPriority = registry.getStageKitPriority();
+    const configPriority = prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked';
+    
+    if (currentPriority !== configPriority) {
+      registry.setStageKitPriority(configPriority);
+    }
+
     return enabled;
   });
 
@@ -111,6 +121,36 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error setting enabled cue groups:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get stage kit priority preference
+  ipcMain.handle('get-stage-kit-priority', async () => {
+    const prefs = controllerManager.getConfig().getAllPreferences();
+    return prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked';
+  });
+
+  // Set stage kit priority preference
+  ipcMain.handle('set-stage-kit-priority', async (_, priority: 'prefer-for-tracked' | 'random' | 'never') => {
+    try {
+      // Update the preference in the config
+      controllerManager.getConfig().updatePreferences({
+        stageKitPrefs: { yargPriority: priority }
+      });
+      
+      // Sync with the CueRegistry
+      const registry = CueRegistry.getInstance();
+      registry.setStageKitPriority(priority);
+      
+      console.log('Updated stage kit priority to:', priority);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting stage kit priority:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : String(error)
