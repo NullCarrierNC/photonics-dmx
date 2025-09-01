@@ -809,7 +809,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
                    strobeEffect === 'fast' ? "Strobe_Fast" :
                    strobeEffect === 'fastest' ? "Strobe_Fastest" : "Strobe_Off",
       performer: 0,
-      autoGenTrack: false,
+      trackMode: 'tracked',
       beat: "Strong",
       keyframe: "Off",
       bonusEffect: false,

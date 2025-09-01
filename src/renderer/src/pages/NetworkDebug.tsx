@@ -134,7 +134,7 @@ const NetworkDebug = () => {
           }
           
           // Special styling for boolean fields
-          if (key === 'autoGenTrack') {
+          if (key === 'trackMode') {
             return (
               <li key={key}>
                 <strong>{key}:</strong>{' '}

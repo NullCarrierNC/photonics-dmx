@@ -31,9 +31,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     
     // Separate state for primary and secondary cues
     const [primaryCueName, setPrimaryCueName] = useState<string>('');
-    const [primaryCueCounter, setPrimaryCueCounter] = useState<number>(0);
+    const [, setPrimaryCueCounter] = useState<number>(0);
     const [secondaryCueName, setSecondaryCueName] = useState<string>('');
-    const [secondaryCueCounter, setSecondaryCueCounter] = useState<number>(0);
+    const [, setSecondaryCueCounter] = useState<number>(0);
 
     // State for beat and measure indicators
     const [beatReceived, setBeatReceived] = useState(false);
@@ -331,8 +331,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         if (simulationMode) {
             return 'Simulation';
         }
-        if (currentCueData?.autoGenTrack !== undefined) {
-            return currentCueData.autoGenTrack ? 'Auto-Generated' : 'Tracked';
+                if (currentCueData?.trackMode !== undefined) {
+          return currentCueData.trackMode === 'autogen' ? 'Auto-Generated' : 'Tracked';
         }
         return null;
     };
@@ -373,7 +373,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
                     <div>
                         <p className="font-medium">Auto-Gen:</p>
-                        <p>{currentCueData.autoGenTrack !== undefined ? (currentCueData.autoGenTrack ? 'Yes' : 'No') : 'Unknown'}</p>
+                        <p>{currentCueData.trackMode !== undefined ? (currentCueData.trackMode === 'autogen' ? 'Yes' : 'No') : 'Unknown'}</p>
                     </div>
                     
                     {/* Second row - 4 columns */}
