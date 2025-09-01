@@ -21,6 +21,11 @@ import { StageKitWarmManualCue } from './handlers/stagekit/StageKitWarmManualCue
 import { StageKitCoolAutoCue } from './handlers/stagekit/StageKitCoolAutoCue';
 import { StageKitCoolManualCue } from './handlers/stagekit/StageKitCoolManualCue';
 import { StageKitWarmAutoCue } from './handlers/stagekit/StageKitWarmAutoCue';
+import { StrobeFastCue } from './handlers/default/StrobeFastCue';
+import { StrobeFastestCue } from './handlers/default/StrobeFastestCue';
+import { StrobeMediumCue } from './handlers/default/StrobeMediumCue';
+import { StrobeOffCue } from './handlers/default/StrobeOffCue';
+import { StrobeSlowCue } from './handlers/default/StrobeSlowCue';
 
 
 /**
@@ -52,6 +57,13 @@ const stagekitGroup: ICueGroup = {
     [CueType.Silhouettes_Spotlight, new StageKitSilhouettesSpotlightCue()],
     [CueType.Flare_Fast, new StageKitFlareFastCue()],
     [CueType.Flare_Slow, new StageKitFlareSlowCue()],
+    // Register the strobes again so that we don't show a fallback in stage kit mode
+    // when a strobe cue is triggered.
+    [CueType.Strobe_Fast, new StrobeFastCue()],
+    [CueType.Strobe_Fastest, new StrobeFastestCue()],
+    [CueType.Strobe_Medium, new StrobeMediumCue()],
+    [CueType.Strobe_Off, new StrobeOffCue()],
+    [CueType.Strobe_Slow, new StrobeSlowCue()],
   ]),
 };
 

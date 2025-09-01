@@ -12,7 +12,7 @@ import { getEffectFlashColor } from '../../../../effects';
 export class StageKitDischordCue implements ICue {
   id = 'stagekit-dischord';
   cueId = CueType.Dischord;
-  description = 'Yellow clockwise on beat, green counter clock on measure, blue alternating front on keyframe, red flash on red drum.';
+  description = 'Yellow clockwise on beat, green counter clock on measure, blue alternating center on keyframe, red flash on red drum.';
   style = CueStyle.Primary;
 
   // Track whether this is the first execution or a repeat
@@ -155,10 +155,12 @@ export class StageKitDischordCue implements ICue {
     // Blue: Bottom lights always on, top lights toggle on/off on keyframe
     const topLights = lightManager.getLights(['front', ], 'third-2');  
     const bottomLights = lightManager.getLights([ 'back'], 'third-2'); 
-    
+    const topBottomLights = [...topLights, ...bottomLights];
+
     const blueTransitions: EffectTransition[] = [];
     
     // Bottom lights: Always blue (no transitions needed, just set once)
+    /*
     for (let lightIndex = 0; lightIndex < bottomLights.length; lightIndex++) {
         const light = bottomLights[lightIndex];
         
@@ -175,43 +177,40 @@ export class StageKitDischordCue implements ICue {
             waitUntilCondition: 'none',
             waitUntilTime: 0
         });
-    }
+    }*/
     
-    // Top lights: Toggle between blue and transparent on each keyframe
-    for (let lightIndex = 0; lightIndex < topLights.length; lightIndex++) {
-        const light = topLights[lightIndex];
-        
-        // Start with blue
-        blueTransitions.push({
-            lights: [light],
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: {
-                color: blueColor,
-                easing: 'linear',
-                duration: 0,
-            },
-            waitUntilCondition: 'keyframe',
-            waitUntilTime: 0
-        });
-        
-        // Toggle to transparent on next keyframe
-        blueTransitions.push({
-            lights: [light],
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: {
-                color: transparentColor,
-                easing: 'linear',
-                duration: 0,
-            },
-            waitUntilCondition: 'keyframe',
-            waitUntilTime: 0,
-            waitUntilConditionCount: 1
-        });
-    }
+    // All middle lights: Toggle between blue and transparent on each keyframe
+    // Start with blue
+    blueTransitions.push({
+        lights: topBottomLights,
+        layer: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: {
+            color: blueColor,
+            easing: 'linear',
+            duration: 0,
+        },
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0
+    });
+    
+    // Toggle to transparent on next keyframe
+    blueTransitions.push({
+        lights: topBottomLights,
+        layer: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: {
+            color: transparentColor,
+            easing: 'linear',
+            duration: 0,
+        },
+        waitUntilCondition: 'keyframe',
+        waitUntilTime: 0,
+        waitUntilConditionCount: 1
+    });
+    
     
     // Create the effects
     const yellowEffect: Effect = {
@@ -246,16 +245,16 @@ export class StageKitDischordCue implements ICue {
     // Apply the effects
     if (this.isFirstExecution) {
         // First time: use setEffect to clear any existing effects and start fresh
-        await controller.setEffect('dischord-yellow', yellowEffect);
+        await controller.setEffect('dischord-blue', blueEffect);
+        await controller.addEffect('dischord-yellow', yellowEffect);
         await controller.addEffect('dischord-green', greenEffect);
-        await controller.addEffect('dischord-blue', blueEffect);
         await controller.addEffect('dischord-red', redFlash);
         this.isFirstExecution = false;
     } else {
         // Repeat call: use addEffect to add to existing effects
+        controller.addEffect('dischord-blue', blueEffect);
         controller.addEffect('dischord-yellow', yellowEffect);
         controller.addEffect('dischord-green', greenEffect);
-        controller.addEffect('dischord-blue', blueEffect);
         controller.addEffect('dischord-red', redFlash);
     }
   }

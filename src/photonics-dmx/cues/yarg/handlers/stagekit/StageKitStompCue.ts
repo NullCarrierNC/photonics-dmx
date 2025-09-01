@@ -42,7 +42,7 @@ export class StageKitStompCue implements ICue {
         },
         {
           lights: backOuterLights,
-          layer: 0,
+          layer: 2,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: redColor, easing: 'linear', duration: 0 },
@@ -72,7 +72,7 @@ export class StageKitStompCue implements ICue {
         // Turn off back outer lights on keyframe
         {
           lights: backOuterLights,
-          layer: 0,
+          layer: 2,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: blackColor, easing: 'linear', duration: 0 },
