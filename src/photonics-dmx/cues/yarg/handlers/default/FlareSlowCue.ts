@@ -9,11 +9,11 @@ import { randomBetween } from '../../../../helpers/utils';
 export class FlareSlowCue implements ICue {
   id = 'default-flare-slow';
   cueId = CueType.Flare_Slow;
-  description = 'Slow, sustained bursts of bright white light on individual front lights with extended timing, creating dramatic lighting moments';
+  description = 'Slow, sustained bursts of bright white light on individual front lights with extended timing.';
   style = CueStyle.Secondary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const white = getColor('white', 'max');
+    const white = getColor('white', 'high', 'add');
     const lights = lightManager.getLights(['front'], 'all');
     const numLights = lights.length;
     for (let i = 0; i < numLights; i++) {

@@ -21,7 +21,7 @@ export class SilhouettesSpotlightCue implements ICue {
       duration: 100,
       waitUntil: 'none',
       untilTime: 0,
-      lights: lightManager.getLights(['front', 'back'], 'all'),
+      lights: lightManager.getLights(['front', 'back'], 'third-2'),
       layer: 0,
     });
 

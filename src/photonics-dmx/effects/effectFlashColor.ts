@@ -39,7 +39,7 @@ export const getEffectFlashColor = ({
 }: FlashColorEffectParams): Effect => {
     const effect: Effect = {
         id: "flash-color",
-        description: "Sets the light a colour then quickly fades it out with P",
+        description: "Sets the light a colour then quickly fades it out",
         transitions: [
             {
                 lights: lights,
@@ -61,9 +61,9 @@ export const getEffectFlashColor = ({
                 waitForTime: endWait,
                 transform: {
                     color: {
-                        red: 0,
-                        green: 0,
-                        blue: 0,
+                        red: color.red,
+                        green: color.green,
+                        blue: color.blue,
                         intensity: 0,
                         opacity: 0.0,
                         blendMode: 'replace',

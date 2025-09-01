@@ -226,27 +226,26 @@ const CueSimulation: React.FC = () => {
         // Only update state if the selection actually changed
         setSelectedGroup(prevSelectedGroup => {
           if (prevSelectedGroup !== displayName) {
-            // Don't override active groups during initial mount - let the startup registration stand
-            if (!isInitialMount.current) {
-              // Set the selected group IDs as active for DMX preview
-              window.electron.ipcRenderer.invoke('set-active-cue-groups', groupIds)
-                .then(result => {
-                  if (result.success) {
-                    // Directly refresh the ActiveGroupsSelector to reflect the change
-                    activeGroupsSelectorRef.current?.refreshActiveGroups();
-                  } else {
-                    console.error('Failed to set active groups for preview:', result.error);
-                  }
-                })
-                .catch(err => {
-                  console.error('Error setting active groups for preview:', err);
-                });
-              
-              // Mark as fully initialized after first user-initiated group change
-              isFullyInitialized.current = true;
-            } else {
+            // Always set the selected group as active, even on initial mount
+            // This ensures that the selected group is used for simulation
+            window.electron.ipcRenderer.invoke('set-active-cue-groups', groupIds)
+              .then(result => {
+                if (result.success) {
+                  // Directly refresh the ActiveGroupsSelector to reflect the change
+                  activeGroupsSelectorRef.current?.refreshActiveGroups();
+                } else {
+                  console.error('Failed to set active groups for preview:', result.error);
+                }
+              })
+              .catch(err => {
+                console.error('Error setting active groups for preview:', err);
+              });
+            
+            // Mark as fully initialized after first group selection
+            if (isInitialMount.current) {
               isInitialMount.current = false;
             }
+            isFullyInitialized.current = true;
             
             return displayName;
           }

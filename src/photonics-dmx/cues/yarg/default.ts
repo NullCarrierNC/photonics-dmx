@@ -38,8 +38,8 @@ import { SearchlightsCue } from './handlers/default/SearchlightsCue';
  */
 const defaultGroup: ICueGroup = {
   id: 'default',
-  name: 'YARG Default',
-  description: 'The original set of YARG cues. If other groups don\'t define a cue, this group\'s cue will be used.',
+  name: 'YARG Base Cues',
+  description: 'A default set of YARG cues largely inspired by, but not matching, the original Stage Kit. If other groups don\'t define a cue, this group\'s cue will be used.',
   cues: new Map([
     [CueType.Default, new DefaultCue()],
     [CueType.Dischord, new DischordCue()],

@@ -9,9 +9,9 @@ import { randomBetween } from '../../../../helpers/utils';
 export class FrenzyCue implements ICue {
   id = 'default-frenzy';
   cueId = CueType.Frenzy;
-  description = 'Rapid color cycling between high-intensity red, green, blue, and orange on all lights for an energetic, chaotic effect';
+  description = 'Color cycling on beat with random colour selection between red, green, blue, and orange on all lights.';
   style = CueStyle.Secondary;
-  private _lastIndex: number = 0;
+  private _lastStartColorIndex: number = -1;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const red = getColor('red', 'high');
@@ -21,11 +21,11 @@ export class FrenzyCue implements ICue {
     const lights = lightManager.getLights(['front', 'back'], 'all');
     const colors = [red, green, blue, orange];
 
-    // Ensure startColor is not the same as _lastIndex
+    // Ensure startColor is not the same as the last startColor used
     let startColorIndex: number;
     do {
       startColorIndex = randomBetween(0, colors.length - 1);
-    } while (startColorIndex === this._lastIndex);
+    } while (startColorIndex === this._lastStartColorIndex);
 
     const startColor = colors[startColorIndex];
 
@@ -39,9 +39,10 @@ export class FrenzyCue implements ICue {
 
     const cross = getEffectCrossFadeColors({
       startColor: startColor,
+      crossFadeTrigger: 'beat',
       afterStartWait: 0,
       endColor: endColor,
-      duration: 100,
+      duration: 200,
       afterEndColorWait: 0,
       lights: lights,
       layer: 10,
@@ -49,6 +50,12 @@ export class FrenzyCue implements ICue {
     // using layer 10 to force it on top of other common effects to take precedence
     sequencer.addEffect('frenzy', cross);
 
-    this._lastIndex = endColorIndex;
+    // Track the startColor index for next execution to ensure color always changes
+    this._lastStartColorIndex = startColorIndex;
+  }
+
+  onStop(): void {
+    // Reset the start color index so next time this cue runs it can use any color
+    this._lastStartColorIndex = -1;
   }
 } 

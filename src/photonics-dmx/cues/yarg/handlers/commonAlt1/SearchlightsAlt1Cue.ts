@@ -37,7 +37,6 @@ export class SearchlightsAlt1Cue implements ICue {
     if (transitionStartTime !== null) {
       const timeElapsed = Date.now() - transitionStartTime;
       if (timeElapsed < transitionDuration) {
-        console.log(`[SearchlightsCue] Transition in progress (${timeElapsed}/${transitionDuration}ms), skipping execution`);
         return; // Wait for current transition to complete
       }
     }
@@ -96,7 +95,6 @@ export class SearchlightsAlt1Cue implements ICue {
     // Fade out current active light if exists
     if (currentActiveLight) {
       const lightToFadeOut = currentActiveLight;
-      console.log(`[SearchlightsCue] Fading out light ${lightToFadeOut.id} to low over ${twoBeatsDuration}ms`);
       const fadeOutEffect = getEffectSingleColor({
         lights: [lightToFadeOut],
         color: blueLow,
