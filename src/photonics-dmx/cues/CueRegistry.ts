@@ -209,7 +209,9 @@ export class CueRegistry {
         }
       }
     }
-
+    
+    // When priority is 'random' or 'never', proceed with normal random selection
+    
     // Check consistency first before getting a new random selection
     const consistentSelection = this.shouldUseConsistentSelection(cueType, trackMode === 'autogen');
     if (consistentSelection) {
@@ -730,8 +732,12 @@ export class CueRegistry {
    * @param preference 'prefer-for-tracked', 'random', or 'never'
    */
   public setStageKitPriority(preference: 'prefer-for-tracked' | 'random' | 'never'): void {
+    const oldPriority = this.stageKitPriority;
     this.stageKitPriority = preference;
-    console.log(`Stage kit priority set to: ${preference}`);
+    console.log(`[CueRegistry] Stage kit priority changed from '${oldPriority}' to '${preference}'`);
+    
+    // Clear consistency tracking when priority changes to ensure immediate effect
+    this.clearConsistencyTracking();
   }
 
   /**

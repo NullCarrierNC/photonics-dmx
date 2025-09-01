@@ -20,7 +20,7 @@ export class StrobeSlowCue implements ICue {
       startTrigger: 'none',
       startWait: 0,
       durationIn: 0,
-      holdTime: 5,
+      holdTime: 70,
       durationOut: 0,
       endTrigger: 'delay',
       endWait: parameters.beatsPerMinute / 8,
