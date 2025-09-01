@@ -58,3 +58,4 @@ const stagekitGroup: ICueGroup = {
 // Get the registry instance and register the StageKit group
 const registry = CueRegistry.getInstance();
 registry.registerGroup(stagekitGroup); 
+registry.setStageKitGroup(stagekitGroup.id);

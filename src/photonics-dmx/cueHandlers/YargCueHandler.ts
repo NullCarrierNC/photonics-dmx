@@ -86,7 +86,7 @@ class YargCueHandler extends BaseCueHandler {
     }
 
     // Get implementation from registry
-    const cue = this.registry.getCueImplementation(cueType);
+    const cue = this.registry.getCueImplementation(cueType, parameters.autoGenTrack || false);
   
     if (cue) {
       // Always check for cue transitions first

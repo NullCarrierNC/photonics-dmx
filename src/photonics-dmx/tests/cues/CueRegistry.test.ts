@@ -73,7 +73,7 @@ describe('CueRegistry', () => {
     });
 
     it('should set default group when registering group named "default"', () => {
-      const implementation = registry.getCueImplementation(CueType.Default);
+      const implementation = registry.getCueImplementation(CueType.Default, false);
       expect(implementation).toBeDefined();
       expect((implementation as MockCueImplementation).cueId).toBe('default');
     });
@@ -367,7 +367,7 @@ describe('CueRegistry', () => {
       registry.setActiveGroups(['custom', 'default']); // Both active
       
       // Call Strobe_Fast - should use default group as fallback since custom doesn't have it
-      const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast);
+      const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast, false);
       expect(strobeCue).toBeTruthy();
       expect(strobeCue!.id).toContain('default-strobe-fast');
       
@@ -376,6 +376,46 @@ describe('CueRegistry', () => {
       expect(status.trackedCues).toHaveLength(1);
       expect(status.trackedCues[0].cueType).toBe(CueType.Strobe_Fast);
       expect(status.trackedCues[0].lastGroupId).toBe('default');
+    });
+
+    it('should prefer stage kit group when autoGen is false and stageKitPriority is prefer-for-tracked', () => {
+      const registry = CueRegistry.getInstance();
+      registry.reset();
+      
+      // Set up test groups including a stage kit group
+      const stageKitGroup: ICueGroup = {
+        id: 'stagekit',
+        name: 'stagekit',
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('stagekit-cool-auto')],
+        ]),
+      };
+      
+      const customGroup: ICueGroup = {
+        id: 'custom',
+        name: 'custom',
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('custom-cool-auto')],
+        ]),
+      };
+      
+      registry.registerGroup(stageKitGroup);
+      registry.registerGroup(customGroup);
+      registry.setStageKitGroup('stagekit');
+      registry.setStageKitPriority('prefer-for-tracked');
+      registry.setEnabledGroups(['stagekit', 'custom']);
+      registry.setActiveGroups(['stagekit', 'custom']);
+      
+      // When autoGen is true (auto-generated lighting), should use random selection (existing behavior)
+      const cueWithAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, true);
+      expect(cueWithAutoGen).toBeTruthy();
+      // Could be either group since it's random
+      expect(['stagekit-cool-auto', 'custom-cool-auto']).toContain(cueWithAutoGen!.cueId);
+      
+      // When autoGen is false (tracked lighting data), should prefer stage kit group
+      const cueWithoutAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, false);
+      expect(cueWithoutAutoGen).toBeTruthy();
+      expect(cueWithoutAutoGen!.cueId).toBe('stagekit-cool-auto');
     });
   });
 }); 
