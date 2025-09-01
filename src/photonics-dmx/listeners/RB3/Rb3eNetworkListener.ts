@@ -237,7 +237,7 @@ export class Rb3eNetworkListener extends EventEmitter {
         fogState: false,
         strobeState: "Strobe_Off",
         performer: 0,
-        autoGenTrack: false,
+        trackMode: 'tracked',
         beat: "Unknown",
         keyframe: "Unknown",
         bonusEffect: false,

@@ -308,7 +308,7 @@ export class YargNetworkListener extends EventEmitter {
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
         performer,
-        autoGenTrack,
+        trackMode: autoGenTrack ? 'autogen' : 'tracked',
         beat: this.getBeatDescription(beatValue),
         keyframe: this.getKeyframeDescription(keyframeValue),
         bonusEffect,
