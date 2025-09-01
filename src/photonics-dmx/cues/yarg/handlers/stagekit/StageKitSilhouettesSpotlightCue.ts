@@ -9,7 +9,7 @@ import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 export class StageKitSilhouettesSpotlightCue implements ICue {
   id = 'stagekit-silhouettesspotlight';
   cueId = CueType.Silhouettes_Spotlight;
-  description = 'StageKit silhouettesspotlight pattern - stub implementation';
+  description = 'YALCY currently blacks out on this cue, so we do too.';
   style = CueStyle.Primary;
 
   async execute(_cueData: CueData, sequencer: ILightingController, _lightManager: DmxLightManager): Promise<void> {

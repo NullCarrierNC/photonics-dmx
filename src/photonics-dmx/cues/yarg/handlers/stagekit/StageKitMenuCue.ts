@@ -3,7 +3,6 @@ import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
-import { getEffectCycleLights } from '../../../../effects/effectCycleLights';
 import { RGBIO } from '../../../../types';
 import { getSweepEffect } from '../../../../effects';
 
