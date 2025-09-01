@@ -8,12 +8,12 @@ import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 export class IntroCue implements ICue {
   id = 'default-intro';
   cueId = CueType.Intro;
-  description = 'Solid medium-blue color on front lights for song introductions';
+  description = 'Solid low green color on front lights.';
   style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const all = lightManager.getLights(['front'], 'all');
-    const blue = getColor('blue', 'medium');
+    const blue = getColor('green', 'low');
     const effect = getEffectSingleColor({
       lights: all,
       color: blue,

@@ -46,7 +46,7 @@ export class Clock {
     this.isRunning = true;
     this.intervalId = setInterval(() => {
       this.update();
-    }, 10);
+    }, 1);
   }
 
   /**

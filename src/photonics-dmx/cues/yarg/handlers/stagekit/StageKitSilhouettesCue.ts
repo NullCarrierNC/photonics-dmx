@@ -12,7 +12,7 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitSilhouettesCue implements ICue {
   id = 'stagekit-silhouettes';
   cueId = CueType.Silhouettes;
-  description = 'StageKit silhouettes pattern - green silhouette lighting';
+  description = 'Solid green on all lights.';
   style = CueStyle.Primary;
 
   async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {

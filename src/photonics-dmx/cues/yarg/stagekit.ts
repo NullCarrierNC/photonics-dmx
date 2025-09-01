@@ -32,11 +32,10 @@ import { StrobeSlowCue } from './handlers/default/StrobeSlowCue';
  * Create and register the StageKit default cue group.
  * The StageKit group provides implementations that try to match the original
  * Rock Band Stage Kit visual effects mapped to DMX lights.
- * These cues are designed to work with the 8-LED StageKit system.
  */
 const stagekitGroup: ICueGroup = {
   id: 'stagekit',
-  name: 'StageKit',
+  name: 'Stage Kit',
   description: 'Stage Kit cues that mimic the original Stage Kit visual effects',
   cues: new Map([
     [CueType.Menu, new StageKitMenuCue()],

@@ -5,12 +5,14 @@ import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { getEffectFlashColor } from '../../../../effects/effectFlashColor';
+import { EasingType } from '../../../../easing';
 
 export class ScoreCue implements ICue {
   id = 'default-score';
   cueId = CueType.Score;
-  description = 'Solid medium-green color on all lights (front and back) to signify success or completion';
+  description = 'Solid medium-blue colour on front with yellow flash';
   style = CueStyle.Primary;
+  private isFirstExecution = true;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const all = lightManager.getLights(['front'], 'all');
@@ -24,7 +26,6 @@ export class ScoreCue implements ICue {
       duration: 10,
       layer: 0,
     });
-    sequencer.setEffect('score_base', baseEffect);
 
     // Add periodic yellow flash
     const flashEffect = getEffectFlashColor({
@@ -32,13 +33,29 @@ export class ScoreCue implements ICue {
       startTrigger: 'delay',
       startWait: 4000,
       durationIn: 300,
-      holdTime: 0,
+      holdTime: 100,
       durationOut: 600,
       endTrigger: 'delay',
       endWait: 0,
       lights: all,
       layer: 1,
+      easing: EasingType.SIN_IN_OUT,
     });
-    sequencer.addEffect('score_flash', flashEffect);
+
+    if (this.isFirstExecution) {
+      // First time: use setEffect to clear any existing effects and start fresh
+      await sequencer.setEffect('score_base', baseEffect);
+      await sequencer.addEffect('score_flash', flashEffect);
+      this.isFirstExecution = false;
+    } else {
+      // Repeat call: use addEffect to add to existing effects
+      sequencer.addEffect('score_base', baseEffect);
+      sequencer.addEffect('score_flash', flashEffect);
+    }
+  }
+
+  onStop(): void {
+    // Reset the first execution flag so next time this cue runs it will use setEffect
+    this.isFirstExecution = true;
   }
 } 

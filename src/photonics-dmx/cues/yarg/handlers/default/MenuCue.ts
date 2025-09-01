@@ -9,7 +9,7 @@ import { RGBIO } from '../../../../types';
 export class MenuCue implements ICue {
   id = 'default-menu';
   cueId = CueType.Menu;
-  description = 'Continuous blue sweep effect that moves around all lights in a circular pattern with a 2-second delay between passes';
+  description = 'Continuous slow blue sweep effect that moves around all lights in a circular pattern with a 2 sec delay between passes';
   style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
@@ -26,7 +26,7 @@ export class MenuCue implements ICue {
       lights: allLights,
       high: brightBlue,
       low: blue,
-      sweepTime: 2000,
+      sweepTime: 3000,
       fadeInDuration: 300,
       fadeOutDuration: 600,
       lightOverlap: 70,
