@@ -21,12 +21,11 @@ const StageKitModeSettings: React.FC = () => {
     }));
     
     try {
-      // Save to backend
-      await window.electron.ipcRenderer.invoke('save-prefs', {
-        stageKitPrefs: newStageKitPrefs
-      });
+      // Save to backend using the specific stage kit priority handler
+      await window.electron.ipcRenderer.invoke('set-stage-kit-priority', priority);
+      console.log(`[StageKitModeSettings] Stage Kit priority changed to: ${priority}`);
     } catch (error) {
-      console.error('Failed to save Stage Kit preferences:', error);
+      console.error('Failed to save Stage Kit priority:', error);
     }
   };
 

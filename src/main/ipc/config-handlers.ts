@@ -146,6 +146,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       const registry = CueRegistry.getInstance();
       registry.setStageKitPriority(priority);
       
+      // Clear any existing consistency tracking to ensure new priority takes effect immediately
+      registry.clearConsistencyTracking();
+      
       console.log('Updated stage kit priority to:', priority);
       
       return { success: true };

@@ -20,7 +20,7 @@ export class StrobeFastestCue implements ICue {
       startTrigger: 'none',
       startWait: 0,
       durationIn: 0,
-      holdTime: 5,
+      holdTime: 40,
       durationOut: 0,
       endTrigger: 'delay',
       endWait: parameters.beatsPerMinute / 64,

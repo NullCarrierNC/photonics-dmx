@@ -12,11 +12,11 @@ export class IntroCue implements ICue {
   style = CueStyle.Primary;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const all = lightManager.getLights(['front'], 'all');
-    const blue = getColor('green', 'low');
+    const all = lightManager.getLights(['front', 'back'], 'all');
+    const color = getColor('green', 'low');
     const effect = getEffectSingleColor({
       lights: all,
-      color: blue,
+      color: color,
       duration: 10,
     });
     sequencer.setEffect('intro', effect);
