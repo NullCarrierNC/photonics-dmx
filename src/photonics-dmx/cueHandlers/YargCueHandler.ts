@@ -86,7 +86,9 @@ class YargCueHandler extends BaseCueHandler {
     }
 
     // Get implementation from registry
-    const cue = this.registry.getCueImplementation(cueType, parameters.autoGenTrack || false);
+    // Use trackMode, defaulting to 'tracked' if not specified
+    const trackMode = parameters.trackMode || 'tracked';
+    const cue = this.registry.getCueImplementation(cueType, trackMode);
   
     if (cue) {
       // Always check for cue transitions first

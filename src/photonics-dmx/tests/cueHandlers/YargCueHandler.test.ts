@@ -131,7 +131,7 @@ describe('YargCueHandler', () => {
       fogState: false,
       strobeState: 'Strobe_Off',
       performer: 0,
-      autoGenTrack: false,
+      trackMode: 'tracked',
       beat: 'Strong',
       keyframe: 'Off',
       bonusEffect: false,

@@ -159,7 +159,8 @@ const CueSimulation: React.FC = () => {
       venueSize: selectedVenueSize,
       bpm: selectedBpm,
       cueGroup: selectedGroupId,
-      effectId: selectedEffect?.id || null
+      effectId: selectedEffect?.id || null,
+      trackMode: 'simulated'
     });
     // Simply turn on the indicator, the useTimeoutEffect will reset it
     setShowBeatIndicator(true);
@@ -170,7 +171,8 @@ const CueSimulation: React.FC = () => {
       venueSize: selectedVenueSize,
       bpm: selectedBpm,
       cueGroup: selectedGroupId,
-      effectId: selectedEffect?.id || null
+      effectId: selectedEffect?.id || null,
+      trackMode: 'simulated'
     });
     setShowKeyframeIndicator(true);
   };
@@ -180,7 +182,8 @@ const CueSimulation: React.FC = () => {
       venueSize: selectedVenueSize,
       bpm: selectedBpm,
       cueGroup: selectedGroupId,
-      effectId: selectedEffect?.id || null
+      effectId: selectedEffect?.id || null,
+      trackMode: 'simulated'
     });
     setShowMeasureIndicator(true);
   };
@@ -193,7 +196,8 @@ const CueSimulation: React.FC = () => {
         venueSize: selectedVenueSize,
         bpm: selectedBpm,
         cueGroup: selectedGroupId,
-        effectId: selectedEffect?.id || null
+        effectId: selectedEffect?.id || null,
+        trackMode: 'simulated'
       });
     } catch (error) {
       console.error('Error simulating instrument note:', error);

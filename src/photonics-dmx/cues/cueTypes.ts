@@ -57,7 +57,7 @@ export type CueData = {
     fogState: boolean;
     strobeState: StrobeState;
     performer: number;
-    autoGenTrack?: boolean;
+    trackMode?: 'tracked' | 'autogen' | 'simulated';
     beat: Beat;
     keyframe: string;
     bonusEffect: boolean;

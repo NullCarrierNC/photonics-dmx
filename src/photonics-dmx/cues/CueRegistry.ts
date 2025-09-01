@@ -184,39 +184,43 @@ export class CueRegistry {
    * (default 2 seconds), it will use the same group selection as the previous call
    * to prevent rapid randomization changes.
    * 
-   * Stage Kit Priority: When autoGen is false and stageKitPriority is 'prefer-for-tracked',
+   * Stage Kit Priority: When trackMode is 'tracked' and stageKitPriority is 'prefer-for-tracked',
    * the stageKitGroup will be preferred over random selection.
+   * 
+   * Simulation Mode: When trackMode is 'simulated', stage kit priority is ignored to allow
+   * testing all cue groups regardless of priority settings.
    * @param cueType The type of cue to get
-   * @param autoGen Whether the song is auto-generated (affects stage kit priority)
+   * @param trackMode The track mode ('tracked', 'autogen', or 'simulated')
    * @returns The cue implementation or null if not found
    */
-  public getCueImplementation(cueType: CueType, autoGen: boolean = false): ICue | null {
-    // Check if we should prefer stage kit group based on priority and autoGen state
-    // When autoGen=false (tracked lighting data), prefer stage kit group if priority is set
-    if (!autoGen && this.stageKitPriority === 'prefer-for-tracked' && this.stageKitGroup) {
+  public getCueImplementation(cueType: CueType, trackMode: 'tracked' | 'autogen' | 'simulated' = 'tracked'): ICue | null {
+    // Check if we should prefer stage kit group based on priority and trackMode
+    // When trackMode='tracked' and stageKitPriority='prefer-for-tracked', prefer stage kit group
+    // When trackMode='simulated', ignore stage kit priority to allow testing all groups
+    if (trackMode === 'tracked' && this.stageKitPriority === 'prefer-for-tracked' && this.stageKitGroup) {
       const stageKitGroup = this.groups.get(this.stageKitGroup);
       if (stageKitGroup?.cues.has(cueType)) {
         // Stage kit group has this cue and should be preferred
         const cue = stageKitGroup.cues.get(cueType)!;
         if (cue.style === CueStyle.Primary) {
-          return this.handlePrimaryCue(cueType, { groupId: this.stageKitGroup, isFallback: false }, autoGen);
+          return this.handlePrimaryCue(cueType, { groupId: this.stageKitGroup, isFallback: false }, false);
         } else {
-          return this.handleSecondaryCue(cueType, { groupId: this.stageKitGroup, isFallback: false }, autoGen);
+          return this.handleSecondaryCue(cueType, { groupId: this.stageKitGroup, isFallback: false }, false);
         }
       }
     }
 
     // Check consistency first before getting a new random selection
-    const consistentSelection = this.shouldUseConsistentSelection(cueType, autoGen);
+    const consistentSelection = this.shouldUseConsistentSelection(cueType, trackMode === 'autogen');
     if (consistentSelection) {
       // Use the consistent selection
       const group = this.groups.get(consistentSelection.groupId);
       const cue = group?.cues.get(cueType);
       if (group && cue) {
         if (cue.style === CueStyle.Primary) {
-          return this.handlePrimaryCue(cueType, consistentSelection, autoGen);
+          return this.handlePrimaryCue(cueType, consistentSelection, trackMode === 'autogen');
         } else {
-          return this.handleSecondaryCue(cueType, consistentSelection, autoGen);
+          return this.handleSecondaryCue(cueType, consistentSelection, trackMode === 'autogen');
         }
       }
     }
@@ -230,9 +234,9 @@ export class CueRegistry {
 
     const tempCue = this.groups.get(tempSelection.groupId)!.cues.get(cueType)!;
     if (tempCue.style === CueStyle.Primary) {
-      return this.handlePrimaryCue(cueType, tempSelection, autoGen);
+      return this.handlePrimaryCue(cueType, tempSelection, trackMode === 'autogen');
     } else {
-      return this.handleSecondaryCue(cueType, tempSelection, autoGen);
+      return this.handleSecondaryCue(cueType, tempSelection, trackMode === 'autogen');
     }
   }
 

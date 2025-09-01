@@ -73,7 +73,7 @@ describe('CueRegistry', () => {
     });
 
     it('should set default group when registering group named "default"', () => {
-      const implementation = registry.getCueImplementation(CueType.Default, false);
+      const implementation = registry.getCueImplementation(CueType.Default, 'tracked');
       expect(implementation).toBeDefined();
       expect((implementation as MockCueImplementation).cueId).toBe('default');
     });
@@ -367,7 +367,7 @@ describe('CueRegistry', () => {
       registry.setActiveGroups(['custom', 'default']); // Both active
       
       // Call Strobe_Fast - should use default group as fallback since custom doesn't have it
-      const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast, false);
+      const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast, 'tracked');
       expect(strobeCue).toBeTruthy();
       expect(strobeCue!.id).toContain('default-strobe-fast');
       
@@ -406,14 +406,14 @@ describe('CueRegistry', () => {
       registry.setEnabledGroups(['stagekit', 'custom']);
       registry.setActiveGroups(['stagekit', 'custom']);
       
-      // When autoGen is true (auto-generated lighting), should use random selection (existing behavior)
-      const cueWithAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, true);
+      // When trackMode is 'autogen' (auto-generated lighting), should use random selection (existing behavior)
+      const cueWithAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, 'autogen');
       expect(cueWithAutoGen).toBeTruthy();
       // Could be either group since it's random
       expect(['stagekit-cool-auto', 'custom-cool-auto']).toContain(cueWithAutoGen!.cueId);
       
-      // When autoGen is false (tracked lighting data), should prefer stage kit group
-      const cueWithoutAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, false);
+      // When trackMode is 'tracked' (tracked lighting data), should prefer stage kit group
+      const cueWithoutAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, 'tracked');
       expect(cueWithoutAutoGen).toBeTruthy();
       expect(cueWithoutAutoGen!.cueId).toBe('stagekit-cool-auto');
     });
