@@ -266,7 +266,7 @@ export class ControllerManager {
       fogState: false,
       strobeState: strobe,
       performer: 0,
-      autoGenTrack: false,
+      trackMode: 'simulated',
       beat: 'Off',
       keyframe: 'Off',
       bonusEffect: false,

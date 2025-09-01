@@ -80,21 +80,21 @@ describe('Cue Descriptions', () => {
 
   describe('Cue Implementation Descriptions', () => {
     it('should retrieve description from cue implementation', () => {
-      const implementation = registry.getCueImplementation(CueType.Default, false);
+      const implementation = registry.getCueImplementation(CueType.Default, 'tracked');
       expect(implementation).toBeDefined();
       expect(implementation?.description).toBe('Default yellow lighting on front lights');
     });
 
     it('should retrieve description from active group implementation', () => {
       registry.setActiveGroups(['custom']);
-      const implementation = registry.getCueImplementation(CueType.Chorus, false);
+      const implementation = registry.getCueImplementation(CueType.Chorus, 'tracked');
       expect(implementation).toBeDefined();
       expect(implementation?.description).toBe('Custom chorus effect with blue pulsing');
     });
 
     it('should fall back to default group and get its description if cue not in active group', () => {
       registry.setActiveGroups(['custom']);
-      const implementation = registry.getCueImplementation(CueType.Default, false);
+      const implementation = registry.getCueImplementation(CueType.Default, 'tracked');
       expect(implementation).toBeDefined();
       expect(implementation?.description).toBe('Default yellow lighting on front lights');
     });

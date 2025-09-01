@@ -130,7 +130,7 @@ describe('AbstractCueHandler', () => {
         fogState: false,
         strobeState: 'Strobe_Off',
         performer: 0,
-        autoGenTrack: false,
+        trackMode: 'tracked',
         beat: 'Off',
         keyframe: 'Off',
         bonusEffect: false
@@ -162,7 +162,7 @@ describe('AbstractCueHandler', () => {
         fogState: false,
         strobeState: 'Strobe_Off',
         performer: 0,
-        autoGenTrack: false,
+        trackMode: 'tracked',
         beat: 'Off',
         keyframe: 'Off',
         bonusEffect: false
@@ -194,7 +194,7 @@ describe('AbstractCueHandler', () => {
         fogState: false,
         strobeState: 'Strobe_Off',
         performer: 0,
-        autoGenTrack: false,
+        trackMode: 'tracked',
         beat: 'Off',
         keyframe: 'Off',
         bonusEffect: false
@@ -226,7 +226,7 @@ describe('AbstractCueHandler', () => {
         fogState: false,
         strobeState: 'Strobe_Off',
         performer: 0,
-        autoGenTrack: false,
+        trackMode: 'tracked',
         beat: 'Off',
         keyframe: 'Off',
         bonusEffect: false
