@@ -62,11 +62,6 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
             handleGroupChangeCallback(firstGroup.id);
             isInitialMount.current = false;
           }
-        } else if (!enabledGroups.some(g => g.id === selectedGroup) && enabledGroups.length > 0) {
-          // If the currently selected group is no longer enabled, fallback to first group
-          const firstGroup = enabledGroups[0];
-          setSelectedGroup(firstGroup.id);
-          handleGroupChangeCallback(firstGroup.id);
         } else if (isInitialMount.current && enabledGroups.length > 0) {
           // On initial mount with a specific group selected, fire the callback
           handleGroupChangeCallback(selectedGroup);
@@ -85,7 +80,17 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
       // Only re-fetch if registry type changed (not on initial mount)
       fetchGroups();
     }
-  }, [registryType, handleGroupChangeCallback, selectedGroup]);
+  }, [registryType, handleGroupChangeCallback]);
+
+  // Separate effect to handle fallback when selected group becomes invalid
+  useEffect(() => {
+    if (groups.length > 0 && selectedGroup && !groups.some(g => g.id === selectedGroup)) {
+      // If the currently selected group is no longer available, fallback to first group
+      const firstGroup = groups[0];
+      setSelectedGroup(firstGroup.id);
+      handleGroupChangeCallback(firstGroup.id);
+    }
+  }, [groups, selectedGroup, handleGroupChangeCallback]);
 
   const handleRegistryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newType = event.target.value as CueRegistryType;

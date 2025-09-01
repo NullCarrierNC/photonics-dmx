@@ -15,6 +15,7 @@ export class DischordCue implements ICue {
   cueId = CueType.Dischord;
   description = 'Front lights alternate between green and blue on left/right halves with bright red or yellow flashes on the measure';
   style = CueStyle.Primary;
+  private isFirstExecution = true;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const blue = getColor('blue', 'medium', 'replace');
@@ -25,7 +26,7 @@ export class DischordCue implements ICue {
     const odd = lightManager.getLights(['front'], 'half-2');
 
     const bps = parameters.beatsPerMinute / 60;
-    const duration = (1000 / bps);
+    const duration = (500 / bps);
 
     const baseLayer = getEffectSingleColor({
       lights: all,
@@ -35,18 +36,20 @@ export class DischordCue implements ICue {
 
     const crossFadeEven = getEffectCrossFadeColors({
       startColor: blue,
-      afterStartWait: 70,
+      crossFadeTrigger: 'keyframe',
+      afterStartWait: 0,
       endColor: green,
-      afterEndColorWait: 75,
+      afterEndColorWait: 0,
       duration: duration,
       lights: even,
       layer: 1,
     });
     const crossFadeOdd = getEffectCrossFadeColors({
       startColor: green,
-      afterStartWait: 70,
+      crossFadeTrigger: 'keyframe',
+      afterStartWait: 0,
       endColor: blue,
-      afterEndColorWait: 75,
+      afterEndColorWait: 0,
       duration: duration,
       lights: odd,
       layer: 2,
@@ -66,9 +69,24 @@ export class DischordCue implements ICue {
       layer: 101,
     });
 
-    sequencer.setEffect('dischord-all', baseLayer);
-    sequencer.addEffect('dischord1', crossFadeEven);
-    sequencer.addEffect('dischord2', crossFadeOdd);
-    sequencer.addEffect('dischord-flash', flashYellowOnBeat);
+    if (this.isFirstExecution) {
+      // First time: use setEffect to clear any existing effects and start fresh
+      await sequencer.setEffect('dischord-all', baseLayer);
+      await sequencer.addEffect('dischord1', crossFadeEven);
+      await sequencer.addEffect('dischord2', crossFadeOdd);
+      await sequencer.addEffect('dischord-flash', flashYellowOnBeat);
+      this.isFirstExecution = false;
+    } else {
+      // Repeat call: use addEffect to add to existing effects
+      sequencer.addEffect('dischord-all', baseLayer);
+      sequencer.addEffect('dischord1', crossFadeEven);
+      sequencer.addEffect('dischord2', crossFadeOdd);
+      sequencer.addEffect('dischord-flash', flashYellowOnBeat);
+    }
+  }
+
+  onStop(): void {
+    // Reset the first execution flag so next time this cue runs it will use setEffect
+    this.isFirstExecution = true;
   }
 } 
