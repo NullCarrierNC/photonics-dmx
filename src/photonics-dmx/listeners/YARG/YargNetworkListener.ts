@@ -379,7 +379,6 @@ export class YargNetworkListener extends EventEmitter {
 
       // Handle strobe state changes
       if (YargCueData.strobeState && YargCueData.strobeState !== "Strobe_Off") {
-        console.log(`[YARG] Strobe state change: ${YargCueData.strobeState}`);
         // Convert strobe state to cue type and handle it
         let strobeCueType: CueType;
         switch (YargCueData.strobeState) {
