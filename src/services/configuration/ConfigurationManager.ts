@@ -56,6 +56,14 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledCueGroups: ['default', 'coolWarmAlt1', 'coolWarmAlt2'],
   cueConsistencyWindow: 2000,
   
+  // Brightness configuration defaults
+  brightness: {
+    low: 40,
+    medium: 100,
+    high: 180,
+    max: 255
+  },
+  
   // Frontend-specific preferences defaults
   dmxOutputConfig: {
     sacnEnabled: true,

@@ -140,7 +140,9 @@ export const App = (): JSX.Element => {
     const getPrefs = async () => {
       const prefs = await window.electron.ipcRenderer.invoke('get-prefs');
       console.log("\n Prefs", prefs);
-      setPrefs(prefs);
+      
+      // Prepare all preference updates in a single object
+      const updatedPrefs = { ...prefs };
       
       // Initialize DMX output preferences from saved preferences or default values
       if (!prefs.dmxOutputConfig) {
@@ -151,10 +153,7 @@ export const App = (): JSX.Element => {
           enttecProEnabled: false
         };
         console.log('No saved DMX output config, using defaults:', defaultConfig);
-        setPrefs(prev => ({
-          ...prev,
-          dmxOutputConfig: defaultConfig
-        }));
+        updatedPrefs.dmxOutputConfig = defaultConfig;
       }
 
       // Initialize Enttec Pro COM port from saved preferences or default values
@@ -173,10 +172,7 @@ export const App = (): JSX.Element => {
           yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never'
         };
         console.log('No saved Stage Kit preferences, using defaults:', defaultStageKitPrefs);
-        setPrefs(prev => ({
-          ...prev,
-          stageKitPrefs: defaultStageKitPrefs
-        }));
+        updatedPrefs.stageKitPrefs = defaultStageKitPrefs;
       }
       
       // Initialize DMX settings preferences if not present
@@ -186,19 +182,12 @@ export const App = (): JSX.Element => {
           enttecProExpanded: false
         };
         console.log('No saved DMX settings preferences, using defaults:', defaultDmxSettingsPrefs);
-        setPrefs(prev => ({
-          ...prev,
-          dmxSettingsPrefs: defaultDmxSettingsPrefs
-        }));
+        updatedPrefs.dmxSettingsPrefs = defaultDmxSettingsPrefs;
       }
       
-      // Debug: Log the complete preferences object to see what we're working with
-      console.log('Complete preferences loaded:', prefs);
-      console.log('DMX Output Config:', prefs.dmxOutputConfig);
-      console.log('Enttec Pro Port:', prefs.enttecProPort);
-      console.log('Enttec Pro COM Port:', prefs.enttecProComPort);
-      console.log('Stage Kit Prefs:', prefs.stageKitPrefs);
-      console.log('DMX Settings Prefs:', prefs.dmxSettingsPrefs);
+      // Set all preferences at once to avoid race conditions
+      setPrefs(updatedPrefs);
+      
     }
 
     fetchAppVersion();
