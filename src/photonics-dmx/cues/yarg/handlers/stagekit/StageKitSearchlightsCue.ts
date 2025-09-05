@@ -35,8 +35,7 @@ export class StageKitSearchlightsCue implements ICue {
       color1 = getColor('yellow', 'medium', 'add');
       color2 = getColor('blue', 'medium', 'add');
     } else {
-      color1 = getColor('yellow', 'medium', 'add');
-      color2 = getColor('red', 'medium', 'add');
+      color1 = getColor('yellow', 'high', 'add');
     }
 
     const searchlightTransitions: EffectTransition[] = [];
@@ -192,51 +191,12 @@ export class StageKitSearchlightsCue implements ICue {
         }
       }
 
-      // Layer 1: Red clockwise chase (same direction as yellow, but offset by +1)
-      for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
-        const light = allLights[lightIndex];
-        const stepsUntilRed = (lightIndex + 1) % allLights.length; // Offset by +1 from yellow
-        
-        if (stepsUntilRed > 0) {
-          searchlightTransitions.push({
-            lights: [light],
-            layer: 1,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: stepsUntilRed * timePerStep
-          });
-        }
-        
-        searchlightTransitions.push({
-          lights: [light],
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: color2, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: timePerStep
-        });
-        
-        const stepsAfterRed = allLights.length - stepsUntilRed - 1;
-        if (stepsAfterRed > 0) {
-          searchlightTransitions.push({
-            lights: [light],
-            layer: 1,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: stepsAfterRed * timePerStep
-          });
-        }
-      }
+     
     }
 
     const searchlightEffect: Effect = {
       id: "stagekit-searchlights",
-      description: `StageKit searchlights pattern - ${isLargeVenue ? 'Yellow/Blue opposing rotations' : 'Yellow/Red synchronized rotations'}`,
+      description: `StageKit searchlights pattern - ${isLargeVenue ? 'Yellow/Blue opposing rotations' : 'Yellow/Red synchronized rotations (= high yellow blended)' }`,
       transitions: searchlightTransitions
     };
 

@@ -17,6 +17,7 @@ export const getColor = (
     blue:       { r: 0,   g: 0,   b: 255 },
     yellow:     { r: 255, g: 255, b: 0 },
     green:      { r: 0,   g: 255, b: 0 },
+    cyan:       { r: 0,   g: 255, b: 255 },
     orange:     { r: 255, g: 127, b: 0 },
     purple:     { r: 128, g: 0,   b: 128 },
     chartreuse: { r: 127, g: 255, b: 0 },

@@ -3,7 +3,7 @@ import { cubicIn, cubicInOut, cubicOut, EasingFunction, linear, quadraticIn, qua
 /**
  * Represents available colors in the lighting system
  */
-export type Color =  'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'purple' |
+export type Color =  'red' | 'blue' | 'yellow' | 'green' | 'cyan' | 'orange' | 'purple' |
 'chartreuse' | 'teal' | 'violet' | 'magenta' | 'vermilion' | 'amber' |
 'white' | 'black' | 'transparent';
 
