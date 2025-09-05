@@ -77,7 +77,7 @@ describe('DefaultCue', () => {
       await cue.execute(data, mockController, mockLightManager);
 
       // Verify that setEffect was called with the default effect
-      expect(mockController.setEffect).toHaveBeenCalledWith('default', expect.any(Object));
+      expect(mockController.setEffect).toHaveBeenCalledWith('default-base', expect.any(Object));
     });
 
     it('should handle missing data', async () => {
@@ -111,7 +111,7 @@ describe('DefaultCue', () => {
       await cue.execute(data, mockController, mockLightManager);
 
       // Verify that setEffect was called with the default effect
-      expect(mockController.setEffect).toHaveBeenCalledWith('default', expect.any(Object));
+      expect(mockController.setEffect).toHaveBeenCalledWith('default-base', expect.any(Object));
     });
   });
 }); 

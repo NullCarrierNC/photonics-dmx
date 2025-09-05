@@ -3,6 +3,7 @@ import { WindowManager } from './WindowManager';
 import { setupIpcHandlers } from './ipc/index';
 import { ControllerManager } from './controllers/ControllerManager';
 import { setupMenu } from './menu';
+import { setGlobalBrightnessConfig } from '../photonics-dmx/helpers/dmxHelpers';
 
 export class Application {
   private windowManager: WindowManager;
@@ -16,6 +17,12 @@ export class Application {
   public async init(): Promise<void> {
     // Initialize controllers
     await this.controllerManager.init();
+    
+    // Initialize global brightness configuration
+    const brightnessConfig = this.controllerManager.getConfig().getPreference('brightness');
+    if (brightnessConfig) {
+      setGlobalBrightnessConfig(brightnessConfig);
+    }
     
     // Create main window
     this.windowManager.createMainWindow();

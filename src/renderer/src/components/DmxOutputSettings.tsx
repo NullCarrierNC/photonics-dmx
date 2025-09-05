@@ -190,6 +190,12 @@ const DmxOutputSettings: React.FC = () => {
       await window.electron.ipcRenderer.invoke('save-prefs', {
         artNetConfig: newConfig
       });
+      
+      // Update the preferences atom to reflect the change
+      setPrefs(prev => ({
+        ...prev,
+        artNetConfig: newConfig
+      }));
     } catch (error) {
       console.error('Failed to save ArtNet configuration:', error);
     }
@@ -203,6 +209,12 @@ const DmxOutputSettings: React.FC = () => {
       await window.electron.ipcRenderer.invoke('save-prefs', {
         enttecProPort: newPort
       });
+      
+      // Update the preferences atom to reflect the change
+      setPrefs(prev => ({
+        ...prev,
+        enttecProPort: newPort
+      }));
     } catch (error) {
       console.error('Failed to save EnttecPro port configuration:', error);
     }

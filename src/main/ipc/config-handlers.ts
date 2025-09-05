@@ -2,6 +2,7 @@ import { IpcMain } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import '../../photonics-dmx/cues';
 import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
+import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers';
 
 /**
  * Set up configuration-related IPC handlers
@@ -73,6 +74,12 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   ipcMain.handle('save-prefs', async (_, updates: any) => {
     try {
       controllerManager.getConfig().updatePreferences(updates);
+      
+      // Update global brightness configuration if brightness settings were changed
+      if (updates.brightness) {
+        setGlobalBrightnessConfig(updates.brightness);
+      }
+      
       return { success: true };
     } catch (error) {
       console.error('Error saving preferences:', error);
