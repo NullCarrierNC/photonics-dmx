@@ -45,7 +45,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     positions: number[];
     timestamp: number;
     interval?: NodeJS.Timeout;
+    targetLights: any[];
   }> = new Map();
+  
+  // Track which lights are currently being strobed (for proper cleanup)
+  private strobedLights: Set<number> = new Set();
+  
+  // Cached DMX light indices for LED positions (computed once on startup)
+  private dmxLightIndices: number[] = [];
   
   // Bound event handler for proper cleanup
   private boundHandleStageKitEvent: ((event: StageKitData) => void) | null = null;
@@ -91,6 +98,10 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     });
     
     this.lightMapper = new StageKitLightMapper(dmxLightCount);
+    
+    // Cache DMX light indices for all LED positions based on configured light count
+    const allPositions = Array.from({ length: dmxLightCount }, (_, i) => i);
+    this.dmxLightIndices = this.lightMapper.mapLedPositionsToDmxLights(allPositions);
     
     // Initialize color tracking maps
     this.colorToLights.set('red', new Set());
@@ -174,22 +185,46 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private applyStrobeEffect(strobeType: 'slow' | 'medium' | 'fast' | 'fastest'): void {
     //console.log(`StageKit: applyStrobeEffect called with type: ${strobeType});
     
-    // Get all available lights for strobe effects
-    const lights = this.lightManager.getLights(['strobe'], 'all');
-    if (!lights) {
-      console.log(`StageKit: No lights returned from lightManager`);
+    // Get strobe lights and all lights to map correctly
+    const strobeLights = this.lightManager.getLights(['strobe'], 'all');
+    const allLights = this.lightManager.getLights(['front', 'back'], 'all');
+    
+    if (!strobeLights || strobeLights.length === 0) {
+      console.log(`StageKit: No strobe lights returned from lightManager`);
       return;
     }
     
-    let targetLights: any[];
-    let dmxLightIndices: number[] = [];
+    if (!allLights) {
+      console.log(`StageKit: No front/back lights returned from lightManager`);
+      return;
+    }
     
-    targetLights = lights;
-    dmxLightIndices = Array.from({ length: lights.length }, (_, i) => i);
+    // Map strobe lights to their corresponding front/back light indices
+    const targetLights: any[] = [];
+    const dmxLightIndices: number[] = [];
     
-    //console.log(`StageKit: Found ${targetLights.length} target lights for strobe effect`);
+  //  console.log(`StageKit: Strobe lights:`, strobeLights.map(l => ({ id: l.id, position: l.position })));
+  //  console.log(`StageKit: All lights:`, allLights.map((l, i) => ({ id: l.id, position: l.position, index: i })));
     
-
+    for (const strobeLight of strobeLights) {
+      // Find the corresponding light in the allLights array
+      const allLightIndex = allLights.findIndex(light => light.id === strobeLight.id);
+      if (allLightIndex !== -1) {
+        targetLights.push(allLights[allLightIndex]);
+        dmxLightIndices.push(allLightIndex);
+        console.log(`StageKit: Mapped strobe light ${strobeLight.id} (position ${strobeLight.position}) to DMX index ${allLightIndex}`);
+      } else {
+        console.log(`StageKit: Could not find strobe light ${strobeLight.id} in front/back lights`);
+      }
+    }
+    
+    if (targetLights.length === 0) {
+      console.log(`StageKit: No matching lights found between strobe and front/back lights`);
+      return;
+    }
+    
+    console.log(`StageKit: Strobe targeting lights at DMX indices: [${dmxLightIndices.join(', ')}]`);
+    
     const white = getColor('white', 'max');
     
     // Calculate strobe timing based on type
@@ -216,11 +251,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     this.activeStrobeEffects.set(effectName, {
       type: strobeType,
       positions: dmxLightIndices,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      targetLights: targetLights
     });
     
+    console.log(`StageKit: Created strobe effect ${effectName} targeting lights:`, dmxLightIndices.map((idx, i) => ({ dmxIndex: idx, lightId: targetLights[i]?.id })));
+    
     // Start the strobe effect using setState
-    this.startStrobeEffect(effectName, targetLights, white, strobeInterval);
+    this.startStrobeEffect(effectName, targetLights, white, strobeInterval, dmxLightIndices);
     
     console.log(`StageKit: Started ${strobeType} strobe on ${targetLights.length} lights with ${strobeInterval}ms interval`);
   }
@@ -231,17 +269,35 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * @param targetLights Array of lights to strobe
    * @param color Color to use for the strobe
    * @param interval Interval between strobe flashes in milliseconds
+   * @param dmxLightIndices Array of DMX light indices corresponding to targetLights
    */
-  private startStrobeEffect(effectName: string, targetLights: any[], color: any, interval: number): void {
+  private startStrobeEffect(effectName: string, targetLights: any[], color: any, interval: number, dmxLightIndices: number[]): void {
     let isOn = false;
+    
+    // Track which lights are being strobed for proper cleanup (use actual DMX indices)
+    for (const lightIndex of dmxLightIndices) {
+      this.strobedLights.add(lightIndex);
+    }
     
     const strobeInterval = setInterval(() => {
       if (isOn) {
-        // Turn off strobe
-        this.photonicsSequencer.setState(targetLights, getColor('transparent', 'max'), 0);
+        // Turn off strobe - restore previous colors
+      //  console.log(`StageKit: Turning OFF strobe for lights at DMX indices [${dmxLightIndices.join(', ')}]`);
+        for (let i = 0; i < dmxLightIndices.length; i++) {
+          const dmxIndex = dmxLightIndices[i];
+          const light = targetLights[i];
+          console.log(`StageKit: Light ${dmxIndex} (${light.id}) - turning off strobe`);
+        }
+        this.restoreColorsAfterStrobe(targetLights, dmxLightIndices);
         isOn = false;
       } else {
         // Turn on strobe
+     //   console.log(`StageKit: Turning ON strobe for lights at DMX indices [${dmxLightIndices.join(', ')}]`);
+        for (let i = 0; i < dmxLightIndices.length; i++) {
+          const dmxIndex = dmxLightIndices[i];
+          const light = targetLights[i];
+          console.log(`StageKit: Light ${dmxIndex} (${light.id}) - turning on strobe`);
+        }
         this.photonicsSequencer.setState(targetLights, color, 0);
         isOn = true;
       }
@@ -258,12 +314,35 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private async clearLightsAtPositions(positions: number[]): Promise<void> {
     if (positions.length === 0) return;
     
-    // Map LED positions to DMX lights
-    const dmxLightIndices = this.lightMapper.mapLedPositionsToDmxLights(positions);
+    // Filter cached DMX light indices to only the requested positions
+    const targetDmxIndices = positions.map(pos => this.dmxLightIndices[pos]);
     
     // Turn off the lights at these positions
-    for (const lightIndex of dmxLightIndices) {
+    for (const lightIndex of targetDmxIndices) {
       await this.turnOffLight(lightIndex);
+    }
+  }
+
+
+  /**
+   * Restore colors after strobe effect ends
+   * This ensures lights return to their previous color state instead of staying transparent
+   */
+  private async restoreColorsAfterStrobe(_targetLights: any[], lightIndices: number[]): Promise<void> {
+    for (const lightIndex of lightIndices) {
+      console.log(`StageKit: Restoring colors for light ${lightIndex}`);
+      
+      // Check if this light has any colors to restore
+  /*    const persistentColors = this.lightColorState.get(lightIndex) || new Set();
+      const currentPassColors = this.currentPassColors.get(lightIndex) || new Set();
+      console.log(`StageKit: Light ${lightIndex} has persistent colors: [${Array.from(persistentColors).join(', ')}], current pass: [${Array.from(currentPassColors).join(', ')}]`);
+    */
+
+      // Remove from strobed lights tracking
+      this.strobedLights.delete(lightIndex);
+      
+      // Trigger color restoration for this light
+      await this.triggerReblend(lightIndex);
     }
   }
 
@@ -272,22 +351,27 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * @param positions The LED positions to clear strobe effects from
    */
   private clearStrobeEffectsAtPositions(positions: number[]): void {
+  //  console.log(`StageKit: Clearing strobe effects for positions [${positions.join(', ')}]`);
+    
     // Find and remove strobe effects that affect these positions
     const effectsToRemove: string[] = [];
     
     if (positions.length === 0) {
       // Empty positions means clear all global strobe effects
+ //     console.log(`StageKit: Clearing all strobe effects`);
       for (const [effectName, _effectData] of this.activeStrobeEffects.entries()) {
         effectsToRemove.push(effectName);
       }
     } else {
-      // Map LED positions to DMX lights
-      const dmxLightIndices = this.lightMapper.mapLedPositionsToDmxLights(positions);
+          // Filter cached DMX light indices to only the requested positions
+    const targetDmxIndices = positions.map(pos => this.dmxLightIndices[pos]);
+  //    console.log(`StageKit: Mapped positions [${positions.join(', ')}] to DMX indices [${dmxLightIndices.join(', ')}]`);
       
       for (const [effectName, effectData] of this.activeStrobeEffects.entries()) {
         // Check if this effect affects any of the target positions
-        const hasOverlap = effectData.positions.some(pos => dmxLightIndices.includes(pos));
+        const hasOverlap = effectData.positions.some(pos => targetDmxIndices.includes(pos));
         if (hasOverlap) {
+          console.log(`StageKit: Effect ${effectName} affects target positions`);
           effectsToRemove.push(effectName);
         }
       }
@@ -297,7 +381,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     for (const effectName of effectsToRemove) {
       const effectData = this.activeStrobeEffects.get(effectName);
       if (effectData && effectData.interval) {
+     //   console.log(`StageKit: Clearing strobe effect ${effectName} with interval ${effectData.interval}`);
         clearInterval(effectData.interval);
+        // Restore colors for strobed lights when clearing strobe
+        if (effectData.targetLights) {
+          console.log(`StageKit: Restoring colors for strobe effect ${effectName}`);
+          const lightIndices = effectData.targetLights.map((_, index) => index);
+          this.restoreColorsAfterStrobe(effectData.targetLights, lightIndices);
+        }
       }
       this.activeStrobeEffects.delete(effectName);
     }
@@ -345,14 +436,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     // Clear the color tracking
     this.colorToLights.set(color, new Set());
     
-    
-    // Let colors accumulate naturally in current pass colors for proper blending
+    // Initialize current pass colors for new target lights (preserve existing for blending)
     for (const lightIndex of newLightIndices) {
       if (!this.currentPassColors.has(lightIndex)) {
         this.currentPassColors.set(lightIndex, new Set());
       }
-      
-      //console.log(`DEBUG: Light ${lightIndex} - current pass colors before adding ${color}`);
     }
     
     // Apply this color to the new light positions
@@ -521,9 +609,15 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       for (const [_effectName, effectData] of this.activeStrobeEffects.entries()) {
         if (effectData.interval) {
           clearInterval(effectData.interval);
+          // Restore colors for strobed lights when clearing strobe
+          if (effectData.targetLights) {
+            const lightIndices = effectData.targetLights.map((_, index) => index);
+            this.restoreColorsAfterStrobe(effectData.targetLights, lightIndices);
+          }
         }
       }
       this.activeStrobeEffects.clear();
+      this.strobedLights.clear();
       
     } catch (error) {
       console.error('StageKitDirectProcessor: Error turning off all DMX lights:', error);
@@ -673,6 +767,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       const blendedColor = this.blendColors(colorsToBlend);
   //    console.log(`DEBUG: Light ${lightIndex} blended result: ${JSON.stringify(blendedColor)}`);
       await this.applyColorToLight(lightIndex, blendedColor);
+      
+      // After applying current pass colors, move them to persistent and clear current pass
+      // This prevents accumulation across different logical packets
+      for (const color of currentPassColors) {
+        persistentColors.add(color);
+      }
+      this.currentPassColors.get(lightIndex)!.clear();
     } else if (persistentColors.size > 0) {
       // No current pass colors - fall back to persistent colors
       const colorsToBlend = Array.from(persistentColors);
@@ -706,9 +807,19 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     const currentPassColors = this.currentPassColors.get(lightIndex) || new Set();
 
     const colorsToBlend = Array.from(persistentColors).concat(Array.from(currentPassColors));
-    //console.log(`DEBUG: Light ${lightIndex} triggering re-blend with colors: [${colorsToBlend.join(', ')}]`);
-    const blendedColor = this.blendColors(colorsToBlend);
-    await this.applyColorToLight(lightIndex, blendedColor);
+  //  console.log(`DEBUG: Light ${lightIndex} triggering re-blend with colors: [${colorsToBlend.join(', ')}]`);
+    
+    if (colorsToBlend.length === 0) {
+      // No colors left - turn off the light
+   //   console.log(`DEBUG: Light ${lightIndex} - no colors left, turning off`);
+      await this.turnOffLight(lightIndex);
+      this.lightColorState.delete(lightIndex);
+      this.currentPassColors.delete(lightIndex);
+    } else {
+      const blendedColor = this.blendColors(colorsToBlend);
+   //   console.log(`DEBUG: Light ${lightIndex} blended result: ${JSON.stringify(blendedColor)}`);
+      await this.applyColorToLight(lightIndex, blendedColor);
+    }
   }
 
 
@@ -721,6 +832,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     activeLightCount: number;
     activeStrobeEffects: string[];
     hasActiveStrobeEffects: boolean;
+    strobedLights: number[];
   } {
     const activeLights: string[] = [];
     for (const [lightIndex, colors] of this.lightColorState.entries()) {
@@ -739,7 +851,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       hasActiveLights: activeLights.length > 0,
       activeLightCount: activeLights.length,
       activeStrobeEffects,
-      hasActiveStrobeEffects: activeStrobeEffects.length > 0
+      hasActiveStrobeEffects: activeStrobeEffects.length > 0,
+      strobedLights: Array.from(this.strobedLights)
     };
   }
 
