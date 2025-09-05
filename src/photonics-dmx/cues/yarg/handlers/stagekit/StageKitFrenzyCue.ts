@@ -12,7 +12,7 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitFrenzyCue implements ICue {
   id = 'stagekit-frenzy';
   cueId = CueType.Frenzy;
-  description = 'Large venue: Red->Blue->Yellow cycle on beat. Small venue: Red->Green->Blue cycle on beat.';
+  description = 'Large venue: Red->Blue->Yellow cycle on red drum. Small venue: Red->Green->Blue cycle on red drum.';
   style = CueStyle.Primary;
 
   async execute(cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
@@ -48,7 +48,7 @@ export class StageKitFrenzyCue implements ICue {
             easing: 'linear',
             duration: 0,
         },
-        waitUntilCondition: 'beat',
+        waitUntilCondition: 'drum-red',
         waitUntilTime: 0
     });
     
@@ -63,7 +63,7 @@ export class StageKitFrenzyCue implements ICue {
             easing: 'linear',
             duration: 0,
         },
-        waitUntilCondition: 'beat',
+        waitUntilCondition: 'drum-red',
         waitUntilTime: 0,
         waitUntilConditionCount: 1
     });
@@ -79,7 +79,7 @@ export class StageKitFrenzyCue implements ICue {
             easing: 'linear',
             duration: 0,
         },
-        waitUntilCondition: 'beat',
+        waitUntilCondition: 'drum-red',
         waitUntilTime: 0,
         waitUntilConditionCount: 1
     });
