@@ -24,7 +24,7 @@ export class StageKitHarmonyCue implements ICue {
     // Determine venue size and set colors accordingly
     const isLargeVenue = cueData.venueSize === 'Large';
     
-    let color1, color2;
+    let color1;
     if (isLargeVenue) {
       // Large venue: Yellow and Red
       color1 = getColor('yellow', 'high', 'add');
