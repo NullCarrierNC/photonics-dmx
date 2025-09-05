@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const CueConsistencySettings: React.FC = () => {
-  const [consistencyWindow, setConsistencyWindow] = useState(2000);
+  const [consistencyWindow, setConsistencyWindow] = useState(60000);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -22,10 +22,10 @@ const CueConsistencySettings: React.FC = () => {
     loadConsistencyWindow();
   }, []);
 
-  const handleConsistencyWindowChange = async (value: number) => {
+  const handleConsistencyWindowChange = useCallback(async (value: number) => {
     if (isSaving) return;
     
-    const newValue = Math.max(0, Math.min(10000, value)); // Clamp to 0-10000
+    const newValue = Math.max(0, Math.min(300000, value)); // Clamp to 0-300000
     setConsistencyWindow(newValue);
     
     try {
@@ -45,11 +45,17 @@ const CueConsistencySettings: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [isSaving, consistencyWindow]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value) || 0;
-    handleConsistencyWindowChange(value);
+    // Only update the local state immediately, don't save on every keystroke
+    setConsistencyWindow(Math.max(0, Math.min(300000, value)));
+  };
+
+  const handleInputBlur = () => {
+    // Save when the user finishes editing (loses focus)
+    handleConsistencyWindowChange(consistencyWindow);
   };
 
   return (
@@ -72,13 +78,14 @@ const CueConsistencySettings: React.FC = () => {
               type="number"
               id="consistency-window"
               min="0"
-              max="10000"
+              max="300000"
               step="100"
               value={consistencyWindow}
               onChange={handleInputChange}
+              onBlur={handleInputBlur}
               className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || isSaving}
-              placeholder="2000"
+              placeholder="60000"
             />
             <span className="text-sm text-gray-600 dark:text-gray-400">
               milliseconds
@@ -86,7 +93,7 @@ const CueConsistencySettings: React.FC = () => {
           </div>
           
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Set to 0 to disable consistency throttling. Default is 2000ms (2 seconds).
+            Set to 0 to disable consistency throttling. Default is 60000ms (60 seconds). Maximum is 300000ms (5 minutes).
           </p>
         </div>
       </div>
