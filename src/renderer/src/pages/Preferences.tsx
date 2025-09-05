@@ -11,9 +11,8 @@ const Preferences: React.FC = () => {
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Preferences</h1>
       <DmxOutputSettings />
       <BrightnessSettings />
-      <StageKitModeSettings />
-      
       <PrefCueGroups />
+      <StageKitModeSettings />
       <CueConsistencySettings />
      
     </div>
