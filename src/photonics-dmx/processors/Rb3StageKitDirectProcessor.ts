@@ -14,6 +14,7 @@ import { StageKitLightMapper } from './StageKitLightMapper';
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes';
 import { getColor } from '../helpers/dmxHelpers';
 import { CueData } from '../cues/cueTypes';
+import { RGBIO, TrackedLight } from '../types';
 
 /**
  * StageKit data structure
@@ -45,7 +46,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     positions: number[];
     timestamp: number;
     interval?: NodeJS.Timeout;
-    targetLights: any[];
+    targetLights: TrackedLight[];
   }> = new Map();
   
   // Track which lights are currently being strobed (for proper cleanup)
@@ -200,7 +201,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     }
     
     // Map strobe lights to their corresponding front/back light indices
-    const targetLights: any[] = [];
+    const targetLights: TrackedLight[] = [];
     const dmxLightIndices: number[] = [];
     
   //  console.log(`StageKit: Strobe lights:`, strobeLights.map(l => ({ id: l.id, position: l.position })));
@@ -255,12 +256,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       targetLights: targetLights
     });
     
-    console.log(`StageKit: Created strobe effect ${effectName} targeting lights:`, dmxLightIndices.map((idx, i) => ({ dmxIndex: idx, lightId: targetLights[i]?.id })));
+  //  console.log(`StageKit: Created strobe effect ${effectName} targeting lights:`, dmxLightIndices.map((idx, i) => ({ dmxIndex: idx, lightId: targetLights[i]?.id })));
     
     // Start the strobe effect using setState
     this.startStrobeEffect(effectName, targetLights, white, strobeInterval, dmxLightIndices);
     
-    console.log(`StageKit: Started ${strobeType} strobe on ${targetLights.length} lights with ${strobeInterval}ms interval`);
+ //   console.log(`StageKit: Started ${strobeType} strobe on ${targetLights.length} lights with ${strobeInterval}ms interval`);
   }
 
   /**
@@ -271,7 +272,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * @param interval Interval between strobe flashes in milliseconds
    * @param dmxLightIndices Array of DMX light indices corresponding to targetLights
    */
-  private startStrobeEffect(effectName: string, targetLights: any[], color: any, interval: number, dmxLightIndices: number[]): void {
+  private startStrobeEffect(effectName: string, targetLights: TrackedLight[], color: RGBIO, interval: number, dmxLightIndices: number[]): void {
     let isOn = false;
     
     // Track which lights are being strobed for proper cleanup (use actual DMX indices)
@@ -328,9 +329,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Restore colors after strobe effect ends
    * This ensures lights return to their previous color state instead of staying transparent
    */
-  private async restoreColorsAfterStrobe(_targetLights: any[], lightIndices: number[]): Promise<void> {
+  private async restoreColorsAfterStrobe(_targetLights: TrackedLight[], lightIndices: number[]): Promise<void> {
     for (const lightIndex of lightIndices) {
-      console.log(`StageKit: Restoring colors for light ${lightIndex}`);
       
       // Check if this light has any colors to restore
   /*    const persistentColors = this.lightColorState.get(lightIndex) || new Set();
@@ -557,7 +557,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   /**
    * Apply a blended color to a specific light
    */
-  private async applyColorToLight(lightIndex: number, color: any): Promise<void> {
+  private async applyColorToLight(lightIndex: number, color: RGBIO): Promise<void> {
     const lights = this.lightManager.getLights(['front', 'back'], 'all');
     if (lights && lights[lightIndex]) {
   //    //console.log(`DEBUG: Applying color ${JSON.stringify(color)} to light ${lightIndex}`);
@@ -657,7 +657,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Blend multiple colors into a single color value
    * This handles cases where multiple StageKit color banks are active simultaneously
    */
-  private blendColors(colors: string[]): any {
+  private blendColors(colors: string[]): RGBIO {
     if (colors.length === 0 || colors.includes('off')) {
       return getColor('black', 'medium');
     }
@@ -688,7 +688,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Add multiple RGBIP colors together
    * This is an averaged blending approach
    */
-  private addColors(colors: any[]): any {
+  private addColors(colors: RGBIO[]): RGBIO {
     if (colors.length === 0) {
       return getColor('black', 'medium');
     }
@@ -720,12 +720,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         result.intensity = Math.min(255, result.intensity + color.intensity);
       }
       
-      // For blended colors, use lower priority values to allow for better mixing
-      // This prevents one color from completely dominating the others
-      result.rp = Math.min(result.rp || 255, color.rp || 255);
-      result.gp = Math.min(result.gp || 255, color.gp || 255);
-      result.bp = Math.min(result.bp || 255, color.bp || 255);
-      result.ip = Math.min(result.ip || 255, color.ip || 255);
+      // For blended colors, use opacity-based blending
+      // Combine opacity values for proper mixing
+      if (result.opacity !== undefined && color.opacity !== undefined) {
+        result.opacity = Math.min(1.0, result.opacity + color.opacity);
+      }
+      
+      result.blendMode = 'add';
     }
     /*
     // Apply averaged blending by dividing by the number of colors
@@ -861,7 +862,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    */
   public getColorBlendingInfo(color: string): {
     color: string;
-    blendedColor: any;
+    blendedColor: RGBIO;
     description: string;
   } {
     const activeColors = [color];
