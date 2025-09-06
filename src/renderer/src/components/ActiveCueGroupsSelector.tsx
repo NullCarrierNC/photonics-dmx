@@ -132,7 +132,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
         </h3>
         {rb3eListenerEnabled ? (
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-            RB3E does not use cues, the lights are driven directly.
+            Except for menus,RB3E does not use cues, the lights are driven directly. In menus the Stage Kit is off, but we'll run an idle animation.
           </p>
         ) : (
           <>
