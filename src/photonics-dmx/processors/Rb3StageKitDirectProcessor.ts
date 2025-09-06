@@ -62,6 +62,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   // Game state tracking
   private _currentGameState: 'Menus' | 'InGame' = 'Menus';
   
+  // Track if we're currently in a song (using direct control)
+  private _inSong: boolean = false;
+  
   // Menu animation timer
   private menuAnimationTimer: NodeJS.Timeout | null = null;
 
@@ -126,7 +129,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * @param networkListener The network listener to listen to
    */
   public startListening(networkListener: EventEmitter): void {
-    console.log('StageKitDirectProcessor: startListening called with networkListener:', networkListener.constructor.name);
+  //  console.log('StageKitDirectProcessor: startListening called with networkListener:', networkListener.constructor.name);
     
     // Use arrow function to preserve 'this' context
     this.boundHandleStageKitEvent = this.handleStageKitEvent.bind(this);
@@ -159,6 +162,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    */
   private handleStageKitEvent(event: StageKitData): void {
     const { positions, color, strobeEffect } = event;
+    
+    // If we're receiving StageKit events, we're in a song
+    if (!this._inSong) {
+      console.log('StageKitDirectProcessor: Received StageKit event while not in song, marking as in song');
+      this._inSong = true;
+    }
     
     // Log the StageKit data for debugging
     //console.log(`StageKit: Received event - positions: [${positions.join(', ')}], color: ${color}, strobe: ${strobeEffect}`);
@@ -196,64 +205,72 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   /**
    * Handle game state events
    */
-  private handleGameStateEvent(event: { gameState: 'Menus' | 'InGame'; platform: string; timestamp: number }): void {
+  private handleGameStateEvent(event: { gameState: 'Menus' | 'InGame'; platform: string; timestamp: number; cueData: CueData | null }): void {
     try {
       console.log('StageKitDirectProcessor: Received game state event:', event);
-      const { gameState } = event;
+    const { gameState, cueData: realCueData } = event;
+    
+    console.log(`StageKitDirectProcessor: Game state changed from ${this._currentGameState} to ${gameState}`);
       
-      console.log(`StageKitDirectProcessor: Game state changed from ${this._currentGameState} to ${gameState}`);
+      // Check if we need to process this transition
+      const stateChanged = this._currentGameState !== gameState;
+      const returningToMenu = gameState === 'Menus' && this._inSong;
       
-      // Only process if the state actually changed
-      if (this._currentGameState === gameState) {
-        console.log('StageKitDirectProcessor: Game state unchanged, skipping processing');
+      if (!stateChanged && !returningToMenu) {
+        console.log('StageKitDirectProcessor: Game state unchanged and not returning from song, skipping processing');
         return;
+      }
+      
+      if (returningToMenu) {
+        console.log('StageKitDirectProcessor: Returning to menu from song, processing transition');
       }
     
     const previousState = this._currentGameState;
     this._currentGameState = gameState;
     
     // Emit CueData with empty LED positions to clear frontend display (applies to both states)
+    // Use real data when available, fallback to defaults when not
     const clearCueData: CueData = {
-      datagramVersion: 1,
-      platform: "RB3E",
+      datagramVersion: realCueData?.datagramVersion || 1,
+      platform: realCueData?.platform || "RB3E",
       currentScene: gameState === 'InGame' ? "Gameplay" : "Menu",
-      pauseState: "Unpaused",
-      venueSize: gameState === 'InGame' ? "Large" : "NoVenue",
-      beatsPerMinute: 0,
-      songSection: "Unknown",
-      guitarNotes: [],
-      bassNotes: [],
-      drumNotes: [],
-      keysNotes: [],
-      vocalNote: 0,
-      harmony0Note: 0,
-      harmony1Note: 0,
-      harmony2Note: 0,
+      pauseState: realCueData?.pauseState || "Unpaused",
+      venueSize: gameState === 'InGame' ? (realCueData?.venueSize || "Large") : "NoVenue",
+      beatsPerMinute: realCueData?.beatsPerMinute || 0,
+      songSection: realCueData?.songSection || "Unknown",
+      guitarNotes: realCueData?.guitarNotes || [],
+      bassNotes: realCueData?.bassNotes || [],
+      drumNotes: realCueData?.drumNotes || [],
+      keysNotes: realCueData?.keysNotes || [],
+      vocalNote: realCueData?.vocalNote || 0,
+      harmony0Note: realCueData?.harmony0Note || 0,
+      harmony1Note: realCueData?.harmony1Note || 0,
+      harmony2Note: realCueData?.harmony2Note || 0,
       lightingCue: gameState === 'InGame' ? "StageKitDirect" : "Default",
-      postProcessing: "Default",
-      fogState: false,
-      strobeState: "Strobe_Off",
-      performer: 0,
-      trackMode: 'tracked',
-      beat: "Unknown",
-      keyframe: "Unknown",
-      bonusEffect: false,
+      postProcessing: realCueData?.postProcessing || "Default",
+      fogState: realCueData?.fogState || false,
+      strobeState: realCueData?.strobeState || "Strobe_Off",
+      performer: realCueData?.performer || 0,
+      trackMode: realCueData?.trackMode || 'tracked',
+      beat: realCueData?.beat || "Unknown",
+      keyframe: realCueData?.keyframe || "Unknown",
+      bonusEffect: realCueData?.bonusEffect || false,
       ledColor: '',
       ledPositions: [], // Clear LED positions for frontend
       rb3Platform: event.platform,
-      rb3BuildTag: "",
-      rb3SongName: "",
-      rb3SongArtist: "",
-      rb3SongShortName: "",
-      rb3VenueName: "",
-      rb3ScreenName: "",
-      rb3BandInfo: { members: [] },
-      rb3ModData: { identifyValue: "", string: "" },
-      totalScore: 0,
-      memberScores: [],
-      stars: 0,
-      sustainDurationMs: 0,
-      measureOrBeat: 0
+      rb3BuildTag: realCueData?.rb3BuildTag || "",
+      rb3SongName: realCueData?.rb3SongName || "",
+      rb3SongArtist: realCueData?.rb3SongArtist || "",
+      rb3SongShortName: realCueData?.rb3SongShortName || "",
+      rb3VenueName: realCueData?.rb3VenueName || "",
+      rb3ScreenName: realCueData?.rb3ScreenName || "",
+      rb3BandInfo: realCueData?.rb3BandInfo || { members: [] },
+      rb3ModData: realCueData?.rb3ModData || { identifyValue: "", string: "" },
+      totalScore: realCueData?.totalScore || 0,
+      memberScores: realCueData?.memberScores || [],
+      stars: realCueData?.stars || 0,
+      sustainDurationMs: realCueData?.sustainDurationMs || 0,
+      measureOrBeat: realCueData?.measureOrBeat || 0
     };
     
     // Emit the clear data for frontend
@@ -263,6 +280,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       // Transition to InGame: Clear all current light states completely
       console.log('StageKitDirectProcessor: Transitioning to InGame - clearing all lights and LED positions');
       
+      // Mark that we're now in a song
+      this._inSong = true;
+      
       // Clear menu animation timer
       this.clearMenuAnimationTimer();
       
@@ -271,13 +291,16 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         console.error('StageKitDirectProcessor: Error clearing lights during InGame transition:', error);
       });
       
-      // Also call blackout on the sequencer to clear any stuck effects on layers
+      // Also call blackout on the sequencer to clear any effects on layers
       this.photonicsSequencer.blackout(0).catch(error => {
         console.error('StageKitDirectProcessor: Error calling sequencer blackout during InGame transition:', error);
       });
     } else if (gameState === 'Menus') {
       // Transition to Menus: Trigger cue handler's handleCueDefault and clear LED positions
       console.log('StageKitDirectProcessor: Transitioning to Menus - triggering cue handler and clearing LED positions');
+      
+      // Mark that we're no longer in a song
+      this._inSong = false;
       
       // Turn off the lights from direct control, but the sequencer isn't handling anything right now.
       this.turnOffAllLights().catch(error => {
@@ -1064,9 +1087,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     console.log('StageKitDirectProcessor: Starting menu animation timer (1000ms interval)');
     
     this.menuAnimationTimer = setInterval(() => {
-      console.log(`StageKitDirectProcessor: Menu animation timer tick - current state: ${this._currentGameState}, cueHandler available: ${!!this.cueHandler}`);
+     // console.log(`StageKitDirectProcessor: Menu animation timer tick - current state: ${this._currentGameState}, cueHandler available: ${!!this.cueHandler}`);
       if (this._currentGameState === 'Menus' && this.cueHandler) {
-        console.log('StageKitDirectProcessor: Calling handleCueDefault from menu animation timer');
         // Create a basic CueData object for the cue handler
         const cueData: CueData = {
           datagramVersion: 1,

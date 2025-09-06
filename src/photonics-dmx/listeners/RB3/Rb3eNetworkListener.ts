@@ -490,7 +490,9 @@ export class Rb3eNetworkListener extends EventEmitter {
     this.emit('rb3e:gameState', {
       gameState,
       platform: this.lastData?.cueData?.rb3Platform || 'Unknown',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      // Include real data from current cue data
+      cueData: this.lastData?.cueData || null
     });
 
   }
