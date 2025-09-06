@@ -32,16 +32,21 @@ export class SenderManager {
     }
 
     try {
-      this.enabledSenders.set(id, sender);
+      // Register error handler before starting
       sender.onSendError(this.handleSenderError);
-
-      console.log(`Sender with ID "${id}" enabled.`);
-      sender.start();
+      
+      // Start the sender and wait for it to complete
+      await sender.start();
+      
+      // Only add to enabled senders after successful startup
+      this.enabledSenders.set(id, sender);
+      console.log(`Sender with ID "${id}" enabled and started successfully.`);
     } catch (err) {
       console.error(`Error starting sender with ID "${id}":`, err);
+      // Clean up error handler if startup failed
+      sender.removeSendError(this.handleSenderError);
       return;
     }
-
   }
 
   /**
