@@ -42,7 +42,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   registry.setCueStateUpdateCallback(sendCueStateUpdate);
 
   // Enable a sender
-  ipcMain.on('sender-enable', (_, data: SenderConfig) => {
+  ipcMain.on('sender-enable', async (_, data: SenderConfig) => {
     try {
       const { sender, port, host, universe, net, subnet, subuni, artNetPort } = data;
       
@@ -56,10 +56,10 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       // Create appropriate sender instance based on name
       if (sender === 'sacn') {
         const sacnSender = new SacnSender();
-        senderManager.enableSender(sender, sacnSender);
+        await senderManager.enableSender(sender, sacnSender);
       } else if (sender === 'ipc') {
         const ipcSender = new IpcSender();
-        senderManager.enableSender(sender, ipcSender);
+        await senderManager.enableSender(sender, ipcSender);
       } else if (sender === 'enttecpro') {
         // Only pass port if it's defined, otherwise use a default value
         if (!port) {
@@ -67,7 +67,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           return;
         }
         const enttecProSender = new EnttecProSender(port);
-        senderManager.enableSender(sender, enttecProSender);
+        await senderManager.enableSender(sender, enttecProSender);
       } else if (sender === 'artnet') {
         // ArtNet configuration
         const artNetHost = host || '127.0.0.1';
@@ -84,7 +84,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           subuni: artNetSubuni,
           port: artNetPortValue
         });
-        senderManager.enableSender(sender, artNetSender);
+        await senderManager.enableSender(sender, artNetSender);
       }
     } catch (error) {
       console.error('Error enabling sender:', error);
