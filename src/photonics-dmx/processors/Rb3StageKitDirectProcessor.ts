@@ -36,13 +36,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private currentPassColors: Map<number, Set<string>> = new Map(); // DMX light index -> Set of colors active in current pass
   private colorToLights: Map<string, Set<number>> = new Map(); // Color -> Set of DMX light indices
   private pendingUpdates: Map<number, { colors: Set<string>; timeout: NodeJS.Timeout }> = new Map(); // DMX light index -> pending update
-  private readonly ACCUMULATION_DELAY_MS = 5;
-  
-  // Game state tracking
-  private _currentGameState: 'Menus' | 'InGame' = 'Menus';
-  
-  // Menu animation timer
-  private menuAnimationTimer: NodeJS.Timeout | null = null; 
+  private readonly ACCUMULATION_DELAY_MS = 5; 
   
 
   
@@ -64,6 +58,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   // Bound event handler for proper cleanup
   private boundHandleStageKitEvent: ((event: StageKitData) => void) | null = null;
   private boundHandleGameStateEvent: ((event: any) => void) | null = null;
+  
+  // Game state tracking
+  private _currentGameState: 'Menus' | 'InGame' = 'Menus';
+  
+  // Menu animation timer
+  private menuAnimationTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private lightManager: DmxLightManager,
@@ -197,14 +197,17 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Handle game state events
    */
   private handleGameStateEvent(event: { gameState: 'Menus' | 'InGame'; platform: string; timestamp: number }): void {
-    const { gameState } = event;
-    
-    console.log(`StageKitDirectProcessor: Game state changed from ${this._currentGameState} to ${gameState}`);
-    
-    // Only process if the state actually changed
-    if (this._currentGameState === gameState) {
-      return;
-    }
+    try {
+      console.log('StageKitDirectProcessor: Received game state event:', event);
+      const { gameState } = event;
+      
+      console.log(`StageKitDirectProcessor: Game state changed from ${this._currentGameState} to ${gameState}`);
+      
+      // Only process if the state actually changed
+      if (this._currentGameState === gameState) {
+        console.log('StageKitDirectProcessor: Game state unchanged, skipping processing');
+        return;
+      }
     
     const previousState = this._currentGameState;
     this._currentGameState = gameState;
@@ -278,7 +281,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       
       // Turn off the lights from direct control, but the sequencer isn't handling anything right now.
       this.turnOffAllLights().catch(error => {
-        console.error('StageKitDirectProcessor: Error clearing lights during InGame transition:', error);
+        console.error('StageKitDirectProcessor: Error clearing lights during Menus transition:', error);
       });
       
       // Start the menu animation timer (we only trigger this on transition change, so we need to repeat the call 
@@ -292,6 +295,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       currentState: gameState,
       timestamp: event.timestamp
     });
+    } catch (error) {
+      console.error('StageKitDirectProcessor: Error handling game state event:', error);
+    }
   }
 
   /**
@@ -329,7 +335,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       if (allLightIndex !== -1) {
         targetLights.push(allLights[allLightIndex]);
         dmxLightIndices.push(allLightIndex);
-        console.log(`StageKit: Mapped strobe light ${strobeLight.id} (position ${strobeLight.position}) to DMX index ${allLightIndex}`);
       } else {
         console.log(`StageKit: Could not find strobe light ${strobeLight.id} in front/back lights`);
       }
@@ -339,8 +344,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       console.log(`StageKit: No matching lights found between strobe and front/back lights`);
       return;
     }
-    
-    console.log(`StageKit: Strobe targeting lights at DMX indices: [${dmxLightIndices.join(', ')}]`);
     
     const white = getColor('white', 'max');
     
@@ -400,21 +403,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       if (isOn) {
         // Turn off strobe - restore previous colors
       //  console.log(`StageKit: Turning OFF strobe for lights at DMX indices [${dmxLightIndices.join(', ')}]`);
-        for (let i = 0; i < dmxLightIndices.length; i++) {
-          const dmxIndex = dmxLightIndices[i];
-          const light = targetLights[i];
-          console.log(`StageKit: Light ${dmxIndex} (${light.id}) - turning off strobe`);
-        }
         this.restoreColorsAfterStrobe(targetLights, dmxLightIndices);
         isOn = false;
       } else {
         // Turn on strobe
      //   console.log(`StageKit: Turning ON strobe for lights at DMX indices [${dmxLightIndices.join(', ')}]`);
-        for (let i = 0; i < dmxLightIndices.length; i++) {
-          const dmxIndex = dmxLightIndices[i];
-          const light = targetLights[i];
-          console.log(`StageKit: Light ${dmxIndex} (${light.id}) - turning on strobe`);
-        }
+       
         this.photonicsSequencer.setState(targetLights, color, 0);
         isOn = true;
       }
@@ -423,23 +417,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     // Store the interval for cleanup
     this.activeStrobeEffects.get(effectName)!.interval = strobeInterval;
   }
-
-  /**
-   * Clear lights at specific LED positions
-   * @param positions The LED positions to clear
-   */
-  private async clearLightsAtPositions(positions: number[]): Promise<void> {
-    if (positions.length === 0) return;
-    
-    // Filter cached DMX light indices to only the requested positions
-    const targetDmxIndices = positions.map(pos => this.dmxLightIndices[pos]);
-    
-    // Turn off the lights at these positions
-    for (const lightIndex of targetDmxIndices) {
-      await this.turnOffLight(lightIndex);
-    }
-  }
-
 
   /**
    * Restore colors after strobe effect ends
@@ -463,18 +440,31 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   /**
+   * Clear lights at specific LED positions
+   * @param positions The LED positions to clear
+   */
+  private async clearLightsAtPositions(positions: number[]): Promise<void> {
+    if (positions.length === 0) return;
+    
+    // Filter cached DMX light indices to only the requested positions
+    const targetDmxIndices = positions.map(pos => this.dmxLightIndices[pos]);
+    
+    // Turn off the lights at these positions
+    for (const lightIndex of targetDmxIndices) {
+      await this.turnOffLight(lightIndex);
+    }
+  }
+
+  /**
    * Clear strobe effects at specific LED positions
    * @param positions The LED positions to clear strobe effects from
    */
   private clearStrobeEffectsAtPositions(positions: number[]): void {
-  //  console.log(`StageKit: Clearing strobe effects for positions [${positions.join(', ')}]`);
-    
     // Find and remove strobe effects that affect these positions
     const effectsToRemove: string[] = [];
     
     if (positions.length === 0) {
       // Empty positions means clear all global strobe effects
- //     console.log(`StageKit: Clearing all strobe effects`);
       for (const [effectName, _effectData] of this.activeStrobeEffects.entries()) {
         effectsToRemove.push(effectName);
       }
@@ -501,7 +491,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         clearInterval(effectData.interval);
         // Restore colors for strobed lights when clearing strobe
         if (effectData.targetLights) {
-          console.log(`StageKit: Restoring colors for strobe effect ${effectName}`);
           const lightIndices = effectData.targetLights.map((_, index) => index);
           this.restoreColorsAfterStrobe(effectData.targetLights, lightIndices);
         }
@@ -552,11 +541,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     // Clear the color tracking
     this.colorToLights.set(color, new Set());
     
-    // Initialize current pass colors for new target lights (preserve existing for blending)
+    
+    // Let colors accumulate naturally in current pass colors for proper blending
     for (const lightIndex of newLightIndices) {
       if (!this.currentPassColors.has(lightIndex)) {
         this.currentPassColors.set(lightIndex, new Set());
       }
+      
+      //console.log(`DEBUG: Light ${lightIndex} - current pass colors before adding ${color}`);
     }
     
     // Apply this color to the new light positions
@@ -673,7 +665,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   /**
    * Apply a blended color to a specific light
    */
-  private async applyColorToLight(lightIndex: number, color: RGBIO): Promise<void> {
+  private async applyColorToLight(lightIndex: number, color: any): Promise<void> {
     const lights = this.lightManager.getLights(['front', 'back'], 'all');
     if (lights && lights[lightIndex]) {
   //    //console.log(`DEBUG: Applying color ${JSON.stringify(color)} to light ${lightIndex}`);
@@ -702,7 +694,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       
       const lights = this.lightManager.getLights(['front', 'back'], 'all');
       if (lights) {
-        const blackColor = getColor('transparent', 'medium');
+        const blackColor = getColor('black', 'medium');
         for (const light of lights) {
           await this.photonicsSequencer.setState([light], blackColor, 1);
         }
@@ -762,93 +754,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   /**
-   * Set the cue handler for menu state handling
-   * @param cueHandler The cue handler instance
-   */
-  public setCueHandler(cueHandler: any): void {
-    this.cueHandler = cueHandler;
-    console.log('StageKitDirectProcessor: Cue handler updated');
-  }
-
-  /**
-   * Start the menu animation timer to call default cue every 1000ms
-   */
-  private startMenuAnimationTimer(): void {
-    // Clear any existing timer first
-    this.clearMenuAnimationTimer();
-    
-    if (!this.cueHandler || typeof this.cueHandler.handleCueDefault !== 'function') {
-      console.warn('StageKitDirectProcessor: Cannot start menu animation - no cue handler available');
-      return;
-    }
-    
-    console.log('StageKitDirectProcessor: Starting menu animation timer (1000ms interval)');
-    
-    this.menuAnimationTimer = setInterval(() => {
-      if (this._currentGameState === 'Menus' && this.cueHandler) {
-        // Create a basic CueData object for the cue handler
-        const cueData: CueData = {
-          datagramVersion: 1,
-          platform: "RB3E",
-          currentScene: "Menu",
-          pauseState: "Unpaused",
-          venueSize: "NoVenue",
-          beatsPerMinute: 0,
-          songSection: "Unknown",
-          guitarNotes: [],
-          bassNotes: [],
-          drumNotes: [],
-          keysNotes: [],
-          vocalNote: 0,
-          harmony0Note: 0,
-          harmony1Note: 0,
-          harmony2Note: 0,
-          lightingCue: "Default",
-          postProcessing: "Default",
-          fogState: false,
-          strobeState: "Strobe_Off",
-          performer: 0,
-          trackMode: 'tracked',
-          beat: "Unknown",
-          keyframe: "Unknown",
-          bonusEffect: false,
-          ledColor: '',
-          ledPositions: [],
-          rb3Platform: "RB3E",
-          rb3BuildTag: "",
-          rb3SongName: "",
-          rb3SongArtist: "",
-          rb3SongShortName: "",
-          rb3VenueName: "",
-          rb3ScreenName: "",
-          rb3BandInfo: { members: [] },
-          rb3ModData: { identifyValue: "", string: "" },
-          totalScore: 0,
-          memberScores: [],
-          stars: 0,
-          sustainDurationMs: 0,
-          measureOrBeat: 0
-        };
-        
-        this.cueHandler.handleCueDefault(cueData).catch(error => {
-          console.error('StageKitDirectProcessor: Error calling cue handler handleCueDefault in timer:', error);
-        });
-      }
-    }, 1000);
-  }
-
-  /**
-   * Clear the menu animation timer
-   */
-  private clearMenuAnimationTimer(): void {
-    if (this.menuAnimationTimer) {
-      console.log('StageKitDirectProcessor: Clearing menu animation timer');
-      clearInterval(this.menuAnimationTimer);
-      this.menuAnimationTimer = null;
-    }
-  }
-
-  /**
    * Get current brightness setting
    */
   public getCurrentBrightness(): 'low' | 'medium' | 'high' {
@@ -860,7 +765,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Blend multiple colors into a single color value
    * This handles cases where multiple StageKit color banks are active simultaneously
    */
-  private blendColors(colors: string[]): RGBIO {
+  private blendColors(colors: string[]): any {
     if (colors.length === 0 || colors.includes('off')) {
       return getColor('black', 'medium');
     }
@@ -891,7 +796,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Add multiple RGBIP colors together
    * This is an averaged blending approach
    */
-  private addColors(colors: RGBIO[]): RGBIO {
+  private addColors(colors: any[]): any {
     if (colors.length === 0) {
       return getColor('black', 'medium');
     }
@@ -923,13 +828,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         result.intensity = Math.min(255, result.intensity + color.intensity);
       }
       
-      // For blended colors, use opacity-based blending
-      // Combine opacity values for proper mixing
-      if (result.opacity !== undefined && color.opacity !== undefined) {
-        result.opacity = Math.min(1.0, result.opacity + color.opacity);
-      }
-      
-      result.blendMode = 'add';
+      // For blended colors, use lower priority values to allow for better mixing
+      // This prevents one color from completely dominating the others
+      result.rp = Math.min(result.rp || 255, color.rp || 255);
+      result.gp = Math.min(result.gp || 255, color.gp || 255);
+      result.bp = Math.min(result.bp || 255, color.bp || 255);
+      result.ip = Math.min(result.ip || 255, color.ip || 255);
     }
     /*
     // Apply averaged blending by dividing by the number of colors
@@ -971,13 +875,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       const blendedColor = this.blendColors(colorsToBlend);
   //    console.log(`DEBUG: Light ${lightIndex} blended result: ${JSON.stringify(blendedColor)}`);
       await this.applyColorToLight(lightIndex, blendedColor);
-      
-      // After applying current pass colors, move them to persistent and clear current pass
-      // This prevents accumulation across different logical packets
-      for (const color of currentPassColors) {
-        persistentColors.add(color);
-      }
-      this.currentPassColors.get(lightIndex)!.clear();
     } else if (persistentColors.size > 0) {
       // No current pass colors - fall back to persistent colors
       const colorsToBlend = Array.from(persistentColors);
@@ -1011,19 +908,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     const currentPassColors = this.currentPassColors.get(lightIndex) || new Set();
 
     const colorsToBlend = Array.from(persistentColors).concat(Array.from(currentPassColors));
-  //  console.log(`DEBUG: Light ${lightIndex} triggering re-blend with colors: [${colorsToBlend.join(', ')}]`);
-    
-    if (colorsToBlend.length === 0) {
-      // No colors left - turn off the light
-   //   console.log(`DEBUG: Light ${lightIndex} - no colors left, turning off`);
-      await this.turnOffLight(lightIndex);
-      this.lightColorState.delete(lightIndex);
-      this.currentPassColors.delete(lightIndex);
-    } else {
-      const blendedColor = this.blendColors(colorsToBlend);
-   //   console.log(`DEBUG: Light ${lightIndex} blended result: ${JSON.stringify(blendedColor)}`);
-      await this.applyColorToLight(lightIndex, blendedColor);
-    }
+    //console.log(`DEBUG: Light ${lightIndex} triggering re-blend with colors: [${colorsToBlend.join(', ')}]`);
+    const blendedColor = this.blendColors(colorsToBlend);
+    await this.applyColorToLight(lightIndex, blendedColor);
   }
 
 
@@ -1065,7 +952,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    */
   public getColorBlendingInfo(color: string): {
     color: string;
-    blendedColor: RGBIO;
+    blendedColor: any;
     description: string;
   } {
     const activeColors = [color];
@@ -1153,6 +1040,99 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   /**
+   * Set the cue handler for menu state handling
+   * @param cueHandler The cue handler instance
+   */
+  public setCueHandler(cueHandler: any): void {
+    this.cueHandler = cueHandler;
+    console.log('StageKitDirectProcessor: Cue handler updated');
+  }
+
+  /**
+   * Start the menu animation timer to call default cue every 1000ms
+   */
+  private startMenuAnimationTimer(): void {
+    console.log('StageKitDirectProcessor: startMenuAnimationTimer called');
+    // Clear any existing timer first
+    this.clearMenuAnimationTimer();
+    
+    if (!this.cueHandler || typeof this.cueHandler.handleCueDefault !== 'function') {
+      console.warn('StageKitDirectProcessor: Cannot start menu animation - no cue handler available');
+      return;
+    }
+    
+    console.log('StageKitDirectProcessor: Starting menu animation timer (1000ms interval)');
+    
+    this.menuAnimationTimer = setInterval(() => {
+      console.log(`StageKitDirectProcessor: Menu animation timer tick - current state: ${this._currentGameState}, cueHandler available: ${!!this.cueHandler}`);
+      if (this._currentGameState === 'Menus' && this.cueHandler) {
+        console.log('StageKitDirectProcessor: Calling handleCueDefault from menu animation timer');
+        // Create a basic CueData object for the cue handler
+        const cueData: CueData = {
+          datagramVersion: 1,
+          platform: "RB3E",
+          currentScene: "Menu",
+          pauseState: "Unpaused",
+          venueSize: "NoVenue",
+          beatsPerMinute: 0,
+          songSection: "Unknown",
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 0,
+          harmony0Note: 0,
+          harmony1Note: 0,
+          harmony2Note: 0,
+          lightingCue: "Default",
+          postProcessing: "Default",
+          fogState: false,
+          strobeState: "Strobe_Off",
+          performer: 0,
+          trackMode: 'tracked',
+          beat: "Unknown",
+          keyframe: "Unknown",
+          bonusEffect: false,
+          ledColor: '',
+          ledPositions: [],
+          rb3Platform: "RB3E",
+          rb3BuildTag: "",
+          rb3SongName: "",
+          rb3SongArtist: "",
+          rb3SongShortName: "",
+          rb3VenueName: "",
+          rb3ScreenName: "",
+          rb3BandInfo: { members: [] },
+          rb3ModData: { identifyValue: "", string: "" },
+          totalScore: 0,
+          memberScores: [],
+          stars: 0,
+          sustainDurationMs: 0,
+          measureOrBeat: 0
+        };
+        
+        this.cueHandler.handleCueDefault(cueData).catch(error => {
+          console.error('StageKitDirectProcessor: Error calling cue handler handleCueDefault in timer:', error);
+        });
+      }
+    }, 1000);
+  }
+
+  /**
+   * Clear the menu animation timer
+   */
+  private clearMenuAnimationTimer(): void {
+    console.log('StageKitDirectProcessor: clearMenuAnimationTimer called');
+    if (this.menuAnimationTimer) {
+      console.log('StageKitDirectProcessor: Clearing menu animation timer');
+      clearInterval(this.menuAnimationTimer);
+      this.menuAnimationTimer = null;
+    } else {
+      console.log('StageKitDirectProcessor: No menu animation timer to clear');
+    }
+  }
+
+  /**
    * Clean up resources
    */
   public destroy(): void {
@@ -1171,6 +1151,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       }
     }
     this.activeStrobeEffects.clear();
+    this.strobedLights.clear();
     
     this.removeAllListeners();
     //console.log('StageKitDirectProcessor destroyed');
