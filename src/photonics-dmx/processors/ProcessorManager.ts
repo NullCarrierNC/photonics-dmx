@@ -209,11 +209,16 @@ export class ProcessorManager extends EventEmitter {
       this.stageKitDirectProcessor = new Rb3StageKitDirectProcessor(
         this.lightManager,
         this.photonicsSequencer,
-        this.config.stageKitConfig
+        this.config.stageKitConfig,
+        this.cueHandler // Pass cue handler for menu state handling
       );
       console.log('ProcessorManager: StageKitDirectProcessor created successfully');
     } else {
       console.log('ProcessorManager: Using existing StageKitDirectProcessor');
+      // Update cue handler if it has changed
+      if (this.cueHandler && this.stageKitDirectProcessor) {
+        this.stageKitDirectProcessor.setCueHandler(this.cueHandler);
+      }
     }
     
     // Listen for cue data events from the processor

@@ -36,7 +36,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private currentPassColors: Map<number, Set<string>> = new Map(); // DMX light index -> Set of colors active in current pass
   private colorToLights: Map<string, Set<number>> = new Map(); // Color -> Set of DMX light indices
   private pendingUpdates: Map<number, { colors: Set<string>; timeout: NodeJS.Timeout }> = new Map(); // DMX light index -> pending update
-  private readonly ACCUMULATION_DELAY_MS = 5; 
+  private readonly ACCUMULATION_DELAY_MS = 5;
+  
+  // Game state tracking
+  private _currentGameState: 'Menus' | 'InGame' = 'Menus';
+  
+  // Menu animation timer
+  private menuAnimationTimer: NodeJS.Timeout | null = null; 
   
 
   
@@ -57,11 +63,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   
   // Bound event handler for proper cleanup
   private boundHandleStageKitEvent: ((event: StageKitData) => void) | null = null;
+  private boundHandleGameStateEvent: ((event: any) => void) | null = null;
 
   constructor(
     private lightManager: DmxLightManager,
     private photonicsSequencer: ILightingController,
-    stageKitConfig: Partial<StageKitConfig> = {}
+    stageKitConfig: Partial<StageKitConfig> = {},
+    private cueHandler?: any // Optional cue handler for menu state handling
   ) {
     super();
     console.log('StageKitDirectProcessor: Constructor called with dependencies:', {
@@ -122,9 +130,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     
     // Use arrow function to preserve 'this' context
     this.boundHandleStageKitEvent = this.handleStageKitEvent.bind(this);
-    networkListener.on('stagekit:data', this.boundHandleStageKitEvent);
-    console.log('StageKitDirectProcessor: Registered listener for stagekit:data events');
+    this.boundHandleGameStateEvent = this.handleGameStateEvent.bind(this);
     
+    networkListener.on('stagekit:data', this.boundHandleStageKitEvent);
+    networkListener.on('rb3e:gameState', this.boundHandleGameStateEvent);
+    
+    console.log('StageKitDirectProcessor: Registered listeners for stagekit:data and rb3e:gameState events');
   }
 
   /**
@@ -136,7 +147,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       networkListener.off('stagekit:data', this.boundHandleStageKitEvent);
       this.boundHandleStageKitEvent = null;
     }
-    console.log('StageKitDirectProcessor stopped listening for stagekit:data events');
+    if (this.boundHandleGameStateEvent) {
+      networkListener.off('rb3e:gameState', this.boundHandleGameStateEvent);
+      this.boundHandleGameStateEvent = null;
+    }
+    console.log('StageKitDirectProcessor stopped listening for stagekit:data and rb3e:gameState events');
   }
 
   /**
@@ -176,6 +191,107 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
     // Emit cue data for network debugging
     this.emitCueDataForStageKit(event);
+  }
+
+  /**
+   * Handle game state events
+   */
+  private handleGameStateEvent(event: { gameState: 'Menus' | 'InGame'; platform: string; timestamp: number }): void {
+    const { gameState } = event;
+    
+    console.log(`StageKitDirectProcessor: Game state changed from ${this._currentGameState} to ${gameState}`);
+    
+    // Only process if the state actually changed
+    if (this._currentGameState === gameState) {
+      return;
+    }
+    
+    const previousState = this._currentGameState;
+    this._currentGameState = gameState;
+    
+    // Emit CueData with empty LED positions to clear frontend display (applies to both states)
+    const clearCueData: CueData = {
+      datagramVersion: 1,
+      platform: "RB3E",
+      currentScene: gameState === 'InGame' ? "Gameplay" : "Menu",
+      pauseState: "Unpaused",
+      venueSize: gameState === 'InGame' ? "Large" : "NoVenue",
+      beatsPerMinute: 0,
+      songSection: "Unknown",
+      guitarNotes: [],
+      bassNotes: [],
+      drumNotes: [],
+      keysNotes: [],
+      vocalNote: 0,
+      harmony0Note: 0,
+      harmony1Note: 0,
+      harmony2Note: 0,
+      lightingCue: gameState === 'InGame' ? "StageKitDirect" : "Default",
+      postProcessing: "Default",
+      fogState: false,
+      strobeState: "Strobe_Off",
+      performer: 0,
+      trackMode: 'tracked',
+      beat: "Unknown",
+      keyframe: "Unknown",
+      bonusEffect: false,
+      ledColor: '',
+      ledPositions: [], // Clear LED positions for frontend
+      rb3Platform: event.platform,
+      rb3BuildTag: "",
+      rb3SongName: "",
+      rb3SongArtist: "",
+      rb3SongShortName: "",
+      rb3VenueName: "",
+      rb3ScreenName: "",
+      rb3BandInfo: { members: [] },
+      rb3ModData: { identifyValue: "", string: "" },
+      totalScore: 0,
+      memberScores: [],
+      stars: 0,
+      sustainDurationMs: 0,
+      measureOrBeat: 0
+    };
+    
+    // Emit the clear data for frontend
+    this.emit('cueHandled', clearCueData);
+    
+    if (gameState === 'InGame') {
+      // Transition to InGame: Clear all current light states completely
+      console.log('StageKitDirectProcessor: Transitioning to InGame - clearing all lights and LED positions');
+      
+      // Clear menu animation timer
+      this.clearMenuAnimationTimer();
+      
+      // Clear all lights and sequencer effects
+      this.turnOffAllLights().catch(error => {
+        console.error('StageKitDirectProcessor: Error clearing lights during InGame transition:', error);
+      });
+      
+      // Also call blackout on the sequencer to clear any stuck effects on layers
+      this.photonicsSequencer.blackout(0).catch(error => {
+        console.error('StageKitDirectProcessor: Error calling sequencer blackout during InGame transition:', error);
+      });
+    } else if (gameState === 'Menus') {
+      // Transition to Menus: Trigger cue handler's handleCueDefault and clear LED positions
+      console.log('StageKitDirectProcessor: Transitioning to Menus - triggering cue handler and clearing LED positions');
+      
+      // Turn off the lights from direct control, but the sequencer isn't handling anything right now.
+      this.turnOffAllLights().catch(error => {
+        console.error('StageKitDirectProcessor: Error clearing lights during InGame transition:', error);
+      });
+      
+      // Start the menu animation timer (we only trigger this on transition change, so we need to repeat the call 
+      // for the cue to continue running.
+      this.startMenuAnimationTimer();
+    }
+    
+    // Emit event for monitoring
+    this.emit('gameStateChanged', {
+      previousState,
+      currentState: gameState,
+      timestamp: event.timestamp
+    });
   }
 
   /**
@@ -586,7 +702,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       
       const lights = this.lightManager.getLights(['front', 'back'], 'all');
       if (lights) {
-        const blackColor = getColor('black', 'medium');
+        const blackColor = getColor('transparent', 'medium');
         for (const light of lights) {
           await this.photonicsSequencer.setState([light], blackColor, 1);
         }
@@ -643,6 +759,93 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    */
   public getConfig(): StageKitConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Set the cue handler for menu state handling
+   * @param cueHandler The cue handler instance
+   */
+  public setCueHandler(cueHandler: any): void {
+    this.cueHandler = cueHandler;
+    console.log('StageKitDirectProcessor: Cue handler updated');
+  }
+
+  /**
+   * Start the menu animation timer to call default cue every 1000ms
+   */
+  private startMenuAnimationTimer(): void {
+    // Clear any existing timer first
+    this.clearMenuAnimationTimer();
+    
+    if (!this.cueHandler || typeof this.cueHandler.handleCueDefault !== 'function') {
+      console.warn('StageKitDirectProcessor: Cannot start menu animation - no cue handler available');
+      return;
+    }
+    
+    console.log('StageKitDirectProcessor: Starting menu animation timer (1000ms interval)');
+    
+    this.menuAnimationTimer = setInterval(() => {
+      if (this._currentGameState === 'Menus' && this.cueHandler) {
+        // Create a basic CueData object for the cue handler
+        const cueData: CueData = {
+          datagramVersion: 1,
+          platform: "RB3E",
+          currentScene: "Menu",
+          pauseState: "Unpaused",
+          venueSize: "NoVenue",
+          beatsPerMinute: 0,
+          songSection: "Unknown",
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 0,
+          harmony0Note: 0,
+          harmony1Note: 0,
+          harmony2Note: 0,
+          lightingCue: "Default",
+          postProcessing: "Default",
+          fogState: false,
+          strobeState: "Strobe_Off",
+          performer: 0,
+          trackMode: 'tracked',
+          beat: "Unknown",
+          keyframe: "Unknown",
+          bonusEffect: false,
+          ledColor: '',
+          ledPositions: [],
+          rb3Platform: "RB3E",
+          rb3BuildTag: "",
+          rb3SongName: "",
+          rb3SongArtist: "",
+          rb3SongShortName: "",
+          rb3VenueName: "",
+          rb3ScreenName: "",
+          rb3BandInfo: { members: [] },
+          rb3ModData: { identifyValue: "", string: "" },
+          totalScore: 0,
+          memberScores: [],
+          stars: 0,
+          sustainDurationMs: 0,
+          measureOrBeat: 0
+        };
+        
+        this.cueHandler.handleCueDefault(cueData).catch(error => {
+          console.error('StageKitDirectProcessor: Error calling cue handler handleCueDefault in timer:', error);
+        });
+      }
+    }, 1000);
+  }
+
+  /**
+   * Clear the menu animation timer
+   */
+  private clearMenuAnimationTimer(): void {
+    if (this.menuAnimationTimer) {
+      console.log('StageKitDirectProcessor: Clearing menu animation timer');
+      clearInterval(this.menuAnimationTimer);
+      this.menuAnimationTimer = null;
+    }
   }
 
   /**
@@ -957,6 +1160,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     this.turnOffAllLights().catch(error => {
       console.error('StageKitDirectProcessor: Error clearing lights during destroy:', error);
     });
+    
+    // Clear menu animation timer
+    this.clearMenuAnimationTimer();
     
     // Clear all strobe effects and intervals
     for (const [_effectName, effectData] of this.activeStrobeEffects.entries()) {
