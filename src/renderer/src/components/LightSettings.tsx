@@ -75,7 +75,7 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
 
       {/* Name Field */}
       <label className="flex flex-col items-start w-full">
-        <span className="mb-2">Name</span>
+        <span className="mb-2 text-gray-700 dark:text-gray-300">Name</span>
         <input
           type="text"
           maxLength={50}

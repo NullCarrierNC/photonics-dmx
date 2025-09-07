@@ -42,10 +42,10 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
 
     return (
       <div>
-        {title && <h3 className="text-lg font-semibold mb-2">{title}</h3>}
+        {title && <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">{title}</h3>}
         {sortedChannels.map(([channelName, value]) => (
           <div key={channelName} className="flex items-center space-x-4 mb-2">
-            <label htmlFor={channelName} className="text-sm capitalize w-1/3">
+            <label htmlFor={channelName} className="text-sm capitalize w-1/3 text-gray-700 dark:text-gray-300">
               {channelName}:
             </label>
             {typeof value === 'number' ? (

@@ -166,14 +166,14 @@ const NetworkDebug = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Network Status</h1>
+      <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Network Status</h1>
 
       <DmxSettingsAccordion startOpen={false} />
 
-      <hr className="mt-8 mb-8" />
+      <hr className="mt-8 mb-8 border-gray-200 dark:border-gray-600" />
 
-      <h2 className="text-lg font-bold mb-4">Network Lighting Cue Data</h2>
-        <p className="mb-8">
+      <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">Network Lighting Cue Data</h2>
+        <p className="mb-8 text-sm text-gray-600 dark:text-gray-400">
           This window will display the raw light data sent over the network by YARG/RB3E. 
           Enable either YARG or RB3E above and start a song in the game. You should see the network data appear below. 
           If nothing happens, verify your network connections, and ensure that all elements are on the same network / subnet.
@@ -188,20 +188,20 @@ const NetworkDebug = () => {
       >
         {/* Handled Cue Panel */}
         <div style={{ flex: '1 1 300px' }}>
-          <h3 className="text-md font-semibold ">
+          <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200">
             Handled Cue ({handledCount}): {handledCueName} {strobeState && `[${strobeState}]`} {ledColor && `[LED: ${ledColor}]`}
           </h3>
           
           {/* Cue History */}
-          <div className="text-md mb-2">
+          <div className="text-sm mb-2">
             {previousHandledCue && previousHandledCue !== handledCueName && (
-              <p className='text-gray-400'>
+              <p className='text-gray-500 dark:text-gray-400'>
                 Previous cue: {previousHandledCue} 
                 {previousLedColor ? ` [LED: ${previousLedColor}]` : ''}
               </p>
             )}
             {thirdHandledCue && thirdHandledCue !== previousHandledCue && thirdHandledCue !== handledCueName && (
-              <p className='text-sm text-gray-500'>
+              <p className='text-sm text-gray-500 dark:text-gray-400'>
                 Third cue: {thirdHandledCue} 
                 {thirdLedColor ? ` [LED: ${thirdLedColor}]` : ''}
               </p>
@@ -211,7 +211,7 @@ const NetworkDebug = () => {
           {handledCue ? (
             renderCueData(handledCue)
           ) : (
-            <p>No handled cues received yet.</p>
+            <p className="text-gray-600 dark:text-gray-400">No handled cues received yet.</p>
           )}
         </div>
 

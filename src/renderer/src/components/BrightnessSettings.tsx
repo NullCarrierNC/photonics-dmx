@@ -78,7 +78,7 @@ const BrightnessSettings: React.FC = () => {
   if (!isLoaded) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600">
+        <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
           DMX Brightness Levels
         </h2>
         <div className="flex items-center justify-center py-8">
@@ -90,7 +90,7 @@ const BrightnessSettings: React.FC = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600">
+      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
         DMX Brightness Levels
       </h2>
       

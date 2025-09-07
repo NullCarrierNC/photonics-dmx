@@ -298,12 +298,12 @@ const CueSimulation: React.FC = () => {
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-      <h1 className="text-2xl font-bold mb-4">Cue Simulation</h1>
+      <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Cue Simulation</h1>
 
       {/* Photonics input/output toggle component as the first thing */}
       <DmxSettingsAccordion startOpen={true} />
 
-      <hr className="my-6" />
+      <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
     
       <div className="bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 mb-6">
@@ -315,23 +315,23 @@ const CueSimulation: React.FC = () => {
           {isAboutOpen ? <FaChevronCircleDown size={20} /> : <FaChevronCircleRight size={20} />}
         </button>
         <div className={`px-4 pb-4 ${isAboutOpen ? '' : 'hidden'}`}>
-          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
             Cue Simulation allows you to test and preview lighting effects before using them in-game. 
             You can select different cue groups, choose specific cues, and manually simulate beats, 
             measures, and keyframes to see how the cues respond.
           </p>
-          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
             Which cue groups are enabled is defined in the Preferences menu.
           </p>
          
-          <hr className="my-6" />
+          <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
-          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
             Testing a cue will give you an approximation of what it will look like in-game. Some effects require you to 
             manually simulate a beat or keyframe. You can adjust the BPM value to test how effects respond to different tempos. 
             For YARG, some effects are modified by run-time data such as the notes being played. This is not currently simulated.
           </p>
-          <p className="text-md text-gray-700 dark:text-gray-300 mt-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
             If you have DMX output enabled above the effect will be sent to your lighting rig. Compare this 
             with the DMX Preview to confirm the configuration of your lights is correct.
           </p>
@@ -339,7 +339,7 @@ const CueSimulation: React.FC = () => {
       </div>
      
       <div className="my-6">
-        <h2 className="text-xl font-bold mb-1">Simulation Settings</h2>
+        <h2 className="text-xl font-bold mb-1 text-gray-800 dark:text-gray-200">Simulation Settings</h2>
         <div className="flex flex-wrap gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -392,14 +392,14 @@ const CueSimulation: React.FC = () => {
         </div>
         
         {currentGroup && (
-          <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             <strong>Group Description:</strong> {currentGroup.description}
           </div>
         )}
         
         {selectedEffect && selectedEffect.yargDescription && 
          selectedEffect.yargDescription !== "No description available" && (
-          <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             <strong>Effect Description:</strong> {selectedEffect.yargDescription}
           </div>
         )}
@@ -467,7 +467,7 @@ const CueSimulation: React.FC = () => {
 
       {/* Instrument Simulation */}
       <div className="mt-6">
-        <h3 className="text-lg font-semibold mb-3">Instrument Simulation</h3>
+        <h3 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">Instrument Simulation</h3>
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -539,7 +539,7 @@ const CueSimulation: React.FC = () => {
         </div>
       </div>
   
-      <hr className="my-6" />
+      <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
       <CuePreviewYarg 
         className="mb-0"
@@ -552,7 +552,7 @@ const CueSimulation: React.FC = () => {
         simulationMode={true}
       />
 
-      <hr className="my-6" />
+      <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
       <LightsDmxPreview lightingConfig={lightingConfig!} dmxValues={dmxValues} />
       <LightsDmxChannelsPreview lightingConfig={lightingConfig!} dmxValues={dmxValues} />
