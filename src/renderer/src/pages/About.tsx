@@ -13,8 +13,7 @@ const About = () => {
 
         <h2 className="text-xl font-bold mb-4 mt-4 text-orange-400">Development Status</h2>
         <p className="mb-4 text-orange-400">
-          This is the second Alpha build of Photonics, and as such is not feature complete. 
-          Some features are incomplete and there is more to come! We'd appreciate any feedback you can provide.
+          This is the second Alpha build of Photonics, and as such is not feature complete. We'd appreciate any feedback you can provide!
         </p>
 
         <h2 className="text-xl font-bold mb-4 mt-4 text-gray-800 dark:text-gray-200">For More Information or Help</h2>
