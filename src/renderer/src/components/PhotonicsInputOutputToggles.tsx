@@ -27,7 +27,7 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps ) => {
   return (
     <div className=" rounded-lg shadow-sm mb-4">
       <button
-        className="flex flex-row gap-4 items-center  text-left font-semibold bg-gray-100 dark:bg-gray-800"
+        className="flex flex-row gap-4 items-center text-left font-semibold bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200"
         onClick={() => setIsOpen(!isOpen)}
       >
         <span>Game Settings</span>

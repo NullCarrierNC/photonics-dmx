@@ -475,16 +475,16 @@ const LightsLayout = () => {
    
     return (
         <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-            <h1 className="text-2xl font-bold mb-4">Lights Layout</h1>
-            <p className="text-md text-gray-700 dark:text-gray-300 mb-6">
+            <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Lights Layout</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                 The Lights Layout allows you to assign the lights you created in My Lights to specific
                 lighting fixture positions and to configure their DMX channels.
             </p>
-            <p className="text-md text-gray-700 dark:text-gray-300 mb-6">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                 The Master Dimmer channel acts like the light's index, and all other channels will be
                 calculated for you automatically.
             </p>
-            <p className="text-md text-gray-700 dark:text-gray-300 mb-6">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                 E.g. If you defined your light as MasterDimmer=1, Red=2, Green=3, Blue=4 and here you set
                 Front 1 Master Dimmer to 11, your R/G/B channels automatically become 12/13/14.
             </p>
@@ -504,7 +504,7 @@ const LightsLayout = () => {
                         <div className="flex flex-wrap gap-4">
                             {/* Number of Lights */}
                             <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                <span className="mb-2">Number of Primary Lights</span>
+                                <span className="mb-2 text-gray-700 dark:text-gray-300">Number of Primary Lights</span>
                                 <select
                                     value={selectedCount || ''}
                                     onChange={(e) => {
@@ -527,7 +527,7 @@ const LightsLayout = () => {
 
                             {/* Light Layout */}
                             <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                <span className="mb-2">Primary Light Layout</span>
+                                <span className="mb-2 text-gray-700 dark:text-gray-300">Primary Light Layout</span>
                                 <select
                                     value={selectedLayout}
                                     onChange={(e) => {
@@ -555,7 +555,7 @@ const LightsLayout = () => {
                             {/* Assigned to Back */}
                             {selectedLayout === 'front-back' && (
                                 <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                    <span className="mb-2">Assigned to Back</span>
+                                    <span className="mb-2 text-gray-700 dark:text-gray-300">Assigned to Back</span>
                                     <select
                                         value={assignedToBack}
                                         onChange={(e) => {
@@ -575,7 +575,7 @@ const LightsLayout = () => {
 
                             {/* Strobe Effects */}
                             <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                <span className="mb-2">Strobe Effects</span>
+                                <span className="mb-2 text-gray-700 dark:text-gray-300">Strobe Effects</span>
                                 <select
                                     value={selectedStrobe}
                                     onChange={(e) => {
@@ -602,7 +602,7 @@ const LightsLayout = () => {
                             {/* Number of Strobes dropdown (only for Dedicated Strobe) */}
                             {selectedStrobe === ConfigStrobeType.Dedicated && (
                                 <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                    <span className="mb-2">Number of Strobes</span>
+                                    <span className="mb-2 text-gray-700 dark:text-gray-300">Number of Strobes</span>
                                     <select
                                         value={dedicatedStrobeCount}
                                         onChange={(e) => setDedicatedStrobeCount(Number(e.target.value))}
@@ -632,7 +632,7 @@ const LightsLayout = () => {
                         {/* Front Lights */}
                         {frontLights.map((light, index) => (
                             <div key={light.id} className="flex flex-col">
-                                <div className="text-center mb-2 font-semibold">
+                                <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
                                     Front {index + 1} (Position {light.position})
                                 </div>
                                 <LightChannelsConfig
@@ -649,7 +649,7 @@ const LightsLayout = () => {
                         {selectedLayout === 'front-back' &&
                             backLights.map((light, index) => (
                                 <div key={light.id} className="flex flex-col">
-                                    <div className="text-center mb-2 font-semibold">
+                                    <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
                                         Back {index + 1} (Position {light.position})
                                     </div>
                                     <LightChannelsConfig
@@ -668,7 +668,7 @@ const LightsLayout = () => {
                                 .filter((l) => l.group === 'strobe')
                                 .map((light, _index) => (
                                     <div key={light.id} className="flex flex-col">
-                                        <div className="text-center mb-2 font-semibold">
+                                        <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
                                             Dedicated Strobe (Position {light.position})
                                         </div>
                                         <LightChannelsConfig

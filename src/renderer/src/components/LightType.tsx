@@ -22,7 +22,7 @@ const LightType: React.FC<LightTypeProps> = ({ selectedType, onTypeChange }) => 
 
   return (
     <label className="flex flex-col items-start w-full">
-      <span className="mb-2">Light Type</span>
+      <span className="mb-2 text-gray-700 dark:text-gray-300">Light Type</span>
       <select
         value={currentType}
         onChange={handleTypeChange}

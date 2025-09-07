@@ -51,19 +51,19 @@ const DmxPreview: React.FC = () => {
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-      <h1 className="text-2xl font-bold mb-4">DMX Preview</h1>
+      <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">DMX Preview</h1>
      
-        <p className="text-md text-gray-700 dark:text-gray-300 mb-4">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           The DMX Preview allows you to see what your lighting rig should be doing. The preview uses the actual DMX channel data being  
           <em> sent</em> by Photonics as it responds to YARG/RB3E input or manual tests from the Cue Simulation page.
         </p>
-        <p className="text-md text-gray-700 dark:text-gray-300 mb-4">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           This is useful for debugging/testing your setup and confirming the configuration of your lights is correct.
         </p>
-        <p className="text-md text-gray-700 dark:text-gray-300 mb-8">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-8">
           <strong>Note:</strong> It does not monitor for sACN/ArtNet data on the network.
         </p>
-        <hr className="my-6" />
+        <hr className="my-6 border-gray-200 dark:border-gray-600" />
         <DmxSettingsAccordion startOpen={true} />
         <ActiveGroupsSelector />
         <CuePreview />

@@ -4,39 +4,39 @@ import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggl
 const Status = () => {
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Status</h1>
+      <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Status</h1>
 
       <DmxSettingsAccordion startOpen={true} />
 
   
-      <hr className="mt-8 mb-8" />
+      <hr className="mt-8 mb-8 border-gray-200 dark:border-gray-600" />
 
       <div className="flex flex-col">
-        <h2 className="text-xl font-bold mb-4">DMX Output</h2>
-        <p className="mb-4">
+        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">DMX Output</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           sACN support is enabled by default. Visit preferences to enable other output methods.
         </p>
-        <p className="mb-4">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           You will need to configure your lights in My Lights and Light Layout before they will be available for use.
         </p>
       </div>
       
-      <hr className="mt-8 mb-8" />
+      <hr className="mt-8 mb-8 border-gray-200 dark:border-gray-600" />
 
       <div className="flex flex-col">
-        <h2 className="text-xl font-bold mb-4">A Note About Custom Songs</h2>
-        <p className="mb-4">
+        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">A Note About Custom Songs</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           If you are using custom or converted songs the venue track for driving the
           lightshow may be missing. If you are using YARG it will automatically generate
           a light show if this data isn't available. These shows tend to be slower paced
           than original RB show data.
         </p>
-        <p className="mb-4">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           YARG's automatically generated shows will not include any strobe effects.
         </p>
       </div>
 
-      <hr className="mt-8 mb-8" />
+      <hr className="mt-8 mb-8 border-gray-200 dark:border-gray-600" />
       
       
 

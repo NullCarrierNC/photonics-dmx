@@ -60,12 +60,13 @@ const CueConsistencySettings: React.FC = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 dark:border-gray-700">
-      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600">
+      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
         Cue Consistency Settings
       </h2>
-      <p className="mb-6">
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
         Prevents rapid randomization changes when the same cue is called within a short time window. 
-        This helps maintain visual consistency during rapid cue transitions.
+        This helps maintain visual consistency during rapid cue transitions. I.e. if Cue A from Group B was 
+        selected, each time Cue A is called within this window will use the same implementation as the previous call.
       </p>
       
       <div className="space-y-4">

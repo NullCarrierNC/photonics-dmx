@@ -222,7 +222,7 @@ const DmxOutputSettings: React.FC = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600">
+      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
         DMX Output Configuration
       </h2>
       
@@ -230,10 +230,10 @@ const DmxOutputSettings: React.FC = () => {
       <div className="mb-8">
         <h3 className="text-lg font-medium mb-3 text-gray-800 dark:text-gray-200">Enabled Modes</h3>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Select the DMX modes you want to use. This will make them available for use.
+          Select the DMX modes you want to use. This will make them available for use in Game Settings on the Status page.
         </p>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          sACN doesn't require any configuration. ArtNet requires you to configure the ArtNet settings below.<br/>EnttecPro requires you to configure the COM port below.
+          sACN doesn't require any configuration. ArtNet requires you to configure the ArtNet network settings below.<br/>EnttecPro requires you to configure the COM port below.
         </p>
         <div className="flex items-center space-x-6">
           <label className="flex items-center space-x-2">
