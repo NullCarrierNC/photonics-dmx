@@ -14,7 +14,7 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitSearchlightsCue implements ICue {
   id = 'stagekit-searchlights';
   cueId = CueType.Searchlights;
-  description = 'Large venue: Yellow clockwise (2→3→4→5→6→7→0→1) and blue counter-clockwise (0→7→6→5→4→3→2→1). Small venue: Yellow counter-clockwise (0→7→6→5→4→3→2→1). 2 rotations per beat.';
+  description = 'Large venue: Yellow clockwise (2→3→4→5→6→7→0→1) and blue counter-clockwise (0→7→6→5→4→3→2→1).Small venue: Yellow counter-clockwise (0→7→6→5→4→3→2→1).';
   style = CueStyle.Primary;
 
   private isFirstExecution: boolean = true;
@@ -30,25 +30,25 @@ export class StageKitSearchlightsCue implements ICue {
 
     const searchlightTransitions: EffectTransition[] = [];
 
-    // Wait for a beat to start the sequence
+    // Start immediately (no initial wait)
     searchlightTransitions.push({
       lights: allLights,
       layer: 0,
       waitForCondition: 'none',
       waitForTime: 0,
       transform: { color: transparentColor, easing: 'linear', duration: 0 },
-      waitUntilCondition: 'beat',
+      waitUntilCondition: 'none',
       waitUntilTime: 0
     });
 
-    // Wait for a beat to start Color 2 sequence
+    // Start immediately (no initial wait)
     searchlightTransitions.push({
       lights: allLights,
       layer: 1,
       waitForCondition: 'none',
       waitForTime: 0,
       transform: { color: transparentColor, easing: 'linear', duration: 0 },
-      waitUntilCondition: 'beat',
+      waitUntilCondition: 'none',
       waitUntilTime: 0
     });
 
@@ -76,7 +76,7 @@ export class StageKitSearchlightsCue implements ICue {
    * Creates searchlight transitions for large venue
    * Yellow LEDs: Rotate clockwise through positions 2→3→4→5→6→7→0→1
    * Blue LEDs: Rotate counter-clockwise through positions 0→7→6→5→4→3→2→1
-   * Beat-based timing: Each step advances on a beat
+   * Beat-based timing: Each step advances on a beat, seamless looping
    */
   private createLargeVenueSearchlights(
     searchlightTransitions: EffectTransition[], 
@@ -89,10 +89,14 @@ export class StageKitSearchlightsCue implements ICue {
     // Layer 0: Yellow clockwise chase (starts at position 2)
     for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
       const light = allLights[lightIndex];
-      // Yellow starts at position 2: (lightIndex + 2) % allLights.length
-      const yellowStartPosition = (lightIndex + 2) % allLights.length;
-      const stepsUntilYellow = yellowStartPosition;
       
+      // Yellow pattern: 2→3→4→5→6→7→0→1
+      // Light at position lightIndex should activate when the pattern reaches that position
+      // Pattern starts at position 2, so light 2 activates at beat 0, light 3 at beat 1, etc.
+      // For light at position lightIndex: (lightIndex - 2 + allLights.length) % allLights.length
+      const stepsUntilYellow = (lightIndex - 2 + allLights.length) % allLights.length;
+      
+      // Phase 1: Wait until it's this light's turn
       if (stepsUntilYellow > 0) {
         searchlightTransitions.push({
           lights: [light],
@@ -104,8 +108,20 @@ export class StageKitSearchlightsCue implements ICue {
           waitUntilTime: 0,
           waitUntilConditionCount: stepsUntilYellow
         });
+      } else {
+        // Start immediately for lights that begin the pattern
+        searchlightTransitions.push({
+          lights: [light],
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        });
       }
       
+      // Phase 2: Turn on yellow for one beat
       searchlightTransitions.push({
         lights: [light],
         layer: 0,
@@ -116,6 +132,7 @@ export class StageKitSearchlightsCue implements ICue {
         waitUntilTime: 0
       });
       
+      // Phase 3: Turn off and wait until cycle completes
       const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
       if (stepsAfterYellow > 0) {
         searchlightTransitions.push({
@@ -134,10 +151,14 @@ export class StageKitSearchlightsCue implements ICue {
     // Layer 1: Blue counter-clockwise chase (starts at position 0)
     for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
       const light = allLights[lightIndex];
-      // Blue starts at position 0 and goes counter-clockwise
-      const blueStartPosition = lightIndex; // Position 0 for first light
+      
+      // Blue counter-clockwise: position 0→7→6→5→4→3→2→1
+      // For counter-clockwise, we want: light 0 at beat 0, light 7 at beat 1, etc.
+      // This means light at position lightIndex should activate at beat (allLights.length - lightIndex) % allLights.length
+      const blueStartPosition = (allLights.length - lightIndex) % allLights.length;
       const stepsUntilBlue = blueStartPosition;
       
+      // Phase 1: Wait until it's this light's turn  
       if (stepsUntilBlue > 0) {
         searchlightTransitions.push({
           lights: [light],
@@ -149,8 +170,20 @@ export class StageKitSearchlightsCue implements ICue {
           waitUntilTime: 0,
           waitUntilConditionCount: stepsUntilBlue
         });
+      } else {
+        // Start immediately for lights that begin the pattern
+        searchlightTransitions.push({
+          lights: [light],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        });
       }
       
+      // Phase 2: Turn on blue for one beat
       searchlightTransitions.push({
         lights: [light],
         layer: 1,
@@ -161,6 +194,7 @@ export class StageKitSearchlightsCue implements ICue {
         waitUntilTime: 0
       });
       
+      // Phase 3: Turn off and wait until cycle completes
       const stepsAfterBlue = allLights.length - stepsUntilBlue - 1;
       if (stepsAfterBlue > 0) {
         searchlightTransitions.push({
