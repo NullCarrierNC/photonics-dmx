@@ -7,13 +7,13 @@ import { Effect, EffectTransition } from '../../../../types';
 
 /**
  * StageKit Sweep Cue - Sweeping light patterns around the LED ring
- * Large venue: Red sweeps through opposite LED pairs
- * Small venue: Yellow opposite pairs + Blue/Green sequential patterns
+ * Large venue: Red diagonal sweep (6|2) → (5|1) → (4|0) → (3|7)
+ * Small venue: Yellow diagonal sweep + Blue sequential + Green delayed reverse
  */
 export class StageKitSweepCue implements ICue {
   id = 'stagekit-sweep';
   cueId = CueType.Sweep;
-  description = 'Large venue: Red sweeps through opposite LED pairs. Small venue: Yellow opposite pairs + Blue/Green sequential patterns.';
+  description = 'Large venue: Red diagonal sweep (6|2) → (5|1) → (4|0) → (3|7). Small venue: Yellow diagonal + Blue sequential + Green delayed reverse. Green and blue only use lights 1-5.';
   style = CueStyle.Primary;
 
   private isFirstExecution: boolean = true;
@@ -23,7 +23,7 @@ export class StageKitSweepCue implements ICue {
     const isLargeVenue = cueData.venueSize === 'Large';
     const transparentColor = getColor('transparent', 'medium');
     
-    // Beat-based timing: Each step advances at 1/4 of a beat (4 steps per beat)
+    // Beat-based timing: Each step advances on a beat
     const sweepTransitions: EffectTransition[] = [];
 
     // Start immediately (no initial wait)
@@ -45,7 +45,7 @@ export class StageKitSweepCue implements ICue {
 
     const sweepEffect: Effect = {
       id: "stagekit-sweep",
-      description: `StageKit sweep pattern - ${isLargeVenue ? 'Red opposite pairs' : 'Yellow opposite pairs + Blue/Green sequential'}`,
+      description: `StageKit sweep pattern - ${isLargeVenue ? 'Red diagonal sweep' : 'Yellow diagonal + Blue sequential + Green delayed reverse'}`,
       transitions: sweepTransitions
     };
 
@@ -59,8 +59,8 @@ export class StageKitSweepCue implements ICue {
 
   /**
    * Creates sweep transitions for large venue
-   * Red LEDs: Sweep through opposite LED pairs (0|4) → (1|5) → (2|6) → (3|7)
-   * Beat-based timing: Each step advances at 1/4 of a beat (4 steps per beat)
+   * Red LEDs: Diagonal sweep (6|2) → (5|1) → (4|0) → (3|7)
+   * Beat-based timing: Each step advances on a beat (4 steps = 4 beats total)
    */
   private createLargeVenueSweep(
     sweepTransitions: EffectTransition[], 
@@ -68,12 +68,12 @@ export class StageKitSweepCue implements ICue {
   ): void {
     const redColor = getColor('red', 'medium', 'add');
     const transparentColor = getColor('transparent', 'medium');
-    const oppositePairs = this.createOppositePairs(allLights);
+    const diagonalPairs = this.createDiagonalPairs(allLights);
     
-    for (let pairIndex = 0; pairIndex < oppositePairs.length; pairIndex++) {
-      const pair = oppositePairs[pairIndex];
+    for (let pairIndex = 0; pairIndex < diagonalPairs.length; pairIndex++) {
+      const pair = diagonalPairs[pairIndex];
       
-      // Wait until it's this pair's turn (1/4 beat per step)
+      // Wait until it's this pair's turn (1 beat per step)
       if (pairIndex > 0) {
         sweepTransitions.push({
           lights: pair,
@@ -87,7 +87,7 @@ export class StageKitSweepCue implements ICue {
         });
       }
       
-      // Turn red for 1/4 beat
+      // Turn red for 1 beat
       sweepTransitions.push({
         lights: pair,
         layer: 0,
@@ -95,12 +95,11 @@ export class StageKitSweepCue implements ICue {
         waitForTime: 0,
         transform: { color: redColor, easing: 'linear', duration: 0 },
         waitUntilCondition: 'beat',
-        waitUntilTime: 0,
-        waitUntilConditionCount: 1
+        waitUntilTime: 0
       });
       
       // Turn off and wait until cycle completes
-      const stepsAfter = oppositePairs.length - pairIndex - 1;
+      const stepsAfter = diagonalPairs.length - pairIndex - 1;
       if (stepsAfter > 0) {
         sweepTransitions.push({
           lights: pair,
@@ -118,10 +117,10 @@ export class StageKitSweepCue implements ICue {
 
   /**
    * Creates sweep transitions for small venue
-   * Yellow LEDs: Same diagonal sweep as large venue
-   * Blue LEDs: Sequential single-LED sweep 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7
+   * Yellow LEDs: Diagonal sweep (6|2) → (5|1) → (4|0) → (3|7)
+   * Blue LEDs: Sequential single-LED sweep 0 → 1 → 2 → 3 → 4 → None → None → None
    * Green LEDs: Delayed reverse sweep None → None → None → None → 4 → 3 → 2 → 1 → 0
-   * Beat-based timing: Each step advances at 1/4 of a beat
+   * Beat-based timing: Each step advances on a beat (8 steps = 8 beats total)
    */
   private createSmallVenueSweep(
     sweepTransitions: EffectTransition[], 
@@ -130,7 +129,7 @@ export class StageKitSweepCue implements ICue {
     const yellowColor = getColor('yellow', 'medium', 'add');
     const blueColor = getColor('blue', 'medium', 'add');
     const greenColor = getColor('green', 'medium', 'add');
-    const transparentColor = getColor('transparent', 'medium', 'add');
+    const transparentColor = getColor('transparent', 'medium');
 
     // Start immediately for layers 1 and 2
     sweepTransitions.push({
@@ -153,10 +152,10 @@ export class StageKitSweepCue implements ICue {
       waitUntilTime: 0
     });
 
-    // Yellow: Opposite pairs (same pattern as large venue red)
-    const oppositePairs = this.createOppositePairs(allLights);
-    for (let pairIndex = 0; pairIndex < oppositePairs.length; pairIndex++) {
-      const pair = oppositePairs[pairIndex];
+    // Yellow: Diagonal sweep (6|2) → (5|1) → (4|0) → (3|7) - same as large venue
+    const diagonalPairs = this.createDiagonalPairs(allLights);
+    for (let pairIndex = 0; pairIndex < diagonalPairs.length; pairIndex++) {
+      const pair = diagonalPairs[pairIndex];
       
       if (pairIndex > 0) {
         sweepTransitions.push({
@@ -178,11 +177,10 @@ export class StageKitSweepCue implements ICue {
         waitForTime: 0,
         transform: { color: yellowColor, easing: 'linear', duration: 0 },
         waitUntilCondition: 'beat',
-        waitUntilTime: 0,
-        waitUntilConditionCount: 1
+        waitUntilTime: 0
       });
       
-      const stepsAfterYellow = oppositePairs.length - pairIndex - 1;
+      const stepsAfterYellow = diagonalPairs.length - pairIndex - 1;
       if (stepsAfterYellow > 0) {
         sweepTransitions.push({
           lights: pair,
@@ -197,11 +195,12 @@ export class StageKitSweepCue implements ICue {
       }
     }
     
-    // Blue: Sequential single-LED sweep 0 → 1 → 2 → 3 → 4 → None → None
-    for (let lightIndex = 0; lightIndex < 5; lightIndex++) { // Only lights 0-4
-      const light = allLights[lightIndex];
+    // Blue: Sequential single-LED sweep 0 → 1 → 2 → 3 → 4 → None → None → None (8 steps total)
+    for (let stepIndex = 0; stepIndex < 5; stepIndex++) {
+      // Steps 0-4: Turn on lights 0-4
+      const light = allLights[stepIndex];
       
-      if (lightIndex > 0) {
+      if (stepIndex > 0) {
         sweepTransitions.push({
           lights: [light],
           layer: 1,
@@ -210,7 +209,7 @@ export class StageKitSweepCue implements ICue {
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'beat',
           waitUntilTime: 0,
-          waitUntilConditionCount: lightIndex
+          waitUntilConditionCount: stepIndex
         });
       }
       
@@ -221,29 +220,31 @@ export class StageKitSweepCue implements ICue {
         waitForTime: 0,
         transform: { color: blueColor, easing: 'linear', duration: 0 },
         waitUntilCondition: 'beat',
-        waitUntilTime: 0,
-        waitUntilConditionCount: 1
+        waitUntilTime: 0
       });
       
-      sweepTransitions.push({
-        lights: [light],
-        layer: 1,
-        waitForCondition: 'none',
-        waitForTime: 0,
-        transform: { color: transparentColor, easing: 'linear', duration: 0 },
-        waitUntilCondition: 'beat',
-        waitUntilTime: 0,
-        waitUntilConditionCount: 4 - lightIndex
-      });
+      const stepsAfterBlue = 7 - stepIndex;
+      if (stepsAfterBlue > 0) {
+        sweepTransitions.push({
+          lights: [light],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsAfterBlue
+        });
+      }
     }
 
-    // Green: Delayed reverse sweep None → None → None → None → 4 → 3 → 2 → 1 → 0
-    const delaySteps = 4; // 4 beats of delay before starting
-    
-    for (let lightIndex = 0; lightIndex < 5; lightIndex++) { // Only lights 4-0
-      const light = allLights[4 - lightIndex]; // Reverse order: 4, 3, 2, 1, 0
+    // Green: Delayed reverse sweep None → None → None → None → 4 → 3 → 2 → 1 → 0 (8 steps total)
+    for (let stepIndex = 0; stepIndex < 5; stepIndex++) {
+      // Steps 4-7 mapped to lights 4,3,2,1,0
+      const lightPosition = 4 - stepIndex; // Maps step 0→light 4, step 1→light 3, etc.
+      const light = allLights[lightPosition];
+      const actualStepIndex = stepIndex + 4; // Delay by 4 beats
       
-      // Wait for delay period (4 beats)
       sweepTransitions.push({
         lights: [light],
         layer: 2,
@@ -252,10 +253,9 @@ export class StageKitSweepCue implements ICue {
         transform: { color: transparentColor, easing: 'linear', duration: 0 },
         waitUntilCondition: 'beat',
         waitUntilTime: 0,
-        waitUntilConditionCount: delaySteps
+        waitUntilConditionCount: actualStepIndex
       });
       
-      // Turn green for 1 beat
       sweepTransitions.push({
         lights: [light],
         layer: 2,
@@ -263,12 +263,10 @@ export class StageKitSweepCue implements ICue {
         waitForTime: 0,
         transform: { color: greenColor, easing: 'linear', duration: 0 },
         waitUntilCondition: 'beat',
-        waitUntilTime: 0,
-        waitUntilConditionCount: 1
+        waitUntilTime: 0
       });
       
-      // Turn off and wait until cycle completes
-      const stepsAfterGreen = 4 - lightIndex;
+      const stepsAfterGreen = 7 - actualStepIndex;
       if (stepsAfterGreen > 0) {
         sweepTransitions.push({
           lights: [light],
@@ -284,20 +282,31 @@ export class StageKitSweepCue implements ICue {
     }
   }
 
-  private createOppositePairs(lights: any[]): any[][] {
+  /**
+   * Creates diagonal pairs for the sweep pattern (6|2) → (5|1) → (4|0) → (3|7)
+   * This creates a diagonal movement across the LED array
+   */
+  private createDiagonalPairs(lights: any[]): any[][] {
     const pairs: any[][] = [];
-    const halfLength = Math.floor(lights.length / 2);
     
-    if (lights.length === 4) {
-      // For 4 lights, just use individual lights instead of pairs
-      for (let i = 0; i < halfLength; i++) {
-        pairs.push([lights[i]]); // Single light, not a pair
-      }
+    if (lights.length === 8) {
+      // For 8 lights: (6|2) → (5|1) → (4|0) → (3|7)
+      pairs.push([lights[6], lights[2]]);
+      pairs.push([lights[5], lights[1]]);
+      pairs.push([lights[4], lights[0]]);
+      pairs.push([lights[3], lights[7]]);
+    } else if (lights.length === 4) {
+      // For 4 lights, use individual lights in diagonal order
+      pairs.push([lights[2]]);
+      pairs.push([lights[1]]);
+      pairs.push([lights[0]]);
+      pairs.push([lights[3]]);
     } else {
-      // For other counts, create actual opposite pairs
+      // Fallback for other light counts - adapt the diagonal pattern
+      const halfLength = Math.floor(lights.length / 2);
       for (let i = 0; i < halfLength; i++) {
-        const first = lights[i];
-        const second = lights[i + halfLength];
+        const first = lights[(lights.length - 2 + i) % lights.length];
+        const second = lights[(2 - i + lights.length) % lights.length];
         pairs.push([first, second]);
       }
     }
