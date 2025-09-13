@@ -13,7 +13,7 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitSweepCue implements ICue {
   id = 'stagekit-sweep';
   cueId = CueType.Sweep;
-  description = 'Large venue: Red sweeps through opposite LED pairs. Small venue: Yellow opposite pairs + Blue/Green sequential patterns. Green current disabled.';
+  description = 'Large venue: Red sweeps through opposite LED pairs. Small venue: Yellow opposite pairs + Blue/Green sequential patterns.';
   style = CueStyle.Primary;
 
   private isFirstExecution: boolean = true;
@@ -23,212 +23,24 @@ export class StageKitSweepCue implements ICue {
     const isLargeVenue = cueData.venueSize === 'Large';
     const transparentColor = getColor('transparent', 'medium');
     
-    // Calculate timing: 0.25 cycles per beat (4 steps per beat)
-    const bpm = cueData.beatsPerMinute || 120;
-    const beatDuration = (60 / bpm) * 1000; // Convert to milliseconds
-    const stepDuration = beatDuration / 4; // 4 steps per beat
-    
+    // Beat-based timing: Each step advances at 1/4 of a beat (4 steps per beat)
     const sweepTransitions: EffectTransition[] = [];
 
-    // Wait for a beat to start the sequence
+    // Start immediately (no initial wait)
     sweepTransitions.push({
       lights: allLights,
       layer: 0,
       waitForCondition: 'none',
       waitForTime: 0,
       transform: { color: transparentColor, easing: 'linear', duration: 0 },
-      waitUntilCondition: 'beat',
+      waitUntilCondition: 'none',
       waitUntilTime: 0
     });
 
     if (isLargeVenue) {
-      // Large venue: Red sweeps through opposite LED pairs
-      const redColor = getColor('red', 'medium', 'add');
-      const oppositePairs = this.createOppositePairs(allLights);
-      
-      for (let pairIndex = 0; pairIndex < oppositePairs.length; pairIndex++) {
-        const pair = oppositePairs[pairIndex];
-        
-        // Wait until it's this pair's turn
-        if (pairIndex > 0) {
-          sweepTransitions.push({
-            lights: pair,
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: pairIndex * stepDuration
-          });
-        }
-        
-        // Turn red
-        sweepTransitions.push({
-          lights: pair,
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: redColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: stepDuration
-        });
-        
-        // Turn off after step duration
-        sweepTransitions.push({
-          lights: pair,
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: (oppositePairs.length - pairIndex - 1) * stepDuration
-        });
-      }
+      this.createLargeVenueSweep(sweepTransitions, allLights);
     } else {
-      // Small venue: Yellow opposite pairs + Blue/Green sequential patterns
-      const yellowColor = getColor('yellow', 'medium', 'add');
-      const blueColor = getColor('blue', 'medium', 'add');
-   //   const greenColor = getColor('green', 'medium', 'add');
-
-          // Wait for a beat to start the sequence
-        sweepTransitions.push({
-          lights: allLights,
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'beat',
-          waitUntilTime: 0
-        });
-
-        sweepTransitions.push({
-          lights: allLights,
-          layer: 2,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'beat',
-          waitUntilTime: 0
-        });
-
-        
-      
-      // Yellow: Opposite pairs (same pattern as large venue red)
-      const oppositePairs = this.createOppositePairs(allLights);
-      for (let pairIndex = 0; pairIndex < oppositePairs.length; pairIndex++) {
-        const pair = oppositePairs[pairIndex];
-        
-        if (pairIndex > 0) {
-          sweepTransitions.push({
-            lights: pair,
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: pairIndex * stepDuration
-          });
-        }
-        
-        sweepTransitions.push({
-          lights: pair,
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: yellowColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: stepDuration
-        });
-        
-        sweepTransitions.push({
-          lights: pair,
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: (oppositePairs.length - pairIndex - 1) * stepDuration
-        });
-      }
-      
-      // Blue: Sequential activation from one side (scales with light count)
-      const blueStepDuration = beatDuration / allLights.length;
-      for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
-        const light = allLights[lightIndex];
-        
-        if (lightIndex > 0) {
-          sweepTransitions.push({
-            lights: [light],
-            layer: 1,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: lightIndex * blueStepDuration
-          });
-        }
-        
-        sweepTransitions.push({
-          lights: [light],
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: blueColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: blueStepDuration
-        });
-        
-        sweepTransitions.push({
-          lights: [light],
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: (allLights.length - lightIndex - 1) * blueStepDuration
-        });
-      }
-      /*
-      // Green: Sequential activation from opposite side with delay (scales with light count)
-      const greenStepDuration = beatDuration / allLights.length;
-      const delaySteps = Math.floor(allLights.length / 2); // Delay scales with light count
-      
-      for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
-        const light = allLights[allLights.length - 1 - lightIndex]; // Reverse order
-        
-        // Wait for delay period
-        sweepTransitions.push({
-          lights: [light],
-          layer: 2,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: delaySteps * greenStepDuration
-        });
-        
-        // Turn green
-        sweepTransitions.push({
-          lights: [light],
-          layer: 2,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: greenColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: greenStepDuration
-        });
-        
-        // Turn off
-        sweepTransitions.push({
-          lights: [light],
-          layer: 2,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: (allLights.length - delaySteps - lightIndex - 1) * greenStepDuration
-        });
-      }*/
+      this.createSmallVenueSweep(sweepTransitions, allLights);
     }
 
     const sweepEffect: Effect = {
@@ -242,6 +54,233 @@ export class StageKitSweepCue implements ICue {
       this.isFirstExecution = false;
     } else {
       await controller.addEffect('stagekit-sweep', sweepEffect);
+    }
+  }
+
+  /**
+   * Creates sweep transitions for large venue
+   * Red LEDs: Sweep through opposite LED pairs (0|4) → (1|5) → (2|6) → (3|7)
+   * Beat-based timing: Each step advances at 1/4 of a beat (4 steps per beat)
+   */
+  private createLargeVenueSweep(
+    sweepTransitions: EffectTransition[], 
+    allLights: any[]
+  ): void {
+    const redColor = getColor('red', 'medium', 'add');
+    const transparentColor = getColor('transparent', 'medium');
+    const oppositePairs = this.createOppositePairs(allLights);
+    
+    for (let pairIndex = 0; pairIndex < oppositePairs.length; pairIndex++) {
+      const pair = oppositePairs[pairIndex];
+      
+      // Wait until it's this pair's turn (1/4 beat per step)
+      if (pairIndex > 0) {
+        sweepTransitions.push({
+          lights: pair,
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: pairIndex
+        });
+      }
+      
+      // Turn red for 1/4 beat
+      sweepTransitions.push({
+        lights: pair,
+        layer: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: redColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0,
+        waitUntilConditionCount: 1
+      });
+      
+      // Turn off and wait until cycle completes
+      const stepsAfter = oppositePairs.length - pairIndex - 1;
+      if (stepsAfter > 0) {
+        sweepTransitions.push({
+          lights: pair,
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsAfter
+        });
+      }
+    }
+  }
+
+  /**
+   * Creates sweep transitions for small venue
+   * Yellow LEDs: Same diagonal sweep as large venue
+   * Blue LEDs: Sequential single-LED sweep 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7
+   * Green LEDs: Delayed reverse sweep None → None → None → None → 4 → 3 → 2 → 1 → 0
+   * Beat-based timing: Each step advances at 1/4 of a beat
+   */
+  private createSmallVenueSweep(
+    sweepTransitions: EffectTransition[], 
+    allLights: any[]
+  ): void {
+    const yellowColor = getColor('yellow', 'medium', 'add');
+    const blueColor = getColor('blue', 'medium', 'add');
+    const greenColor = getColor('green', 'medium', 'add');
+    const transparentColor = getColor('transparent', 'medium', 'add');
+
+    // Start immediately for layers 1 and 2
+    sweepTransitions.push({
+      lights: allLights,
+      layer: 1,
+      waitForCondition: 'none',
+      waitForTime: 0,
+      transform: { color: transparentColor, easing: 'linear', duration: 0 },
+      waitUntilCondition: 'none',
+      waitUntilTime: 0
+    });
+
+    sweepTransitions.push({
+      lights: allLights,
+      layer: 2,
+      waitForCondition: 'none',
+      waitForTime: 0,
+      transform: { color: transparentColor, easing: 'linear', duration: 0 },
+      waitUntilCondition: 'none',
+      waitUntilTime: 0
+    });
+
+    // Yellow: Opposite pairs (same pattern as large venue red)
+    const oppositePairs = this.createOppositePairs(allLights);
+    for (let pairIndex = 0; pairIndex < oppositePairs.length; pairIndex++) {
+      const pair = oppositePairs[pairIndex];
+      
+      if (pairIndex > 0) {
+        sweepTransitions.push({
+          lights: pair,
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: pairIndex
+        });
+      }
+      
+      sweepTransitions.push({
+        lights: pair,
+        layer: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: yellowColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0,
+        waitUntilConditionCount: 1
+      });
+      
+      const stepsAfterYellow = oppositePairs.length - pairIndex - 1;
+      if (stepsAfterYellow > 0) {
+        sweepTransitions.push({
+          lights: pair,
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsAfterYellow
+        });
+      }
+    }
+    
+    // Blue: Sequential single-LED sweep 0 → 1 → 2 → 3 → 4 → None → None
+    for (let lightIndex = 0; lightIndex < 5; lightIndex++) { // Only lights 0-4
+      const light = allLights[lightIndex];
+      
+      if (lightIndex > 0) {
+        sweepTransitions.push({
+          lights: [light],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: lightIndex
+        });
+      }
+      
+      sweepTransitions.push({
+        lights: [light],
+        layer: 1,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: blueColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0,
+        waitUntilConditionCount: 1
+      });
+      
+      sweepTransitions.push({
+        lights: [light],
+        layer: 1,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: transparentColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0,
+        waitUntilConditionCount: 4 - lightIndex
+      });
+    }
+
+    // Green: Delayed reverse sweep None → None → None → None → 4 → 3 → 2 → 1 → 0
+    const delaySteps = 4; // 4 beats of delay before starting
+    
+    for (let lightIndex = 0; lightIndex < 5; lightIndex++) { // Only lights 4-0
+      const light = allLights[4 - lightIndex]; // Reverse order: 4, 3, 2, 1, 0
+      
+      // Wait for delay period (4 beats)
+      sweepTransitions.push({
+        lights: [light],
+        layer: 2,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: transparentColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0,
+        waitUntilConditionCount: delaySteps
+      });
+      
+      // Turn green for 1 beat
+      sweepTransitions.push({
+        lights: [light],
+        layer: 2,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: greenColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0,
+        waitUntilConditionCount: 1
+      });
+      
+      // Turn off and wait until cycle completes
+      const stepsAfterGreen = 4 - lightIndex;
+      if (stepsAfterGreen > 0) {
+        sweepTransitions.push({
+          lights: [light],
+          layer: 2,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsAfterGreen
+        });
+      }
     }
   }
 
