@@ -16,6 +16,14 @@ export abstract class BaseCueHandler extends EventEmitter {
   protected debouncePeriod: number;
   protected lastDebouncedCueTime: number = 0;
   protected registry: CueRegistry;
+  
+  // Cue history tracking
+  private cueHistory: CueType[] = [];
+  private currentCue?: CueType;
+  private executionCount = 0;
+  private cueStartTime = 0;
+  private lastCueChangeTime = 0;
+  private previousCueData?: Partial<CueData>;
 
   constructor(
     lightManager: DmxLightManager,
@@ -35,6 +43,20 @@ export abstract class BaseCueHandler extends EventEmitter {
    */
   public reset(): void {
     this.registry.reset();
+    this.resetCueHistory();
+  }
+
+  /**
+   * Reset cue history tracking
+   * Called when starting a new session or switching handlers
+   */
+  public resetCueHistory(): void {
+    this.cueHistory = [];
+    this.currentCue = undefined;
+    this.executionCount = 0;
+    this.cueStartTime = 0;
+    this.lastCueChangeTime = 0;
+    this.previousCueData = undefined;
   }
 
   /**
@@ -43,6 +65,62 @@ export abstract class BaseCueHandler extends EventEmitter {
    * @param parameters The cue parameters
    */
   public abstract handleCue(cueType: CueType, parameters: CueData): Promise<void>;
+
+  /**
+   * Add history to CueData with context information
+   * @param cueType The current cue type
+   * @param parameters The original cue parameters
+   * @returns CueData with history information
+   */
+  protected addHistoryToCueData(cueType: CueType, parameters: CueData): CueData {
+    const now = Date.now();
+    
+    // Detect cue changes and update history
+    if (this.currentCue !== cueType) {
+      // Only add to history if different from the last cue (avoid immediate succession duplicates)
+      if (this.currentCue && this.currentCue !== cueType) {
+        this.cueHistory.push(this.currentCue);
+        
+        // Limit history to last 5 cues
+        if (this.cueHistory.length > 5) {
+          this.cueHistory.shift();
+        }
+      }
+      
+      this.currentCue = cueType;
+      this.executionCount = 1;
+      this.lastCueChangeTime = now;
+      this.cueStartTime = now;
+    } else {
+      this.executionCount++;
+    }
+
+    // Calculate timing information
+    const timeSinceLastCue = now - this.lastCueChangeTime;
+    
+    
+    const historyCueData: CueData = {
+      ...parameters,
+      previousCue: this.cueHistory.length > 0 ? this.cueHistory[this.cueHistory.length - 1] : undefined,
+      cueHistory: [...this.cueHistory],
+      executionCount: this.executionCount,
+      cueStartTime: this.cueStartTime,
+      timeSinceLastCue,
+      previousFrame: this.previousCueData
+    };
+
+    // Store current frame for next comparison
+    this.previousCueData = {
+      vocalNote: parameters.vocalNote,
+      harmony0Note: parameters.harmony0Note,
+      harmony1Note: parameters.harmony1Note,
+      harmony2Note: parameters.harmony2Note,
+      beat: parameters.beat,
+      keyframe: parameters.keyframe
+    };
+
+    return historyCueData;
+  }
 
   /**
    * Check if enough time has passed since the last cue
@@ -217,5 +295,25 @@ export abstract class BaseCueHandler extends EventEmitter {
     const groups = groupNames.map(name => this.registry.getGroup(name)).filter(g => g);
     // The type from the registry is ICueGroup, we need to cast it to CueGroup
     return groups.map(g => ({ name: g!.name, description: g!.description })) as CueGroup[];
+  }
+
+  /**
+   * Get current cue history for debugging/monitoring
+   * @returns Object containing current cue state and history
+   */
+  public getCueHistoryState(): {
+    currentCue?: CueType;
+    previousCue?: CueType;
+    cueHistory: CueType[];
+    executionCount: number;
+    timeSinceLastCue: number;
+  } {
+    return {
+      currentCue: this.currentCue,
+      previousCue: this.cueHistory.length > 0 ? this.cueHistory[this.cueHistory.length - 1] : undefined,
+      cueHistory: [...this.cueHistory],
+      executionCount: this.executionCount,
+      timeSinceLastCue: Date.now() - this.lastCueChangeTime
+    };
   }
 } 

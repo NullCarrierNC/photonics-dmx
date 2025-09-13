@@ -62,6 +62,14 @@ export type CueData = {
     keyframe: string;
     bonusEffect: boolean;
     
+    // Cue history and context
+    previousCue?: CueType;
+    cueHistory: CueType[];
+    executionCount: number;
+    cueStartTime: number;
+    timeSinceLastCue: number;
+    previousFrame?: Partial<CueData>;
+    
   
     // Optional RB3E-specific properties
     ledColor?: string | null;
@@ -120,6 +128,12 @@ export type CueData = {
     beat: "Unknown",
     keyframe: "Unknown",
     bonusEffect: false,
+    
+    // Cue history defaults
+    cueHistory: [],
+    executionCount: 0,
+    cueStartTime: 0,
+    timeSinceLastCue: 0,
     ledColor: null,
     rb3Platform: "Unknown",
     rb3BuildTag: "",
