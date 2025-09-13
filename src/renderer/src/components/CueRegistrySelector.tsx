@@ -12,6 +12,11 @@ type CueGroup = {
 interface CueRegistrySelectorProps {
   onRegistryChange: (registryType: CueRegistryType) => void;
   onGroupChange: (groupIds: string[]) => void;
+  selectedVenueSize: 'NoVenue' | 'Small' | 'Large';
+  onVenueSizeChange: (venueSize: 'NoVenue' | 'Small' | 'Large') => void;
+  selectedBpm: number;
+  onBpmChange: (bpm: number) => void;
+  selectedGroupId: string;
   
   /**
    * When true, the component will initialize with the currently active group selected.
@@ -22,7 +27,12 @@ interface CueRegistrySelectorProps {
 
 const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   onRegistryChange,
-  onGroupChange
+  onGroupChange,
+  selectedVenueSize,
+  onVenueSizeChange,
+  selectedBpm,
+  onBpmChange,
+  selectedGroupId
 }) => {
   const [registryType, setRegistryType] = useState<CueRegistryType>('YARG');
   const [groups, setGroups] = useState<CueGroup[]>([]);
@@ -108,17 +118,35 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     <div className="flex items-center gap-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Game Type
+          Venue Size
         </label>
         <select
-          value={registryType}
-          onChange={handleRegistryChange}
-          className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
-          style={{ width: '200px' }}
+          value={selectedVenueSize}
+          onChange={(e) => onVenueSizeChange(e.target.value as 'NoVenue' | 'Small' | 'Large')}
+          className="p-2 pr-8 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
+          style={{ width: '150px' }}
+          disabled={!selectedGroupId}
         >
-          <option value="YARG">YARG</option>
-          <option value="RB3E" disabled>RB3E (Uses direct)</option>
+          <option value="NoVenue">No Venue</option>
+          <option value="Small">Small</option>
+          <option value="Large">Large</option>
         </select>
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          BPM
+        </label>
+        <input
+          type="number"
+          min="60"
+          max="200"
+          value={selectedBpm}
+          onChange={(e) => onBpmChange(parseInt(e.target.value) || 120)}
+          className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
+          style={{ width: '80px' }}
+          disabled={!selectedGroupId}
+        />
       </div>
 
       <div>

@@ -14,7 +14,7 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitSearchlightsCue implements ICue {
   id = 'stagekit-searchlights';
   cueId = CueType.Searchlights;
-  description = 'Large venue: Yellow and blue rotate in opposite directions. Small venue: Yellow and red rotate together in same direction offset by 1.';
+  description = 'Large venue: Yellow clockwise (2→3→4→5→6→7→0→1) and blue counter-clockwise (0→7→6→5→4→3→2→1). Small venue: Yellow counter-clockwise (0→7→6→5→4→3→2→1). 2 rotations per beat.';
   style = CueStyle.Primary;
 
   private isFirstExecution: boolean = true;
@@ -24,19 +24,9 @@ export class StageKitSearchlightsCue implements ICue {
     const transparentColor = getColor('transparent', 'medium');
     const isLargeVenue = cueData.venueSize === 'Large';
     
-    // Calculate timing: entire sequence completes within one beat
-    // Each light gets a fraction of the beat duration
-    const bpm = cueData.beatsPerMinute || 120;
-    const beatDuration = (60 / bpm) * 1000; // Convert to milliseconds
-    const timePerStep = beatDuration / allLights.length;
-    
-    let color1, color2;
-    if (isLargeVenue) {
-      color1 = getColor('yellow', 'medium', 'add');
-      color2 = getColor('blue', 'medium', 'add');
-    } else {
-      color1 = getColor('yellow', 'high', 'add');
-    }
+    // Beat-based timing: Each step advances on a beat
+    // 8 steps = 8 beats for one full rotation
+    // 2 rotations = 16 beats total
 
     const searchlightTransitions: EffectTransition[] = [];
 
@@ -63,140 +53,14 @@ export class StageKitSearchlightsCue implements ICue {
     });
 
     if (isLargeVenue) {
-      // Large venue: Yellow and blue rotate in opposite directions (crossing beams)
-      
-      // Layer 0: Yellow clockwise chase
-      for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
-        const light = allLights[lightIndex];
-        const stepsUntilYellow = lightIndex;
-        
-        if (stepsUntilYellow > 0) {
-          searchlightTransitions.push({
-            lights: [light],
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: stepsUntilYellow * timePerStep
-          });
-        }
-        
-        searchlightTransitions.push({
-          lights: [light],
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: color1, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: timePerStep
-        });
-        
-        const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
-        if (stepsAfterYellow > 0) {
-          searchlightTransitions.push({
-            lights: [light],
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: stepsAfterYellow * timePerStep
-          });
-        }
-      }
-
-      // Layer 1: Blue counter-clockwise chase
-      for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
-        const light = allLights[lightIndex];
-        const stepsUntilBlue = (allLights.length - 1 - lightIndex + allLights.length) % allLights.length;
-        
-        if (stepsUntilBlue > 0) {
-          searchlightTransitions.push({
-            lights: [light],
-            layer: 1,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: stepsUntilBlue * timePerStep
-          });
-        }
-        
-        searchlightTransitions.push({
-          lights: [light],
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: color2, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: timePerStep
-        });
-        
-        const stepsAfterBlue = allLights.length - stepsUntilBlue - 1;
-        if (stepsAfterBlue > 0) {
-          searchlightTransitions.push({
-            lights: [light],
-            layer: 1,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: stepsAfterBlue * timePerStep
-          });
-        }
-      }
+      this.createLargeVenueSearchlights(searchlightTransitions, allLights);
     } else {
-      // Small venue: Yellow and red rotate together in same direction
-      // Yellow offset by -1 (leads red)
-      
-      // Layer 0: Yellow clockwise chase
-      for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
-        const light = allLights[lightIndex];
-        const stepsUntilYellow = lightIndex;
-        
-        if (stepsUntilYellow > 0) {
-          searchlightTransitions.push({
-            lights: [light],
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: stepsUntilYellow * timePerStep
-          });
-        }
-        
-        searchlightTransitions.push({
-          lights: [light],
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: color1, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: timePerStep
-        });
-        
-        const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
-        if (stepsAfterYellow > 0) {
-          searchlightTransitions.push({
-            lights: [light],
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: { color: transparentColor, easing: 'linear', duration: 0 },
-            waitUntilCondition: 'delay',
-            waitUntilTime: stepsAfterYellow * timePerStep
-          });
-        }
-      }
-
-     
+      this.createSmallVenueSearchlights(searchlightTransitions, allLights);
     }
 
     const searchlightEffect: Effect = {
       id: "stagekit-searchlights",
-      description: `StageKit searchlights pattern - ${isLargeVenue ? 'Yellow/Blue opposing rotations' : 'Yellow/Red synchronized rotations (= high yellow blended)' }`,
+      description: `StageKit searchlights pattern - ${isLargeVenue ? 'Yellow clockwise + Blue counter-clockwise' : 'Yellow counter-clockwise'} (beat-based timing)`,
       transitions: searchlightTransitions
     };
 
@@ -205,6 +69,170 @@ export class StageKitSearchlightsCue implements ICue {
       this.isFirstExecution = false;
     } else {
       await controller.addEffect('stagekit-searchlights', searchlightEffect);
+    }
+  }
+
+  /**
+   * Creates searchlight transitions for large venue
+   * Yellow LEDs: Rotate clockwise through positions 2→3→4→5→6→7→0→1
+   * Blue LEDs: Rotate counter-clockwise through positions 0→7→6→5→4→3→2→1
+   * Beat-based timing: Each step advances on a beat
+   */
+  private createLargeVenueSearchlights(
+    searchlightTransitions: EffectTransition[], 
+    allLights: any[]
+  ): void {
+    const yellowColor = getColor('yellow', 'medium', 'add');
+    const blueColor = getColor('blue', 'medium', 'add');
+    const transparentColor = getColor('transparent', 'medium');
+
+    // Layer 0: Yellow clockwise chase (starts at position 2)
+    for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
+      const light = allLights[lightIndex];
+      // Yellow starts at position 2: (lightIndex + 2) % allLights.length
+      const yellowStartPosition = (lightIndex + 2) % allLights.length;
+      const stepsUntilYellow = yellowStartPosition;
+      
+      if (stepsUntilYellow > 0) {
+        searchlightTransitions.push({
+          lights: [light],
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsUntilYellow
+        });
+      }
+      
+      searchlightTransitions.push({
+        lights: [light],
+        layer: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: yellowColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0
+      });
+      
+      const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
+      if (stepsAfterYellow > 0) {
+        searchlightTransitions.push({
+          lights: [light],
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsAfterYellow
+        });
+      }
+    }
+
+    // Layer 1: Blue counter-clockwise chase (starts at position 0)
+    for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
+      const light = allLights[lightIndex];
+      // Blue starts at position 0 and goes counter-clockwise
+      const blueStartPosition = lightIndex; // Position 0 for first light
+      const stepsUntilBlue = blueStartPosition;
+      
+      if (stepsUntilBlue > 0) {
+        searchlightTransitions.push({
+          lights: [light],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsUntilBlue
+        });
+      }
+      
+      searchlightTransitions.push({
+        lights: [light],
+        layer: 1,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: blueColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0
+      });
+      
+      const stepsAfterBlue = allLights.length - stepsUntilBlue - 1;
+      if (stepsAfterBlue > 0) {
+        searchlightTransitions.push({
+          lights: [light],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsAfterBlue
+        });
+      }
+    }
+  }
+
+  /**
+   * Creates searchlight transitions for small venue
+   * Yellow LEDs: Rotate counter-clockwise through positions 0→7→6→5→4→3→2→1
+   * Uses yellow high (equivalent to red medium + yellow medium blending)
+   * Beat-based timing: Each step advances on a beat
+   */
+  private createSmallVenueSearchlights(
+    searchlightTransitions: EffectTransition[], 
+    allLights: any[]
+  ): void {
+    const yellowColor = getColor('yellow', 'high', 'add');
+    const transparentColor = getColor('transparent', 'medium');
+
+    // Layer 0: Yellow counter-clockwise chase (starts at position 0)
+    for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
+      const light = allLights[lightIndex];
+      // Yellow starts at position 0 and goes counter-clockwise
+      const yellowStartPosition = lightIndex; // Position 0 for first light
+      const stepsUntilYellow = yellowStartPosition;
+      
+      if (stepsUntilYellow > 0) {
+        searchlightTransitions.push({
+          lights: [light],
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsUntilYellow
+        });
+      }
+      
+      searchlightTransitions.push({
+        lights: [light],
+        layer: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: yellowColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0
+      });
+      
+      const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
+      if (stepsAfterYellow > 0) {
+        searchlightTransitions.push({
+          lights: [light],
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: transparentColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsAfterYellow
+        });
+      }
     }
   }
 
