@@ -12,7 +12,7 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitFrenzyCue implements ICue {
   id = 'stagekit-frenzy';
   cueId = CueType.Frenzy;
-  description = 'Large venue: Red->Blue->Yellow cycle on red drum. Small venue: Red->Green->Blue cycle on red drum.';
+  description = 'Large venue: Red->Blue->Yellow cycle on beat. Small venue: Red->Green->Blue cycle on beat. NOTE: Differs from StageKit/YALCY which flashes each colour very quickly - this turns our lower number of lights into colourful strobes instead.';
   style = CueStyle.Primary;
 
   async execute(cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
@@ -24,20 +24,20 @@ export class StageKitFrenzyCue implements ICue {
     let color1, color2, color3;
     if (isLargeVenue) {
       // Large venue: Red -> Blue -> Yellow
-      color1 = getColor('red', 'medium', 'replace');
-      color2 = getColor('blue', 'medium', 'replace');
-      color3 = getColor('yellow', 'medium', 'replace');
+      color1 = getColor('red', 'medium', 'add');
+      color2 = getColor('blue', 'medium', 'add');
+      color3 = getColor('yellow', 'medium', 'add');
     } else {
       // Small venue: Red -> Green -> Blue
-      color1 = getColor('red', 'medium', 'replace');
-      color2 = getColor('green', 'medium', 'replace');
-      color3 = getColor('blue', 'medium', 'replace');
+      color1 = getColor('red', 'medium', 'add');
+      color2 = getColor('green', 'medium', 'add');
+      color3 = getColor('blue', 'medium', 'add');
     }
     
     // Create frenzy effect with 3-beat cycle
     const frenzyTransitions: EffectTransition[] = [];
     
-    // Beat 1: First color (Red)
+    // beat 1: First color (Red)
     frenzyTransitions.push({
         lights: allLights,
         layer: 0,
@@ -48,11 +48,11 @@ export class StageKitFrenzyCue implements ICue {
             easing: 'linear',
             duration: 0,
         },
-        waitUntilCondition: 'drum-red',
+        waitUntilCondition: 'beat',
         waitUntilTime: 0
     });
     
-    // Beat 2: Second color (Blue for large, Green for small)
+    // beat 2: Second color (Blue for large, Green for small)
     frenzyTransitions.push({
         lights: allLights,
         layer: 0,
@@ -63,12 +63,12 @@ export class StageKitFrenzyCue implements ICue {
             easing: 'linear',
             duration: 0,
         },
-        waitUntilCondition: 'drum-red',
+        waitUntilCondition: 'beat',
         waitUntilTime: 0,
         waitUntilConditionCount: 1
     });
     
-    // Beat 3: Third color (Yellow for large, Blue for small)
+    // beat 3: Third color (Yellow for large, Blue for small)
     frenzyTransitions.push({
         lights: allLights,
         layer: 0,
@@ -79,7 +79,7 @@ export class StageKitFrenzyCue implements ICue {
             easing: 'linear',
             duration: 0,
         },
-        waitUntilCondition: 'drum-red',
+        waitUntilCondition: 'beat',
         waitUntilTime: 0,
         waitUntilConditionCount: 1
     });
