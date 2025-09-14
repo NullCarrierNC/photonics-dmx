@@ -443,11 +443,11 @@ export class LightTransitionController {
           out.blue = Math.min(255, current.blue + newState.blue);
           out.intensity = Math.min(255, current.intensity + newState.intensity);
         } else {
-          // Partial opacity - higher layer overrides lower layer for each channel
-          out.red = newState.red;
-          out.green = newState.green;
-          out.blue = newState.blue;
-          out.intensity = newState.intensity;
+          // Partial opacity - add the scaled color to the underlying color
+          out.red = Math.min(255, current.red + Math.round(newState.red * opacity));
+          out.green = Math.min(255, current.green + Math.round(newState.green * opacity));
+          out.blue = Math.min(255, current.blue + Math.round(newState.blue * opacity));
+          out.intensity = Math.min(255, current.intensity + Math.round(newState.intensity * opacity));
         }
         break;
         
