@@ -95,7 +95,11 @@ export class Rb3CueBasedProcessor extends EventEmitter {
       memberScores: [],
       stars: 0,
       sustainDurationMs: 0,
-      measureOrBeat: 0
+      measureOrBeat: 0,
+      cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
     };
     
     console.log('CueBasedProcessor initialized with cue handler');

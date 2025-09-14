@@ -26,7 +26,6 @@ interface CueRegistrySelectorProps {
 }
 
 const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
-  onRegistryChange,
   onGroupChange,
   selectedVenueSize,
   onVenueSizeChange,
@@ -34,7 +33,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   onBpmChange,
   selectedGroupId
 }) => {
-  const [registryType, setRegistryType] = useState<CueRegistryType>('YARG');
+  const [registryType] = useState<CueRegistryType>('YARG');
   const [groups, setGroups] = useState<CueGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const isMounted = useRef(false);
@@ -102,11 +101,6 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     }
   }, [groups, selectedGroup, handleGroupChangeCallback]);
 
-  const handleRegistryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newType = event.target.value as CueRegistryType;
-    setRegistryType(newType);
-    onRegistryChange(newType);
-  };
 
   const handleGroupChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const groupId = event.target.value;

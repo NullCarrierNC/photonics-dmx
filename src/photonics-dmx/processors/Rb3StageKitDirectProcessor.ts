@@ -270,7 +270,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       memberScores: realCueData?.memberScores || [],
       stars: realCueData?.stars || 0,
       sustainDurationMs: realCueData?.sustainDurationMs || 0,
-      measureOrBeat: realCueData?.measureOrBeat || 0
+      measureOrBeat: realCueData?.measureOrBeat || 0,
+      cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
     };
     
     // Emit the clear data for frontend
@@ -1055,7 +1059,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       memberScores: [],
       stars: 0,
       sustainDurationMs: 0,
-      measureOrBeat: 0
+      measureOrBeat: 0,
+      cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
     };
 
     // Emit the cue data for network debugging
@@ -1130,7 +1138,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
           memberScores: [],
           stars: 0,
           sustainDurationMs: 0,
-          measureOrBeat: 0
+          measureOrBeat: 0,
+          cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
         };
         
         this.cueHandler.handleCueDefault(cueData).catch(error => {

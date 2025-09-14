@@ -255,7 +255,11 @@ export class Rb3eNetworkListener extends EventEmitter {
         memberScores: [],
         stars: 0,
         sustainDurationMs: 0,
-        measureOrBeat: 0
+        measureOrBeat: 0,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
       };
 
       // Store platform information from the packet header

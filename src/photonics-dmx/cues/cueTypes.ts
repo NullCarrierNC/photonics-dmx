@@ -64,10 +64,10 @@ export type CueData = {
     
     // Cue history and context
     previousCue?: CueType;
-    cueHistory: CueType[];
-    executionCount: number;
-    cueStartTime: number;
-    timeSinceLastCue: number;
+    cueHistory?: CueType[];
+    executionCount?: number;
+    cueStartTime?: number;
+    timeSinceLastCue?: number;
     previousFrame?: Partial<CueData>;
     
   

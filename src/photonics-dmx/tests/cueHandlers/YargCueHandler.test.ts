@@ -135,6 +135,10 @@ describe('YargCueHandler', () => {
       beat: 'Strong',
       keyframe: 'Off',
       bonusEffect: false,
+      cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
     };
 
     it('should emit cueHandled event for special cases', async () => {
