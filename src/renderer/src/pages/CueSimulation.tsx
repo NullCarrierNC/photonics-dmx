@@ -318,7 +318,7 @@ const CueSimulation: React.FC = () => {
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
             Cue Simulation allows you to test and preview lighting effects before using them in-game. 
             You can select different cue groups, choose specific cues, and manually simulate beats, 
-            measures, and keyframes to see how the cues respond.
+            measures, keyframes, and in some cases instrument notes to see how the cues respond.
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
             Which cue groups are enabled is defined in the Preferences menu.

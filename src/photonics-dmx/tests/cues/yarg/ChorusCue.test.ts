@@ -1,4 +1,4 @@
-import { ChorusCue } from '../../../cues/yarg/handlers/default/ChorusCue';
+import { ChorusCue } from '../../../cues/yarg/handlers/yarg1/ChorusCue';
 import { CueData } from '../../../cues/cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
