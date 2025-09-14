@@ -32,7 +32,7 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
         holdTime: 200,
         durationIn: 0, 
         durationOut: 0,
-        layer: 1,
+        layer: 100,
       });
 
       const baseEffect = getEffectSingleColor({
