@@ -72,6 +72,10 @@ describe('DefaultCue', () => {
         beat: "Strong",
         keyframe: "Unknown",
         bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
       };
 
       await cue.execute(data, mockController, mockLightManager);
@@ -106,6 +110,10 @@ describe('DefaultCue', () => {
         beat: "Strong",
         keyframe: "Unknown",
         bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
       };
 
       await cue.execute(data, mockController, mockLightManager);

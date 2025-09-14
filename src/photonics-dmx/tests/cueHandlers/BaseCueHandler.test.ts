@@ -133,7 +133,11 @@ describe('AbstractCueHandler', () => {
         trackMode: 'tracked',
         beat: 'Off',
         keyframe: 'Off',
-        bonusEffect: false
+        bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
       };
 
       cueHandler.handleDrumNote(DrumNoteType.Kick, cueData);
@@ -165,7 +169,11 @@ describe('AbstractCueHandler', () => {
         trackMode: 'tracked',
         beat: 'Off',
         keyframe: 'Off',
-        bonusEffect: false
+        bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
       };
 
       cueHandler.handleGuitarNote(InstrumentNoteType.Green, cueData);
@@ -197,7 +205,11 @@ describe('AbstractCueHandler', () => {
         trackMode: 'tracked',
         beat: 'Off',
         keyframe: 'Off',
-        bonusEffect: false
+        bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
       };
 
       cueHandler.handleBassNote(InstrumentNoteType.Red, cueData);
@@ -229,7 +241,11 @@ describe('AbstractCueHandler', () => {
         trackMode: 'tracked',
         beat: 'Off',
         keyframe: 'Off',
-        bonusEffect: false
+        bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
       };
 
       cueHandler.handleKeysNote(InstrumentNoteType.Blue, cueData);

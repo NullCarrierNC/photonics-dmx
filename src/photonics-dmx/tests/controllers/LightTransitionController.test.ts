@@ -370,13 +370,13 @@ describe('LightTransitionController', () => {
         opacity: 0.5, blendMode: 'add'
       });
       
-      // Expected result: Each channel is blended according to opacity and blend mode
-      // red: higher layer has opacity 0.5, so red = higherRed = 0 (overrides base)
-      // green: higher layer has opacity 0.5, so green = higherGreen = 200 (overrides base)
-      // blue: higher layer has opacity 0.5, so blue = higherBlue = 0 (overrides base)
-      // intensity: higher layer has opacity 0.5, so intensity = higherIntensity = 100 (overrides base)
+      // Expected result: Additive blending with opacity scaling
+      // red: 255 + (0 × 0.5) = 255 (base + scaled higher)
+      // green: 0 + (200 × 0.5) = 100 (base + scaled higher)
+      // blue: 0 + (0 × 0.5) = 0 (base + scaled higher)
+      // intensity: 255 + (100 × 0.5) = 305 → clamped to 255 (base + scaled higher)
       const expectedState = createMockRGBIP({ 
-        red: 0, green: 200, blue: 0, intensity: 100,
+        red: 255, green: 100, blue: 0, intensity: 255,
         opacity: 1.0, blendMode: 'add'
       });
       
@@ -502,14 +502,14 @@ describe('LightTransitionController', () => {
       expect(actualBlendedResult).toBeDefined();
       expect(actualBlendedResult.opacity).toBe(1.0);
       
-      // RGB values should be blended based on opacity
+      // RGB values should be blended additively: 255 + (255 × 0.5) = 255 (clamped)
       expect(actualBlendedResult.red).toBe(255);
       expect(actualBlendedResult.green).toBe(0);
       expect(actualBlendedResult.blue).toBe(0);
       
-      // Intensity should be blended based on opacity (50%)
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(actualBlendedResult.intensity).toBe(100);
+      // Intensity should be blended additively: 200 + (100 × 0.5) = 250
+      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
+      expect(actualBlendedResult.intensity).toBe(250);
     });
 
     it('should respect intensity opacity independently of RGB opacity', () => {
@@ -557,21 +557,21 @@ describe('LightTransitionController', () => {
       
       // Verify each RGB channel is blended according to opacity and blend mode
       
-      // Red should be blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(actualBlendedResult.red).toBe(100);
+      // Red should be blended additively: 200 + (100 × 0.5) = 250
+      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
+      expect(actualBlendedResult.red).toBe(250);
       
-      // Green should be blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(actualBlendedResult.green).toBe(100);
+      // Green should be blended additively: 0 + (100 × 0.5) = 50
+      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
+      expect(actualBlendedResult.green).toBe(50);
       
-      // Blue should be blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(actualBlendedResult.blue).toBe(100);
+      // Blue should be blended additively: 0 + (100 × 0.5) = 50
+      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
+      expect(actualBlendedResult.blue).toBe(50);
       
-      // Intensity should be blended based on opacity (50%)
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(actualBlendedResult.intensity).toBe(100);
+      // Intensity should be blended additively: 200 + (100 × 0.5) = 250
+      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
+      expect(actualBlendedResult.intensity).toBe(250);
     });
 
     it('should correctly blend multiple layers with varying opacity', () => {
@@ -693,21 +693,21 @@ describe('LightTransitionController', () => {
       
       // Calculate expected values for each channel based on opacity
       
-      // Red channel - blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(finalState.red).toBe(100);
+      // Red channel - blended additively: 200 + (100 × 0.5) = 250
+      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
+      expect(finalState.red).toBe(250);
       
-      // Green channel - blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(finalState.green).toBe(250);
+      // Green channel - blended additively: 200 + (250 × 0.5) = 200 + 125 = 255 (clamped)
+      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
+      expect(finalState.green).toBe(255);
       
-      // Blue channel - blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(finalState.blue).toBe(50);
+      // Blue channel - blended additively: 200 + (50 × 0.5) = 225
+      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
+      expect(finalState.blue).toBe(225);
       
-      // Intensity channel - blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(finalState.intensity).toBe(150);
+      // Intensity channel - blended additively: 200 + (150 × 0.5) = 275 (clamped to 255)
+      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
+      expect(finalState.intensity).toBe(255);
       
       // Verify that opacity and blendMode from the upper layer are preserved
       expect(finalState.opacity).toBe(1.0);

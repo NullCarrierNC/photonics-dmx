@@ -135,6 +135,10 @@ describe('YargCueHandler', () => {
       beat: 'Strong',
       keyframe: 'Off',
       bonusEffect: false,
+      cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
     };
 
     it('should emit cueHandled event for special cases', async () => {
@@ -144,17 +148,22 @@ describe('YargCueHandler', () => {
 
       // Test Blackout_Fast
       await cueHandler.handleCue(CueType.Blackout_Fast, mockCueData);
-      expect(cueHandledListener).toHaveBeenCalledWith(mockCueData);
+      // Exclude runtime-generated properties from comparison
+      const { cueStartTime, timeSinceLastCue, ...expectedCoreData } = mockCueData;
+      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData));
       expect(mockSequencer.blackout).toHaveBeenCalledWith(0);
 
       // Reset mock calls and advance timers
       mockSequencer.blackout.mockClear();
       cueHandledListener.mockClear();
+      cueHandler.resetCueHistory(); // Reset history to prevent accumulation
       jest.advanceTimersByTime(20);
 
       // Test Blackout_Slow
       await cueHandler.handleCue(CueType.Blackout_Slow, mockCueData);
-      expect(cueHandledListener).toHaveBeenCalledWith(mockCueData);
+      // Exclude runtime-generated properties from comparison
+      const { cueStartTime: cst2, timeSinceLastCue: tslc2, ...expectedCoreData2 } = mockCueData;
+      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData2));
       expect(mockSequencer.blackout).toHaveBeenCalledWith(1000);
 
       // Reset mock calls and advance timers
@@ -172,7 +181,9 @@ describe('YargCueHandler', () => {
 
       // Test with a regular cue
       await cueHandler.handleCue(CueType.Default, mockCueData);
-      expect(cueHandledListener).toHaveBeenCalledWith(mockCueData);
+      // Exclude runtime-generated properties from comparison
+      const { cueStartTime, timeSinceLastCue, ...expectedCoreData } = mockCueData;
+      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData));
     });
 
     it('should emit cueHandled event even when no implementation is found', async () => {
@@ -181,7 +192,9 @@ describe('YargCueHandler', () => {
 
       // Test with an unknown cue type
       await cueHandler.handleCue(CueType.Unknown, mockCueData);
-      expect(cueHandledListener).toHaveBeenCalledWith(mockCueData);
+      // Exclude runtime-generated properties from comparison
+      const { cueStartTime, timeSinceLastCue, ...expectedCoreData } = mockCueData;
+      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData));
     });
 
     it('should respect debounce period', async () => {
