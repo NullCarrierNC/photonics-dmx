@@ -28,7 +28,7 @@ const CueSimulation: React.FC = () => {
   const [_isIpcEnabled, setIsIpcEnabled] = useAtom(senderIpcEnabledAtom);
   const [lightingConfig] = useAtom(activeDmxLightsConfigAtom);
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null);
-  const [, setRegistryType] = useState<CueRegistryType>('YARG');
+  const [selectedRegistryType, setSelectedRegistryType] = useState<CueRegistryType>('YARG');
   const [selectedGroup, setSelectedGroup] = useState<string>('Select');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null);
@@ -205,7 +205,7 @@ const CueSimulation: React.FC = () => {
   };
 
   const handleRegistryChange = (type: CueRegistryType) => {
-    setRegistryType(type);
+    setSelectedRegistryType(type);
     // Future implementation: switch between YARG and RB3E registries
   };
 
@@ -343,34 +343,17 @@ const CueSimulation: React.FC = () => {
         <div className="flex flex-wrap gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Venue Size
+              Game Type
             </label>
             <select
-              value={selectedVenueSize}
-              onChange={(e) => setSelectedVenueSize(e.target.value as 'NoVenue' | 'Small' | 'Large')}
+              value={selectedRegistryType}
+              onChange={(e) => setSelectedRegistryType(e.target.value as CueRegistryType)}
               className="p-2 pr-8 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
               style={{ width: '150px' }}
-              disabled={!selectedGroupId}
             >
-              <option value="NoVenue">No Venue</option>
-              <option value="Small">Small</option>
-              <option value="Large">Large</option>
+              <option value="YARG">YARG</option>
+              <option value="RB3E" disabled>RB3E (Uses direct)</option>
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              BPM
-            </label>
-            <input
-              type="number"
-              min="60"
-              max="200"
-              value={selectedBpm}
-              onChange={(e) => setSelectedBpm(parseInt(e.target.value) || 120)}
-              className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
-              style={{ width: '80px' }}
-              disabled={!selectedGroupId}
-            />
           </div>
         </div>
         
@@ -379,6 +362,11 @@ const CueSimulation: React.FC = () => {
             <CueRegistrySelector 
               onRegistryChange={handleRegistryChange}
               onGroupChange={handleGroupChange}
+              selectedVenueSize={selectedVenueSize}
+              onVenueSizeChange={setSelectedVenueSize}
+              selectedBpm={selectedBpm}
+              onBpmChange={setSelectedBpm}
+              selectedGroupId={selectedGroupId}
             />
           </div>
           <div className="lg:w-64">

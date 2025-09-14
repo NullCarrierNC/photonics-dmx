@@ -47,41 +47,44 @@ class YargCueHandler extends BaseCueHandler {
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
     if (!this.checkDebounce()) return;
 
+    // Update CueData with history and context information
+    const historicCueData = this.addHistoryToCueData(cueType, parameters);
+
     // Special cases that need to be handled differently
     switch (cueType) {
       case CueType.Blackout_Fast:
         this.stopCurrentCue();
         this._sequencer.blackout(0);
-        this.emit('cueHandled', parameters);
+        this.emit('cueHandled', historicCueData);
         return;
       case CueType.Blackout_Slow:
         this.stopCurrentCue();
         this._sequencer.blackout(1000);
-        this.emit('cueHandled', parameters);
+        this.emit('cueHandled', historicCueData);
         return;
       case CueType.Blackout_Spotlight:
         this.stopCurrentCue();
         this._sequencer.blackout(0);
-        this.emit('cueHandled', parameters);
+        this.emit('cueHandled', historicCueData);
         return;
       case CueType.Strobe_Off:
-        this.emit('cueHandled', parameters);
+        this.emit('cueHandled', historicCueData);
         return; // Do nothing
       case CueType.Keyframe_First:
       case CueType.Keyframe_Next:
       case CueType.Keyframe_Previous:
         this.handleKeyframe();
-        this.emit('cueHandled', parameters);
+        this.emit('cueHandled', historicCueData);
         return;
       case CueType.NoCue:
         this.stopCurrentCue();
         this._sequencer.blackout(0);
-        this.emit('cueHandled', parameters);
+        this.emit('cueHandled', historicCueData);
         return;
       case CueType.Menu:
         this.stopCurrentCue();
         //this.registry.setActiveGroups([]);
-        this.emit('cueHandled', parameters);
+        this.emit('cueHandled', historicCueData);
         break;
     }
 
@@ -102,11 +105,11 @@ class YargCueHandler extends BaseCueHandler {
         this.currentExecutingCueType = cueType;
       }
       
-      await cue.execute(parameters, this._sequencer, this._lightManager);
-      this.emit('cueHandled', parameters);
+      await cue.execute(historicCueData, this._sequencer, this._lightManager);
+      this.emit('cueHandled', historicCueData);
     } else {
       console.error(`No implementation found for cue: ${cueType}`);
-      this.emit('cueHandled', parameters);
+      this.emit('cueHandled', historicCueData);
     }
   }
 

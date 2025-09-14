@@ -11,7 +11,7 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitHarmonyCue implements ICue {
   id = 'stagekit-harmony';
   cueId = CueType.Harmony;
-  description = 'Small venue: Green/blue clockwise chase on beat (= high cyan). Large venue: Yellow/red clockwise chase on beat (= high yellow). Stage Kit sets both colours to the same light number, so we blend them together.';
+  description = 'Small venue: Green/blue clockwise chase on beat (= high cyan). Large venue: Yellow/red dual rotation patterns with 3-step and 4-step offsets (= additive blending).';
   style = CueStyle.Primary;
 
   // Track whether this is the first execution or a repeat
@@ -19,24 +19,183 @@ export class StageKitHarmonyCue implements ICue {
 
   async execute(cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], 'all');
-    const transparentColor = getColor('transparent', 'medium');
-    
-    // Determine venue size and set colors accordingly
     const isLargeVenue = cueData.venueSize === 'Large';
     
-    let color1;
-    if (isLargeVenue) {
-      // Large venue: Yellow and Red
-      color1 = getColor('yellow', 'high', 'add');
-    } else {
-      // Small venue: Green and Blue
-      color1 = getColor('cyan', 'high', 'add');
-    }
-    
-    // Create harmony effect with clockwise chase patterns
     const harmonyTransitions: EffectTransition[] = [];
     
-    // Layer 0: Color1 (Green/Yellow) clockwise chase
+    if (isLargeVenue) {
+      this.createLargeVenueHarmony(harmonyTransitions, allLights);
+    } else {
+      this.createSmallVenueHarmony(harmonyTransitions, allLights);
+    }
+    
+    // Create the harmony effect
+    const harmonyEffect: Effect = {
+        id: "stagekit-harmony",
+        description: `StageKit harmony pattern - ${isLargeVenue ? 'Yellow/Red dual rotation' : 'Green/Blue clockwise chase'} on beat`,
+        transitions: harmonyTransitions
+    };
+    
+    // Apply the effect
+    if (this.isFirstExecution) {
+        // First time: use setEffect to clear any existing effects and start fresh
+        await controller.setEffect('stagekit-harmony', harmonyEffect);
+        this.isFirstExecution = false;
+    } else {
+        // Repeat call: use addEffect to add to existing effects
+        await controller.addEffect('stagekit-harmony', harmonyEffect);
+    }
+  }
+
+  /**
+   * Creates harmony transitions for large venue (Yellow and Red dual rotation)
+   * Yellow LEDs: Rotate clockwise through positions 3→2→1→0→7→6→5→4
+   * Red LEDs: Rotate clockwise through positions 4→3→2→1→0→7→6→5
+   */
+  private createLargeVenueHarmony(
+    harmonyTransitions: EffectTransition[], 
+    allLights: any[]
+  ): void {
+    const yellowColor = getColor('yellow', 'medium', 'add');
+    const redColor = getColor('red', 'medium', 'add');
+    const transparentColor = getColor('transparent', 'medium');
+
+    // Layer 0: Yellow clockwise chase (offset by 3)
+    for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
+      const light = allLights[lightIndex];
+      
+      // Calculate when this light should be yellow based on its position
+      // Yellow starts at position 3 and steps clockwise
+      const yellowStartPosition = (lightIndex + 3) % allLights.length;
+      const stepsUntilYellow = yellowStartPosition;
+      
+      // Add transparent transitions before yellow (to wait for the right beat)
+      if (stepsUntilYellow > 0) {
+        harmonyTransitions.push({
+          lights: [light],
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: transparentColor,
+            easing: 'linear',
+            duration: 0,
+          },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsUntilYellow
+        });
+      }
+      
+      // Add the yellow transition
+      harmonyTransitions.push({
+        lights: [light],
+        layer: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: {
+          color: yellowColor,
+          easing: 'linear',
+          duration: 0,
+        },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0
+      });
+      
+      // Add transparent transitions after yellow (to wait until the cycle completes)
+      const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
+      if (stepsAfterYellow > 0) {
+        harmonyTransitions.push({
+          lights: [light],
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: transparentColor,
+            easing: 'linear',
+            duration: 0,
+          },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsAfterYellow
+        });
+      }
+    }
+
+    // Layer 1: Red clockwise chase (offset by 4)
+    for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
+      const light = allLights[lightIndex];
+      
+      // Calculate when this light should be red based on its position
+      // Red starts at position 4 and steps clockwise
+      const redStartPosition = (lightIndex + 4) % allLights.length;
+      const stepsUntilRed = redStartPosition;
+      
+      // Add transparent transitions before red (to wait for the right beat)
+      if (stepsUntilRed > 0) {
+        harmonyTransitions.push({
+          lights: [light],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: transparentColor,
+            easing: 'linear',
+            duration: 0,
+          },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsUntilRed
+        });
+      }
+      
+      // Add the red transition
+      harmonyTransitions.push({
+        lights: [light],
+        layer: 1,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: {
+          color: redColor,
+          easing: 'linear',
+          duration: 0,
+        },
+        waitUntilCondition: 'beat',
+        waitUntilTime: 0
+      });
+      
+      // Add transparent transitions after red (to wait until the cycle completes)
+      const stepsAfterRed = allLights.length - stepsUntilRed - 1;
+      if (stepsAfterRed > 0) {
+        harmonyTransitions.push({
+          lights: [light],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: transparentColor,
+            easing: 'linear',
+            duration: 0,
+          },
+          waitUntilCondition: 'beat',
+          waitUntilTime: 0,
+          waitUntilConditionCount: stepsAfterRed
+        });
+      }
+    }
+  }
+
+  /**
+   * Creates harmony transitions for small venue (Green/Blue clockwise chase)
+   */
+  private createSmallVenueHarmony(
+    harmonyTransitions: EffectTransition[], 
+    allLights: any[]
+  ): void {
+    const color1 = getColor('cyan', 'high', 'add');
+    const transparentColor = getColor('transparent', 'medium');
+    
+    // Layer 0: Color1 (Green/Blue) clockwise chase
     for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
         const light = allLights[lightIndex];
         
@@ -95,24 +254,6 @@ export class StageKitHarmonyCue implements ICue {
                 waitUntilConditionCount: stepsAfterColor1
             });
         }
-    }
-    
-   
-    // Create the harmony effect
-    const harmonyEffect: Effect = {
-        id: "stagekit-harmony",
-        description: `StageKit harmony pattern - ${isLargeVenue ? 'Yellow/Red' : 'Green/Blue'} clockwise chase on beat`,
-        transitions: harmonyTransitions
-    };
-    
-    // Apply the effect
-    if (this.isFirstExecution) {
-        // First time: use setEffect to clear any existing effects and start fresh
-        await controller.setEffect('stagekit-harmony', harmonyEffect);
-        this.isFirstExecution = false;
-    } else {
-        // Repeat call: use addEffect to add to existing effects
-        await controller.addEffect('stagekit-harmony', harmonyEffect);
     }
   }
 

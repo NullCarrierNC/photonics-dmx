@@ -38,7 +38,7 @@ export class StageKitMenuCue implements ICue {
       layer: 0,
     });
     // Use unblocked to avoid breaking the sweep timing.
-    sequencer.addEffectUnblockedName('menu', sweep, 0, true);
+    sequencer.setEffectUnblockedName('menu', sweep, 0, true);
   }
 
   onStop(): void {

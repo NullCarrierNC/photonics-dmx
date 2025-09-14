@@ -345,7 +345,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
                 {autoGenStatus && (
                     <span className={`text-sm font-medium px-2 py-1 rounded ${
                         autoGenStatus === 'Simulation' 
-                            ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
+                            ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                            : autoGenStatus === 'Auto-Generated'
+                            ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
                             : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
                     }`}>
                         {autoGenStatus}

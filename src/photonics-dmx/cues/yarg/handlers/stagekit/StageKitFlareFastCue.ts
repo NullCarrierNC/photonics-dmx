@@ -16,7 +16,7 @@ export class StageKitFlareFastCue implements ICue {
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
-    const blueColor = getColor('blue', 'medium');
+    const blueColor = getColor('blue', 'medium', 'add');
 
     const effect = getEffectSingleColor({
       lights: allLights,
