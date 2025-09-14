@@ -4,6 +4,7 @@ import { ILightingController } from '../../../../controllers/sequencer/interface
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { Effect, EffectTransition } from '../../../../types';
+import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 
 /**
  * StageKit Searchlights Cue - Searchlight effect with rotating patterns
@@ -26,68 +27,57 @@ export class StageKitSearchlightsCue implements ICue {
     // BPM-based timing: 0.5 cycles per beat
     // For 8 lights: 0.5 cycles per beat = 2 beats per full cycle = 0.25 beats per light
     const beatDuration = 60000 / cueData.beatsPerMinute; // ms per beat
-    const lightDuration = beatDuration * 0.25; // 0.25 beats per light
+    const lightDuration = beatDuration * 0.27; // 0.25 beats per light
     
-    const searchlightTransitions: EffectTransition[] = [];
-
-    // Start immediately (no initial wait)
-    searchlightTransitions.push({
+    const singleColor = getEffectSingleColor({
+      color: transparentColor,
+      duration: lightDuration,
       lights: allLights,
       layer: 0,
-      waitForCondition: 'none',
-      waitForTime: 0,
-      transform: { color: transparentColor, easing: 'linear', duration: 0 },
-      waitUntilCondition: 'none',
-      waitUntilTime: 0
-    });
-
-    // Start immediately (no initial wait)
-    searchlightTransitions.push({
-      lights: allLights,
-      layer: 20,
-      waitForCondition: 'none',
-      waitForTime: 0,
-      transform: { color: transparentColor, easing: 'linear', duration: 0 },
-      waitUntilCondition: 'none',
-      waitUntilTime: 0
     });
 
     if (allLights.length >= 8) {
-      this.createDualCounterClockwisePattern(searchlightTransitions, allLights, lightDuration);
-    } else {
-      this.createSingleYellowPattern(searchlightTransitions, allLights, lightDuration);
-    }
+      // Create separate effects for yellow and red to avoid state collisions
+      const yellowEffect = this.createYellowCounterClockwiseEffect(allLights, lightDuration);
+      const redEffect = this.createRedCounterClockwiseEffect(allLights, lightDuration);
 
-    const searchlightEffect: Effect = {
-      id: "stagekit-searchlights",
-      description: `StageKit searchlights pattern - ${allLights.length >= 8 ? 'Yellow + Red counter-clockwise (offset)' : 'Yellow counter-clockwise'} (BPM-based timing)`,
-      transitions: searchlightTransitions
-    };
-
-    if (this.isFirstExecution) {
-      await controller.setEffectUnblockedName('stagekit-searchlights', searchlightEffect);
-      this.isFirstExecution = false;
+      if (this.isFirstExecution) {
+        await controller.setEffect('stagekit-clear-0', singleColor);
+        await controller.setEffect('stagekit-searchlights-yellow', yellowEffect);
+        await controller.addEffect('stagekit-searchlights-red', redEffect);
+        this.isFirstExecution = false;
+      } else {
+        await controller.addEffect('stagekit-clear-0', singleColor);
+        await controller.addEffectUnblockedName('stagekit-searchlights-yellow', yellowEffect);
+        await controller.addEffectUnblockedName('stagekit-searchlights-red', redEffect);
+      }
     } else {
-      await controller.addEffectUnblockedName('stagekit-searchlights', searchlightEffect);
+      // Single yellow pattern for <8 lights
+      const yellowEffect = this.createYellowCounterClockwiseEffect(allLights, lightDuration);
+
+      if (this.isFirstExecution) {
+        await controller.setEffect('stagekit-searchlights-yellow', yellowEffect);
+        this.isFirstExecution = false;
+      } else {
+        await controller.addEffect('stagekit-searchlights-yellow', yellowEffect);
+      }
     }
   }
 
   /**
-   * Creates dual counter-clockwise patterns for 8+ lights
+   * Creates yellow counter-clockwise effect
    * Yellow LEDs: Rotate counter-clockwise through positions 0→7→6→5→4→3→2→1
-   * Red LEDs: Rotate counter-clockwise through positions, offset by 1 position (yellow index - 1)
    * BPM-based timing: Each step advances based on calculated duration for 0.5 cycles per beat
    */
-  private createDualCounterClockwisePattern(
-    searchlightTransitions: EffectTransition[], 
+  private createYellowCounterClockwiseEffect(
     allLights: any[],
     lightDuration: number
-  ): void {
+  ): Effect {
     const yellowColor = getColor('yellow', 'medium', 'add');
-    const redColor = getColor('red', 'medium', 'add');
     const transparentColor = getColor('transparent', 'medium');
+    const yellowTransitions: EffectTransition[] = [];
     
-    // Layer 0: Yellow counter-clockwise chase (starts at position 0)
+    // Yellow counter-clockwise chase (starts at position 0)
     for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
       const light = allLights[lightIndex];
       
@@ -99,9 +89,9 @@ export class StageKitSearchlightsCue implements ICue {
       
       // Phase 1: Wait until it's this light's turn
       if (stepsUntilYellow > 0) {
-        searchlightTransitions.push({
+        yellowTransitions.push({
           lights: [light],
-          layer: 0,
+          layer: 1,
           waitForCondition: 'delay',
           waitForTime: stepsUntilYellow * lightDuration,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -110,9 +100,9 @@ export class StageKitSearchlightsCue implements ICue {
         });
       } else {
         // Start immediately for lights that begin the pattern
-        searchlightTransitions.push({
+        yellowTransitions.push({
           lights: [light],
-          layer: 0,
+          layer: 1,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -122,9 +112,9 @@ export class StageKitSearchlightsCue implements ICue {
       }
       
       // Phase 2: Turn on yellow for lightDuration
-      searchlightTransitions.push({
+      yellowTransitions.push({
         lights: [light],
-        layer: 0,
+        layer: 1,
         waitForCondition: 'none',
         waitForTime: 0,
         transform: { color: yellowColor, easing: 'linear', duration: 0 },
@@ -135,9 +125,9 @@ export class StageKitSearchlightsCue implements ICue {
       // Phase 3: Turn off and wait until cycle completes
       const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
       if (stepsAfterYellow > 0) {
-        searchlightTransitions.push({
+        yellowTransitions.push({
           lights: [light],
-          layer: 0,
+          layer: 1,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -147,7 +137,27 @@ export class StageKitSearchlightsCue implements ICue {
       }
     }
 
-    // Layer 1: Red counter-clockwise chase (offset by 1 position from yellow)
+    return {
+      id: 'stagekit-searchlights-yellow',
+      description: 'Yellow counter-clockwise searchlight pattern',
+      transitions: yellowTransitions
+    };
+  }
+
+  /**
+   * Creates red counter-clockwise effect (offset by 1 position from yellow)
+   * Red LEDs: Rotate counter-clockwise through positions, offset by 1 position
+   * BPM-based timing: Each step advances based on calculated duration for 0.5 cycles per beat
+   */
+  private createRedCounterClockwiseEffect(
+    allLights: any[],
+    lightDuration: number
+  ): Effect {
+    const redColor = getColor('red', 'medium', 'add');
+    const transparentColor = getColor('transparent', 'medium');
+    const redTransitions: EffectTransition[] = [];
+    
+    // Red counter-clockwise chase (offset by 1 position from yellow)
     for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
       const light = allLights[lightIndex];
       
@@ -158,9 +168,9 @@ export class StageKitSearchlightsCue implements ICue {
       
       // Phase 1: Wait until it's this light's turn  
       if (stepsUntilRed > 0) {
-        searchlightTransitions.push({
+        redTransitions.push({
           lights: [light],
-          layer: 1,
+          layer: 20,
           waitForCondition: 'delay',
           waitForTime: stepsUntilRed * lightDuration,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -169,9 +179,9 @@ export class StageKitSearchlightsCue implements ICue {
         });
       } else {
         // Start immediately for lights that begin the pattern
-        searchlightTransitions.push({
+        redTransitions.push({
           lights: [light],
-          layer: 1,
+          layer: 20,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -181,9 +191,9 @@ export class StageKitSearchlightsCue implements ICue {
       }
       
       // Phase 2: Turn on red for lightDuration
-      searchlightTransitions.push({
+      redTransitions.push({
         lights: [light],
-        layer: 1,
+        layer: 20,
         waitForCondition: 'none',
         waitForTime: 0,
         transform: { color: redColor, easing: 'linear', duration: 0 },
@@ -194,9 +204,9 @@ export class StageKitSearchlightsCue implements ICue {
       // Phase 3: Turn off and wait until cycle completes
       const stepsAfterRed = allLights.length - stepsUntilRed - 1;
       if (stepsAfterRed > 0) {
-        searchlightTransitions.push({
+        redTransitions.push({
           lights: [light],
-          layer: 1,
+          layer: 20,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -205,66 +215,14 @@ export class StageKitSearchlightsCue implements ICue {
         });
       }
     }
+
+    return {
+      id: 'stagekit-searchlights-red',
+      description: 'Red counter-clockwise searchlight pattern (offset)',
+      transitions: redTransitions
+    };
   }
 
-  /**
-   * Creates single yellow pattern for <8 lights
-   * Yellow LEDs: Rotate counter-clockwise through positions 0→7→6→5→4→3→2→1
-   * BPM-based timing: Each step advances based on calculated duration for 0.5 cycles per beat
-   */
-  private createSingleYellowPattern(
-    searchlightTransitions: EffectTransition[], 
-    allLights: any[],
-    lightDuration: number
-  ): void {
-    const yellowColor = getColor('yellow', 'medium', 'add');
-    const transparentColor = getColor('transparent', 'medium');
-
-    // Layer 0: Yellow counter-clockwise chase (starts at position 0)
-    for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
-      const light = allLights[lightIndex];
-      
-      // Yellow pattern: 0→7→6→5→4→3→2→1 (counter-clockwise)
-      // Same logic as the dual pattern
-      const yellowSequencePosition = (allLights.length - lightIndex) % allLights.length;
-      const stepsUntilYellow = yellowSequencePosition;
-      
-      if (stepsUntilYellow > 0) {
-        searchlightTransitions.push({
-          lights: [light],
-          layer: 0,
-          waitForCondition: 'delay',
-          waitForTime: stepsUntilYellow * lightDuration,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'none',
-          waitUntilTime: 0
-        });
-      }
-      
-      searchlightTransitions.push({
-        lights: [light],
-        layer: 0,
-        waitForCondition: 'none',
-        waitForTime: 0,
-        transform: { color: yellowColor, easing: 'linear', duration: 0 },
-        waitUntilCondition: 'delay',
-        waitUntilTime: lightDuration
-      });
-      
-      const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
-      if (stepsAfterYellow > 0) {
-        searchlightTransitions.push({
-          lights: [light],
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: stepsAfterYellow * lightDuration
-        });
-      }
-    }
-  }
 
   onStop(): void {
     this.isFirstExecution = true;
