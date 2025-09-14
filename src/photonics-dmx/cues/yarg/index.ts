@@ -1,6 +1,7 @@
 // Import the cue registry initialization to ensure it runs
-import './default';
 import './stagekit';
+import './yarg1';
+
 // These are not ready for prime time yet.
 // import './coolWarmAlt1';
 // import './coolWarmAlt2';

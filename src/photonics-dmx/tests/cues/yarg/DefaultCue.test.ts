@@ -1,4 +1,4 @@
-import { DefaultCue } from '../../../cues/yarg/handlers/default/DefaultCue';
+import { DefaultCue } from '../../../cues/yarg/handlers/yarg1/DefaultCue';
 import { CueData } from '../../../cues/cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';

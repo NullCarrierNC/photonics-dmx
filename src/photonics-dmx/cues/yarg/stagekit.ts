@@ -21,11 +21,11 @@ import { StageKitWarmManualCue } from './handlers/stagekit/StageKitWarmManualCue
 import { StageKitCoolAutoCue } from './handlers/stagekit/StageKitCoolAutoCue';
 import { StageKitCoolManualCue } from './handlers/stagekit/StageKitCoolManualCue';
 import { StageKitWarmAutoCue } from './handlers/stagekit/StageKitWarmAutoCue';
-import { StrobeFastCue } from './handlers/default/StrobeFastCue';
-import { StrobeFastestCue } from './handlers/default/StrobeFastestCue';
-import { StrobeMediumCue } from './handlers/default/StrobeMediumCue';
-import { StrobeOffCue } from './handlers/default/StrobeOffCue';
-import { StrobeSlowCue } from './handlers/default/StrobeSlowCue';
+import { StrobeFastCue } from './handlers/stagekit/StrobeFastCue';
+import { StrobeFastestCue } from './handlers/stagekit/StrobeFastestCue';
+import { StrobeMediumCue } from './handlers/stagekit/StrobeMediumCue';
+import { StrobeOffCue } from './handlers/stagekit/StrobeOffCue';
+import { StrobeSlowCue } from './handlers/stagekit/StrobeSlowCue';
 
 
 /**
@@ -36,7 +36,7 @@ import { StrobeSlowCue } from './handlers/default/StrobeSlowCue';
 const stagekitGroup: ICueGroup = {
   id: 'stagekit',
   name: 'Stage Kit',
-  description: 'Stage Kit cues that mimic the original Stage Kit visual effects',
+  description: 'Stage Kit cues that mimic the original Stage Kit visual effects. There is some variation to account for mapping to a smaller number of lights.',
   cues: new Map([
     [CueType.Menu, new StageKitMenuCue()],
     [CueType.Score, new StageKitScoreCue()],
@@ -70,3 +70,5 @@ const stagekitGroup: ICueGroup = {
 const registry = CueRegistry.getInstance();
 registry.registerGroup(stagekitGroup); 
 registry.setStageKitGroup(stagekitGroup.id);
+registry.setDefaultGroup(stagekitGroup.id);
+registry.activateGroup(stagekitGroup.id);
