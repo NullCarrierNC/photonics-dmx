@@ -1,7 +1,7 @@
 import * as dgram from 'dgram';
 import { EventEmitter } from 'events';
 import { Rb3ePacketType, Rb3GameState, Rb3PlatformID, Rb3TrackType, Rb3Difficulty } from './rb3eTypes';
-import { CueData } from '../../cues/cueTypes';
+import { CueData, StrobeState } from '../../cues/cueTypes';
 
 
 // Use the same port that RB3Enhanced sends to.
@@ -87,6 +87,8 @@ export class Rb3eNetworkListener extends EventEmitter {
   private lastData: { header: any; payload: Buffer; cueData: CueData } | null = null;
   // Track the current LED brightness setting
   private _currentBrightness: 'low' | 'medium' | 'high' = 'medium';
+  // Track persistent strobe state across all packet types
+  private _currentStrobeState: StrobeState = 'Strobe_Off';
   // Packet counter for debugging
   private packetCount = 0;
 
@@ -235,7 +237,7 @@ export class Rb3eNetworkListener extends EventEmitter {
         lightingCue: "NoCue",
         postProcessing: "Default",
         fogState: false,
-        strobeState: "Strobe_Off",
+        strobeState: this._currentStrobeState, // Use persistent strobe state
         performer: 0,
         trackMode: 'tracked',
         beat: "Unknown",
@@ -256,10 +258,7 @@ export class Rb3eNetworkListener extends EventEmitter {
         stars: 0,
         sustainDurationMs: 0,
         measureOrBeat: 0,
-        cueHistory: [],
-      executionCount: 1,
-      cueStartTime: Date.now(),
-      timeSinceLastCue: 0,
+      
       };
 
       // Store platform information from the packet header
@@ -409,6 +408,14 @@ export class Rb3eNetworkListener extends EventEmitter {
   public getCurrentBuildTag(): string {
     if (!this.lastData) return '';
     return this.lastData.cueData.rb3BuildTag || '';
+  }
+
+  /**
+   * Get the current persistent strobe state
+   * @returns The current strobe state that persists across all packet types
+   */
+  public getCurrentStrobeState(): StrobeState {
+    return this._currentStrobeState;
   }
 
   /**
@@ -570,7 +577,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     console.log(`RB3E_EVENT_SCORE => totalScore=${totalScore}, stars=${stars}, memberScores=${memberScores}`);
   }
 
-  private handleStageKit(payload: Buffer, _cueData: CueData) {
+  private handleStageKit(payload: Buffer, cueData: CueData) {
     // StageKit struct has 2 bytes: LeftChannel, RightChannel
     if (payload.length < 2) {
       console.warn(`STAGEKIT payload too short: expected 2 bytes, got ${payload.length}`);
@@ -581,6 +588,10 @@ export class Rb3eNetworkListener extends EventEmitter {
 
     // Parse RB3E bytes into clean StageKit data
     const stageKitData = this.parseStageKitData(leftChannel, rightChannel);
+
+    // Update the cueData with the current persistent strobe state
+    // (parseStageKitData already updated _currentStrobeState if this was a strobe command)
+    cueData.strobeState = this._currentStrobeState;
 
     this.emit('stagekit:data', stageKitData);
   }
@@ -611,26 +622,46 @@ export class Rb3eNetworkListener extends EventEmitter {
     let color: string;
     let strobeEffect: 'slow' | 'medium' | 'fast' | 'fastest' | 'off' | undefined;
     
-    // Check for strobe effects first
+    // Check for strobe effects first and update persistent state
     switch (rightChannel) {
       case 3: // StrobeSlow
         strobeEffect = 'slow';
+        if (this._currentStrobeState !== 'Strobe_Slow') {
+          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Slow`);
+          this._currentStrobeState = 'Strobe_Slow';
+        }
         color = 'off';
         break;
       case 4: // StrobeMedium
         strobeEffect = 'medium';
+        if (this._currentStrobeState !== 'Strobe_Medium') {
+          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Medium`);
+          this._currentStrobeState = 'Strobe_Medium';
+        }
         color = 'off';
         break;
       case 5: // StrobeFast
         strobeEffect = 'fast';
+        if (this._currentStrobeState !== 'Strobe_Fast') {
+          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fast`);
+          this._currentStrobeState = 'Strobe_Fast';
+        }
         color = 'off';
         break;
       case 6: // StrobeFastest
         strobeEffect = 'fastest';
+        if (this._currentStrobeState !== 'Strobe_Fastest') {
+          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fastest`);
+          this._currentStrobeState = 'Strobe_Fastest';
+        }
         color = 'off';
         break;
       case 7: // StrobeOff
         strobeEffect = 'off';
+        if (this._currentStrobeState !== 'Strobe_Off') {
+          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Off`);
+          this._currentStrobeState = 'Strobe_Off';
+        }
         color = 'off';
         break;
       case 32: // Blue LEDs (0x20)
