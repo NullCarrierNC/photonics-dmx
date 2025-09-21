@@ -55,9 +55,7 @@ const DmxPreview: React.FC = () => {
      
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           The DMX Preview allows you to see what your lighting rig should be doing. The preview uses the actual DMX channel data being  
-          <em> sent</em> by Photonics as it responds to YARG/RB3E input or manual tests from the Cue Simulation page.
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          <em> sent</em> by Photonics 
           This is useful for debugging/testing your setup and confirming the configuration of your lights is correct.
         </p>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-8">

@@ -329,7 +329,7 @@ const CueSimulation: React.FC = () => {
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
             Testing a cue will give you an approximation of what it will look like in-game. Some effects require you to 
             manually simulate a beat or keyframe. You can adjust the BPM value to test how effects respond to different tempos. 
-            For YARG, some effects are modified by run-time data such as the notes being played. This is not currently simulated.
+            In YARG, some effects are modified by run-time data such as the notes being played. 
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
             If you have DMX output enabled above the effect will be sent to your lighting rig. Compare this 

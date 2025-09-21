@@ -90,10 +90,14 @@ const StageKitModeSettings: React.FC = () => {
       <div>
         <h3 className="text-lg font-medium mb-3 text-gray-800 dark:text-gray-200">Rock Band 3 Enhanced</h3>
         <div className=" ">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
             Due to how the RB3E networking works, Photonics doesn't use the cue system like it does with YARG. Instead it uses the 
             provided LED lighting data diirectly to re-create the original Stage Kit lighting effects. This is essentially the same as using 
             YARG in Stage Kit mode.
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            If you have 4 lights then the Stage Kit LED colours assigned to lights 5-8 will be mapped 5-&gt;1, 6-&gt;2, 7-&gt;3, 8-&gt;4. The resulting colour 
+            and brightness will be a blend of the LED values assigned to 1 and 5, 2 and 6, etc.
           </p>
         </div>
       </div>

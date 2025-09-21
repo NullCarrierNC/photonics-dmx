@@ -24,15 +24,15 @@ const Status = () => {
       <hr className="mt-8 mb-8 border-gray-200 dark:border-gray-600" />
 
       <div className="flex flex-col">
-        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">A Note About Custom Songs</h2>
+        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">Getting Help</h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          If you are using custom or converted songs the venue track for driving the
-          lightshow may be missing. If you are using YARG it will automatically generate
-          a light show if this data isn't available. These shows tend to be slower paced
-          than original RB show data.
+          For a how-to guide on setting up your lights in Photonics, please visit the <a href="https://photonics.rocks/quickstart-guide/" className="text-blue-600 dark:text-blue-500 hover:underline" target="_blank">Quickstart Guide</a>.
         </p>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          YARG's automatically generated shows will not include any strobe effects.
+          For more details about how Photoincs works, how many lights you need, and how things differ between YARG and RB3E, please visit the <a href="https://photonics.rocks/documentation/" className="text-blue-600 dark:text-blue-500 hover:underline" target="_blank">Documentation</a>.
+        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Still having trouble? Looking for hardware recommendations? Visit our <a href="https://discord.com/invite/2Vyqc2hYcK" className="text-blue-600 dark:text-blue-500 hover:underline" target="_blank">Discord Server</a>.
         </p>
       </div>
 

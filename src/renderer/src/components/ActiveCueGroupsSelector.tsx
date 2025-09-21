@@ -141,10 +141,10 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
               Disabling it here is temporary.
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              If the active groups are missing a cue the system will fallback to the Default group, even if it is disabled.
+              If the active groups are missing a cue the system will fallback to the Stage Kit group, even if it is disabled.
             </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              If Stage Kit Priority Mode is set to Prefer for Tracked, only the Stage Kit group will be used if the song has tracked lighting data.
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              If Stage Kit Priority Mode is set to <span className="font-bold">Prefer for Tracked</span>, <span className="font-bold">only</span> the Stage Kit group will be used if the song has tracked lighting data.
             </p>
             <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg mb-3">
               <div className="flex items-center justify-start gap-3">

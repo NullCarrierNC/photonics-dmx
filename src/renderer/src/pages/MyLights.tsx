@@ -88,17 +88,18 @@ const MyLights = () => {
 
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         <strong>Note on Strobes:</strong> while some DMX fixtures support strobe channels, using this feature with different models 
-        of can DMX lights cause the lights to stobe out of sync with each other. To avoid this, if you don't have a dedicated strobe light, 
-        Photonics will use lights marked as strobe-capable as a strobe using regular DMX channels (E.g. RGB @ 255).
+        of can DMX lights cause the lights to stobe out of sync with each other. To avoid this Photonics will use lights marked as 
+        strobe-capable as a strobe using regular DMX channels (E.g. RGB @ 255).
       </p>
      
-      <p className='mb-4 mt-3 mb-2 italic font-bold text-orange-400'>
-          Physical strobe fixtures are not functionally implemented in this version. They can be created but won't be used.</p>
-        <p className='mb-4 italic font-bold text-orange-400'>
+      <p className='mb-2 italic font-bold text-orange-400 text-[9pt]'>
+          Physical strobe fixtures are not yet implemented. You can use regular RGB PAR lights as either a dedicated strobe, or as a strobe-capable light.
+        </p>
+        <p className='mb-2 italic font-bold text-orange-400  text-[9pt]'>
             Moving Head RGB lights are fundamentally supported, but will only 
             move to the configured home position. Lighting effects do not yet include motion. 
         </p>
-        <p className='mb-6 italic font-bold text-orange-400'>
+        <p className='mb-4 italic font-bold text-orange-400  text-[9pt]'>
           Gobo based lights are not supported.
         </p>
 
