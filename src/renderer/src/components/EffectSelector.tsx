@@ -9,7 +9,7 @@ interface EffectsDropdownProps {
 }
 
 export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
-  groupId = 'default',
+  groupId = 'stagekit',
   onSelect,
   value,
   disabled = false
