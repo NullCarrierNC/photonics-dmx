@@ -34,7 +34,7 @@ const About = () => {
     
         <p className="mb-8 text-sm text-gray-600 dark:text-gray-400">And a thank you to the developers of 
             of <a href='https://rb3e.rbenhanced.rocks/' target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">RB3Enhanced</a> which
-             makes RB support possible.</p>
+             makes Rock Band 3 support possible.</p>
 
             
 
