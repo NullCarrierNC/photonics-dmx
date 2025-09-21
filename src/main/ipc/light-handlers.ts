@@ -495,11 +495,9 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     try {
       return {
         success: true,
-        isInitialized: controllerManager.getIsInitialized(),
         isYargEnabled: controllerManager.getIsYargEnabled(),
         isRb3Enabled: controllerManager.getIsRb3Enabled(),
-        hasCueHandler: !!controllerManager.getCueHandler(),
-        hasLightingSystem: !!controllerManager.getLightingController()
+        senderStatus: controllerManager.getSenderStatus()
       };
     } catch (error) {
       console.error('Error getting system status:', error);
