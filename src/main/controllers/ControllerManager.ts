@@ -636,6 +636,19 @@ export class ControllerManager {
   }
 
   /**
+   * Get sender status information
+   * @returns Object containing status of each sender type
+   */
+  public getSenderStatus(): { sacn: boolean; artnet: boolean; enttecpro: boolean } {
+    const enabledSenders = this.senderManager.getEnabledSenders();
+    return {
+      sacn: enabledSenders.includes('sacn'),
+      artnet: enabledSenders.includes('artnet'),
+      enttecpro: enabledSenders.includes('enttecpro')
+    };
+  }
+
+  /**
    * Restart controllers to pick up configuration changes
    * This shuts down existing controllers and reinitializes them
    */

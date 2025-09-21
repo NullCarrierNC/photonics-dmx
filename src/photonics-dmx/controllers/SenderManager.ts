@@ -160,6 +160,23 @@ export class SenderManager {
     this.eventEmitter.off('SenderError', listener);
   }
 
+  /**
+   * Get the list of enabled sender IDs
+   * @returns Array of enabled sender IDs
+   */
+  public getEnabledSenders(): string[] {
+    return Array.from(this.enabledSenders.keys());
+  }
+
+  /**
+   * Check if a specific sender is enabled
+   * @param senderId The sender ID to check
+   * @returns True if the sender is enabled, false otherwise
+   */
+  public isSenderEnabled(senderId: string): boolean {
+    return this.enabledSenders.has(senderId);
+  }
+
   // Using an arrow function to ensure correct "this" binding.
   private handleSenderError = (senderErr: SenderError): void => {
     this.eventEmitter.emit('SenderError', senderErr);
