@@ -40,7 +40,7 @@ const StatusBar: React.FC = () => {
           isEnabledInPrefs={prefs.dmxOutputConfig?.artNetEnabled || false}
         />
         <StatusIndicator 
-          label="EnttecPro" 
+          label="EnttecPro USB" 
           isActive={isEnttecProEnabled}
           isEnabledInPrefs={prefs.dmxOutputConfig?.enttecProEnabled || false}
         />
