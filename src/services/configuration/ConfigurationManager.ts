@@ -53,7 +53,7 @@ export interface UserLightsConfig {
 const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
-  enabledCueGroups: ['default', 'coolWarmAlt1', 'coolWarmAlt2'],
+  enabledCueGroups: ['stagekit'],
   cueConsistencyWindow: 2000,
   
   // Brightness configuration defaults
