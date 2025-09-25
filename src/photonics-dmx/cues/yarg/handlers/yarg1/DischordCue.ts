@@ -3,87 +3,99 @@ import { ILightingController } from '../../../../controllers/sequencer/interface
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { getColor } from '../../../../helpers/dmxHelpers';
-import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
-import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
-import { getEffectFlashColor } from '../../../../effects/effectFlashColor';
-import { randomBetween } from '../../../../helpers/utils';
-import { TimingPresets } from '../../../../helpers/bpmUtils';
-import { EasingType } from '../../../../easing';
+import { 
+  getEffectFlashColor, 
+  getEffectClockwiseRotation, 
+  getEffectDualModeRotation, 
+  getEffectAlternatingPatterns 
+} from '../../../../effects';
 
-
+/**
+ * Dischord Cue - Stage Kit Implementation
+ * Yellow LEDs: Sequential clockwise rotation (0→1→2→3→4→5→6→7) responding to beats
+ * Green LEDs: Dual behavior - spinning counter-clockwise OR solid on, toggles on measure (large venues only)
+ * Blue LEDs: Two alternating patterns on keyframe events - Pattern A: side positions, Pattern B: even positions
+ * Red LEDs: Flash all lights on red drum hits
+ */
 export class DischordCue implements ICue {
   id = 'default-dischord';
   cueId = CueType.Dischord;
-  description = 'Front lights alternate between green and blue on left/right halves with bright red or yellow flashes on the measure';
+  description = 'Yellow clockwise rotation on beat, green dual-mode (spinning/solid) on measure, blue alternating patterns on keyframe, red flash on red drum';
   style = CueStyle.Primary;
   private isFirstExecution = true;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const blue = getColor('blue', 'medium', 'replace');
-    const green = getColor('green', 'medium', 'replace');
+    const allLights = lightManager.getLights(['front', 'back'], 'all');
+    const yellowColor = getColor('yellow', 'medium', 'add');
+    const greenColor = getColor('green', 'medium', 'add');
+    const blueColor = getColor('blue', 'medium', 'replace');
+    const transparentColor = getColor('transparent', 'medium');
+    const redColor = getColor('red', 'medium', 'replace');
 
-    const all = lightManager.getLights(['front'], 'all');
-    const even = lightManager.getLights(['front'], 'half-1');
-    const odd = lightManager.getLights(['front'], 'half-2');
-
-    const duration = TimingPresets.dischord(parameters.beatsPerMinute);
-
-    const baseLayer = getEffectSingleColor({
-      lights: all,
-      color: blue,
-      duration: 10,
-    });
-
-    const crossFadeEven = getEffectCrossFadeColors({
-      startColor: blue,
-      crossFadeTrigger: 'keyframe',
-      afterStartWait: 0,
-      endColor: green,
-      afterEndColorWait: 0,
-      duration: duration,
-      lights: even,
-      layer: 1,
-    });
-    const crossFadeOdd = getEffectCrossFadeColors({
-      startColor: green,
-      crossFadeTrigger: 'keyframe',
-      afterStartWait: 0,
-      endColor: blue,
-      afterEndColorWait: 0,
-      duration: duration,
-      lights: odd,
+    // Yellow: Clockwise rotation on beat (0→1→2→3→4→5→6→7)
+    const yellowEffect = getEffectClockwiseRotation({
+      lights: allLights,
+      activeColor: yellowColor,
+      baseColor: transparentColor,
       layer: 2,
+      waitFor: 'beat',
+      beatsPerCycle: 1,
     });
-    const allLights = lightManager.getLights(['front'], 'all');
-    const yellow = getColor('yellow', 'high', 'replace');
-    const red = getColor('red', 'high', 'replace');
-    const rnd = randomBetween(1, 2);
-    const flashYellowOnBeat = getEffectFlashColor({
-      color: rnd === 1 ? red : yellow,
-      startTrigger: 'measure',
+
+    // Green: Dual behavior - spinning counter-clockwise OR solid on, toggles on measure (large venues only)
+    const greenEffect = getEffectDualModeRotation({
+      lights: allLights,
+      activeColor: greenColor,
+      baseColor: transparentColor,
+      solidColor: greenColor,
+      isLargeVenue: parameters.venueSize === 'Large',
+      layer: 1,
+      waitFor: 'beat',
+      beatsPerCycle: 2, // 0.5 cycles per beat = 2 beats per cycle
+      modeSwitchTrigger: 'measure',
+    });
+
+    // Blue: Two alternating patterns on keyframe events
+    const bluePatternA = lightManager.getLights(['front', 'back'], 'third-2');
+    const bluePatternB = lightManager.getLights(['front', 'back'], 'even');
+    const blueEffect = getEffectAlternatingPatterns({
+      patternALights: bluePatternA,
+      patternBLights: bluePatternB,
+      activeColor: blueColor,
+      baseColor: transparentColor,
+      layer: 0,
+      switchTrigger: 'keyframe',
+      completeTrigger: 'beat',
+    });
+
+    // Red: Flash all lights on red drum hits
+    const redFlash = getEffectFlashColor({
+      lights: allLights,
+      color: redColor,
+      startTrigger: 'drum-red',
       durationIn: 0,
       holdTime: 120,
       durationOut: 150,
-      lights: allLights,
-      easing: EasingType.SIN_OUT,
       layer: 101,
     });
 
+    // Apply the effects
     if (this.isFirstExecution) {
       // First time: use setEffect to clear any existing effects and start fresh
-      await sequencer.setEffect('dischord-all', baseLayer);
-      await sequencer.addEffect('dischord1', crossFadeEven);
-      await sequencer.addEffect('dischord2', crossFadeOdd);
-      await sequencer.addEffect('dischord-flash', flashYellowOnBeat);
+      await sequencer.setEffect('dischord-yellow', yellowEffect);
+      await sequencer.addEffect('dischord-green', greenEffect);
+      await sequencer.addEffect('dischord-blue', blueEffect);
+      await sequencer.addEffect('dischord-red', redFlash);
       this.isFirstExecution = false;
     } else {
       // Repeat call: use addEffect to add to existing effects
-      sequencer.addEffect('dischord-all', baseLayer);
-      sequencer.addEffect('dischord1', crossFadeEven);
-      sequencer.addEffect('dischord2', crossFadeOdd);
-      sequencer.addEffect('dischord-flash', flashYellowOnBeat);
+      sequencer.addEffect('dischord-yellow', yellowEffect);
+      sequencer.addEffect('dischord-green', greenEffect);
+      sequencer.addEffect('dischord-blue', blueEffect);
+      sequencer.addEffect('dischord-red', redFlash);
     }
   }
+
 
   onStop(): void {
     // Reset the first execution flag so next time this cue runs it will use setEffect
