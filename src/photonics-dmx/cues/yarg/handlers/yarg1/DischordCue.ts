@@ -7,6 +7,7 @@ import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
 import { getEffectFlashColor } from '../../../../effects/effectFlashColor';
 import { randomBetween } from '../../../../helpers/utils';
+import { TimingPresets } from '../../../../helpers/bpmUtils';
 import { EasingType } from '../../../../easing';
 
 
@@ -25,8 +26,7 @@ export class DischordCue implements ICue {
     const even = lightManager.getLights(['front'], 'half-1');
     const odd = lightManager.getLights(['front'], 'half-2');
 
-    const bps = parameters.beatsPerMinute / 60;
-    const duration = (500 / bps);
+    const duration = TimingPresets.dischord(parameters.beatsPerMinute);
 
     const baseLayer = getEffectSingleColor({
       lights: all,
