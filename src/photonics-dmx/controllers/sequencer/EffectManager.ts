@@ -151,7 +151,7 @@ export class EffectManager implements IEffectManager {
       console.warn('Cancelling blackout for setEffect');
       this.systemEffects.cancelBlackout();
     }
-
+    this.removeAllEffects();
     if (effect.transitions.length === 0) {
       console.warn(`Effect "${name}" has no transitions. Ignoring.`);
       return;
