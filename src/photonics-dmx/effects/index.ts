@@ -10,9 +10,9 @@ export { getEffectFlashColor } from './effectFlashColor';
 export { getEffectBlackout } from './effectBlackout';
 export { getSweepEffect } from './sweepEffect';
 export { getEffectCycleLights } from './effectCycleLights';
-export { 
-  getEffectClockwiseRotation, 
-  getEffectCounterClockwiseRotation, 
-  getEffectDualModeRotation, 
-  getEffectAlternatingPatterns 
-} from './effectRotationPatterns'; 
+export {
+  getEffectClockwiseRotation,
+  getEffectCounterClockwiseRotation,
+  getEffectDualModeRotation,
+  getEffectAlternatingPatterns
+} from './effectRotationPatterns';

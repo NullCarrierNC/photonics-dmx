@@ -4,8 +4,7 @@ import { ILightingController } from '../../../../controllers/sequencer/interface
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { 
-  getEffectClockwiseRotation, 
-  getEffectCounterClockwiseRotation 
+  getEffectClockwiseRotation,  
 } from '../../../../effects';
 
 /**
