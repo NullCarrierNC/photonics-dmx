@@ -14,6 +14,8 @@ export class StageKitIntroCue implements ICue {
   cueId = CueType.Intro;
   description = 'All green lights';
   style = CueStyle.Primary;
+  
+  private isFirstExecution: boolean = true;
 
   async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
@@ -41,11 +43,16 @@ export class StageKitIntroCue implements ICue {
       transitions: transitions
     };
     
-    await controller.setEffect('stagekit-intro', introEffect);
+    if (this.isFirstExecution) {
+      await controller.setEffect('stagekit-intro', introEffect);
+      this.isFirstExecution = false;
+    } else {
+      controller.addEffect('stagekit-intro', introEffect);
+    }
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {

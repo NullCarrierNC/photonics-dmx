@@ -15,6 +15,8 @@ export class StageKitFrenzyCue implements ICue {
   cueId = CueType.Frenzy;
   description = 'Large venue: Red->Blue->Yellow cycle with 25% beat delays. Small venue: Red->Green->Blue cycle with 25% beat delays. NOTE: Differs from StageKit/YALCY as they change LEDs at different times, but this doesn\'t map well to a lower number of lights.';
   style = CueStyle.Primary;
+  
+  private isFirstExecution: boolean = true;
 
   async execute(cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], 'all');
@@ -94,12 +96,16 @@ export class StageKitFrenzyCue implements ICue {
         transitions: frenzyTransitions
     };
     
-    // Apply the effect
-    await controller.setEffect('stagekit-frenzy', frenzyEffect);
+    if (this.isFirstExecution) {
+      await controller.setEffect('stagekit-frenzy', frenzyEffect);
+      this.isFirstExecution = false;
+    } else {
+      controller.addEffect('stagekit-frenzy', frenzyEffect);
+    }
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {

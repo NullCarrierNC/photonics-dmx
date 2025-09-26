@@ -3,6 +3,7 @@ import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers';
+import { Effect } from '../../../../types';
 
 
 
@@ -16,6 +17,9 @@ export class StageKitStompCue implements ICue {
   cueId = CueType.Stomp;
   description = 'Front: quarter 1 yellow, quarter 4 red. Back: quarter 1 red, quarter 4 yellow. Inner green. Toggles on/off with each keyframe.';
   style = CueStyle.Primary;
+  
+  // Track whether this is the first execution or a repeat
+  private isFirstExecution: boolean = true;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     // Front: quarter 1 flashes yellow, quarter 4 flashes red
@@ -32,8 +36,8 @@ export class StageKitStompCue implements ICue {
     const greenColor = getColor('green', 'high');
     const blackColor = getColor('black', 'medium');
 
-    // Set initial state and create toggle effect
-    await sequencer.setEffect('stagekit-stomp-toggle', {
+    // Create the stomp effect
+    const stompEffect: Effect = {
       id: 'stagekit-stomp-toggle',
       description: 'Stomp pattern - front q1 yellow/q4 red, back q1 red/q4 yellow, inner green, keyframe toggle',
       transitions: [
@@ -139,11 +143,18 @@ export class StageKitStompCue implements ICue {
           waitUntilConditionCount: 1
         }
       ]
-    });
+    };
+
+    if (this.isFirstExecution) {
+      await sequencer.setEffect('stagekit-stomp-toggle', stompEffect);
+      this.isFirstExecution = false;
+    } else {
+      sequencer.addEffect('stagekit-stomp-toggle', stompEffect);
+    }
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {
