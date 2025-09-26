@@ -59,7 +59,7 @@ class YargCueHandler extends BaseCueHandler {
         return;
       case CueType.Blackout_Slow:
         this.stopCurrentCue();
-        this._sequencer.blackout(1000);
+        this._sequencer.blackout(500);
         this.emit('cueHandled', historicCueData);
         return;
       case CueType.Blackout_Spotlight:

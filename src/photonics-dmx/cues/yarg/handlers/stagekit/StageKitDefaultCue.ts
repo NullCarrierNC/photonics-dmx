@@ -4,18 +4,17 @@ import { ILightingController } from '../../../../controllers/sequencer/interface
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { Effect, EffectTransition } from '../../../../types';
-import { getEffectFlashColor } from '../../../../effects';
 import { EasingType } from '../../../../easing';
 
 /**
  * StageKit Default Cue
  * Large venue: Blue/red alternating on keyframes
- * Small venue: Yellow flash on drums, red/blue alternating on keyframes
+ * Small venue: Yellow LEDs normally ON but flash OFF on red drum hits, red/blue alternating on keyframes
  */
 export class StageKitDefaultCue implements ICue {
   id = 'stagekit-default';
   cueId = CueType.Default;
-  description = 'Large venue: Blue/red alternating on keyframes, small venue: Red/blue alternating on keyframes and yellow flash on red drum.';
+  description = 'Large venue: Blue/red alternating on keyframes, small venue: Red/blue alternating on keyframes and yellow lights normally ON but flash OFF on red drum.';
   style = CueStyle.Primary;
   private isFirstRun = true;
   
@@ -127,26 +126,67 @@ export class StageKitDefaultCue implements ICue {
     await controller.addEffect('stagekit-default-large-red', redEffect, 0);
   }
 
-  // Inverts ted/blue order
+  // Inverts red/blue order
   private async executeSmallVenueDefault(controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     // Small uses the same based effect as large, so re-use large:
     this.executeLargeVenueDefault(controller, lightManager);
 
-    // Add the yellow flash on beat:
-    const yellowColor = getColor('yellow', 'high');
+    // Add the yellow dimming effect on red drum hits:
+    const yellowColor = getColor('yellow', 'medium', 'replace'); //Using replace so when mixed with blue we don't blend to white
+    const transparentColor = getColor('transparent', 'medium');
     const lights = lightManager.getLights(['front', 'back'], 'all');
 
-    const flashYellowOnBeat = getEffectFlashColor({
-      color: yellowColor,
-      startTrigger: 'drum-red',
-      durationIn: 0,
-      holdTime: 120,
-      durationOut: 200,
-      lights: lights,
-      easing: EasingType.SIN_OUT,
-      layer: 101,
-    });
-    controller.addEffect('stagekit-default-small-yellow', flashYellowOnBeat);
+    // Create custom effect for yellow LEDs that are normally ON but dim OFF on red drum hits
+    const yellowDimmingEffect: Effect = {
+      id: 'stagekit-default-small-yellow-dimming',
+      description: 'Yellow LEDs normally ON but flash OFF on red drum hits',
+      transitions: [
+        // First, set yellow LEDs to ON (normal state)
+        {
+          lights: lights,
+          layer: 101,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: yellowColor,
+            easing: 'linear',
+            duration: 0
+          },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        },
+        // Then, when red drum is hit, dim them OFF briefly
+        {
+          lights: lights,
+          layer: 101,
+          waitForCondition: 'drum-red',
+          waitForTime: 0,
+          transform: {
+            color: transparentColor,
+            easing: EasingType.LINEAR,
+            duration: 0
+          },
+          waitUntilCondition: 'delay',
+          waitUntilTime: 200
+        },
+        // Finally, return them to ON
+        {
+          lights: lights,
+          layer: 101,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: yellowColor,
+            easing: EasingType.LINEAR,
+            duration: 0
+          },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }
+      ]
+    };
+    
+    controller.addEffect('stagekit-default-small-yellow-dimming', yellowDimmingEffect);
   }
 
   onStop(): void {

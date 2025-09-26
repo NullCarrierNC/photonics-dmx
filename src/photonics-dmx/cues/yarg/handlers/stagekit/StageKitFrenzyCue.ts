@@ -3,6 +3,7 @@ import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
+import { getBeatDuration } from '../../../../helpers/bpmUtils';
 import { Effect, EffectTransition } from '../../../../types';
 
 /**
@@ -12,11 +13,17 @@ import { Effect, EffectTransition } from '../../../../types';
 export class StageKitFrenzyCue implements ICue {
   id = 'stagekit-frenzy';
   cueId = CueType.Frenzy;
-  description = 'Large venue: Red->Blue->Yellow cycle on beat. Small venue: Red->Green->Blue cycle on beat. NOTE: Differs from StageKit/YALCY which flashes each colour very quickly - this turns our lower number of lights into colourful strobes instead.';
+  description = 'Large venue: Red->Blue->Yellow cycle with 25% beat delays. Small venue: Red->Green->Blue cycle with 25% beat delays. NOTE: Differs from StageKit/YALCY as they change LEDs at different times, but this doesn\'t map well to a lower number of lights.';
   style = CueStyle.Primary;
+  
+  private isFirstExecution: boolean = true;
 
   async execute(cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], 'all');
+    
+    // Calculate delay timing - 25% of beat duration
+    const beatDuration = getBeatDuration(cueData.beatsPerMinute);
+    const delayTime = beatDuration * 0.25;
     
     // Determine venue size and set colors accordingly
     const isLargeVenue = cueData.venueSize === 'Large';
@@ -34,10 +41,10 @@ export class StageKitFrenzyCue implements ICue {
       color3 = getColor('blue', 'medium', 'add');
     }
     
-    // Create frenzy effect with 3-beat cycle
+    // Create frenzy effect with delay-based timing
     const frenzyTransitions: EffectTransition[] = [];
     
-    // beat 1: First color (Red)
+    // First color (Red) - immediate
     frenzyTransitions.push({
         lights: allLights,
         layer: 0,
@@ -48,11 +55,11 @@ export class StageKitFrenzyCue implements ICue {
             easing: 'linear',
             duration: 0,
         },
-        waitUntilCondition: 'beat',
-        waitUntilTime: 0
+        waitUntilCondition: 'delay',
+        waitUntilTime: delayTime
     });
     
-    // beat 2: Second color (Blue for large, Green for small)
+    // Second color (Blue for large, Green for small) - after delay
     frenzyTransitions.push({
         lights: allLights,
         layer: 0,
@@ -63,12 +70,11 @@ export class StageKitFrenzyCue implements ICue {
             easing: 'linear',
             duration: 0,
         },
-        waitUntilCondition: 'beat',
-        waitUntilTime: 0,
-        waitUntilConditionCount: 1
+        waitUntilCondition: 'delay',
+        waitUntilTime: delayTime
     });
     
-    // beat 3: Third color (Yellow for large, Blue for small)
+    // Third color (Yellow for large, Blue for small) - after another delay
     frenzyTransitions.push({
         lights: allLights,
         layer: 0,
@@ -79,24 +85,27 @@ export class StageKitFrenzyCue implements ICue {
             easing: 'linear',
             duration: 0,
         },
-        waitUntilCondition: 'beat',
-        waitUntilTime: 0,
-        waitUntilConditionCount: 1
+        waitUntilCondition: 'delay',
+        waitUntilTime: delayTime
     });
     
     // Create the frenzy effect
     const frenzyEffect: Effect = {
         id: "stagekit-frenzy",
-        description: `StageKit frenzy pattern - ${isLargeVenue ? 'Red->Blue->Yellow' : 'Red->Green->Blue'} cycle on beat`,
+        description: `StageKit frenzy pattern - ${isLargeVenue ? 'Red->Blue->Yellow' : 'Red->Green->Blue'} cycle with ${delayTime.toFixed(0)}ms delays`,
         transitions: frenzyTransitions
     };
     
-    // Apply the effect
-    await controller.setEffect('stagekit-frenzy', frenzyEffect);
+    if (this.isFirstExecution) {
+      await controller.setEffect('stagekit-frenzy', frenzyEffect);
+      this.isFirstExecution = false;
+    } else {
+      controller.addEffect('stagekit-frenzy', frenzyEffect);
+    }
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {

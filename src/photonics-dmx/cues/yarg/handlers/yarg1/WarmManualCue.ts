@@ -5,6 +5,7 @@ import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
+import { TimingPresets } from '../../../../helpers/bpmUtils';
 
 export class WarmManualCue implements ICue {
   id = 'default-warm-manual';
@@ -20,8 +21,7 @@ export class WarmManualCue implements ICue {
     const red = getColor('red', 'medium');
     const yellow = getColor('yellow', 'medium');
 
-    const bps = parameters.beatsPerMinute / 60;
-    const duration = (1000 / bps);
+    const duration = TimingPresets.beat(parameters.beatsPerMinute);
 
     const baseLayer = getEffectSingleColor({
       lights: all,

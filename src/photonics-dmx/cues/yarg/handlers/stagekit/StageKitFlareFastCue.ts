@@ -13,6 +13,8 @@ export class StageKitFlareFastCue implements ICue {
   cueId = CueType.Flare_Fast;
   description = 'Solid blue on all. Does not yet support green if previous was cool.';
   style = CueStyle.Primary;
+  
+  private isFirstExecution: boolean = true;
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
@@ -28,11 +30,17 @@ export class StageKitFlareFastCue implements ICue {
       waitUntil: 'none',
       untilTime: 0,
     });
-    sequencer.setEffect('stagekit-flare-fast', effect);
+  
+    if (this.isFirstExecution) {
+      sequencer.setEffect('stagekit-flare-fast', effect);
+      this.isFirstExecution = false;
+    } else {
+      sequencer.addEffect('stagekit-flare-fast', effect);
+    }
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {

@@ -5,6 +5,7 @@ import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
 import { randomBetween } from '../../../../helpers/utils';
+import { TimingPresets } from '../../../../helpers/bpmUtils';
 import { EasingType } from '../../../../easing';
 
 export class HarmonyCue implements ICue {
@@ -89,8 +90,7 @@ export class HarmonyCue implements ICue {
       endColor = colors[randomBetween(0, colors.length - 1)];
     }
 
-    const bps = parameters.beatsPerMinute / 60;
-    const duration = (1000 / bps) / 4;
+    const duration = TimingPresets.quarterBeat(parameters.beatsPerMinute);
 
     const cross = getEffectCrossFadeColors({
       startColor: startColor,

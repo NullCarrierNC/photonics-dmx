@@ -5,6 +5,7 @@ import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { randomBetween } from '../../../../helpers/utils';
+import { TimingPresets } from '../../../../helpers/bpmUtils';
 
 export class VerseCue implements ICue {
   id = 'default-verse';
@@ -29,8 +30,7 @@ export class VerseCue implements ICue {
 
     const flip = randomBetween(0, 1);
 
-    const bps = parameters.beatsPerMinute / 60;
-    const duration = (1000 / bps) + (100 - parameters.beatsPerMinute);
+    const duration = TimingPresets.verse(parameters.beatsPerMinute);
 
     for (let i = 0; i < num; i++) {
       const color = flip === 1 ? set1[randomBetween(0, set1.length - 1)] : set2[randomBetween(0, set2.length - 1)];
