@@ -75,7 +75,7 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
 
       {/* Back Lights Group */}
       {lightingConfig?.backLights.length > 0 &&
-        renderLightsGroup(lightingConfig.backLights, 'Back Lights')}
+        renderLightsGroup([...lightingConfig.backLights].reverse(), 'Back Lights')}
 
       {/* Strobe Lights Group (if strobeType is 'dedicated')
       {lightingConfig.strobeType === 'dedicated' &&

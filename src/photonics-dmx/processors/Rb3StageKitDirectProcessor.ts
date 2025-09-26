@@ -296,7 +296,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       });
       
       // Also call blackout on the sequencer to clear any effects on layers
-      this.photonicsSequencer.blackout(0).catch(error => {
+      this.photonicsSequencer.blackout(200).catch(error => {
         console.error('StageKitDirectProcessor: Error calling sequencer blackout during InGame transition:', error);
       });
     } else if (gameState === 'Menus') {
