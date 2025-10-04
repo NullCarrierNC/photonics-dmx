@@ -29,7 +29,7 @@ export class StageKitScoreCue implements ICue {
 
     // Use addEffectUnblockedName for reliable looping
     controller.setEffect('stagekit-score-yellow', yellowSweep, 0, true);
-    controller.addEffect('stagekit-score-blue', blueSweep, 0, true);
+    await controller.addEffect('stagekit-score-blue', blueSweep, 0, true);
   }
 
   private createYellowClockwiseSweep(allLights: any[], yellowColor: any, transparentColor: any) {

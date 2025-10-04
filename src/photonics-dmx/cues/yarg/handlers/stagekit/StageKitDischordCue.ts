@@ -307,10 +307,10 @@ export class StageKitDischordCue implements ICue {
         this.isFirstExecution = false;
     } else {
         // Repeat call: use addEffect to add to existing effects
-        controller.addEffect('dischord-blue', blueEffect);
-        controller.addEffect('dischord-yellow', yellowEffect);
-        controller.addEffect('dischord-green', greenEffect);
-        controller.addEffect('dischord-red', redFlash);
+        await controller.addEffect('dischord-blue', blueEffect);
+        await controller.addEffect('dischord-yellow', yellowEffect);
+        await controller.addEffect('dischord-green', greenEffect);
+        await controller.addEffect('dischord-red', redFlash);
     }
   }
 
