@@ -82,9 +82,8 @@ class YargCueHandler extends BaseCueHandler {
         this.emit('cueHandled', historicCueData);
         return;
       case CueType.Menu:
-        this.stopCurrentCue();
+        
         //this.registry.setActiveGroups([]);
-        this.emit('cueHandled', historicCueData);
         break;
     }
 
@@ -97,12 +96,19 @@ class YargCueHandler extends BaseCueHandler {
       // Always check for cue transitions first
       if (this.currentExecutingCueType !== cueType) {
       //  console.log(`[Lifecycle] Cue change detected: ${this.currentExecutingCueType} -> ${cueType}`);
-        this.stopCurrentCue();
-        
-        // Track the new executing cue
+
+        // Don't stop strobe effects as they run on higher layers above regular cues
+        const strobeTypes = ['Strobe_Fastest', 'Strobe_Fast', 'Strobe_Medium', 'Strobe_Slow', 'Strobe_Off'];
+        if (!this.currentExecutingCueType || !strobeTypes.includes(this.currentExecutingCueType)) {
+          this.stopCurrentCue();
+
+               // Track the new executing cue
        // console.log(`[Lifecycle] Starting new cue: ${cue.cueId} (${cueType})`);
         this.currentExecutingCue = cue;
         this.currentExecutingCueType = cueType;
+        }
+
+   
       }
       
       await cue.execute(historicCueData, this._sequencer, this._lightManager);
