@@ -100,7 +100,7 @@ export class StageKitFrenzyCue implements ICue {
       await controller.setEffect('stagekit-frenzy', frenzyEffect);
       this.isFirstExecution = false;
     } else {
-      controller.addEffect('stagekit-frenzy', frenzyEffect);
+      await controller.addEffect('stagekit-frenzy', frenzyEffect);
     }
   }
 

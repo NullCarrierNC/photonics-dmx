@@ -186,7 +186,7 @@ export class StageKitDefaultCue implements ICue {
       ]
     };
     
-    controller.addEffect('stagekit-default-small-yellow-dimming', yellowDimmingEffect);
+    await controller.addEffect('stagekit-default-small-yellow-dimming', yellowDimmingEffect);
   }
 
   onStop(): void {

@@ -47,7 +47,7 @@ export class StageKitIntroCue implements ICue {
       await controller.setEffect('stagekit-intro', introEffect);
       this.isFirstExecution = false;
     } else {
-      controller.addEffect('stagekit-intro', introEffect);
+      await controller.addEffect('stagekit-intro', introEffect);
     }
   }
 
