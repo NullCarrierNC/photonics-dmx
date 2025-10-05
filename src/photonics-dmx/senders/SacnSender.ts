@@ -7,14 +7,26 @@ import { Sender } from 'sacn';
 export class SacnSender extends BaseSender {
   private sender: Sender | undefined;
   private eventEmitter: EventEmitter;
+  
+  // Reusable payload buffer for performance optimization
+  private payloadBuffer: Record<number, number> = {};
 
   constructor() {
     super();
     this.eventEmitter = new EventEmitter();
-    // process.on('exit', () => this.stop());
+    
+    // Pre-allocate 512 channels (DMX universe size)
+    for (let i = 1; i <= 512; i++) {
+      this.payloadBuffer[i] = 0;
+    }
   }
 
   public async start(): Promise<void> {
+    // Reset payload buffer on start
+    for (let i = 1; i <= 512; i++) {
+      this.payloadBuffer[i] = 0;
+    }
+    
     this.sender = new Sender({
       universe: 1,
       defaultPacketOptions: {
@@ -46,15 +58,30 @@ export class SacnSender extends BaseSender {
     }
   }
 
-  public async send(channelValues: DmxChannel[]): Promise<void> {
+  public send(channelValues: DmxChannel[]): void {
     try {
       this.verifySenderStarted();
-      const payloadMap = new Map<number, number>();
-      channelValues.forEach(({ channel, value }) => {
-        payloadMap.set(channel, value);
-      });
-      const payload = Object.fromEntries(payloadMap);
-      await this.sender!.send({ payload });
+      
+      // Update buffer
+      let hasChanges = false;
+      const channelCount = channelValues.length;
+      
+      for (let i = 0; i < channelCount; i++) {
+        const { channel, value } = channelValues[i];
+        if (this.payloadBuffer[channel] !== value) {
+          this.payloadBuffer[channel] = value;
+          hasChanges = true;
+        }
+      }
+      
+      // Only send if something changed
+      if (hasChanges) {
+        this.sender!.send({ payload: this.payloadBuffer }).catch(err => {
+          console.error("SacnSender error during send:", err);
+          const errorEvent = new SenderError(err);
+          this.eventEmitter.emit('SenderError', errorEvent);
+        });
+      }
     } catch (err) {
       console.error("SacnSender error:", err);
       const errorEvent = new SenderError(err);

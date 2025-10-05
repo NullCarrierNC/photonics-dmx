@@ -123,10 +123,7 @@ export class SenderManager {
 
     // Fire-and-forget: start all senders in parallel without waiting
     for (const sender of this.enabledSenders.values()) {
-      // Each sender handles its own errors via try/catch
-      sender.send(channelValues).catch((error) => {
-        console.error(`Error sending data with ${sender.constructor.name}:`, error);
-      });
+      sender.send(channelValues);
     }
   }
 

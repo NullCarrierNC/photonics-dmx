@@ -23,7 +23,7 @@ export abstract class BaseSender {
    * Sends DMX data to the corresponding implementation.
    * @param channelValues Array of channel-value pairs.
    */
-  public abstract send(channelValues: DmxChannel[]): Promise<void>;
+  public abstract send(channelValues: DmxChannel[]): void;
 
   /**
    * Verifies that the sender is ready to send data.

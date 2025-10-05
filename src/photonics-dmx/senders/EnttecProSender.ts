@@ -7,6 +7,9 @@ export class EnttecProSender extends BaseSender {
   private dmx:DMX = new DMX();
   private universe?: IUniverseDriver;
   private eventEmitter: EventEmitter;
+  
+  // Reusable payload buffer for performance optimization
+  private payloadBuffer: Record<number, number> = {};
 
   constructor(
     private port: string,
@@ -15,10 +18,20 @@ export class EnttecProSender extends BaseSender {
   ) {
     super();
     this.eventEmitter = new EventEmitter();
+    
+    // Pre-allocate payload buffer with 512 channels (DMX universe size)
+    for (let i = 0; i < 512; i++) {
+      this.payloadBuffer[i] = 0;
+    }
   }
 
   public async start(): Promise<void> {
     try {
+      // Reset payload buffer on start
+      for (let i = 0; i < 512; i++) {
+        this.payloadBuffer[i] = 0;
+      }
+      
       this.universe = await this.dmx.addUniverse(
         this.universeName,
         new EnttecUSBDMXProDriver(this.port, this.options)
@@ -98,14 +111,27 @@ export class EnttecProSender extends BaseSender {
   }
 
   public async send(channelValues: DmxChannel[]): Promise<void> {
-   // console.log("Sending on port", this.port);
     try {
       this.verifySenderStarted();
-      const payload: Record<number, number> = {};
-      channelValues.forEach(({ channel, value }) => {
-        payload[channel] = value;
-      });
-      this.universe!.update(payload);
+      
+      // Reuse existing buffer - just update changed values
+      let hasChanges = false;
+      const channelCount = channelValues.length;
+      
+      for (let i = 0; i < channelCount; i++) {
+        const { channel, value } = channelValues[i];
+        
+        // Only mark as changed if value actually changed
+        if (this.payloadBuffer[channel] !== value) {
+          this.payloadBuffer[channel] = value;
+          hasChanges = true;
+        }
+      }
+      
+      // Only send if something changed
+      if (hasChanges) {
+        this.universe!.update(this.payloadBuffer);
+      }
     } catch (err) {
       console.error("EnttecProSender error:", err);
       const errorEvent = new SenderError(err);
