@@ -49,8 +49,8 @@ export class ScoreCue implements ICue {
       this.isFirstExecution = false;
     } else {
       // Repeat call: use addEffect to add to existing effects
-      sequencer.addEffect('score_base', baseEffect);
-      sequencer.addEffect('score_flash', flashEffect);
+      await sequencer.addEffect('score_base', baseEffect);
+      await sequencer.addEffect('score_flash', flashEffect);
     }
   }
 

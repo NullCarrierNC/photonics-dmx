@@ -12,6 +12,8 @@ export class CoolManualCue implements ICue {
   description = 'Alternates between blue and green on even/odd front lights triggered by beat events';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const even = lightManager.getLights(['front'], 'even');
     const odd = lightManager.getLights(['front'], 'odd');
@@ -46,8 +48,26 @@ export class CoolManualCue implements ICue {
       layer: 2,
     });
 
-    sequencer.setEffect('coolManual-base', baseLayer);
-    sequencer.addEffect('coolManual-e', crossFadeEven);
-    sequencer.addEffect('coolManual-o', crossFadeOdd);
+    if (this.isFirstExecution) {
+      await sequencer.setEffect('coolManual-base', baseLayer);
+      this.isFirstExecution = false;
+    } else {
+      await sequencer.addEffect('coolManual-base', baseLayer);
+    }
+    
+    await sequencer.addEffect('coolManual-e', crossFadeEven);
+    await sequencer.addEffect('coolManual-o', crossFadeOdd);
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

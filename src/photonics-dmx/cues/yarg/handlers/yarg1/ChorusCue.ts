@@ -15,6 +15,8 @@ export class ChorusCue implements ICue {
   description = 'Alternating randomly between Amber/Purple or Yellow/Red colors on all lights with timing based on song BPM';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const amberLow = getColor('amber', 'low');
     const amberMedium = getColor('amber', 'medium');
@@ -52,7 +54,24 @@ export class ChorusCue implements ICue {
         lights: [lights[i]],
         layer: i
       });
-      sequencer.addEffect(`chorus-${i}`, effect);
+      if (this.isFirstExecution) {
+        await sequencer.setEffect(`chorus-${i}`, effect);
+        this.isFirstExecution = false;
+      } else {
+        await sequencer.addEffect(`chorus-${i}`, effect);
+      }
     }
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

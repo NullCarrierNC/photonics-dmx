@@ -48,7 +48,7 @@ export class FrenzyCue implements ICue {
       layer: 10,
     });
     // using layer 10 to force it on top of other common effects to take precedence
-    sequencer.addEffect('frenzy', cross);
+    await sequencer.addEffect('frenzy', cross);
 
     // Track the startColor index for next execution to ensure color always changes
     this._lastStartColorIndex = startColorIndex;

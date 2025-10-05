@@ -12,6 +12,8 @@ export class DefaultCue implements ICue {
   description = 'Alternates red and blue between front and back lights, triggered by keyframe events';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const front = lightManager.getLights(['front'], 'all');
     const back = lightManager.getLights(['back'], 'all');
@@ -47,8 +49,26 @@ export class DefaultCue implements ICue {
       layer: 2,
     });
 
-    sequencer.setEffect('default-base', baseLayer);
-    sequencer.addEffect('default-front', crossFadeFront);
-    sequencer.addEffect('default-back', crossFadeBack);
+    if (this.isFirstExecution) {
+      await sequencer.setEffect('default-base', baseLayer);
+      this.isFirstExecution = false;
+    } else {
+      await sequencer.addEffect('default-base', baseLayer);
+    }
+    
+    await sequencer.addEffect('default-front', crossFadeFront);
+    await sequencer.addEffect('default-back', crossFadeBack);
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

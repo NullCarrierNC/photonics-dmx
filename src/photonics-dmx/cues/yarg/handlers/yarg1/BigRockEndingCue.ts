@@ -13,6 +13,7 @@ export class BigRockEndingCue implements ICue {
   description = 'Chaotic, individual flashing of bright colors (red, green, blue, orange) on all lights with random timings';
   style = CueStyle.Secondary;
 
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const red = getColor('red', 'max');
     const green = getColor('green', 'max');
@@ -36,11 +37,23 @@ export class BigRockEndingCue implements ICue {
           layer: i + 10,
         });
         
-        sequencer.addEffect(`big-rock-ending${i}`, flash);
+        await sequencer.addEffect(`big-rock-ending${i}`, flash);
       }
     } catch (ex) {
       console.error(ex);
       throw ex;
     }
+  }
+
+  onStop(): void {
+  
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

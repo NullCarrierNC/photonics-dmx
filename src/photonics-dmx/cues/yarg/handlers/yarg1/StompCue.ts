@@ -11,6 +11,7 @@ export class StompCue implements ICue {
   description = 'White flash effect on front lights triggered by keyframe';
   style = CueStyle.Secondary;
 
+  
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const white = getColor('white', 'high', 'add');
     const transparent = getColor('transparent', 'medium', 'add');
@@ -75,6 +76,17 @@ export class StompCue implements ICue {
       ]
     };
 
-    sequencer.addEffect('stomp', stompEffect);
+    await sequencer.addEffect('stomp', stompEffect);
+  }
+
+  onStop(): void {
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

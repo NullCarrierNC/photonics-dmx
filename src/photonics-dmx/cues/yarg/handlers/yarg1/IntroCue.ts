@@ -11,6 +11,8 @@ export class IntroCue implements ICue {
   description = 'Solid low green color on front lights.';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const all = lightManager.getLights(['front', 'back'], 'all');
     const color = getColor('green', 'low');
@@ -19,6 +21,24 @@ export class IntroCue implements ICue {
       color: color,
       duration: 10,
     });
-    sequencer.setEffect('intro', effect);
+    
+    if (this.isFirstExecution) {
+      await sequencer.setEffect('intro', effect);
+      this.isFirstExecution = false;
+    } else {
+      await sequencer.addEffect('intro', effect);
+    }
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

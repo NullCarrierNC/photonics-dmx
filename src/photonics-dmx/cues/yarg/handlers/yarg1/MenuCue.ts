@@ -12,6 +12,8 @@ export class MenuCue implements ICue {
   description = 'Continuous slow blue sweep effect that moves around all lights in a circular pattern with a 2 sec delay between passes';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const frontLights = lightManager.getLights(['front'], 'all');
     const backLights = lightManager.getLights(['back'], 'all');
@@ -34,6 +36,23 @@ export class MenuCue implements ICue {
       layer: 0,
     });
     // Use unblocked to avoid breaking the sweep timing.
-    sequencer.addEffectUnblockedName('menu', sweep, 0, true);
+    if (this.isFirstExecution) {
+      await sequencer.setEffectUnblockedName('menu', sweep, 0, true);
+      this.isFirstExecution = false;
+    } else {
+      await sequencer.addEffectUnblockedName('menu', sweep, 0, true);
+    }
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 
