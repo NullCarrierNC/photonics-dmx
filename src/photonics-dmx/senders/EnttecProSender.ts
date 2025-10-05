@@ -1,6 +1,5 @@
 import { DMX, EnttecUSBDMXProDriver, IUniverseDriver } from "dmx-ts";
 import { EventEmitter } from "events";
-import { DmxChannel } from "../types";
 import { BaseSender, SenderError } from "./BaseSender";
 
 export class EnttecProSender extends BaseSender {
@@ -110,18 +109,18 @@ export class EnttecProSender extends BaseSender {
     }
   }
 
-  public async send(channelValues: DmxChannel[]): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<void> {
     try {
       this.verifySenderStarted();
       
-      // Reuse existing buffer - just update changed values
+      // Check if anything changed in the incoming buffer
       let hasChanges = false;
-      const channelCount = channelValues.length;
       
-      for (let i = 0; i < channelCount; i++) {
-        const { channel, value } = channelValues[i];
+      for (const channelStr in universeBuffer) {
+        const channel = parseInt(channelStr, 10);
+        const value = universeBuffer[channel];
         
-        // Only mark as changed if value actually changed
+        // Only update if value actually changed
         if (this.payloadBuffer[channel] !== value) {
           this.payloadBuffer[channel] = value;
           hasChanges = true;

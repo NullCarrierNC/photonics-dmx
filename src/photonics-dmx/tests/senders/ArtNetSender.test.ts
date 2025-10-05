@@ -1,5 +1,4 @@
 import { ArtNetSender } from '../../senders/ArtNetSender';
-import { DmxChannel } from '../../types';
 
 // Mock the dmx-ts library
 jest.mock('dmx-ts', () => ({
@@ -58,12 +57,12 @@ describe('ArtNetSender', () => {
 
   describe('send', () => {
     it('should handle error when not started', async () => {
-      const channels: DmxChannel[] = [
-        { universe: 1, channel: 1, value: 255 }
-      ];
+      const universeBuffer: Record<number, number> = {
+        1: 255
+      };
 
       // The send method catches errors and emits them, so we expect it to not throw
-      await expect(artNetSender.send(channels)).resolves.not.toThrow();
+      await expect(artNetSender.send(universeBuffer)).resolves.not.toThrow();
     });
   });
 
@@ -75,7 +74,7 @@ describe('ArtNetSender', () => {
       });
 
       // Trigger an error by trying to send without starting
-      artNetSender.send([{ universe: 1, channel: 1, value: 255 }]).catch(() => {
+      artNetSender.send({ 1: 255 }).catch(() => {
         // Expected error - this is caught by the send method
       });
     });

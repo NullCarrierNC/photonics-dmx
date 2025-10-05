@@ -1,7 +1,6 @@
 // src/managers/SenderManager.ts
 import { EventEmitter } from 'stream';
 import { BaseSender, SenderError } from '../senders/BaseSender';
-import { DmxChannel } from '../types';
 
 
 /**
@@ -113,17 +112,18 @@ export class SenderManager {
   }
 
   /**
-   * Sends data to all enabled senders in parallel without blocking.
-   * @param channelValues Array of channel-value pairs.
+   * Sends pre-built universe buffer to all enabled senders without blocking.
+   * @param universeBuffer Complete DMX universe buffer (channel -> value mapping).
    */
-  public send(channelValues: DmxChannel[]): void {
+  public send(universeBuffer: Record<number, number>): void {
     if (this.enabledSenders.size === 0) {
       return;
     }
 
-    // Fire-and-forget: start all senders in parallel without waiting
     for (const sender of this.enabledSenders.values()) {
-      sender.send(channelValues);
+      sender.send(universeBuffer).catch((error) => {
+        console.error(`Error sending data with ${sender.constructor.name}:`, error);
+      });
     }
   }
 

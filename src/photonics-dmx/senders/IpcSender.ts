@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
+import { BaseSender, SenderError } from './BaseSender';
 import { DmxChannel } from '../types';
-import { BaseSender, SenderError } from './BaseSender'
 
 /**
  * IPC Sender uses Electron IPC's to communicate 
@@ -28,10 +28,20 @@ export class IpcSender extends BaseSender {
 
   /**
    * Sends DMX data using Electron IPC protocol.
-   * @param channelValues Array of channel-value pairs.
+   * @param universeBuffer Pre-built universe buffer (channel -> value mapping).
    */
-  public async send(channelValues: DmxChannel[]): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<void> {
     if(this.enabled){
+      // Convert buffer to DmxChannel[] format for renderer
+      const channelValues: DmxChannel[] = [];
+      for (const channelStr in universeBuffer) {
+        const channel = parseInt(channelStr, 10);
+        channelValues.push({
+          universe: 1,
+          channel,
+          value: universeBuffer[channel]
+        });
+      }
       this.window.webContents.send("dmxValues", channelValues);
     }
   }

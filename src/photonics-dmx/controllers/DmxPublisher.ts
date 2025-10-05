@@ -1,6 +1,5 @@
 import {
     LightState,
-    DmxChannel,
     RgbwDmxChannels,
     RgbDmxChannels,
     RgbStrobeDmxChannels,
@@ -22,7 +21,7 @@ export class DmxPublisher {
     private _dmxLightManager: DmxLightManager;
     private _sender: SenderManager;
     private _lightStateManager: LightStateManager;
-    private _immediateBlackoutData:DmxChannel[] = [];
+    private _immediateBlackoutData: Record<number, number> = {};
 
     constructor(
         dmxLightManager: DmxLightManager,
@@ -36,13 +35,9 @@ export class DmxPublisher {
         this.publish = this.publish.bind(this);
         this._lightStateManager.on('LightStatesUpdated', this.publish);
 
-
-        for (let channel = 1; channel <= 255; channel++) {
-            this._immediateBlackoutData.push({
-                universe: 1,
-                channel: channel,
-                value: 0
-            });
+        // Pre-build blackout buffer
+        for (let channel = 1; channel <= 512; channel++) {
+            this._immediateBlackoutData[channel] = 0;
         }
     }
 
@@ -60,9 +55,11 @@ export class DmxPublisher {
     /**
      * Contains the logic for converting light states
      * to DMX channels and sending them.
+     * Optimized to build complete universe buffer once before sending.
      */
     private publishNow(lights: LightState[]): void {
-        const dmxChannels: DmxChannel[] = [];
+        // Build complete universe buffer (channels 0-511)
+        const universeBuffer: Record<number, number> = {};
         const lightCount = lights.length;
 
         for (let i = 0; i < lightCount; i++) {
@@ -91,7 +88,7 @@ export class DmxPublisher {
                 continue;
             }
 
-
+            // Write directly to universe buffer
             for (const [channelName, channelNumber] of Object.entries(dmxLight.channels)) {
                 let value: number = 0;
 
@@ -119,24 +116,15 @@ export class DmxPublisher {
                         continue;
                 }
 
-                // Ensure the DMX value is within [0, 255]
-                value = Math.max(0, Math.min(255, value));
-
-                const dmxChannel: DmxChannel = {
-                    universe: dmxLight.universe ?? 0,
-                    channel: channelNumber,
-                    value: value,
-                };
-
-                dmxChannels.push(dmxChannel);
+                // Ensure the DMX value is within [0, 255] and write directly to buffer
+                universeBuffer[channelNumber] = Math.max(0, Math.min(255, value));
             }
-
-            
         }
 
-        if (dmxChannels.length > 0) {
+        // Send complete universe buffer to all senders at once
+        if (Object.keys(universeBuffer).length > 0) {
             try {
-                this._sender.send(dmxChannels);
+                this._sender.send(universeBuffer);
             } catch (error) {
                 console.error('Failed to send DMX data:', error);
             }
