@@ -43,14 +43,12 @@ export class ScoreCue implements ICue {
     });
 
     if (this.isFirstExecution) {
-      // First time: use setEffect to clear any existing effects and start fresh
-      await sequencer.setEffect('score_base', baseEffect);
-      await sequencer.addEffect('score_flash', flashEffect);
+      await sequencer.setEffect('score_base', baseEffect, 0 ,true);
+      await sequencer.addEffect('score_flash', flashEffect, 0 ,true);
       this.isFirstExecution = false;
     } else {
-      // Repeat call: use addEffect to add to existing effects
-      await sequencer.addEffect('score_base', baseEffect);
-      await sequencer.addEffect('score_flash', flashEffect);
+      await sequencer.addEffect('score_base', baseEffect, 0 ,true);
+      await sequencer.addEffect('score_flash', flashEffect, 0 ,true);
     }
   }
 
