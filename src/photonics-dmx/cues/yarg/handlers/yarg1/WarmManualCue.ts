@@ -16,9 +16,9 @@ export class WarmManualCue implements ICue {
   private isFirstExecution: boolean = true;
 
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const even = lightManager.getLights(['front'], 'even');
-    const odd = lightManager.getLights(['front'], 'odd');
-    const all = lightManager.getLights(['front'], 'all');
+    const even = lightManager.getLights(['front', 'back'], 'even');
+    const odd = lightManager.getLights(['front', 'back'], 'odd');
+    const all = lightManager.getLights(['front', 'back'], 'all');
 
     const red = getColor('red', 'medium');
     const yellow = getColor('yellow', 'medium');
