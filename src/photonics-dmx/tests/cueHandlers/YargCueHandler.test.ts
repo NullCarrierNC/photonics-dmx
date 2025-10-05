@@ -164,7 +164,7 @@ describe('YargCueHandler', () => {
       // Exclude runtime-generated properties from comparison
       const { cueStartTime: cst2, timeSinceLastCue: tslc2, ...expectedCoreData2 } = mockCueData;
       expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData2));
-      expect(mockSequencer.blackout).toHaveBeenCalledWith(1000);
+      expect(mockSequencer.blackout).toHaveBeenCalledWith(500);
 
       // Reset mock calls and advance timers
       mockSequencer.blackout.mockClear();

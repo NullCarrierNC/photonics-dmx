@@ -47,6 +47,9 @@ describe('ChorusCue', () => {
 
   describe('execute', () => {
     it('should set chorus lighting state', async () => {
+      // Reset the cue to ensure fresh state
+      cue.onStop();
+      
       const data: CueData = {
         datagramVersion: 1,
         platform: "RB3E",
@@ -80,13 +83,17 @@ describe('ChorusCue', () => {
 
       await cue.execute(data, mockController, mockLightManager);
 
-      // Verify that addEffect was called for each light
-      expect(mockController.addEffect).toHaveBeenCalledTimes(2);
-      expect(mockController.addEffect).toHaveBeenCalledWith('chorus-0', expect.any(Object));
+      // Verify that setEffect was called for the first light and addEffect for the second
+      expect(mockController.setEffect).toHaveBeenCalledTimes(1);
+      expect(mockController.setEffect).toHaveBeenCalledWith('chorus-0', expect.any(Object));
+      expect(mockController.addEffect).toHaveBeenCalledTimes(1);
       expect(mockController.addEffect).toHaveBeenCalledWith('chorus-1', expect.any(Object));
     });
 
     it('should handle missing data', async () => {
+      // Reset the cue to simulate a fresh execution
+      cue.onStop();
+      
       const data: CueData = {
         datagramVersion: 1,
         platform: "RB3E",
@@ -120,9 +127,10 @@ describe('ChorusCue', () => {
 
       await cue.execute(data, mockController, mockLightManager);
 
-      // Verify that addEffect was called for each light
-      expect(mockController.addEffect).toHaveBeenCalledTimes(2);
-      expect(mockController.addEffect).toHaveBeenCalledWith('chorus-0', expect.any(Object));
+      // Verify that setEffect was called for the first light and addEffect for the second
+      expect(mockController.setEffect).toHaveBeenCalledTimes(1);
+      expect(mockController.setEffect).toHaveBeenCalledWith('chorus-0', expect.any(Object));
+      expect(mockController.addEffect).toHaveBeenCalledTimes(1);
       expect(mockController.addEffect).toHaveBeenCalledWith('chorus-1', expect.any(Object));
     });
   });
