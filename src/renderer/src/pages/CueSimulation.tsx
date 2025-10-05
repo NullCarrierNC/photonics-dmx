@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAtom } from 'jotai';
 import { senderIpcEnabledAtom, activeDmxLightsConfigAtom } from '@renderer/atoms';
-import { EffectSelector, DmxChannel } from '../../../photonics-dmx/types';
+import { EffectSelector } from '../../../photonics-dmx/types';
 import { InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/cueTypes';
 import EffectsDropdown from '../components/EffectSelector';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
@@ -73,12 +73,9 @@ const CueSimulation: React.FC = () => {
 
   // Listen for IPC messages to receive DMX values.
   useEffect(() => {
-    const handleDmxValues = (_: unknown, channels: DmxChannel[]) => {
-      const values = channels.reduce<Record<number, number>>((acc, channel) => {
-        acc[channel.channel] = channel.value;
-        return acc;
-      }, {});
-      setDmxValues(values);
+    const handleDmxValues = (_: unknown, universeBuffer: Record<number, number>) => {
+      // Set the buffer directly
+      setDmxValues(universeBuffer);
     };
 
     // Add the listener

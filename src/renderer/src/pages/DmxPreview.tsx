@@ -6,7 +6,6 @@ import {
 } from '@renderer/atoms';
 import LightsDmxPreview from '@renderer/components/LightsDmxPreview';
 import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview';
-import { DmxChannel } from '../../../photonics-dmx/types';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 import CuePreview from '@renderer/components/CuePreview';
@@ -32,12 +31,9 @@ const DmxPreview: React.FC = () => {
 
   // Listen for IPC messages to receive DMX values.
   useEffect(() => {
-    const handleDmxValues = (_: unknown, channels: DmxChannel[]) => {
-      const values = channels.reduce<Record<number, number>>((acc, channel) => {
-        acc[channel.channel] = channel.value;
-        return acc;
-      }, {});
-      setDmxValues(values);
+    const handleDmxValues = (_: unknown, universeBuffer: Record<number, number>) => {
+      // Set the buffer directly
+      setDmxValues(universeBuffer);
     };
 
     // Add the listener
