@@ -11,6 +11,10 @@ import { Effect } from '../../../../types';
  * StageKit Stomp Cue - Keyframe-based toggle with quarter-based color patterns
  * Front: quarter 1 yellow, quarter 4 red. Back: quarter 1 red, quarter 4 yellow. Inner green.
  * Toggles on/off with each keyframe
+ * NOTE: The start state appears to be inverse of what's used in the venue. I.e. YALCY starts off, 
+ * then turns on. The venue appears to start on, then turns off. 
+ * We're matching YALCY here.
+ * TODO: double check this. This can be seen with NIN Discipline and the Outdoor Festival venue.
  */
 export class StageKitStompCue implements ICue {
   id = 'stagekit-stomp';
@@ -41,59 +45,14 @@ export class StageKitStompCue implements ICue {
       id: 'stagekit-stomp-toggle',
       description: 'Stomp pattern - front q1 yellow/q4 red, back q1 red/q4 yellow, inner green, keyframe toggle',
       transitions: [
-        // Initial state: front q1 yellow, front q4 red, back q1 red, back q4 yellow, inner green
-        {
-          lights: frontQuarter1Lights,
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: yellowColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'keyframe',
-          waitUntilTime: 0
-        },
-        {
-          lights: frontQuarter4Lights,
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: redColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'keyframe',
-          waitUntilTime: 0
-        },
-        {
-          lights: backQuarter1Lights,
-          layer: 2,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: redColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'keyframe',
-          waitUntilTime: 0
-        },
-        {
-          lights: backQuarter4Lights,
-          layer: 3,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: yellowColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'keyframe',
-          waitUntilTime: 0
-        },
-        {
-          lights: innerLights,
-          layer: 4,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: greenColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'keyframe',
-          waitUntilTime: 0
-        },
+       
         // Turn off front quarter 1 lights on keyframe
         {
           lights: frontQuarter1Lights,
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -104,7 +63,7 @@ export class StageKitStompCue implements ICue {
           layer: 1,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -115,7 +74,7 @@ export class StageKitStompCue implements ICue {
           layer: 2,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -126,7 +85,7 @@ export class StageKitStompCue implements ICue {
           layer: 3,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -137,11 +96,57 @@ export class StageKitStompCue implements ICue {
           layer: 4,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
-        }
+        },
+         // Turn on: front q1 yellow, front q4 red, back q1 red, back q4 yellow, inner green
+         {
+          lights: frontQuarter1Lights,
+          layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: yellowColor, easing: 'linear', duration: 20 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0
+        },
+        {
+          lights: frontQuarter4Lights,
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: redColor, easing: 'linear', duration: 20 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0
+        },
+        {
+          lights: backQuarter1Lights,
+          layer: 2,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: redColor, easing: 'linear', duration: 20 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0
+        },
+        {
+          lights: backQuarter4Lights,
+          layer: 3,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: yellowColor, easing: 'linear', duration: 20 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0
+        },
+        {
+          lights: innerLights,
+          layer: 4,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: greenColor, easing: 'linear', duration: 20 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0
+        },
       ]
     };
 

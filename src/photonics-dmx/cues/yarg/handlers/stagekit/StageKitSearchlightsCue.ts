@@ -27,7 +27,7 @@ export class StageKitSearchlightsCue implements ICue {
     // BPM-based timing: 0.5 cycles per beat
     // For 8 lights: 0.5 cycles per beat = 2 beats per full cycle = 0.25 beats per light
     const beatDuration = 60000 / cueData.beatsPerMinute; // ms per beat
-    const lightDuration = beatDuration * 0.27; // Normally 0.25 beats per light, adding a bit of padding for the loop
+    const lightDuration = beatDuration * 0.26; // Normally 0.25 beats per light, adding a bit of padding for the loop
     
     const singleColor = getEffectSingleColor({
       color: transparentColor,
@@ -43,7 +43,7 @@ export class StageKitSearchlightsCue implements ICue {
 
       if (this.isFirstExecution) {
         await controller.setEffect('stagekit-clear-0', singleColor);
-        await controller.setEffect('stagekit-searchlights-yellow', yellowEffect);
+        await controller.addEffect('stagekit-searchlights-yellow', yellowEffect);
         await controller.addEffect('stagekit-searchlights-red', redEffect);
         this.isFirstExecution = false;
       } else {
@@ -74,7 +74,7 @@ export class StageKitSearchlightsCue implements ICue {
     lightDuration: number
   ): Effect {
     const yellowColor = getColor('yellow', 'medium', 'add');
-    const transparentColor = getColor('transparent', 'medium');
+    const transparentColor = getColor('transparent', 'medium', 'add');
     const yellowTransitions: EffectTransition[] = [];
     
     // Yellow counter-clockwise chase (starts at position 0)
@@ -154,7 +154,7 @@ export class StageKitSearchlightsCue implements ICue {
     lightDuration: number
   ): Effect {
     const redColor = getColor('red', 'medium', 'add');
-    const transparentColor = getColor('transparent', 'medium');
+    const transparentColor = getColor('transparent', 'medium', 'add');
     const redTransitions: EffectTransition[] = [];
     
     // Red counter-clockwise chase (offset by 1 position from yellow)

@@ -62,7 +62,7 @@ const stagekitGroup: ICueGroup = {
     [CueType.Strobe_Fastest, new StrobeFastestCue()],
     [CueType.Strobe_Medium, new StrobeMediumCue()],
     [CueType.Strobe_Off, new StrobeOffCue()],
-    [CueType.Strobe_Slow, new StrobeSlowCue()],
+    [CueType.Strobe_Slow, new StrobeSlowCue()]
   ]),
 };
 
