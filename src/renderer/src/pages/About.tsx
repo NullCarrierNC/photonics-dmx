@@ -17,7 +17,7 @@ const About = () => {
         </p>
 
         <h2 className="text-xl font-bold mb-4 mt-4 text-gray-800 dark:text-gray-200">For More Information or Help</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">For more information or to see the Quickstart Guide please visit us a <a href="https://photonics.rocks/" 
+        <p className="text-sm text-gray-600 dark:text-gray-400">For more information or to see the Quickstart Guide please visit us at <a href="https://photonics.rocks/" 
           className="text-blue-600 dark:text-blue-500 hover:underline" target="_blank">https://photonics.rocks/</a>.</p>
         <p className="text-sm text-gray-600 dark:text-gray-400">You can also visit our <a href="https://discord.com/invite/2Vyqc2hYcK" className="text-blue-600 dark:text-blue-500 hover:underline" target="_blank">Discord Server</a>.</p>
         
