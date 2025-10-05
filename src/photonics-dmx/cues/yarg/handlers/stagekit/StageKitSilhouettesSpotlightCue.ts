@@ -54,9 +54,9 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
     } else if (previousCue === CueType.Dischord) {
       // Previous cue was Dischord: Green backdrop + blue odd positions + vocal response
       const allLights = lightManager.getLights(['front', 'back'], 'all');
-      const oddLights = lightManager.getLights(['front', 'back'], 'odd');
+  //    const oddLights = lightManager.getLights(['front', 'back'], 'odd');
       const green = getColor('green', 'medium');
-      const blue = getColor('blue', 'medium');
+  //    const blue = getColor('blue', 'medium');
 
       // Green backdrop (always on)
       const greenBackdrop = getEffectSingleColor({
@@ -67,22 +67,23 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
       });
 
       // Blue odd positions (initially on)
+      /* Disabled Blue handling until vocal harmony toggle is implemented
       const blueOdd = getEffectSingleColor({
         lights: oddLights,
         color: blue,
         duration: 10,
         layer: 1,
       });
-
+*/
       // TODO: Add vocal harmony toggle logic 
 
       if (this.isFirstExecution) {
         await sequencer.setEffect('silhouettes-spotlight-green', greenBackdrop);
-        await sequencer.addEffect('silhouettes-spotlight-blue-odd', blueOdd);
+  //      await sequencer.addEffect('silhouettes-spotlight-blue-odd', blueOdd);
         this.isFirstExecution = false;
       } else {
         sequencer.addEffect('silhouettes-spotlight-green', greenBackdrop);
-        sequencer.addEffect('silhouettes-spotlight-blue-odd', blueOdd);
+  //      sequencer.addEffect('silhouettes-spotlight-blue-odd', blueOdd);
       }
       
     } else {
