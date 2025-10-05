@@ -23,7 +23,7 @@ export class StageKitFlareSlowCue implements ICue {
       color: white,
       duration: 100,
     });
-    sequencer.setEffect('stagekit-flare-slow', effect);
+    await sequencer.setEffect('stagekit-flare-slow', effect);
   }
 
   onStop(): void {

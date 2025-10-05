@@ -47,8 +47,8 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
         await sequencer.addEffect('silhouettes-spotlight-flash', flashEffect);
         this.isFirstExecution = false;
       } else {
-        sequencer.addEffect('silhouettes-spotlight-base', baseEffect);
-        sequencer.addEffect('silhouettes-spotlight-flash', flashEffect);
+        await sequencer.addEffect('silhouettes-spotlight-base', baseEffect);
+        await  sequencer.addEffect('silhouettes-spotlight-flash', flashEffect);
       }
       
     } else if (previousCue === CueType.Dischord) {

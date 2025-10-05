@@ -293,8 +293,8 @@ export class StageKitWarmManualCue implements ICue {
       this.isFirstExecution = false;
     } else {
       // Repeat call: use addEffect to add to existing effects
-      sequencer.addEffect('warm-manual-red', redEffect);
-      sequencer.addEffect('warm-manual-yellow', yellowEffect);
+      await sequencer.addEffect('warm-manual-red', redEffect);
+      await sequencer.addEffect('warm-manual-yellow', yellowEffect);
     }
   }
 

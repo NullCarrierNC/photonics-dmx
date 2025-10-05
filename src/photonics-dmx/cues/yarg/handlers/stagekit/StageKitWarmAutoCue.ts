@@ -293,8 +293,8 @@ export class StageKitWarmAutoCue implements ICue {
       this.isFirstExecution = false;
     } else {
       // Repeat call: use addEffect to add to existing effects
-      sequencer.addEffect('warm-auto-red', redEffect);
-      sequencer.addEffect('warm-auto-yellow', yellowEffect);
+      await sequencer.addEffect('warm-auto-red', redEffect);
+      await sequencer.addEffect('warm-auto-yellow', yellowEffect);
     }
   }
 

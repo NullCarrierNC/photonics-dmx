@@ -27,6 +27,6 @@ export class StrobeMediumCue implements ICue {
       lights: strobes,
       layer: 255,
     });
-    sequencer.addEffectUnblockedName('strobe', flash);
+    await sequencer.addEffectUnblockedName('strobe', flash);
   }
 } 
