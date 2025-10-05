@@ -48,10 +48,9 @@ export class DmxPublisher {
 
     /**
      * Publishes the provided light states to the DMX senders by 
-     * mapping the desired channels to each DMX fixtures channels.
-     * (Assuming publishers are enabled of course)
+     * mapping the desired channels to each DMX fixture's channels.
      */
-    public publish = async (lights: LightState[]): Promise<void> => {
+    public publish = (lights: LightState[]): void => {
         this.publishNow(lights);
     };
 
@@ -60,24 +59,26 @@ export class DmxPublisher {
 
     /**
      * Contains the logic for converting light states
-     * to DMX channels and sending them. 
+     * to DMX channels and sending them.
      */
-    private async publishNow(lights: LightState[]): Promise<void> {
+    private publishNow(lights: LightState[]): void {
         const dmxChannels: DmxChannel[] = [];
+        const lightCount = lights.length;
 
-        for (const light of lights) {
+        for (let i = 0; i < lightCount; i++) {
+            const light = lights[i];
             const dmxLight = this._dmxLightManager.getDmxLight(light.id);
             if (!dmxLight) {
                 console.warn(`DMX Light configuration not found for Light ID: ${light.id}`);
                 continue;
             }
 
-            const { red: r, green: g, blue: b, intensity: i, pan, tilt } = light.value;
+            const { red: r, green: g, blue: b, intensity, pan, tilt } = light.value;
             const channelsInput: { [key: string]: number } = {
                 red: r,
                 green: g,
                 blue: b,
-                masterDimmer: i,
+                masterDimmer: intensity,
                 pan: pan ?? dmxLight.config?.panHome ?? 0,
                 tilt: tilt ?? dmxLight.config?.tiltHome ??  0,
             };

@@ -113,21 +113,21 @@ export class SenderManager {
   }
 
   /**
-   * Sends data to all enabled senders.
+   * Sends data to all enabled senders in parallel without blocking.
    * @param channelValues Array of channel-value pairs.
    */
-  public async send(channelValues: DmxChannel[]): Promise<void> {
+  public send(channelValues: DmxChannel[]): void {
     if (this.enabledSenders.size === 0) {
       return;
     }
 
-    const promises = Array.from(this.enabledSenders.values()).map(sender =>
+    // Fire-and-forget: start all senders in parallel without waiting
+    for (const sender of this.enabledSenders.values()) {
+      // Each sender handles its own errors via try/catch
       sender.send(channelValues).catch((error) => {
         console.error(`Error sending data with ${sender.constructor.name}:`, error);
-      })
-    );
-
-    await Promise.all(promises);
+      });
+    }
   }
 
   /**
