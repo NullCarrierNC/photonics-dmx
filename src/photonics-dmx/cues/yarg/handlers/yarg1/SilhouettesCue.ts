@@ -12,6 +12,8 @@ export class SilhouettesCue implements ICue {
   description = 'Solid green color on back lights, or front lights if no back lights are available';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const back = lightManager.getLights(['back'], 'all');
     const front = lightManager.getLights(['front'], 'all');
@@ -23,6 +25,24 @@ export class SilhouettesCue implements ICue {
       lights: back.length > 0 ? back : front,
       layer: 0,
     });
-    sequencer.setEffect('silhouettes', singleColor);
+    
+    if (this.isFirstExecution) {
+      await sequencer.setEffect('silhouettes', singleColor);
+      this.isFirstExecution = false;
+    } else {
+      await sequencer.addEffect('silhouettes', singleColor);
+    }
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

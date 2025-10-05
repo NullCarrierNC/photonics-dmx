@@ -13,10 +13,12 @@ export class WarmManualCue implements ICue {
   description = 'Alternates between red and yellow on even/odd front lights triggered by measure events';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const even = lightManager.getLights(['front'], 'even');
-    const odd = lightManager.getLights(['front'], 'odd');
-    const all = lightManager.getLights(['front'], 'all');
+    const even = lightManager.getLights(['front', 'back'], 'even');
+    const odd = lightManager.getLights(['front', 'back'], 'odd');
+    const all = lightManager.getLights(['front', 'back'], 'all');
 
     const red = getColor('red', 'medium');
     const yellow = getColor('yellow', 'medium');
@@ -49,8 +51,26 @@ export class WarmManualCue implements ICue {
       lights: odd,
       layer: 2,
     });
-    sequencer.setEffect('warm_manual-base', baseLayer);
-    sequencer.addEffect('warm_manual-e', crossFadeEven);
-    sequencer.addEffect('warm_manual-o', crossFadeOdd);
+    if (this.isFirstExecution) {
+      await sequencer.setEffect('warm_manual-base', baseLayer);
+      this.isFirstExecution = false;
+    } else {
+      await sequencer.addEffect('warm_manual-base', baseLayer);
+    }
+    
+    await sequencer.addEffect('warm_manual-e', crossFadeEven);
+    await sequencer.addEffect('warm_manual-o', crossFadeOdd);
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

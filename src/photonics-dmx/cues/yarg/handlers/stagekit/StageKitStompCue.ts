@@ -10,7 +10,7 @@ import { Effect } from '../../../../types';
 /**
  * StageKit Stomp Cue - Keyframe-based toggle with quarter-based color patterns
  * Front: quarter 1 yellow, quarter 4 red. Back: quarter 1 red, quarter 4 yellow. Inner green.
- * Toggles on/off with each keyframe
+ * Toggles on/off with each keyframe.
  */
 export class StageKitStompCue implements ICue {
   id = 'stagekit-stomp';
@@ -41,59 +41,59 @@ export class StageKitStompCue implements ICue {
       id: 'stagekit-stomp-toggle',
       description: 'Stomp pattern - front q1 yellow/q4 red, back q1 red/q4 yellow, inner green, keyframe toggle',
       transitions: [
-        // Initial state: front q1 yellow, front q4 red, back q1 red, back q4 yellow, inner green
-        {
+         // Turn on: front q1 yellow, front q4 red, back q1 red, back q4 yellow, inner green
+         {
           lights: frontQuarter1Lights,
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: yellowColor, easing: 'linear', duration: 0 },
+          transform: { color: yellowColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
         {
           lights: frontQuarter4Lights,
-          layer: 1,
+          layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: redColor, easing: 'linear', duration: 0 },
+          transform: { color: redColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
         {
           lights: backQuarter1Lights,
-          layer: 2,
+          layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: redColor, easing: 'linear', duration: 0 },
+          transform: { color: redColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
         {
           lights: backQuarter4Lights,
-          layer: 3,
+          layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: yellowColor, easing: 'linear', duration: 0 },
+          transform: { color: yellowColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
         {
           lights: innerLights,
-          layer: 4,
+          layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: greenColor, easing: 'linear', duration: 0 },
+          transform: { color: greenColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
-        // Turn off front quarter 1 lights on keyframe
-        {
+         // Turn off front quarter 1 lights on keyframe
+         {
           lights: frontQuarter1Lights,
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -101,10 +101,10 @@ export class StageKitStompCue implements ICue {
         // Turn off front quarter 4 lights on keyframe
         {
           lights: frontQuarter4Lights,
-          layer: 1,
+          layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -112,10 +112,10 @@ export class StageKitStompCue implements ICue {
         // Turn off back quarter 1 lights on keyframe
         {
           lights: backQuarter1Lights,
-          layer: 2,
+          layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -123,10 +123,10 @@ export class StageKitStompCue implements ICue {
         // Turn off back quarter 4 lights on keyframe
         {
           lights: backQuarter4Lights,
-          layer: 3,
+          layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -134,14 +134,14 @@ export class StageKitStompCue implements ICue {
         // Turn off inner lights on keyframe
         {
           lights: innerLights,
-          layer: 4,
+          layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 20 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
-        }
+        },
       ]
     };
 

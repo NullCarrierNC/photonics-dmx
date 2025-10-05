@@ -10,8 +10,9 @@ export class FlareFastCue implements ICue {
   id = 'default-flare-fast';
   cueId = CueType.Flare_Fast;
   description = 'Quick, intense bursts of bright blue light on individual front lights with randomized timing.';
-  style = CueStyle.Primary;
+  style = CueStyle.Secondary;
 
+ 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const white = getColor('blue', 'high');
     const lights = lightManager.getLights(['front'], 'all');
@@ -27,7 +28,19 @@ export class FlareFastCue implements ICue {
         lights: [lights[i]],
         layer: i + 101,
       });
-      sequencer.addEffect(`flare-fast${i}`, flash);
+      await sequencer.addEffect(`flare-fast${i}`, flash);
     }
+  }
+
+  onStop(): void {
+  
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

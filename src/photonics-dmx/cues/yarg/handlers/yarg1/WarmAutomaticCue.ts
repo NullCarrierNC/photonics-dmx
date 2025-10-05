@@ -12,6 +12,8 @@ export class WarmAutomaticCue implements ICue {
   description = 'Alternates red and yellow between front and back lights, triggered by measure events';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const even = lightManager.getLights(['front'], 'all');
     const odd = lightManager.getLights(['back'], 'all');
@@ -46,8 +48,26 @@ export class WarmAutomaticCue implements ICue {
       lights: odd,
       layer: 2,
     });
-    sequencer.setEffect('warm_automatic-base', baseLayer);
-    sequencer.addEffect('warm_automatic-e', crossFadeEven);
-    sequencer.addEffect('warm_automatic-o', crossFadeOdd);
+    if (this.isFirstExecution) {
+      await sequencer.setEffect('warm_automatic-base', baseLayer);
+      this.isFirstExecution = false;
+    } else {
+      await sequencer.addEffect('warm_automatic-base', baseLayer);
+    }
+    
+    await sequencer.addEffect('warm_automatic-e', crossFadeEven);
+    await sequencer.addEffect('warm_automatic-o', crossFadeOdd);
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

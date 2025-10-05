@@ -15,6 +15,7 @@ export class SearchlightsCue implements ICue {
   description = 'Slow sweeping effect of a random bright color (red, green, blue, or white) that alternates direction with each activation';
   style = CueStyle.Secondary;
 
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const frontLights = lightManager.getLights(['front'], 'all');
     const backLights = lightManager.getLights(['back'], 'all');
@@ -46,9 +47,21 @@ export class SearchlightsCue implements ICue {
       layer: 101,
     });
     // Use unblocked to avoid breaking the sweep timing.
-    const didAdd = sequencer.addEffectUnblockedName('searchlights', sweep);
+    const didAdd =  await sequencer.addEffectUnblockedName('searchlights', sweep);
     if (didAdd) {
       ltr = !ltr;
     }
+  }
+
+  onStop(): void {
+ 
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

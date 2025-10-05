@@ -13,6 +13,8 @@ export class VerseCue implements ICue {
   description = 'Randomized blue or yellow colors at varying intensities on all lights with timing based on song BPM';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const blueLow = getColor('blue', 'low');
     const blueMed = getColor('blue', 'medium');
@@ -41,7 +43,25 @@ export class VerseCue implements ICue {
         lights: [lights[i]],
         layer: i
       });
-      sequencer.addEffect(`verse-${i}`, effect);
+      if (this.isFirstExecution) {
+        await sequencer.setEffect(`verse-${i}`, effect);
+        this.isFirstExecution = false;
+      } else {
+        await sequencer.addEffect(`verse-${i}`, effect);
+      }
+
     }
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

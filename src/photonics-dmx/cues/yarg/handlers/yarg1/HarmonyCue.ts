@@ -14,6 +14,8 @@ export class HarmonyCue implements ICue {
   description = 'Interactive color cross-fade effect where colors are determined by drum hits (starting color) and guitar notes (ending color)';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const red = getColor('red', 'high');
     const green = getColor('green', 'high');
@@ -104,6 +106,23 @@ export class HarmonyCue implements ICue {
       easing: EasingType.SIN_OUT,
     });
 
-    sequencer.addEffect('harmony', cross);
+    if (this.isFirstExecution) {
+      await sequencer.setEffect('harmony', cross);
+      this.isFirstExecution = false;
+    } else {
+      await sequencer.addEffect('harmony', cross);
+    }
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

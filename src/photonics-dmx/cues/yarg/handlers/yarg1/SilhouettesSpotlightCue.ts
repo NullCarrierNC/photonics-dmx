@@ -44,8 +44,8 @@ export class SilhouettesSpotlightCue implements ICue {
          this.isFirstExecution = false;
        } else {
          // Repeat call: use addEffect to add to existing effects
-         sequencer.addEffect('silhouettes-spotlight-off', solidEffect);
-         sequencer.addEffect('silhouettes-spotlight-blue', flashEffect);
+         await sequencer.addEffect('silhouettes-spotlight-off', solidEffect);
+         await sequencer.addEffect('silhouettes-spotlight-blue', flashEffect);
        }
   }
 

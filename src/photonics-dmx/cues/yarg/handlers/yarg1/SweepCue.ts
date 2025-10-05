@@ -12,6 +12,7 @@ export class SweepCue implements ICue {
   description = 'Rapid sweep effect that moves a bright color (red/yellow or blue/green based on venue size) across front lights, either left-to-right or right-to-left';
   style = CueStyle.Secondary;
 
+
   async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const transparent = getColor('transparent', 'high');
     const red = getColor('red', 'max');
@@ -54,6 +55,18 @@ export class SweepCue implements ICue {
       layer: 101,
     });
 
-    sequencer.addEffectUnblockedName('sweep', sweep);
+    await sequencer.addEffectUnblockedName('sweep', sweep);
+  }
+
+  onStop(): void {
+
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

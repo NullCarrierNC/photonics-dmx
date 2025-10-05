@@ -131,6 +131,7 @@ export interface IEffectManager {
   addEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
   setEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;
+  removeAllEffectsForced(): void;
   startNextEffectInQueue(layer: number, lightId: string): boolean;
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
   isLayerFreeForLight(layer: number, lightId: string): boolean;
@@ -198,6 +199,7 @@ export interface ILightingController {
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;
   removeEffect(name: string, layer: number): void;
   removeAllEffects(): void;
+  removeAllEffectsForced(): void;
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
   isLayerFreeForLight(layer: number, lightId: string): boolean;
   setState(lights: TrackedLight[], color: RGBIO, time: number): void;

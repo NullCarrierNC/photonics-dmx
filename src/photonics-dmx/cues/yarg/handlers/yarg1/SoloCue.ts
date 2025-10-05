@@ -11,6 +11,8 @@ export class SoloCue implements ICue {
   description = 'Rapid alternating white and purple colors on all lights with short transitions';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const all = lightManager.getLights(['front'], 'all');
     const purple = getColor('purple', 'medium');
@@ -19,6 +21,24 @@ export class SoloCue implements ICue {
       color: purple,
       duration: 10,
     });
-    sequencer.setEffect('solo', effect);
+    
+    if (this.isFirstExecution) {
+      await sequencer.setEffect('solo', effect);
+      this.isFirstExecution = false;
+    } else {
+      await sequencer.addEffect('solo', effect);
+    }
+  }
+
+  onStop(): void {
+    this.isFirstExecution = true;
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

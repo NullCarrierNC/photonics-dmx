@@ -32,10 +32,10 @@ export class StageKitFlareFastCue implements ICue {
     });
   
     if (this.isFirstExecution) {
-      sequencer.setEffect('stagekit-flare-fast', effect);
+      await sequencer.setEffect('stagekit-flare-fast', effect);
       this.isFirstExecution = false;
     } else {
-      sequencer.addEffect('stagekit-flare-fast', effect);
+      await  sequencer.addEffect('stagekit-flare-fast', effect);
     }
   }
 

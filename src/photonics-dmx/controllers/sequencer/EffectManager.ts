@@ -351,6 +351,7 @@ export class EffectManager implements IEffectManager {
    * Removes all active effects and clears the queue
    */
   public removeAllEffects(): void {
+   
    // console.log("Removing all effects");
     
     // First clear the queue to prevent queued effects from being started when active effects are removed
@@ -369,6 +370,23 @@ export class EffectManager implements IEffectManager {
     }
     
     // Reset the last called layer 0 effect to prevent jamming issues if we restart the same effect
+    this._lastCalled0LayerEffect = "";
+  }
+
+  /**
+   * Forcibly removes all active effects, clears the queue, and immediately clears all light states and transitions on all layers
+   */
+  public removeAllEffectsForced(): void {
+    // Clear all active effects
+    this.layerManager.getActiveEffects().clear();
+    
+    // Clear all queued effects
+    this.layerManager.getEffectQueue().clear();
+    
+    // Reset all light states and transitions
+    this.transitionEngine.getLightTransitionController().resetLightStates();
+    
+    // Reset the last called layer 0 effect
     this._lastCalled0LayerEffect = "";
   }
 

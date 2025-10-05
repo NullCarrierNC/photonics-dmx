@@ -12,6 +12,7 @@ export class FlareSlowCue implements ICue {
   description = 'Slow, sustained bursts of bright white light on individual front lights with extended timing.';
   style = CueStyle.Secondary;
 
+
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const white = getColor('white', 'high', 'add');
     const lights = lightManager.getLights(['front'], 'all');
@@ -27,7 +28,19 @@ export class FlareSlowCue implements ICue {
         lights: [lights[i]],
         layer: i + 101,
       });
-      sequencer.addEffect(`flare-slow${i}`, flash);
+      await sequencer.addEffect(`flare-slow${i}`, flash);
     }
+  }
+
+  onStop(): void {
+  
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
   }
 } 

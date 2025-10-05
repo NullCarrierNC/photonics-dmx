@@ -15,6 +15,8 @@ export class StageKitSilhouettesCue implements ICue {
   description = 'Solid green on all lights.';
   style = CueStyle.Primary;
 
+  private isFirstExecution: boolean = true;
+
   async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
     const greenColor = getColor('green', 'medium');
@@ -41,11 +43,16 @@ export class StageKitSilhouettesCue implements ICue {
       transitions: transitions
     };
     
-    await controller.setEffect('stagekit-silhouettes', silhouettesEffect);
+    if (this.isFirstExecution) {
+      await controller.setEffect('stagekit-silhouettes', silhouettesEffect);
+      this.isFirstExecution = false;
+    } else {
+      await controller.addEffect('stagekit-silhouettes', silhouettesEffect);
+    }
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {

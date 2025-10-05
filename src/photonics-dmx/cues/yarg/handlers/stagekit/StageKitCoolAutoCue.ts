@@ -293,8 +293,8 @@ export class StageKitCoolAutoCue implements ICue {
       this.isFirstExecution = false;
     } else {
       // Repeat call: use addEffect to add to existing effects
-      sequencer.addEffect('cool-auto-blue', blueEffect);
-      sequencer.addEffect('cool-auto-green', greenEffect);
+      await sequencer.addEffect('cool-auto-blue', blueEffect);
+      await sequencer.addEffect('cool-auto-green', greenEffect);
     }
   }
 
