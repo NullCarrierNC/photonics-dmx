@@ -8,6 +8,7 @@ import {
   ITransitionEngine,
   LightEffectState
 } from './interfaces';
+import { performance } from 'perf_hooks';
 
 /**
  * @class EffectManager
@@ -35,6 +36,16 @@ export class EffectManager implements IEffectManager {
   private timeoutManager: IEventScheduler;
   private systemEffects: ISystemEffectsController;
   private _lastCalled0LayerEffect: string = ""; // Tracks the last effect name that targeted layer 0
+  
+  // Reusable default state template for performance
+  private defaultStateTemplate: RGBIO = {
+    red: 0,
+    green: 0,
+    blue: 0,
+    intensity: 0,
+    opacity: 1.0,
+    blendMode: 'replace'
+  };
 
   /**
    * @constructor
@@ -391,7 +402,19 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
-   * Starts an effect
+   * Creates a default black state for lights with no previous state.
+   * Returns a copy so each light has its own instance.
+   * @returns A new RGBIO object with black/default values
+   */
+  private createDefaultState(): RGBIO {
+    return { ...this.defaultStateTemplate };
+  }
+
+  /**
+   * Starts an effect with optimized batch initialization.
+   * Pre-computes initial states and immediately sets up transitions for lights
+   * with waitForCondition='none' to ensure simultaneous activation.
+   * 
    * @param name The name of the effect
    * @param effect The effect data
    * @param lights The lights to apply the effect to
@@ -407,7 +430,33 @@ export class EffectManager implements IEffectManager {
     transitions: EffectTransition[],
     isPersistent = false,
   ): void {
-    // Create separate LightEffectState objects for each light
+    // Get current time once for all lights
+    const currentTime = performance.now();
+    
+    // Pre-compute initial states for all lights in a single pass
+    const initialStates = new Map<string, RGBIO>();
+    
+    lights.forEach(light => {
+      // Try to get existing state from layer manager
+      let initialState = this.layerManager.getLightState(layer, light.id);
+      
+      // Try transition controller if layer manager has no state
+      if (!initialState) {
+        const ltc = this.transitionEngine.getLightTransitionController();
+        if (ltc && typeof ltc.getLightState === 'function') {
+          initialState = ltc.getLightState(light.id, layer);
+        }
+      }
+      
+      // If no state exists, use default (create once per light)
+      if (!initialState) {
+        initialState = this.createDefaultState();
+      }
+      
+      initialStates.set(light.id, initialState);
+    });
+    
+    // Process all lights and prepare their effects
     lights.forEach(light => {
       // Expand transitions to one-light-per-transition for this specific light
       const lightTransitions = this.effectTransformer.expandTransitionsByLight(transitions)
@@ -422,13 +471,50 @@ export class EffectManager implements IEffectManager {
         lightId: light.id,
         layer,
         currentTransitionIndex: 0,
-        state: 'idle' as const,
-        transitionStartTime: 0,
-        waitEndTime: 0,
-        isPersistent
+        state: 'waitingFor' as const,  // Start in 'waitingFor' instead of 'idle'
+        transitionStartTime: currentTime,
+        waitEndTime: currentTime,
+        isPersistent,
+        lastEndState: initialStates.get(light.id)  // Pre-computed state
       };
+      
+      // Immediately set up the transition if waitForCondition is 'none'
+      const firstTransition = lightTransitions[0];
+      if (firstTransition.waitForCondition === 'none') {
+        // Prepare the color with pan/tilt defaults if needed
+        let color = { ...firstTransition.transform.color };
+        if (light.config) {
+          if (color.pan === undefined) {
+            color.pan = light.config.panHome;
+          }
+          if (color.tilt === undefined) {
+            color.tilt = light.config.tiltHome;
+          }
+        }
+        
+        // Set transition directly on the controller
+        const ltc = this.transitionEngine.getLightTransitionController();
+        if (ltc && typeof ltc.setTransition === 'function') {
+          ltc.setTransition(
+            light.id,
+            layer,
+            initialStates.get(light.id),
+            color,
+            firstTransition.transform.duration,
+            firstTransition.transform.easing
+          );
+        }
+        
+        // Update effect state to transitioning
+        lightEffect.state = 'transitioning';
+        lightEffect.transitionStartTime = currentTime;
+        lightEffect.waitEndTime = currentTime + firstTransition.transform.duration;
+      } else if (firstTransition.waitForCondition === 'delay') {
+        // Set up delay-based waiting
+        lightEffect.waitEndTime = currentTime + firstTransition.waitForTime;
+      }
 
-      // Add the effect to the layer manager for this specific light
+      // Add the effect to the layer manager
       this.layerManager.addActiveEffect(layer, light.id, lightEffect);
     });
   }
