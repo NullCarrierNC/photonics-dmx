@@ -52,7 +52,7 @@ export class DmxPublisher {
      * (Assuming publishers are enabled of course)
      */
     public publish = async (lights: LightState[]): Promise<void> => {
-        await this.publishNow(lights);
+        this.publishNow(lights);
     };
 
  
@@ -135,7 +135,7 @@ export class DmxPublisher {
 
         if (dmxChannels.length > 0) {
             try {
-                await this._sender.send(dmxChannels);
+                this._sender.send(dmxChannels);
             } catch (error) {
                 console.error('Failed to send DMX data:', error);
             }
