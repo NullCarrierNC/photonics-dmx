@@ -142,6 +142,13 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Forcibly removes all active effects, clears the queue, and immediately clears all light states and transitions on all layers
+   */
+  public removeAllEffectsForced(): void {
+    this.effectManager.removeAllEffectsForced();
+  }
+
+  /**
    * Removes an effect from a specific layer
    * @param layer The layer from which to remove the effect
    * @param shouldRemoveTransitions Whether to remove transition data as well

@@ -79,6 +79,7 @@ describe('AbstractCueHandler', () => {
       setEffectUnblockedName: jest.fn().mockReturnValue(true),
       removeEffect: jest.fn(),
       removeAllEffects: jest.fn(),
+      removeAllEffectsForced: jest.fn(),
       setState: jest.fn(),
       onBeat: jest.fn(),
       onMeasure: jest.fn(),
