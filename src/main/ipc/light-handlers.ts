@@ -1,10 +1,6 @@
 import { IpcMain, BrowserWindow } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { SenderConfig } from '../../photonics-dmx/types';
-import { SacnSender } from '../../photonics-dmx/senders/SacnSender';
-import { IpcSender } from '../../photonics-dmx/senders/IpcSender';
-import { EnttecProSender } from '../../photonics-dmx/senders/EnttecProSender';
-import { ArtNetSender } from '../../photonics-dmx/senders/ArtNetSender';
 import { CueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/CueRegistry';
 import { CueType } from '../../photonics-dmx/cues/cueTypes';
 
@@ -45,47 +41,54 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   ipcMain.on('sender-enable', async (_, data: SenderConfig) => {
     try {
       const { sender, port, host, universe, net, subnet, subuni, artNetPort } = data;
-      
+
       if (!sender) {
         console.error('Sender name is required');
         return;
       }
-      
+
       const senderManager = controllerManager.getSenderManager();
-      
-      // Create appropriate sender instance based on name
+
+      // Check if sender is already enabled
+      if (senderManager.isSenderEnabled(sender)) {
+        console.log(`Sender "${sender}" is already enabled`);
+        return;
+      }
+
+      // Prepare configuration for the sender type
+      let config: any = {};
+
       if (sender === 'sacn') {
-        const sacnSender = new SacnSender();
-        await senderManager.enableSender(sender, sacnSender);
+        const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 1;
+        if (universeNum < 1 || universeNum > 63999) {
+          console.error(`Invalid SACN universe: ${universeNum}. Must be between 1-63999`);
+          return;
+        }
+        config = { universe: universeNum };
       } else if (sender === 'ipc') {
-        const ipcSender = new IpcSender();
-        await senderManager.enableSender(sender, ipcSender);
+        config = {};
       } else if (sender === 'enttecpro') {
-        // Only pass port if it's defined, otherwise use a default value
         if (!port) {
           console.error('Port is required for EnttecPro sender');
           return;
         }
-        const enttecProSender = new EnttecProSender(port);
-        await senderManager.enableSender(sender, enttecProSender);
+        config = { devicePath: port };
       } else if (sender === 'artnet') {
-        // ArtNet configuration
-        const artNetHost = host || '127.0.0.1';
-        const artNetUniverse = universe !== undefined ? universe : 0;
-        const artNetNet = net !== undefined ? net : 0;
-        const artNetSubnet = subnet !== undefined ? subnet : 0;
-        const artNetSubuni = subuni !== undefined ? subuni : 0;
-        const artNetPortValue = artNetPort !== undefined ? artNetPort : 6454;
-        
-        const artNetSender = new ArtNetSender(artNetHost, {
-          universe: artNetUniverse,
-          net: artNetNet,
-          subnet: artNetSubnet,
-          subuni: artNetSubuni,
-          port: artNetPortValue
-        });
-        await senderManager.enableSender(sender, artNetSender);
+        config = {
+          host: host || '127.0.0.1',
+          options: {
+            universe: universe !== undefined ? universe : 0,
+            net: net !== undefined ? net : 0,
+            subnet: subnet !== undefined ? subnet : 0,
+            subuni: subuni !== undefined ? subuni : 0,
+            port: artNetPort !== undefined ? artNetPort : 6454
+          }
+        };
       }
+
+      // Use the new worker-based sender API
+      console.log(`Enabling ${sender} sender with config:`, config);
+      await senderManager.enableSender(sender, sender as 'artnet' | 'sacn' | 'enttecpro', config);
     } catch (error) {
       console.error('Error enabling sender:', error);
     }

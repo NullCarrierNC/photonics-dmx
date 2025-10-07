@@ -14,7 +14,10 @@ export class IpcSender extends BaseSender {
     
     public constructor (){
         super();
-        this.window = BrowserWindow.getAllWindows()[0];
+        this.window = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+        if (!this.window) {
+          console.error('IPC Sender: No browser window available');
+        }
     }
 
   public async start(): Promise<void> {
@@ -30,9 +33,11 @@ export class IpcSender extends BaseSender {
    * @param universeBuffer Pre-built universe buffer (channel -> value mapping).
    */
   public async send(universeBuffer: Record<number, number>): Promise<void> {
-    if(this.enabled){
+    if(this.enabled && this.window){
       // Send buffer directly to renderer
       this.window.webContents.send("dmxValues", universeBuffer);
+    } else {
+      console.error('IPC Sender: Not enabled or no window available');
     }
   }
 

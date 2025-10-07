@@ -13,7 +13,7 @@ const DmxOutputSettings: React.FC = () => {
   const [isArtNetEnabled, setIsArtNetEnabled] = useAtom(senderArtNetEnabledAtom);
   const [isSacnEnabled, setIsSacnEnabled] = useAtom(senderSacnEnabledAtom);
   const [isEnttecProEnabled, setIsEnttecProEnabled] = useAtom(senderEnttecProEnabledAtom);
-  const [artNetConfig, setArtNetConfig] = useAtom(artNetConfigAtom);
+  const [artNetConfig] = useAtom(artNetConfigAtom);
   const [comPort, setComPort] = useAtom(enttecProComPortAtom);
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom);
 
@@ -24,17 +24,12 @@ const DmxOutputSettings: React.FC = () => {
   useEffect(() => {
     console.log('Loading other preferences');
     
-    if (prefs.artNetConfig) {
-      setArtNetConfig(prev => ({
-        ...prev,
-        ...prefs.artNetConfig
-      }));
-    }
+ 
     if (prefs.enttecProPort) {
       setComPort(prefs.enttecProPort);
     }
-    // dmxSettingsPrefs are now handled centrally in App.tsx
-  }, [prefs, setArtNetConfig, setComPort]);
+
+  }, [prefs, setComPort]);
 
   // Load DMX output configuration independently
   useEffect(() => {
@@ -183,14 +178,12 @@ const DmxOutputSettings: React.FC = () => {
       ...artNetConfig,
       [field]: typeof value === 'string' ? value : value
     };
-    
-    setArtNetConfig(newConfig);
-    
+
     try {
       await window.electron.ipcRenderer.invoke('save-prefs', {
         artNetConfig: newConfig
       });
-      
+
       // Update the preferences atom to reflect the change
       setPrefs(prev => ({
         ...prev,

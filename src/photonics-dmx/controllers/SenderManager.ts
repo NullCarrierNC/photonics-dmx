@@ -1,6 +1,7 @@
 // src/managers/SenderManager.ts
 import { EventEmitter } from 'stream';
 import { BaseSender, SenderError } from '../senders/BaseSender';
+import { NetworkWorkerManager } from '../workers/NetworkWorkerManager';
 
 
 /**
@@ -13,37 +14,49 @@ import { BaseSender, SenderError } from '../senders/BaseSender';
 export class SenderManager {
   private enabledSenders: Map<string, BaseSender>;
   private eventEmitter: EventEmitter;
+  private networkWorkerManager: NetworkWorkerManager;
 
   constructor() {
     this.enabledSenders = new Map<string, BaseSender>();
     this.eventEmitter = new EventEmitter();
+    this.networkWorkerManager = new NetworkWorkerManager();
   }
 
   /**
    * Enables a sender by starting it and registering its error handler.
    * @param id A unique string identifier for the sender.
-   * @param sender An already-instantiated sender.
+   * @param senderType The type of sender to create ('artnet', 'sacn', 'enttecpro').
+   * @param config Configuration for the sender.
    */
-  public async enableSender(id: string, sender: BaseSender): Promise<void> {
+  public async enableSender(
+    id: string,
+    senderType: 'artnet' | 'sacn' | 'enttecpro',
+    config: any
+  ): Promise<void> {
     if (this.enabledSenders.has(id)) {
       console.warn(`Sender with ID "${id}" is already enabled.`);
       return;
     }
 
     try {
+      // Initialize network worker if not already done
+      await this.networkWorkerManager.initialize();
+
+      // Create worker-based sender
+      const { WorkerSenderAdapter } = await import('../senders/WorkerSenderAdapter');
+      const sender = new WorkerSenderAdapter(id, senderType, config, this.networkWorkerManager);
+
       // Register error handler before starting
       sender.onSendError(this.handleSenderError);
-      
+
       // Start the sender and wait for it to complete
       await sender.start();
-      
+
       // Only add to enabled senders after successful startup
       this.enabledSenders.set(id, sender);
-      console.log(`Sender with ID "${id}" enabled and started successfully.`);
+      console.log(`Worker-based sender with ID "${id}" enabled and started successfully.`);
     } catch (err) {
       console.error(`Error starting sender with ID "${id}":`, err);
-      // Clean up error handler if startup failed
-      sender.removeSendError(this.handleSenderError);
       return;
     }
   }
@@ -66,7 +79,7 @@ export class SenderManager {
     }
     sender.removeSendError(this.handleSenderError);
     this.enabledSenders.delete(id);
-    console.log(`Sender with ID "${id}" disabled.`);
+    console.log(`Worker-based sender with ID "${id}" disabled.`);
   }
 
   /**
@@ -120,20 +133,29 @@ export class SenderManager {
       return;
     }
 
+    // Fire-and-forget - send to all senders asynchronously
     for (const sender of this.enabledSenders.values()) {
-      sender.send(universeBuffer).catch((error) => {
+      // Use Promise.resolve to make it non-blocking
+      Promise.resolve(sender.send(universeBuffer)).catch((error) => {
         console.error(`Error sending data with ${sender.constructor.name}:`, error);
       });
     }
   }
 
   /**
-   * Shuts down the manager by disabling all senders.
+   * Shuts down the manager by disabling all senders and stopping the network worker.
    */
   public async shutdown(): Promise<void> {
     console.log("SenderManager shutdown: starting");
     try {
       await this.disableAllSenders();
+
+      // Shutdown the network worker
+      if (this.networkWorkerManager) {
+        await this.networkWorkerManager.shutdown();
+        console.log("Network worker shutdown: completed");
+      }
+
       console.log("SenderManager shutdown: completed");
     } catch (error) {
       console.error("SenderManager shutdown error:", error);
