@@ -43,6 +43,7 @@ export interface AppPreferences {
   dmxSettingsPrefs?: {
     artNetExpanded: boolean;
     enttecProExpanded: boolean;
+    sacnExpanded: boolean;
   };
 }
 
@@ -60,7 +61,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
   enabledCueGroups: ['stagekit'],
-  cueConsistencyWindow: 2000,
+  cueConsistencyWindow: 60000,
   
   // Brightness configuration defaults
   brightness: {

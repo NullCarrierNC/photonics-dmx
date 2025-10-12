@@ -99,8 +99,11 @@ const BrightnessSettings: React.FC = () => {
         appear when using low, medium, high, or maximum brightness settings. Most effects will use medium brightness. 
         Max is only used by strobes. Colour blending can cause combined brightness levels to be higher.
       </p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+        If you have powerful lights or a small venue, you may want to decrease the brightness levels so it's not quite so intense. 
+      </p>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        If you have powerful lights or a small venue, you may want to decrease the brightness levels so it's not quite so intense.
+        Conversely, if you have cheaper/dimmer lights you can increase the brightness (particularly of the medium level) to make them brighter.
       </p>
 
       <div className="space-y-1">
