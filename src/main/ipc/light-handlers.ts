@@ -40,7 +40,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Enable a sender
   ipcMain.on('sender-enable', async (_, data: SenderConfig) => {
     try {
-      const { sender, port, host, universe, net, subnet, subuni, artNetPort, networkInterface, useUnicast, unicastDestination } = data;
+      const { sender, port, host, universe, net, subnet, subuni, artNetPort } = data;
 
       if (!sender) {
         console.error('Sender name is required');

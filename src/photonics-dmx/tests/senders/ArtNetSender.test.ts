@@ -25,7 +25,8 @@ describe('ArtNetSender', () => {
       net: 0,
       subnet: 0,
       subuni: 0,
-      port: 6454
+      port: 6454,
+      base_refresh_interval: 1000
     });
   });
 
@@ -49,7 +50,8 @@ describe('ArtNetSender', () => {
         net: 1,
         subnet: 1,
         subuni: 1,
-        port: 6455
+        port: 6455,
+        base_refresh_interval: 1000
       });
       expect(sender).toBeInstanceOf(ArtNetSender);
     });
