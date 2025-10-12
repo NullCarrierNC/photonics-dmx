@@ -1,6 +1,5 @@
 import { BrowserWindow } from 'electron';
-import { DmxChannel } from '../types';
-import { BaseSender, SenderError } from './BaseSender'
+import { BaseSender, SenderError } from './BaseSender';
 
 /**
  * IPC Sender uses Electron IPC's to communicate 
@@ -9,13 +8,11 @@ import { BaseSender, SenderError } from './BaseSender'
  * the same DMX data going out over the wire.
  */
 export class IpcSender extends BaseSender {
-    private window:BrowserWindow
     private enabled:Boolean = false;
-    
-    
+
     public constructor (){
         super();
-        this.window = BrowserWindow.getAllWindows()[0];
+        // Window will be determined when sending, not during construction
     }
 
   public async start(): Promise<void> {
@@ -28,11 +25,21 @@ export class IpcSender extends BaseSender {
 
   /**
    * Sends DMX data using Electron IPC protocol.
-   * @param channelValues Array of channel-value pairs.
+   * @param universeBuffer Pre-built universe buffer (channel -> value mapping).
    */
-  public async send(channelValues: DmxChannel[]): Promise<void> {
-    if(this.enabled){
-      this.window.webContents.send("dmxValues", channelValues);
+  public async send(universeBuffer: Record<number, number>): Promise<void> {
+    if(!this.enabled) {
+      console.error('IPC Sender: Not enabled');
+      return;
+    }
+
+    // Get the window when sending to ensure we have the current active window
+    const window = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+    if(window){
+      // Send buffer directly to renderer
+      window.webContents.send("dmxValues", universeBuffer);
+    } else {
+      console.error('IPC Sender: No browser window available when sending');
     }
   }
 

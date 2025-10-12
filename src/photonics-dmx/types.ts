@@ -489,5 +489,8 @@ export interface SenderConfig {
   subnet?: number
   subuni?: number
   artNetPort?: number
+  networkInterface?: string
+  useUnicast?: boolean
+  unicastDestination?: string
 }
 

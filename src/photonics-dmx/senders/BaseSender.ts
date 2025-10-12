@@ -1,5 +1,4 @@
 // src/senders/BaseSender.ts
-import { DmxChannel } from '../types';
 
 export class SenderError {
   err: any;
@@ -21,9 +20,9 @@ export abstract class BaseSender {
 
   /**
    * Sends DMX data to the corresponding implementation.
-   * @param channelValues Array of channel-value pairs.
+   * @param universeBuffer Pre-built universe buffer (channel -> value mapping).
    */
-  public abstract send(channelValues: DmxChannel[]): Promise<void>;
+  public abstract send(universeBuffer: Record<number, number>): Promise<void>;
 
   /**
    * Verifies that the sender is ready to send data.

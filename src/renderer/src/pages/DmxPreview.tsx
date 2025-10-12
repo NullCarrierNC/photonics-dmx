@@ -6,7 +6,6 @@ import {
 } from '@renderer/atoms';
 import LightsDmxPreview from '@renderer/components/LightsDmxPreview';
 import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview';
-import { DmxChannel } from '../../../photonics-dmx/types';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 import CuePreview from '@renderer/components/CuePreview';
@@ -14,30 +13,22 @@ import ActiveGroupsSelector from '@renderer/components/ActiveCueGroupsSelector';
 
 const DmxPreview: React.FC = () => {
   const [lightingConfig] = useAtom(activeDmxLightsConfigAtom);
-  const [_isIpcEnabled, setIsIpcEnabled] = useAtom(senderIpcEnabledAtom);
+  const [_isIpcEnabled] = useAtom(senderIpcEnabledAtom);
   const [dmxValues, setDmxValues] = useState<Record<number, number>>({});
 
-  // Automatically enable IPC sender on mount and disable on unmount.
+  // Automatically enable IPC sender for preview functionality when lights are configured
   useEffect(() => {
-    setIsIpcEnabled(true);
-    window.electron.ipcRenderer.send('sender-enable', {sender:'ipc'});
-    console.log('IPC sender enabled automatically on mount');
-
-    return () => {
-      setIsIpcEnabled(false);
-      window.electron.ipcRenderer.send('sender-disable', {sender:'ipc'} ) ;
-      console.log('IPC sender disabled automatically on unmount');
-    };
-  }, [setIsIpcEnabled]);
+    if (lightingConfig && Object.keys(lightingConfig).length > 0) {
+      window.electron.ipcRenderer.send('sender-enable', {sender:'ipc'});
+      console.log('IPC sender enabled for preview functionality');
+    }
+  }, [lightingConfig]);
 
   // Listen for IPC messages to receive DMX values.
   useEffect(() => {
-    const handleDmxValues = (_: unknown, channels: DmxChannel[]) => {
-      const values = channels.reduce<Record<number, number>>((acc, channel) => {
-        acc[channel.channel] = channel.value;
-        return acc;
-      }, {});
-      setDmxValues(values);
+    const handleDmxValues = (_: unknown, universeBuffer: Record<number, number>) => {
+      // Set the buffer directly
+      setDmxValues(universeBuffer);
     };
 
     // Add the listener

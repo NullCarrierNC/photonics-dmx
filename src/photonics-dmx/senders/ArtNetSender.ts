@@ -1,12 +1,14 @@
 import { DMX, ArtnetDriver, IUniverseDriver } from "dmx-ts";
 import { EventEmitter } from "events";
-import { DmxChannel } from "../types";
 import { BaseSender, SenderError } from "./BaseSender";
 
 export class ArtNetSender extends BaseSender {
   private dmx: DMX = new DMX();
   private universe?: IUniverseDriver;
   private eventEmitter: EventEmitter;
+  
+  // Reusable payload buffer for performance optimization
+  private payloadBuffer: Record<number, number> = {};
 
   constructor(
     private host: string = "127.0.0.1",
@@ -15,15 +17,26 @@ export class ArtNetSender extends BaseSender {
       net: 0,
       subnet: 0,
       subuni: 0,
-      port: 6454
+      port: 6454,
+      base_refresh_interval: 1000  // 1 second refresh interval for unchanged frames
     }
   ) {
     super();
     this.eventEmitter = new EventEmitter();
+    
+    // Pre-allocate payload buffer with 512 channels (DMX universe size)
+    for (let i = 0; i < 512; i++) {
+      this.payloadBuffer[i] = 0;
+    }
   }
 
   public async start(): Promise<void> {
     try {
+      // Reset payload buffer on start
+      for (let i = 0; i < 512; i++) {
+        this.payloadBuffer[i] = 0;
+      }
+      
       this.universe = await this.dmx.addUniverse(
         "artnet-universe",
         new ArtnetDriver(this.host, this.options)
@@ -98,30 +111,30 @@ export class ArtNetSender extends BaseSender {
     }
   }
 
-  public async send(channelValues: DmxChannel[]): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<void> {
     try {
       this.verifySenderStarted();
-      const payload: Record<number, number> = {};
-      channelValues.forEach(({ channel, value }) => {
+      
+      // Check if anything changed in the incoming buffer
+      let hasChanges = false;
+      
+      for (const channelStr in universeBuffer) {
+        const channel = parseInt(channelStr, 10);
+        const value = universeBuffer[channel];
         // Channel indexing needs to be shifted by -1 for ArtNet
         const artNetChannel = channel - 1;
-        payload[artNetChannel] = value;
-      });
+        
+        // Only update if value actually changed
+        if (this.payloadBuffer[artNetChannel] !== value) {
+          this.payloadBuffer[artNetChannel] = value;
+          hasChanges = true;
+        }
+      }
       
-      // Log the DMX values being sent
-      /*
-      console.log(`[ArtNetSender] Sending DMX data to ${this.host}:`, {
-        universe: this.options.universe,
-        net: this.options.net,
-        subnet: this.options.subnet,
-        subuni: this.options.subuni,
-        channelCount: channelValues.length,
-        channels: channelValues.slice(0, 10), // Show first 10 channels
-        payload: Object.keys(payload).length > 0 ? payload : 'No payload'
-      });
-      */
-
-      this.universe!.update(payload);
+      // Only send if something changed
+      if (hasChanges) {
+        this.universe!.update(this.payloadBuffer);
+      }
     } catch (err) {
       console.error("ArtNetSender error:", err);
       const errorEvent = new SenderError(err);

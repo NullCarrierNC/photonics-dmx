@@ -81,13 +81,29 @@ export const senderEnttecProEnabledAtom = atom<boolean>(false);
 export const enttecProComPortAtom = atom<string>("");
 
 export const senderArtNetEnabledAtom = atom<boolean>(false);
-export const artNetConfigAtom = atom({
-  host: "127.0.0.1",
-  universe: 0,
-  net: 0,
-  subnet: 0,
-  subuni: 0,
-  port: 6454
+
+// ArtNet config derived from preferences with fallback defaults
+export const artNetConfigAtom = atom((get) => {
+  const prefs = get(lightingPrefsAtom);
+  return {
+    host: prefs.artNetConfig?.host || "127.0.0.1",
+    universe: prefs.artNetConfig?.universe || 0,
+    net: prefs.artNetConfig?.net || 0,
+    subnet: prefs.artNetConfig?.subnet || 0,
+    subuni: prefs.artNetConfig?.subuni || 0,
+    port: prefs.artNetConfig?.port || 6454
+  };
+});
+
+// sACN config derived from preferences with fallback defaults
+export const sacnConfigAtom = atom((get) => {
+  const prefs = get(lightingPrefsAtom);
+  return {
+    universe: prefs.sacnConfig?.universe || 1,
+    networkInterface: prefs.sacnConfig?.networkInterface || "",
+    unicastDestination: prefs.sacnConfig?.unicastDestination || "",
+    useUnicast: prefs.sacnConfig?.useUnicast || false
+  };
 });
 
 /**
@@ -106,6 +122,12 @@ export interface LightingPreferences {
     subnet: number;
     subuni: number;
     port: number;
+  };
+  sacnConfig?: {
+    universe: number;
+    networkInterface?: string;
+    unicastDestination?: string;
+    useUnicast: boolean;
   };
   brightness?: {
     low: number;
@@ -128,6 +150,7 @@ export interface LightingPreferences {
   dmxSettingsPrefs?: {
     artNetExpanded: boolean;
     enttecProExpanded: boolean;
+    sacnExpanded: boolean;
   };
 }
 

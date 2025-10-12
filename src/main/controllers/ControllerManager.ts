@@ -27,24 +27,33 @@ export class ControllerManager {
   private sequencer: Sequencer | null = null;
   private effectsController: ILightingController | null = null;
   private dmxPublisher: DmxPublisher | null = null;
-  private senderManager: SenderManager;
-  
+  private senderManager: SenderManager | null = null;
+
   private cueHandler: YargCueHandler | Rb3CueHandler | null = null;
   private yargListener: YargNetworkListener | null = null;
   private rb3eListener: Rb3eNetworkListener | null = null;
   private processorManager: ProcessorManager | null = null;
-  
+
   private testEffectInterval: NodeJS.Timeout | null = null;
   private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large';
   private testBpm: number = 120;
-  
+
   private isInitialized = false;
   private isYargEnabled = false;
   private isRb3Enabled = false;
-  
+
   constructor() {
     this.config = new ConfigurationManager();
     this.senderManager = new SenderManager();
+  }
+
+  /**
+   * Ensure sender manager exists
+   */
+  private ensureSenderManager(): void {
+    if (this.senderManager === null) {
+      this.senderManager = new SenderManager();
+    }
   }
   
   /**
@@ -52,12 +61,13 @@ export class ControllerManager {
    */
   public async init(): Promise<void> {
     if (this.isInitialized) return;
-    
+
+    this.ensureSenderManager();
     await this.initializeDmxManager();
     await this.initializeSequencer();
     await this.initializeCueRegistry();
     await this.initializeListeners();
-    
+
     this.isInitialized = true;
   }
   
@@ -90,12 +100,12 @@ export class ControllerManager {
     // Set up DMX publisher
     this.dmxPublisher = new DmxPublisher(
       this.dmxLightManager,
-      this.senderManager,
+      this.senderManager!,
       this.lightStateManager
     );
-    
+
     // Set up error handling
-    this.senderManager.onSendError(this.handleSenderError);
+    this.senderManager!.onSendError(this.handleSenderError);
   }
   
   /**
@@ -122,14 +132,15 @@ export class ControllerManager {
     console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms');
   }
   
+
   /**
    * Initialize network listeners
    */
   private async initializeListeners(): Promise<void> {
     if (!this.dmxLightManager || !this.effectsController) return;
-    
+
     const debouncePeriod = this.config.getPreference('effectDebounce');
-    
+
     // Create cue handler (default to YARG)
     this.cueHandler = new YargCueHandler(
       this.dmxLightManager,
@@ -585,7 +596,8 @@ export class ControllerManager {
           console.error("Error shutting down sender manager:", err);
         }
       }
-      
+
+
       this.isInitialized = false;
       console.log("ControllerManager shutdown: completed");
     } catch (err) {
@@ -608,9 +620,11 @@ export class ControllerManager {
   }
   
   public getSenderManager(): SenderManager {
-    return this.senderManager;
+    this.ensureSenderManager();
+    return this.senderManager!;
   }
-  
+
+
   public getCueHandler(): YargCueHandler | Rb3CueHandler | null {
     return this.cueHandler;
   }
@@ -639,12 +653,14 @@ export class ControllerManager {
    * Get sender status information
    * @returns Object containing status of each sender type
    */
-  public getSenderStatus(): { sacn: boolean; artnet: boolean; enttecpro: boolean } {
-    const enabledSenders = this.senderManager.getEnabledSenders();
+  public getSenderStatus(): { sacn: boolean; artnet: boolean; enttecpro: boolean; ipc: boolean } {
+    this.ensureSenderManager();
+    const enabledSenders = this.senderManager!.getEnabledSenders();
     return {
       sacn: enabledSenders.includes('sacn'),
       artnet: enabledSenders.includes('artnet'),
-      enttecpro: enabledSenders.includes('enttecpro')
+      enttecpro: enabledSenders.includes('enttecpro'),
+      ipc: this.senderManager!.isIpcSenderEnabled()
     };
   }
 
@@ -692,7 +708,8 @@ export class ControllerManager {
       this.effectsController = null;
       this.dmxPublisher = null;
       this.cueHandler = null;
-      
+      this.senderManager = null;
+
       // Mark as not initialized
       this.isInitialized = false;
       
@@ -704,14 +721,14 @@ export class ControllerManager {
     // Reinitialize
     try {
       await this.init();
-      
+
       // Restore previously active listeners
       if (wasYargEnabled) {
         this.enableYarg();
       } else if (wasRb3Enabled) {
         this.enableRb3();
       }
-      
+
       console.log("Controllers restarted successfully");
     } catch (error) {
       console.error("Error reinitializing controllers:", error);
