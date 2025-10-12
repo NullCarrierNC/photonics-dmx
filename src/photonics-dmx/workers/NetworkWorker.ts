@@ -462,7 +462,7 @@ class SacnNetworkSender extends NetworkSender {
    * Get the address of a specific network interface
    */
   private getNetworkInterfaceAddress(interfaceName: string, networkInterfaces: any): string | null {
-    for (const [name, interfaces] of Object.entries(networkInterfaces)) {
+    for (const [, interfaces] of Object.entries(networkInterfaces)) {
       for (const iface of interfaces as any[]) {
         // Skip internal and loopback interfaces
         if (!iface.internal && !iface.address.startsWith('127.')) {
@@ -475,34 +475,6 @@ class SacnNetworkSender extends NetworkSender {
     return null;
   }
 
-  /**
-   * Get the default network interface for sACN multicast
-   * Prefers non-internal, non-loopback interfaces
-   */
-  private getDefaultNetworkInterface(networkInterfaces: any): string | null {
-    for (const [name, interfaces] of Object.entries(networkInterfaces)) {
-      for (const iface of interfaces as any[]) {
-        // Skip internal and loopback interfaces
-        if (!iface.internal && !iface.address.startsWith('127.')) {
-          // Prefer IPv4 interfaces
-          if (iface.family === 'IPv4') {
-            return iface.address;
-          }
-        }
-      }
-    }
-
-    // Fallback to first non-internal interface
-    for (const [_name, interfaces] of Object.entries(networkInterfaces)) {
-      for (const iface of interfaces as any[]) {
-        if (!iface.internal) {
-          return iface.address;
-        }
-      }
-    }
-
-    return null;
-  }
 }
 
 /**
