@@ -13,14 +13,14 @@ export class NetworkWorker extends WorkerThread {
   private senders: Map<string, NetworkSender> = new Map();
 
   constructor() {
+    console.log('NetworkWorker: Constructor called');
     super();
     try {
       this.dmx = new DMX();
-      console.log('DMX instance created successfully');
-
+    
       // Set up global error handlers for the worker
       process.on('uncaughtException', (error) => {
-        console.error('Uncaught exception in NetworkWorker:', error);
+        console.error('NetworkWorker: Uncaught exception:', error);
         this.sendToMain({
           type: 'WORKER_ERROR',
           error: `Uncaught exception: ${error.message}`,
@@ -29,7 +29,7 @@ export class NetworkWorker extends WorkerThread {
       });
 
       process.on('unhandledRejection', (reason) => {
-        console.error('Unhandled rejection in NetworkWorker:', reason);
+        console.error('NetworkWorker: Unhandled rejection:', reason);
         this.sendToMain({
           type: 'WORKER_ERROR',
           error: `Unhandled rejection: ${reason}`,
@@ -37,8 +37,9 @@ export class NetworkWorker extends WorkerThread {
         });
       });
 
+      console.log('NetworkWorker: Constructor completed successfully');
     } catch (error) {
-      console.error('Failed to create DMX instance:', error);
+      console.error('NetworkWorker: Failed to create DMX instance:', error);
       throw error;
     }
   }
@@ -90,8 +91,10 @@ export class NetworkWorker extends WorkerThread {
 
   private createSender(senderId: string, senderType: string, config: any): void {
     try {
+      
       // Check if sender already exists
       if (this.senders.has(senderId)) {
+        console.log(`NetworkWorker: Sender "${senderId}" already exists, sending SENDER_CREATED`);
         this.sendToMain({ type: 'SENDER_CREATED', senderId });
         return;
       }
@@ -113,8 +116,10 @@ export class NetworkWorker extends WorkerThread {
       }
 
       this.senders.set(senderId, sender);
+      console.log(`NetworkWorker: Sender "${senderId}" created and stored, sending SENDER_CREATED`);
       this.sendToMain({ type: 'SENDER_CREATED', senderId });
     } catch (error) {
+      console.error(`NetworkWorker: Error creating sender "${senderId}":`, error);
       this.sendToMain({
         type: 'SENDER_ERROR',
         senderId,
@@ -124,15 +129,19 @@ export class NetworkWorker extends WorkerThread {
   }
 
   private async startSender(senderId: string): Promise<void> {
+    console.log(`NetworkWorker: Starting sender "${senderId}"`);
     const sender = this.senders.get(senderId);
     if (!sender) {
+      console.error(`NetworkWorker: Sender "${senderId}" not found`);
       throw new Error(`Sender ${senderId} not found`);
     }
 
     try {
       await sender.start();
+      console.log(`NetworkWorker: Sender "${senderId}" started successfully, sending SENDER_STARTED`);
       this.sendToMain({ type: 'SENDER_STARTED', senderId });
     } catch (error) {
+      console.error(`NetworkWorker: Error starting sender "${senderId}":`, error);
       this.sendToMain({
         type: 'SENDER_ERROR',
         senderId,
@@ -235,7 +244,7 @@ class ArtNetNetworkSender extends NetworkSender {
 
   public async start(): Promise<void> {
     try {
-      console.log(`ArtNet sender starting with host: ${this.config.host}`, this.config.options);
+      //console.log(`ArtNet sender starting with host: ${this.config.host}`, this.config.options);
 
       // Validate configuration
       if (!this.config.host) {
@@ -247,13 +256,19 @@ class ArtNetNetworkSender extends NetworkSender {
         setTimeout(() => reject(new Error(`ArtNet connection timeout for host ${this.config.host}`)), 10000);
       });
 
+      // Ensure base_refresh_interval is properly set
+      const artnetOptions = {
+        ...this.config.options,
+        base_refresh_interval: this.config.options.base_refresh_interval || 1000
+      };
+      
+   
       const universePromise = this.dmx.addUniverse(
         "artnet-universe",
-        new ArtnetDriver(this.config.host, this.config.options)
+        new ArtnetDriver(this.config.host, artnetOptions)
       );
 
       this.universe = await Promise.race([universePromise, timeoutPromise]);
-      console.log(`ArtNet sender started successfully for host: ${this.config.host}`);
     } catch (error) {
       console.error(`Failed to start ArtNet sender for host ${this.config.host}:`, error);
       throw new Error(`ArtNet connection failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -332,15 +347,63 @@ class SacnNetworkSender extends NetworkSender {
   public async start(): Promise<void> {
     const sacn = await import('sacn');
     const universe = this.config.universe || 1;
-    console.log(`SACN sender starting with universe: ${universe} (type: ${typeof universe})`, this.config);
+    const networkInterface = this.config.networkInterface;
+    const unicastDestination = this.config.unicastDestination;
+    const useUnicast = this.config.useUnicast || false;
+
+    console.log(`SACN sender starting with universe: ${universe}, unicast: ${useUnicast}, destination: ${unicastDestination || 'broadcast'}, interface: ${networkInterface || 'auto'}`, this.config);
 
     // Ensure universe is a valid number
     const validUniverse = Math.max(1, Math.min(63999, Number(universe)));
     console.log(`SACN sender using universe: ${validUniverse}`);
 
-    // SACN library expects universe as object with universe property
-    this.sender = new sacn.Sender({ universe: validUniverse } as any);
-    console.log(`SACN sender created successfully with universe: ${validUniverse}`);
+    // Configure sender options
+    const senderOptions: any = {
+      universe: validUniverse,
+      port: 5568,
+      reuseAddr: true,
+      defaultPacketOptions: {
+        sourceName: "Photonics-DMX",
+        useRawDmxValues: true,
+      }
+    };
+
+    // Only add iface if we have a specific interface selected (not auto-detect)
+    if (networkInterface) {
+      const networkInterfaces = require('os').networkInterfaces();
+      const iface = this.getNetworkInterfaceAddress(networkInterface, networkInterfaces);
+
+      if (!iface) {
+        throw new Error(`Network interface '${networkInterface}' not found`);
+      }
+
+      senderOptions.iface = iface;
+      console.log(`SACN sender configured for specific interface: ${iface}`);
+    } else {
+      console.log('SACN sender configured for auto-detect interface');
+    }
+
+    // Add unicast destination if specified
+    if (useUnicast && unicastDestination) {
+      senderOptions.useUnicastDestination = unicastDestination;
+      console.log(`SACN sender configured for unicast to: ${unicastDestination}`);
+    }
+
+    // Create the sACN sender
+    this.sender = new sacn.Sender(senderOptions);
+
+    // Send an initial blackout packet to ensure the sender is active
+    // This helps establish the connection and ensures the sender is ready
+    try {
+      await this.sender.send({ payload: this.payloadBuffer });
+      console.log(`SACN sender initialized with blackout packet on universe: ${validUniverse}`);
+    } catch (error) {
+      console.warn(`SACN sender initialization warning:`, error);
+      // Don't throw here, the sender might still work for subsequent sends
+    }
+
+    const interfaceInfo = networkInterface ? ` on interface: ${networkInterface}` : ' (auto-detect)';
+    console.log(`SACN sender created successfully with universe: ${validUniverse}${interfaceInfo}${useUnicast ? ` (unicast to ${unicastDestination})` : ' (broadcast)'}`);
   }
 
   public async stop(): Promise<void> {
@@ -358,6 +421,7 @@ class SacnNetworkSender extends NetworkSender {
 
     // Update buffer with only changed values (optimization)
     let hasChanges = false;
+    let changedChannels: number[] = [];
 
     for (const channelStr in universeBuffer) {
       const channel = parseInt(channelStr, 10);
@@ -366,13 +430,15 @@ class SacnNetworkSender extends NetworkSender {
       if (this.payloadBuffer[channel] !== value) {
         this.payloadBuffer[channel] = value;
         hasChanges = true;
+        changedChannels.push(channel);
       }
     }
 
     // Only send if something changed
     if (hasChanges) {
-      // Fire-and-forget - don't await
+      // Fire-and-forget - don't await, but handle errors
       this.sender.send({ payload: this.payloadBuffer }).catch((error: Error) => {
+        console.error(`sACN send error: ${error.message}`);
         this.sendError(`sACN send error: ${error.message}`);
       });
     }
@@ -386,9 +452,56 @@ class SacnNetworkSender extends NetworkSender {
       }
 
       this.sender.send({ payload: zeroPayload }).catch((error: Error) => {
+        console.error(`sACN blackout error: ${error.message}`);
         this.sendError(`sACN blackout error: ${error.message}`);
       });
     }
+  }
+
+  /**
+   * Get the address of a specific network interface
+   */
+  private getNetworkInterfaceAddress(interfaceName: string, networkInterfaces: any): string | null {
+    for (const [name, interfaces] of Object.entries(networkInterfaces)) {
+      for (const iface of interfaces as any[]) {
+        // Skip internal and loopback interfaces
+        if (!iface.internal && !iface.address.startsWith('127.')) {
+          if (iface.address === interfaceName) {
+            return iface.address;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get the default network interface for sACN multicast
+   * Prefers non-internal, non-loopback interfaces
+   */
+  private getDefaultNetworkInterface(networkInterfaces: any): string | null {
+    for (const [name, interfaces] of Object.entries(networkInterfaces)) {
+      for (const iface of interfaces as any[]) {
+        // Skip internal and loopback interfaces
+        if (!iface.internal && !iface.address.startsWith('127.')) {
+          // Prefer IPv4 interfaces
+          if (iface.family === 'IPv4') {
+            return iface.address;
+          }
+        }
+      }
+    }
+
+    // Fallback to first non-internal interface
+    for (const [_name, interfaces] of Object.entries(networkInterfaces)) {
+      for (const iface of interfaces as any[]) {
+        if (!iface.internal) {
+          return iface.address;
+        }
+      }
+    }
+
+    return null;
   }
 }
 
@@ -469,6 +582,8 @@ class EnttecProNetworkSender extends NetworkSender {
 }
 
 // Start the worker if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Only instantiate if this is the main module being executed
+if (require.main === module) {
+  console.log('NetworkWorker: Instantiating worker thread');
   new NetworkWorker();
 }

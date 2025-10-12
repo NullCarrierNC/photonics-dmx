@@ -15,8 +15,20 @@ const SacnToggle = ({ disabled = false }: SacnToggleProps) => {
     setIsSacnEnabled(newState);
 
     if (newState) {
-      window.electron.ipcRenderer.send('sender-enable', {sender: 'sacn'});
-      console.log('sACN enabled');
+      // Get the latest sacnConfig when enabling
+      const networkInterface = prefs.sacnConfig?.networkInterface;
+      const currentSacnConfig = {
+        universe: prefs.sacnConfig?.universe || 1,
+        networkInterface: networkInterface === "" ? undefined : networkInterface,
+        unicastDestination: prefs.sacnConfig?.unicastDestination || "",
+        useUnicast: prefs.sacnConfig?.useUnicast || false
+      };
+
+      window.electron.ipcRenderer.send('sender-enable', {
+        sender: 'sacn',
+        ...currentSacnConfig
+      });
+      console.log('sACN enabled with config:', currentSacnConfig);
     } else {
       window.electron.ipcRenderer.send('sender-disable', {sender: 'sacn'});
       console.log('sACN disabled');

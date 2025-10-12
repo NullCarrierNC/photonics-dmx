@@ -653,13 +653,14 @@ export class ControllerManager {
    * Get sender status information
    * @returns Object containing status of each sender type
    */
-  public getSenderStatus(): { sacn: boolean; artnet: boolean; enttecpro: boolean } {
+  public getSenderStatus(): { sacn: boolean; artnet: boolean; enttecpro: boolean; ipc: boolean } {
     this.ensureSenderManager();
     const enabledSenders = this.senderManager!.getEnabledSenders();
     return {
       sacn: enabledSenders.includes('sacn'),
       artnet: enabledSenders.includes('artnet'),
-      enttecpro: enabledSenders.includes('enttecpro')
+      enttecpro: enabledSenders.includes('enttecpro'),
+      ipc: this.senderManager!.isIpcSenderEnabled()
     };
   }
 

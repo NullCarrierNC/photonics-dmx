@@ -17,7 +17,8 @@ export class ArtNetSender extends BaseSender {
       net: 0,
       subnet: 0,
       subuni: 0,
-      port: 6454
+      port: 6454,
+      base_refresh_interval: 1000  // 1 second refresh interval for unchanged frames
     }
   ) {
     super();

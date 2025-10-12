@@ -30,7 +30,7 @@ const StatusBar: React.FC = () => {
         />
         <div className="w-1"></div>
         <StatusIndicator 
-          label="SACn" 
+          label="sACN" 
           isActive={isSacnEnabled}
           isEnabledInPrefs={prefs.dmxOutputConfig?.sacnEnabled || false}
         />

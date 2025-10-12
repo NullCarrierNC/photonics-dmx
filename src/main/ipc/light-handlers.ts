@@ -40,7 +40,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Enable a sender
   ipcMain.on('sender-enable', async (_, data: SenderConfig) => {
     try {
-      const { sender, port, host, universe, net, subnet, subuni, artNetPort } = data;
+      const { sender, port, host, universe, net, subnet, subuni, artNetPort, networkInterface, useUnicast, unicastDestination } = data;
 
       if (!sender) {
         console.error('Sender name is required');
@@ -64,7 +64,19 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           console.error(`Invalid SACN universe: ${universeNum}. Must be between 1-63999`);
           return;
         }
-        config = { universe: universeNum };
+
+        // Extract sACN-specific configuration from the data parameter
+        const networkInterface = data.networkInterface;
+        const useUnicast = data.useUnicast;
+        const unicastDestination = data.unicastDestination;
+
+        config = {
+          universe: universeNum,
+          networkInterface: networkInterface,
+          useUnicast: useUnicast,
+          unicastDestination: unicastDestination,
+        };
+        console.log(`sACN config: universe=${universeNum}, networkInterface=${networkInterface}, useUnicast=${useUnicast}, unicastDestination=${unicastDestination}`);
       } else if (sender === 'ipc') {
         config = {};
       } else if (sender === 'enttecpro') {
@@ -81,14 +93,21 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
             net: net !== undefined ? net : 0,
             subnet: subnet !== undefined ? subnet : 0,
             subuni: subuni !== undefined ? subuni : 0,
-            port: artNetPort !== undefined ? artNetPort : 6454
+            port: artNetPort !== undefined ? artNetPort : 6454,
+            base_refresh_interval: 1000  // 1 second refresh interval for unchanged frames
           }
         };
       }
 
-      // Use the new worker-based sender API
+      // Use the new sender API (supports both worker-based and IPC senders)
       console.log(`Enabling ${sender} sender with config:`, config);
-      await senderManager.enableSender(sender, sender as 'artnet' | 'sacn' | 'enttecpro', config);
+      try {
+        await senderManager.enableSender(sender, sender as 'artnet' | 'sacn' | 'enttecpro' | 'ipc', config);
+        console.log(`Successfully enabled ${sender} sender`);
+      } catch (error) {
+        console.error(`Failed to enable ${sender} sender:`, error);
+        throw error;
+      }
     } catch (error) {
       console.error('Error enabling sender:', error);
     }
@@ -107,6 +126,29 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       controllerManager.getSenderManager().disableSender(sender);
     } catch (error) {
       console.error('Error disabling sender:', error);
+    }
+  });
+
+  // Update sACN configuration and restart sender
+  ipcMain.handle('update-sacn-config', async (_, config: any) => {
+    try {
+      const senderManager = controllerManager.getSenderManager();
+
+      // If sACN is currently enabled, restart it with new configuration
+      if (senderManager.getEnabledSenders().includes('sacn')) {
+        await senderManager.restartSender('sacn', {
+          senderType: 'sacn',
+          ...config
+        });
+        console.log('sACN configuration updated and sender restarted');
+      } else {
+        console.log('sACN not currently enabled, configuration saved for next enable');
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating sACN configuration:', error);
+      throw error;
     }
   });
 
@@ -826,16 +868,50 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     try {
       const registry = CueRegistry.getInstance();
       const status = registry.getConsistencyStatus();
-      
-      return { 
+
+      return {
         success: true,
         status
       };
     } catch (error) {
       console.error('Error getting consistency status:', error);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get available network interfaces for sACN configuration
+  ipcMain.handle('get-network-interfaces', async () => {
+    try {
+      const os = require('os');
+      const networkInterfaces = os.networkInterfaces();
+      const interfaces: Array<{name: string, value: string, family: string}> = [];
+
+      for (const [name, ifaceArray] of Object.entries(networkInterfaces)) {
+        for (const iface of ifaceArray as any[]) {
+          // Skip internal and loopback interfaces
+          if (!iface.internal && !iface.address.startsWith('127.')) {
+            interfaces.push({
+              name: `${name}: ${iface.address}`,
+              value: iface.address,
+              family: iface.family
+            });
+          }
+        }
+      }
+
+      return {
+        success: true,
+        interfaces
+      };
+    } catch (error) {
+      console.error('Error getting network interfaces:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        interfaces: []
       };
     }
   });

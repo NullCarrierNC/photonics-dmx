@@ -8,16 +8,11 @@ import { BaseSender, SenderError } from './BaseSender';
  * the same DMX data going out over the wire.
  */
 export class IpcSender extends BaseSender {
-    private window:BrowserWindow
     private enabled:Boolean = false;
-    
-    
+
     public constructor (){
         super();
-        this.window = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
-        if (!this.window) {
-          console.error('IPC Sender: No browser window available');
-        }
+        // Window will be determined when sending, not during construction
     }
 
   public async start(): Promise<void> {
@@ -33,11 +28,18 @@ export class IpcSender extends BaseSender {
    * @param universeBuffer Pre-built universe buffer (channel -> value mapping).
    */
   public async send(universeBuffer: Record<number, number>): Promise<void> {
-    if(this.enabled && this.window){
+    if(!this.enabled) {
+      console.error('IPC Sender: Not enabled');
+      return;
+    }
+
+    // Get the window when sending to ensure we have the current active window
+    const window = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+    if(window){
       // Send buffer directly to renderer
-      this.window.webContents.send("dmxValues", universeBuffer);
+      window.webContents.send("dmxValues", universeBuffer);
     } else {
-      console.error('IPC Sender: Not enabled or no window available');
+      console.error('IPC Sender: No browser window available when sending');
     }
   }
 

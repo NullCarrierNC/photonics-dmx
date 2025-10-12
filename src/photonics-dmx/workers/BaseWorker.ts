@@ -30,8 +30,11 @@ export abstract class BaseWorker extends EventEmitter {
       throw new Error('Worker already started');
     }
 
+    console.log(`BaseWorker: Starting worker with path: ${this.workerPath}`);
+
     return new Promise((resolve, reject) => {
       try {
+        console.log(`BaseWorker: Creating new Worker instance`);
         this.worker = new Worker(this.workerPath, {
           // Increase stack size for complex operations
           resourceLimits: {
@@ -40,15 +43,18 @@ export abstract class BaseWorker extends EventEmitter {
         });
 
         this.worker.on('message', (message) => {
+          console.log(`BaseWorker: Received message from worker:`, message.type);
           this.handleMessage(message);
         });
 
         this.worker.on('error', (error) => {
+          console.error(`BaseWorker: Worker error:`, error);
           this.emit('error', error);
           reject(error);
         });
 
         this.worker.on('exit', (code) => {
+          console.log(`BaseWorker: Worker exited with code: ${code}`);
           if (code !== 0 && !this.isTerminating) {
             this.emit('error', new Error(`Worker exited with code ${code}`));
           }
@@ -56,8 +62,13 @@ export abstract class BaseWorker extends EventEmitter {
         });
 
         // Wait for worker to signal it's ready
-        this.once('ready', () => resolve());
+        console.log(`BaseWorker: Waiting for worker to signal ready...`);
+        this.once('ready', () => {
+          console.log(`BaseWorker: Worker signaled ready`);
+          resolve();
+        });
       } catch (error) {
+        console.error(`BaseWorker: Failed to create worker:`, error);
         reject(error);
       }
     });
@@ -132,7 +143,10 @@ export abstract class WorkerThread {
   protected isShuttingDown = false;
 
   constructor() {
+    console.log('WorkerThread: Constructor called');
+    
     // Signal that worker is ready
+    console.log('WorkerThread: Sending WORKER_READY signal');
     this.sendToMain({ type: 'WORKER_READY' });
 
     // Handle shutdown messages
@@ -147,6 +161,8 @@ export abstract class WorkerThread {
     // Handle process termination
     process.on('SIGTERM', () => this.shutdown());
     process.on('SIGINT', () => this.shutdown());
+    
+    console.log('WorkerThread: Constructor completed');
   }
 
   /**

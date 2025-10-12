@@ -53,11 +53,20 @@ export class NetworkWorkerManager extends BaseWorker {
    */
   public async initialize(): Promise<void> {
     if (this.isInitialized) {
+      console.log(`NetworkWorkerManager: Already initialized`);
       return;
     }
 
-    await this.start();
-    this.isInitialized = true;
+    console.log(`NetworkWorkerManager: Starting worker...`);
+    try {
+      await this.start();
+      console.log(`NetworkWorkerManager: Worker started successfully`);
+      this.isInitialized = true;
+      console.log(`NetworkWorkerManager: Initialization complete`);
+    } catch (error) {
+      console.error(`NetworkWorkerManager: Failed to start worker:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -68,49 +77,65 @@ export class NetworkWorkerManager extends BaseWorker {
     senderType: 'artnet' | 'sacn' | 'enttecpro',
     config: any
   ): Promise<WorkerSender> {
+    console.log(`NetworkWorkerManager: Creating sender "${senderId}" of type "${senderType}"`);
+    
     if (!this.isInitialized) {
+      console.log(`NetworkWorkerManager: Initializing worker manager for sender "${senderId}"`);
       await this.initialize();
     }
 
     // Check if sender already exists
     if (this.senders.has(senderId)) {
+      console.log(`NetworkWorkerManager: Sender "${senderId}" already exists, returning existing sender`);
       return this.senders.get(senderId)!;
     }
 
     return new Promise((resolve, reject) => {
+      console.log(`NetworkWorkerManager: Creating new WorkerSender for "${senderId}"`);
       const sender = new WorkerSender(senderId, senderType, config, this);
 
       // Set up promise resolution when sender is created
       const onCreated = () => {
+        console.log(`NetworkWorkerManager: Sender "${senderId}" created successfully`);
         this.removeListener('sender_error', onError);
         this.senders.set(senderId, sender);
         resolve(sender);
       };
 
+      // Timeout after 10 seconds
+      const timeoutId = setTimeout(() => {
+        console.error(`NetworkWorkerManager: Timeout creating sender "${senderId}" - this should not happen if sender was created successfully`);
+        this.removeListener('sender_created', wrappedOnCreated);
+        this.removeListener('sender_error', onError);
+        reject(new Error('Timeout creating sender'));
+      }, 10000);
+
+      // Clear timeout when sender is created successfully
+      const wrappedOnCreated = () => {
+        clearTimeout(timeoutId);
+        onCreated();
+      };
+
       const onError = (errorSenderId: string, error: string) => {
         if (errorSenderId === senderId) {
-          this.removeListener('sender_created', onCreated);
+          console.error(`NetworkWorkerManager: Error creating sender "${senderId}": ${error}`);
+          clearTimeout(timeoutId);
+          this.removeListener('sender_created', wrappedOnCreated);
           reject(new Error(error));
         }
       };
 
-      this.once('sender_created', onCreated);
+      this.once('sender_created', wrappedOnCreated);
       this.once('sender_error', onError);
 
       // Send create message to worker
+      console.log(`NetworkWorkerManager: Sending CREATE_SENDER message for "${senderId}"`);
       this.sendMessage({
         type: 'CREATE_SENDER',
         senderId,
         senderType,
         config
       });
-
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        this.removeListener('sender_created', onCreated);
-        this.removeListener('sender_error', onError);
-        reject(new Error('Timeout creating sender'));
-      }, 10000);
     });
   }
 

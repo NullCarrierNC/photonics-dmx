@@ -16,6 +16,12 @@ export interface AppPreferences {
     subuni: number;
     port: number;
   };
+  sacnConfig?: {
+    universe: number;
+    networkInterface?: string;
+    unicastDestination?: string;
+    useUnicast: boolean;
+  };
   brightness?: {
     low: number;
     medium: number;
@@ -70,12 +76,18 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     artNetEnabled: false,
     enttecProEnabled: false
   },
+  sacnConfig: {
+    universe: 1,
+    useUnicast: false,
+    unicastDestination: ''
+  },
   stageKitPrefs: {
     yargPriority: 'prefer-for-tracked'
   },
   dmxSettingsPrefs: {
     artNetExpanded: false,
-    enttecProExpanded: false
+    enttecProExpanded: false,
+    sacnExpanded: false
   }
 };
 

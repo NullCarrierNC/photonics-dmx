@@ -95,6 +95,17 @@ export const artNetConfigAtom = atom((get) => {
   };
 });
 
+// sACN config derived from preferences with fallback defaults
+export const sacnConfigAtom = atom((get) => {
+  const prefs = get(lightingPrefsAtom);
+  return {
+    universe: prefs.sacnConfig?.universe || 1,
+    networkInterface: prefs.sacnConfig?.networkInterface || "",
+    unicastDestination: prefs.sacnConfig?.unicastDestination || "",
+    useUnicast: prefs.sacnConfig?.useUnicast || false
+  };
+});
+
 /**
  * Interface for lighting preferences stored in the frontend
  * This extends the backend AppPreferences with frontend-specific properties
@@ -111,6 +122,12 @@ export interface LightingPreferences {
     subnet: number;
     subuni: number;
     port: number;
+  };
+  sacnConfig?: {
+    universe: number;
+    networkInterface?: string;
+    unicastDestination?: string;
+    useUnicast: boolean;
   };
   brightness?: {
     low: number;
@@ -133,6 +150,7 @@ export interface LightingPreferences {
   dmxSettingsPrefs?: {
     artNetExpanded: boolean;
     enttecProExpanded: boolean;
+    sacnExpanded: boolean;
   };
 }
 

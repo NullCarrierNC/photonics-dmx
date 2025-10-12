@@ -40,11 +40,13 @@ export class WorkerSenderAdapter extends BaseSender {
       }
 
       try {
+        console.log(`WorkerSenderAdapter: Creating worker sender for ${this.senderType} with ID "${this.senderId}"`);
         this.workerSender = await this.workerManager.createSender(
           this.senderId,
           this.senderType as 'artnet' | 'sacn' | 'enttecpro',
           this.config
         );
+        console.log(`WorkerSenderAdapter: Worker sender created successfully for "${this.senderId}"`);
 
         // Set up error forwarding from worker manager
         this.workerManager.on('error', (senderId: string, error: string) => {
@@ -59,6 +61,7 @@ export class WorkerSenderAdapter extends BaseSender {
           }
         });
       } catch (error) {
+        console.error(`WorkerSenderAdapter: Failed to create worker sender for "${this.senderId}":`, error);
         throw new Error(`Failed to create worker sender: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
@@ -80,17 +83,24 @@ export class WorkerSenderAdapter extends BaseSender {
     } else {
       // Network senders run in worker threads
       if (!this.workerSender) {
+        console.log(`WorkerSenderAdapter: Initializing worker sender for "${this.senderId}"`);
         await this.initialize();
       }
 
       if (this.workerSender!.isRunning()) {
+        console.log(`WorkerSenderAdapter: Worker sender "${this.senderId}" is already running`);
         return;
       }
 
       this.isStarting = true;
+      console.log(`WorkerSenderAdapter: Starting worker sender "${this.senderId}"`);
 
       try {
         await this.workerSender!.start();
+        console.log(`WorkerSenderAdapter: Worker sender "${this.senderId}" started successfully`);
+      } catch (error) {
+        console.error(`WorkerSenderAdapter: Failed to start worker sender "${this.senderId}":`, error);
+        throw error;
       } finally {
         this.isStarting = false;
       }
