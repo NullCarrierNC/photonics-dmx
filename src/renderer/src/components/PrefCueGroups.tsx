@@ -112,8 +112,11 @@ const PrefCueGroups: React.FC = () => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">Enabled Cue Groups</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Note: Disabling the default group will prevent default cues from being selected during gameplay <em>unless no other groups contain the necessary cue</em>. 
-      I.e. if the system cannot find a cue in any other group, it will fallback to use the one from the default group.</p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+        Cue groups contain different implementations of the same cue triggered by YARG. Having multiple groups enabled allows for a wider range of visual 
+        effects during gameplay. The Stage Kit group is used as a fallback if no other group contains the necessary cue. 
+        
+      </p>
       <div className="space-y-4">
         {allGroups.map((group) => (
           <div key={group.name} className="border rounded-lg border-gray-200 dark:border-gray-600">

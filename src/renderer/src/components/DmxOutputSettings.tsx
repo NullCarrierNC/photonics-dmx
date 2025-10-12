@@ -28,9 +28,15 @@ const DmxOutputSettings: React.FC = () => {
   useEffect(() => {
     console.log('Loading other preferences');
 
-
     if (prefs.enttecProPort) {
       setComPort(prefs.enttecProPort);
+    }
+
+    // Load DMX settings UI preferences
+    if (prefs.dmxSettingsPrefs) {
+      setArtNetExpanded(prefs.dmxSettingsPrefs.artNetExpanded || false);
+      setSacnExpanded(prefs.dmxSettingsPrefs.sacnExpanded || false);
+      setEnttecProExpanded(prefs.dmxSettingsPrefs.enttecProExpanded || false);
     }
 
   }, [prefs, setComPort]);
@@ -290,6 +296,28 @@ const DmxOutputSettings: React.FC = () => {
     }
   };
 
+  // Save expanded state changes
+  const saveExpandedStates = async (artNet: boolean, sacn: boolean, enttecPro: boolean) => {
+    const newDmxSettingsPrefs = {
+      artNetExpanded: artNet,
+      sacnExpanded: sacn,
+      enttecProExpanded: enttecPro
+    };
+
+    try {
+      await window.electron.ipcRenderer.invoke('save-prefs', {
+        dmxSettingsPrefs: newDmxSettingsPrefs
+      });
+
+      setPrefs(prev => ({
+        ...prev,
+        dmxSettingsPrefs: newDmxSettingsPrefs
+      }));
+    } catch (error) {
+      console.error('Failed to save DMX settings preferences:', error);
+    }
+  };
+
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -299,12 +327,12 @@ const DmxOutputSettings: React.FC = () => {
       
       {/* Enabled Modes */}
       <div className="mb-8">
-        <h3 className="text-lg font-medium mb-3 text-gray-800 dark:text-gray-200">Enabled Modes</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        <h3 className="text-lg font-medium mb-3 text-gray-800 dark:text-gray-200">Enabled DMX Output Modes</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
           Select the DMX modes you want to use. This will make them available for use in Game Settings on the Status page.
         </p>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          sACN supports network interface selection and unicast destinations. ArtNet requires you to configure the ArtNet network settings below.<br/>EnttecPro requires you to configure the COM port below.
+         Each sender can be configured individually below.
         </p>
         <div className="flex items-center space-x-6">
           <label className="flex items-center space-x-2">
@@ -340,11 +368,16 @@ const DmxOutputSettings: React.FC = () => {
       </div>
 
       {/* sACN Configuration */}
-      <div className="mb-6">
-        <div className="border rounded-lg border-gray-200 dark:border-gray-600">
+      {prefs.dmxOutputConfig?.sacnEnabled && (
+        <div className="mb-6">
+          <div className="border rounded-lg border-gray-200 dark:border-gray-600">
           <div
             className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-            onClick={() => setSacnExpanded(!sacnExpanded)}
+            onClick={() => {
+              const newSacnExpanded = !sacnExpanded;
+              setSacnExpanded(newSacnExpanded);
+              saveExpandedStates(artNetExpanded, newSacnExpanded, enttecProExpanded);
+            }}
           >
             <div className="flex items-center flex-1">
               <div className="mr-3 text-gray-600 dark:text-gray-400">
@@ -430,14 +463,20 @@ const DmxOutputSettings: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
 
       {/* ArtNet Configuration */}
-      <div className="mb-6">
-        <div className="border rounded-lg border-gray-200 dark:border-gray-600">
+      {prefs.dmxOutputConfig?.artNetEnabled && (
+        <div className="mb-6">
+          <div className="border rounded-lg border-gray-200 dark:border-gray-600">
           <div 
             className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-            onClick={() => setArtNetExpanded(!artNetExpanded)}
+            onClick={() => {
+              const newArtNetExpanded = !artNetExpanded;
+              setArtNetExpanded(newArtNetExpanded);
+              saveExpandedStates(newArtNetExpanded, sacnExpanded, enttecProExpanded);
+            }}
           >
             <div className="flex items-center flex-1">
               <div className="mr-3 text-gray-600 dark:text-gray-400">
@@ -538,14 +577,20 @@ const DmxOutputSettings: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Enttec Pro USB Configuration */}
-      <div>
-        <div className="border rounded-lg border-gray-200 dark:border-gray-600">
+      {prefs.dmxOutputConfig?.enttecProEnabled && (
+        <div>
+          <div className="border rounded-lg border-gray-200 dark:border-gray-600">
           <div 
             className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-            onClick={() => setEnttecProExpanded(!enttecProExpanded)}
+            onClick={() => {
+              const newEnttecProExpanded = !enttecProExpanded;
+              setEnttecProExpanded(newEnttecProExpanded);
+              saveExpandedStates(artNetExpanded, sacnExpanded, newEnttecProExpanded);
+            }}
           >
             <div className="flex items-center flex-1">
               <div className="mr-3 text-gray-600 dark:text-gray-400">
@@ -585,7 +630,8 @@ const DmxOutputSettings: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
