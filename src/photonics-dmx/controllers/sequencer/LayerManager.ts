@@ -386,4 +386,32 @@ export class LayerManager implements ILayerManager {
       this._layerLastUsed.delete(layer);
     }
   }
+
+  /**
+   * Clears all active effects across all layers
+   */
+  public clearAllActiveEffects(): void {
+    this._activeEffects.clear();
+  }
+
+  /**
+   * Clears all queued effects across all layers
+   */
+  public clearAllQueuedEffects(): void {
+    this._effectQueue.clear();
+  }
+
+  /**
+   * Clears all layer states across all layers
+   */
+  public clearAllLayerStates(): void {
+    this._layerStates.clear();
+  }
+
+  /**
+   * Clears all layer tracking timestamps
+   */
+  public clearAllLayerTracking(): void {
+    this._layerLastUsed.clear();
+  }
 }

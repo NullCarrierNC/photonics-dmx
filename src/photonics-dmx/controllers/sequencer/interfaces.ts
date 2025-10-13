@@ -78,6 +78,12 @@ export interface ILayerManager {
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
   isLayerFreeForLight(layer: number, lightId: string): boolean;
   isLayerFree(layer: number): boolean;
+  
+  // Clear methods for immediate state reset
+  clearAllActiveEffects(): void;
+  clearAllQueuedEffects(): void;
+  clearAllLayerStates(): void;
+  clearAllLayerTracking(): void;
 }
 
 /**
