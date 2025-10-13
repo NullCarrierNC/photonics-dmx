@@ -149,7 +149,7 @@ export class StageKitStompCue implements ICue {
       await sequencer.setEffect('stagekit-stomp-toggle', stompEffect);
       this.isFirstExecution = false;
     } else {
-      sequencer.addEffect('stagekit-stomp-toggle', stompEffect);
+      await sequencer.addEffect('stagekit-stomp-toggle', stompEffect);
     }
   }
 

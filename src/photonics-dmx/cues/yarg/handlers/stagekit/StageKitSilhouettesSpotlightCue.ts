@@ -82,7 +82,7 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
   //      await sequencer.addEffect('silhouettes-spotlight-blue-odd', blueOdd);
         this.isFirstExecution = false;
       } else {
-        sequencer.addEffect('silhouettes-spotlight-green', greenBackdrop);
+        await sequencer.addEffect('silhouettes-spotlight-green', greenBackdrop);
   //      sequencer.addEffect('silhouettes-spotlight-blue-odd', blueOdd);
       }
       
@@ -100,7 +100,7 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
         await sequencer.setEffect('silhouettes-spotlight-dark', darkEffect);
         this.isFirstExecution = false;
       } else {
-        sequencer.addEffect('silhouettes-spotlight-dark', darkEffect);
+        await sequencer.addEffect('silhouettes-spotlight-dark', darkEffect);
       }
     }
   }
