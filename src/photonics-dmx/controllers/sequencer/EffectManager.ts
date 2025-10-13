@@ -1,4 +1,3 @@
-import { l } from 'vite/dist/node/types.d-aGj9QkWt';
 import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types';
 import {
   IEffectManager,
