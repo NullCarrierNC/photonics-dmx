@@ -363,63 +363,39 @@ export class EffectManager implements IEffectManager {
 
   /**
    * Removes all active effects and clears the queue
+   * Immediately clears ALL state in the sequencer system as though it had just been initialized
    */
   public removeAllEffects(): void {
-    console.log('[EffectManager] removeAllEffects STARTING');
-   
-    // First clear the queue to prevent queued effects from being started when active effects are removed
-    this.layerManager.getEffectQueue().clear();
-    
-    // CRITICAL ORDERING:
-    // 1. First, remove all active effects tracking so the TransitionEngine update cycle
-    //    sees no active effects and stops processing them
-    // 2. THEN clear all transitions, so no new transitions are created while we're clearing
-    
-    const allLayers = this.layerManager.getAllLayers();
-    console.log('[EffectManager] Removing active effects for layers:', allLayers);
-    
-    for (const layer of allLayers) {
-      const activeEffects = this.layerManager.getActiveEffects().get(layer);
-      if (activeEffects) {
-        const lightIds = Array.from(activeEffects.keys());
-        console.log(`[EffectManager] Removing layer ${layer} for ${lightIds.length} lights`);
-        for (const lightId of lightIds) {
-          this.layerManager.removeActiveEffect(layer, lightId);
-          this.layerManager.resetLayerTracking(layer);
-        }
-      }
-      // Also clear any stored final states for this layer to prevent stale state
-      this.layerManager.clearLayerStates(layer);
+    // Cancel any active blackouts first
+    if (this.systemEffects.isBlackoutActive()) {
+      console.warn('Cancelling blackout for removeAllEffects');
+      this.systemEffects.cancelBlackout();
     }
     
-    console.log('[EffectManager] Active effects removed, now clearing transitions...');
+
+    // 1. Clear all active effects and queues (stops new effects from starting)
+    this.layerManager.clearAllActiveEffects();
+    this.layerManager.clearAllQueuedEffects();
     
-    // NOW that active effects are removed, clear all transitions
-    // The update cycle won't recreate them because it sees no active effects
+    // 2. Clear all layer states and tracking (prevents stale state)
+    this.layerManager.clearAllLayerStates();
+    this.layerManager.clearAllLayerTracking();
+    
+    // 3. Use the robust clearAllTransitions() which has proper locking and immediately publishes black states
     const ltc = this.transitionEngine.getLightTransitionController();
     ltc.clearAllTransitions();
     
-    // Reset the last called layer 0 effect to prevent jamming issues if we restart the same effect
+    // 4. Reset effect tracking state
     this._lastCalled0LayerEffect = "";
-    
-    console.log('[EffectManager] removeAllEffects COMPLETE');
   }
 
   /**
    * Forcibly removes all active effects, clears the queue, and immediately clears all light states and transitions on all layers
+   * This method is now identical to removeAllEffects() for consistency
    */
   public removeAllEffectsForced(): void {
-    // Clear all active effects
-    this.layerManager.getActiveEffects().clear();
-    
-    // Clear all queued effects
-    this.layerManager.getEffectQueue().clear();
-    
-    // Reset all light states and transitions
-    this.transitionEngine.getLightTransitionController().resetLightStates();
-    
-    // Reset the last called layer 0 effect
-    this._lastCalled0LayerEffect = "";
+    // Use the same immediate approach as removeAllEffects for consistency
+    this.removeAllEffects();
   }
 
   /**
