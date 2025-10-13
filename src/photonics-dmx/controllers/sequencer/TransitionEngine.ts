@@ -122,6 +122,10 @@ export class TransitionEngine implements ITransitionEngine {
    * @param deltaTime The time elapsed since last update in milliseconds
    */
   public updateTransitions(deltaTime: number = 0): void {
+    // Skip processing if a global clear is in progress to avoid races
+    if (this.lightTransitionController && (this.lightTransitionController as any).isClearing && (this.lightTransitionController as any).isClearing()) {
+      return;
+    }
     // Update internal timing state
     this.advanceTimingState(deltaTime);
     
@@ -162,9 +166,6 @@ export class TransitionEngine implements ITransitionEngine {
       const justFinishedEffect = this.layerManager.getActiveEffect(layer, lightId);
       if (!justFinishedEffect) continue;
 
-      // Capture final states using the layer manager
-      this.layerManager.captureFinalStates(layer, justFinishedEffect.transitions[0].lights);
-      
       // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId);
 

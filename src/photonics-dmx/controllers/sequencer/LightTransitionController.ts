@@ -46,6 +46,7 @@ export class LightTransitionController {
   private _finalColors: Map<string, RGBIO>;
 
   private _transitionLock = false;
+  private _clearingTransitions = false; // Flag to prevent new transitions during cleanup
   private clock: Clock | null = null;
   private updateCallback: (deltaTime: number) => void;
   private accumulatedTime: number = 0;
@@ -108,6 +109,13 @@ export class LightTransitionController {
     easing: string,
     initialState?: RGBIO
   ): void {
+    // CRITICAL: Reject new transitions if we're in the middle of clearing
+    // This prevents race conditions where events trigger new transitions during cleanup
+    if (this._clearingTransitions) {
+      console.warn(`[LTC] Rejected setTransition for light ${lightId} layer ${layer} - clearing in progress`);
+      return;
+    }
+    
     // Initialize our map for this light if it doesn't exist
     if (!this._transitionsByLight.has(lightId)) {
       this._transitionsByLight.set(lightId, new Map<number, TransitionData>());
@@ -181,17 +189,106 @@ export class LightTransitionController {
   }
 
   /**
+   * Gets all unique layers that have transitions
+   */
+  public getAllTransitionLayers(): number[] {
+    const layers = new Set<number>();
+    for (const layerMap of this._transitionsByLight.values()) {
+      for (const layer of layerMap.keys()) {
+        layers.add(layer);
+      }
+    }
+    return Array.from(layers).sort((a, b) => a - b);
+  }
+
+  /**
+   * Clears ALL transitions and resets all lights to black
+   * This is a nuclear option used when switching cues
+   */
+  public clearAllTransitions(): void {
+    // Set the clearing flag FIRST to prevent new transitions from being added
+    this._clearingTransitions = true;
+    
+    // Wait for any active update cycle to complete by checking the lock
+    const maxWait = 100; // 100ms max wait
+    const startWait = performance.now();
+    while (this._transitionLock && (performance.now() - startWait) < maxWait) {
+      // Busy wait for lock to release (update cycle runs every 5ms, so this should be quick)
+    }
+    
+    // Set our own lock to prevent update cycle from running
+    this._transitionLock = true;
+    this.lockStartTime = performance.now();
+    
+    try {
+      // Get all light IDs before clearing (union of all known sources)
+      const idSet = new Set<string>();
+      // From LightStateManager (externally tracked)
+      this._lightStateManager.getTrackedLightIds().forEach(id => idSet.add(id));
+      // From transitions controller internal maps
+      this._transitionsByLight.forEach((_v, id) => idSet.add(id));
+      this._currentLayerStates.forEach((_v, id) => idSet.add(id));
+      this._finalColors.forEach((_v, id) => idSet.add(id));
+      const allLightIds = Array.from(idSet);
+      
+      // Clear all transitions
+      this._transitionsByLight.clear();
+      this._currentLayerStates.clear();
+      this._finalColors.clear();
+      
+      // Reset all lights to black
+      const blackState: RGBIO = {
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 1.0,
+        blendMode: 'replace'
+      };
+      
+      allLightIds.forEach(lightId => {
+        this._lightStateManager.setLightState(lightId, blackState);
+      });
+      
+      // Publish the black states immediately
+      this._lightStateManager.publishLightStates();
+    } finally {
+      // Release the lock
+      this._transitionLock = false;
+      // Release the clearing flag LAST
+      this._clearingTransitions = false;
+    }
+  }
+
+  /**
    * Removes a specific layer from the given light.
+   * Immediately recalculates and publishes the new color state.
    */
   public removeLightLayer(lightId: string, layer: number): void {
     const layerMap = this._transitionsByLight.get(lightId);
     if (layerMap) {
       layerMap.delete(layer);
+      
+      // If this was the last layer for this light, clean up the map entry
+      if (layerMap.size === 0) {
+        this._transitionsByLight.delete(lightId);
+      }
     }
+    
     const currentLayerMap = this._currentLayerStates.get(lightId);
     if (currentLayerMap) {
       currentLayerMap.delete(layer);
+      
+      // If no layers remain, clean up the map entry
+      if (currentLayerMap.size === 0) {
+        this._currentLayerStates.delete(lightId);
+      }
     }
+    
+    // Force immediate recalculation and publication of the final color
+    // This ensures the light updates immediately rather than waiting for the next update cycle
+    this.calculateFinalColorForLight(lightId);
+    this._lightStateManager.publishLightStates();
   }
 
   /**
@@ -267,6 +364,13 @@ export class LightTransitionController {
       this._finalColors.set(lightId, blackState);
     });
     this.setFinalColors();
+  }
+
+  /**
+   * Indicates whether a global transition clear is currently in progress
+   */
+  public isClearing(): boolean {
+    return this._clearingTransitions;
   }
 
   /**
@@ -371,8 +475,15 @@ export class LightTransitionController {
             }
           });
 
-          // Update the layer states with the new values
-          this._currentLayerStates.set(lightId, perLightLayerStates);
+          // Update layer states incrementally instead of replacing the entire map
+          // This prevents race conditions with removeLightLayer
+          if (!this._currentLayerStates.has(lightId)) {
+            this._currentLayerStates.set(lightId, new Map<number, RGBIO>());
+          }
+          const currentStates = this._currentLayerStates.get(lightId)!;
+          perLightLayerStates.forEach((state, layer) => {
+            currentStates.set(layer, state);
+          });
         });
 
         // Calculate the final colors for all active lights
@@ -613,12 +724,33 @@ export class LightTransitionController {
    * @returns The calculated final color
    */
   private calculateFinalColorForLight(lightId: string): RGBIO {
+    const transparentColor = this.transparentColor();
+    const blackColor: RGBIO = {
+      red: 0,
+      green: 0,
+      blue: 0,
+      intensity: 0,
+      opacity: 1.0,
+      blendMode: 'replace'
+    };
+    
     if (!this._currentLayerStates.has(lightId)) {
-      return this.transparentColor();
+      // With no layers, force hard black output to avoid residual hardware colour
+      this._finalColors.set(lightId, blackColor);
+      this._lightStateManager.setLightState(lightId, blackColor);
+      return blackColor;
     }
 
     const layerStates = this._currentLayerStates.get(lightId)!;
-    let finalColor: RGBIO = this.transparentColor();
+    
+    // If no layers remain for this light, force hard black output
+    if (layerStates.size === 0) {
+      this._finalColors.set(lightId, blackColor);
+      this._lightStateManager.setLightState(lightId, blackColor);
+      return blackColor;
+    }
+    
+    let finalColor: RGBIO = transparentColor;
 
     // Convert Map to array, sort by layer number, then process
     const sortedLayers = Array.from(layerStates.entries())
@@ -699,7 +831,7 @@ export class LightTransitionController {
    */
   private cleanupOrphanedTransitions(): void {
     const currentTime = performance.now();
-    const maxTransitionAge = 10000; // 10 seconds
+    const maxTransitionAge = 2000;
 
     for (const [lightId, layerMap] of this._transitionsByLight.entries()) {
       for (const [layer, transitionData] of layerMap.entries()) {
