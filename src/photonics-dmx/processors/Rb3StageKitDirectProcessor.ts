@@ -296,7 +296,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       });
       
       // Also call blackout on the sequencer to clear any effects on layers
-      this.photonicsSequencer.blackout(200).catch(error => {
+      this.photonicsSequencer.blackout(0).catch(error => {
         console.error('StageKitDirectProcessor: Error calling sequencer blackout during InGame transition:', error);
       });
     } else if (gameState === 'Menus') {
@@ -719,14 +719,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     try {
   //    //console.log('StageKitDirectProcessor: Turning off all DMX lights using setState black');
       
-      const lights = this.lightManager.getLights(['front', 'back'], 'all');
-      if (lights) {
-        const blackColor = getColor('black', 'medium');
-        for (const light of lights) {
-          await this.photonicsSequencer.setState([light], blackColor, 1);
-        }
-      }
-      
+     
       // Clear all color state
       this.lightColorState.clear();
       this.currentPassColors.clear();
@@ -753,6 +746,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       }
       this.activeStrobeEffects.clear();
       this.strobedLights.clear();
+      console.log('StageKitDirectProcessor: Turning off all DMX lights using blackout');
+      this.photonicsSequencer.blackout(0);
       
     } catch (error) {
       console.error('StageKitDirectProcessor: Error turning off all DMX lights:', error);
