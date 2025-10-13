@@ -106,6 +106,16 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         console.log(`Successfully enabled ${sender} sender`);
       } catch (error) {
         console.error(`Failed to enable ${sender} sender:`, error);
+
+        // Send failure notification to frontend so UI can update state
+        const mainWindow = BrowserWindow.getFocusedWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send('sender-start-failed', {
+            sender: sender,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+
         throw error;
       }
     } catch (error) {

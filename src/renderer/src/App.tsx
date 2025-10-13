@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom } from './atoms';
+import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom, senderSacnEnabledAtom, senderArtNetEnabledAtom, senderEnttecProEnabledAtom, senderIpcEnabledAtom } from './atoms';
 import { Pages } from './types';
 import squareLogo from './assets/images/photonics-icon.png';
 import LeftMenu from './components/LeftMenu';
@@ -40,6 +40,10 @@ export const App = (): JSX.Element => {
   const setSenderError = useSetAtom(senderErrorAtom);
   const setCueState = useSetAtom(currentCueStateAtom);
   const setEnttecProComPort = useSetAtom(enttecProComPortAtom);
+  const setSacnEnabled = useSetAtom(senderSacnEnabledAtom);
+  const setArtNetEnabled = useSetAtom(senderArtNetEnabledAtom);
+  const setEnttecProEnabled = useSetAtom(senderEnttecProEnabledAtom);
+  const setIpcEnabled = useSetAtom(senderIpcEnabledAtom);
   const [appVer, setAppVer] = useState('');
 
   // Create a clearErrorTimeout callback that will be used to reset error state
@@ -66,6 +70,34 @@ export const App = (): JSX.Element => {
   const handleCueStateUpdate = useCallback((_evt: IpcRendererEvent, cueState: CueStateInfo): void => {
     setCueState(cueState);
   }, [setCueState]);
+
+  // Handler for sender start failures
+  const handleSenderStartFailure = useCallback((_evt: IpcRendererEvent, data: { sender: string; error: string }): void => {
+    console.error(`Sender "${data.sender}" failed to start:`, data.error);
+
+    // Update the UI state to reflect that the sender is not running
+    switch (data.sender) {
+      case 'sacn':
+        setSacnEnabled(false);
+        break;
+      case 'artnet':
+        setArtNetEnabled(false);
+        break;
+      case 'enttecpro':
+        setEnttecProEnabled(false);
+        break;
+      case 'ipc':
+        setIpcEnabled(false);
+        break;
+      default:
+        console.warn(`Unknown sender type in failure notification: ${data.sender}`);
+    }
+
+    // Also set sender error state to show the error to the user
+    setIsSenderError(true);
+    setSenderError(`Failed to start ${data.sender} sender: ${data.error}`);
+    resetErrorTimeout();
+  }, [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setIpcEnabled, setIsSenderError, setSenderError, resetErrorTimeout]);
 
   const toggleDarkMode = (): void => {
     setIsDarkMode((prevMode) => !prevMode);
@@ -195,9 +227,12 @@ export const App = (): JSX.Element => {
 
     // Set up event listener for sender errors
     addIpcListener('sender-error', handleSenderError);
-    
+
     // Set up event listener for cue state updates
     addIpcListener('cue-state-update', handleCueStateUpdate);
+
+    // Set up event listener for sender start failures
+    addIpcListener('sender-start-failed', handleSenderStartFailure);
 
     const saveLightLayout = async () => {
       if (activeConfig) {
@@ -215,8 +250,9 @@ export const App = (): JSX.Element => {
     return () => {
       removeIpcListener('sender-error', handleSenderError);
       removeIpcListener('cue-state-update', handleCueStateUpdate);
+      removeIpcListener('sender-start-failed', handleSenderStartFailure);
     };
-  }, [activeConfig, handleSenderError, handleCueStateUpdate]);
+  }, [activeConfig, handleSenderError, handleCueStateUpdate, handleSenderStartFailure]);
 
   const renderContent = () => {
     switch (currentPage) {

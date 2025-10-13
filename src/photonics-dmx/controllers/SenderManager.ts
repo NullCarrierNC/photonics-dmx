@@ -65,7 +65,7 @@ export class SenderManager {
       } else {
         // Handle network senders through worker system
         console.log(`Creating worker-based sender for ${senderType} with ID "${id}"`);
-        
+
         // Initialize network worker if not already done
         console.log(`Initializing network worker for sender "${id}"...`);
         try {
@@ -73,6 +73,7 @@ export class SenderManager {
           console.log(`Network worker initialized for sender "${id}"`);
         } catch (error) {
           console.error(`Failed to initialize network worker for sender "${id}":`, error);
+          this.initializingSenders.delete(id);
           throw error;
         }
 
@@ -92,7 +93,7 @@ export class SenderManager {
         // Only add to enabled senders after successful startup
         this.enabledSenders.set(id, sender);
         console.log(`Worker-based sender with ID "${id}" enabled and started successfully.`);
-        
+
         // Remove from initializing set
         this.initializingSenders.delete(id);
       }
@@ -100,7 +101,9 @@ export class SenderManager {
       console.error(`Error starting sender with ID "${id}":`, err);
       // Remove from initializing set on error
       this.initializingSenders.delete(id);
-      return;
+
+      // Re-throw the error so the IPC handler can catch it and send the failure notification
+      throw err;
     }
   }
 
