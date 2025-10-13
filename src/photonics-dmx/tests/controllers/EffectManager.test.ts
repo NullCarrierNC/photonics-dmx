@@ -65,7 +65,12 @@ describe('EffectManager', () => {
       clearLayerStates: jest.fn(),
       captureFinalStates: jest.fn(),
       resetLayerTracking: jest.fn(),
-      captureInitialStates: jest.fn().mockReturnValue(new Map())
+      captureInitialStates: jest.fn().mockReturnValue(new Map()),
+      // New bulk clear methods
+      clearAllActiveEffects: jest.fn(),
+      clearAllQueuedEffects: jest.fn(),
+      clearAllLayerStates: jest.fn(),
+      clearAllLayerTracking: jest.fn()
     } as unknown as jest.Mocked<LayerManager>;
 
     transitionEngine = {
@@ -393,7 +398,7 @@ describe('EffectManager', () => {
       await effectManager.setEffect('test', effect);
 
       // Verify that setEffect calls removeAllEffects to clear existing effects
-      expect(layerManager.getEffectQueue().clear).toHaveBeenCalled();
+      expect(layerManager.clearAllQueuedEffects).toHaveBeenCalled();
       
       // Verify new effect was added
       expect(layerManager.addActiveEffect).toHaveBeenCalledWith(
@@ -703,8 +708,11 @@ describe('EffectManager', () => {
       // But the test is checking for direct calls which don't happen in the implementation
       // Instead, we should verify that removeEffectByLayer was called for each layer
       
-      // Verify all layers were processed
-      expect(layerManager.getAllLayers).toHaveBeenCalled();
+      // Verify bulk clear methods were called
+      expect(layerManager.clearAllActiveEffects).toHaveBeenCalled();
+      expect(layerManager.clearAllQueuedEffects).toHaveBeenCalled();
+      expect(layerManager.clearAllLayerStates).toHaveBeenCalled();
+      expect(layerManager.clearAllLayerTracking).toHaveBeenCalled();
       
       // Since we can't easily test the internal implementation, let's just verify that
       // the method was called without checking the specific behavior
