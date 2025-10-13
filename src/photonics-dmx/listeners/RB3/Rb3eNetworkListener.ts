@@ -627,7 +627,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 3: // StrobeSlow
         strobeEffect = 'slow';
         if (this._currentStrobeState !== 'Strobe_Slow') {
-          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Slow`);
+    //      console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Slow`);
           this._currentStrobeState = 'Strobe_Slow';
         }
         color = 'off';
@@ -635,7 +635,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 4: // StrobeMedium
         strobeEffect = 'medium';
         if (this._currentStrobeState !== 'Strobe_Medium') {
-          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Medium`);
+   //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Medium`);
           this._currentStrobeState = 'Strobe_Medium';
         }
         color = 'off';
@@ -643,7 +643,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 5: // StrobeFast
         strobeEffect = 'fast';
         if (this._currentStrobeState !== 'Strobe_Fast') {
-          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fast`);
+   //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fast`);
           this._currentStrobeState = 'Strobe_Fast';
         }
         color = 'off';
@@ -651,7 +651,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 6: // StrobeFastest
         strobeEffect = 'fastest';
         if (this._currentStrobeState !== 'Strobe_Fastest') {
-          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fastest`);
+   //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fastest`);
           this._currentStrobeState = 'Strobe_Fastest';
         }
         color = 'off';
@@ -659,7 +659,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 7: // StrobeOff
         strobeEffect = 'off';
         if (this._currentStrobeState !== 'Strobe_Off') {
-          console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Off`);
+    //      console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Off`);
           this._currentStrobeState = 'Strobe_Off';
         }
         color = 'off';
