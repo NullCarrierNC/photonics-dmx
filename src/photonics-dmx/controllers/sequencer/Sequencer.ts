@@ -35,9 +35,10 @@ export class Sequencer implements ILightingController {
   /**
    * @constructor
    * @param lightTransitionController The underlying light transition controller
+   * @param clockRate The clock rate in milliseconds (1-100ms)
    */
-  constructor(lightTransitionController: LightTransitionController) {
-    this.clock = new Clock();
+  constructor(lightTransitionController: LightTransitionController, clockRate: number = 5) {
+    this.clock = new Clock(clockRate);
     this.lightTransitionController = lightTransitionController;
     this.effectTransformer = new EffectTransformer();
     this.eventScheduler = new EventScheduler();

@@ -1,9 +1,9 @@
 /**
  * @class Clock
  * @description Centralized timing source for the lighting sequencer system.
- * 
- * Provides a single source of truth for timing by using a 
- * 1ms interval that notifies all registered components.
+ *
+ * Provides a single source of truth for timing by using a
+ * configurable interval that notifies all registered components.
  */
 export class Clock {
   private intervalId: NodeJS.Timeout | null = null;
@@ -12,8 +12,10 @@ export class Clock {
   private updateCallbacks: Array<(deltaTime: number) => void> = [];
   private isRunning: boolean = false;
   private tickCount: number = 0;
+  private intervalMs: number;
 
-  constructor() {
+  constructor(intervalMs: number = 5) {
+    this.intervalMs = Math.max(1, Math.min(100, intervalMs)); // Clamp between 1-100ms
     this.startTime = this.getCurrentTime();
     this.lastUpdateTime = this.startTime;
   }
@@ -42,11 +44,11 @@ export class Clock {
    */
   start(): void {
     if (this.isRunning) return;
-    
+
     this.isRunning = true;
     this.intervalId = setInterval(() => {
       this.update();
-    }, 5);
+    }, this.intervalMs);
   }
 
   /**

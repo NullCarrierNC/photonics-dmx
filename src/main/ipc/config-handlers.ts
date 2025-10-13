@@ -148,21 +148,64 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       controllerManager.getConfig().updatePreferences({
         stageKitPrefs: { yargPriority: priority }
       });
-      
+
       // Sync with the CueRegistry
       const registry = CueRegistry.getInstance();
       registry.setStageKitPriority(priority);
-      
+
       // Clear any existing consistency tracking to ensure new priority takes effect immediately
       registry.clearConsistencyTracking();
-      
+
       console.log('Updated stage kit priority to:', priority);
-      
+
       return { success: true };
     } catch (error) {
       console.error('Error setting stage kit priority:', error);
-      return { 
-        success: false, 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get clock rate preference
+  ipcMain.handle('get-clock-rate', async () => {
+    try {
+      const clockRate = controllerManager.getConfig().getClockRate();
+      return { success: true, clockRate };
+    } catch (error) {
+      console.error('Error getting clock rate:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Set clock rate preference
+  ipcMain.handle('set-clock-rate', async (_, clockRate: number) => {
+    try {
+      // Validate clock rate range
+      if (clockRate < 1 || clockRate > 100) {
+        return {
+          success: false,
+          error: 'Clock rate must be between 1 and 100 milliseconds'
+        };
+      }
+
+      // Update the preference in the config
+      controllerManager.getConfig().setClockRate(clockRate);
+
+      // Restart controllers to apply the new clock rate
+      await controllerManager.restartControllers();
+
+      console.log('Updated clock rate to:', clockRate, 'ms');
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting clock rate:', error);
+      return {
+        success: false,
         error: error instanceof Error ? error.message : String(error)
       };
     }

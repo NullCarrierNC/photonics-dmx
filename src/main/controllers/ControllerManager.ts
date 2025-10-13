@@ -90,11 +90,14 @@ export class ControllerManager {
    */
   private async initializeSequencer(): Promise<void> {
     if (!this.dmxLightManager) return;
-    
+
     // Create the sequencer components
     this.lightStateManager = new LightStateManager();
     this.lightTransitionController = new LightTransitionController(this.lightStateManager);
-    this.sequencer = new Sequencer(this.lightTransitionController);
+
+    // Get clock rate from configuration
+    const clockRate = this.config.getClockRate();
+    this.sequencer = new Sequencer(this.lightTransitionController, clockRate);
     this.effectsController = this.sequencer;
     
     // Set up DMX publisher

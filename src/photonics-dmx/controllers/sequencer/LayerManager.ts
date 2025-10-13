@@ -328,21 +328,22 @@ export class LayerManager implements ILayerManager {
     if (!this._layerStates.has(layer)) {
       this._layerStates.set(layer, new Map<string, RGBIO>());
     }
-    
+
     const layerStates = this._layerStates.get(layer)!;
-    
+
     lights.forEach(light => {
-      // First try to get current state from LightTransitionController
-      const currentState = this._lightTransitionController.getLightState(light.id, layer);
-      if (currentState) {
-        // Store deep copy of state
-        layerStates.set(light.id, { ...currentState });
-      } 
-      // If no current state but active effect has last end state, use that
+      // First try to get the target state from the active effect (what it was trying to achieve)
+      const activeEffect = this.getActiveEffect(layer, light.id);
+      if (activeEffect && activeEffect.lastEndState) {
+        // Use the effect's target state, not the current interpolated state
+        layerStates.set(light.id, { ...activeEffect.lastEndState });
+      }
+      // Fallback to current state if no target state available
       else {
-        const activeEffect = this.getActiveEffect(layer, light.id);
-        if (activeEffect && activeEffect.lastEndState) {
-          layerStates.set(light.id, { ...activeEffect.lastEndState });
+        const currentState = this._lightTransitionController.getLightState(light.id, layer);
+        if (currentState) {
+          // Store deep copy of state
+          layerStates.set(light.id, { ...currentState });
         }
       }
     });

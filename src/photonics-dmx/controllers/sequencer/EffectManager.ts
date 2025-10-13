@@ -1,3 +1,4 @@
+import { l } from 'vite/dist/node/types.d-aGj9QkWt';
 import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types';
 import {
   IEffectManager,
@@ -312,7 +313,10 @@ export class EffectManager implements IEffectManager {
     }
 
     // Remove all existing effects first
-    this.removeAllEffects();
+    //this.removeAllEffects();
+    // HACK: We're foribly clearing all effects and no longert persisting Layer 0 state
+    // TBD if we want to keep this and remove the special handling for Layer 0
+    this.removeAllEffectsForced();
 
     const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(effect.transitions);
 
