@@ -165,6 +165,12 @@ export class SongEventHandler implements ISongEventHandler {
     'bass-open' | 'bass-green' | 'bass-red' | 'bass-yellow' | 'bass-blue' | 'bass-orange' |
     'keys-open' | 'keys-green' | 'keys-red' | 'keys-yellow' | 'keys-blue' | 'keys-orange'): void {
     const currentTime = performance.now();
+
+    // Guard against processing while transitions are being globally cleared
+    const ltc = this.transitionEngine.getLightTransitionController();
+    if (ltc && typeof (ltc as any).isClearing === 'function' && (ltc as any).isClearing()) {
+      return;
+    }
     
     this.layerManager.getActiveEffects().forEach((layerMap, _layer) => {
       layerMap.forEach((activeEffect, _lightId) => {

@@ -163,6 +163,7 @@ export class EffectManager implements IEffectManager {
       this.systemEffects.cancelBlackout();
     }
     this.removeAllEffects();
+
     if (effect.transitions.length === 0) {
       console.warn(`Effect "${name}" has no transitions. Ignoring.`);
       return;
@@ -182,7 +183,6 @@ export class EffectManager implements IEffectManager {
         });
         });
       } else {
-        this.removeAllEffects();
         this.addEffect(name, effect, 0, isPersistent);
         
         // Update the last layer 0 effect name if this effect targets layer 0
@@ -365,26 +365,44 @@ export class EffectManager implements IEffectManager {
    * Removes all active effects and clears the queue
    */
   public removeAllEffects(): void {
+    console.log('[EffectManager] removeAllEffects STARTING');
    
-   // console.log("Removing all effects");
-    
     // First clear the queue to prevent queued effects from being started when active effects are removed
     this.layerManager.getEffectQueue().clear();
     
-    // Then remove active effects
+    // CRITICAL ORDERING:
+    // 1. First, remove all active effects tracking so the TransitionEngine update cycle
+    //    sees no active effects and stops processing them
+    // 2. THEN clear all transitions, so no new transitions are created while we're clearing
+    
     const allLayers = this.layerManager.getAllLayers();
+    console.log('[EffectManager] Removing active effects for layers:', allLayers);
+    
     for (const layer of allLayers) {
-      if (layer === 0) {
-        // Remove effect from layer 0, but preserve final colour for transitioning
-        this.removeEffectByLayer(layer, false);
-      } else {
-        // Remove effect + transitions from all other layers
-        this.removeEffectByLayer(layer, true);
+      const activeEffects = this.layerManager.getActiveEffects().get(layer);
+      if (activeEffects) {
+        const lightIds = Array.from(activeEffects.keys());
+        console.log(`[EffectManager] Removing layer ${layer} for ${lightIds.length} lights`);
+        for (const lightId of lightIds) {
+          this.layerManager.removeActiveEffect(layer, lightId);
+          this.layerManager.resetLayerTracking(layer);
+        }
       }
+      // Also clear any stored final states for this layer to prevent stale state
+      this.layerManager.clearLayerStates(layer);
     }
+    
+    console.log('[EffectManager] Active effects removed, now clearing transitions...');
+    
+    // NOW that active effects are removed, clear all transitions
+    // The update cycle won't recreate them because it sees no active effects
+    const ltc = this.transitionEngine.getLightTransitionController();
+    ltc.clearAllTransitions();
     
     // Reset the last called layer 0 effect to prevent jamming issues if we restart the same effect
     this._lastCalled0LayerEffect = "";
+    
+    console.log('[EffectManager] removeAllEffects COMPLETE');
   }
 
   /**
@@ -532,17 +550,18 @@ export class EffectManager implements IEffectManager {
     const activeEffects = this.layerManager.getActiveEffects().get(layer);
     if (!activeEffects) return;
     
+    // Convert to array to avoid modifying the map while iterating
+    const lightIds = Array.from(activeEffects.keys());
+    const lightsToCleanup: string[] = [];
+    
     // Process each light's effect on this layer
-    activeEffects.forEach((activeEffect, lightId) => {
-      // Capture final state before removing the effect
-      this.layerManager.captureFinalStates(layer, [activeEffect.transitions[0].lights.find(l => l.id === lightId)!]);
-      
+    for (const lightId of lightIds) {
       // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId);
       
       // Start the next effect in queue for this light on this layer if one exists
       const hasNextEffect = this.startNextEffectInQueue(layer, lightId);
-    //  console.log(`Removing effect ${activeEffect.name} from layer ${layer}, light ${lightId}. Has next effect: ${hasNextEffect}`);
+    //  console.log(`Removing effect from layer ${layer}, light ${lightId}. Has next effect: ${hasNextEffect}`);
 
       // If we're removing the effect and there's no next effect in the queue,
       // also reset layer tracking to prevent cleanup after grace period
@@ -550,14 +569,21 @@ export class EffectManager implements IEffectManager {
         this.layerManager.resetLayerTracking(layer);
       }
 
-      // Clean up transitions ONLY if requested AND there's no next effect AND it's not layer 0
-      if (shouldRemoveTransitions && !hasNextEffect && layer > 0) {
-        // We've confirmed no new effect is starting on this layer for this light
-        this.transitionEngine.getLightTransitionController().removeLightLayer(lightId, layer);
-        
-        // Don't clear states for layer 0 to maintain smooth transitions
+      // Clean up transitions ONLY if requested AND there's no next effect
+      if (shouldRemoveTransitions && !hasNextEffect ) {
+        lightsToCleanup.push(lightId);
       }
-    });
+    }
+    
+    // Batch cleanup all lights that need transition removal
+    if (lightsToCleanup.length > 0) {
+      const ltc = this.transitionEngine.getLightTransitionController();
+      for (const lightId of lightsToCleanup) {
+        ltc.removeLightLayer(lightId, layer);
+      }
+      
+      // Cleaned up layer transitions
+    }
   }
 
   /**
