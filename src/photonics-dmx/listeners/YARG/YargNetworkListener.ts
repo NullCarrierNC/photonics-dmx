@@ -121,6 +121,9 @@ export class YargNetworkListener extends EventEmitter {
 
   private lastLogData: Record<string, any> | null = null;
 
+  // Track the last scene to detect transitions
+  private lastScene: "Unknown" | "Menu" | "Gameplay" | "Score" | "Calibration" | null = null;
+
   constructor(cueHandler: BaseCueHandler) {
     super(); // Initialize EventEmitter
     this.cueHandler = cueHandler;
@@ -319,6 +322,9 @@ export class YargNetworkListener extends EventEmitter {
         // console.log("Received identical packet, skipping processing.");
         return;
       }
+
+      // Check for scene transitions and handle Menu -> Gameplay transition
+      this.handleSceneTransition(YargCueData.currentScene);
 
       const logData = {
         currentScene: YargCueData.currentScene,
@@ -786,6 +792,52 @@ export class YargNetworkListener extends EventEmitter {
   }
 
   */
+
+  /**
+   * Handle scene transitions, particularly Menu -> Gameplay to clear menu lighting
+   * @param currentScene The current scene from the YARG packet
+   */
+  private handleSceneTransition(currentScene: "Unknown" | "Menu" | "Gameplay" | "Score" | "Calibration"): void {
+    // Check if we have a scene change
+    if (this.lastScene !== null && this.lastScene !== currentScene) {
+      console.log(`YARG: Scene transition detected: ${this.lastScene} -> ${currentScene}`);
+      
+      // Handle Menu -> Gameplay transition (song start)
+      if (this.lastScene === "Menu" && currentScene === "Gameplay") {
+        console.log("YARG: Song starting - triggering blackout to clear menu lighting");
+        // Trigger a fast blackout to clear any menu lighting
+        this.cueHandler.handleCue(CueType.Blackout_Fast, {
+          datagramVersion: 0,
+          platform: "Unknown",
+          currentScene: currentScene,
+          pauseState: "Unpaused",
+          venueSize: "NoVenue",
+          beatsPerMinute: 0,
+          songSection: "None",
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 0,
+          harmony0Note: 0,
+          harmony1Note: 0,
+          harmony2Note: 0,
+          lightingCue: "Blackout_Fast",
+          postProcessing: "Default",
+          fogState: false,
+          strobeState: "Strobe_Off",
+          performer: 0,
+          trackMode: "tracked",
+          beat: "Off",
+          keyframe: "Off",
+          bonusEffect: false
+        });
+      }
+    }
+    
+    // Update the last scene
+    this.lastScene = currentScene;
+  }
 
   public destroy() {
     if (this.flushTimer) {
