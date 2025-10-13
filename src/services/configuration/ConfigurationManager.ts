@@ -30,6 +30,7 @@ export interface AppPreferences {
   };
   enabledCueGroups: string[];
   cueConsistencyWindow: number;
+  clockRate: number;
   
   // Frontend-specific preferences
   dmxOutputConfig?: {
@@ -62,7 +63,8 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   complex: true,
   enabledCueGroups: ['stagekit'],
   cueConsistencyWindow: 60000,
-  
+  clockRate: 5, // 5ms interval for smooth animations
+
   // Brightness configuration defaults
   brightness: {
     low: 40,
@@ -118,7 +120,7 @@ export class ConfigurationManager {
 
   constructor() {
     // Initialize config files with version numbers
-    this.preferences = new ConfigFile('prefs.json', DEFAULT_PREFERENCES, 1);
+    this.preferences = new ConfigFile('prefs.json', DEFAULT_PREFERENCES, 2);
     this.userLights = new ConfigFile('lights.json', DEFAULT_USER_LIGHTS, 1);
     this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1);
     
@@ -214,6 +216,22 @@ export class ConfigurationManager {
    */
   setCueConsistencyWindow(windowMs: number): void {
     this.setPreference('cueConsistencyWindow', windowMs);
+  }
+
+  /**
+   * Gets the clock rate preference (in milliseconds)
+   */
+  getClockRate(): number {
+    return this.preferences.get().clockRate;
+  }
+
+  /**
+   * Sets the clock rate preference (in milliseconds)
+   * @param rate The clock rate in milliseconds (1-100ms)
+   */
+  setClockRate(rate: number): void {
+    const clampedRate = Math.max(1, Math.min(100, rate));
+    this.setPreference('clockRate', clampedRate);
   }
 
   // User Lights Methods
