@@ -57,8 +57,8 @@ export class LightTransitionController {
   private lockDurations: number[] = [];
   private readonly MAX_LOCK_HISTORY = 100;
   private lastStateValidation: number = 0;
-  private readonly VALIDATION_INTERVAL = 3000; // Validate every 5 seconds
-
+  private readonly VALIDATION_INTERVAL = 3000; 
+  
   constructor(lightStateManager: LightStateManager) {
     this._lightStateManager = lightStateManager;
     this._transitionsByLight = new Map();
