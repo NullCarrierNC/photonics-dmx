@@ -169,33 +169,83 @@ export class TransitionEngine implements ITransitionEngine {
       // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId);
 
-      // If the effect is persistent, add it to the queue
+      // If the effect is persistent, handle re-queuing with absolute timing
       if (justFinishedEffect.isPersistent) {
+        // Add to queue with preserved timing metadata
         this.layerManager.addQueuedEffect(layer, lightId, {
           name: justFinishedEffect.name,
           effect: justFinishedEffect.effect,
           lightId: lightId,
-          isPersistent: true
+          isPersistent: true,
+          absoluteTiming: justFinishedEffect.absoluteTiming
         });
-      }
-      
-      // Start the next queued effect for this light on this layer immediately
-      const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId);
-      if (nextQueuedEffect) {
-        // Start the next effect if we have an effect manager
-        if (this.effectManager) {
-          this.effectManager.startNextEffectInQueue(layer, lightId);
+        
+        // Calculate delay based on absolute timing (if available)
+        let delay = 0;
+        
+        if (justFinishedEffect.absoluteTiming) {
+          const { cycleStartTime, cycleDuration, lightOffset } = justFinishedEffect.absoluteTiming;
+          const currentTime = this.getCurrentTime();
+          
+          // Calculate the next scheduled start time for this light
+          // This light starts at: cycleStartTime + (N * cycleDuration) + lightOffset for N = 0, 1, 2, ...
+          // We need to find the next scheduled start time that is >= currentTime
+          
+          const elapsedSinceStart = currentTime - cycleStartTime;
+          const timeSinceFirstStart = elapsedSinceStart - lightOffset;
+          
+          if (timeSinceFirstStart < 0) {
+            // Haven't reached first start yet - wait for cycle 0
+            delay = Math.max(0, (cycleStartTime + lightOffset) - currentTime);
+          } else {
+            // Find the next scheduled start time that is after or equal to currentTime
+            // First, find which cycle we're in
+            const currentCycle = Math.floor(timeSinceFirstStart / cycleDuration);
+            
+            // Calculate when the current cycle started for this light
+            const currentCycleStart = cycleStartTime + (currentCycle * cycleDuration) + lightOffset;
+            
+            // If we've passed the current cycle's start (strictly after), we need the next cycle
+            // If we're exactly at or before the start time, we can still catch the current cycle
+            const targetCycle = currentTime > currentCycleStart ? currentCycle + 1 : currentCycle;
+            const targetStart = cycleStartTime + (targetCycle * cycleDuration) + lightOffset;
+            
+            delay = Math.max(0, targetStart - currentTime);
+          }
+        }
+        
+        // Schedule the effect start with calculated delay
+        if (delay > 0) {
+          setTimeout(() => {
+            if (this.effectManager) {
+              this.effectManager.startNextEffectInQueue(layer, lightId);
+            }
+          }, delay);
         } else {
-          console.warn(`Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`);
+          // No delay or no absolute timing - start immediately
+          if (this.effectManager) {
+            this.effectManager.startNextEffectInQueue(layer, lightId);
+          }
         }
       } else {
-        // Only if there's no next effect, remove transitions for non-base layers
-        if (layer > 0) {
-          // Only remove transitions if we've confirmed no new effect is queued
-          this.lightTransitionController.removeLightLayer(lightId, layer);
-          
-          // Only clear final states if there's no next effect and we've removed transitions
-          this.layerManager.clearLayerStates(layer);
+        // Non-persistent effect - check for queued effects
+        const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId);
+        if (nextQueuedEffect) {
+          // Start the next effect if we have an effect manager
+          if (this.effectManager) {
+            this.effectManager.startNextEffectInQueue(layer, lightId);
+          } else {
+            console.warn(`Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`);
+          }
+        } else {
+          // Only if there's no next effect, remove transitions for non-base layers
+          if (layer > 0) {
+            // Only remove transitions if we've confirmed no new effect is queued
+            this.lightTransitionController.removeLightLayer(lightId, layer);
+            
+            // Only clear final states if there's no next effect and we've removed transitions
+            this.layerManager.clearLayerStates(layer);
+          }
         }
       }
     }
