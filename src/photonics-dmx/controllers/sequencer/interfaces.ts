@@ -162,6 +162,13 @@ export interface IEffectManager {
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
   isLayerFreeForLight(layer: number, lightId: string): boolean;
   setState(lights: TrackedLight[], color: RGBIO, time: number): void;
+
+  /**
+   * Applies timing corrections to the effect timing registry
+   * @param cycleStartTime The cycle start time to match against
+   * @param correctionAmount The amount to add to matching timing entries
+   */
+  correctTimingRegistry(cycleStartTime: number, correctionAmount: number): void;
 }
 
 /**

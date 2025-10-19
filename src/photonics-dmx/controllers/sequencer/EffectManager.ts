@@ -8,6 +8,7 @@ import {
   ITransitionEngine,
   LightEffectState
 } from './interfaces';
+import { LightTransitionController } from './LightTransitionController';
 import { performance } from 'perf_hooks';
 
 /**
@@ -35,6 +36,9 @@ export class EffectManager implements IEffectManager {
   private effectTransformer: IEffectTransformer;
   private timeoutManager: IEventScheduler;
   private systemEffects: ISystemEffectsController;
+
+  // Cached reference to avoid repeated method calls
+  private lightTransitionController: LightTransitionController;
   private _lastCalled0LayerEffect: string = ""; // Tracks the last effect name that targeted layer 0
   
   // Timing registry for absolute timeline synchronization
@@ -75,6 +79,9 @@ export class EffectManager implements IEffectManager {
     this.effectTransformer = effectTransformer;
     this.timeoutManager = timeoutManager;
     this.systemEffects = systemEffects;
+
+    // Cache the light transition controller for performance
+    this.lightTransitionController = transitionEngine.getLightTransitionController();
     
     // Set this instance on the transition engine to allow it to start queued effects
     this.transitionEngine.setEffectManager(this);
@@ -392,9 +399,8 @@ export class EffectManager implements IEffectManager {
     // 3. Clear timing registry (resets absolute timing for all effects)
     this.effectTimingRegistry.clear();
     
-    // 4. Use the robust clearAllTransitions() which has proper locking and immediately publishes black states
-    const ltc = this.transitionEngine.getLightTransitionController();
-    ltc.clearAllTransitions();
+    // 4. Use clearAllTransitions() which has locking and immediately publishes black states
+    this.lightTransitionController.clearAllTransitions();
     
     // 5. Reset effect tracking state
     this._lastCalled0LayerEffect = "";
@@ -577,9 +583,9 @@ export class EffectManager implements IEffectManager {
       
       // Try transition controller if layer manager has no state
       if (!initialState) {
-        const ltc = this.transitionEngine.getLightTransitionController();
-        if (ltc && typeof ltc.getLightState === 'function') {
-          initialState = ltc.getLightState(light.id, layer);
+
+        if (this.lightTransitionController && typeof this.lightTransitionController.getLightState === 'function') {
+          initialState = this.lightTransitionController.getLightState(light.id, layer);
         }
       }
       
@@ -633,9 +639,9 @@ export class EffectManager implements IEffectManager {
         }
         
         // Set transition directly on the controller
-        const ltc = this.transitionEngine.getLightTransitionController();
-        if (ltc && typeof ltc.setTransition === 'function') {
-          ltc.setTransition(
+        
+        if (this.lightTransitionController && typeof this.lightTransitionController.setTransition === 'function') {
+          this.lightTransitionController.setTransition(
             light.id,
             layer,
             initialStates.get(light.id),
@@ -696,12 +702,10 @@ export class EffectManager implements IEffectManager {
     
     // Batch cleanup all lights that need transition removal
     if (lightsToCleanup.length > 0) {
-      const ltc = this.transitionEngine.getLightTransitionController();
       for (const lightId of lightsToCleanup) {
-        ltc.removeLightLayer(lightId, layer);
+        this.lightTransitionController.removeLightLayer(lightId, layer);
       }
-      
-      // Cleaned up layer transitions
+
     }
   }
 
@@ -805,5 +809,18 @@ export class EffectManager implements IEffectManager {
    */
   public isLayerFreeForLight(layer: number, lightId: string): boolean {
     return this.layerManager.isLayerFreeForLight(layer, lightId);
+  }
+
+  /**
+   * Applies timing corrections to the effect timing registry
+   * @param cycleStartTime The cycle start time to match against
+   * @param correctionAmount The amount to add to matching timing entries
+   */
+  public correctTimingRegistry(cycleStartTime: number, correctionAmount: number): void {
+    for (const [, timing] of this.effectTimingRegistry.entries()) {
+      if (timing.cycleStartTime === cycleStartTime) {
+        timing.cycleStartTime += correctionAmount;
+      }
+    }
   }
 }

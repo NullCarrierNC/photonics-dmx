@@ -18,6 +18,12 @@ export class TransitionEngine implements ITransitionEngine {
   private updateCallback: (deltaTime: number) => void;
   private currentTime: number = 0;
 
+  // Periodic timing correction properties
+  private lastCorrectionTime: number = 0;
+  private readonly CORRECTION_INTERVAL = 20000; // 20 seconds
+  private readonly DRIFT_THRESHOLD = 2; // 2ms threshold for corrections
+  private readonly CORRECTION_FACTOR = 0.5; // Apply 50% of detected drift per correction
+
   /**
    * @constructor
    * @param lightTransitionController The underlying transition controller
@@ -35,6 +41,7 @@ export class TransitionEngine implements ITransitionEngine {
     
     // Initialize timing state
     this.currentTime = performance.now();
+    this.lastCorrectionTime = this.currentTime;
   }
 
   /**
@@ -43,6 +50,58 @@ export class TransitionEngine implements ITransitionEngine {
    */
   private advanceTimingState(deltaTime: number): void {
     this.currentTime += deltaTime;
+  }
+
+  /**
+   * Performs periodic timing corrections to compensate for accumulated drift
+   * @param currentTime The current time for drift calculation
+   */
+  private performPeriodicTimingCorrection(currentTime: number): void {
+    // Check if it's time for a correction
+    if (currentTime - this.lastCorrectionTime < this.CORRECTION_INTERVAL) {
+      return;
+    }
+
+    // Find an active effect with absolute timing to use as reference
+    let referenceTiming: { cycleStartTime: number; cycleDuration: number; lightOffset: number } | null = null;
+
+    const allActiveEffects = this.layerManager.getActiveEffects();
+    for (const [, layerEffects] of allActiveEffects) {
+      for (const [, effect] of layerEffects) {
+        if (effect.absoluteTiming) {
+          referenceTiming = effect.absoluteTiming;
+          break;
+        }
+      }
+      if (referenceTiming) break;
+    }
+
+    if (!referenceTiming) return; // No active effects with absolute timing
+
+    // Calculate expected vs actual timing
+    const { cycleStartTime, cycleDuration, lightOffset } = referenceTiming;
+    const timeSinceStart = currentTime - cycleStartTime;
+    const expectedCycles = Math.floor(timeSinceStart / cycleDuration);
+    const actualCycles = Math.floor((currentTime - cycleStartTime - lightOffset) / cycleDuration);
+
+    // Calculate drift (difference between expected and actual cycles)
+    const drift = (actualCycles - expectedCycles) * cycleDuration;
+
+    // Apply correction if drift exceeds threshold
+    if (Math.abs(drift) >= this.DRIFT_THRESHOLD) {
+      // Apply gradual correction (50% of detected drift)
+      const correctionAmount = drift * this.CORRECTION_FACTOR;
+
+      // Update the reference timing object
+      referenceTiming.cycleStartTime += correctionAmount;
+
+      // Apply timing correction:
+      if (this.effectManager) {
+        this.effectManager.correctTimingRegistry(cycleStartTime, correctionAmount);
+      }
+
+      this.lastCorrectionTime = currentTime;
+    }
   }
 
   /**
@@ -128,8 +187,12 @@ export class TransitionEngine implements ITransitionEngine {
     }
     // Update internal timing state
     this.advanceTimingState(deltaTime);
-    
+
     const currentTime = this.getCurrentTime();
+
+    // Perform periodic timing corrections to compensate for accumulated drift
+    this.performPeriodicTimingCorrection(currentTime);
+
     const effectsToRemove: Array<{layer: number, lightId: string}> = [];
 
     this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
