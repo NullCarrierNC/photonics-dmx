@@ -357,6 +357,17 @@ export class ControllerManager {
     // Create new listener
     this.yargListener = new YargNetworkListener(this.cueHandler);
     
+    // Set up error handling for YARG listener
+    this.yargListener.on('yarg-error', (errorData: { type: string; message: string; datagramVersion?: number }) => {
+      console.error('YARG Listener Error:', errorData);
+      
+      // Send error to frontend
+      const mainWindow = BrowserWindow.getFocusedWindow();
+      if (mainWindow) {
+        mainWindow.webContents.send('sender-error', errorData.message);
+      }
+    });
+    
     // Start the listener
     this.yargListener.start();
     
