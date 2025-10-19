@@ -101,7 +101,7 @@ enum BeatByte {
 
 const PORT = 36107;
 const PACKET_HEADER = 0x59415247; // 'YARG' in hex
-
+const YARG_DATAGRAM_VERSION = 1;
 
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null;
@@ -217,7 +217,7 @@ export class YargNetworkListener extends EventEmitter {
     try {
       let offset = 0;
 
-      // Ensure buffer has at least the minimum expected length
+      // Ensure buffer has exactly the expected length
       const expectedLength =
         4 + // Header
         1 + // Datagram version
@@ -239,15 +239,15 @@ export class YargNetworkListener extends EventEmitter {
         1 + // PostProcessing
         1 + // FogState
         1 + // StrobeState
-        1 + // Performer
         1 + // Beat
         1 + // Keyframe
         1 + // Bonus Effect
-        1; // AutoGen Track
+        1 + // AutoGen Track
+        1 + // Spotlight
+        1; // Singalong
 
-      if (buffer.length < expectedLength) {
-        console.warn(`Received packet is too short: ${buffer.length} bytes`);
-        return;
+      if (buffer.length !== expectedLength) {
+        throw new Error(`Received packet is not the expected length: ${buffer.length} bytes, expected exactly ${expectedLength} bytes`);
       }
 
       // Header (little-endian)
@@ -276,17 +276,31 @@ export class YargNetworkListener extends EventEmitter {
       const postProcessingByte = buffer.readUInt8(offset); offset += 1;
       const fogState = buffer.readUInt8(offset) === 1;
       offset += 1;
-
       const strobeStateValue = buffer.readUInt8(offset); offset += 1;
-      const performer = buffer.readUInt8(offset); offset += 1;
       const beatValue = buffer.readUInt8(offset); offset += 1;
       const keyframeValue = buffer.readUInt8(offset); offset += 1;
       const bonusEffect = buffer.readUInt8(offset) === 1;
       offset += 1;
-      
-      // AutoGen track field (byte 24)
       const autoGenTrack = buffer.readUInt8(offset) === 1;
       offset += 1;
+      
+      if(datagramVersion !== YARG_DATAGRAM_VERSION){
+        console.error(`Invalid datagram version: ${datagramVersion}`);
+        const errorMessage = `YARG Datagram Version mismatch: received version ${datagramVersion}, expected version ${YARG_DATAGRAM_VERSION}`;
+        
+        // Emit error event for the controller to handle
+        this.emit('yarg-error', {
+          type: 'datagram-version-mismatch',
+          message: errorMessage,
+          datagramVersion: datagramVersion
+        });
+        
+        throw new Error(errorMessage);
+      }
+      
+      // Added missing fields
+    //  const spotlight = buffer.readUInt8(offset); offset += 1;
+   //   const singalong = buffer.readUInt8(offset); offset += 1;
 
       const lightingCue = lightingCueMap[lightingCueValue] || `Unknown (${lightingCueValue})`;
 
@@ -310,7 +324,7 @@ export class YargNetworkListener extends EventEmitter {
         postProcessing: this.getPostProcessing(postProcessingByte),
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
-        performer,
+        performer: 0,//No longer in the network data?
         trackMode: autoGenTrack ? 'autogen' : 'tracked',
         beat: this.getBeatDescription(beatValue),
         keyframe: this.getKeyframeDescription(keyframeValue),
