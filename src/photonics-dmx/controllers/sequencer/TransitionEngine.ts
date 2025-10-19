@@ -196,21 +196,26 @@ export class TransitionEngine implements ITransitionEngine {
           
           if (timeSinceFirstStart < 0) {
             // Haven't reached first start yet - wait for cycle 0
-            delay = Math.max(0, (cycleStartTime + lightOffset) - currentTime);
+            // Use integer-based calculation for initial delay
+            delay = Math.max(0, Math.floor((cycleStartTime + lightOffset) - currentTime));
           } else {
-            // Find the next scheduled start time that is after or equal to currentTime
-            // First, find which cycle we're in
-            const currentCycle = Math.floor(timeSinceFirstStart / cycleDuration);
-            
-            // Calculate when the current cycle started for this light
-            const currentCycleStart = cycleStartTime + (currentCycle * cycleDuration) + lightOffset;
-            
-            // If we've passed the current cycle's start (strictly after), we need the next cycle
-            // If we're exactly at or before the start time, we can still catch the current cycle
-            const targetCycle = currentTime > currentCycleStart ? currentCycle + 1 : currentCycle;
-            const targetStart = cycleStartTime + (targetCycle * cycleDuration) + lightOffset;
-            
-            delay = Math.max(0, targetStart - currentTime);
+            // The effect just finished. Find the next cycle start time for this light.
+            // Use integer-based calculations to avoid floating-point precision drift
+
+            // Calculate time since this light's offset start (ensure integer-like precision)
+            const timeSinceLightStart = Math.floor(currentTime - (cycleStartTime + lightOffset));
+
+            // Find the most recent cycle boundary that we should have started at
+            const lastCycleNumber = Math.floor(timeSinceLightStart / cycleDuration);
+            const lastCycleStart = cycleStartTime + (lastCycleNumber * cycleDuration) + lightOffset;
+
+            // If we've already passed the last cycle start time, start immediately
+            // Otherwise, wait for the last cycle start time
+            if (currentTime >= lastCycleStart) {
+              delay = 0;
+            } else {
+              delay = lastCycleStart - currentTime;
+            }
           }
         }
         
@@ -222,9 +227,19 @@ export class TransitionEngine implements ITransitionEngine {
             }
           }, delay);
         } else {
-          // No delay or no absolute timing - start immediately
-          if (this.effectManager) {
-            this.effectManager.startNextEffectInQueue(layer, lightId);
+          // Use setImmediate or Promise.resolve for immediate execution to avoid setTimeout overhead
+          if (typeof globalThis.setImmediate === 'function') {
+            setImmediate(() => {
+              if (this.effectManager) {
+                this.effectManager.startNextEffectInQueue(layer, lightId);
+              }
+            });
+          } else {
+            Promise.resolve().then(() => {
+              if (this.effectManager) {
+                this.effectManager.startNextEffectInQueue(layer, lightId);
+              }
+            });
           }
         }
       } else {
