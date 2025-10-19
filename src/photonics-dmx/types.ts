@@ -76,6 +76,18 @@ export interface Effect {
   id: string;
   description: string;
   transitions: EffectTransition[];
+  
+  /**
+   * Optional timing hints for absolute timing synchronization
+   * When provided, persistent/queued effects will maintain synchronization
+   * by calculating start times relative to an absolute timeline
+   */
+  timingHints?: {
+    /** Duration of one complete cycle in milliseconds */
+    cycleDuration: number;
+    /** Time offset between sequential lights in milliseconds (0 for synchronized) */
+    perLightOffset?: number;
+  };
 }
 
 /**

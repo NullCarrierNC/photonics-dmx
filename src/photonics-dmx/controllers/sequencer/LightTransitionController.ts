@@ -57,8 +57,8 @@ export class LightTransitionController {
   private lockDurations: number[] = [];
   private readonly MAX_LOCK_HISTORY = 100;
   private lastStateValidation: number = 0;
-  private readonly VALIDATION_INTERVAL = 3000; // Validate every 5 seconds
-
+  private readonly VALIDATION_INTERVAL = 3000; 
+  
   constructor(lightStateManager: LightStateManager) {
     this._lightStateManager = lightStateManager;
     this._transitionsByLight = new Map();
@@ -424,14 +424,21 @@ export class LightTransitionController {
             ? this._currentLayerStates.get(lightId)!
             : new Map<number, RGBIO>();
 
-          layerTransitions.forEach((transitionData, layer) => {
+          // Collect layers to process and layers to remove
+          const layersToProcess = Array.from(layerTransitions.keys());
+          const layersToRemove = new Set<number>();
+
+          for (const layer of layersToProcess) {
+            const transitionData = layerTransitions.get(layer);
+            if (!transitionData) continue; // Skip if already removed
+
             const { startState, endState, startTime, transition } = transitionData;
 
             // Use accumulated time from Clock system for consistent timing
             const elapsed = this.accumulatedTime - startTime;
             const duration = transition.transform.duration;
 
-            // Calculate progress (0 to 1)
+            // Calculate progress (0 to 1) - use >= 0.999 to handle floating point precision
             const progress = duration > 0 ? Math.min(elapsed / duration, 1) : 1;
 
             // Get the easing function
@@ -468,12 +475,25 @@ export class LightTransitionController {
             // Mark this light as having an active transition
             activeTransitionLights.add(lightId);
 
-            // If transition is complete, store its final state so future transitions start from it
-            if (progress >= 1) {
+            // If transition is complete (or very close to complete), mark for removal
+            if (progress >= 0.999) {
               // Important: Set the startState to the final state for future transitions
               transitionData.startState = { ...endState };
+
+              // Mark this layer for removal after processing
+              layersToRemove.add(layer);
             }
-          });
+          }
+
+          // Remove completed transitions after processing all layers
+          for (const layer of layersToRemove) {
+            layerTransitions.delete(layer);
+          }
+
+          // Clean up empty layer maps for this light
+          if (layerTransitions.size === 0) {
+            this._transitionsByLight.delete(lightId);
+          }
 
           // Update layer states incrementally instead of replacing the entire map
           // This prevents race conditions with removeLightLayer
@@ -831,7 +851,7 @@ export class LightTransitionController {
    */
   private cleanupOrphanedTransitions(): void {
     const currentTime = performance.now();
-    const maxTransitionAge = 2000;
+    const maxTransitionAge = 5000;
 
     for (const [lightId, layerMap] of this._transitionsByLight.entries()) {
       for (const [layer, transitionData] of layerMap.entries()) {

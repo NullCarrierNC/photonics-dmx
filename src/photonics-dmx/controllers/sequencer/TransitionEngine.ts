@@ -18,6 +18,12 @@ export class TransitionEngine implements ITransitionEngine {
   private updateCallback: (deltaTime: number) => void;
   private currentTime: number = 0;
 
+  // Periodic timing correction properties
+  private lastCorrectionTime: number = 0;
+  private readonly CORRECTION_INTERVAL = 20000; // 20 seconds
+  private readonly DRIFT_THRESHOLD = 2; // 2ms threshold for corrections
+  private readonly CORRECTION_FACTOR = 0.5; // Apply 50% of detected drift per correction
+
   /**
    * @constructor
    * @param lightTransitionController The underlying transition controller
@@ -35,6 +41,7 @@ export class TransitionEngine implements ITransitionEngine {
     
     // Initialize timing state
     this.currentTime = performance.now();
+    this.lastCorrectionTime = this.currentTime;
   }
 
   /**
@@ -43,6 +50,58 @@ export class TransitionEngine implements ITransitionEngine {
    */
   private advanceTimingState(deltaTime: number): void {
     this.currentTime += deltaTime;
+  }
+
+  /**
+   * Performs periodic timing corrections to compensate for accumulated drift
+   * @param currentTime The current time for drift calculation
+   */
+  private performPeriodicTimingCorrection(currentTime: number): void {
+    // Check if it's time for a correction
+    if (currentTime - this.lastCorrectionTime < this.CORRECTION_INTERVAL) {
+      return;
+    }
+
+    // Find an active effect with absolute timing to use as reference
+    let referenceTiming: { cycleStartTime: number; cycleDuration: number; lightOffset: number } | null = null;
+
+    const allActiveEffects = this.layerManager.getActiveEffects();
+    for (const [, layerEffects] of allActiveEffects) {
+      for (const [, effect] of layerEffects) {
+        if (effect.absoluteTiming) {
+          referenceTiming = effect.absoluteTiming;
+          break;
+        }
+      }
+      if (referenceTiming) break;
+    }
+
+    if (!referenceTiming) return; // No active effects with absolute timing
+
+    // Calculate expected vs actual timing
+    const { cycleStartTime, cycleDuration, lightOffset } = referenceTiming;
+    const timeSinceStart = currentTime - cycleStartTime;
+    const expectedCycles = Math.floor(timeSinceStart / cycleDuration);
+    const actualCycles = Math.floor((currentTime - cycleStartTime - lightOffset) / cycleDuration);
+
+    // Calculate drift (difference between expected and actual cycles)
+    const drift = (actualCycles - expectedCycles) * cycleDuration;
+
+    // Apply correction if drift exceeds threshold
+    if (Math.abs(drift) >= this.DRIFT_THRESHOLD) {
+      // Apply gradual correction (50% of detected drift)
+      const correctionAmount = drift * this.CORRECTION_FACTOR;
+
+      // Update the reference timing object
+      referenceTiming.cycleStartTime += correctionAmount;
+
+      // Apply timing correction:
+      if (this.effectManager) {
+        this.effectManager.correctTimingRegistry(cycleStartTime, correctionAmount);
+      }
+
+      this.lastCorrectionTime = currentTime;
+    }
   }
 
   /**
@@ -128,8 +187,12 @@ export class TransitionEngine implements ITransitionEngine {
     }
     // Update internal timing state
     this.advanceTimingState(deltaTime);
-    
+
     const currentTime = this.getCurrentTime();
+
+    // Perform periodic timing corrections to compensate for accumulated drift
+    this.performPeriodicTimingCorrection(currentTime);
+
     const effectsToRemove: Array<{layer: number, lightId: string}> = [];
 
     this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
@@ -169,33 +232,98 @@ export class TransitionEngine implements ITransitionEngine {
       // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId);
 
-      // If the effect is persistent, add it to the queue
+      // If the effect is persistent, handle re-queuing with absolute timing
       if (justFinishedEffect.isPersistent) {
+        // Add to queue with preserved timing metadata
         this.layerManager.addQueuedEffect(layer, lightId, {
           name: justFinishedEffect.name,
           effect: justFinishedEffect.effect,
           lightId: lightId,
-          isPersistent: true
+          isPersistent: true,
+          absoluteTiming: justFinishedEffect.absoluteTiming
         });
-      }
-      
-      // Start the next queued effect for this light on this layer immediately
-      const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId);
-      if (nextQueuedEffect) {
-        // Start the next effect if we have an effect manager
-        if (this.effectManager) {
-          this.effectManager.startNextEffectInQueue(layer, lightId);
+        
+        // Calculate delay based on absolute timing (if available)
+        let delay = 0;
+        
+        if (justFinishedEffect.absoluteTiming) {
+          const { cycleStartTime, cycleDuration, lightOffset } = justFinishedEffect.absoluteTiming;
+          const currentTime = this.getCurrentTime();
+          
+          // Calculate the next scheduled start time for this light
+          // This light starts at: cycleStartTime + (N * cycleDuration) + lightOffset for N = 0, 1, 2, ...
+          // We need to find the next scheduled start time that is >= currentTime
+          
+          const elapsedSinceStart = currentTime - cycleStartTime;
+          const timeSinceFirstStart = elapsedSinceStart - lightOffset;
+          
+          if (timeSinceFirstStart < 0) {
+            // Haven't reached first start yet - wait for cycle 0
+            // Use integer-based calculation for initial delay
+            delay = Math.max(0, Math.floor((cycleStartTime + lightOffset) - currentTime));
+          } else {
+            // The effect just finished. Find the next cycle start time for this light.
+            // Use integer-based calculations to avoid floating-point precision drift
+
+            // Calculate time since this light's offset start (ensure integer-like precision)
+            const timeSinceLightStart = Math.floor(currentTime - (cycleStartTime + lightOffset));
+
+            // Find the most recent cycle boundary that we should have started at
+            const lastCycleNumber = Math.floor(timeSinceLightStart / cycleDuration);
+            const lastCycleStart = cycleStartTime + (lastCycleNumber * cycleDuration) + lightOffset;
+
+            // If we've already passed the last cycle start time, start immediately
+            // Otherwise, wait for the last cycle start time
+            if (currentTime >= lastCycleStart) {
+              delay = 0;
+            } else {
+              delay = lastCycleStart - currentTime;
+            }
+          }
+        }
+        
+        // Schedule the effect start with calculated delay
+        if (delay > 0) {
+          setTimeout(() => {
+            if (this.effectManager) {
+              this.effectManager.startNextEffectInQueue(layer, lightId);
+            }
+          }, delay);
         } else {
-          console.warn(`Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`);
+          // Use setImmediate or Promise.resolve for immediate execution to avoid setTimeout overhead
+          if (typeof globalThis.setImmediate === 'function') {
+            setImmediate(() => {
+              if (this.effectManager) {
+                this.effectManager.startNextEffectInQueue(layer, lightId);
+              }
+            });
+          } else {
+            Promise.resolve().then(() => {
+              if (this.effectManager) {
+                this.effectManager.startNextEffectInQueue(layer, lightId);
+              }
+            });
+          }
         }
       } else {
-        // Only if there's no next effect, remove transitions for non-base layers
-        if (layer > 0) {
-          // Only remove transitions if we've confirmed no new effect is queued
-          this.lightTransitionController.removeLightLayer(lightId, layer);
-          
-          // Only clear final states if there's no next effect and we've removed transitions
-          this.layerManager.clearLayerStates(layer);
+        // Non-persistent effect - check for queued effects
+        const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId);
+        if (nextQueuedEffect) {
+          // Start the next effect if we have an effect manager
+          if (this.effectManager) {
+            this.effectManager.startNextEffectInQueue(layer, lightId);
+          } else {
+            console.warn(`Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`);
+          }
+        } else {
+          // Only if there's no next effect, remove transitions for non-base layers
+          if (layer > 0) {
+            // Only remove transitions if we've confirmed no new effect is queued
+            this.lightTransitionController.removeLightLayer(lightId, layer);
+            
+            // Only clear final states if there's no next effect and we've removed transitions
+            this.layerManager.clearLayerStates(layer);
+          }
         }
       }
     }

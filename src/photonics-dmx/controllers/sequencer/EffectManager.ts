@@ -8,6 +8,7 @@ import {
   ITransitionEngine,
   LightEffectState
 } from './interfaces';
+import { LightTransitionController } from './LightTransitionController';
 import { performance } from 'perf_hooks';
 
 /**
@@ -35,7 +36,18 @@ export class EffectManager implements IEffectManager {
   private effectTransformer: IEffectTransformer;
   private timeoutManager: IEventScheduler;
   private systemEffects: ISystemEffectsController;
+
+  // Cached reference to avoid repeated method calls
+  private lightTransitionController: LightTransitionController;
   private _lastCalled0LayerEffect: string = ""; // Tracks the last effect name that targeted layer 0
+  
+  // Timing registry for absolute timeline synchronization
+  // Maps effect name to shared timing metadata for all lights in that effect
+  private effectTimingRegistry: Map<string, {
+    cycleStartTime: number;
+    cycleDuration: number;
+    perLightOffset: number;
+  }> = new Map();
   
   // Reusable default state template for performance
   private defaultStateTemplate: RGBIO = {
@@ -67,6 +79,9 @@ export class EffectManager implements IEffectManager {
     this.effectTransformer = effectTransformer;
     this.timeoutManager = timeoutManager;
     this.systemEffects = systemEffects;
+
+    // Cache the light transition controller for performance
+    this.lightTransitionController = transitionEngine.getLightTransitionController();
     
     // Set this instance on the transition engine to allow it to start queued effects
     this.transitionEngine.setEffectManager(this);
@@ -381,11 +396,13 @@ export class EffectManager implements IEffectManager {
     this.layerManager.clearAllLayerStates();
     this.layerManager.clearAllLayerTracking();
     
-    // 3. Use the robust clearAllTransitions() which has proper locking and immediately publishes black states
-    const ltc = this.transitionEngine.getLightTransitionController();
-    ltc.clearAllTransitions();
+    // 3. Clear timing registry (resets absolute timing for all effects)
+    this.effectTimingRegistry.clear();
     
-    // 4. Reset effect tracking state
+    // 4. Use clearAllTransitions() which has locking and immediately publishes black states
+    this.lightTransitionController.clearAllTransitions();
+    
+    // 5. Reset effect tracking state
     this._lastCalled0LayerEffect = "";
   }
 
@@ -405,6 +422,113 @@ export class EffectManager implements IEffectManager {
    */
   private createDefaultState(): RGBIO {
     return { ...this.defaultStateTemplate };
+  }
+
+  /**
+   * Automatically calculates timing information from effect transitions
+   * Analyzes the transitions to determine cycle duration and per-light offsets
+   * Returns null if timing cannot be determined (e.g., beat-based effects)
+   * 
+   * @param transitions The effect transitions
+   * @param lights The lights affected by the effect
+   * @returns Timing info or null if cannot be calculated
+   */
+  private calculateTimingFromTransitions(
+    transitions: EffectTransition[],
+    lights: TrackedLight[]
+  ): { cycleDuration: number; perLightOffset: number } | null {
+    // Group transitions by light ID
+    const transitionsByLight = new Map<string, EffectTransition[]>();
+    
+    transitions.forEach(transition => {
+      transition.lights.forEach(light => {
+        if (!transitionsByLight.has(light.id)) {
+          transitionsByLight.set(light.id, []);
+        }
+        transitionsByLight.get(light.id)!.push(transition);
+      });
+    });
+    
+    // Calculate start time and total duration for each light
+    const lightTimings: Array<{ lightId: string; startTime: number; totalDuration: number }> = [];
+    
+    for (const light of lights) {
+      const lightTransitions = transitionsByLight.get(light.id);
+      if (!lightTransitions || lightTransitions.length === 0) continue;
+      
+      // Find the initial start time (first transition's waitForTime)
+      const firstTransition = lightTransitions[0];
+      
+      // Skip if using beat/measure-based timing (not time-based)
+      if (firstTransition.waitForCondition !== 'none' && firstTransition.waitForCondition !== 'delay') {
+        return null; // Cannot calculate timing for event-based effects
+      }
+      
+      const startTime = firstTransition.waitForCondition === 'delay' 
+        ? firstTransition.waitForTime 
+        : 0;
+      
+      // Calculate total duration for this light
+      let totalDuration = 0;
+      for (const transition of lightTransitions) {
+        // Check if any transition uses non-time-based waiting
+        if (transition.waitForCondition !== 'none' && transition.waitForCondition !== 'delay') {
+          return null;
+        }
+        if (transition.waitUntilCondition !== 'none' && transition.waitUntilCondition !== 'delay') {
+          return null;
+        }
+        
+        // Add transition duration
+        totalDuration += transition.transform.duration;
+        
+        // Add wait time after transition
+        if (transition.waitUntilCondition === 'delay') {
+          totalDuration += transition.waitUntilTime;
+        }
+      }
+      
+      lightTimings.push({
+        lightId: light.id,
+        startTime,
+        totalDuration
+      });
+    }
+    
+    if (lightTimings.length === 0) {
+      return null;
+    }
+    
+    // Calculate cycle duration (max finish time across all lights)
+    const cycleDuration = Math.max(
+      ...lightTimings.map(lt => lt.startTime + lt.totalDuration)
+    );
+    
+    // Detect per-light offset (for sequential patterns)
+    let perLightOffset = 0;
+    
+    if (lightTimings.length > 1) {
+      // Sort by start time
+      const sortedTimings = [...lightTimings].sort((a, b) => a.startTime - b.startTime);
+      
+      // Check if start times form a consistent sequence
+      const offsets: number[] = [];
+      for (let i = 1; i < sortedTimings.length; i++) {
+        offsets.push(sortedTimings[i].startTime - sortedTimings[i - 1].startTime);
+      }
+      
+      // If all offsets are the same (or very similar), it's a sequential pattern
+      if (offsets.length > 0) {
+        const firstOffset = offsets[0];
+        const isConsistent = offsets.every(offset => Math.abs(offset - firstOffset) < 1);
+        
+        if (isConsistent) {
+          perLightOffset = firstOffset;
+        }
+      }
+    }
+    
+    return { cycleDuration, perLightOffset };
   }
 
   /**
@@ -430,6 +554,26 @@ export class EffectManager implements IEffectManager {
     // Get current time once for all lights
     const currentTime = performance.now();
     
+    // Initialize or retrieve timing information for absolute synchronization
+    let timing = this.effectTimingRegistry.get(name);
+    
+    if (!timing) {
+      // First time starting this effect (or after setEffect cleared registry)
+      // Try to calculate timing automatically from transitions, or use manual hints as override
+      const calculatedTiming = effect.timingHints 
+        ? { cycleDuration: effect.timingHints.cycleDuration, perLightOffset: effect.timingHints.perLightOffset || 0 }
+        : this.calculateTimingFromTransitions(transitions, lights);
+      
+      if (calculatedTiming) {
+        timing = {
+          cycleStartTime: currentTime,
+          cycleDuration: calculatedTiming.cycleDuration,
+          perLightOffset: calculatedTiming.perLightOffset
+        };
+        this.effectTimingRegistry.set(name, timing);
+      }
+    }
+    
     // Pre-compute initial states for all lights in a single pass
     const initialStates = new Map<string, RGBIO>();
     
@@ -439,9 +583,9 @@ export class EffectManager implements IEffectManager {
       
       // Try transition controller if layer manager has no state
       if (!initialState) {
-        const ltc = this.transitionEngine.getLightTransitionController();
-        if (ltc && typeof ltc.getLightState === 'function') {
-          initialState = ltc.getLightState(light.id, layer);
+
+        if (this.lightTransitionController && typeof this.lightTransitionController.getLightState === 'function') {
+          initialState = this.lightTransitionController.getLightState(light.id, layer);
         }
       }
       
@@ -454,7 +598,7 @@ export class EffectManager implements IEffectManager {
     });
     
     // Process all lights and prepare their effects
-    lights.forEach(light => {
+    lights.forEach((light, lightIndex) => {
       // Expand transitions to one-light-per-transition for this specific light
       const lightTransitions = this.effectTransformer.expandTransitionsByLight(transitions)
         .filter(t => t.lights.some(l => l.id === light.id));
@@ -472,7 +616,12 @@ export class EffectManager implements IEffectManager {
         transitionStartTime: currentTime,
         waitEndTime: currentTime,
         isPersistent,
-        lastEndState: initialStates.get(light.id)  // Pre-computed state
+        lastEndState: initialStates.get(light.id),  // Pre-computed state
+        absoluteTiming: timing ? {
+          cycleStartTime: timing.cycleStartTime,
+          cycleDuration: timing.cycleDuration,
+          lightOffset: timing.perLightOffset * lightIndex
+        } : undefined
       };
       
       // Immediately set up the transition if waitForCondition is 'none'
@@ -490,9 +639,9 @@ export class EffectManager implements IEffectManager {
         }
         
         // Set transition directly on the controller
-        const ltc = this.transitionEngine.getLightTransitionController();
-        if (ltc && typeof ltc.setTransition === 'function') {
-          ltc.setTransition(
+        
+        if (this.lightTransitionController && typeof this.lightTransitionController.setTransition === 'function') {
+          this.lightTransitionController.setTransition(
             light.id,
             layer,
             initialStates.get(light.id),
@@ -553,12 +702,10 @@ export class EffectManager implements IEffectManager {
     
     // Batch cleanup all lights that need transition removal
     if (lightsToCleanup.length > 0) {
-      const ltc = this.transitionEngine.getLightTransitionController();
       for (const lightId of lightsToCleanup) {
-        ltc.removeLightLayer(lightId, layer);
+        this.lightTransitionController.removeLightLayer(lightId, layer);
       }
-      
-      // Cleaned up layer transitions
+
     }
   }
 
@@ -662,5 +809,18 @@ export class EffectManager implements IEffectManager {
    */
   public isLayerFreeForLight(layer: number, lightId: string): boolean {
     return this.layerManager.isLayerFreeForLight(layer, lightId);
+  }
+
+  /**
+   * Applies timing corrections to the effect timing registry
+   * @param cycleStartTime The cycle start time to match against
+   * @param correctionAmount The amount to add to matching timing entries
+   */
+  public correctTimingRegistry(cycleStartTime: number, correctionAmount: number): void {
+    for (const [, timing] of this.effectTimingRegistry.entries()) {
+      if (timing.cycleStartTime === cycleStartTime) {
+        timing.cycleStartTime += correctionAmount;
+      }
+    }
   }
 }
