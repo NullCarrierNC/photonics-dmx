@@ -878,7 +878,7 @@ export class LightTransitionController {
       const recalculated = this.calculateFinalColorForLight(lightId);
       if (JSON.stringify(finalColor) !== JSON.stringify(recalculated)) {
         const position = this.getLightPosition(lightId);
-        console.error(`State inconsistency detected for light ${lightId} (position ${position})`);
+        console.warn(`State inconsistency detected for light ${lightId} (position ${position})`);
         // Trigger correction
         this._finalColors.set(lightId, recalculated);
         this._lightStateManager.setLightState(lightId, recalculated);

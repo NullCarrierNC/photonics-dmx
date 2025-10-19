@@ -47,7 +47,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: yellowColor, easing: 'linear', duration: 20 },
+          transform: { color: yellowColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
@@ -56,7 +56,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: redColor, easing: 'linear', duration: 20 },
+          transform: { color: redColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
@@ -65,7 +65,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: redColor, easing: 'linear', duration: 20 },
+          transform: { color: redColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
@@ -74,7 +74,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: yellowColor, easing: 'linear', duration: 20 },
+          transform: { color: yellowColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
@@ -83,7 +83,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: greenColor, easing: 'linear', duration: 20 },
+          transform: { color: greenColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
@@ -93,7 +93,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 20 },
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -104,7 +104,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 20 },
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -115,7 +115,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 20 },
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -126,7 +126,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 20 },
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
@@ -137,7 +137,7 @@ export class StageKitStompCue implements ICue {
           layer: 0,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 20 },
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
