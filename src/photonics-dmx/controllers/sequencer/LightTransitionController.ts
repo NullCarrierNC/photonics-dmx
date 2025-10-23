@@ -48,15 +48,10 @@ export class LightTransitionController {
   private _clearingTransitions = false; // Flag to prevent new transitions during cleanup
   private clock: Clock | null = null;
   private updateCallback: (deltaTime: number) => void;
-  private systemStartTime: number = 0;
 
   // Monitoring fields
   private lastStateValidation: number = 0;
   private readonly VALIDATION_INTERVAL = 3000;
-  
-  // Time correction fields
-  private lastTimeCorrection: number = 0;
-  private readonly TIME_CORRECTION_INTERVAL = 10000; // 10 seconds 
   
   constructor(lightStateManager: LightStateManager) {
     this._lightStateManager = lightStateManager;
@@ -74,9 +69,6 @@ export class LightTransitionController {
    */
   public registerWithClock(clock: Clock): void {
     this.clock = clock;
-    // Initialize system start time for absolute time references
-    this.systemStartTime = performance.now();
-    this.lastTimeCorrection = this.systemStartTime;
     clock.onTick(this.updateCallback);
   }
 
@@ -380,12 +372,6 @@ export class LightTransitionController {
     try {
       const now = performance.now();
       
-      // Periodic time correction to prevent drift
-      if (now - this.lastTimeCorrection > this.TIME_CORRECTION_INTERVAL) {
-        this.performTimeCorrection(now);
-        this.lastTimeCorrection = now;
-      }
-
       // Periodic state validation and cleanup
       if (now - this.lastStateValidation > this.VALIDATION_INTERVAL) {
         this.validateAllStates();
@@ -499,21 +485,6 @@ export class LightTransitionController {
       console.error('Critical error in transition processing:', error);
       // Emergency state reset if needed
       this.emergencyStateReset();
-    }
-  }
-
-  /**
-   * Performs periodic time correction to prevent drift accumulation
-   */
-  private performTimeCorrection(currentTime: number): void {
-    // Reset system start time to current time to prevent long-term drift
-    const timeSinceStart = currentTime - this.systemStartTime;
-    
-    // If we've been running for more than 10 minutes, reset the start time
-    // This prevents extreme drift accumulation
-    if (timeSinceStart > 10000) {
-      this.systemStartTime = currentTime;
-      console.log('[LTC] Performed time correction to prevent drift');
     }
   }
 
@@ -959,16 +930,6 @@ export class LightTransitionController {
     // Ensure the black state is published
    // this._lightStateManager.publishLightStates();
   }
-
-  /**
-   * Reset the system start time
-   * Useful when you want to reset timing state or force immediate processing
-   */
-  public resetSystemTime(): void {
-    this.systemStartTime = performance.now();
-    this.lastTimeCorrection = this.systemStartTime;
-  }
-
 
   /**
    * Get the current time from the system

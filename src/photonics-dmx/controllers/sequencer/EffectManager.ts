@@ -573,6 +573,8 @@ export class EffectManager implements IEffectManager {
         this.effectTimingRegistry.set(name, timing);
       }
     }
+    // NOTE: We do NOT update cycleStartTime on restart to preserve absolute timing
+    // Each light restarts at its offset time relative to the original cycleStartTime
     
     // Pre-compute initial states for all lights in a single pass
     const initialStates = new Map<string, RGBIO>();
@@ -605,6 +607,9 @@ export class EffectManager implements IEffectManager {
       
       if (lightTransitions.length === 0) return;
       
+      // Calculate light offset
+      const lightOffset = timing ? timing.perLightOffset * lightIndex : 0;
+      
       const lightEffect: LightEffectState = {
         name,
         effect,
@@ -620,12 +625,13 @@ export class EffectManager implements IEffectManager {
         absoluteTiming: timing ? {
           cycleStartTime: timing.cycleStartTime,
           cycleDuration: timing.cycleDuration,
-          lightOffset: timing.perLightOffset * lightIndex
+          lightOffset: lightOffset
         } : undefined
       };
       
-      // Immediately set up the transition if waitForCondition is 'none'
+      // Get the first transition
       const firstTransition = lightTransitions[0];
+      
       if (firstTransition.waitForCondition === 'none') {
         // Prepare the color with pan/tilt defaults if needed
         let color = { ...firstTransition.transform.color };
