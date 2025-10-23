@@ -1,5 +1,5 @@
 import {
-    LightState,
+    RGBIO,
     RgbwDmxChannels,
     RgbDmxChannels,
     RgbStrobeDmxChannels,
@@ -45,7 +45,7 @@ export class DmxPublisher {
      * Publishes the provided light states to the DMX senders by 
      * mapping the desired channels to each DMX fixture's channels.
      */
-    public publish = (lights: LightState[]): void => {
+    public publish = (lights: Map<string, RGBIO>): void => {
         this.publishNow(lights);
     };
 
@@ -57,23 +57,22 @@ export class DmxPublisher {
      * to DMX channels and sending them.
      * Optimized to build complete universe buffer once before sending.
      */
-    private publishNow(lights: LightState[]): void {
+    private publishNow(lights: Map<string, RGBIO>): void {
         // Build complete universe buffer (channels 0-511)
         const universeBuffer: Record<number, number> = {};
         
-        // Sort lights by ID for consistent processing order
-        const sortedLights = lights.sort((a, b) => a.id.localeCompare(b.id));
-        const lightCount = sortedLights.length;
+        // Sort light IDs for consistent processing order
+        const sortedLightIds = Array.from(lights.keys()).sort((a, b) => a.localeCompare(b));
 
-        for (let i = 0; i < lightCount; i++) {
-            const light = sortedLights[i];
-            const dmxLight = this._dmxLightManager.getDmxLight(light.id);
+        for (const lightId of sortedLightIds) {
+            const lightValue = lights.get(lightId)!;
+            const dmxLight = this._dmxLightManager.getDmxLight(lightId);
             if (!dmxLight) {
-                console.warn(`DMX Light configuration not found for Light ID: ${light.id}`);
+                console.warn(`DMX Light configuration not found for Light ID: ${lightId}`);
                 continue;
             }
 
-            const { red: r, green: g, blue: b, intensity, pan, tilt } = light.value;
+            const { red: r, green: g, blue: b, intensity, pan, tilt } = lightValue;
             const channelsInput: { [key: string]: number } = {
                 red: r,
                 green: g,
@@ -87,7 +86,7 @@ export class DmxPublisher {
             try {
                 dmxChannelData = castToChannelType(dmxLight.fixture, channelsInput);
             } catch (error) {
-                console.error(`Error casting channels for Light ID: ${light.id} - ${error}`);
+                console.error(`Error casting channels for Light ID: ${lightId} - ${error}`);
                 continue;
             }
 

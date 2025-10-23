@@ -48,11 +48,15 @@ export class LightTransitionController {
   private _clearingTransitions = false; // Flag to prevent new transitions during cleanup
   private clock: Clock | null = null;
   private updateCallback: (deltaTime: number) => void;
-  private accumulatedTime: number = 0;
+  private systemStartTime: number = 0;
 
   // Monitoring fields
   private lastStateValidation: number = 0;
-  private readonly VALIDATION_INTERVAL = 3000; 
+  private readonly VALIDATION_INTERVAL = 3000;
+  
+  // Time correction fields
+  private lastTimeCorrection: number = 0;
+  private readonly TIME_CORRECTION_INTERVAL = 10000; // 10 seconds 
   
   constructor(lightStateManager: LightStateManager) {
     this._lightStateManager = lightStateManager;
@@ -70,8 +74,9 @@ export class LightTransitionController {
    */
   public registerWithClock(clock: Clock): void {
     this.clock = clock;
-    // Initialize accumulated time with current clock time for consistency
-    this.accumulatedTime = clock.getCurrentTimeMs();
+    // Initialize system start time for absolute time references
+    this.systemStartTime = performance.now();
+    this.lastTimeCorrection = this.systemStartTime;
     clock.onTick(this.updateCallback);
   }
 
@@ -147,7 +152,7 @@ export class LightTransitionController {
       layer,
       startState: effectiveStartState,
       endState: { ...endState },
-      startTime: this.clock ? this.clock.getCurrentTimeMs() : this.accumulatedTime,
+      startTime: performance.now(),
       transition: {
         transform: {
           color: endState,
@@ -366,18 +371,22 @@ export class LightTransitionController {
    *
    * @param deltaTime The time elapsed since last update in milliseconds
    */
-  private updateTransitions(deltaTime: number): void {
+  private updateTransitions(_deltaTime: number): void {
     // Skip processing if a global clear is in progress
     if (this._clearingTransitions) {
       return;
     }
 
     try {
-      // Accumulate delta time for smooth transitions
-      this.accumulatedTime += deltaTime;
+      const now = performance.now();
+      
+      // Periodic time correction to prevent drift
+      if (now - this.lastTimeCorrection > this.TIME_CORRECTION_INTERVAL) {
+        this.performTimeCorrection(now);
+        this.lastTimeCorrection = now;
+      }
 
       // Periodic state validation and cleanup
-      const now = performance.now();
       if (now - this.lastStateValidation > this.VALIDATION_INTERVAL) {
         this.validateAllStates();
         this.cleanupOrphanedTransitions();
@@ -405,12 +414,12 @@ export class LightTransitionController {
 
           const { startState, endState, startTime, transition } = transitionData;
 
-          // Use accumulated time from Clock system for consistent timing
-          const elapsed = this.accumulatedTime - startTime;
+          // Use absolute time for consistent timing
+          const elapsed = now - startTime;
           const duration = transition.transform.duration;
 
-          // Calculate progress (0 to 1) - use >= 0.999 to handle floating point precision
-          const progress = duration > 0 ? Math.min(elapsed / duration, 1) : 1;
+          // Calculate progress (0 to 1) using integer math to avoid floating-point drift
+          const progress = duration > 0 ? Math.min(Math.floor((elapsed * 1000) / duration), 1000) / 1000 : 1;
 
           // Get the easing function
           const easing = transition.transform.easing;
@@ -490,6 +499,21 @@ export class LightTransitionController {
       console.error('Critical error in transition processing:', error);
       // Emergency state reset if needed
       this.emergencyStateReset();
+    }
+  }
+
+  /**
+   * Performs periodic time correction to prevent drift accumulation
+   */
+  private performTimeCorrection(currentTime: number): void {
+    // Reset system start time to current time to prevent long-term drift
+    const timeSinceStart = currentTime - this.systemStartTime;
+    
+    // If we've been running for more than 10 minutes, reset the start time
+    // This prevents extreme drift accumulation
+    if (timeSinceStart > 10000) {
+      this.systemStartTime = currentTime;
+      console.log('[LTC] Performed time correction to prevent drift');
     }
   }
 
@@ -799,11 +823,10 @@ export class LightTransitionController {
   }
 
   /**
-   * Get the current accumulated time from the Clock system
-   * Useful for debugging timing issues
+   * Get the current system time for debugging timing issues
    */
-  public getAccumulatedTime(): number {
-    return this.accumulatedTime;
+  public getCurrentSystemTime(): number {
+    return performance.now();
   }
 
   /**
@@ -938,19 +961,20 @@ export class LightTransitionController {
   }
 
   /**
-   * Reset the accumulated time counter
+   * Reset the system start time
    * Useful when you want to reset timing state or force immediate processing
    */
-  public resetAccumulatedTime(): void {
-    this.accumulatedTime = 0;
+  public resetSystemTime(): void {
+    this.systemStartTime = performance.now();
+    this.lastTimeCorrection = this.systemStartTime;
   }
 
 
   /**
-   * Get the current time from the Clock system
-   * Falls back to accumulated time if clock is not available
+   * Get the current time from the system
+   * Uses performance.now() for high precision timing
    */
   public getCurrentTime(): number {
-    return this.clock ? this.clock.getCurrentTimeMs() : this.accumulatedTime;
+    return performance.now();
   }
 }

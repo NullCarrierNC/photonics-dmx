@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { LightState, RGBIO } from '../../types';
+import { RGBIO } from '../../types';
 import { Clock } from './Clock';
 
 /**
@@ -58,11 +58,7 @@ class LightStateManager extends EventEmitter {
    * Publishes the final states via an event. 
    */
   public publishLightStates(): void {
-    const states: LightState[] = [];
-    this._finalStates.forEach((color, lightId) => {
-      states.push({ id: lightId, value: color });
-    });
-    this.emit('LightStatesUpdated', states);
+    this.emit('LightStatesUpdated', this._finalStates);
   }
 
   /**
