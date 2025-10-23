@@ -18,6 +18,7 @@ export class DmxLightManager {
   private _strobeLights: TrackedLight[] = [];
 
   private _dmxLights: Map<string, DmxFixture> = new Map<string, DmxFixture>();
+  private _lightsCache: Map<string, TrackedLight[]> = new Map<string, TrackedLight[]>();
 
 
   constructor(private config: LightingConfiguration) {
@@ -82,6 +83,7 @@ export class DmxLightManager {
 
   /**
    * Retrieves lights based on group(s) and target(s).
+   * Results are cached for performance optimization.
    * @param group Single or array of LocationGroup
    * @param target Single or array of LightTarget
    * @returns Array of TrackedLight
@@ -93,6 +95,15 @@ export class DmxLightManager {
     const groups = Array.isArray(group) ? group : [group];
     const targets = Array.isArray(target) ? target : [target];
 
+    // Generate cache key by sorting groups and targets for consistency
+    const cacheKey = `${[...groups].sort().join(',')}|${[...targets].sort().join(',')}`;
+    
+    // Check cache first
+    if (this._lightsCache.has(cacheKey)) {
+      return this._lightsCache.get(cacheKey)!;
+    }
+
+    // Cache miss - perform calculation
     const lightsSet = new Set<TrackedLight>();
 
     groups.forEach((g) => {
@@ -103,7 +114,12 @@ export class DmxLightManager {
       });
     });
 
-    return Array.from(lightsSet).sort((a, b) => a.position - b.position);
+    const result = Array.from(lightsSet).sort((a, b) => a.position - b.position);
+    
+    // Cache the result
+    this._lightsCache.set(cacheKey, result);
+    
+    return result;
   }
 
   /**
@@ -459,6 +475,7 @@ export class DmxLightManager {
     this.config = config;
     this.initializeLights();
     this.initializeDmxLights(); // Re-initialize the _dmxLights map with the new configuration
+    this._lightsCache.clear(); // Clear cache when configuration changes
   }
 
   /**
@@ -469,6 +486,7 @@ export class DmxLightManager {
     this._backLights = [];
     this._strobeLights = [];
     this._dmxLights.clear();
+    this._lightsCache.clear(); // Clear cache during shutdown
     this.config = {} as LightingConfiguration;
   }
 }
