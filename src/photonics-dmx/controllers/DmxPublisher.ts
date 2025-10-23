@@ -60,10 +60,13 @@ export class DmxPublisher {
     private publishNow(lights: LightState[]): void {
         // Build complete universe buffer (channels 0-511)
         const universeBuffer: Record<number, number> = {};
-        const lightCount = lights.length;
+        
+        // Sort lights by ID for consistent processing order
+        const sortedLights = lights.sort((a, b) => a.id.localeCompare(b.id));
+        const lightCount = sortedLights.length;
 
         for (let i = 0; i < lightCount; i++) {
-            const light = lights[i];
+            const light = sortedLights[i];
             const dmxLight = this._dmxLightManager.getDmxLight(light.id);
             if (!dmxLight) {
                 console.warn(`DMX Light configuration not found for Light ID: ${light.id}`);

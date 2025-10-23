@@ -8,6 +8,7 @@ import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetwo
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
+import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
 import { BrowserWindow } from 'electron';
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces';
@@ -91,14 +92,22 @@ export class ControllerManager {
   private async initializeSequencer(): Promise<void> {
     if (!this.dmxLightManager) return;
 
-    // Create the sequencer components
-    this.lightStateManager = new LightStateManager();
-    this.lightTransitionController = new LightTransitionController(this.lightStateManager);
-
     // Get clock rate from configuration
     const clockRate = this.config.getClockRate();
-    this.sequencer = new Sequencer(this.lightTransitionController, clockRate);
+    
+    // Create the shared Clock instance
+    const clock = new Clock(clockRate);
+    
+    // Create the sequencer components with the Clock
+    this.lightStateManager = new LightStateManager(clock);
+    this.lightTransitionController = new LightTransitionController(this.lightStateManager);
+    
+    // Create the sequencer with all components
+    this.sequencer = new Sequencer(this.lightTransitionController, clock);
     this.effectsController = this.sequencer;
+    
+    // Start the centralized timing system
+    clock.start();
     
     // Set up DMX publisher
     this.dmxPublisher = new DmxPublisher(

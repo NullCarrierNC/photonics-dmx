@@ -35,10 +35,10 @@ export class Sequencer implements ILightingController {
   /**
    * @constructor
    * @param lightTransitionController The underlying light transition controller
-   * @param clockRate The clock rate in milliseconds (1-100ms)
+   * @param clock The shared Clock instance for timing synchronization
    */
-  constructor(lightTransitionController: LightTransitionController, clockRate: number = 5) {
-    this.clock = new Clock(clockRate);
+  constructor(lightTransitionController: LightTransitionController, clock: Clock) {
+    this.clock = clock;
     this.lightTransitionController = lightTransitionController;
     this.effectTransformer = new EffectTransformer();
     this.eventScheduler = new EventScheduler();
@@ -66,10 +66,8 @@ export class Sequencer implements ILightingController {
     this.transitionEngine.registerWithClock(this.clock);
     this.lightTransitionController.registerWithClock(this.clock);
     this.eventScheduler.registerWithClock(this.clock);
-
-    // Start the centralized timing system
-    this.clock.start();
   }
+
 
   /**
    * Adds a new effect without affecting effects on other layers.
