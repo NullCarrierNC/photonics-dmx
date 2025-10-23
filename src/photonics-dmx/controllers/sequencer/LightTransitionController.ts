@@ -486,6 +486,9 @@ export class LightTransitionController {
       // Emergency state reset if needed
       this.emergencyStateReset();
     }
+    
+    // Publish all buffered light state updates atomically after all calculations complete
+    this._lightStateManager.syncFrame();
   }
 
   /**

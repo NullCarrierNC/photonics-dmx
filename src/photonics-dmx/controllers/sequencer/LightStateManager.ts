@@ -64,7 +64,7 @@ class LightStateManager extends EventEmitter {
   /**
    * Synchronizes all pending frame updates atomically
    */
-  private syncFrame(): void {
+  public syncFrame(): void {
     if (this._frameBuffer.size === 0) return;
     
     // Apply all pending updates atomically
