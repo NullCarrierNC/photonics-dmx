@@ -194,7 +194,7 @@ describe('TransitionEngine', () => {
       const transition = mockEffect.transitions[0];
       
       // Call handleWaitingFor
-      transitionEngine.handleWaitingFor(mockEffect, transition);
+      transitionEngine.handleWaitingFor(mockEffect, transition, now);
       
       // Verify state changed to transitioning
       expect(mockEffect.state).toBe('transitioning');
@@ -243,7 +243,7 @@ describe('TransitionEngine', () => {
       });
       
       // Call handleWaitingUntil
-      transitionEngine.handleWaitingUntil(mockEffect, transition);
+      transitionEngine.handleWaitingUntil(mockEffect, transition, now);
       
       // Verify advanced to next transition
       expect(mockEffect.state).toBe('idle');

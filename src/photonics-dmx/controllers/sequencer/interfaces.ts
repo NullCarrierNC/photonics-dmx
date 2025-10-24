@@ -91,10 +91,6 @@ export interface ILayerManager {
  * @description Centralized tracking of scheduled events
  */
 export interface IEventScheduler {
-  setTimeout(callback: () => void, delay: number): string;
-  clearAllTimeouts(): void;
-  removeTimeout(timeoutId: string): void;
-  
   // Clock integration
   registerWithClock(clock: any): void;
   unregisterFromClock(): void;
@@ -132,10 +128,10 @@ export interface ITransitionEngine {
  * @description Coordinates the addition, removal, and updating of effects
  */
 export interface IEffectManager {
-  addEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): void;
-  setEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): Promise<void>;
-  addEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
-  setEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
+  addEffect(name: string, effect: Effect,isPersistent?: boolean): void;
+  setEffect(name: string, effect: Effect,isPersistent?: boolean): Promise<void>;
+  addEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
+  setEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;
   removeAllEffectsForced(): void;
   startNextEffectInQueue(layer: number, lightId: string): boolean;
@@ -198,10 +194,10 @@ export interface IDebugMonitor {
  * @description Main interface for the lighting system
  */
 export interface ILightingController {
-  addEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): void;
-  setEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): Promise<void>;
-  addEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
-  setEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
+  addEffect(name: string, effect: Effect,isPersistent?: boolean): void;
+  setEffect(name: string, effect: Effect,isPersistent?: boolean): Promise<void>;
+  addEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
+  setEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;
   removeEffect(name: string, layer: number): void;
   removeAllEffects(): void;

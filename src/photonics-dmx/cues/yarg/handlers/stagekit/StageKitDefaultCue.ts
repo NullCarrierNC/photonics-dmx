@@ -117,13 +117,13 @@ export class StageKitDefaultCue implements ICue {
     
     // Use firstRun to determine if we should set or add the effect
     if (this.isFirstRun) {
-      await controller.setEffect('stagekit-default-large-blue', blueEffect, 0);
+      await controller.setEffect('stagekit-default-large-blue', blueEffect);
       this.isFirstRun = false;
     } else {
-      await controller.addEffect('stagekit-default-large-blue', blueEffect, 0);
+      await controller.addEffect('stagekit-default-large-blue', blueEffect);
     }
 
-    await controller.addEffect('stagekit-default-large-red', redEffect, 0);
+    await controller.addEffect('stagekit-default-large-red', redEffect);
   }
 
   // Inverts red/blue order

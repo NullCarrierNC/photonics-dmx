@@ -4,7 +4,6 @@ import {
   IEffectTransformer,
   ILayerManager,
   ISystemEffectsController,
-  IEventScheduler,
   ITransitionEngine,
   LightEffectState
 } from './interfaces';
@@ -20,7 +19,6 @@ import { performance } from 'perf_hooks';
  * - Coordinates the addition, removal, and updating of effects
  * - Routes effects to appropriate layers
  * - Manages effect transitions, queuing, and lifecycle
- * - Handles scheduling via offset timing
  * - Coordinates with SystemEffects for blackout handling
  * - Tracks layer-specific effect history
  * 
@@ -34,7 +32,6 @@ export class EffectManager implements IEffectManager {
   private layerManager: ILayerManager;
   private transitionEngine: ITransitionEngine;
   private effectTransformer: IEffectTransformer;
-  private timeoutManager: IEventScheduler;
   private systemEffects: ISystemEffectsController;
 
   // Cached reference to avoid repeated method calls
@@ -56,20 +53,17 @@ export class EffectManager implements IEffectManager {
    * @param layerManager The layer manager
    * @param transitionEngine The transition engine
    * @param effectTransformer The effect transformer
-   * @param timeoutManager The timeout manager
    * @param systemEffects The system effects controller
    */
   constructor(
     layerManager: ILayerManager,
     transitionEngine: ITransitionEngine,
     effectTransformer: IEffectTransformer,
-    timeoutManager: IEventScheduler,
     systemEffects: ISystemEffectsController
   ) {
     this.layerManager = layerManager;
     this.transitionEngine = transitionEngine;
     this.effectTransformer = effectTransformer;
-    this.timeoutManager = timeoutManager;
     this.systemEffects = systemEffects;
 
     // Cache the light transition controller for performance
@@ -95,10 +89,9 @@ export class EffectManager implements IEffectManager {
    * 
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param offset How long to wait before applying this effect (in ms)
    * @param isPersistent If true, the effect re-queues itself after completing
    */
-  public addEffect(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): void {
+  public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 200) {
       console.warn('Add cancelling blackout');
       this.systemEffects.cancelBlackout();
@@ -145,13 +138,7 @@ export class EffectManager implements IEffectManager {
       });
     };
 
-    if (offset > 0) {
-      this.timeoutManager.setTimeout(() => {
-        executeAddEffect();
-      }, offset);
-    } else {
-      executeAddEffect();
-    }
+    executeAddEffect();
   }
 
   /**
@@ -160,11 +147,9 @@ export class EffectManager implements IEffectManager {
    * 
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param offset How long to wait before applying this effect (in ms)
    * @param isPersistent If true, the effect re-queues itself after completing
    */
-  public async setEffect(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): Promise<void> {
-   // console.log(`Setting effect ${name} with offset ${offset}`);
+  public async setEffect(name: string, effect: Effect, isPersistent: boolean = false): Promise<void> {
     if (this.systemEffects.isBlackoutActive()) {
       console.warn('Cancelling blackout for setEffect');
       this.systemEffects.cancelBlackout();
@@ -190,7 +175,7 @@ export class EffectManager implements IEffectManager {
         });
         });
       } else {
-        this.addEffect(name, effect, 0, isPersistent);
+        this.addEffect(name, effect, isPersistent);
         
         // Update the last layer 0 effect name if this effect targets layer 0
         if (hasLayer0) {
@@ -199,16 +184,7 @@ export class EffectManager implements IEffectManager {
       }
     };
 
-    if (offset > 0) {
-      await new Promise<void>(resolve => {
-        this.timeoutManager.setTimeout(() => {
-          executeSetEffect();
-          resolve();
-        }, offset);
-      });
-    } else {
-      executeSetEffect();
-    }
+    executeSetEffect();
   }
 
   /**
@@ -218,11 +194,10 @@ export class EffectManager implements IEffectManager {
    * 
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param offset How long to wait before applying this effect (in ms)
    * @param isPersistent If true, the effect re-queues itself after completing
    * @returns True if the effect was added, false otherwise
    */
-  public addEffectUnblockedName(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): boolean {
+  public addEffectUnblockedName(name: string, effect: Effect, isPersistent: boolean = false): boolean {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 200) {
       console.warn(`Cannot add effect "${name}" because a blackout is in progress.`);
       return false;
@@ -273,13 +248,7 @@ export class EffectManager implements IEffectManager {
       });
     };
 
-    if (offset > 0) {
-      this.timeoutManager.setTimeout(() => {
-        executeAddEffect();
-      }, offset);
-    } else {
-      executeAddEffect();
-    }
+    executeAddEffect();
 
     return true;
   }
@@ -291,11 +260,10 @@ export class EffectManager implements IEffectManager {
    * 
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param offset How long to wait before applying this effect (in ms)
    * @param isPersistent If true, the effect re-queues itself after completing
    * @returns True if the effect was set, false otherwise
    */
-  public setEffectUnblockedName(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): boolean {
+  public setEffectUnblockedName(name: string, effect: Effect, isPersistent: boolean = false): boolean {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 200) {
       console.warn(`Cannot add effect "${name}" because a blackout is in progress.`);
       return false;
@@ -340,14 +308,7 @@ export class EffectManager implements IEffectManager {
       });
     };
 
-    if (offset > 0) {
-      this.timeoutManager.setTimeout(() => {
-        executeSetEffect();
-      }, offset);
-    } else {
-      executeSetEffect();
-    }
-
+    executeSetEffect();
     return true;
   }
 
