@@ -37,7 +37,7 @@ export class BigRockEndingCue implements ICue {
           layer: i + 10,
         });
         
-        await sequencer.addEffect(`big-rock-ending${i}`, flash);
+        sequencer.addEffect(`big-rock-ending${i}`, flash);
       }
     } catch (ex) {
       console.error(ex);

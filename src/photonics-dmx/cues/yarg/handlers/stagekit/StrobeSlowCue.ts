@@ -27,6 +27,6 @@ export class StrobeSlowCue implements ICue {
       lights: strobes,
       layer: 255,
     });
-    await sequencer.addEffectUnblockedName('strobe', flash);
+    sequencer.addEffectUnblockedName('strobe', flash);
   }
 } 

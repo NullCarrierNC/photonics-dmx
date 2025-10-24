@@ -42,24 +42,24 @@ export class StageKitSearchlightsCue implements ICue {
       const redEffect = this.createRedCounterClockwiseEffect(allLights, lightDuration);
 
       if (this.isFirstExecution) {
-        await controller.setEffect('stagekit-clear-0', singleColor);
-        await controller.addEffect('stagekit-searchlights-yellow', yellowEffect);
-        await controller.addEffect('stagekit-searchlights-red', redEffect);
+        controller.setEffect('stagekit-clear-0', singleColor);
+        controller.addEffect('stagekit-searchlights-yellow', yellowEffect);
+        controller.addEffect('stagekit-searchlights-red', redEffect);
         this.isFirstExecution = false;
       } else {
-        await controller.addEffect('stagekit-clear-0', singleColor);
-        await controller.addEffectUnblockedName('stagekit-searchlights-yellow', yellowEffect);
-        await controller.addEffectUnblockedName('stagekit-searchlights-red', redEffect);
+        controller.addEffect('stagekit-clear-0', singleColor);
+        controller.addEffectUnblockedName('stagekit-searchlights-yellow', yellowEffect);
+        controller.addEffectUnblockedName('stagekit-searchlights-red', redEffect);
       }
     } else {
       // Single yellow pattern for <8 lights
       const yellowEffect = this.createYellowCounterClockwiseEffect(allLights, lightDuration);
 
       if (this.isFirstExecution) {
-        await controller.setEffect('stagekit-searchlights-yellow', yellowEffect);
+        controller.setEffect('stagekit-searchlights-yellow', yellowEffect);
         this.isFirstExecution = false;
       } else {
-        await controller.addEffect('stagekit-searchlights-yellow', yellowEffect);
+        controller.addEffect('stagekit-searchlights-yellow', yellowEffect);
       }
     }
   }

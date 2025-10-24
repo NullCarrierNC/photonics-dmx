@@ -1,6 +1,6 @@
 import { RGBIO, Transition } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
-import { ILayerManager, ISystemEffectsController, IEventScheduler } from './interfaces';
+import { ILayerManager, ISystemEffectsController } from './interfaces';
 
 /**
  * @class SystemEffectsController
@@ -9,7 +9,6 @@ import { ILayerManager, ISystemEffectsController, IEventScheduler } from './inte
 export class SystemEffectsController implements ISystemEffectsController {
   private lightTransitionController: LightTransitionController;
   private layerManager: ILayerManager;
-  private timeoutManager: IEventScheduler;
   private isBlackingOut: boolean = false;
   private _blackoutLayersUnder: number = 200;
   
@@ -25,11 +24,9 @@ export class SystemEffectsController implements ISystemEffectsController {
   constructor(
     lightTransitionController: LightTransitionController,
     layerManager: ILayerManager,
-    timeoutManager: IEventScheduler
   ) {
     this.lightTransitionController = lightTransitionController;
     this.layerManager = layerManager;
-    this.timeoutManager = timeoutManager;
   }
 
   /**
@@ -81,7 +78,7 @@ export class SystemEffectsController implements ISystemEffectsController {
     }
 
     this.isBlackingOut = true;
-    this.timeoutManager.clearAllTimeouts();
+   
     console.log(`Initiating blackout for ${duration}ms.`);
     
     try {

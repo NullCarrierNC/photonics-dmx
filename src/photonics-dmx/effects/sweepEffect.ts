@@ -88,8 +88,9 @@ export const getSweepEffect = ({
     : (lights as TrackedLight[]).map(light => [light]);
 
   const numGroups = groups.length;
-  // Base slot time if there were no overlap.
-  const slotTime = sweepTime / numGroups;
+  // Base slot time if there were no overlap (integerized).
+  const slotTimeFloat = sweepTime / numGroups;
+  const slotTime = Math.round(slotTimeFloat);
   
   // Calculate effective delay factor based on lightOverlap.
   // For example, if lightOverlap is 50, then effectiveDelayFactor is 0.5.
@@ -102,27 +103,27 @@ export const getSweepEffect = ({
   // Without overlap the last group would start at (numGroups - 1) * slotTime.
   // With overlap it starts at (numGroups - 1) * slotTime * effectiveDelayFactor.
   // So the total speed-up is:
-  const totalSpeedup = (numGroups - 1) * slotTime * (1 - effectiveDelayFactor);
-  // Distribute this extra time evenly across all groups.
-  const additionalHold = totalSpeedup / numGroups;
+  const totalSpeedupFloat = (numGroups - 1) * slotTime * (1 - effectiveDelayFactor);
+  // Distribute this extra time evenly across all groups (integerized).
+  const additionalHold = Math.round(totalSpeedupFloat / numGroups);
 
   const desiredTotalFade = fadeInDuration + fadeOutDuration;
 
-  let actualFadeIn = fadeInDuration;
-  let actualFadeOut = fadeOutDuration;
+  let actualFadeIn = Math.round(fadeInDuration);
+  let actualFadeOut = Math.round(fadeOutDuration);
   let holdTime = 0;
   
   // Calculate the base hold time using the base slotTime.
   if (desiredTotalFade <= slotTime) {
     // Add the extra hold time so that each group's overall cycle is lengthened.
-    holdTime = (slotTime - desiredTotalFade) + additionalHold;
+    holdTime = Math.round((slotTime - desiredTotalFade) + additionalHold);
   } else {
     // Scale down the fade times so they fit in the base slot.
     // (fade times are too long for the provided duration)
     const scale = slotTime / desiredTotalFade;
-    actualFadeIn = fadeInDuration * scale;
-    actualFadeOut = fadeOutDuration * scale;
-    holdTime = additionalHold;
+    actualFadeIn = Math.round(fadeInDuration * scale);
+    actualFadeOut = Math.round(fadeOutDuration * scale);
+    holdTime = Math.round(additionalHold);
   }
 
   const transitions: EffectTransition[] = [];
@@ -151,7 +152,7 @@ export const getSweepEffect = ({
 
   groups.forEach((group, index) => {
     // Each group's start delay is scaled by the effectiveDelayFactor.
-    const groupDelay = index * slotTime * effectiveDelayFactor;
+    const groupDelay = Math.round(index * slotTime * effectiveDelayFactor);
     // Assign each group a unique layer (base layer plus index)
     const groupLayer = layer + index;
 
@@ -171,18 +172,25 @@ export const getSweepEffect = ({
     });
     
     // Calculate the total time used by the transitions for this group.
-    const totalTransitionTime = actualFadeIn + holdTime + actualFadeOut;
+    let totalTransitionTime = actualFadeIn + holdTime + actualFadeOut;
     let extraWait = (sweepTime - groupDelay) - totalTransitionTime;
     
     // Overlap logic for fade out: if extraWait is negative, shorten fade-out duration.
     let finalFadeOutDuration = actualFadeOut;
     let fadeOutWaitUntil: WaitCondition = "delay";
-    let fadeOutWaitTime = extraWait;
+    let fadeOutWaitTime = Math.round(extraWait);
     
     if (extraWait < 0) {
-      finalFadeOutDuration = actualFadeOut + extraWait; // extraWait is negative so reduces the duration
+      finalFadeOutDuration = Math.max(0, actualFadeOut + extraWait); // clamp at 0
       fadeOutWaitUntil = "none";
       fadeOutWaitTime = 0;
+    }
+
+    // After rounding, adjust final wait so the per-group total equals sweepTime
+    totalTransitionTime = actualFadeIn + holdTime + finalFadeOutDuration;
+    const roundedExtraWait = (sweepTime - groupDelay) - totalTransitionTime;
+    if (fadeOutWaitUntil === "delay") {
+      fadeOutWaitTime = Math.max(0, Math.round(roundedExtraWait));
     }
 
     // Transition 2: Fade out from high back to low.
@@ -212,7 +220,7 @@ export const getSweepEffect = ({
           duration: 1,
         },
         waitUntilCondition: "delay",
-        waitUntilTime: betweenSweepDelay,
+        waitUntilTime: Math.max(0, Math.round(betweenSweepDelay)),
       })
     }
   });
@@ -221,6 +229,10 @@ export const getSweepEffect = ({
   return {
     id: "SweepEffect",
     description: "Sequentially sweeps across light groups, fading in to the high state and fading out to the low state. Extra hold time is added when lights overlap so that the overall effect always lasts sweepTime.",
-    transitions: transitions
+    transitions: transitions,
+    timingHints: {
+      cycleDuration: Math.max(0, Math.round(sweepTime + Math.max(0, Math.round(betweenSweepDelay || 0)))),
+      perLightOffset: Math.max(0, Math.round(slotTime * effectiveDelayFactor))
+    }
   };
 };

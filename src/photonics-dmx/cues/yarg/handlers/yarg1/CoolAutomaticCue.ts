@@ -50,14 +50,14 @@ export class CoolAutomaticCue implements ICue {
     });
 
     if (this.isFirstExecution) {
-      await sequencer.setEffect('cool-auto-base', baseLayer);
+      sequencer.setEffect('cool-auto-base', baseLayer);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('cool-auto-base', baseLayer);
+      sequencer.addEffect('cool-auto-base', baseLayer);
     }
     
-    await sequencer.addEffect('cool-auto-e', crossFadeEven);
-    await sequencer.addEffect('cool-auto-o', crossFadeOdd);
+    sequencer.addEffect('cool-auto-e', crossFadeEven);
+    sequencer.addEffect('cool-auto-o', crossFadeOdd);
   }
 
   onStop(): void {

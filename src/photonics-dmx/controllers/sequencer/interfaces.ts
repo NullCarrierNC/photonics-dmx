@@ -18,16 +18,6 @@ export interface LightEffectState {
   waitEndTime: number;
   lastEndState?: RGBIO;
   isPersistent?: boolean;
-  
-  /**
-   * Absolute timing information for synchronized effects
-   * Enables drift-free looping by maintaining position on an absolute timeline
-   */
-  absoluteTiming?: {
-    cycleStartTime: number;    // Absolute time when cycle 0 began
-    cycleDuration: number;      // Duration of one complete cycle (ms)
-    lightOffset: number;        // This light's offset within the cycle (ms)
-  };
 }
 
 
@@ -41,16 +31,6 @@ export interface QueuedEffect {
   effect: Effect;
   lightId: string;
   isPersistent: boolean;
-  
-  /**
-   * Absolute timing information preserved through queuing
-   * Ensures continued synchronization when effect restarts
-   */
-  absoluteTiming?: {
-    cycleStartTime: number;
-    cycleDuration: number;
-    lightOffset: number;
-  };
 }
 
 /**
@@ -111,10 +91,6 @@ export interface ILayerManager {
  * @description Centralized tracking of scheduled events
  */
 export interface IEventScheduler {
-  setTimeout(callback: () => void, delay: number): string;
-  clearAllTimeouts(): void;
-  removeTimeout(timeoutId: string): void;
-  
   // Clock integration
   registerWithClock(clock: any): void;
   unregisterFromClock(): void;
@@ -152,23 +128,16 @@ export interface ITransitionEngine {
  * @description Coordinates the addition, removal, and updating of effects
  */
 export interface IEffectManager {
-  addEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): void;
-  setEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): Promise<void>;
-  addEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
-  setEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
+  addEffect(name: string, effect: Effect,isPersistent?: boolean): void;
+  setEffect(name: string, effect: Effect,isPersistent?: boolean): void;
+  addEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
+  setEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;
   removeAllEffectsForced(): void;
   startNextEffectInQueue(layer: number, lightId: string): boolean;
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
   isLayerFreeForLight(layer: number, lightId: string): boolean;
   setState(lights: TrackedLight[], color: RGBIO, time: number): void;
-
-  /**
-   * Applies timing corrections to the effect timing registry
-   * @param cycleStartTime The cycle start time to match against
-   * @param correctionAmount The amount to add to matching timing entries
-   */
-  correctTimingRegistry(cycleStartTime: number, correctionAmount: number): void;
 }
 
 /**
@@ -225,10 +194,10 @@ export interface IDebugMonitor {
  * @description Main interface for the lighting system
  */
 export interface ILightingController {
-  addEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): void;
-  setEffect(name: string, effect: Effect, offset?: number, isPersistent?: boolean): Promise<void>;
-  addEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
-  setEffectUnblockedName(name: string, effect: Effect, offset?: number, isPersistent?: boolean): boolean;
+  addEffect(name: string, effect: Effect,isPersistent?: boolean): void;
+  setEffect(name: string, effect: Effect,isPersistent?: boolean): Promise<void>;
+  addEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
+  setEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;
   removeEffect(name: string, layer: number): void;
   removeAllEffects(): void;

@@ -23,10 +23,10 @@ export class SoloCue implements ICue {
     });
     
     if (this.isFirstExecution) {
-      await sequencer.setEffect('solo', effect);
+      sequencer.setEffect('solo', effect);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('solo', effect);
+      sequencer.addEffect('solo', effect);
     }
   }
 

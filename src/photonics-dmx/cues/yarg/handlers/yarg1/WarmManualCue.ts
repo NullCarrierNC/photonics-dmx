@@ -52,14 +52,14 @@ export class WarmManualCue implements ICue {
       layer: 2,
     });
     if (this.isFirstExecution) {
-      await sequencer.setEffect('warm_manual-base', baseLayer);
+      sequencer.setEffect('warm_manual-base', baseLayer);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('warm_manual-base', baseLayer);
+      sequencer.addEffect('warm_manual-base', baseLayer);
     }
     
-    await sequencer.addEffect('warm_manual-e', crossFadeEven);
-    await sequencer.addEffect('warm_manual-o', crossFadeOdd);
+    sequencer.addEffect('warm_manual-e', crossFadeEven);
+    sequencer.addEffect('warm_manual-o', crossFadeOdd);
   }
 
   onStop(): void {

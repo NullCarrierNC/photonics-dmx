@@ -49,14 +49,14 @@ export class WarmAutomaticCue implements ICue {
       layer: 2,
     });
     if (this.isFirstExecution) {
-      await sequencer.setEffect('warm_automatic-base', baseLayer);
+      sequencer.setEffect('warm_automatic-base', baseLayer);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('warm_automatic-base', baseLayer);
+      sequencer.addEffect('warm_automatic-base', baseLayer);
     }
     
-    await sequencer.addEffect('warm_automatic-e', crossFadeEven);
-    await sequencer.addEffect('warm_automatic-o', crossFadeOdd);
+    sequencer.addEffect('warm_automatic-e', crossFadeEven);
+    sequencer.addEffect('warm_automatic-o', crossFadeOdd);
   }
 
   onStop(): void {

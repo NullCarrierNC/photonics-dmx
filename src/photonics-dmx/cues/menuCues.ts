@@ -43,8 +43,8 @@ export function cueMenuRandomFlash(effectController: ILightingController, lightM
         layer: 5,
     })
 
-    effectController.addEffect("menu", effect, 0, true);
-    effectController.addEffect("menuflash", flashBlue, 0, true);
+    effectController.addEffect("menu", effect, true);
+    effectController.addEffect("menuflash", flashBlue, true);
 }
 
 
@@ -79,7 +79,7 @@ export function cueMenuCircleChase(effectController: ILightingController, lightM
       layer: 0,
     })
     // Use unblocked to avoid breaking the sweep timing.
-    effectController.addEffectUnblockedName('menu', sweep, 0, true);
+    effectController.addEffectUnblockedName('menu', sweep, true);
 
 
 }

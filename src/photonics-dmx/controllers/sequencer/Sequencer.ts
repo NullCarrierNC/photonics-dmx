@@ -35,10 +35,10 @@ export class Sequencer implements ILightingController {
   /**
    * @constructor
    * @param lightTransitionController The underlying light transition controller
-   * @param clockRate The clock rate in milliseconds (1-100ms)
+   * @param clock The shared Clock instance for timing synchronization
    */
-  constructor(lightTransitionController: LightTransitionController, clockRate: number = 5) {
-    this.clock = new Clock(clockRate);
+  constructor(lightTransitionController: LightTransitionController, clock: Clock) {
+    this.clock = clock;
     this.lightTransitionController = lightTransitionController;
     this.effectTransformer = new EffectTransformer();
     this.eventScheduler = new EventScheduler();
@@ -50,13 +50,11 @@ export class Sequencer implements ILightingController {
     this.systemEffectsController = new SystemEffectsController(
       this.lightTransitionController,
       this.layerManager,
-      this.eventScheduler
     );
     this.effectManager = new EffectManager(
       this.layerManager,
       this.transitionEngine,
       this.effectTransformer,
-      this.eventScheduler,
       this.systemEffectsController
     );
     this.eventHandler = new SongEventHandler(this.layerManager, this.transitionEngine);
@@ -66,10 +64,8 @@ export class Sequencer implements ILightingController {
     this.transitionEngine.registerWithClock(this.clock);
     this.lightTransitionController.registerWithClock(this.clock);
     this.eventScheduler.registerWithClock(this.clock);
-
-    // Start the centralized timing system
-    this.clock.start();
   }
+
 
   /**
    * Adds a new effect without affecting effects on other layers.
@@ -81,8 +77,8 @@ export class Sequencer implements ILightingController {
    * @param offset How long to wait before applying this effect (in ms)
    * @param isPersistent If true, the effect re-queues itself after completing
    */
-  public addEffect(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): void {
-    this.effectManager.addEffect(name, effect, offset, isPersistent);
+  public addEffect(name: string, effect: Effect,  isPersistent: boolean = false): void {
+    this.effectManager.addEffect(name, effect, isPersistent);
   }
 
   /**
@@ -94,8 +90,8 @@ export class Sequencer implements ILightingController {
    * @param offset How long to wait before applying this effect (in ms)
    * @param isPersistent If true, the effect re-queues itself after completing
    */
-  public async setEffect(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): Promise<void> {
-    await this.effectManager.setEffect(name, effect, offset, isPersistent);
+  public async setEffect(name: string, effect: Effect, isPersistent: boolean = false): Promise<void> {
+    await this.effectManager.setEffect(name, effect, isPersistent);
   }
 
   /**
@@ -108,8 +104,8 @@ export class Sequencer implements ILightingController {
    * @param isPersistent If true, the effect re-queues itself after completing
    * @returns True if the effect was added, false otherwise
    */
-  public addEffectUnblockedName(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): boolean {
-    return this.effectManager.addEffectUnblockedName(name, effect, offset, isPersistent);
+  public addEffectUnblockedName(name: string, effect: Effect, isPersistent: boolean = false): boolean {
+    return this.effectManager.addEffectUnblockedName(name, effect, isPersistent);
   }
 
   /**
@@ -122,8 +118,8 @@ export class Sequencer implements ILightingController {
    * @param isPersistent If true, the effect re-queues itself after completing
    * @returns True if the effect was set, false otherwise
    */
-  public setEffectUnblockedName(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): boolean {
-    return this.effectManager.setEffectUnblockedName(name, effect, offset, isPersistent);
+  public setEffectUnblockedName(name: string, effect: Effect, isPersistent: boolean = false): boolean {
+    return this.effectManager.setEffectUnblockedName(name, effect, isPersistent);
   }
 
   /**
@@ -285,9 +281,6 @@ export class Sequencer implements ILightingController {
       this.transitionEngine.unregisterFromClock();
       this.lightTransitionController.unregisterFromClock();
       this.eventScheduler.unregisterFromClock();
-      
-      // Clear all timeouts
-      this.eventScheduler.clearAllTimeouts();
       
       // Remove all effects
       this.removeAllEffects();

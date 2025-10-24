@@ -2,7 +2,7 @@ import { ICue, CueStyle } from '../../../interfaces/ICue';
 import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { getColor } from '../../../../helpers';
+import { getColor } from '../../../../helpers/dmxHelpers';
 import { Effect } from '../../../../types';
 
 
@@ -36,13 +36,12 @@ export class StageKitStompCue implements ICue {
     const greenColor = getColor('green', 'high');
     const blackColor = getColor('black', 'medium');
 
-    // Create the stomp effect
-    const stompEffect: Effect = {
-      id: 'stagekit-stomp-toggle',
-      description: 'Stomp pattern - front q1 yellow/q4 red, back q1 red/q4 yellow, inner green, keyframe toggle',
+    // Create separate effects for each light group
+    const frontQuarter1Effect: Effect = {
+      id: 'stagekit-stomp-front-q1',
+      description: 'Front quarter 1 yellow toggle on keyframe',
       transitions: [
-         // Turn on: front q1 yellow, front q4 red, back q1 red, back q4 yellow, inner green
-         {
+        {
           lights: frontQuarter1Lights,
           layer: 0,
           waitForCondition: 'none',
@@ -52,8 +51,51 @@ export class StageKitStompCue implements ICue {
           waitUntilTime: 0
         },
         {
-          lights: frontQuarter4Lights,
+          lights: frontQuarter1Lights,
           layer: 0,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0,
+          waitUntilConditionCount: 1
+        }
+      ]
+    };
+
+    const frontQuarter4Effect: Effect = {
+      id: 'stagekit-stomp-front-q4',
+      description: 'Front quarter 4 red toggle on keyframe',
+      transitions: [
+        {
+          lights: frontQuarter4Lights,
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: redColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0
+        },
+        {
+          lights: frontQuarter4Lights,
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0,
+          waitUntilConditionCount: 1
+        }
+      ]
+    };
+
+    const backQuarter1Effect: Effect = {
+      id: 'stagekit-stomp-back-q1',
+      description: 'Back quarter 1 red toggle on keyframe',
+      transitions: [
+        {
+          lights: backQuarter1Lights,
+          layer: 2,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: redColor, easing: 'linear', duration: 0 },
@@ -62,16 +104,24 @@ export class StageKitStompCue implements ICue {
         },
         {
           lights: backQuarter1Lights,
-          layer: 0,
+          layer: 2,
           waitForCondition: 'none',
           waitForTime: 0,
-          transform: { color: redColor, easing: 'linear', duration: 0 },
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
-          waitUntilTime: 0
-        },
+          waitUntilTime: 0,
+          waitUntilConditionCount: 1
+        }
+      ]
+    };
+
+    const backQuarter4Effect: Effect = {
+      id: 'stagekit-stomp-back-q4',
+      description: 'Back quarter 4 yellow toggle on keyframe',
+      transitions: [
         {
           lights: backQuarter4Lights,
-          layer: 0,
+          layer: 3,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: yellowColor, easing: 'linear', duration: 0 },
@@ -79,78 +129,55 @@ export class StageKitStompCue implements ICue {
           waitUntilTime: 0
         },
         {
+          lights: backQuarter4Lights,
+          layer: 3,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: blackColor, easing: 'linear', duration: 0 },
+          waitUntilCondition: 'keyframe',
+          waitUntilTime: 0,
+          waitUntilConditionCount: 1
+        }
+      ]
+    };
+
+    const innerEffect: Effect = {
+      id: 'stagekit-stomp-inner',
+      description: 'Inner lights green toggle on keyframe',
+      transitions: [
+        {
           lights: innerLights,
-          layer: 0,
+          layer: 4,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: greenColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0
         },
-         // Turn off front quarter 1 lights on keyframe
-         {
-          lights: frontQuarter1Lights,
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'keyframe',
-          waitUntilTime: 0,
-          waitUntilConditionCount: 1
-        },
-        // Turn off front quarter 4 lights on keyframe
-        {
-          lights: frontQuarter4Lights,
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'keyframe',
-          waitUntilTime: 0,
-          waitUntilConditionCount: 1
-        },
-        // Turn off back quarter 1 lights on keyframe
-        {
-          lights: backQuarter1Lights,
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'keyframe',
-          waitUntilTime: 0,
-          waitUntilConditionCount: 1
-        },
-        // Turn off back quarter 4 lights on keyframe
-        {
-          lights: backQuarter4Lights,
-          layer: 0,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: blackColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'keyframe',
-          waitUntilTime: 0,
-          waitUntilConditionCount: 1
-        },
-        // Turn off inner lights on keyframe
         {
           lights: innerLights,
-          layer: 0,
+          layer: 4,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: blackColor, easing: 'linear', duration: 0 },
           waitUntilCondition: 'keyframe',
           waitUntilTime: 0,
           waitUntilConditionCount: 1
-        },
+        }
       ]
     };
 
+    // Apply the effects using the set/add pattern
     if (this.isFirstExecution) {
-      await sequencer.setEffect('stagekit-stomp-toggle', stompEffect);
+      sequencer.setEffect('stagekit-stomp-front-q1', frontQuarter1Effect);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('stagekit-stomp-toggle', stompEffect);
+      sequencer.addEffect('stagekit-stomp-front-q1', frontQuarter1Effect);
     }
+    sequencer.addEffect('stagekit-stomp-front-q4', frontQuarter4Effect);
+    sequencer.addEffect('stagekit-stomp-back-q1', backQuarter1Effect);
+    sequencer.addEffect('stagekit-stomp-back-q4', backQuarter4Effect);
+    sequencer.addEffect('stagekit-stomp-inner', innerEffect);
   }
 
   onStop(): void {

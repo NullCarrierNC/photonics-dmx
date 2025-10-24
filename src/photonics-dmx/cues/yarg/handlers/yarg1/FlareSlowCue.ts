@@ -28,7 +28,7 @@ export class FlareSlowCue implements ICue {
         lights: [lights[i]],
         layer: i + 101,
       });
-      await sequencer.addEffect(`flare-slow${i}`, flash);
+      sequencer.addEffect(`flare-slow${i}`, flash);
     }
   }
 

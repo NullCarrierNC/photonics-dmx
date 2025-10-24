@@ -47,27 +47,6 @@ export class EventScheduler implements IEventScheduler {
     }
   }
 
-  /**
-   * Sets a timeout using the clock
-   * @param callback The function to call when the timeout completes
-   * @param delay The delay in milliseconds
-   * @returns The event ID for cancellation
-   */
-  public setTimeout(callback: () => void, delay: number): string {
-    const targetTime = this.getCurrentTime() + delay;
-    const eventId = this.generateEventId();
-    
-    const event: ScheduledEvent = {
-      id: eventId,
-      targetTime,
-      callback,
-      isRepeating: false
-    };
-    
-    this.scheduledEvents.set(eventId, event);
-    
-    return eventId;
-  }
 
   /**
    * Schedule an event at a specific absolute time
@@ -112,22 +91,7 @@ export class EventScheduler implements IEventScheduler {
     return eventId;
   }
 
-  /**
-   * Clears all tracked timeouts
-   */
-  public clearAllTimeouts(): void {
-    this.scheduledEvents.clear();
-  }
 
-  /**
-   * Removes a specific timeout from tracking
-   * @param timeoutId The timeout ID to remove
-   */
-  public removeTimeout(timeoutId: string): void {
-    if (timeoutId) {
-      this.scheduledEvents.delete(timeoutId);
-    }
-  }
 
   /**
    * Remove a scheduled event by ID

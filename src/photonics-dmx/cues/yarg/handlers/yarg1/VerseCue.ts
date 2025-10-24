@@ -44,10 +44,10 @@ export class VerseCue implements ICue {
         layer: i
       });
       if (this.isFirstExecution) {
-        await sequencer.setEffect(`verse-${i}`, effect);
+        sequencer.setEffect(`verse-${i}`, effect);
         this.isFirstExecution = false;
       } else {
-        await sequencer.addEffect(`verse-${i}`, effect);
+        sequencer.addEffect(`verse-${i}`, effect);
       }
 
     }

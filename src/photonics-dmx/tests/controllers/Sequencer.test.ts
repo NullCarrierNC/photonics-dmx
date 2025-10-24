@@ -13,6 +13,7 @@
 import '@jest/globals';
 import { Sequencer } from '../../controllers/sequencer/Sequencer';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
+import { Clock } from '../../controllers/sequencer/Clock';
 import { Effect, RGBIO, TrackedLight } from '../../types';
 import { createMockTrackedLight, createMockRGBIP } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
@@ -20,16 +21,17 @@ import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals
 // Mock all dependencies that Sequencer relies on
 jest.mock('../../controllers/sequencer/LightTransitionController');
 jest.mock('../../controllers/sequencer/EffectTransformer');
-jest.mock('../../controllers/sequencer/EventScheduler');
 jest.mock('../../controllers/sequencer/LayerManager');
 jest.mock('../../controllers/sequencer/TransitionEngine');
 jest.mock('../../controllers/sequencer/SystemEffectsController');
 jest.mock('../../controllers/sequencer/EffectManager');
 jest.mock('../../controllers/sequencer/SongEventHandler');
 jest.mock('../../controllers/sequencer/DebugMonitor');
+jest.mock('../../controllers/sequencer/Clock');
 
 describe('Sequencer', () => {
   let lightTransitionController: jest.Mocked<LightTransitionController>;
+  let clock: jest.Mocked<Clock>;
   let sequencer: Sequencer;
 
   beforeEach(() => {
@@ -45,8 +47,19 @@ describe('Sequencer', () => {
       unregisterFromClock: jest.fn()
     } as unknown as jest.Mocked<LightTransitionController>;
 
-    // Create Sequencer with mocked LightTransitionController
-    sequencer = new Sequencer(lightTransitionController);
+    // Create mock for Clock
+    clock = {
+      onTick: jest.fn(),
+      offTick: jest.fn(),
+      start: jest.fn(),
+      stop: jest.fn(),
+      getCurrentTime: jest.fn().mockReturnValue(0),
+      getTickCount: jest.fn().mockReturnValue(0),
+      isRunning: jest.fn().mockReturnValue(false)
+    } as unknown as jest.Mocked<Clock>;
+
+    // Create Sequencer with mocked LightTransitionController and Clock
+    sequencer = new Sequencer(lightTransitionController, clock);
   });
 
   afterEach(() => {
@@ -81,14 +94,14 @@ describe('Sequencer', () => {
           }
         ]
       };
-      const offset = 500;
+      
       const isPersistent = true;
 
       // Call the method
-      sequencer.addEffect(effectName, effect, offset, isPersistent);
+      sequencer.addEffect(effectName, effect, isPersistent);
 
       // Verify the delegation
-      expect(addEffectSpy).toHaveBeenCalledWith(effectName, effect, offset, isPersistent);
+      expect(addEffectSpy).toHaveBeenCalledWith(effectName, effect, isPersistent);
     });
   });
 
@@ -104,14 +117,14 @@ describe('Sequencer', () => {
         description: 'Test effect',
         transitions: []
       };
-      const offset = 500;
+
       const isPersistent = true;
 
       // Call the method
-      await sequencer.setEffect(effectName, effect, offset, isPersistent);
+      sequencer.setEffect(effectName, effect, isPersistent);
 
       // Verify the delegation
-      expect(setEffectSpy).toHaveBeenCalledWith(effectName, effect, offset, isPersistent);
+      expect(setEffectSpy).toHaveBeenCalledWith(effectName, effect, isPersistent);
     });
   });
 
@@ -142,7 +155,7 @@ describe('Sequencer', () => {
       const duration = 1000;
 
       // Call the method
-      await sequencer.blackout(duration);
+      sequencer.blackout(duration);
 
       // Verify the delegation
       expect(blackoutSpy).toHaveBeenCalledWith(duration);

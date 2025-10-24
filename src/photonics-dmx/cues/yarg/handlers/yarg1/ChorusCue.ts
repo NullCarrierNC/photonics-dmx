@@ -55,10 +55,10 @@ export class ChorusCue implements ICue {
         layer: i
       });
       if (this.isFirstExecution) {
-        await sequencer.setEffect(`chorus-${i}`, effect);
+        sequencer.setEffect(`chorus-${i}`, effect);
         this.isFirstExecution = false;
       } else {
-        await sequencer.addEffect(`chorus-${i}`, effect);
+        sequencer.addEffect(`chorus-${i}`, effect);
       }
     }
   }

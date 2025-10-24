@@ -53,12 +53,12 @@ export class StageKitHarmonyCue implements ICue {
       
       // Apply both effects
       if (this.isFirstExecution) {
-        await controller.setEffect('stagekit-harmony-yellow', yellowEffect);
-        await controller.addEffect('stagekit-harmony-red', redEffect);
+        controller.setEffect('stagekit-harmony-yellow', yellowEffect);
+        controller.addEffect('stagekit-harmony-red', redEffect);
         this.isFirstExecution = false;
       } else {
-        await controller.addEffect('stagekit-harmony-yellow', yellowEffect);
-        await controller.addEffect('stagekit-harmony-red', redEffect);
+        controller.addEffect('stagekit-harmony-yellow', yellowEffect);
+        controller.addEffect('stagekit-harmony-red', redEffect);
       }
     } else {
       // Small venue: Green/Blue clockwise chase (cyan color)
@@ -75,10 +75,10 @@ export class StageKitHarmonyCue implements ICue {
       
       // Apply the effect
       if (this.isFirstExecution) {
-        await controller.setEffect('stagekit-harmony-cyan', cyanEffect);
+        controller.setEffect('stagekit-harmony-cyan', cyanEffect);
         this.isFirstExecution = false;
       } else {
-        await controller.addEffect('stagekit-harmony-cyan', cyanEffect);
+        controller.addEffect('stagekit-harmony-cyan', cyanEffect);
       }
     }
   }

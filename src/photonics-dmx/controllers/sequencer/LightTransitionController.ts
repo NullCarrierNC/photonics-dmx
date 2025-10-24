@@ -45,19 +45,13 @@ export class LightTransitionController {
    */
   private _finalColors: Map<string, RGBIO>;
 
-  private _transitionLock = false;
   private _clearingTransitions = false; // Flag to prevent new transitions during cleanup
   private clock: Clock | null = null;
   private updateCallback: (deltaTime: number) => void;
-  private accumulatedTime: number = 0;
 
-  // Enhanced lock and monitoring fields
-  private lockStartTime: number = 0;
-  private readonly MAX_LOCK_TIME_MS = 20; // Maximum time to hold lock
-  private lockDurations: number[] = [];
-  private readonly MAX_LOCK_HISTORY = 100;
+  // Monitoring fields
   private lastStateValidation: number = 0;
-  private readonly VALIDATION_INTERVAL = 3000; 
+  private readonly VALIDATION_INTERVAL = 3000;
   
   constructor(lightStateManager: LightStateManager) {
     this._lightStateManager = lightStateManager;
@@ -75,8 +69,6 @@ export class LightTransitionController {
    */
   public registerWithClock(clock: Clock): void {
     this.clock = clock;
-    // Initialize accumulated time with current clock time for consistency
-    this.accumulatedTime = clock.getCurrentTimeMs();
     clock.onTick(this.updateCallback);
   }
 
@@ -152,7 +144,7 @@ export class LightTransitionController {
       layer,
       startState: effectiveStartState,
       endState: { ...endState },
-      startTime: this.clock ? this.clock.getCurrentTimeMs() : this.accumulatedTime,
+      startTime: performance.now(),
       transition: {
         transform: {
           color: endState,
@@ -206,19 +198,8 @@ export class LightTransitionController {
    * This is a nuclear option used when switching cues
    */
   public clearAllTransitions(): void {
-    // Set the clearing flag FIRST to prevent new transitions from being added
+    // Set the clearing flag to prevent new transitions from being added
     this._clearingTransitions = true;
-    
-    // Wait for any active update cycle to complete by checking the lock
-    const maxWait = 100; // 100ms max wait
-    const startWait = performance.now();
-    while (this._transitionLock && (performance.now() - startWait) < maxWait) {
-      // Busy wait for lock to release (update cycle runs every 5ms, so this should be quick)
-    }
-    
-    // Set our own lock to prevent update cycle from running
-    this._transitionLock = true;
-    this.lockStartTime = performance.now();
     
     try {
       // Get all light IDs before clearing (union of all known sources)
@@ -251,11 +232,9 @@ export class LightTransitionController {
       });
       
       // Publish the black states immediately
-      this._lightStateManager.publishLightStates();
+    //  this._lightStateManager.publishLightStates();
     } finally {
-      // Release the lock
-      this._transitionLock = false;
-      // Release the clearing flag LAST
+      // Release the clearing flag
       this._clearingTransitions = false;
     }
   }
@@ -288,7 +267,7 @@ export class LightTransitionController {
     // Force immediate recalculation and publication of the final color
     // This ensures the light updates immediately rather than waiting for the next update cycle
     this.calculateFinalColorForLight(lightId);
-    this._lightStateManager.publishLightStates();
+  //  this._lightStateManager.publishLightStates();
   }
 
   /**
@@ -374,161 +353,204 @@ export class LightTransitionController {
   }
 
   /**
-   * Update method called by the clock with enhanced safeguards
+   * Update method called by the clock with frame synchronization
    *
-   * This method:
-   *   1) Processes all active transitions using deltaTime.
-   *   2) Interpolates per-layer colours based on elapsed time.
-   *   3) Merges layer colours using blend modes.
-   *   4) Set final colour in LightStateManager.
-   *   5) Includes deadlock prevention, state validation, and monitoring.
+   * All lights and all layers are calculated using a SINGLE timestamp captured once per frame.
    *
-   * @param deltaTime The time elapsed since last update in milliseconds
+   * Process:
+   *   1) Capture single timestamp for the entire frame
+   *   2) Interpolate ALL layer states for ALL lights using this timestamp
+   *   3) Blend ALL layers for ALL lights
+   *   4) Publish all states atomically
+   *
+   * @param deltaTime The time elapsed since last update in milliseconds (unused)
    */
-  private updateTransitions(deltaTime: number): Promise<void> {
-    return new Promise((resolve) => {
-      // Check for lock timeout and force release if necessary
-      if (this._transitionLock) {
-        if (performance.now() - this.lockStartTime > this.MAX_LOCK_TIME_MS) {
-          console.warn('LightTransitionController: Forcing lock release due to timeout');
-          this._transitionLock = false;
-          this.recordLockDuration(this.MAX_LOCK_TIME_MS + 10); // Record exceeded time
-        } else {
-          resolve(); // Skip this update cycle if lock is held
-          return;
-        }
+  private updateTransitions(_deltaTime: number): void {
+    // Skip processing if a global clear is in progress
+    if (this._clearingTransitions) {
+      return;
+    }
+
+    try {
+      // CRITICAL: Single timestamp for all calculations in this frame
+      const now = performance.now();
+      
+      // Periodic state validation and cleanup
+      if (now - this.lastStateValidation > this.VALIDATION_INTERVAL) {
+        this.validateAllStates();
+        this.cleanupOrphanedTransitions();
+        this.lastStateValidation = now;
       }
 
-      this._transitionLock = true;
-      this.lockStartTime = performance.now();
+      // Phase 1: Calculate interpolated states for ALL lights on ALL layers
+      // All calculations use the SAME 'now' timestamp
+      const allLayerStates = new Map<string, Map<number, RGBIO>>();
+      const layersToRemove: Array<{lightId: string, layer: number}> = [];
+      const lightsToRemove: string[] = [];
+      const transitionUpdates: Array<{lightId: string, layer: number, startState: RGBIO}> = [];
 
-      try {
-        // Accumulate delta time for smooth transitions
-        this.accumulatedTime += deltaTime;
+      this._transitionsByLight.forEach((layerTransitions, lightId) => {
+        const layerStates = new Map<number, RGBIO>();
+        const layersToRemoveForLight = new Set<number>();
 
-        // Periodic state validation and cleanup
-        const now = performance.now();
-        if (now - this.lastStateValidation > this.VALIDATION_INTERVAL) {
-          this.validateAllStates();
-          this.cleanupOrphanedTransitions();
-          this.lastStateValidation = now;
+        layerTransitions.forEach((transitionData, layer) => {
+          const { startState, endState, startTime, transition } = transitionData;
+
+          // Calculate elapsed time using the shared 'now' timestamp
+          const elapsed = now - startTime;
+          const duration = transition.transform.duration;
+          const progress = duration > 0 ? Math.min(elapsed / duration, 1) : 1;
+
+          // Get the easing function
+          const easing = transition.transform.easing;
+          const easedProgress = this.getEasingValue(progress, easing);
+
+          // Interpolate the state
+          const newState: RGBIO = {
+            red: this.interpolate(startState.red, endState.red, easedProgress),
+            green: this.interpolate(startState.green, endState.green, easedProgress),
+            blue: this.interpolate(startState.blue, endState.blue, easedProgress),
+            intensity: this.interpolate(startState.intensity, endState.intensity, easedProgress),
+            opacity: endState.opacity,
+            blendMode: endState.blendMode,
+          };
+
+          // Handle optional properties
+          if (startState.pan !== undefined || endState.pan !== undefined) {
+            const startPan = startState.pan ?? endState.pan ?? 0;
+            const endPan = endState.pan ?? startState.pan ?? 0;
+            newState.pan = this.interpolate(startPan, endPan, easedProgress);
+          }
+
+          if (startState.tilt !== undefined || endState.tilt !== undefined) {
+            const startTilt = startState.tilt ?? endState.tilt ?? 0;
+            const endTilt = endState.tilt ?? startState.tilt ?? 0;
+            newState.tilt = this.interpolate(startTilt, endTilt, easedProgress);
+          }
+
+          // Validate and correct the state
+          const correctedState = this.validateAndCorrectLightState(lightId, newState);
+          layerStates.set(layer, correctedState);
+
+          // If transition is complete, mark for removal
+          if (progress >= 0.999) {
+            transitionUpdates.push({
+              lightId,
+              layer,
+              startState: { ...endState }
+            });
+            layersToRemoveForLight.add(layer);
+          }
+        });
+
+        // Store the interpolated layer states for this light
+        if (layerStates.size > 0) {
+          allLayerStates.set(lightId, layerStates);
         }
 
-        // Track which lights have active transitions and need final color calculations
-        const activeTransitionLights = new Set<string>();
+        // Collect layers to remove
+        for (const layer of layersToRemoveForLight) {
+          layersToRemove.push({lightId, layer});
+        }
 
-        // Process all transitions by light
-        this._transitionsByLight.forEach((layerTransitions, lightId) => {
-          // Process transitions for this light by layer
-          const perLightLayerStates = this._currentLayerStates.has(lightId)
-            ? this._currentLayerStates.get(lightId)!
-            : new Map<number, RGBIO>();
+        // Check if this light should be completely removed
+        if (layersToRemoveForLight.size === layerTransitions.size) {
+          lightsToRemove.push(lightId);
+        }
+      });
 
-          // Collect layers to process and layers to remove
-          const layersToProcess = Array.from(layerTransitions.keys());
-          const layersToRemove = new Set<number>();
+      // Phase 2: Update internal state structures
+      allLayerStates.forEach((layerStates, lightId) => {
+        if (!this._currentLayerStates.has(lightId)) {
+          this._currentLayerStates.set(lightId, new Map<number, RGBIO>());
+        }
+        const currentStates = this._currentLayerStates.get(lightId)!;
+        layerStates.forEach((state, layer) => {
+          currentStates.set(layer, state);
+        });
+      });
 
-          for (const layer of layersToProcess) {
-            const transitionData = layerTransitions.get(layer);
-            if (!transitionData) continue; // Skip if already removed
-
-            const { startState, endState, startTime, transition } = transitionData;
-
-            // Use accumulated time from Clock system for consistent timing
-            const elapsed = this.accumulatedTime - startTime;
-            const duration = transition.transform.duration;
-
-            // Calculate progress (0 to 1) - use >= 0.999 to handle floating point precision
-            const progress = duration > 0 ? Math.min(elapsed / duration, 1) : 1;
-
-            // Get the easing function
-            const easing = transition.transform.easing;
-            const easedProgress = this.getEasingValue(progress, easing);
-
-            // Calculate the new state based on interpolation
-            const newState: RGBIO = {
-              red: this.interpolate(startState.red, endState.red, easedProgress),
-              green: this.interpolate(startState.green, endState.green, easedProgress),
-              blue: this.interpolate(startState.blue, endState.blue, easedProgress),
-              intensity: this.interpolate(startState.intensity, endState.intensity, easedProgress),
-              opacity: endState.opacity,
-              blendMode: endState.blendMode,
-            };
-
-            // Handle optional properties
-            if (startState.pan !== undefined || endState.pan !== undefined) {
-              const startPan = startState.pan ?? endState.pan ?? 0;
-              const endPan = endState.pan ?? startState.pan ?? 0;
-              newState.pan = this.interpolate(startPan, endPan, easedProgress);
-            }
-
-            if (startState.tilt !== undefined || endState.tilt !== undefined) {
-              const startTilt = startState.tilt ?? endState.tilt ?? 0;
-              const endTilt = endState.tilt ?? startState.tilt ?? 0;
-              newState.tilt = this.interpolate(startTilt, endTilt, easedProgress);
-            }
-
-            // Validate and correct the new state
-            const correctedState = this.validateAndCorrectLightState(lightId, newState);
-            perLightLayerStates.set(layer, correctedState);
-
-            // Mark this light as having an active transition
-            activeTransitionLights.add(lightId);
-
-            // If transition is complete (or very close to complete), mark for removal
-            if (progress >= 0.999) {
-              // Important: Set the startState to the final state for future transitions
-              transitionData.startState = { ...endState };
-
-              // Mark this layer for removal after processing
-              layersToRemove.add(layer);
-            }
+      // Apply transition updates for completed transitions
+      transitionUpdates.forEach(({lightId, layer, startState}) => {
+        const layerTransitions = this._transitionsByLight.get(lightId);
+        if (layerTransitions) {
+          const transitionData = layerTransitions.get(layer);
+          if (transitionData) {
+            transitionData.startState = startState;
           }
+        }
+      });
 
-          // Remove completed transitions after processing all layers
-          for (const layer of layersToRemove) {
-            layerTransitions.delete(layer);
-          }
+      // Phase 3: Blend ALL layers for ALL lights
+      allLayerStates.forEach((layerStates, lightId) => {
+        this.blendAndSetFinalColor(lightId, layerStates);
+      });
 
-          // Clean up empty layer maps for this light
+      // Phase 4: Clean up completed transitions
+      layersToRemove.forEach(({lightId, layer}) => {
+        const layerTransitions = this._transitionsByLight.get(lightId);
+        if (layerTransitions) {
+          layerTransitions.delete(layer);
           if (layerTransitions.size === 0) {
             this._transitionsByLight.delete(lightId);
           }
+        }
+      });
 
-          // Update layer states incrementally instead of replacing the entire map
-          // This prevents race conditions with removeLightLayer
-          if (!this._currentLayerStates.has(lightId)) {
-            this._currentLayerStates.set(lightId, new Map<number, RGBIO>());
-          }
-          const currentStates = this._currentLayerStates.get(lightId)!;
-          perLightLayerStates.forEach((state, layer) => {
-            currentStates.set(layer, state);
-          });
-        });
+      lightsToRemove.forEach(lightId => {
+        this._transitionsByLight.delete(lightId);
+      });
 
-        // Calculate the final colors for all active lights
-        activeTransitionLights.forEach(lightId => {
-          this.calculateFinalColorForLight(lightId);
-        });
+      // Verify state consistency
+      this.verifyStateConsistency();
 
-        // Verify state consistency
-        this.verifyStateConsistency();
+    } catch (error) {
+      console.error('Critical error in transition processing:', error);
+      this.emergencyStateReset();
+    }
+    
+    // Phase 5: Publish all buffered light state updates atomically
+    this._lightStateManager.syncFrame();
+  }
 
-        this._lightStateManager.publishLightStates();
+  /**
+   * Blends all layers for a light and sets the final color
+   * @param lightId The ID of the light
+   * @param layerStates Map of layer numbers to their interpolated states
+   */
+  private blendAndSetFinalColor(lightId: string, layerStates: Map<number, RGBIO>): void {
+    const transparentColor = this.transparentColor();
+    const blackColor: RGBIO = {
+      red: 0,
+      green: 0,
+      blue: 0,
+      intensity: 0,
+      opacity: 1.0,
+      blendMode: 'replace'
+    };
+    
+    // If no layers, force hard black output
+    if (layerStates.size === 0) {
+      this._finalColors.set(lightId, blackColor);
+      this._lightStateManager.setLightState(lightId, blackColor);
+      return;
+    }
+    
+    let finalColor: RGBIO = transparentColor;
 
-        // Record lock duration for monitoring
-        const lockDuration = performance.now() - this.lockStartTime;
-        this.recordLockDuration(lockDuration);
+    // Convert Map to array, sort by layer number, then blend
+    const sortedLayers = Array.from(layerStates.entries())
+      .sort(([layerA], [layerB]) => layerA - layerB);
 
-      } catch (error) {
-        console.error('Critical error in transition processing:', error);
-        // Emergency state reset if needed
-        this.emergencyStateReset();
-      } finally {
-        this._transitionLock = false;
-        resolve();
-      }
-    });
+    for (const [_, layerColor] of sortedLayers) {
+      finalColor = this.blendWithOpacity(finalColor, layerColor);
+    }
+
+    // Store the final color
+    this._finalColors.set(lightId, finalColor);
+
+    // Update the light state manager (will be batched)
+    this._lightStateManager.setLightState(lightId, finalColor);
   }
 
   /**
@@ -547,7 +569,7 @@ export class LightTransitionController {
     this._finalColors.forEach((color, lightId) => {
       this._lightStateManager.setLightState(lightId, color);
     });
-    this._lightStateManager.publishLightStates();
+  //  this._lightStateManager.publishLightStates();
   }
 
   /**
@@ -703,7 +725,7 @@ export class LightTransitionController {
     this._finalColors.clear();
     
     // Ensure the black state is published
-    this._lightStateManager.publishLightStates();
+    //this._lightStateManager.publishLightStates();
   }
 
   /**
@@ -790,11 +812,10 @@ export class LightTransitionController {
   }
 
   /**
-   * Get the current accumulated time from the Clock system
-   * Useful for debugging timing issues
+   * Get the current system time for debugging timing issues
    */
-  public getAccumulatedTime(): number {
-    return this.accumulatedTime;
+  public getCurrentSystemTime(): number {
+    return performance.now();
   }
 
   /**
@@ -897,22 +918,6 @@ export class LightTransitionController {
     return index !== -1 ? index + 1 : 0;
   }
 
-  /**
-   * Records lock duration for monitoring performance
-   * @param duration The duration the lock was held in milliseconds
-   */
-  private recordLockDuration(duration: number): void {
-    this.lockDurations.push(duration);
-    if (this.lockDurations.length > this.MAX_LOCK_HISTORY) {
-      this.lockDurations.shift();
-    }
-
-    // Warn if lock times are consistently high
-    const avgDuration = this.lockDurations.reduce((a, b) => a + b) / this.lockDurations.length;
-    if (avgDuration > 20) { // 20ms threshold
-      console.warn(`High average lock duration: ${avgDuration.toFixed(2)}ms`);
-    }
-  }
 
   /**
    * Emergency state reset for critical error recovery
@@ -941,58 +946,14 @@ export class LightTransitionController {
     this._finalColors.clear();
 
     // Ensure the black state is published
-    this._lightStateManager.publishLightStates();
+   // this._lightStateManager.publishLightStates();
   }
 
   /**
-   * Reset the accumulated time counter
-   * Useful when you want to reset timing state or force immediate processing
-   */
-  public resetAccumulatedTime(): void {
-    this.accumulatedTime = 0;
-  }
-
-  /**
-   * Get lock duration statistics for performance monitoring
-   * @returns Object containing lock duration statistics
-   */
-  public getLockDurationStats(): {
-    averageDuration: number;
-    maxDuration: number;
-    minDuration: number;
-    totalSamples: number;
-    highDurationCount: number;
-  } {
-    if (this.lockDurations.length === 0) {
-      return {
-        averageDuration: 0,
-        maxDuration: 0,
-        minDuration: 0,
-        totalSamples: 0,
-        highDurationCount: 0
-      };
-    }
-
-    const sum = this.lockDurations.reduce((a, b) => a + b);
-    const average = sum / this.lockDurations.length;
-    const max = Math.max(...this.lockDurations);
-    const min = Math.min(...this.lockDurations);
-    const highDurationCount = this.lockDurations.filter(d => d > 20).length;
-
-    return {
-      averageDuration: average,
-      maxDuration: max,
-      minDuration: min,
-      totalSamples: this.lockDurations.length,
-      highDurationCount
-    };
-  }
-
-  /**
-   * Get the current time from the Clock system
-   * Falls back to accumulated time if clock is not available
+   * Get the current time from the system
+   * Uses performance.now() for high precision timing
    */
   public getCurrentTime(): number {
-    return this.clock ? this.clock.getCurrentTimeMs() : this.accumulatedTime;
+    return performance.now();
   }
 }

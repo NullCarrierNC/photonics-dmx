@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
-import { LightState, RGBIO } from '../../types';
+import { RGBIO } from '../../types';
+import { Clock } from './Clock';
 
 /**
  * The LightStateManager stores the current state of each light.
@@ -8,21 +9,31 @@ import { LightState, RGBIO } from '../../types';
 class LightStateManager extends EventEmitter {
   private _finalStates: Map<string, RGBIO>;
   private _publishInterval: NodeJS.Timeout | null;
+  private _frameBuffer: Map<string, RGBIO>;
+  private _clock: Clock | null = null;
 
-  constructor() {
+  constructor(clock?: Clock) {
     super();
     this._finalStates = new Map();
     this._publishInterval = null;
+    this._frameBuffer = new Map();
+    this._clock = clock || null;
+    
+    // Register for frame synchronization if clock is provided
+    if (this._clock) {
+      this._clock.onTick(() => this.syncFrame());
+    }
   }
 
 
   /**
-   * Sets the lights state
+   * Sets the lights state, batches updates for frame synchronization
    * @param lightId 
    * @param finalColor 
    */
   public setLightState(lightId: string, finalColor: RGBIO): void {
-    this._finalStates.set(lightId, finalColor);
+    // Store in frame buffer for synchronized updates
+    this._frameBuffer.set(lightId, finalColor);
   }
 
 
@@ -47,11 +58,25 @@ class LightStateManager extends EventEmitter {
    * Publishes the final states via an event. 
    */
   public publishLightStates(): void {
-    const states: LightState[] = [];
-    this._finalStates.forEach((color, lightId) => {
-      states.push({ id: lightId, value: color });
+    this.emit('LightStatesUpdated', this._finalStates);
+  }
+
+  /**
+   * Synchronizes all pending frame updates atomically
+   */
+  public syncFrame(): void {
+    if (this._frameBuffer.size === 0) return;
+    
+    // Apply all pending updates atomically
+    this._frameBuffer.forEach((color, lightId) => {
+      this._finalStates.set(lightId, color);
     });
-    this.emit('LightStatesUpdated', states);
+    
+    // Clear frame buffer
+    this._frameBuffer.clear();
+    
+    // Publish all synchronized states
+    this.publishLightStates();
   }
 
   /**
@@ -64,6 +89,7 @@ class LightStateManager extends EventEmitter {
       this._publishInterval = null;
     }
     this._finalStates.clear();
+    this._frameBuffer.clear();
   }
 }
 

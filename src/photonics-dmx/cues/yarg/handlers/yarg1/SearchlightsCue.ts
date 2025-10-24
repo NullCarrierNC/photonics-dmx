@@ -47,7 +47,7 @@ export class SearchlightsCue implements ICue {
       layer: 101,
     });
     // Use unblocked to avoid breaking the sweep timing.
-    const didAdd =  await sequencer.addEffectUnblockedName('searchlights', sweep);
+    const didAdd =  sequencer.addEffectUnblockedName('searchlights', sweep);
     if (didAdd) {
       ltr = !ltr;
     }

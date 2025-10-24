@@ -12,21 +12,21 @@
 import { SystemEffectsController } from '../../controllers/sequencer/SystemEffectsController';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
 import { LayerManager } from '../../controllers/sequencer/LayerManager';
-import { EventScheduler } from '../../controllers/sequencer/EventScheduler';
 import { Sequencer } from '../../controllers/sequencer/Sequencer';
+import { Clock } from '../../controllers/sequencer/Clock';
 import { createMockRGBIP } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
 import { DmxFixture, FixtureTypes } from '../../types';
 
 jest.mock('../../controllers/sequencer/LightTransitionController');
 jest.mock('../../controllers/sequencer/LayerManager');
-jest.mock('../../controllers/sequencer/EventScheduler');
 jest.mock('../../controllers/sequencer/Sequencer');
+jest.mock('../../controllers/sequencer/Clock');
 
 describe('SystemEffectsController', () => {
   let lightTransitionController: jest.Mocked<LightTransitionController>;
   let layerManager: jest.Mocked<LayerManager>;
-  let eventScheduler: jest.Mocked<EventScheduler>;
+  let clock: jest.Mocked<Clock>;
   let systemEffectsController: SystemEffectsController;
   let sequencer: jest.Mocked<Sequencer>;
 
@@ -67,24 +67,26 @@ describe('SystemEffectsController', () => {
       getBlackoutLayersUnder: jest.fn().mockReturnValue(200),
       getActiveEffects: jest.fn().mockReturnValue(new Map())
     } as unknown as jest.Mocked<LayerManager>;
-    
-    eventScheduler = {
-      setTimeout: jest.fn((_callback: () => void, _delay: number) => {
-        return 'mock-event-id';
-      }),
-      clearAllTimeouts: jest.fn(),
-      removeTimeout: jest.fn()
-    } as unknown as jest.Mocked<EventScheduler>;
+
+    // Create mock for Clock
+    clock = {
+      onTick: jest.fn(),
+      offTick: jest.fn(),
+      start: jest.fn(),
+      stop: jest.fn(),
+      getCurrentTime: jest.fn().mockReturnValue(0),
+      getTickCount: jest.fn().mockReturnValue(0),
+      isRunning: jest.fn().mockReturnValue(false)
+    } as unknown as jest.Mocked<Clock>;
     
     // Create SystemEffectsController instance with mocked dependencies
     systemEffectsController = new SystemEffectsController(
       lightTransitionController,
-      layerManager,
-      eventScheduler
+      layerManager
     );
     
     // Create a mocked Sequencer that would use this SystemEffectsController
-    sequencer = new Sequencer(lightTransitionController) as jest.Mocked<Sequencer>;
+    sequencer = new Sequencer(lightTransitionController, clock) as jest.Mocked<Sequencer>;
     // Manually set the systemEffectsController
     (sequencer as any).systemEffectsController = systemEffectsController;
     

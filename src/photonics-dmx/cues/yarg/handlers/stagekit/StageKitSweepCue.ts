@@ -50,10 +50,10 @@ export class StageKitSweepCue implements ICue {
     };
 
     if (this.isFirstExecution) {
-      await controller.setEffect('stagekit-sweep', sweepEffect);
+      controller.setEffect('stagekit-sweep', sweepEffect);
       this.isFirstExecution = false;
     } else {
-      await controller.addEffect('stagekit-sweep', sweepEffect);
+      controller.addEffect('stagekit-sweep', sweepEffect);
     }
   }
 

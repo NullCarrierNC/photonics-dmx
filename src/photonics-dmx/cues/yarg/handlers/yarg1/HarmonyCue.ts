@@ -107,10 +107,10 @@ export class HarmonyCue implements ICue {
     });
 
     if (this.isFirstExecution) {
-      await sequencer.setEffect('harmony', cross);
+      sequencer.setEffect('harmony', cross);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('harmony', cross);
+      sequencer.addEffect('harmony', cross);
     }
   }
 

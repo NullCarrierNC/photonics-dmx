@@ -76,7 +76,7 @@ export class StompCue implements ICue {
       ]
     };
 
-    await sequencer.addEffect('stomp', stompEffect);
+    sequencer.addEffect('stomp', stompEffect);
   }
 
   onStop(): void {

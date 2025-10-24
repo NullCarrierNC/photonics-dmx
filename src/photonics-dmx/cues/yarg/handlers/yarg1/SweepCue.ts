@@ -55,7 +55,7 @@ export class SweepCue implements ICue {
       layer: 101,
     });
 
-    await sequencer.addEffectUnblockedName('sweep', sweep);
+    sequencer.addEffectUnblockedName('sweep', sweep);
   }
 
   onStop(): void {

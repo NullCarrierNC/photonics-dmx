@@ -43,11 +43,11 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
       });
 
       if (this.isFirstExecution) {
-        await sequencer.setEffect('silhouettes-spotlight-base', baseEffect);
-        await sequencer.addEffect('silhouettes-spotlight-flash', flashEffect);
+        sequencer.setEffect('silhouettes-spotlight-base', baseEffect);
+        sequencer.addEffect('silhouettes-spotlight-flash', flashEffect);
         this.isFirstExecution = false;
       } else {
-        await sequencer.addEffect('silhouettes-spotlight-base', baseEffect);
+        sequencer.addEffect('silhouettes-spotlight-base', baseEffect);
         await  sequencer.addEffect('silhouettes-spotlight-flash', flashEffect);
       }
       
@@ -78,11 +78,11 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
       // TODO: Add vocal harmony toggle logic 
 
       if (this.isFirstExecution) {
-        await sequencer.setEffect('silhouettes-spotlight-green', greenBackdrop);
-  //      await sequencer.addEffect('silhouettes-spotlight-blue-odd', blueOdd);
+        sequencer.setEffect('silhouettes-spotlight-green', greenBackdrop);
+  //      sequencer.addEffect('silhouettes-spotlight-blue-odd', blueOdd);
         this.isFirstExecution = false;
       } else {
-        await sequencer.addEffect('silhouettes-spotlight-green', greenBackdrop);
+        sequencer.addEffect('silhouettes-spotlight-green', greenBackdrop);
   //      sequencer.addEffect('silhouettes-spotlight-blue-odd', blueOdd);
       }
       
@@ -97,10 +97,10 @@ export class StageKitSilhouettesSpotlightCue implements ICue {
       });
 
       if (this.isFirstExecution) {
-        await sequencer.setEffect('silhouettes-spotlight-dark', darkEffect);
+        sequencer.setEffect('silhouettes-spotlight-dark', darkEffect);
         this.isFirstExecution = false;
       } else {
-        await sequencer.addEffect('silhouettes-spotlight-dark', darkEffect);
+        sequencer.addEffect('silhouettes-spotlight-dark', darkEffect);
       }
     }
   }

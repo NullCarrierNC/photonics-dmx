@@ -17,19 +17,17 @@ import { EffectManager } from '../../controllers/sequencer/EffectManager';
 import { LayerManager } from '../../controllers/sequencer/LayerManager';
 import { TransitionEngine } from '../../controllers/sequencer/TransitionEngine';
 import { EffectTransformer } from '../../controllers/sequencer/EffectTransformer';
-import { EventScheduler } from '../../controllers/sequencer/EventScheduler';
 import { SystemEffectsController } from '../../controllers/sequencer/SystemEffectsController';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
 import { Effect, EffectTransition } from '../../types';
 import { createMockTrackedLight, createMockRGBIP } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
-import { ILayerManager, ITransitionEngine, IEffectTransformer, IEventScheduler, ISystemEffectsController } from '../../controllers/sequencer/interfaces';
+import { ILayerManager, ITransitionEngine, IEffectTransformer, ISystemEffectsController } from '../../controllers/sequencer/interfaces';
 
 // Mock all dependencies
 jest.mock('../../controllers/sequencer/LayerManager');
 jest.mock('../../controllers/sequencer/TransitionEngine');
 jest.mock('../../controllers/sequencer/EffectTransformer');
-jest.mock('../../controllers/sequencer/EventScheduler');
 jest.mock('../../controllers/sequencer/SystemEffectsController');
 jest.mock('../../controllers/sequencer/LightTransitionController');
 
@@ -37,7 +35,6 @@ describe('EffectManager', () => {
   let layerManager: jest.Mocked<LayerManager>;
   let transitionEngine: jest.Mocked<TransitionEngine>;
   let effectTransformer: jest.Mocked<EffectTransformer>;
-  let eventScheduler: jest.Mocked<EventScheduler>;
   let systemEffects: jest.Mocked<SystemEffectsController>;
   let lightTransitionController: jest.Mocked<LightTransitionController>;
   let effectManager: EffectManager;
@@ -127,11 +124,6 @@ describe('EffectManager', () => {
       }) as any)
     } as unknown as jest.Mocked<EffectTransformer>;
 
-    eventScheduler = {
-      setTimeout: jest.fn().mockReturnValue('mock-event-id'),
-      clearAllTimeouts: jest.fn(),
-      removeTimeout: jest.fn()
-    } as unknown as jest.Mocked<EventScheduler>;
 
     systemEffects = {
       isBlackoutActive: jest.fn().mockReturnValue(false),
@@ -155,7 +147,6 @@ describe('EffectManager', () => {
       layerManager as unknown as ILayerManager,
       transitionEngine as unknown as ITransitionEngine,
       effectTransformer as unknown as IEffectTransformer,
-      eventScheduler as unknown as IEventScheduler,
       systemEffects as unknown as ISystemEffectsController
     );
   });
@@ -318,7 +309,7 @@ describe('EffectManager', () => {
       expect(layerManager.removeActiveEffect).not.toHaveBeenCalled();
     });
 
-    it('should schedule effect with offset timing', () => {
+    it('should add effect immediately (no longer scheduled)', () => {
       const effect: Effect = {
         id: 'test-effect',
         description: 'Test effect',
@@ -337,23 +328,11 @@ describe('EffectManager', () => {
         }]
       };
 
-      const offset = 500; // 500ms offset
+      // Call addEffect
+      effectManager.addEffect('test', effect);
 
-      // Call addEffect with offset
-      effectManager.addEffect('test', effect, offset);
-
-      // Verify setTimeout was called with the correct delay
-      expect(eventScheduler.setTimeout).toHaveBeenCalledWith(
-        expect.any(Function),
-        offset
-      );
-
-      // Verify effect is not added immediately
-      expect(layerManager.addActiveEffect).not.toHaveBeenCalled();
-
-      // Note: With the EventScheduler system, the actual execution happens through the Clock
-      // The test verifies that the scheduling was set up correctly
-      // The actual execution would happen when the Clock processes the scheduled event
+      // Verify effect is added immediately (no longer scheduled)
+      expect(layerManager.addActiveEffect).toHaveBeenCalled();
     });
   });
 
