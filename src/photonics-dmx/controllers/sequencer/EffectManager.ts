@@ -110,29 +110,25 @@ export class EffectManager implements IEffectManager {
       this._lastCalled0LayerEffect = name;
     }
 
-    const startEffectForLight = (layer: number, lightId: string, transitionsForLight: EffectTransition[]) => {
-      // Check if this specific light has an active effect
-      const activeEffect = this.layerManager.getActiveEffect(layer, lightId);
-
-      if (activeEffect) {
-        if (activeEffect.name === name) {
-          // Same effect name - queue it for this light
-          this.layerManager.addQueuedEffect(layer, lightId, { name, effect, isPersistent, lightId });
-        } else {
-          // Different effect name - remove current effect and start new one
-          this.removeEffectByLayer(layer, false);
-          this.layerManager.removeQueuedEffect(layer, lightId);
-          this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
-        }
-      } else {
-        // No active effect - start new one
-        this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
-      }
-    };
-
+   
     transitionsByLayerAndLight.forEach((layerMap, layer) => {
       layerMap.forEach((transitionsForLight, lightId) => {
-        startEffectForLight(layer, lightId, transitionsForLight);
+        const activeEffect = this.layerManager.getActiveEffect(layer, lightId);
+
+        if (activeEffect) {
+          if (activeEffect.name === name) {
+            // Same effect name - queue it for this light
+            this.layerManager.addQueuedEffect(layer, lightId, { name, effect, isPersistent, lightId });
+          } else {
+            // Different effect name - remove current effect and start new one
+            this.removeEffectByLayer(layer, false);
+            this.layerManager.removeQueuedEffect(layer, lightId);
+            this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
+          }
+        } else {
+          // No active effect - start new one
+          this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
+        }
       });
     });
   }
@@ -276,10 +272,7 @@ export class EffectManager implements IEffectManager {
     }
 
     // Remove all existing effects first
-    //this.removeAllEffects();
-    // HACK: We're foribly clearing all effects and no longert persisting Layer 0 state
-    // TBD if we want to keep this and remove the special handling for Layer 0
-    this.removeAllEffectsForced();
+    this.removeAllEffects();
 
     const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(effect.transitions);
 
@@ -338,15 +331,6 @@ export class EffectManager implements IEffectManager {
 
     // 4. Reset effect tracking state
     this._lastCalled0LayerEffect = "";
-  }
-
-  /**
-   * Forcibly removes all active effects, clears the queue, and immediately clears all light states and transitions on all layers
-   * This method is now identical to removeAllEffects() for consistency
-   */
-  public removeAllEffectsForced(): void {
-    // Use the same immediate approach as removeAllEffects for consistency
-    this.removeAllEffects();
   }
 
   /**
