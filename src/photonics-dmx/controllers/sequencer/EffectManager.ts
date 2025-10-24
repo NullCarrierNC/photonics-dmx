@@ -41,14 +41,6 @@ export class EffectManager implements IEffectManager {
   private lightTransitionController: LightTransitionController;
   private _lastCalled0LayerEffect: string = ""; // Tracks the last effect name that targeted layer 0
   
-  // Timing registry for absolute timeline synchronization
-  // Maps effect name to shared timing metadata for all lights in that effect
-  private effectTimingRegistry: Map<string, {
-    cycleStartTime: number;
-    cycleDuration: number;
-    perLightOffset: number;
-  }> = new Map();
-  
   // Reusable default state template for performance
   private defaultStateTemplate: RGBIO = {
     red: 0,
@@ -396,13 +388,10 @@ export class EffectManager implements IEffectManager {
     this.layerManager.clearAllLayerStates();
     this.layerManager.clearAllLayerTracking();
     
-    // 3. Clear timing registry (resets absolute timing for all effects)
-    this.effectTimingRegistry.clear();
-    
-    // 4. Use clearAllTransitions() which has locking and immediately publishes black states
+    // 3. Use clearAllTransitions() which has locking and immediately publishes black states
     this.lightTransitionController.clearAllTransitions();
     
-    // 5. Reset effect tracking state
+    // 4. Reset effect tracking state
     this._lastCalled0LayerEffect = "";
   }
 
@@ -424,117 +413,13 @@ export class EffectManager implements IEffectManager {
     return { ...this.defaultStateTemplate };
   }
 
-  /**
-   * Automatically calculates timing information from effect transitions
-   * Analyzes the transitions to determine cycle duration and per-light offsets
-   * Returns null if timing cannot be determined (e.g., beat-based effects)
-   * 
-   * @param transitions The effect transitions
-   * @param lights The lights affected by the effect
-   * @returns Timing info or null if cannot be calculated
-   */
-  private calculateTimingFromTransitions(
-    transitions: EffectTransition[],
-    lights: TrackedLight[]
-  ): { cycleDuration: number; perLightOffset: number } | null {
-    // Group transitions by light ID
-    const transitionsByLight = new Map<string, EffectTransition[]>();
-    
-    transitions.forEach(transition => {
-      transition.lights.forEach(light => {
-        if (!transitionsByLight.has(light.id)) {
-          transitionsByLight.set(light.id, []);
-        }
-        transitionsByLight.get(light.id)!.push(transition);
-      });
-    });
-    
-    // Calculate start time and total duration for each light
-    const lightTimings: Array<{ lightId: string; startTime: number; totalDuration: number }> = [];
-    
-    for (const light of lights) {
-      const lightTransitions = transitionsByLight.get(light.id);
-      if (!lightTransitions || lightTransitions.length === 0) continue;
-      
-      // Find the initial start time (first transition's waitForTime)
-      const firstTransition = lightTransitions[0];
-      
-      // Skip if using beat/measure-based timing (not time-based)
-      if (firstTransition.waitForCondition !== 'none' && firstTransition.waitForCondition !== 'delay') {
-        return null; // Cannot calculate timing for event-based effects
-      }
-      
-      const startTime = firstTransition.waitForCondition === 'delay' 
-        ? firstTransition.waitForTime 
-        : 0;
-      
-      // Calculate total duration for this light
-      let totalDuration = 0;
-      for (const transition of lightTransitions) {
-        // Check if any transition uses non-time-based waiting
-        if (transition.waitForCondition !== 'none' && transition.waitForCondition !== 'delay') {
-          return null;
-        }
-        if (transition.waitUntilCondition !== 'none' && transition.waitUntilCondition !== 'delay') {
-          return null;
-        }
-        
-        // Add transition duration
-        totalDuration += transition.transform.duration;
-        
-        // Add wait time after transition
-        if (transition.waitUntilCondition === 'delay') {
-          totalDuration += transition.waitUntilTime;
-        }
-      }
-      
-      lightTimings.push({
-        lightId: light.id,
-        startTime,
-        totalDuration
-      });
-    }
-    
-    if (lightTimings.length === 0) {
-      return null;
-    }
-    
-    // Calculate cycle duration (max finish time across all lights)
-    const cycleDuration = Math.max(
-      ...lightTimings.map(lt => lt.startTime + lt.totalDuration)
-    );
-    
-    // Detect per-light offset (for sequential patterns)
-    let perLightOffset = 0;
-    
-    if (lightTimings.length > 1) {
-      // Sort by start time
-      const sortedTimings = [...lightTimings].sort((a, b) => a.startTime - b.startTime);
-      
-      // Check if start times form a consistent sequence
-      const offsets: number[] = [];
-      for (let i = 1; i < sortedTimings.length; i++) {
-        offsets.push(sortedTimings[i].startTime - sortedTimings[i - 1].startTime);
-      }
-      
-      // If all offsets are the same (or very similar), it's a sequential pattern
-      if (offsets.length > 0) {
-        const firstOffset = offsets[0];
-        const isConsistent = offsets.every(offset => Math.abs(offset - firstOffset) < 1);
-        
-        if (isConsistent) {
-          perLightOffset = firstOffset;
-        }
-      }
-    }
-    
-    return { cycleDuration, perLightOffset };
-  }
 
   /**
    * Starts an effect with optimized batch initialization.
    * Pre-computes initial states and immediately sets up transitions for lights
    * with waitForCondition='none' to ensure simultaneous activation.
+   * 
+   * All lights start using the same timestamp for atomic synchronization.
    * 
    * @param name The name of the effect
    * @param effect The effect data
@@ -551,30 +436,8 @@ export class EffectManager implements IEffectManager {
     transitions: EffectTransition[],
     isPersistent = false,
   ): void {
-    // Get current time once for all lights
+    // Get current time once for all lights - atomic synchronization
     const currentTime = performance.now();
-    
-    // Initialize or retrieve timing information for absolute synchronization
-    let timing = this.effectTimingRegistry.get(name);
-    
-    if (!timing) {
-      // First time starting this effect (or after setEffect cleared registry)
-      // Try to calculate timing automatically from transitions, or use manual hints as override
-      const calculatedTiming = effect.timingHints 
-        ? { cycleDuration: effect.timingHints.cycleDuration, perLightOffset: effect.timingHints.perLightOffset || 0 }
-        : this.calculateTimingFromTransitions(transitions, lights);
-      
-      if (calculatedTiming) {
-        timing = {
-          cycleStartTime: currentTime,
-          cycleDuration: calculatedTiming.cycleDuration,
-          perLightOffset: calculatedTiming.perLightOffset
-        };
-        this.effectTimingRegistry.set(name, timing);
-      }
-    }
-    // NOTE: We do NOT update cycleStartTime on restart to preserve absolute timing
-    // Each light restarts at its offset time relative to the original cycleStartTime
     
     // Pre-compute initial states for all lights in a single pass
     const initialStates = new Map<string, RGBIO>();
@@ -585,7 +448,6 @@ export class EffectManager implements IEffectManager {
       
       // Try transition controller if layer manager has no state
       if (!initialState) {
-
         if (this.lightTransitionController && typeof this.lightTransitionController.getLightState === 'function') {
           initialState = this.lightTransitionController.getLightState(light.id, layer);
         }
@@ -600,15 +462,12 @@ export class EffectManager implements IEffectManager {
     });
     
     // Process all lights and prepare their effects
-    lights.forEach((light, lightIndex) => {
+    lights.forEach((light) => {
       // Expand transitions to one-light-per-transition for this specific light
       const lightTransitions = this.effectTransformer.expandTransitionsByLight(transitions)
         .filter(t => t.lights.some(l => l.id === light.id));
       
       if (lightTransitions.length === 0) return;
-      
-      // Calculate light offset
-      const lightOffset = timing ? timing.perLightOffset * lightIndex : 0;
       
       const lightEffect: LightEffectState = {
         name,
@@ -621,12 +480,7 @@ export class EffectManager implements IEffectManager {
         transitionStartTime: currentTime,
         waitEndTime: currentTime,
         isPersistent,
-        lastEndState: initialStates.get(light.id),  // Pre-computed state
-        absoluteTiming: timing ? {
-          cycleStartTime: timing.cycleStartTime,
-          cycleDuration: timing.cycleDuration,
-          lightOffset: lightOffset
-        } : undefined
+        lastEndState: initialStates.get(light.id)  // Pre-computed state
       };
       
       // Get the first transition
@@ -645,7 +499,6 @@ export class EffectManager implements IEffectManager {
         }
         
         // Set transition directly on the controller
-        
         if (this.lightTransitionController && typeof this.lightTransitionController.setTransition === 'function') {
           this.lightTransitionController.setTransition(
             light.id,
@@ -817,197 +670,5 @@ export class EffectManager implements IEffectManager {
     return this.layerManager.isLayerFreeForLight(layer, lightId);
   }
 
-  /**
-   * Applies timing corrections to the effect timing registry
-   * @param cycleStartTime The cycle start time to match against
-   * @param correctionAmount The amount to add to matching timing entries
-   */
-  public correctTimingRegistry(cycleStartTime: number, correctionAmount: number): void {
-    for (const [, timing] of this.effectTimingRegistry.entries()) {
-      if (timing.cycleStartTime === cycleStartTime) {
-        timing.cycleStartTime += correctionAmount;
-      }
-    }
-  }
 
-  /**
-   * Applies timing correction by effect name in the timing registry.
-   * @param effectName The effect name to correct
-   * @param correctionAmount The amount to add to cycleStartTime
-   */
-  public correctTimingRegistryByName(effectName: string, correctionAmount: number): void {
-    const timing = this.effectTimingRegistry.get(effectName);
-    if (timing) {
-      timing.cycleStartTime += correctionAmount;
-    }
-  }
-
-  /**
-   * Schedules an aligned cycle restart for a given effect/layer at the next cycle boundary using the EventScheduler.
-   * Ensures all queued instances start together, avoiding per-light timer jitter.
-   */
-  public scheduleEffectCycleRestart(effectName: string, layer: number, cycleStartTime: number, cycleDuration: number): void {
-    const now = performance.now();
-    if (cycleDuration <= 0) {
-      return;
-    }
-    const elapsed = Math.max(0, now - cycleStartTime);
-    const cyclesElapsedFloor = Math.floor(elapsed / cycleDuration);
-    const boundaryFloor = cycleStartTime + (cyclesElapsedFloor * cycleDuration);
-
-    // If we've reached or passed the boundary, start immediately; otherwise schedule to boundary
-    if (now >= boundaryFloor) {
-      const queuedMap = this.layerManager.getEffectQueue().get(layer);
-      if (!queuedMap) return;
-
-      // Collect lights queued for this effectName on this layer
-      const entries: Array<{ lightId: string; qe: any }> = [];
-      queuedMap.forEach((qe, lightId) => {
-        if (qe && qe.name === effectName) {
-          entries.push({ lightId, qe });
-        }
-      });
-
-      if (entries.length === 0) return;
-
-      // Start all queued instances together within this same tick
-      for (const { lightId, qe } of entries) {
-        // Remove from queue before starting
-        this.layerManager.removeQueuedEffect(layer, lightId);
-
-        const transitions = qe.effect.transitions.filter((t: any) => t.layer === layer);
-        if (transitions.length === 0) continue;
-
-        const trackedLights = transitions[0].lights;
-        this.startEffect(qe.name, qe.effect, trackedLights, layer, transitions, qe.isPersistent);
-      }
-    } else {
-      const delayMs = Math.max(0, boundaryFloor - now);
-      this.timeoutManager.setTimeout(() => {
-        const queuedMap = this.layerManager.getEffectQueue().get(layer);
-        if (!queuedMap) return;
-
-        const entries: Array<{ lightId: string; qe: any }> = [];
-        queuedMap.forEach((qe, lightId) => {
-          if (qe && qe.name === effectName) {
-            entries.push({ lightId, qe });
-          }
-        });
-
-        if (entries.length === 0) return;
-
-        for (const { lightId, qe } of entries) {
-          this.layerManager.removeQueuedEffect(layer, lightId);
-          const transitions = qe.effect.transitions.filter((t: any) => t.layer === layer);
-          if (transitions.length === 0) continue;
-          const trackedLights = transitions[0].lights;
-          this.startEffect(qe.name, qe.effect, trackedLights, layer, transitions, qe.isPersistent);
-        }
-      }, delayMs);
-    }
-  }
-
-  /**
-   * Calculates the actual runtime of an effect by analyzing its transitions.
-   * This is used to determine if an effect should restart immediately or wait for cycle boundaries.
-   * 
-   * @param transitions The effect transitions to analyze
-   * @returns The total runtime in milliseconds, or 0 if cannot be calculated
-   */
-  private calculateEffectRuntime(transitions: EffectTransition[]): number {
-    if (transitions.length === 0) return 0;
-    
-    // Group transitions by light to calculate per-light runtime
-    const transitionsByLight = new Map<string, EffectTransition[]>();
-    
-    transitions.forEach(transition => {
-      transition.lights.forEach(light => {
-        if (!transitionsByLight.has(light.id)) {
-          transitionsByLight.set(light.id, []);
-        }
-        transitionsByLight.get(light.id)!.push(transition);
-      });
-    });
-    
-    // Calculate the maximum runtime across all lights
-    let maxRuntime = 0;
-    
-    for (const [, lightTransitions] of transitionsByLight) {
-      let lightRuntime = 0;
-      
-      for (const transition of lightTransitions) {
-        // Add transition duration
-        lightRuntime += transition.transform.duration;
-        
-        // Add wait time after transition
-        if (transition.waitUntilCondition === 'delay') {
-          lightRuntime += transition.waitUntilTime;
-        }
-      }
-      
-      maxRuntime = Math.max(maxRuntime, lightRuntime);
-    }
-    
-    return maxRuntime;
-  }
-
-  /**
-   * Schedules an aligned restart for a specific light at its next offset position within the cycle.
-   * Useful if we need per-light alignment without introducing OS timer jitter (uses the central clock).
-   * 
-   * For effects with no delay between cycles (immediate looping), this method will restart
-   * the effect immediately rather than waiting for cycle boundaries.
-   */
-  public scheduleEffectCycleRestartForLight(effectName: string, layer: number, lightId: string, cycleStartTime: number, cycleDuration: number, lightOffset: number): void {
-    const now = performance.now();
-    if (cycleDuration <= 0) return;
-    
-    const startLight = () => {
-      const queuedMap = this.layerManager.getEffectQueue().get(layer);
-      if (!queuedMap) return;
-      const qe = queuedMap.get(lightId);
-      if (!qe || qe.name !== effectName) return;
-      this.layerManager.removeQueuedEffect(layer, lightId);
-      const transitions = qe.effect.transitions.filter((t: any) => t.layer === layer);
-      if (transitions.length === 0) return;
-      const trackedLights = transitions[0].lights;
-      this.startEffect(qe.name, qe.effect, trackedLights, layer, transitions, qe.isPersistent);
-    };
-
-    // Check if this effect should restart immediately (no delay between cycles)
-    // This happens when the effect's timing hints indicate no delay between cycles
-    const queuedMap = this.layerManager.getEffectQueue().get(layer);
-    const qe = queuedMap?.get(lightId);
-    if (qe && qe.effect.timingHints) {
-      // If the effect has timing hints, check if it's designed for immediate looping
-      // by comparing the cycle duration with the actual effect runtime
-      const effectRuntime = this.calculateEffectRuntime(qe.effect.transitions);
-      
-      // If the cycle duration equals the effect runtime, there's no delay between cycles
-      // This indicates the effect should restart immediately
-      if (effectRuntime > 0 && Math.abs(cycleDuration - effectRuntime) < 10) {
-        // Immediate restart for seamless looping
-        startLight();
-        return;
-      }
-    }
-
-    // Standard cycle-aligned restart for effects with delays between cycles
-    const base = cycleStartTime + lightOffset;
-    const elapsed = Math.max(0, now - base);
-    const cyclesElapsedFloor = Math.floor(elapsed / cycleDuration);
-    const boundaryFloor = base + (cyclesElapsedFloor * cycleDuration);
-    const epsilon = 60; // ms tolerance window
-
-    const startNow = Math.abs(now - boundaryFloor) <= epsilon;
-
-    if (startNow) {
-      startLight();
-    } else {
-      const cyclesElapsedCeil = Math.ceil(elapsed / cycleDuration);
-      const nextBoundary = base + (cyclesElapsedCeil * cycleDuration);
-      const delayMs = Math.max(0, nextBoundary - now);
-      this.timeoutManager.setTimeout(startLight, delayMs);
-    }
-  }
 }

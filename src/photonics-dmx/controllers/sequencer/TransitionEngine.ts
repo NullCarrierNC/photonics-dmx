@@ -15,12 +15,7 @@ export class TransitionEngine implements ITransitionEngine {
   private layerManager: ILayerManager;
   private effectManager!: IEffectManager;
   private clock: Clock | null = null;
-  private updateCallback: (deltaTime: number) => void;
-
-  // Periodic timing correction properties
-  private lastCorrectionTime: number = 0;
-  private readonly CORRECTION_INTERVAL = 1000;  
-  private readonly DRIFT_THRESHOLD = 5; 
+  private updateCallback: (deltaTime: number) => void; 
   
   /**
    * @constructor
@@ -36,72 +31,8 @@ export class TransitionEngine implements ITransitionEngine {
     
     // Create the update callback bound to this instance
     this.updateCallback = this.updateTransitions.bind(this);
-    
-    // Initialize timing state
-    this.lastCorrectionTime = performance.now();
   }
 
-  /**
-   * Performs periodic timing corrections to compensate for accumulated drift
-   * @param currentTime The current time for drift calculation
-   */
-  private performPeriodicTimingCorrection(currentTime: number): void {
-    // Check if it's time for a correction
-    if (currentTime - this.lastCorrectionTime < this.CORRECTION_INTERVAL) {
-      return;
-    }
-
-    // Find an active effect with absolute timing to use as reference
-    let referenceTiming: { cycleStartTime: number; cycleDuration: number; lightOffset: number } | null = null;
-    let referenceEffectName: string | null = null;
-
-    const allActiveEffects = this.layerManager.getActiveEffects();
-    for (const [, layerEffects] of allActiveEffects) {
-      for (const [, effect] of layerEffects) {
-        if (effect.absoluteTiming) {
-          referenceTiming = effect.absoluteTiming;
-          referenceEffectName = effect.name;
-          break;
-        }
-      }
-      if (referenceTiming) break;
-    }
-
-    if (!referenceTiming || !referenceEffectName) return; // No active effects with absolute timing
-
-    // Calculate expected vs actual timing
-    const { cycleStartTime, cycleDuration, lightOffset } = referenceTiming;
-    const timeSinceStart = currentTime - cycleStartTime;
-    const expectedCycles = Math.floor(timeSinceStart / cycleDuration);
-    const actualCycles = Math.floor((currentTime - cycleStartTime - lightOffset) / cycleDuration);
-
-    // Calculate drift (difference between expected and actual cycles)
-    const drift = (actualCycles - expectedCycles) * cycleDuration;
-
-    // Apply correction if drift exceeds threshold
-    if (Math.abs(drift) >= this.DRIFT_THRESHOLD) {
-      const correctionAmount = drift;
-
-      // Apply correction to all active effects with the same name
-      this.layerManager.getActiveEffects().forEach((layerMap) => {
-        layerMap.forEach((activeEffect) => {
-          if (activeEffect.name === referenceEffectName && activeEffect.absoluteTiming) {
-            activeEffect.absoluteTiming.cycleStartTime += correctionAmount;
-          }
-        });
-      });
-
-      // Update timing registry for this effect name
-      if (this.effectManager && typeof this.effectManager.correctTimingRegistryByName === 'function') {
-        this.effectManager.correctTimingRegistryByName(referenceEffectName, correctionAmount);
-      } else if (this.effectManager) {
-        // Fallback for older interface (by cycleStartTime)
-        this.effectManager.correctTimingRegistry(cycleStartTime, correctionAmount);
-      }
-
-      this.lastCorrectionTime = currentTime;
-    }
-  }
 
   /**
    * Gets the current time using performance.now() for absolute time
@@ -174,10 +105,10 @@ export class TransitionEngine implements ITransitionEngine {
   }
 
   /**
-   * Updates all active transitions based on elapsed time since last update.
+   * Updates all active transitions using a single timestamp for atomic calculations.
    * This method is called by the Clock system to advance transitions incrementally.
    * 
-   * @param deltaTime The time elapsed since last update in milliseconds
+   * @param deltaTime The time elapsed since last update in milliseconds (unused)
    */
   public updateTransitions(_deltaTime: number = 0): void {
     // Skip processing if a global clear is in progress to avoid races
@@ -185,15 +116,14 @@ export class TransitionEngine implements ITransitionEngine {
       return;
     }
 
+    // Single timestamp for all effect state machines
     const currentTime = this.getCurrentTime();
-
-    // Perform periodic timing corrections to compensate for accumulated drift
-    this.performPeriodicTimingCorrection(currentTime);
 
     const effectsToRemove: Array<{layer: number, lightId: string}> = [];
 
+    // Process ALL light effects using the SAME currentTime
     this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
-      this.layerManager.setLayerLastUsed(layer, performance.now());
+      this.layerManager.setLayerLastUsed(layer, currentTime);
       
       layerMap.forEach((lightEffect, lightId) => {
         if (lightEffect.currentTransitionIndex >= lightEffect.transitions.length) {
@@ -202,18 +132,20 @@ export class TransitionEngine implements ITransitionEngine {
         }
 
         const currentTransition = lightEffect.transitions[lightEffect.currentTransitionIndex];
+        
+        // Process state machine - all use the same currentTime
         switch (lightEffect.state) {
           case 'idle':
-            this.prepareTransition(lightEffect, currentTransition);
+            this.prepareTransition(lightEffect, currentTransition, currentTime);
             break;
           case 'waitingFor':
-            this.handleWaitingFor(lightEffect, currentTransition);
+            this.handleWaitingFor(lightEffect, currentTransition, currentTime);
             break;
           case 'transitioning':
-            this.handleTransitioning(lightEffect, currentTransition);
+            this.handleTransitioning(lightEffect, currentTransition, currentTime);
             break;
           case 'waitingUntil':
-            this.handleWaitingUntil(lightEffect, currentTransition);
+            this.handleWaitingUntil(lightEffect, currentTransition, currentTime);
             break;
           default:
             console.warn(`Unknown state "${lightEffect.state}" for effect "${lightEffect.effect.id}".`);
@@ -221,7 +153,7 @@ export class TransitionEngine implements ITransitionEngine {
       });
     });
 
-    // Process completed effects by ensuring the next effect is queued before removing transitions
+    // Process completed effects
     for (const {layer, lightId} of effectsToRemove) {
       const justFinishedEffect = this.layerManager.getActiveEffect(layer, lightId);
       if (!justFinishedEffect) continue;
@@ -229,63 +161,18 @@ export class TransitionEngine implements ITransitionEngine {
       // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId);
 
-      // If the effect is persistent, handle re-queuing with absolute timing
+      // If the effect is persistent, re-queue it for immediate restart
       if (justFinishedEffect.isPersistent) {
-        // Add to queue with preserved timing metadata
         this.layerManager.addQueuedEffect(layer, lightId, {
           name: justFinishedEffect.name,
           effect: justFinishedEffect.effect,
           lightId: lightId,
-          isPersistent: true,
-          absoluteTiming: justFinishedEffect.absoluteTiming
+          isPersistent: true
         });
         
-        // Calculate delay based on absolute timing (if available)
-        if (justFinishedEffect.absoluteTiming) {
-          const { cycleStartTime, cycleDuration, lightOffset } = justFinishedEffect.absoluteTiming;
-          const currentTime = this.getCurrentTime();
-          
-          // Calculate the next scheduled start time for this light
-          // This light starts at: cycleStartTime + (N * cycleDuration) + lightOffset for N = 0, 1, 2, ...
-          // We need to find the next scheduled start time that is >= currentTime
-          
-          const elapsedSinceStart = currentTime - cycleStartTime;
-          const timeSinceFirstStart = elapsedSinceStart - lightOffset;
-          
-          if (timeSinceFirstStart < 0) {
-            // Haven't reached first start yet - wait for cycle 0
-            // Use integer-based calculation for initial delay
-            // Using cycle-aligned scheduling; immediate start handled by scheduleEffectCycleRestart
-          } else {
-            // The effect just finished. Calculate when this specific light should restart.
-            // Use integer-based calculations to avoid floating-point precision drift
-            
-            // Calculate time since this light's first start (cycleStartTime + lightOffset)
-            const timeSinceLightStart = currentTime - (cycleStartTime + lightOffset);
-            
-            // Find the most recent cycle boundary that we should have started at
-            const lastCycleNumber = Math.floor(timeSinceLightStart / cycleDuration);
-            const lastCycleStart = cycleStartTime + (lastCycleNumber * cycleDuration) + lightOffset;
-            
-            // If we've already passed the last cycle start time, start immediately
-            // Otherwise, wait for the last cycle start time
-            if (currentTime >= lastCycleStart) {
-              // Immediate start handled by scheduleEffectCycleRestart
-            } else {
-              // Deferred start handled by scheduleEffectCycleRestart
-            }
-          }
-        }
-        // Schedule a clock-aligned restart for this light at its next offset position
-        if (this.effectManager && justFinishedEffect.absoluteTiming) {
-          this.effectManager.scheduleEffectCycleRestartForLight(
-            justFinishedEffect.name,
-            layer,
-            lightId,
-            justFinishedEffect.absoluteTiming.cycleStartTime,
-            justFinishedEffect.absoluteTiming.cycleDuration,
-            justFinishedEffect.absoluteTiming.lightOffset
-          );
+        // Start the next cycle immediately for persistent effects
+        if (this.effectManager) {
+          this.effectManager.startNextEffectInQueue(layer, lightId);
         }
       } else {
         // Non-persistent effect - check for queued effects
@@ -311,7 +198,7 @@ export class TransitionEngine implements ITransitionEngine {
     }
 
     // Clean up unused layers
-    this.layerManager.cleanupUnusedLayers(performance.now());
+    this.layerManager.cleanupUnusedLayers(currentTime);
   }
 
   /**
@@ -320,12 +207,12 @@ export class TransitionEngine implements ITransitionEngine {
    * 
    * @param activeEffect The active effect record
    * @param transition The current transition to prepare
+   * @param currentTime The current timestamp (shared across all calculations)
    */
-  public prepareTransition(activeEffect: LightEffectState, transition: EffectTransition): void {
-    const currentTime = this.getCurrentTime();
+  public prepareTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
     activeEffect.state = 'waitingFor';
     if (transition.waitForCondition === 'none') {
-      this.startTransition(activeEffect, transition);
+      this.startTransition(activeEffect, transition, currentTime);
     } else {
       activeEffect.transitionStartTime = currentTime;
       if (transition.waitForCondition === 'delay') {
@@ -341,15 +228,15 @@ export class TransitionEngine implements ITransitionEngine {
    * 
    * @param activeEffect The active effect record
    * @param transition The current transition being waited on
+   * @param currentTime The current timestamp (shared across all calculations)
    */
-  public handleWaitingFor(activeEffect: LightEffectState, transition: EffectTransition): void {
-    const currentTime = this.getCurrentTime();
+  public handleWaitingFor(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
     if (transition.waitForCondition === 'delay') {
       if (currentTime >= activeEffect.waitEndTime) {
-        this.startTransition(activeEffect, transition);
+        this.startTransition(activeEffect, transition, currentTime);
       }
     } else if (transition.waitForCondition === 'none') {
-      this.startTransition(activeEffect, transition);
+      this.startTransition(activeEffect, transition, currentTime);
     }
   }
 
@@ -358,17 +245,11 @@ export class TransitionEngine implements ITransitionEngine {
    * 
    * @param activeEffect The active effect record
    * @param transition The current transition to execute
+   * @param currentTime The current timestamp (shared across all calculations)
    */
-  public startTransition(activeEffect: LightEffectState, transition: EffectTransition): void {
+  public startTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
     this.ensureLastEndState(activeEffect);
-    /*
-    const baseTransitionConfig = {
-      transform: {
-        ...transition.transform
-      },
-      layer: transition.layer
-    };
-*/
+    
     // Since this is a per-light effect, we work with the single light in the transition
     const light = transition.lights[0];
     
@@ -421,7 +302,6 @@ export class TransitionEngine implements ITransitionEngine {
       transition.transform.easing
     );
 
-    const currentTime = this.getCurrentTime();
     activeEffect.state = 'transitioning';
     activeEffect.transitionStartTime = currentTime;
     activeEffect.waitEndTime = currentTime + transition.transform.duration;
@@ -432,11 +312,11 @@ export class TransitionEngine implements ITransitionEngine {
    * 
    * @param activeEffect The active effect record
    * @param transition The current transition being processed
+   * @param currentTime The current timestamp (shared across all calculations)
    */
-  public handleTransitioning(activeEffect: LightEffectState, transition: EffectTransition): void {
+  public handleTransitioning(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
     this.ensureLastEndState(activeEffect);
     
-    const currentTime = this.getCurrentTime();
     if (currentTime >= activeEffect.waitEndTime) {
       // Since this is a per-light effect, we just update the lastEndState directly
       activeEffect.lastEndState = transition.transform.color;
@@ -459,9 +339,9 @@ export class TransitionEngine implements ITransitionEngine {
    * 
    * @param activeEffect The active effect record
    * @param transition The current transition being processed
+   * @param currentTime The current timestamp (shared across all calculations)
    */
-  public handleWaitingUntil(activeEffect: LightEffectState, transition: EffectTransition): void {
-    const currentTime = this.getCurrentTime();
+  public handleWaitingUntil(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
     if (transition.waitUntilCondition === 'delay') {
       if (currentTime >= activeEffect.waitEndTime) {
         activeEffect.currentTransitionIndex += 1;

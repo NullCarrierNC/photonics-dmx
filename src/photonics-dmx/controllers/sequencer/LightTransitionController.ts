@@ -355,13 +355,15 @@ export class LightTransitionController {
   /**
    * Update method called by the clock with frame synchronization
    *
-   * This method:
-   *   1) Processes all active transitions using deltaTime.
-   *   2) Interpolates per-layer colours based on elapsed time.
-   *   3) Merges layer colours using blend modes.
-   *   4) Batches state updates for synchronized publishing.
+   * All lights and all layers are calculated using a SINGLE timestamp captured once per frame.
    *
-   * @param deltaTime The time elapsed since last update in milliseconds
+   * Process:
+   *   1) Capture single timestamp for the entire frame
+   *   2) Interpolate ALL layer states for ALL lights using this timestamp
+   *   3) Blend ALL layers for ALL lights
+   *   4) Publish all states atomically
+   *
+   * @param deltaTime The time elapsed since last update in milliseconds (unused)
    */
   private updateTransitions(_deltaTime: number): void {
     // Skip processing if a global clear is in progress
@@ -370,6 +372,7 @@ export class LightTransitionController {
     }
 
     try {
+      // CRITICAL: Single timestamp for all calculations in this frame
       const now = performance.now();
       
       // Periodic state validation and cleanup
@@ -379,39 +382,30 @@ export class LightTransitionController {
         this.lastStateValidation = now;
       }
 
-      // Track which lights have active transitions and need final color calculations
-      const activeTransitionLights = new Set<string>();
-
-      // Collections for changes to apply after iteration
-      const layerStateChanges: Array<{lightId: string, layer: number, state: RGBIO}> = [];
+      // Phase 1: Calculate interpolated states for ALL lights on ALL layers
+      // All calculations use the SAME 'now' timestamp
+      const allLayerStates = new Map<string, Map<number, RGBIO>>();
       const layersToRemove: Array<{lightId: string, layer: number}> = [];
       const lightsToRemove: string[] = [];
       const transitionUpdates: Array<{lightId: string, layer: number, startState: RGBIO}> = [];
 
-      // Process all transitions by light - collect changes without mutating
       this._transitionsByLight.forEach((layerTransitions, lightId) => {
-        // Collect layers to process and layers to remove
-        const layersToProcess = Array.from(layerTransitions.keys());
+        const layerStates = new Map<number, RGBIO>();
         const layersToRemoveForLight = new Set<number>();
 
-        for (const layer of layersToProcess) {
-          const transitionData = layerTransitions.get(layer);
-          if (!transitionData) continue; // Skip if already removed
-
+        layerTransitions.forEach((transitionData, layer) => {
           const { startState, endState, startTime, transition } = transitionData;
 
-          // Use absolute time for consistent timing
+          // Calculate elapsed time using the shared 'now' timestamp
           const elapsed = now - startTime;
           const duration = transition.transform.duration;
-
-          // Calculate progress (0 to 1) using integer math to avoid floating-point drift
-          const progress = duration > 0 ? Math.min(Math.floor((elapsed * 1000) / duration), 1000) / 1000 : 1;
+          const progress = duration > 0 ? Math.min(elapsed / duration, 1) : 1;
 
           // Get the easing function
           const easing = transition.transform.easing;
           const easedProgress = this.getEasingValue(progress, easing);
 
-          // Calculate the new state based on interpolation
+          // Interpolate the state
           const newState: RGBIO = {
             red: this.interpolate(startState.red, endState.red, easedProgress),
             green: this.interpolate(startState.green, endState.green, easedProgress),
@@ -434,48 +428,77 @@ export class LightTransitionController {
             newState.tilt = this.interpolate(startTilt, endTilt, easedProgress);
           }
 
-          // Validate and correct the new state
+          // Validate and correct the state
           const correctedState = this.validateAndCorrectLightState(lightId, newState);
-          
-          // Collect layer state change instead of applying immediately
-          layerStateChanges.push({lightId, layer, state: correctedState});
+          layerStates.set(layer, correctedState);
 
-          // Mark this light as having an active transition
-          activeTransitionLights.add(lightId);
-
-          // If transition is complete (or very close to complete), mark for removal
+          // If transition is complete, mark for removal
           if (progress >= 0.999) {
-            // Collect transition update instead of applying immediately
             transitionUpdates.push({
               lightId,
               layer,
               startState: { ...endState }
             });
-
-            // Mark this layer for removal after processing
             layersToRemoveForLight.add(layer);
           }
+        });
+
+        // Store the interpolated layer states for this light
+        if (layerStates.size > 0) {
+          allLayerStates.set(lightId, layerStates);
         }
 
-        // Collect layer removals for this light
+        // Collect layers to remove
         for (const layer of layersToRemoveForLight) {
           layersToRemove.push({lightId, layer});
         }
 
         // Check if this light should be completely removed
-        const remainingLayers = layersToProcess.length - layersToRemoveForLight.size;
-        if (remainingLayers === 0) {
+        if (layersToRemoveForLight.size === layerTransitions.size) {
           lightsToRemove.push(lightId);
         }
       });
 
-      // Apply all changes atomically after iteration
-      this.applyTransitionChanges(layerStateChanges, layersToRemove, lightsToRemove, transitionUpdates);
+      // Phase 2: Update internal state structures
+      allLayerStates.forEach((layerStates, lightId) => {
+        if (!this._currentLayerStates.has(lightId)) {
+          this._currentLayerStates.set(lightId, new Map<number, RGBIO>());
+        }
+        const currentStates = this._currentLayerStates.get(lightId)!;
+        layerStates.forEach((state, layer) => {
+          currentStates.set(layer, state);
+        });
+      });
 
-      // Calculate the final colors for all active lights
-      // This will batch updates in the LightStateManager
-      activeTransitionLights.forEach(lightId => {
-        this.calculateFinalColorForLight(lightId);
+      // Apply transition updates for completed transitions
+      transitionUpdates.forEach(({lightId, layer, startState}) => {
+        const layerTransitions = this._transitionsByLight.get(lightId);
+        if (layerTransitions) {
+          const transitionData = layerTransitions.get(layer);
+          if (transitionData) {
+            transitionData.startState = startState;
+          }
+        }
+      });
+
+      // Phase 3: Blend ALL layers for ALL lights
+      allLayerStates.forEach((layerStates, lightId) => {
+        this.blendAndSetFinalColor(lightId, layerStates);
+      });
+
+      // Phase 4: Clean up completed transitions
+      layersToRemove.forEach(({lightId, layer}) => {
+        const layerTransitions = this._transitionsByLight.get(lightId);
+        if (layerTransitions) {
+          layerTransitions.delete(layer);
+          if (layerTransitions.size === 0) {
+            this._transitionsByLight.delete(lightId);
+          }
+        }
+      });
+
+      lightsToRemove.forEach(lightId => {
+        this._transitionsByLight.delete(lightId);
       });
 
       // Verify state consistency
@@ -483,59 +506,51 @@ export class LightTransitionController {
 
     } catch (error) {
       console.error('Critical error in transition processing:', error);
-      // Emergency state reset if needed
       this.emergencyStateReset();
     }
     
-    // Publish all buffered light state updates atomically after all calculations complete
+    // Phase 5: Publish all buffered light state updates atomically
     this._lightStateManager.syncFrame();
   }
 
   /**
-   * Applies all transition changes atomically after collection
+   * Blends all layers for a light and sets the final color
+   * @param lightId The ID of the light
+   * @param layerStates Map of layer numbers to their interpolated states
    */
-  private applyTransitionChanges(
-    layerStateChanges: Array<{lightId: string, layer: number, state: RGBIO}>,
-    layersToRemove: Array<{lightId: string, layer: number}>,
-    lightsToRemove: string[],
-    transitionUpdates: Array<{lightId: string, layer: number, startState: RGBIO}>
-  ): void {
-    // Apply layer state changes
-    layerStateChanges.forEach(({lightId, layer, state}) => {
-      if (!this._currentLayerStates.has(lightId)) {
-        this._currentLayerStates.set(lightId, new Map<number, RGBIO>());
-      }
-      this._currentLayerStates.get(lightId)!.set(layer, state);
-    });
+  private blendAndSetFinalColor(lightId: string, layerStates: Map<number, RGBIO>): void {
+    const transparentColor = this.transparentColor();
+    const blackColor: RGBIO = {
+      red: 0,
+      green: 0,
+      blue: 0,
+      intensity: 0,
+      opacity: 1.0,
+      blendMode: 'replace'
+    };
+    
+    // If no layers, force hard black output
+    if (layerStates.size === 0) {
+      this._finalColors.set(lightId, blackColor);
+      this._lightStateManager.setLightState(lightId, blackColor);
+      return;
+    }
+    
+    let finalColor: RGBIO = transparentColor;
 
-    // Apply transition updates (for completed transitions)
-    transitionUpdates.forEach(({lightId, layer, startState}) => {
-      const layerTransitions = this._transitionsByLight.get(lightId);
-      if (layerTransitions) {
-        const transitionData = layerTransitions.get(layer);
-        if (transitionData) {
-          transitionData.startState = startState;
-        }
-      }
-    });
+    // Convert Map to array, sort by layer number, then blend
+    const sortedLayers = Array.from(layerStates.entries())
+      .sort(([layerA], [layerB]) => layerA - layerB);
 
-    // Remove completed layers
-    layersToRemove.forEach(({lightId, layer}) => {
-      const layerTransitions = this._transitionsByLight.get(lightId);
-      if (layerTransitions) {
-        layerTransitions.delete(layer);
-        
-        // Clean up empty layer maps for this light
-        if (layerTransitions.size === 0) {
-          this._transitionsByLight.delete(lightId);
-        }
-      }
-    });
+    for (const [_, layerColor] of sortedLayers) {
+      finalColor = this.blendWithOpacity(finalColor, layerColor);
+    }
 
-    // Remove completed lights
-    lightsToRemove.forEach(lightId => {
-      this._transitionsByLight.delete(lightId);
-    });
+    // Store the final color
+    this._finalColors.set(lightId, finalColor);
+
+    // Update the light state manager (will be batched)
+    this._lightStateManager.setLightState(lightId, finalColor);
   }
 
   /**

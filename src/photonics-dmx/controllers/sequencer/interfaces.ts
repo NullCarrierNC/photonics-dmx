@@ -18,16 +18,6 @@ export interface LightEffectState {
   waitEndTime: number;
   lastEndState?: RGBIO;
   isPersistent?: boolean;
-  
-  /**
-   * Absolute timing information for synchronized effects
-   * Enables drift-free looping by maintaining position on an absolute timeline
-   */
-  absoluteTiming?: {
-    cycleStartTime: number;    // Absolute time when cycle 0 began
-    cycleDuration: number;      // Duration of one complete cycle (ms)
-    lightOffset: number;        // This light's offset within the cycle (ms)
-  };
 }
 
 
@@ -41,16 +31,6 @@ export interface QueuedEffect {
   effect: Effect;
   lightId: string;
   isPersistent: boolean;
-  
-  /**
-   * Absolute timing information preserved through queuing
-   * Ensures continued synchronization when effect restarts
-   */
-  absoluteTiming?: {
-    cycleStartTime: number;
-    cycleDuration: number;
-    lightOffset: number;
-  };
 }
 
 /**
@@ -162,19 +142,6 @@ export interface IEffectManager {
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
   isLayerFreeForLight(layer: number, lightId: string): boolean;
   setState(lights: TrackedLight[], color: RGBIO, time: number): void;
-
-  /**
-   * Applies timing corrections to the effect timing registry
-   * @param cycleStartTime The cycle start time to match against
-   * @param correctionAmount The amount to add to matching timing entries
-   */
-  correctTimingRegistry(cycleStartTime: number, correctionAmount: number): void;
-  /** Applies timing correction by effect name */
-  correctTimingRegistryByName(effectName: string, correctionAmount: number): void;
-  /** Schedules a cycle-aligned restart for an effect/layer using the clock */
-  scheduleEffectCycleRestart(effectName: string, layer: number, cycleStartTime: number, cycleDuration: number): void;
-  /** Schedules a clock-aligned restart for a specific light at its next offset in the cycle */
-  scheduleEffectCycleRestartForLight(effectName: string, layer: number, lightId: string, cycleStartTime: number, cycleDuration: number, lightOffset: number): void;
 }
 
 /**
