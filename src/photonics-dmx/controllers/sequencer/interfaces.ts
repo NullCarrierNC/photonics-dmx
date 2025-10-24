@@ -129,7 +129,7 @@ export interface ITransitionEngine {
  */
 export interface IEffectManager {
   addEffect(name: string, effect: Effect,isPersistent?: boolean): void;
-  setEffect(name: string, effect: Effect,isPersistent?: boolean): Promise<void>;
+  setEffect(name: string, effect: Effect,isPersistent?: boolean): void;
   addEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
   setEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;

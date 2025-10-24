@@ -37,7 +37,7 @@ export class EffectManager implements IEffectManager {
   // Cached reference to avoid repeated method calls
   private lightTransitionController: LightTransitionController;
   private _lastCalled0LayerEffect: string = ""; // Tracks the last effect name that targeted layer 0
-  
+
   // Reusable default state template for performance
   private defaultStateTemplate: RGBIO = {
     red: 0,
@@ -68,16 +68,16 @@ export class EffectManager implements IEffectManager {
 
     // Cache the light transition controller for performance
     this.lightTransitionController = transitionEngine.getLightTransitionController();
-    
+
     // Set this instance on the transition engine to allow it to start queued effects
     this.transitionEngine.setEffectManager(this);
-    
+
     // Register a callback to reset our state when a blackout completes
     if ('setOnBlackoutCompleteCallback' in this.systemEffects) {
       (this.systemEffects as any).setOnBlackoutCompleteCallback(() => {
         // Reset layer 0 effect tracking when a blackout completes
         this._lastCalled0LayerEffect = "";
-      //  console.debug("EffectManager: Reset _lastCalled0LayerEffect after blackout");
+        //  console.debug("EffectManager: Reset _lastCalled0LayerEffect after blackout");
       });
     }
   }
@@ -96,14 +96,14 @@ export class EffectManager implements IEffectManager {
       console.warn('Add cancelling blackout');
       this.systemEffects.cancelBlackout();
     }
-    
+
     if (effect.transitions.length === 0) {
       console.warn(`Effect "${name}" has no transitions. Ignoring.`);
       return;
     }
 
     const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(effect.transitions);
-    
+
     // Check if the effect contains transitions for layer 0
     const hasLayer0 = transitionsByLayerAndLight.has(0);
     if (hasLayer0) {
@@ -113,7 +113,7 @@ export class EffectManager implements IEffectManager {
     const startEffectForLight = (layer: number, lightId: string, transitionsForLight: EffectTransition[]) => {
       // Check if this specific light has an active effect
       const activeEffect = this.layerManager.getActiveEffect(layer, lightId);
-      
+
       if (activeEffect) {
         if (activeEffect.name === name) {
           // Same effect name - queue it for this light
@@ -130,15 +130,11 @@ export class EffectManager implements IEffectManager {
       }
     };
 
-    const executeAddEffect = () => {
-      transitionsByLayerAndLight.forEach((layerMap, layer) => {
-        layerMap.forEach((transitionsForLight, lightId) => {
-          startEffectForLight(layer, lightId, transitionsForLight);
-        });
+    transitionsByLayerAndLight.forEach((layerMap, layer) => {
+      layerMap.forEach((transitionsForLight, lightId) => {
+        startEffectForLight(layer, lightId, transitionsForLight);
       });
-    };
-
-    executeAddEffect();
+    });
   }
 
   /**
@@ -149,7 +145,7 @@ export class EffectManager implements IEffectManager {
    * @param effect The effect configuration
    * @param isPersistent If true, the effect re-queues itself after completing
    */
-  public async setEffect(name: string, effect: Effect, isPersistent: boolean = false): Promise<void> {
+  public setEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     if (this.systemEffects.isBlackoutActive()) {
       console.warn('Cancelling blackout for setEffect');
       this.systemEffects.cancelBlackout();
@@ -162,29 +158,26 @@ export class EffectManager implements IEffectManager {
     }
 
     const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(effect.transitions);
-    
+
     // Check if the effect contains transitions for layer 0
     const hasLayer0 = transitionsByLayerAndLight.has(0);
-    
-    const executeSetEffect = () => {
-      // Check to see if we've called setEffect before for this effect. If so, queue it and don't clear all.
-      if (hasLayer0 && this._lastCalled0LayerEffect === name) {
-        transitionsByLayerAndLight.forEach((layerMap, layer) => {
-                  layerMap.forEach((_, lightId) => {
+
+    // Check to see if we've called setEffect before for this effect. If so, queue it and don't clear all.
+    if (hasLayer0 && this._lastCalled0LayerEffect === name) {
+      transitionsByLayerAndLight.forEach((layerMap, layer) => {
+        layerMap.forEach((_, lightId) => {
           this.layerManager.addQueuedEffect(layer, lightId, { name, effect, isPersistent, lightId });
         });
-        });
-      } else {
-        this.addEffect(name, effect, isPersistent);
-        
-        // Update the last layer 0 effect name if this effect targets layer 0
-        if (hasLayer0) {
-          this._lastCalled0LayerEffect = name;
-        }
-      }
-    };
+      });
+    } else {
+      this.addEffect(name, effect, isPersistent);
 
-    executeSetEffect();
+      // Update the last layer 0 effect name if this effect targets layer 0
+      if (hasLayer0) {
+        this._lastCalled0LayerEffect = name;
+      }
+    }
+
   }
 
   /**
@@ -202,7 +195,7 @@ export class EffectManager implements IEffectManager {
       console.warn(`Cannot add effect "${name}" because a blackout is in progress.`);
       return false;
     }
-    
+
     if (effect.transitions.length === 0) {
       console.warn(`Effect "${name}" has no transitions. Ignoring.`);
       return false;
@@ -214,14 +207,14 @@ export class EffectManager implements IEffectManager {
         (activeEffect) => activeEffect.name === name
       )
     );
-    
+
     if (effectAlreadyRunning) {
-    //  console.warn(`Not adding effect "${name}" because an effect with the same name is already running. Preventing timing issues.`);
+      //  console.warn(`Not adding effect "${name}" because an effect with the same name is already running. Preventing timing issues.`);
       return false;
     }
 
     const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(effect.transitions);
-    
+
     // Check if the effect contains transitions for layer 0
     const hasLayer0 = transitionsByLayerAndLight.has(0);
     if (hasLayer0) {
@@ -240,15 +233,11 @@ export class EffectManager implements IEffectManager {
       this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
     };
 
-    const executeAddEffect = () => {
-      transitionsByLayerAndLight.forEach((layerMap, layer) => {
-        layerMap.forEach((transitionsForLight, lightId) => {
-          startEffectForLight(layer, lightId, transitionsForLight);
-        });
+    transitionsByLayerAndLight.forEach((layerMap, layer) => {
+      layerMap.forEach((transitionsForLight, lightId) => {
+        startEffectForLight(layer, lightId, transitionsForLight);
       });
-    };
-
-    executeAddEffect();
+    });
 
     return true;
   }
@@ -280,7 +269,7 @@ export class EffectManager implements IEffectManager {
         (activeEffect) => activeEffect.name === name
       )
     );
-    
+
     if (effectAlreadyRunning) {
       console.warn(`Not setting effect "${name}" because an effect with the same name is already running. Preventing timing issues.`);
       return false;
@@ -299,16 +288,11 @@ export class EffectManager implements IEffectManager {
     if (hasLayer0) {
       this._lastCalled0LayerEffect = name;
     }
-
-    const executeSetEffect = () => {
-      transitionsByLayerAndLight.forEach((layerMap, layer) => {
-        layerMap.forEach((transitionsForLight, lightId) => {
-          this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
-        });
+    transitionsByLayerAndLight.forEach((layerMap, layer) => {
+      layerMap.forEach((transitionsForLight, lightId) => {
+        this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
       });
-    };
-
-    executeSetEffect();
+    });
     return true;
   }
 
@@ -320,7 +304,7 @@ export class EffectManager implements IEffectManager {
   public removeEffect(name: string, layer: number): void {
     const activeEffects = this.layerManager.getActiveEffects().get(layer);
     if (!activeEffects) return;
-    
+
     // Find and remove effects with the matching name
     activeEffects.forEach((activeEffect, _lightId) => {
       if (activeEffect.name === name) {
@@ -339,19 +323,19 @@ export class EffectManager implements IEffectManager {
       console.warn('Cancelling blackout for removeAllEffects');
       this.systemEffects.cancelBlackout();
     }
-    
+
 
     // 1. Clear all active effects and queues (stops new effects from starting)
     this.layerManager.clearAllActiveEffects();
     this.layerManager.clearAllQueuedEffects();
-    
+
     // 2. Clear all layer states and tracking (prevents stale state)
     this.layerManager.clearAllLayerStates();
     this.layerManager.clearAllLayerTracking();
-    
+
     // 3. Use clearAllTransitions() which has locking and immediately publishes black states
     this.lightTransitionController.clearAllTransitions();
-    
+
     // 4. Reset effect tracking state
     this._lastCalled0LayerEffect = "";
   }
@@ -399,37 +383,37 @@ export class EffectManager implements IEffectManager {
   ): void {
     // Get current time once for all lights - atomic synchronization
     const currentTime = performance.now();
-    
+
     // Pre-compute initial states for all lights in a single pass
     const initialStates = new Map<string, RGBIO>();
-    
+
     lights.forEach(light => {
       // Try to get existing state from layer manager
       let initialState = this.layerManager.getLightState(layer, light.id);
-      
+
       // Try transition controller if layer manager has no state
       if (!initialState) {
         if (this.lightTransitionController && typeof this.lightTransitionController.getLightState === 'function') {
           initialState = this.lightTransitionController.getLightState(light.id, layer);
         }
       }
-      
+
       // If no state exists, use default (create once per light)
       if (!initialState) {
         initialState = this.createDefaultState();
       }
-      
+
       initialStates.set(light.id, initialState);
     });
-    
+
     // Process all lights and prepare their effects
     lights.forEach((light) => {
       // Expand transitions to one-light-per-transition for this specific light
       const lightTransitions = this.effectTransformer.expandTransitionsByLight(transitions)
         .filter(t => t.lights.some(l => l.id === light.id));
-      
+
       if (lightTransitions.length === 0) return;
-      
+
       const lightEffect: LightEffectState = {
         name,
         effect,
@@ -443,10 +427,10 @@ export class EffectManager implements IEffectManager {
         isPersistent,
         lastEndState: initialStates.get(light.id)  // Pre-computed state
       };
-      
+
       // Get the first transition
       const firstTransition = lightTransitions[0];
-      
+
       if (firstTransition.waitForCondition === 'none') {
         // Prepare the color with pan/tilt defaults if needed
         let color = { ...firstTransition.transform.color };
@@ -458,7 +442,7 @@ export class EffectManager implements IEffectManager {
             color.tilt = light.config.tiltHome;
           }
         }
-        
+
         // Set transition directly on the controller
         if (this.lightTransitionController && typeof this.lightTransitionController.setTransition === 'function') {
           this.lightTransitionController.setTransition(
@@ -470,7 +454,7 @@ export class EffectManager implements IEffectManager {
             firstTransition.transform.easing
           );
         }
-        
+
         // Update effect state to transitioning
         lightEffect.state = 'transitioning';
         lightEffect.transitionStartTime = currentTime;
@@ -494,19 +478,19 @@ export class EffectManager implements IEffectManager {
     // Get all active effects for this layer
     const activeEffects = this.layerManager.getActiveEffects().get(layer);
     if (!activeEffects) return;
-    
+
     // Convert to array to avoid modifying the map while iterating
     const lightIds = Array.from(activeEffects.keys());
     const lightsToCleanup: string[] = [];
-    
+
     // Process each light's effect on this layer
     for (const lightId of lightIds) {
       // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId);
-      
+
       // Start the next effect in queue for this light on this layer if one exists
       const hasNextEffect = this.startNextEffectInQueue(layer, lightId);
-    //  console.log(`Removing effect from layer ${layer}, light ${lightId}. Has next effect: ${hasNextEffect}`);
+      //  console.log(`Removing effect from layer ${layer}, light ${lightId}. Has next effect: ${hasNextEffect}`);
 
       // If we're removing the effect and there's no next effect in the queue,
       // also reset layer tracking to prevent cleanup after grace period
@@ -515,11 +499,11 @@ export class EffectManager implements IEffectManager {
       }
 
       // Clean up transitions ONLY if requested AND there's no next effect
-      if (shouldRemoveTransitions && !hasNextEffect ) {
+      if (shouldRemoveTransitions && !hasNextEffect) {
         lightsToCleanup.push(lightId);
       }
     }
-    
+
     // Batch cleanup all lights that need transition removal
     if (lightsToCleanup.length > 0) {
       for (const lightId of lightsToCleanup) {
@@ -537,20 +521,20 @@ export class EffectManager implements IEffectManager {
   public startNextEffectInQueue(layer: number, lightId: string): boolean {
     const nextEffect = this.layerManager.getQueuedEffect(layer, lightId);
     if (!nextEffect) return false;
-   // console.log(`Starting next effect in queue: ${JSON.stringify(nextEffect)}`);
-    
-   // Remove from queue
+    // console.log(`Starting next effect in queue: ${JSON.stringify(nextEffect)}`);
+
+    // Remove from queue
     this.layerManager.removeQueuedEffect(layer, lightId);
-    
+
     // Check if we have any active transitions for these lights
     const transitions = nextEffect.effect.transitions.filter(t => t.layer === layer);
     if (transitions.length === 0) return false;
-    
+
     // Find out what lights were tracked in the previous effect so we can
     // use their final states
     const previousEffect = this.layerManager.getActiveEffect(layer, lightId);
     const trackedLights = previousEffect ? [previousEffect.transitions[0].lights.find(l => l.id === lightId)!] : [];
-    
+
     // Start the effect
     this.startEffect(
       nextEffect.name,
@@ -588,7 +572,7 @@ export class EffectManager implements IEffectManager {
     // Create transitions for each light
     const transitions: EffectTransition[] = [{
       lights: lights,
-      layer: 0, 
+      layer: 0,
       waitForCondition: 'none',
       waitForTime: 0,
       transform: {
@@ -602,7 +586,7 @@ export class EffectManager implements IEffectManager {
 
     // Create an effect
     const effect: Effect = {
-      id: `setState`, 
+      id: `setState`,
       description: 'Set light state directly',
       transitions: transitions
     };
