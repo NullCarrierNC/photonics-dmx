@@ -829,4 +829,185 @@ export class EffectManager implements IEffectManager {
       }
     }
   }
+
+  /**
+   * Applies timing correction by effect name in the timing registry.
+   * @param effectName The effect name to correct
+   * @param correctionAmount The amount to add to cycleStartTime
+   */
+  public correctTimingRegistryByName(effectName: string, correctionAmount: number): void {
+    const timing = this.effectTimingRegistry.get(effectName);
+    if (timing) {
+      timing.cycleStartTime += correctionAmount;
+    }
+  }
+
+  /**
+   * Schedules an aligned cycle restart for a given effect/layer at the next cycle boundary using the EventScheduler.
+   * Ensures all queued instances start together, avoiding per-light timer jitter.
+   */
+  public scheduleEffectCycleRestart(effectName: string, layer: number, cycleStartTime: number, cycleDuration: number): void {
+    const now = performance.now();
+    if (cycleDuration <= 0) {
+      return;
+    }
+    const elapsed = Math.max(0, now - cycleStartTime);
+    const cyclesElapsedFloor = Math.floor(elapsed / cycleDuration);
+    const boundaryFloor = cycleStartTime + (cyclesElapsedFloor * cycleDuration);
+
+    // If we've reached or passed the boundary, start immediately; otherwise schedule to boundary
+    if (now >= boundaryFloor) {
+      const queuedMap = this.layerManager.getEffectQueue().get(layer);
+      if (!queuedMap) return;
+
+      // Collect lights queued for this effectName on this layer
+      const entries: Array<{ lightId: string; qe: any }> = [];
+      queuedMap.forEach((qe, lightId) => {
+        if (qe && qe.name === effectName) {
+          entries.push({ lightId, qe });
+        }
+      });
+
+      if (entries.length === 0) return;
+
+      // Start all queued instances together within this same tick
+      for (const { lightId, qe } of entries) {
+        // Remove from queue before starting
+        this.layerManager.removeQueuedEffect(layer, lightId);
+
+        const transitions = qe.effect.transitions.filter((t: any) => t.layer === layer);
+        if (transitions.length === 0) continue;
+
+        const trackedLights = transitions[0].lights;
+        this.startEffect(qe.name, qe.effect, trackedLights, layer, transitions, qe.isPersistent);
+      }
+    } else {
+      const delayMs = Math.max(0, boundaryFloor - now);
+      this.timeoutManager.setTimeout(() => {
+        const queuedMap = this.layerManager.getEffectQueue().get(layer);
+        if (!queuedMap) return;
+
+        const entries: Array<{ lightId: string; qe: any }> = [];
+        queuedMap.forEach((qe, lightId) => {
+          if (qe && qe.name === effectName) {
+            entries.push({ lightId, qe });
+          }
+        });
+
+        if (entries.length === 0) return;
+
+        for (const { lightId, qe } of entries) {
+          this.layerManager.removeQueuedEffect(layer, lightId);
+          const transitions = qe.effect.transitions.filter((t: any) => t.layer === layer);
+          if (transitions.length === 0) continue;
+          const trackedLights = transitions[0].lights;
+          this.startEffect(qe.name, qe.effect, trackedLights, layer, transitions, qe.isPersistent);
+        }
+      }, delayMs);
+    }
+  }
+
+  /**
+   * Calculates the actual runtime of an effect by analyzing its transitions.
+   * This is used to determine if an effect should restart immediately or wait for cycle boundaries.
+   * 
+   * @param transitions The effect transitions to analyze
+   * @returns The total runtime in milliseconds, or 0 if cannot be calculated
+   */
+  private calculateEffectRuntime(transitions: EffectTransition[]): number {
+    if (transitions.length === 0) return 0;
+    
+    // Group transitions by light to calculate per-light runtime
+    const transitionsByLight = new Map<string, EffectTransition[]>();
+    
+    transitions.forEach(transition => {
+      transition.lights.forEach(light => {
+        if (!transitionsByLight.has(light.id)) {
+          transitionsByLight.set(light.id, []);
+        }
+        transitionsByLight.get(light.id)!.push(transition);
+      });
+    });
+    
+    // Calculate the maximum runtime across all lights
+    let maxRuntime = 0;
+    
+    for (const [, lightTransitions] of transitionsByLight) {
+      let lightRuntime = 0;
+      
+      for (const transition of lightTransitions) {
+        // Add transition duration
+        lightRuntime += transition.transform.duration;
+        
+        // Add wait time after transition
+        if (transition.waitUntilCondition === 'delay') {
+          lightRuntime += transition.waitUntilTime;
+        }
+      }
+      
+      maxRuntime = Math.max(maxRuntime, lightRuntime);
+    }
+    
+    return maxRuntime;
+  }
+
+  /**
+   * Schedules an aligned restart for a specific light at its next offset position within the cycle.
+   * Useful if we need per-light alignment without introducing OS timer jitter (uses the central clock).
+   * 
+   * For effects with no delay between cycles (immediate looping), this method will restart
+   * the effect immediately rather than waiting for cycle boundaries.
+   */
+  public scheduleEffectCycleRestartForLight(effectName: string, layer: number, lightId: string, cycleStartTime: number, cycleDuration: number, lightOffset: number): void {
+    const now = performance.now();
+    if (cycleDuration <= 0) return;
+    
+    const startLight = () => {
+      const queuedMap = this.layerManager.getEffectQueue().get(layer);
+      if (!queuedMap) return;
+      const qe = queuedMap.get(lightId);
+      if (!qe || qe.name !== effectName) return;
+      this.layerManager.removeQueuedEffect(layer, lightId);
+      const transitions = qe.effect.transitions.filter((t: any) => t.layer === layer);
+      if (transitions.length === 0) return;
+      const trackedLights = transitions[0].lights;
+      this.startEffect(qe.name, qe.effect, trackedLights, layer, transitions, qe.isPersistent);
+    };
+
+    // Check if this effect should restart immediately (no delay between cycles)
+    // This happens when the effect's timing hints indicate no delay between cycles
+    const queuedMap = this.layerManager.getEffectQueue().get(layer);
+    const qe = queuedMap?.get(lightId);
+    if (qe && qe.effect.timingHints) {
+      // If the effect has timing hints, check if it's designed for immediate looping
+      // by comparing the cycle duration with the actual effect runtime
+      const effectRuntime = this.calculateEffectRuntime(qe.effect.transitions);
+      
+      // If the cycle duration equals the effect runtime, there's no delay between cycles
+      // This indicates the effect should restart immediately
+      if (effectRuntime > 0 && Math.abs(cycleDuration - effectRuntime) < 10) {
+        // Immediate restart for seamless looping
+        startLight();
+        return;
+      }
+    }
+
+    // Standard cycle-aligned restart for effects with delays between cycles
+    const base = cycleStartTime + lightOffset;
+    const elapsed = Math.max(0, now - base);
+    const cyclesElapsedFloor = Math.floor(elapsed / cycleDuration);
+    const boundaryFloor = base + (cyclesElapsedFloor * cycleDuration);
+    const epsilon = 60; // ms tolerance window
+
+    const startNow = Math.abs(now - boundaryFloor) <= epsilon;
+
+    if (startNow) {
+      startLight();
+    } else {
+      const cyclesElapsedCeil = Math.ceil(elapsed / cycleDuration);
+      const nextBoundary = base + (cyclesElapsedCeil * cycleDuration);
+      const delayMs = Math.max(0, nextBoundary - now);
+      this.timeoutManager.setTimeout(startLight, delayMs);
+    }
+  }
 }

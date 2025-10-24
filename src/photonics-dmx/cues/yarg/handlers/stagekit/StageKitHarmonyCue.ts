@@ -69,7 +69,7 @@ export class StageKitHarmonyCue implements ICue {
         activeColor: cyanColor,
         baseColor: transparentColor,
         layer: 0,
-        waitFor: 'beat',
+        waitUntil: 'beat',
         beatsPerCycle: 1,
       });
       

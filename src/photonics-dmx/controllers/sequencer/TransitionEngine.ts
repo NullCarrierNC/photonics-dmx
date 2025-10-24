@@ -19,9 +19,9 @@ export class TransitionEngine implements ITransitionEngine {
 
   // Periodic timing correction properties
   private lastCorrectionTime: number = 0;
-  private readonly CORRECTION_INTERVAL = 5000;  
-  private readonly DRIFT_THRESHOLD = 1; // 1ms threshold for corrections
-
+  private readonly CORRECTION_INTERVAL = 1000;  
+  private readonly DRIFT_THRESHOLD = 5; 
+  
   /**
    * @constructor
    * @param lightTransitionController The underlying transition controller
@@ -53,19 +53,21 @@ export class TransitionEngine implements ITransitionEngine {
 
     // Find an active effect with absolute timing to use as reference
     let referenceTiming: { cycleStartTime: number; cycleDuration: number; lightOffset: number } | null = null;
+    let referenceEffectName: string | null = null;
 
     const allActiveEffects = this.layerManager.getActiveEffects();
     for (const [, layerEffects] of allActiveEffects) {
       for (const [, effect] of layerEffects) {
         if (effect.absoluteTiming) {
           referenceTiming = effect.absoluteTiming;
+          referenceEffectName = effect.name;
           break;
         }
       }
       if (referenceTiming) break;
     }
 
-    if (!referenceTiming) return; // No active effects with absolute timing
+    if (!referenceTiming || !referenceEffectName) return; // No active effects with absolute timing
 
     // Calculate expected vs actual timing
     const { cycleStartTime, cycleDuration, lightOffset } = referenceTiming;
@@ -78,14 +80,22 @@ export class TransitionEngine implements ITransitionEngine {
 
     // Apply correction if drift exceeds threshold
     if (Math.abs(drift) >= this.DRIFT_THRESHOLD) {
-      // Apply full correction immediately
       const correctionAmount = drift;
 
-      // Update the reference timing object
-      referenceTiming.cycleStartTime += correctionAmount;
+      // Apply correction to all active effects with the same name
+      this.layerManager.getActiveEffects().forEach((layerMap) => {
+        layerMap.forEach((activeEffect) => {
+          if (activeEffect.name === referenceEffectName && activeEffect.absoluteTiming) {
+            activeEffect.absoluteTiming.cycleStartTime += correctionAmount;
+          }
+        });
+      });
 
-      // Apply timing correction:
-      if (this.effectManager) {
+      // Update timing registry for this effect name
+      if (this.effectManager && typeof this.effectManager.correctTimingRegistryByName === 'function') {
+        this.effectManager.correctTimingRegistryByName(referenceEffectName, correctionAmount);
+      } else if (this.effectManager) {
+        // Fallback for older interface (by cycleStartTime)
         this.effectManager.correctTimingRegistry(cycleStartTime, correctionAmount);
       }
 
@@ -231,8 +241,6 @@ export class TransitionEngine implements ITransitionEngine {
         });
         
         // Calculate delay based on absolute timing (if available)
-        let delay = 0;
-        
         if (justFinishedEffect.absoluteTiming) {
           const { cycleStartTime, cycleDuration, lightOffset } = justFinishedEffect.absoluteTiming;
           const currentTime = this.getCurrentTime();
@@ -247,7 +255,7 @@ export class TransitionEngine implements ITransitionEngine {
           if (timeSinceFirstStart < 0) {
             // Haven't reached first start yet - wait for cycle 0
             // Use integer-based calculation for initial delay
-            delay = Math.max(0, Math.floor((cycleStartTime + lightOffset) - currentTime));
+            // Using cycle-aligned scheduling; immediate start handled by scheduleEffectCycleRestart
           } else {
             // The effect just finished. Calculate when this specific light should restart.
             // Use integer-based calculations to avoid floating-point precision drift
@@ -262,35 +270,22 @@ export class TransitionEngine implements ITransitionEngine {
             // If we've already passed the last cycle start time, start immediately
             // Otherwise, wait for the last cycle start time
             if (currentTime >= lastCycleStart) {
-              delay = 0;
+              // Immediate start handled by scheduleEffectCycleRestart
             } else {
-              delay = lastCycleStart - currentTime;
+              // Deferred start handled by scheduleEffectCycleRestart
             }
           }
         }
-        
-        // Schedule the effect start with calculated delay
-        if (delay > 0) {
-          setTimeout(() => {
-            if (this.effectManager) {
-              this.effectManager.startNextEffectInQueue(layer, lightId);
-            }
-          }, delay);
-        } else {
-          // Use setImmediate or Promise.resolve for immediate execution to avoid setTimeout overhead
-          if (typeof globalThis.setImmediate === 'function') {
-            setImmediate(() => {
-              if (this.effectManager) {
-                this.effectManager.startNextEffectInQueue(layer, lightId);
-              }
-            });
-          } else {
-            Promise.resolve().then(() => {
-              if (this.effectManager) {
-                this.effectManager.startNextEffectInQueue(layer, lightId);
-              }
-            });
-          }
+        // Schedule a clock-aligned restart for this light at its next offset position
+        if (this.effectManager && justFinishedEffect.absoluteTiming) {
+          this.effectManager.scheduleEffectCycleRestartForLight(
+            justFinishedEffect.name,
+            layer,
+            lightId,
+            justFinishedEffect.absoluteTiming.cycleStartTime,
+            justFinishedEffect.absoluteTiming.cycleDuration,
+            justFinishedEffect.absoluteTiming.lightOffset
+          );
         }
       } else {
         // Non-persistent effect - check for queued effects

@@ -169,6 +169,12 @@ export interface IEffectManager {
    * @param correctionAmount The amount to add to matching timing entries
    */
   correctTimingRegistry(cycleStartTime: number, correctionAmount: number): void;
+  /** Applies timing correction by effect name */
+  correctTimingRegistryByName(effectName: string, correctionAmount: number): void;
+  /** Schedules a cycle-aligned restart for an effect/layer using the clock */
+  scheduleEffectCycleRestart(effectName: string, layer: number, cycleStartTime: number, cycleDuration: number): void;
+  /** Schedules a clock-aligned restart for a specific light at its next offset in the cycle */
+  scheduleEffectCycleRestartForLight(effectName: string, layer: number, lightId: string, cycleStartTime: number, cycleDuration: number, lightOffset: number): void;
 }
 
 /**
