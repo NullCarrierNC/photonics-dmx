@@ -44,10 +44,10 @@ export class StageKitSilhouettesCue implements ICue {
     };
     
     if (this.isFirstExecution) {
-      await controller.setEffect('stagekit-silhouettes', silhouettesEffect);
+      controller.setEffect('stagekit-silhouettes', silhouettesEffect);
       this.isFirstExecution = false;
     } else {
-      await controller.addEffect('stagekit-silhouettes', silhouettesEffect);
+      controller.addEffect('stagekit-silhouettes', silhouettesEffect);
     }
   }
 

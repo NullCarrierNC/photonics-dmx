@@ -27,10 +27,10 @@ export class SilhouettesCue implements ICue {
     });
     
     if (this.isFirstExecution) {
-      await sequencer.setEffect('silhouettes', singleColor);
+      sequencer.setEffect('silhouettes', singleColor);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('silhouettes', singleColor);
+      sequencer.addEffect('silhouettes', singleColor);
     }
   }
 

@@ -50,14 +50,14 @@ export class DefaultCue implements ICue {
     });
 
     if (this.isFirstExecution) {
-      await sequencer.setEffect('default-base', baseLayer);
+      sequencer.setEffect('default-base', baseLayer);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('default-base', baseLayer);
+      sequencer.addEffect('default-base', baseLayer);
     }
     
-    await sequencer.addEffect('default-front', crossFadeFront);
-    await sequencer.addEffect('default-back', crossFadeBack);
+    sequencer.addEffect('default-front', crossFadeFront);
+    sequencer.addEffect('default-back', crossFadeBack);
   }
 
   onStop(): void {

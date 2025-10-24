@@ -23,10 +23,10 @@ export class IntroCue implements ICue {
     });
     
     if (this.isFirstExecution) {
-      await sequencer.setEffect('intro', effect);
+      sequencer.setEffect('intro', effect);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('intro', effect);
+      sequencer.addEffect('intro', effect);
     }
   }
 

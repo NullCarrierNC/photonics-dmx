@@ -82,17 +82,17 @@ export class DischordCue implements ICue {
     // Apply the effects
     if (this.isFirstExecution) {
       // First time: use setEffect to clear any existing effects and start fresh
-      await sequencer.setEffect('dischord-yellow', yellowEffect);
-      await sequencer.addEffect('dischord-green', greenEffect);
-      await sequencer.addEffect('dischord-blue', blueEffect);
-      await sequencer.addEffect('dischord-red', redFlash);
+      sequencer.setEffect('dischord-yellow', yellowEffect);
+      sequencer.addEffect('dischord-green', greenEffect);
+      sequencer.addEffect('dischord-blue', blueEffect);
+      sequencer.addEffect('dischord-red', redFlash);
       this.isFirstExecution = false;
     } else {
       // Repeat call: use addEffect to add to existing effects
-      await sequencer.addEffect('dischord-yellow', yellowEffect);
-      await sequencer.addEffect('dischord-green', greenEffect);
-      await sequencer.addEffect('dischord-blue', blueEffect);
-      await sequencer.addEffect('dischord-red', redFlash);
+      sequencer.addEffect('dischord-yellow', yellowEffect);
+      sequencer.addEffect('dischord-green', greenEffect);
+      sequencer.addEffect('dischord-blue', blueEffect);
+      sequencer.addEffect('dischord-red', redFlash);
     }
   }
 

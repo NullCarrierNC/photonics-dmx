@@ -28,7 +28,7 @@ export class FlareFastCue implements ICue {
         lights: [lights[i]],
         layer: i + 101,
       });
-      await sequencer.addEffect(`flare-fast${i}`, flash);
+      sequencer.addEffect(`flare-fast${i}`, flash);
     }
   }
 

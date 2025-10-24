@@ -121,7 +121,7 @@ describe('Sequencer', () => {
       const isPersistent = true;
 
       // Call the method
-      await sequencer.setEffect(effectName, effect, isPersistent);
+      sequencer.setEffect(effectName, effect, isPersistent);
 
       // Verify the delegation
       expect(setEffectSpy).toHaveBeenCalledWith(effectName, effect, isPersistent);
@@ -155,7 +155,7 @@ describe('Sequencer', () => {
       const duration = 1000;
 
       // Call the method
-      await sequencer.blackout(duration);
+      sequencer.blackout(duration);
 
       // Verify the delegation
       expect(blackoutSpy).toHaveBeenCalledWith(duration);

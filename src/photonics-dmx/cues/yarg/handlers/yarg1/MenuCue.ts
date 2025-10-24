@@ -37,10 +37,10 @@ export class MenuCue implements ICue {
     });
     // Use unblocked to avoid breaking the sweep timing.
     if (this.isFirstExecution) {
-      await sequencer.setEffectUnblockedName('menu', sweep, true);
+      sequencer.setEffectUnblockedName('menu', sweep, true);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffectUnblockedName('menu', sweep, true);
+      sequencer.addEffectUnblockedName('menu', sweep, true);
     }
   }
 

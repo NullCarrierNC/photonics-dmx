@@ -49,14 +49,14 @@ export class CoolManualCue implements ICue {
     });
 
     if (this.isFirstExecution) {
-      await sequencer.setEffect('coolManual-base', baseLayer);
+      sequencer.setEffect('coolManual-base', baseLayer);
       this.isFirstExecution = false;
     } else {
-      await sequencer.addEffect('coolManual-base', baseLayer);
+      sequencer.addEffect('coolManual-base', baseLayer);
     }
     
-    await sequencer.addEffect('coolManual-e', crossFadeEven);
-    await sequencer.addEffect('coolManual-o', crossFadeOdd);
+    sequencer.addEffect('coolManual-e', crossFadeEven);
+    sequencer.addEffect('coolManual-o', crossFadeOdd);
   }
 
   onStop(): void {

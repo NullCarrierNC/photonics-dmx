@@ -39,13 +39,13 @@ export class SilhouettesSpotlightCue implements ICue {
            // Apply the effects
        if (this.isFirstExecution) {
          // First time: use setEffect to clear any existing effects and start fresh
-         await sequencer.setEffect('silhouettes-spotlight-off', solidEffect);
-         await sequencer.addEffect('silhouettes-spotlight-blue', flashEffect);
+         sequencer.setEffect('silhouettes-spotlight-off', solidEffect);
+         sequencer.addEffect('silhouettes-spotlight-blue', flashEffect);
          this.isFirstExecution = false;
        } else {
          // Repeat call: use addEffect to add to existing effects
-         await sequencer.addEffect('silhouettes-spotlight-off', solidEffect);
-         await sequencer.addEffect('silhouettes-spotlight-blue', flashEffect);
+         sequencer.addEffect('silhouettes-spotlight-off', solidEffect);
+         sequencer.addEffect('silhouettes-spotlight-blue', flashEffect);
        }
   }
 

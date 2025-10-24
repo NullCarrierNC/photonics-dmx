@@ -117,13 +117,13 @@ export class StageKitDefaultCue implements ICue {
     
     // Use firstRun to determine if we should set or add the effect
     if (this.isFirstRun) {
-      await controller.setEffect('stagekit-default-large-blue', blueEffect);
+      controller.setEffect('stagekit-default-large-blue', blueEffect);
       this.isFirstRun = false;
     } else {
-      await controller.addEffect('stagekit-default-large-blue', blueEffect);
+      controller.addEffect('stagekit-default-large-blue', blueEffect);
     }
 
-    await controller.addEffect('stagekit-default-large-red', redEffect);
+    controller.addEffect('stagekit-default-large-red', redEffect);
   }
 
   // Inverts red/blue order
@@ -186,7 +186,7 @@ export class StageKitDefaultCue implements ICue {
       ]
     };
     
-    await controller.addEffect('stagekit-default-small-yellow-dimming', yellowDimmingEffect);
+    controller.addEffect('stagekit-default-small-yellow-dimming', yellowDimmingEffect);
   }
 
   onStop(): void {
