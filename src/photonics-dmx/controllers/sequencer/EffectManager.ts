@@ -317,20 +317,28 @@ export class EffectManager implements IEffectManager {
       this.systemEffects.cancelBlackout();
     }
 
+    // Begin the clearing sequence - this sets a lock to prevent race conditions
+    // where TransitionEngine might try to re-add effects while we're clearing
+    this.lightTransitionController.beginClearingSequence();
 
-    // 1. Clear all active effects and queues (stops new effects from starting)
-    this.layerManager.clearAllActiveEffects();
-    this.layerManager.clearAllQueuedEffects();
+    try {
+      // 1. Clear all active effects and queues (stops new effects from starting)
+      this.layerManager.clearAllActiveEffects();
+      this.layerManager.clearAllQueuedEffects();
 
-    // 2. Clear all layer states and tracking (prevents stale state)
-    this.layerManager.clearAllLayerStates();
-    this.layerManager.clearAllLayerTracking();
+      // 2. Clear all layer states and tracking (prevents stale state)
+      this.layerManager.clearAllLayerStates();
+      this.layerManager.clearAllLayerTracking();
 
-    // 3. Use clearAllTransitions() which has locking and immediately publishes black states
-    this.lightTransitionController.clearAllTransitions();
+      // 3. Use clearAllTransitions() which clears maps and publishes black states
+      this.lightTransitionController.clearAllTransitions();
 
-    // 4. Reset effect tracking state
-    this._lastCalled0LayerEffect = "";
+      // 4. Reset effect tracking state
+      this._lastCalled0LayerEffect = "";
+    } finally {
+      // Always release the clearing lock, even if an error occurs
+      this.lightTransitionController.endClearingSequence();
+    }
   }
 
   /**

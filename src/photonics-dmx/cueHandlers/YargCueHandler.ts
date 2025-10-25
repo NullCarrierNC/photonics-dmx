@@ -95,20 +95,20 @@ class YargCueHandler extends BaseCueHandler {
     if (cue) {
       // Always check for cue transitions first
       if (this.currentExecutingCueType !== cueType) {
-      //  console.log(`[Lifecycle] Cue change detected: ${this.currentExecutingCueType} -> ${cueType}`);
+       // console.log(`[Lifecycle] Cue change detected: ${this.currentExecutingCueType} -> ${cueType}`);
 
         // Don't stop strobe effects as they run on higher layers above regular cues
         const strobeTypes = ['Strobe_Fastest', 'Strobe_Fast', 'Strobe_Medium', 'Strobe_Slow', 'Strobe_Off'];
-        if (!this.currentExecutingCueType || !strobeTypes.includes(this.currentExecutingCueType)) {
+        const shouldStopCurrentCue = !this.currentExecutingCueType || !strobeTypes.includes(this.currentExecutingCueType);
+        
+        if (shouldStopCurrentCue) {
           this.stopCurrentCue();
+        } 
 
-               // Track the new executing cue
+        // ALWAYS update the tracking, regardless of whether we stopped the cue
        // console.log(`[Lifecycle] Starting new cue: ${cue.cueId} (${cueType})`);
         this.currentExecutingCue = cue;
         this.currentExecutingCueType = cueType;
-        }
-
-   
       }
       
       await cue.execute(historicCueData, this._sequencer, this._lightManager);

@@ -234,7 +234,7 @@ export class LightTransitionController {
       });
       
       this._currentLayerStates.clear();
-      
+
       // Publish the black states immediately
       this._lightStateManager.publishLightStates();
       this._lightStateManager.syncFrame();
@@ -268,6 +268,8 @@ export class LightTransitionController {
         this._currentLayerStates.delete(lightId);
       }
     }
+
+    
     
     // Force immediate recalculation and publication of the final color
     // This ensures the light updates immediately rather than waiting for the next update cycle
@@ -355,6 +357,23 @@ export class LightTransitionController {
    */
   public isClearing(): boolean {
     return this._clearingTransitions;
+  }
+
+  /**
+   * Begin the clearing sequence by setting the clearing lock.
+   * This prevents new transitions from being added during the clearing process.
+   * Must be paired with endClearingSequence() in a finally block.
+   */
+  public beginClearingSequence(): void {
+    this._clearingTransitions = true;
+  }
+
+  /**
+   * End the clearing sequence by releasing the clearing lock.
+   * This allows new transitions to be added again.
+   */
+  public endClearingSequence(): void {
+    this._clearingTransitions = false;
   }
 
   /**
