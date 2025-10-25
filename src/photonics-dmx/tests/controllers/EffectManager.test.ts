@@ -137,7 +137,9 @@ describe('EffectManager', () => {
       removeLightLayer: jest.fn(),
       getFinalLightState: jest.fn(),
       resetLightStates: jest.fn(),
-      clearAllTransitions: jest.fn()
+      clearAllTransitions: jest.fn(),
+      beginClearingSequence: jest.fn(),
+      endClearingSequence: jest.fn()
     } as unknown as jest.Mocked<LightTransitionController>;
 
     transitionEngine.getLightTransitionController.mockReturnValue(lightTransitionController);

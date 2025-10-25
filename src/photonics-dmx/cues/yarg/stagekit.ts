@@ -1,6 +1,7 @@
 import { CueRegistry } from '../CueRegistry';
 import { CueType } from '../cueTypes';
 import { ICueGroup } from '../interfaces/ICueGroup';
+import { ICue } from '../interfaces/ICue';
 
 // Import StageKit group cues
 import { StageKitMenuCue } from './handlers/stagekit/StageKitMenuCue';
@@ -37,7 +38,7 @@ const stagekitGroup: ICueGroup = {
   id: 'stagekit',
   name: 'Stage Kit',
   description: 'Stage Kit cues that mimic the original Stage Kit visual effects. There is some variation to account for mapping to a smaller number of lights.',
-  cues: new Map([
+  cues: new Map<CueType, ICue>([
     [CueType.Menu, new StageKitMenuCue()],
     [CueType.Score, new StageKitScoreCue()],
     [CueType.Warm_Manual, new StageKitWarmManualCue()],

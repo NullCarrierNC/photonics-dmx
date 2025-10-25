@@ -36,7 +36,7 @@ export interface ICue {
    * @param sequencer The lighting controller
    * @param lightManager The DMX light manager
    */
-  execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): void;
+  execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): void | Promise<void>;
 
   /**
    * Called when the cue is stopped or being replaced by another cue

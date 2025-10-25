@@ -3,7 +3,6 @@ import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
-import { Effect, EffectTransition } from '../../../../types';
 import { getEffectClockwiseRotation, getEffectCounterClockwiseRotation } from '../../../../effects';
 
 /**
