@@ -484,8 +484,9 @@ export class LightTransitionController {
         }
       });
 
-      // Phase 3: Blend ALL layers for ALL lights
-      allLayerStates.forEach((layerStates, lightId) => {
+      // Phase 3: Blend ALL layers for ALL lights that have ANY layer state
+      // Use _currentLayerStates instead of allLayerStates to include waiting transitions
+      this._currentLayerStates.forEach((layerStates, lightId) => {
         this.blendAndSetFinalColor(lightId, layerStates);
       });
 
