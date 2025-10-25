@@ -20,7 +20,7 @@ export class StageKitSearchlightsCue implements ICue {
 
   private isFirstExecution: boolean = true;
 
-  async execute(cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
+  execute(cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): void {
     const allLights = lightManager.getLights(['front', 'back'], 'all');
     const transparentColor = getColor('transparent', 'medium');
     
@@ -31,7 +31,7 @@ export class StageKitSearchlightsCue implements ICue {
     
     const singleColor = getEffectSingleColor({
       color: transparentColor,
-      duration: lightDuration,
+      duration: 100,
       lights: allLights,
       layer: 0,
     });
@@ -47,7 +47,7 @@ export class StageKitSearchlightsCue implements ICue {
         controller.addEffect('stagekit-searchlights-red', redEffect);
         this.isFirstExecution = false;
       } else {
-        controller.addEffect('stagekit-clear-0', singleColor);
+       controller.addEffect('stagekit-clear-0', singleColor);
         controller.addEffectUnblockedName('stagekit-searchlights-yellow', yellowEffect);
         controller.addEffectUnblockedName('stagekit-searchlights-red', redEffect);
       }

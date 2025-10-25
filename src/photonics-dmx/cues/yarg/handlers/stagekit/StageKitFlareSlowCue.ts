@@ -14,6 +14,7 @@ export class StageKitFlareSlowCue implements ICue {
   cueId = CueType.Flare_Slow;
   description = 'All to white, high.';
   style = CueStyle.Primary;
+  private isFirstExecution: boolean = true;
 
   async execute(_cueData: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const white = getColor('white', 'high');
@@ -23,11 +24,17 @@ export class StageKitFlareSlowCue implements ICue {
       color: white,
       duration: 100,
     });
-    sequencer.setEffect('stagekit-flare-slow', effect);
+
+    if (this.isFirstExecution) {
+      sequencer.setEffect('stagekit-flare-slow', effect);
+      this.isFirstExecution = false;
+    } else {
+      sequencer.addEffect('stagekit-flare-slow', effect);
+    }
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {

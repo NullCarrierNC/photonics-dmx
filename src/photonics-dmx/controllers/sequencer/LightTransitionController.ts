@@ -228,11 +228,16 @@ export class LightTransitionController {
       };
       
       allLightIds.forEach(lightId => {
+        // Set in final colors map directly to avoid state inconsistency
+        this._finalColors.set(lightId, blackState);
         this._lightStateManager.setLightState(lightId, blackState);
       });
       
+      this._currentLayerStates.clear();
+
       // Publish the black states immediately
-    //  this._lightStateManager.publishLightStates();
+      this._lightStateManager.publishLightStates();
+      this._lightStateManager.syncFrame();
     } finally {
       // Release the clearing flag
       this._clearingTransitions = false;
@@ -263,6 +268,8 @@ export class LightTransitionController {
         this._currentLayerStates.delete(lightId);
       }
     }
+
+    
     
     // Force immediate recalculation and publication of the final color
     // This ensures the light updates immediately rather than waiting for the next update cycle
@@ -350,6 +357,23 @@ export class LightTransitionController {
    */
   public isClearing(): boolean {
     return this._clearingTransitions;
+  }
+
+  /**
+   * Begin the clearing sequence by setting the clearing lock.
+   * This prevents new transitions from being added during the clearing process.
+   * Must be paired with endClearingSequence() in a finally block.
+   */
+  public beginClearingSequence(): void {
+    this._clearingTransitions = true;
+  }
+
+  /**
+   * End the clearing sequence by releasing the clearing lock.
+   * This allows new transitions to be added again.
+   */
+  public endClearingSequence(): void {
+    this._clearingTransitions = false;
   }
 
   /**
@@ -481,8 +505,9 @@ export class LightTransitionController {
         }
       });
 
-      // Phase 3: Blend ALL layers for ALL lights
-      allLayerStates.forEach((layerStates, lightId) => {
+      // Phase 3: Blend ALL layers for ALL lights that have ANY layer state
+      // Use _currentLayerStates instead of allLayerStates to include waiting transitions
+      this._currentLayerStates.forEach((layerStates, lightId) => {
         this.blendAndSetFinalColor(lightId, layerStates);
       });
 
@@ -501,8 +526,6 @@ export class LightTransitionController {
         this._transitionsByLight.delete(lightId);
       });
 
-      // Verify state consistency
-      this.verifyStateConsistency();
 
     } catch (error) {
       console.error('Critical error in transition processing:', error);
@@ -890,22 +913,6 @@ export class LightTransitionController {
     }
   }
 
-  /**
-   * Verifies that final colors match what layers would produce
-   */
-  private verifyStateConsistency(): void {
-    // Check that final colors match what layers would produce
-    for (const [lightId, finalColor] of this._finalColors.entries()) {
-      const recalculated = this.calculateFinalColorForLight(lightId);
-      if (JSON.stringify(finalColor) !== JSON.stringify(recalculated)) {
-        const position = this.getLightPosition(lightId);
-        console.warn(`State inconsistency detected for light ${lightId} (position ${position})`);
-        // Trigger correction
-        this._finalColors.set(lightId, recalculated);
-        this._lightStateManager.setLightState(lightId, recalculated);
-      }
-    }
-  }
 
   /**
    * Gets the 1-based position of a light in the tracked lights array

@@ -76,7 +76,7 @@ export class StageKitDefaultCue implements ICue {
       // Blue, wait for keyframe
       {
         lights: redLights,
-        layer: 0,
+        layer: 2,
         waitForCondition: 'none',
         waitForTime: 0,
         waitUntilCondition: 'keyframe',
@@ -90,7 +90,7 @@ export class StageKitDefaultCue implements ICue {
       // Turn off, wait for keyframe
       {
         lights: redLights,
-        layer: 0,
+        layer: 2,
         waitForCondition: 'none',
         waitForTime: 0,
         waitUntilCondition: 'keyframe',
@@ -127,13 +127,13 @@ export class StageKitDefaultCue implements ICue {
   }
 
   // Inverts red/blue order
-  private async executeSmallVenueDefault(controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
+  private executeSmallVenueDefault(controller: ILightingController, lightManager: DmxLightManager): void {
     // Small uses the same based effect as large, so re-use large:
     this.executeLargeVenueDefault(controller, lightManager);
 
     // Add the yellow dimming effect on red drum hits:
     const yellowColor = getColor('yellow', 'medium', 'replace'); //Using replace so when mixed with blue we don't blend to white
-    const transparentColor = getColor('transparent', 'medium');
+    const transparentColor = getColor('transparent', 'medium', 'replace');
     const lights = lightManager.getLights(['front', 'back'], 'all');
 
     // Create custom effect for yellow LEDs that are normally ON but dim OFF on red drum hits
@@ -152,14 +152,14 @@ export class StageKitDefaultCue implements ICue {
             easing: 'linear',
             duration: 0
           },
-          waitUntilCondition: 'none',
+          waitUntilCondition: 'drum-red',
           waitUntilTime: 0
         },
         // Then, when red drum is hit, dim them OFF briefly
         {
           lights: lights,
           layer: 101,
-          waitForCondition: 'drum-red',
+          waitForCondition: 'none',
           waitForTime: 0,
           transform: {
             color: transparentColor,
@@ -169,20 +169,7 @@ export class StageKitDefaultCue implements ICue {
           waitUntilCondition: 'delay',
           waitUntilTime: 200
         },
-        // Finally, return them to ON
-        {
-          lights: lights,
-          layer: 101,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: {
-            color: yellowColor,
-            easing: EasingType.LINEAR,
-            duration: 0
-          },
-          waitUntilCondition: 'none',
-          waitUntilTime: 0
-        }
+        
       ]
     };
     

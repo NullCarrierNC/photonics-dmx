@@ -4,6 +4,7 @@ import { ILightingController } from '../../../../controllers/sequencer/interface
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { Effect, EffectTransition } from '../../../../types';
+import { getEffectClockwiseRotation, getEffectCounterClockwiseRotation } from '../../../../effects';
 
 /**
  * StageKit Cool Manual Cue 
@@ -20,281 +21,51 @@ export class StageKitCoolManualCue implements ICue {
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
-    const blue = getColor('blue', 'medium', 'add');
-    const green = getColor('green', 'medium', 'add');
-  
-    const blackColor = getColor('black', 'medium');
+    const blueColor = getColor('blue', 'medium', 'add');
+    const greenColor = getColor('green', 'medium', 'add');
     const transparentColor = getColor('transparent', 'medium');
-    
-    // Calculate number of light pairs and steps
-    const lightPairs = Math.floor(allLights.length / 2);
-    
-    // Create transitions for blue light pairs
-    const blueTransitions: EffectTransition[] = [];
-    
-    // For each light pair, create the appropriate number of transparent transitions
-    // followed by blue, then more transparent transitions
-    for (let pairIndex = 0; pairIndex < lightPairs; pairIndex++) {
-        const light1Index = pairIndex;
-        const light2Index = (pairIndex + lightPairs) % allLights.length;
-        
-        const light1 = allLights[light1Index];
-        const light2 = allLights[light2Index];
-        
-        // Calculate when this pair should be active
-        const stepsUntilActive = pairIndex;
-        
-        // Add transparent transitions before blue (to wait for the right keyframe)
-        if (stepsUntilActive > 0) {
-            // Light 1 transparent - wait for stepsUntilActive keyframes
-            blueTransitions.push({
-                lights: [light1],
-                layer: 0,
-                waitForCondition: 'none',
-                waitForTime: 0,
-                transform: {
-                    color: blackColor,
-                    easing: 'linear',
-                    duration: 100,
-                },
-                waitUntilCondition: 'keyframe',
-                waitUntilTime: 0,
-                waitUntilConditionCount: stepsUntilActive
-            });
-            
-            // Light 2 transparent - wait for stepsUntilActive keyframes
-            blueTransitions.push({
-                lights: [light2],
-                layer: 0,
-                waitForCondition: 'none',
-                waitForTime: 0,
-                transform: {
-                    color: blackColor,
-                    easing: 'linear',
-                    duration: 100,
-                },
-                waitUntilCondition: 'keyframe',
-                waitUntilTime: 0,
-                waitUntilConditionCount: stepsUntilActive
-            });
-        }
-        
-        // Add the blue transition for both lights
-        blueTransitions.push({
-            lights: [light1],
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: {
-                color: blue,
-                easing: 'linear',
-                duration: 100,
-            },
-            waitUntilCondition: 'keyframe',
-            waitUntilTime: 0
-        });
-        
-        blueTransitions.push({
-            lights: [light2],
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: {
-                color: blue,
-                easing: 'linear',
-                duration: 100,
-            },
-            waitUntilCondition: 'keyframe',
-            waitUntilTime: 0
-        });
-        
-        // Add transparent transitions after blue (to wait until the cycle completes)
-        const stepsAfterBlue = lightPairs - stepsUntilActive - 1;
-        if (stepsAfterBlue > 0) {
-            // Light 1 transparent - wait for stepsAfterBlue keyframes
-            blueTransitions.push({
-                lights: [light1],
-                layer: 0,
-                waitForCondition: 'none',
-                waitForTime: 0,
-                transform: {
-                    color: blackColor,
-                    easing: 'linear',
-                    duration: 100,
-                },
-                waitUntilCondition: 'keyframe',
-                waitUntilTime: 0,
-                waitUntilConditionCount: stepsAfterBlue
-            });
-            
-            // Light 2 transparent - wait for stepsAfterBlue keyframes
-            blueTransitions.push({
-                lights: [light2],
-                layer: 0,
-                waitForCondition: 'none',
-                waitForTime: 0,
-                transform: {
-                    color: blackColor,
-                    easing: 'linear',
-                    duration: 100,
-                },
-                waitUntilCondition: 'keyframe',
-                waitUntilTime: 0,
-                waitUntilConditionCount: stepsAfterBlue
-            });
-        }
-    }
-    
-    // Handle center light if odd number of lights
-    if (allLights.length % 2 !== 0) {
-        const centerLight = allLights[lightPairs];
-        
-        // Center light follows pair 0 timing
-        const stepsUntilActive = 0;
-        
-        // Add transparent transitions before blue (to wait for the right keyframe)
-        if (stepsUntilActive > 0) {
-            blueTransitions.push({
-                lights: [centerLight],
-                layer: 0,
-                waitForCondition: 'none',
-                waitForTime: 0,
-                transform: {
-                    color: blackColor,
-                    easing: 'linear',
-                    duration: 100,
-                },
-                waitUntilCondition: 'keyframe',
-                waitUntilTime: 0,
-                waitUntilConditionCount: stepsUntilActive
-            });
-        }
-        
-        // Add the blue transition
-        blueTransitions.push({
-            lights: [centerLight],
-            layer: 0,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: {
-                color: blue,
-                easing: 'linear',
-                duration: 100,
-            },
-            waitUntilCondition: 'keyframe',
-            waitUntilTime: 0
-        });
-        
-        // Add transparent transitions after blue (to wait until the cycle completes)
-        const stepsAfterBlue = lightPairs - stepsUntilActive - 1;
-        if (stepsAfterBlue > 0) {
-            blueTransitions.push({
-                lights: [centerLight],
-                layer: 0,
-                waitForCondition: 'none',
-                waitForTime: 0,
-                transform: {
-                    color: blackColor,
-                    easing: 'linear',
-                    duration: 100,
-                },
-                waitUntilCondition: 'keyframe',
-                waitUntilTime: 0,
-                waitUntilConditionCount: stepsAfterBlue
-            });
-        }
-    }
-    
-    // Create transitions for green light stepping
-    const greenTransitions: EffectTransition[] = [];
-    
-    // For each light, create the appropriate number of transparent transitions
-    // followed by green, then more transparent transitions
-    for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
-        const light = allLights[lightIndex];
-        
-        // Calculate when this light should be green based on its position
-        // Green starts at 90 degrees (1/4 of ring) and steps counter-clockwise
-        const greenStartIndex = Math.floor(allLights.length / 4);
-        const stepsUntilGreen = (greenStartIndex - lightIndex + allLights.length) % allLights.length;
-        
-        // Add transparent transitions before green (to wait for the right keyframe)
-        if (stepsUntilGreen > 0) {
-            greenTransitions.push({
-                lights: [light],
-                layer: 5,
-                waitForCondition: 'none',
-                waitForTime: 0,
-                transform: {
-                    color: transparentColor,
-                    easing: 'linear',
-                    duration: 0,
-                },
-                waitUntilCondition: 'keyframe',
-                waitUntilTime: 0,
-                waitUntilConditionCount: stepsUntilGreen
-            });
-        }
-        
-        // Add the green transition
-        greenTransitions.push({
-            lights: [light],
-            layer: 5,
-            waitForCondition: 'none',
-            waitForTime: 0,
-            transform: {
-                color: green,
-                easing: 'linear',
-                duration: 0,
-            },
-            waitUntilCondition: 'keyframe',
-            waitUntilTime: 0
-        });
-        
-        // Add transparent transitions after green (to wait until the cycle completes)
-        const stepsAfterGreen = allLights.length - stepsUntilGreen - 1;
-        if (stepsAfterGreen > 0) {
-            greenTransitions.push({
-                lights: [light],
-                layer: 5,
-                waitForCondition: 'none',
-                waitForTime: 0,
-                transform: {
-                    color: transparentColor,
-                    easing: 'linear',
-                    duration: 0,
-                },
-                waitUntilCondition: 'keyframe',
-                waitUntilTime: 0,
-                waitUntilConditionCount: stepsAfterGreen
-            });
-        }
-    }
-    
-    // Create the blue effect
-    const blueEffect: Effect = {
-        id: "cool-manual-blue",
-        description: "Cool manual pattern - blue pairs stepping clockwise",
-        transitions: blueTransitions
-    };
-    
-    // Create the green effect
-    const greenEffect: Effect = {
-        id: "cool-manual-green",
-        description: "Cool manual pattern - green light stepping counter-clockwise",
-        transitions: greenTransitions
-    };
-    
+
+    // Green effect: Counter-clockwise rotation starting at 90° position (1/4 of ring)
+    const greenEffect = getEffectCounterClockwiseRotation({
+      lights: allLights,
+      activeColor: greenColor,
+      baseColor: transparentColor,
+      layer: 5,
+      waitFor: 'keyframe',
+      startOffset: Math.floor(allLights.length / 4)
+    });
+
+   
+  
+   // Create blue effects for each pair with offset timing
+    const blueEffect1 = getEffectClockwiseRotation({
+      lights: allLights,
+      activeColor: blueColor,
+      baseColor: transparentColor,
+      layer: 0,
+      waitFor: 'keyframe'
+    });
+
+    const blueEffect2 = getEffectClockwiseRotation({
+      lights: allLights,
+      activeColor: blueColor,
+      baseColor: transparentColor,
+      layer: 2,
+      waitFor: 'keyframe',
+      startOffset: allLights.length / 2
+    });
+
+ 
     // Add both effects to the sequencer
     if (this.isFirstExecution) {
-      // First time: use setEffect to clear any existing effects and start fresh
-      sequencer.setEffect('cool-manual-blue', blueEffect);
-      sequencer.addEffect('cool-manual-green', greenEffect);
+      sequencer.setEffect('cool-auto-blue', blueEffect1);
+      sequencer.addEffect('cool-auto-blue', blueEffect2);
+      sequencer.addEffect('cool-auto-green', greenEffect);
       this.isFirstExecution = false;
     } else {
-      // Repeat call: use addEffect to add to existing effects
-      sequencer.addEffect('cool-manual-blue', blueEffect);
-      sequencer.addEffect('cool-manual-green', greenEffect);
+      sequencer.addEffect('cool-auto-blue', blueEffect1);
+      sequencer.addEffect('cool-auto-blue', blueEffect2);
+      sequencer.addEffect('cool-auto-green', greenEffect);
     }
   }
 

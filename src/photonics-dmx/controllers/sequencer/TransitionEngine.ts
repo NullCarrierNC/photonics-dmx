@@ -111,11 +111,7 @@ export class TransitionEngine implements ITransitionEngine {
    * @param deltaTime The time elapsed since last update in milliseconds (unused)
    */
   public updateTransitions(_deltaTime: number = 0): void {
-    // Skip processing if a global clear is in progress to avoid races
-    if (this.lightTransitionController && (this.lightTransitionController as any).isClearing && (this.lightTransitionController as any).isClearing()) {
-      return;
-    }
-
+   
     // Single timestamp for all effect state machines
     const currentTime = this.getCurrentTime();
 
