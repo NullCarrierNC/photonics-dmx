@@ -233,6 +233,8 @@ export class LightTransitionController {
         this._lightStateManager.setLightState(lightId, blackState);
       });
       
+      this._currentLayerStates.clear();
+      
       // Publish the black states immediately
       this._lightStateManager.publishLightStates();
       this._lightStateManager.syncFrame();
