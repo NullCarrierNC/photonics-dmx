@@ -35,7 +35,7 @@ export class StageKitHarmonyCue implements ICue {
         activeColor: yellowColor,
         baseColor: transparentColor,
         layer: 0,
-        waitFor: 'beat',
+        waitUntilCondition: 'beat',
         beatsPerCycle: 1,
         startOffset: 3,
       });
@@ -46,7 +46,7 @@ export class StageKitHarmonyCue implements ICue {
         activeColor: redColor,
         baseColor: transparentColor,
         layer: 1,
-        waitFor: 'beat',
+        waitUntilCondition: 'beat',
         beatsPerCycle: 1,
         startOffset: 4,
       });
@@ -69,7 +69,7 @@ export class StageKitHarmonyCue implements ICue {
         activeColor: cyanColor,
         baseColor: transparentColor,
         layer: 0,
-        waitFor: 'beat',
+        waitUntilCondition: 'beat',
         beatsPerCycle: 1,
       });
       

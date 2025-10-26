@@ -13,8 +13,18 @@ export interface RotationPatternEffectParams extends IEffect {
   baseColor: RGBIO;
   /** The layer to apply the effect on */
   layer?: number;
-  /** The condition that triggers each step in the rotation */
-  waitFor?: WaitCondition;
+  /** Condition that must be met before the transition starts */
+  waitForCondition?: WaitCondition;
+  /** Time to wait before the transition starts (ms) */
+  waitForTime?: number;
+  /** Number of condition events before the transition starts */
+  waitForConditionCount?: number;
+  /** Condition that must be met before the next transition */
+  waitUntilCondition?: WaitCondition;
+  /** Time to wait before the next transition (ms) */
+  waitUntilTime?: number;
+  /** Number of condition events before the next transition */
+  waitUntilConditionCount?: number;
   /** Number of beats per full rotation cycle (default: 1) */
   beatsPerCycle?: number;
   /** Starting position offset (default: 0) */
@@ -31,8 +41,12 @@ export interface DualModeRotationEffectParams extends RotationPatternEffectParam
   isLargeVenue: boolean;
   /** Color for solid mode (when not rotating) */
   solidColor: RGBIO;
-  /** The condition that triggers mode switching (default: 'measure') */
-  modeSwitchTrigger?: WaitCondition;
+  /** The condition that triggers mode switching */
+  modeSwitchCondition?: WaitCondition;
+  /** Time for mode switching (ms) */
+  modeSwitchTime?: number;
+  /** Condition count for mode switching */
+  modeSwitchConditionCount?: number;
 }
 
 /**
@@ -49,10 +63,18 @@ export interface AlternatingPatternEffectParams {
   baseColor: RGBIO;
   /** The layer to apply the effect on */
   layer?: number;
-  /** The condition that triggers pattern switching */
-  switchTrigger?: WaitCondition;
-  /** The condition that triggers pattern completion */
-  completeTrigger?: WaitCondition;
+  /** Condition that triggers pattern switching */
+  switchCondition?: WaitCondition;
+  /** Time for pattern switching (ms) */
+  switchTime?: number;
+  /** Condition count for pattern switching */
+  switchConditionCount?: number;
+  /** Condition that triggers pattern completion */
+  completeCondition?: WaitCondition;
+  /** Time for pattern completion (ms) */
+  completeTime?: number;
+  /** Condition count for pattern completion */
+  completeConditionCount?: number;
 }
 
 /**
@@ -64,7 +86,12 @@ export const getEffectClockwiseRotation = ({
   activeColor,
   baseColor,
   layer = 0,
-  waitFor = 'beat',
+  waitForCondition = 'none',
+  waitForTime = 0,
+  waitForConditionCount = 0,
+  waitUntilCondition = 'none',
+  waitUntilTime = 0,
+  waitUntilConditionCount = 0,
   beatsPerCycle = 1,
   startOffset = 0,
 }: RotationPatternEffectParams): Effect => {
@@ -82,16 +109,17 @@ export const getEffectClockwiseRotation = ({
       transitions.push({
         lights: [light],
         layer: layer,
-        waitForCondition: 'none',
-        waitForTime: 0,
+        waitForCondition: waitForCondition,
+        waitForTime: waitForTime,
+        waitForConditionCount: waitForConditionCount,
         transform: {
           color: baseColor,
           easing: 'linear',
           duration: 0,
         },
-        waitUntilCondition: waitFor,
-        waitUntilTime: 0,
-        waitUntilConditionCount: stepsUntilActive * beatsPerCycle
+        waitUntilCondition: waitUntilCondition,
+        waitUntilTime: waitUntilTime,
+        waitUntilConditionCount: (stepsUntilActive * beatsPerCycle) + waitUntilConditionCount
       });
     }
     
@@ -99,16 +127,17 @@ export const getEffectClockwiseRotation = ({
     transitions.push({
       lights: [light],
       layer: layer,
-      waitForCondition: 'none',
-      waitForTime: 0,
+      waitForCondition: waitForCondition,
+      waitForTime: waitForTime,
+      waitForConditionCount: waitForConditionCount,
       transform: {
         color: activeColor,
         easing: 'linear',
         duration: 0,
       },
-      waitUntilCondition: waitFor,
-      waitUntilTime: 0,
-      waitUntilConditionCount: beatsPerCycle
+      waitUntilCondition: waitUntilCondition,
+      waitUntilTime: waitUntilTime,
+      waitUntilConditionCount: beatsPerCycle + waitUntilConditionCount
     });
     
     // Phase 3: Turn off and wait for cycle completion
@@ -117,23 +146,24 @@ export const getEffectClockwiseRotation = ({
       transitions.push({
         lights: [light],
         layer: layer,
-        waitForCondition: 'none',
-        waitForTime: 0,
+        waitForCondition: waitForCondition,
+        waitForTime: waitForTime,
+        waitForConditionCount: waitForConditionCount,
         transform: {
           color: baseColor,
           easing: 'linear',
           duration: 0,
         },
-        waitUntilCondition: waitFor,
-        waitUntilTime: 0,
-        waitUntilConditionCount: stepsAfterActive * beatsPerCycle
+        waitUntilCondition: waitUntilCondition,
+        waitUntilTime: waitUntilTime,
+        waitUntilConditionCount: (stepsAfterActive * beatsPerCycle) + waitUntilConditionCount
       });
     }
   }
 
   return {
     id: "ClockwiseRotationEffect",
-    description: `Clockwise rotation pattern (${lights.length} lights) responding to ${waitFor}`,
+    description: `Clockwise rotation pattern (${lights.length} lights)`,
     transitions: transitions
   };
 };
@@ -147,7 +177,12 @@ export const getEffectCounterClockwiseRotation = ({
   activeColor,
   baseColor,
   layer = 0,
-  waitFor = 'beat',
+  waitForCondition = 'none',
+  waitForTime = 0,
+  waitForConditionCount = 0,
+  waitUntilCondition = 'none',
+  waitUntilTime = 0,
+  waitUntilConditionCount = 0,
   beatsPerCycle = 1,
   startOffset = 0,
 }: RotationPatternEffectParams): Effect => {
@@ -165,16 +200,17 @@ export const getEffectCounterClockwiseRotation = ({
       transitions.push({
         lights: [light],
         layer: layer,
-        waitForCondition: 'none',
-        waitForTime: 0,
+        waitForCondition: waitForCondition,
+        waitForTime: waitForTime,
+        waitForConditionCount: waitForConditionCount,
         transform: {
           color: baseColor,
           easing: 'linear',
           duration: 0,
         },
-        waitUntilCondition: waitFor,
-        waitUntilTime: 0,
-        waitUntilConditionCount: stepsUntilActive * beatsPerCycle
+        waitUntilCondition: waitUntilCondition,
+        waitUntilTime: waitUntilTime,
+        waitUntilConditionCount: (stepsUntilActive * beatsPerCycle) + waitUntilConditionCount
       });
     }
     
@@ -182,16 +218,17 @@ export const getEffectCounterClockwiseRotation = ({
     transitions.push({
       lights: [light],
       layer: layer,
-      waitForCondition: 'none',
-      waitForTime: 0,
+      waitForCondition: waitForCondition,
+      waitForTime: waitForTime,
+      waitForConditionCount: waitForConditionCount,
       transform: {
         color: activeColor,
         easing: 'linear',
         duration: 0,
       },
-      waitUntilCondition: waitFor,
-      waitUntilTime: 0,
-      waitUntilConditionCount: beatsPerCycle
+      waitUntilCondition: waitUntilCondition,
+      waitUntilTime: waitUntilTime,
+      waitUntilConditionCount: beatsPerCycle + waitUntilConditionCount
     });
     
     // Phase 3: Turn off and wait for cycle completion
@@ -200,23 +237,24 @@ export const getEffectCounterClockwiseRotation = ({
       transitions.push({
         lights: [light],
         layer: layer,
-        waitForCondition: 'none',
-        waitForTime: 0,
+        waitForCondition: waitForCondition,
+        waitForTime: waitForTime,
+        waitForConditionCount: waitForConditionCount,
         transform: {
           color: baseColor,
           easing: 'linear',
           duration: 0,
         },
-        waitUntilCondition: waitFor,
-        waitUntilTime: 0,
-        waitUntilConditionCount: stepsAfterActive * beatsPerCycle
+        waitUntilCondition: waitUntilCondition,
+        waitUntilTime: waitUntilTime,
+        waitUntilConditionCount: (stepsAfterActive * beatsPerCycle) + waitUntilConditionCount
       });
     }
   }
 
   return {
     id: "CounterClockwiseRotationEffect",
-    description: `Counter-clockwise rotation pattern (${lights.length} lights) responding to ${waitFor}`,
+    description: `Counter-clockwise rotation pattern (${lights.length} lights)`,
     transitions: transitions
   };
 };
@@ -233,9 +271,17 @@ export const getEffectDualModeRotation = ({
   solidColor,
   isLargeVenue,
   layer = 0,
-  waitFor = 'beat',
+  waitForCondition = 'none',
+  waitForTime = 0,
+  waitForConditionCount = 0,
+  waitUntilCondition = 'none',
+  waitUntilTime = 0,
+  waitUntilConditionCount = 0,
   beatsPerCycle = 1,
-  modeSwitchTrigger = 'measure',
+  startOffset = 0,
+  modeSwitchCondition = 'measure',
+  modeSwitchTime = 0,
+  modeSwitchConditionCount = 0,
 }: DualModeRotationEffectParams): Effect => {
   const transitions: EffectTransition[] = [];
 
@@ -247,8 +293,14 @@ export const getEffectDualModeRotation = ({
       activeColor,
       baseColor,
       layer,
-      waitFor,
+      waitForCondition,
+      waitForTime,
+      waitForConditionCount,
+      waitUntilCondition,
+      waitUntilTime,
+      waitUntilConditionCount,
       beatsPerCycle,
+      startOffset,
     });
     transitions.push(...rotationEffect.transitions);
     
@@ -256,21 +308,25 @@ export const getEffectDualModeRotation = ({
     transitions.push({
       lights: lights,
       layer: layer,
-      waitForCondition: 'none',
-      waitForTime: 0,
+      waitForCondition: waitForCondition,
+      waitForTime: waitForTime,
+      waitForConditionCount: waitForConditionCount,
       transform: { color: solidColor, easing: 'linear', duration: 0 },
-      waitUntilCondition: modeSwitchTrigger,
-      waitUntilTime: 0
+      waitUntilCondition: modeSwitchCondition,
+      waitUntilTime: modeSwitchTime,
+      waitUntilConditionCount: modeSwitchConditionCount
     });
     
     transitions.push({
       lights: lights,
       layer: layer,
-      waitForCondition: 'none',
-      waitForTime: 0,
+      waitForCondition: waitForCondition,
+      waitForTime: waitForTime,
+      waitForConditionCount: waitForConditionCount,
       transform: { color: baseColor, easing: 'linear', duration: 0 },
-      waitUntilCondition: modeSwitchTrigger,
-      waitUntilTime: 0
+      waitUntilCondition: modeSwitchCondition,
+      waitUntilTime: modeSwitchTime,
+      waitUntilConditionCount: modeSwitchConditionCount
     });
   } else {
     // Small venue: Only counter-clockwise rotation
@@ -279,8 +335,14 @@ export const getEffectDualModeRotation = ({
       activeColor,
       baseColor,
       layer,
-      waitFor,
+      waitForCondition,
+      waitForTime,
+      waitForConditionCount,
+      waitUntilCondition,
+      waitUntilTime,
+      waitUntilConditionCount,
       beatsPerCycle,
+      startOffset,
     });
     transitions.push(...rotationEffect.transitions);
   }
@@ -302,8 +364,12 @@ export const getEffectAlternatingPatterns = ({
   activeColor,
   baseColor,
   layer = 0,
-  switchTrigger = 'keyframe',
-  completeTrigger = 'beat',
+  switchCondition = 'keyframe',
+  switchTime = 0,
+  switchConditionCount = 0,
+  completeCondition = 'none',
+  completeTime = 0,
+  completeConditionCount = 0,
 }: AlternatingPatternEffectParams): Effect => {
   const transitions: EffectTransition[] = [];
   
@@ -313,9 +379,11 @@ export const getEffectAlternatingPatterns = ({
     layer: layer,
     waitForCondition: 'none',
     waitForTime: 0,
+    waitForConditionCount: 0,
     transform: { color: activeColor, easing: 'linear', duration: 0 },
-    waitUntilCondition: switchTrigger,
-    waitUntilTime: 0
+    waitUntilCondition: switchCondition,
+    waitUntilTime: switchTime,
+    waitUntilConditionCount: switchConditionCount
   });
   
   transitions.push({
@@ -323,9 +391,11 @@ export const getEffectAlternatingPatterns = ({
     layer: layer,
     waitForCondition: 'none',
     waitForTime: 0,
+    waitForConditionCount: 0,
     transform: { color: baseColor, easing: 'linear', duration: 0 },
-    waitUntilCondition: completeTrigger,
-    waitUntilTime: 0
+    waitUntilCondition: completeCondition,
+    waitUntilTime: completeTime,
+    waitUntilConditionCount: completeConditionCount
   });
   
   // Pattern B: Flash on second trigger, then off
@@ -334,9 +404,11 @@ export const getEffectAlternatingPatterns = ({
     layer: layer,
     waitForCondition: 'none',
     waitForTime: 0,
+    waitForConditionCount: 0,
     transform: { color: baseColor, easing: 'linear', duration: 0 },
-    waitUntilCondition: switchTrigger,
-    waitUntilTime: 0
+    waitUntilCondition: switchCondition,
+    waitUntilTime: switchTime,
+    waitUntilConditionCount: switchConditionCount
   });
   
   transitions.push({
@@ -344,9 +416,11 @@ export const getEffectAlternatingPatterns = ({
     layer: layer,
     waitForCondition: 'none',
     waitForTime: 0,
+    waitForConditionCount: 0,
     transform: { color: activeColor, easing: 'linear', duration: 0 },
-    waitUntilCondition: switchTrigger,
-    waitUntilTime: 0
+    waitUntilCondition: switchCondition,
+    waitUntilTime: switchTime,
+    waitUntilConditionCount: switchConditionCount
   });
   
   transitions.push({
@@ -354,14 +428,16 @@ export const getEffectAlternatingPatterns = ({
     layer: layer,
     waitForCondition: 'none',
     waitForTime: 0,
+    waitForConditionCount: 0,
     transform: { color: baseColor, easing: 'linear', duration: 0 },
-    waitUntilCondition: completeTrigger,
-    waitUntilTime: 0
+    waitUntilCondition: completeCondition,
+    waitUntilTime: completeTime,
+    waitUntilConditionCount: completeConditionCount
   });
 
   return {
     id: "AlternatingPatternsEffect",
-    description: `Alternating patterns (A: ${patternALights.length} lights, B: ${patternBLights.length} lights) on ${switchTrigger}`,
+    description: `Alternating patterns (A: ${patternALights.length} lights, B: ${patternBLights.length} lights)`,
     transitions: transitions
   };
 };

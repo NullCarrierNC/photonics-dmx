@@ -38,7 +38,7 @@ export class DischordCue implements ICue {
       activeColor: yellowColor,
       baseColor: transparentColor,
       layer: 2,
-      waitFor: 'beat',
+      waitUntilCondition: 'beat',
       beatsPerCycle: 1,
     });
 
@@ -50,9 +50,9 @@ export class DischordCue implements ICue {
       solidColor: greenColor,
       isLargeVenue: parameters.venueSize === 'Large',
       layer: 1,
-      waitFor: 'beat',
+      waitUntilCondition: 'beat',
       beatsPerCycle: 2, // 0.5 cycles per beat = 2 beats per cycle
-      modeSwitchTrigger: 'measure',
+      modeSwitchCondition: 'measure',
     });
 
     // Blue: Two alternating patterns on keyframe events
@@ -64,8 +64,8 @@ export class DischordCue implements ICue {
       activeColor: blueColor,
       baseColor: transparentColor,
       layer: 0,
-      switchTrigger: 'keyframe',
-      completeTrigger: 'beat',
+      switchCondition: 'keyframe',
+      completeCondition: 'beat',
     });
 
     // Red: Flash all lights on red drum hits

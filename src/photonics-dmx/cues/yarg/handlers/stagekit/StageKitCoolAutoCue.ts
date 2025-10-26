@@ -30,7 +30,7 @@ export class StageKitCoolAutoCue implements ICue {
       activeColor: greenColor,
       baseColor: transparentColor,
       layer: 5,
-      waitFor: 'beat',
+      waitUntilCondition: 'beat',
       startOffset: Math.floor(allLights.length / 4)
     });
 
@@ -42,7 +42,7 @@ export class StageKitCoolAutoCue implements ICue {
       activeColor: blueColor,
       baseColor: transparentColor,
       layer: 0,
-      waitFor: 'beat'
+      waitUntilCondition: 'beat'
     });
 
     const blueEffect2 = getEffectClockwiseRotation({
@@ -50,7 +50,7 @@ export class StageKitCoolAutoCue implements ICue {
       activeColor: blueColor,
       baseColor: transparentColor,
       layer: 2,
-      waitFor: 'beat',
+      waitUntilCondition: 'beat',
       startOffset: allLights.length / 2
     });
 

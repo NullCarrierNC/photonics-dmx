@@ -30,7 +30,7 @@ export class StageKitCoolManualCue implements ICue {
       activeColor: greenColor,
       baseColor: transparentColor,
       layer: 5,
-      waitFor: 'keyframe',
+      waitUntilCondition: 'keyframe',
       startOffset: Math.floor(allLights.length / 4)
     });
 
@@ -42,7 +42,7 @@ export class StageKitCoolManualCue implements ICue {
       activeColor: blueColor,
       baseColor: transparentColor,
       layer: 0,
-      waitFor: 'keyframe'
+      waitUntilCondition: 'keyframe'
     });
 
     const blueEffect2 = getEffectClockwiseRotation({
@@ -50,7 +50,7 @@ export class StageKitCoolManualCue implements ICue {
       activeColor: blueColor,
       baseColor: transparentColor,
       layer: 2,
-      waitFor: 'keyframe',
+      waitUntilCondition: 'keyframe',
       startOffset: allLights.length / 2
     });
 
