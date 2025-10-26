@@ -39,6 +39,18 @@ You will have to update your _Light Layout_ configuration to correctly order you
 If you have problems feel free to reach out in our [Discord Server](https://discord.gg/2Vyqc2hYcK).
 
 
+### Mac Users:
+
+You can now download a build for MacOS. If you try to run it and get an error message: 
+`“Photonics” is damaged and can’t be opened. You should move it to the Trash.`
+
+This is Gatekeeper blocking the app because it's not currently signed. To bypass this warning you need to open your terminal and run:
+`xattr -cr /Applications/Photonics.app`
+
+This should only need to be done once. After running that try opening Photonics again normally.
+
+
+
 ## Before You Begin…
 
 If this is your first foray into real-world lighting for rhythm games, and you primarily use YARG, 
