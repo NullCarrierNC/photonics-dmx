@@ -229,7 +229,7 @@ class Rb3CueHandler extends AbstractCueHandler {
       duration: 10,
     })
     
-    this._sequencer.setEffect('default-base', baseLayer, true);
+    this._sequencer.addEffect('default-base', baseLayer);
 
     // RB3 doesn't call this as frequently as YARG.
     // So we're making the effect last longer to cover the gap. 
