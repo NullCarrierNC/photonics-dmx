@@ -27,7 +27,7 @@ export class StageKitSearchlightsCue implements ICue {
     // BPM-based timing: 0.5 cycles per beat
     // For 8 lights: 0.5 cycles per beat = 2 beats per full cycle = 0.25 beats per light
     const beatDuration = 60000 / cueData.beatsPerMinute; // ms per beat
-    const lightDuration = beatDuration * 0.27; // Normally 0.25 beats per light, adding a bit of padding for the loop
+    const lightDuration = (beatDuration * 0.25) + 10; // Normally 0.25 beats per light, adding a bit of padding for the loop
     
     const singleColor = getEffectSingleColor({
       color: transparentColor,
