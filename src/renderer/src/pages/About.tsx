@@ -29,7 +29,7 @@ const About = () => {
             A thank you to the developers of <a href='https://yarg.in/' target='_blank' 
           className="text-blue-600 dark:text-blue-500 hover:underline" 
           >YARG</a> for building the future of rhythm gaming and The Fat Bastid / <a href="https://github.com/YARC-Official/YALCY" target="_blank" 
-          className="text-blue-600 dark:text-blue-500 hover:underline">YALCY</a> specifically for making the lighting integration possible.
+          className="text-blue-600 dark:text-blue-500 hover:underline">YALCY</a> specifically for making the YARG lighting integration possible.
         </p>
     
         <p className="mb-8 text-sm text-gray-600 dark:text-gray-400">And a thank you to the developers of 
@@ -39,8 +39,9 @@ const About = () => {
             
 
         <p className="text-sm text-gray-600 dark:text-gray-400">Additional thanks to the creators of various libraries Photonics utilizes under the hood including:</p>
-        <ul className="space-y-0 ml-4 mr-4">
-          <li className="text-left text-sm text-gray-600 dark:text-gray-400"><a href="https://github.com/node-dmx/dmx-ts" target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">dmx-ts</a>: provides support for sACN, ArtNet, and Enttec Pro out.</li>
+        <ul className="space-y-1 ml-4 mr-4">
+          <li className="text-left text-sm text-gray-600 dark:text-gray-400"><a href="https://github.com/node-dmx/sacn" target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">sacn</a>: sACN DMX over network</li>
+          <li className="text-left text-sm text-gray-600 dark:text-gray-400"><a href="https://github.com/node-dmx/dmx-ts" target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">dmx-ts</a>: ArtNet and Enttec Pro USB Support</li>
         </ul>
 
             <p className="mt-10 text-sm text-gray-600 dark:text-gray-400">Photonics is developed by <em>Null Carrier</em>, you can reach me at <a href='https://photonics.rocks/contact' className="text-blue-600 dark:text-blue-500 hover:underline" target="_blank">Photonics.rocks/contact</a>.</p>

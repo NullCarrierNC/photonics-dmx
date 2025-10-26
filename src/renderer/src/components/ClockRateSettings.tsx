@@ -64,7 +64,7 @@ const ClockRateSettings: React.FC = () => {
         Clock Rate Settings
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        Controls the timing precision of lighting effects. Lower values provide smoother animations but may impact performance on slower systems. Higher values reduce CPU usage but may cause less smooth transitions.
+        Controls the timing precision of lighting effects. Lower values provide smoother animations but may impact performance on slower systems. Higher values reduce CPU usage but may cause less smooth transitions. 
       </p>
 
       <div className="space-y-4">
@@ -92,7 +92,7 @@ const ClockRateSettings: React.FC = () => {
           </div>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Default is 5ms for smooth animations. Increase for better performance on slower systems, decrease for smoother effects on faster systems. Range: 1-100ms.
+            Default is 5ms. Increase for better performance on slower systems. Range: 1-100ms but you probably should't go higher than 20ms.
           </p>
         </div>
       </div>
