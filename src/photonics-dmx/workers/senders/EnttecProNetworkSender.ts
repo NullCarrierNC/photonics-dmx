@@ -13,7 +13,7 @@ export class EnttecProNetworkSender extends NetworkSender {
     super();
     this.dmx = new DMX();
 
-    // Pre-allocate payload buffer with 512 channels (Enttec Pro uses 0-based indexing)
+    // Pre-allocate payload buffer with 512 channels
     for (let i = 0; i < 512; i++) {
       this.payloadBuffer[i] = 0;
     }
@@ -28,12 +28,34 @@ export class EnttecProNetworkSender extends NetworkSender {
   }
 
   public async stop(): Promise<void> {
-    if (this.universe) {
-      // Send blackout before stopping
+    if (!this.universe) {
+      return;
+    }
+
+    console.log(`Stopping Enttec Pro sender on port ${this.config.devicePath}...`);
+
+    try {
+      // First set all channels to zero (blackout)
       this.sendBlackout();
 
-      // Clean up
+      // Give a small delay to ensure commands are sent
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Close the DMX connection to release the serial port lock
+      try {
+        if (this.dmx) {
+          await this.dmx.close();
+          console.log("Enttec Pro DMX connection closed");
+        }
+      } catch (err) {
+        console.error("Error during DMX close:", err);
+      }
+    } catch (err) {
+      console.error("Error during EnttecProNetworkSender stop:", err);
+    } finally {
+      // Final cleanup, clear all references
       this.universe = undefined;
+      console.log("Enttec Pro sender cleanup completed");
     }
   }
 
@@ -44,22 +66,32 @@ export class EnttecProNetworkSender extends NetworkSender {
 
     // Update buffer with only changed values (optimization)
     let hasChanges = false;
+    let channelCount = 0;
 
     for (const channelStr in universeBuffer) {
+      channelCount++;
       const channel = parseInt(channelStr, 10);
       const value = universeBuffer[channel];
-      // Enttec Pro uses 0-based indexing, DMX uses 1-based
-      const enttecChannel = channel - 1;
-
-      if (this.payloadBuffer[enttecChannel] !== value) {
-        this.payloadBuffer[enttecChannel] = value;
+      
+      // dmx-ts EnttecUSBDMXProDriver expects channel numbers directly (no conversion)
+      if (this.payloadBuffer[channel] !== value) {
+        this.payloadBuffer[channel] = value;
         hasChanges = true;
       }
     }
 
+    // Log periodically to see if data is flowing
+    if (Math.random() < 0.01 || hasChanges) {
+      console.log(`EnttecProNetworkSender: received ${channelCount} channels, hasChanges=${hasChanges}`);
+    }
+
     // Only send if something changed
     if (hasChanges) {
-      this.universe.update(this.payloadBuffer);
+      try {
+        this.universe.update(this.payloadBuffer);
+      } catch (err) {
+        console.error("EnttecProNetworkSender: Error calling universe.update:", err);
+      }
     }
   }
 
@@ -67,8 +99,7 @@ export class EnttecProNetworkSender extends NetworkSender {
     if (this.universe) {
       const zeroPayload: Record<number, number> = {};
       for (let channel = 1; channel <= 512; channel++) {
-        const enttecChannel = channel - 1;
-        zeroPayload[enttecChannel] = 0;
+        zeroPayload[channel] = 0;
       }
       this.universe.update(zeroPayload);
     }
