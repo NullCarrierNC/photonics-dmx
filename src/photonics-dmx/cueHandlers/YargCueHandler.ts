@@ -97,11 +97,12 @@ class YargCueHandler extends BaseCueHandler {
       if (this.currentExecutingCueType !== cueType) {
        // console.log(`[Lifecycle] Cue change detected: ${this.currentExecutingCueType} -> ${cueType}`);
 
-        // Don't stop strobe effects as they run on higher layers above regular cues
+        // Strobes run on layer 255 above regular cues - don't clear effects when transitioning TO a strobe
         const strobeTypes = ['Strobe_Fastest', 'Strobe_Fast', 'Strobe_Medium', 'Strobe_Slow', 'Strobe_Off'];
-        const shouldStopCurrentCue = !this.currentExecutingCueType || !strobeTypes.includes(this.currentExecutingCueType);
+        const incomingIsStrobe = strobeTypes.includes(cueType);
         
-        if (shouldStopCurrentCue) {
+        // Only stop the current cue if we're NOT transitioning to a strobe
+        if (!incomingIsStrobe) {
           this.stopCurrentCue();
         } 
 
