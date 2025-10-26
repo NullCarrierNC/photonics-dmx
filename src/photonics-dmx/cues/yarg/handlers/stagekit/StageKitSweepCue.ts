@@ -131,26 +131,17 @@ export class StageKitSweepCue implements ICue {
     const greenColor = getColor('green', 'medium', 'add');
     const transparentColor = getColor('transparent', 'medium');
 
-    // Start immediately for layers 1 and 2
+    // Start immediately 
     sweepTransitions.push({
       lights: allLights,
-      layer: 1,
+      layer: 0,
       waitForCondition: 'none',
       waitForTime: 0,
       transform: { color: transparentColor, easing: 'linear', duration: 0 },
       waitUntilCondition: 'none',
-      waitUntilTime: 0
+      waitUntilTime: 100
     });
 
-    sweepTransitions.push({
-      lights: allLights,
-      layer: 2,
-      waitForCondition: 'none',
-      waitForTime: 0,
-      transform: { color: transparentColor, easing: 'linear', duration: 0 },
-      waitUntilCondition: 'none',
-      waitUntilTime: 0
-    });
 
     // Yellow: Diagonal sweep (6|2) → (5|1) → (4|0) → (3|7) - same as large venue
     const diagonalPairs = this.createDiagonalPairs(allLights);
@@ -160,7 +151,7 @@ export class StageKitSweepCue implements ICue {
       if (pairIndex > 0) {
         sweepTransitions.push({
           lights: pair,
-          layer: 0,
+          layer: 5,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -172,7 +163,7 @@ export class StageKitSweepCue implements ICue {
       
       sweepTransitions.push({
         lights: pair,
-        layer: 0,
+        layer: 5,
         waitForCondition: 'none',
         waitForTime: 0,
         transform: { color: yellowColor, easing: 'linear', duration: 0 },
@@ -184,7 +175,7 @@ export class StageKitSweepCue implements ICue {
       if (stepsAfterYellow > 0) {
         sweepTransitions.push({
           lights: pair,
-          layer: 0,
+          layer: 5,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -203,7 +194,7 @@ export class StageKitSweepCue implements ICue {
       if (stepIndex > 0) {
         sweepTransitions.push({
           lights: [light],
-          layer: 1,
+          layer: 10,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -215,7 +206,7 @@ export class StageKitSweepCue implements ICue {
       
       sweepTransitions.push({
         lights: [light],
-        layer: 1,
+        layer: 10,
         waitForCondition: 'none',
         waitForTime: 0,
         transform: { color: blueColor, easing: 'linear', duration: 0 },
@@ -227,7 +218,7 @@ export class StageKitSweepCue implements ICue {
       if (stepsAfterBlue > 0) {
         sweepTransitions.push({
           lights: [light],
-          layer: 1,
+          layer: 10,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -247,7 +238,7 @@ export class StageKitSweepCue implements ICue {
       
       sweepTransitions.push({
         lights: [light],
-        layer: 2,
+        layer: 15,
         waitForCondition: 'none',
         waitForTime: 0,
         transform: { color: transparentColor, easing: 'linear', duration: 0 },
@@ -258,7 +249,7 @@ export class StageKitSweepCue implements ICue {
       
       sweepTransitions.push({
         lights: [light],
-        layer: 2,
+        layer: 15,
         waitForCondition: 'none',
         waitForTime: 0,
         transform: { color: greenColor, easing: 'linear', duration: 0 },
@@ -270,7 +261,7 @@ export class StageKitSweepCue implements ICue {
       if (stepsAfterGreen > 0) {
         sweepTransitions.push({
           lights: [light],
-          layer: 2,
+          layer: 15,
           waitForCondition: 'none',
           waitForTime: 0,
           transform: { color: transparentColor, easing: 'linear', duration: 0 },
