@@ -5,7 +5,7 @@ import { getSweepEffect } from "../effects/sweepEffect";
 
 import { getColor } from "../helpers/dmxHelpers";
 import { randomBetween } from "../helpers/utils";
-import { RGBIP, TrackedLight } from "../types";
+import { RGBIO, TrackedLight } from "../types";
 
 var ltr = true;
 
@@ -22,7 +22,7 @@ export function cueSearchlightsChase(effectController: ILightingController, ligh
         allLights.reverse();
     }
 
-    const transparent: RGBIP = getColor('transparent', 'low');
+    const transparent: RGBIO = getColor('transparent', 'low');
     const highRed = getColor('red', 'high');
     const highGreen = getColor('green', 'high');
     const highBlue = getColor('blue', 'high');
@@ -47,7 +47,6 @@ export function cueSearchlightsChase(effectController: ILightingController, ligh
     // Use unblocked to avoid breaking the sweep timing.
     const didAdd = effectController.addEffectUnblockedName('searchlights', sweep);
     if (didAdd){
-        console.log(didAdd, ltr);
         ltr = !ltr;
     }
 }

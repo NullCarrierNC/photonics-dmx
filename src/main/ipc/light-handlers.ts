@@ -1,10 +1,8 @@
-import { IpcMain } from 'electron';
+import { IpcMain, BrowserWindow } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { SenderConfig } from '../../photonics-dmx/types';
-import { SacnSender } from '../../photonics-dmx/senders/SacnSender';
-import { IpcSender } from '../../photonics-dmx/senders/IpcSender';
-import { EnttecProSender } from '../../photonics-dmx/senders/EnttecProSender';
-import { CueTypeDescriptions } from '../../photonics-dmx/cues/cueTypes';
+import { CueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/CueRegistry';
+import { CueType } from '../../photonics-dmx/cues/cueTypes';
 
 /**
  * Set up light-related IPC handlers
@@ -12,33 +10,113 @@ import { CueTypeDescriptions } from '../../photonics-dmx/cues/cueTypes';
  * @param controllerManager The controller manager instance
  */
 export function setupLightHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  // Enable a sender
-  ipcMain.on('sender-enable', (_, data: SenderConfig) => {
-    try {
-      const { sender, port } = data;
+  // Send cue state updates to renderer
+  const sendCueStateUpdate = (cueState: CueStateUpdate) => {
+    const allWindows = BrowserWindow.getAllWindows();
+    const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
+    if (mainWindow) {
+      const registry = CueRegistry.getInstance();
+      const group = registry.getGroup(cueState.groupId);
+      const groupName = group ? group.name : null;
       
+      const frontendCueState = {
+        cueType: cueState.cueType,
+        groupId: cueState.groupId,
+        groupName,
+        isFallback: cueState.isFallback,
+        cueStyle: cueState.cueStyle,
+        counter: cueState.counter,
+        limit: cueState.limit
+      };
+      
+      mainWindow.webContents.send('cue-state-update', frontendCueState);
+    }
+  };
+  
+  // Set up the callback with the CueRegistry
+  const registry = CueRegistry.getInstance();
+  registry.setCueStateUpdateCallback(sendCueStateUpdate);
+
+  // Enable a sender
+  ipcMain.on('sender-enable', async (_, data: SenderConfig) => {
+    try {
+      const { sender, port, host, universe, net, subnet, subuni, artNetPort } = data;
+
       if (!sender) {
         console.error('Sender name is required');
         return;
       }
-      
+
       const senderManager = controllerManager.getSenderManager();
-      
-      // Create appropriate sender instance based on name
+
+      // Check if sender is already enabled
+      if (senderManager.isSenderEnabled(sender)) {
+        console.log(`Sender "${sender}" is already enabled`);
+        return;
+      }
+
+      // Prepare configuration for the sender type
+      let config: any = {};
+
       if (sender === 'sacn') {
-        const sacnSender = new SacnSender();
-        senderManager.enableSender(sender, sacnSender);
+        const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 1;
+        if (universeNum < 1 || universeNum > 63999) {
+          console.error(`Invalid SACN universe: ${universeNum}. Must be between 1-63999`);
+          return;
+        }
+
+        // Extract sACN-specific configuration from the data parameter
+        const networkInterface = data.networkInterface;
+        const useUnicast = data.useUnicast;
+        const unicastDestination = data.unicastDestination;
+
+        config = {
+          universe: universeNum,
+          networkInterface: networkInterface,
+          useUnicast: useUnicast,
+          unicastDestination: unicastDestination,
+        };
+        console.log(`sACN config: universe=${universeNum}, networkInterface=${networkInterface}, useUnicast=${useUnicast}, unicastDestination=${unicastDestination}`);
       } else if (sender === 'ipc') {
-        const ipcSender = new IpcSender();
-        senderManager.enableSender(sender, ipcSender);
+        config = {};
       } else if (sender === 'enttecpro') {
-        // Only pass port if it's defined, otherwise use a default value
         if (!port) {
           console.error('Port is required for EnttecPro sender');
           return;
         }
-        const enttecProSender = new EnttecProSender(port);
-        senderManager.enableSender(sender, enttecProSender);
+        config = { devicePath: port };
+      } else if (sender === 'artnet') {
+        config = {
+          host: host || '127.0.0.1',
+          options: {
+            universe: universe !== undefined ? universe : 0,
+            net: net !== undefined ? net : 0,
+            subnet: subnet !== undefined ? subnet : 0,
+            subuni: subuni !== undefined ? subuni : 0,
+            port: artNetPort !== undefined ? artNetPort : 6454,
+            base_refresh_interval: 1000  // 1 second refresh interval for unchanged frames
+          }
+        };
+      }
+
+      // Use the new sender API (supports both worker-based and IPC senders)
+      console.log(`Enabling ${sender} sender with config:`, config);
+      try {
+        await senderManager.enableSender(sender, sender as 'artnet' | 'sacn' | 'enttecpro' | 'ipc', config);
+        console.log(`Successfully enabled ${sender} sender`);
+      } catch (error) {
+        console.error(`Failed to enable ${sender} sender:`, error);
+
+        // Send failure notification to frontend so UI can update state
+        const mainWindow = BrowserWindow.getFocusedWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send('sender-start-failed', {
+            sender: sender,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+
+        throw error;
       }
     } catch (error) {
       console.error('Error enabling sender:', error);
@@ -61,14 +139,81 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     }
   });
 
+  // Update sACN configuration and restart sender
+  ipcMain.handle('update-sacn-config', async (_, config: any) => {
+    try {
+      const senderManager = controllerManager.getSenderManager();
+
+      // If sACN is currently enabled, restart it with new configuration
+      if (senderManager.getEnabledSenders().includes('sacn')) {
+        await senderManager.restartSender('sacn', {
+          senderType: 'sacn',
+          ...config
+        });
+        console.log('sACN configuration updated and sender restarted');
+      } else {
+        console.log('sACN not currently enabled, configuration saved for next enable');
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating sACN configuration:', error);
+      throw error;
+    }
+  });
+
   // Get available light effects
-  ipcMain.handle('get-available-cues', async () => {
-    // Return the available cue types
-    return CueTypeDescriptions;
+  ipcMain.handle('get-available-cues', async (_, groupId?: string) => {
+    try {
+      // Get the registry instance
+      const registry = CueRegistry.getInstance();
+      
+      // Default to 'default' if no group ID is provided
+      const targetGroupId = groupId || 'default';
+      
+      console.log(`Getting cues for group: ${targetGroupId}`);
+      
+       const group = registry.getGroup(targetGroupId);
+      if (!group) {
+        console.error(`Group not found: ${targetGroupId}`);
+        return []; // No group found, return empty array
+      }
+      
+      // Get only the cue types that are actually defined in this group
+      const availableCueTypes = Array.from(group.cues.keys());
+      console.log(`Found ${availableCueTypes.length} cue types in group ${targetGroupId}`);
+      
+      if (availableCueTypes.length === 0) {
+        console.error(`No cue types found in group: ${targetGroupId}`);
+        return [];
+      }
+      
+      // Create descriptions based on the implementations
+      const cueDescriptions = availableCueTypes.map(cueType => {
+        // Get the implementation for this cue
+        const implementation = group.cues.get(cueType);
+        
+        // Use the implementation's description (required property)
+        const yargDescription = implementation!.description;
+        
+        return {
+          id: cueType,
+          yargDescription: yargDescription,
+          rb3Description: "RB3E: Does not currently use cues, lights are set directly from passed LED colour values.",
+          groupName: group.name 
+        };
+      });
+
+      return cueDescriptions;
+    } catch (error) {
+      console.error('Error getting available cues:', error);
+      return [];
+    }
   });
 
   // Start a test effect
-  ipcMain.handle('start-test-effect', async (_, effectId: string) => {
+  ipcMain.handle('start-test-effect', async (_, effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large', bpm?: number) => {
+    console.log(`IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}`);
     try {
       // Check if the controller is initialized
       if (!controllerManager.getIsInitialized()) {
@@ -76,8 +221,8 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         await controllerManager.init();
       }
       
-      // Use the controller manager to start the test effect
-      controllerManager.startTestEffect(effectId);
+      // Use the controller manager to start the test effect with venue size and BPM
+      controllerManager.startTestEffect(effectId, venueSize, bpm);
       return { success: true };
     } catch (error) {
       console.error('Error starting test effect:', error);
@@ -101,8 +246,64 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   });
 
   // Simulate a beat
-  ipcMain.handle('simulate-beat', async () => {
+  ipcMain.handle('simulate-beat', async (_, data?: { 
+    venueSize?: 'NoVenue' | 'Small' | 'Large';
+    bpm?: number;
+    cueGroup?: string;
+    effectId?: string | null;
+  }) => {
     if (controllerManager.getLightingController()) {
+      // Create mock cue data with simulation settings
+      if (data) {
+        const { venueSize = 'Small', bpm = 120, cueGroup, effectId } = data;
+        
+        const mockCueData: any = {
+          platform: 'YARG',
+          currentScene: 'InGame',
+          pauseState: 'Playing',
+          venueSize: venueSize,
+          beatsPerMinute: bpm,
+          songSection: 'Verse',
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 'None',
+          harmony0Note: 'None',
+          harmony1Note: 'None',
+          harmony2Note: 'None',
+          lightingCue: effectId || 'None',
+          postProcessing: 'None',
+          fogState: 'Off',
+          strobeState: 'Strobe_Off',
+          performer: 'None',
+          trackMode: 'simulated',
+          beat: 'Strong',
+          keyframe: 'Unknown',
+          bonusEffect: 'None',
+          ledPositions: [],
+          ledColor: 'off',
+          timestamp: Date.now()
+        };
+        
+        // Set active cue group if specified
+        if (cueGroup) {
+          try {
+            const registry = CueRegistry.getInstance();
+            registry.setActiveGroups([cueGroup]);
+          } catch (error) {
+            console.warn(`Failed to set active cue group: ${error}`);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend
+        const allWindows = BrowserWindow.getAllWindows();
+        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
+        if (mainWindow) {
+          mainWindow.webContents.send('cue-handled', mockCueData);
+        }
+      }
+      
       controllerManager.getLightingController()?.onBeat();
       return true;
     }
@@ -110,8 +311,64 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   });
 
   // Simulate a keyframe
-  ipcMain.handle('simulate-keyframe', async () => {
+  ipcMain.handle('simulate-keyframe', async (_, data?: { 
+    venueSize?: 'NoVenue' | 'Small' | 'Large';
+    bpm?: number;
+    cueGroup?: string;
+    effectId?: string | null;
+  }) => {
     if (controllerManager.getLightingController()) {
+      // Create mock cue data with simulation settings
+      if (data) {
+        const { venueSize = 'Small', bpm = 120, cueGroup, effectId } = data;
+        
+        const mockCueData: any = {
+          platform: 'YARG',
+          currentScene: 'InGame',
+          pauseState: 'Playing',
+          venueSize: venueSize,
+          beatsPerMinute: bpm,
+          songSection: 'Verse',
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 'None',
+          harmony0Note: 'None',
+          harmony1Note: 'None',
+          harmony2Note: 'None',
+          lightingCue: effectId || 'None',
+          postProcessing: 'None',
+          fogState: 'Off',
+          strobeState: 'Strobe_Off',
+          performer: 'None',
+          trackMode: 'simulated',
+          beat: 'Unknown',
+          keyframe: 'On',
+          bonusEffect: 'None',
+          ledPositions: [],
+          ledColor: 'off',
+          timestamp: Date.now()
+        };
+        
+        // Set active cue group if specified
+        if (cueGroup) {
+          try {
+            const registry = CueRegistry.getInstance();
+            registry.setActiveGroups([cueGroup]);
+          } catch (error) {
+            console.warn(`Failed to set active cue group: ${error}`);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend
+        const allWindows = BrowserWindow.getAllWindows();
+        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
+        if (mainWindow) {
+          mainWindow.webContents.send('cue-handled', mockCueData);
+        }
+      }
+      
       controllerManager.getLightingController()?.onKeyframe();
       return true;
     }
@@ -119,12 +376,173 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   });
 
   // Simulate a measure
-  ipcMain.handle('simulate-measure', async () => {
+  ipcMain.handle('simulate-measure', async (_, data?: { 
+    venueSize?: 'NoVenue' | 'Small' | 'Large';
+    bpm?: number;
+    cueGroup?: string;
+    effectId?: string | null;
+  }) => {
     if (controllerManager.getLightingController()) {
+      // Create mock cue data with simulation settings
+      if (data) {
+        const { venueSize = 'Small', bpm = 120, cueGroup, effectId } = data;
+        
+        const mockCueData: any = {
+          platform: 'YARG',
+          currentScene: 'InGame',
+          pauseState: 'Playing',
+          venueSize: venueSize,
+          beatsPerMinute: bpm,
+          songSection: 'Verse',
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 'None',
+          harmony0Note: 'None',
+          harmony1Note: 'None',
+          harmony2Note: 'None',
+          lightingCue: effectId || 'None',
+          postProcessing: 'None',
+          fogState: 'Off',
+          strobeState: 'Strobe_Off',
+          performer: 'None',
+          trackMode: 'simulated',
+          beat: 'Unknown',
+          keyframe: 'Unknown',
+          bonusEffect: 'None',
+          ledPositions: [],
+          ledColor: 'off',
+          timestamp: Date.now()
+        };
+        
+        // Set active cue group if specified
+        if (cueGroup) {
+          try {
+            const registry = CueRegistry.getInstance();
+            registry.setActiveGroups([cueGroup]);
+          } catch (error) {
+            console.warn(`Failed to set active cue group: ${error}`);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+          mainWindow.webContents.send('cue-handled', mockCueData);
+        }
+      }
+      
       controllerManager.getLightingController()?.onMeasure();
       return true;
     }
     return false;
+  });
+
+  // Simulate an instrument note
+  ipcMain.handle('simulate-instrument-note', async (_, data: { 
+    instrument: string; 
+    noteType: string; 
+    venueSize?: 'NoVenue' | 'Small' | 'Large';
+    bpm?: number;
+    cueGroup?: string;
+    effectId?: string | null;
+  }) => {
+    try {
+      const { instrument, noteType, venueSize = 'Small', bpm = 120, cueGroup, effectId } = data;
+      
+      // Get the cue handler to simulate the note
+      const cueHandler = controllerManager.getCueHandler();
+      if (cueHandler) {
+        // Create a mock cue data object for simulation
+        const mockCueData: any = {
+          platform: 'YARG',
+          currentScene: 'InGame',
+          pauseState: 'Playing',
+          venueSize: venueSize,
+          beatsPerMinute: bpm,
+          songSection: 'Verse',
+          guitarNotes: [],
+          bassNotes: [],
+          drumNotes: [],
+          keysNotes: [],
+          vocalNote: 'None',
+          harmony0Note: 'None',
+          harmony1Note: 'None',
+          harmony2Note: 'None',
+          lightingCue: effectId || 'None',
+          postProcessing: 'None',
+          fogState: 'Off',
+          strobeState: 'Strobe_Off',
+          performer: 'None',
+          trackMode: 'simulated',
+          beat: 'Unknown',
+          keyframe: 'Unknown',
+          bonusEffect: 'None',
+          ledPositions: [],
+          ledColor: 'off',
+          timestamp: Date.now()
+        };
+
+        // Update the mock cue data with the simulated note
+        switch (instrument) {
+          case 'guitar':
+            mockCueData.guitarNotes = [noteType];
+            if ('handleGuitarNote' in cueHandler) {
+              cueHandler.handleGuitarNote(noteType as any, mockCueData);
+            }
+            break;
+          case 'bass':
+            mockCueData.bassNotes = [noteType];
+            if ('handleBassNote' in cueHandler) {
+              cueHandler.handleBassNote(noteType as any, mockCueData);
+            }
+            break;
+          case 'keys':
+            mockCueData.keysNotes = [noteType];
+            if ('handleKeysNote' in cueHandler) {
+              cueHandler.handleKeysNote(noteType as any, mockCueData);
+            }
+            break;
+          case 'drums':
+            mockCueData.drumNotes = [noteType];
+            if ('handleDrumNote' in cueHandler) {
+              cueHandler.handleDrumNote(noteType as any, mockCueData);
+            }
+            break;
+          default:
+            console.warn(`Unknown instrument: ${instrument}`);
+            return { success: false, error: `Unknown instrument: ${instrument}` };
+        }
+        
+        // Set active cue group if specified
+        if (cueGroup) {
+          try {
+            const registry = CueRegistry.getInstance();
+            registry.setActiveGroups([cueGroup]);
+          } catch (error) {
+            console.warn(`Failed to set active cue group: ${error}`);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend
+        const allWindows = BrowserWindow.getAllWindows();
+        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
+        if (mainWindow) {
+          mainWindow.webContents.send('cue-handled', mockCueData);
+        }
+        
+        return { success: true };
+      } else {
+        return { success: false, error: 'No cue handler available' };
+      }
+    } catch (error) {
+      console.error('Error simulating instrument note:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
   });
 
   // Get the system status
@@ -132,17 +550,378 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     try {
       return {
         success: true,
-        isInitialized: controllerManager.getIsInitialized(),
         isYargEnabled: controllerManager.getIsYargEnabled(),
         isRb3Enabled: controllerManager.getIsRb3Enabled(),
-        hasCueHandler: !!controllerManager.getCueHandler(),
-        hasLightingSystem: !!controllerManager.getLightingController()
+        senderStatus: controllerManager.getSenderStatus()
       };
     } catch (error) {
       console.error('Error getting system status:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get available cue groups from registry
+  ipcMain.handle('get-cue-groups', async () => {
+    const registry = CueRegistry.getInstance();
+    const groupIds = registry.getAllGroups();
+    
+    // Get descriptions for each group
+    const groupInfo = groupIds.map(groupId => {
+      const group = registry.getGroup(groupId);
+      return {
+        id: groupId,
+        name: group!.name,
+        description: group!.description,
+        // Get list of cue types defined in this group
+        cueTypes: group ? Array.from(group.cues.keys()) : []
+      };
+    });
+    
+    return groupInfo;
+  });
+  
+  // Get active cue groups
+  ipcMain.handle('get-active-cue-groups', async () => {
+    const registry = CueRegistry.getInstance();
+    const activeGroupIds = registry.getActiveGroups();
+    
+    console.log('Active group IDs:', activeGroupIds);
+    
+    // Get details for the active groups
+    const activeGroups = activeGroupIds.map(groupId => {
+      const group = registry.getGroup(groupId);
+      console.log(`Group ${groupId}:`, group ? 'found' : 'not found');
+      return {
+        id: groupId,
+        name: group!.name,
+        description: group!.description,
+        // Get list of cue types defined in this group
+        cueTypes: group ? Array.from(group.cues.keys()) : []
+      };
+    });
+    
+    console.log(`Returning ${activeGroups.length} active groups`);
+    return activeGroups;
+  });
+  
+  // Activate a single cue group
+  ipcMain.handle('activate-cue-group', async (_, groupId: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Check if the group exists
+      const group = registry.getGroup(groupId);
+      if (!group) {
+        return { 
+          success: false, 
+          error: `Group '${groupId}' not found` 
+        };
+      }
+      
+      // Activate the group
+      const result = registry.activateGroup(groupId);
+      if (result) {
+        console.log(`Activated cue group: ${group.name}`);
+        return { success: true };
+      } else {
+        console.error(`Failed to activate group '${group.name}'. It may not be enabled.`);
+        return { 
+          success: false, 
+          error: `Failed to activate group '${group.name}'. It may not be enabled.` 
+        };
+      }
+    } catch (error) {
+      console.error('Error activating cue group:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  
+  // Deactivate a single cue group
+  ipcMain.handle('deactivate-cue-group', async (_, groupId: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Check if the group exists
+      const group = registry.getGroup(groupId);
+      if (!group) {
+        return { 
+          success: false, 
+          error: `Group '${groupId}' not found` 
+        };
+      }
+      
+      // Deactivate the group
+      const result = registry.deactivateGroup(groupId);
+      if (result) {
+        console.log(`Deactivated cue group: ${group.name}`);
+        return { success: true };
+      } else {
+        console.error(`Failed to deactivate group '${group.name}'. It may be the default group.`);
+        return { 
+          success: false, 
+          error: `Failed to deactivate group '${group.name}'. It may be the default group.` 
+        };
+      }
+    } catch (error) {
+      console.error('Error deactivating cue group:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  
+  // Enable a single cue group
+  ipcMain.handle('enable-cue-group', async (_, groupId: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Check if the group exists
+      const group = registry.getGroup(groupId);
+      if (!group) {
+        return { 
+          success: false, 
+          error: `Group '${groupId}' not found` 
+        };
+      }
+      
+      // Enable the group
+      const result = registry.enableGroup(groupId);
+      if (result) {
+        console.log(`Enabled cue group: ${group.name}`);
+        return { success: true };
+      } else {
+        console.error(`Failed to enable group '${group.name}'.`);
+        return { 
+          success: false, 
+          error: `Failed to enable group '${group.name}'.` 
+        };
+      }
+    } catch (error) {
+      console.error('Error enabling cue group:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  
+  // Disable a single cue group
+  ipcMain.handle('disable-cue-group', async (_, groupId: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Check if the group exists
+      const group = registry.getGroup(groupId);
+      if (!group) {
+        return { 
+          success: false, 
+          error: `Group '${groupId}' not found` 
+        };
+      }
+      
+      // Disable the group
+      const result = registry.disableGroup(groupId);
+      if (result) {
+        console.log(`Disabled cue group: ${group.name}`);
+        return { success: true };
+      } else {
+        console.error(`Failed to disable group '${group.name}'. It may be the default group.`);
+        return { 
+          success: false, 
+          error: `Failed to disable group '${group.name}'. It may be the default group.` 
+        };
+      }
+    } catch (error) {
+      console.error('Error disabling cue group:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  
+  // Set active cue groups
+  ipcMain.handle('set-active-cue-groups', async (_, groupIds: string[]) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      
+      // Validate that each group exists and is enabled before setting them as active
+      const invalidGroups: string[] = [];
+      const disabledGroups: string[] = [];
+      const validGroupIds: string[] = [];
+      const enabledGroupIds = registry.getEnabledGroups();
+      
+      for (const groupId of groupIds) {
+        if (!registry.getGroup(groupId)) {
+          invalidGroups.push(groupId);
+        } else if (!enabledGroupIds.includes(groupId)) {
+          disabledGroups.push(groupId);
+        } else {
+          validGroupIds.push(groupId);
+        }
+      }
+      
+      if (invalidGroups.length > 0) {
+        console.error(`Cannot set active groups: groups not found: ${invalidGroups.join(', ')}`);
+      }
+      
+      if (disabledGroups.length > 0) {
+        console.error(`Cannot set active groups: groups not enabled: ${disabledGroups.join(', ')}`);
+      }
+      
+      if (validGroupIds.length === 0) {
+        return { 
+          success: false, 
+          error: `No valid groups provided. Invalid: ${invalidGroups.join(', ')}, Disabled: ${disabledGroups.join(', ')}`
+        };
+      }
+      
+      // Set the valid group IDs as active
+      registry.setActiveGroups(validGroupIds);
+      console.log(`Set active cue groups: ${validGroupIds.join(', ')}`);
+      
+      return { 
+        success: true,
+        activeGroups: validGroupIds,
+        invalidGroups: invalidGroups.length > 0 ? invalidGroups : undefined,
+        disabledGroups: disabledGroups.length > 0 ? disabledGroups : undefined
+      };
+    } catch (error) {
+      console.error('Error setting active cue groups:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get the source group for a specific cue
+  ipcMain.handle('get-cue-source-group', async (_, cueType: string) => {
+    try {
+      const registry = CueRegistry.getInstance();
+      const cueState = registry.getCueState(cueType as CueType);
+      
+      if (cueState) {
+        return { 
+          success: true,
+          cueType: cueState.cueType,
+          groupId: cueState.groupId,
+          cueStyle: cueState.cueStyle,
+          isFallback: cueState.isFallback,
+          counter: cueState.counter,
+          limit: cueState.limit
+        };
+      } else {
+        return { 
+          success: false, 
+          error: `No state found for cue: ${cueType}` 
+        };
+      }
+    } catch (error) {
+      console.error('Error getting cue source group:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Set the cue consistency window
+  ipcMain.handle('set-cue-consistency-window', async (_, windowMs: number) => {
+    try {
+      // Update the configuration
+      controllerManager.getConfig().setCueConsistencyWindow(windowMs);
+      
+      // Also update the CueRegistry to apply the change immediately
+      const registry = CueRegistry.getInstance();
+      registry.setCueConsistencyWindow(windowMs);
+      
+      return { 
+        success: true, 
+        windowMs: windowMs 
+      };
+    } catch (error) {
+      console.error('Error setting cue consistency window:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  });
+
+  // Get the cue consistency window
+  ipcMain.handle('get-cue-consistency-window', async () => {
+    try {
+      const windowMs = controllerManager.getConfig().getCueConsistencyWindow();
+      return { 
+        success: true, 
+        windowMs: windowMs 
+      };
+    } catch (error) {
+      console.error('Error getting cue consistency window:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  });
+
+  // Get the current consistency status
+  ipcMain.handle('get-consistency-status', async () => {
+    try {
+      const registry = CueRegistry.getInstance();
+      const status = registry.getConsistencyStatus();
+
+      return {
+        success: true,
+        status
+      };
+    } catch (error) {
+      console.error('Error getting consistency status:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get available network interfaces for sACN configuration
+  ipcMain.handle('get-network-interfaces', async () => {
+    try {
+      const os = require('os');
+      const networkInterfaces = os.networkInterfaces();
+      const interfaces: Array<{name: string, value: string, family: string}> = [];
+
+      for (const [name, ifaceArray] of Object.entries(networkInterfaces)) {
+        for (const iface of ifaceArray as any[]) {
+          // Skip internal and loopback interfaces
+          if (!iface.internal && !iface.address.startsWith('127.')) {
+            interfaces.push({
+              name: `${name}: ${iface.address}`,
+              value: iface.address,
+              family: iface.family
+            });
+          }
+        }
+      }
+
+      return {
+        success: true,
+        interfaces
+      };
+    } catch (error) {
+      console.error('Error getting network interfaces:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        interfaces: []
       };
     }
   });

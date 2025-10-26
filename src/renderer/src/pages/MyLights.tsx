@@ -78,37 +78,46 @@ const MyLights = () => {
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-      <h1 className="text-2xl font-bold mb-4">My Lights</h1>
+      <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">My Lights</h1>
 
-      <p className="text-md mb-6">
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
         Here you define the types of lights in your setup and map their DMX channels.
         Create <em>one</em> light for each unique type of fixture in your setup. The lights you create
         will be available in the <em>Lights Layout</em> where different channels can be assigned.
       </p>
 
-      <p className="text-md mb-4">
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         <strong>Note on Strobes:</strong> while some DMX fixtures support strobe channels, using this feature with different models 
-        of can DMX lights cause the lights to stobe out of sync with each other. To avoid this, if you don't have a dedicated strobe light, 
-        Photonics will use lights marked as strobe-capable as a strobe using regular DMX channels (E.g. RGB @ 255).
+        of can DMX lights cause the lights to stobe out of sync with each other. To avoid this Photonics will use lights marked as 
+        strobe-capable as a strobe using regular DMX channels (E.g. RGB @ 255).
       </p>
      
-      <p className='mb-4 mt-3 mb-2 italic font-bold text-orange-400'>
-          Physical strobe fixtures are not functionally implemented in this version. They can be created but won't be used.</p>
-        <p className='mb-4 italic font-bold text-orange-400'>
+      <p className='mb-2 italic font-bold text-orange-400 text-[9pt]'>
+          Physical strobe fixtures are not yet implemented. You can use regular RGB PAR lights as either a dedicated strobe, or as a strobe-capable light.
+        </p>
+        <p className='mb-2 italic font-bold text-orange-400  text-[9pt]'>
             Moving Head RGB lights are fundamentally supported, but will only 
             move to the configured home position. Lighting effects do not yet include motion. 
         </p>
-        <p className='mb-6 italic font-bold text-orange-400'>
+        <p className='mb-4 italic font-bold text-orange-400  text-[9pt]'>
           Gobo based lights are not supported.
         </p>
 
 
-      <p className="text-md mb-6">You <em>must</em> assign a channel value to all channels for a light to be valid. Invalid
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">You <em>must</em> assign a channel value to all channels for a light to be valid. Invalid
         lights will have a red background and won't be usable in Light Layout.
       </p>
 
+      <h3 className="text-lg font-medium mb-3 text-gray-800 dark:text-gray-200">Assigning Channels</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+        Assign the base channels used for your light. E.g. if your light's manual says that if the Master Dimmer is 1, 
+        the Red channel is 2, the Green channel is 3, and the Blue channel is 4, then you would assign 1 to Master Dimmer, 2 to Red, 3 to Green, and 4 to Blue.
+      </p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+        Don't assign the same light twice here: in Light Layout you can assign this template to as many different physical lights as you want.
+      </p>
 
-      <h2 className="text-xl font-semibold mb-2">Current Lights</h2>
+      <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Current Lights</h2>
 
       {myLightsSorted.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
@@ -134,7 +143,7 @@ const MyLights = () => {
         + Light
       </button>
 
-      <hr className="border-t border-gray-300 dark:border-gray-700 mt-6 mb-6" />
+      <hr className="border-t border-gray-200 dark:border-gray-600 mt-6 mb-6" />
 
       {currentLight && (
         <>

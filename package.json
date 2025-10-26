@@ -1,6 +1,6 @@
 {
   "name": "photonics-dmx",
-  "version": "0.0.22-alpha.1-fix",
+  "version": "0.0.24-alpha.2-interim-15",
   "description": "A DMX sequencer for YARG and RB3E",
   "main": "./out/main/index.js",
   "author": "Null Carrier",
@@ -21,7 +21,9 @@
     "build:linux": "electron-vite build && electron-builder --linux",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "c8 --reporter=lcov --reporter=text npm test"
+    "test:coverage": "c8 --reporter=lcov --reporter=text npm test",
+    "test:color-blending": "npx ts-node src/photonics-dmx/tests/runColorBlendingTest.ts",
+    "test:color-analysis": "npx ts-node src/photonics-dmx/tests/runColorAnalysis.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "3.0.1",
@@ -65,7 +67,7 @@
     "terser": "5.37.0",
     "ts-jest": "^29.1.2",
     "typescript": "5.5.2",
-    "vite": "5.4.14"
+    "vite": "^5.4.19"
   },
   "overrides": {
     "glob": "10.3.10",

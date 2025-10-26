@@ -20,7 +20,7 @@ const Header: React.FC = () => {
 
   return (
     <div className="flex items-center justify-between p-4 w-full">
-      <h1 className="text-xl font-semibold">{pageTitles[currentPage]}</h1>
+      <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{pageTitles[currentPage]}</h1>
       <button
         className="ml-auto flex items-center text-white font-bold hover:text-gray-300 focus:outline-none"
         aria-label="Help"

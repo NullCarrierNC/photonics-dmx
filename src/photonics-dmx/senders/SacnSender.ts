@@ -1,20 +1,31 @@
 // src/senders/SacnSender.ts
 import { EventEmitter } from 'events';
-import { DmxChannel } from '../types';
 import { BaseSender, SenderError } from './BaseSender';
 import { Sender } from 'sacn';
 
 export class SacnSender extends BaseSender {
   private sender: Sender | undefined;
   private eventEmitter: EventEmitter;
+  
+  // Reusable payload buffer for performance optimization
+  private payloadBuffer: Record<number, number> = {};
 
   constructor() {
     super();
     this.eventEmitter = new EventEmitter();
-    // process.on('exit', () => this.stop());
+    
+    // Pre-allocate 512 channels (DMX universe size)
+    for (let i = 1; i <= 512; i++) {
+      this.payloadBuffer[i] = 0;
+    }
   }
 
   public async start(): Promise<void> {
+    // Reset payload buffer on start
+    for (let i = 1; i <= 512; i++) {
+      this.payloadBuffer[i] = 0;
+    }
+    
     this.sender = new Sender({
       universe: 1,
       defaultPacketOptions: {
@@ -32,12 +43,11 @@ export class SacnSender extends BaseSender {
     }
 
     try {
-      const zeroChannels: DmxChannel[] = Array.from({ length: 255 }, (_, index) => ({
-        universe: 1,
-        channel: index + 1,
-        value: 0,
-      }));
-      await this.send(zeroChannels);
+      const zeroBuffer: Record<number, number> = {};
+      for (let i = 1; i <= 512; i++) {
+        zeroBuffer[i] = 0;
+      }
+      await this.send(zeroBuffer);
     } catch (error) {
       console.error('Failed to send zero values before stopping:', error);
     } finally {
@@ -46,15 +56,27 @@ export class SacnSender extends BaseSender {
     }
   }
 
-  public async send(channelValues: DmxChannel[]): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<void> {
     try {
       this.verifySenderStarted();
-      const payloadMap = new Map<number, number>();
-      channelValues.forEach(({ channel, value }) => {
-        payloadMap.set(channel, value);
-      });
-      const payload = Object.fromEntries(payloadMap);
-      await this.sender!.send({ payload });
+      
+      // Check if anything changed in the incoming buffer
+      let hasChanges = false;
+      
+      for (const channelStr in universeBuffer) {
+        const channel = parseInt(channelStr, 10);
+        const value = universeBuffer[channel];
+        
+        if (this.payloadBuffer[channel] !== value) {
+          this.payloadBuffer[channel] = value;
+          hasChanges = true;
+        }
+      }
+      
+      // Only send if something changed
+      if (hasChanges) {
+        await this.sender!.send({ payload: this.payloadBuffer });
+      }
     } catch (err) {
       console.error("SacnSender error:", err);
       const errorEvent = new SenderError(err);

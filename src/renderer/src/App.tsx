@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, } from './atoms';
+import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom, senderSacnEnabledAtom, senderArtNetEnabledAtom, senderEnttecProEnabledAtom, senderIpcEnabledAtom } from './atoms';
 import { Pages } from './types';
 import squareLogo from './assets/images/photonics-icon.png';
 import LeftMenu from './components/LeftMenu';
@@ -11,9 +11,11 @@ import LightsLayout from './pages/LightsLayout';
 import NetworkDebug from './pages/NetworkDebug';
 import StatusBar from './components/StatusBar';
 import DmxPreview from './pages/DmxPreview';
+import CueSimulation from './pages/CueSimulation';
 import { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types';
 import { IpcRendererEvent } from 'electron';
 import About from './pages/About';
+import Preferences from './pages/Preferences';
 import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
@@ -36,6 +38,12 @@ export const App = (): JSX.Element => {
   const [, setPrefs] = useAtom(lightingPrefsAtom);
   const setIsSenderError = useSetAtom(isSenderErrorAtom);
   const setSenderError = useSetAtom(senderErrorAtom);
+  const setCueState = useSetAtom(currentCueStateAtom);
+  const setEnttecProComPort = useSetAtom(enttecProComPortAtom);
+  const setSacnEnabled = useSetAtom(senderSacnEnabledAtom);
+  const setArtNetEnabled = useSetAtom(senderArtNetEnabledAtom);
+  const setEnttecProEnabled = useSetAtom(senderEnttecProEnabledAtom);
+  const setIpcEnabled = useSetAtom(senderIpcEnabledAtom);
   const [appVer, setAppVer] = useState('');
 
   // Create a clearErrorTimeout callback that will be used to reset error state
@@ -57,6 +65,39 @@ export const App = (): JSX.Element => {
     // Reset the error timeout (clears existing timeout and sets a new one)
     resetErrorTimeout();
   }, [setIsSenderError, setSenderError, resetErrorTimeout]);
+
+  // Handler for cue state updates
+  const handleCueStateUpdate = useCallback((_evt: IpcRendererEvent, cueState: CueStateInfo): void => {
+    setCueState(cueState);
+  }, [setCueState]);
+
+  // Handler for sender start failures
+  const handleSenderStartFailure = useCallback((_evt: IpcRendererEvent, data: { sender: string; error: string }): void => {
+    console.error(`Sender "${data.sender}" failed to start:`, data.error);
+
+    // Update the UI state to reflect that the sender is not running
+    switch (data.sender) {
+      case 'sacn':
+        setSacnEnabled(false);
+        break;
+      case 'artnet':
+        setArtNetEnabled(false);
+        break;
+      case 'enttecpro':
+        setEnttecProEnabled(false);
+        break;
+      case 'ipc':
+        setIpcEnabled(false);
+        break;
+      default:
+        console.warn(`Unknown sender type in failure notification: ${data.sender}`);
+    }
+
+    // Also set sender error state to show the error to the user
+    setIsSenderError(true);
+    setSenderError(`Failed to start ${data.sender} sender: ${data.error}`);
+    resetErrorTimeout();
+  }, [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setIpcEnabled, setIsSenderError, setSenderError, resetErrorTimeout]);
 
   const toggleDarkMode = (): void => {
     setIsDarkMode((prevMode) => !prevMode);
@@ -131,7 +172,54 @@ export const App = (): JSX.Element => {
     const getPrefs = async () => {
       const prefs = await window.electron.ipcRenderer.invoke('get-prefs');
       console.log("\n Prefs", prefs);
-      setPrefs(prefs)
+      
+      // Prepare all preference updates in a single object
+      const updatedPrefs = { ...prefs };
+      
+      // Initialize DMX output preferences from saved preferences or default values
+      if (!prefs.dmxOutputConfig) {
+        // If no saved preferences, initialize with default values (all disabled)
+        const defaultConfig = {
+          sacnEnabled: false,
+          artNetEnabled: false,
+          enttecProEnabled: false
+        };
+        console.log('No saved DMX output config, using defaults:', defaultConfig);
+        updatedPrefs.dmxOutputConfig = defaultConfig;
+      }
+
+      // Initialize Enttec Pro COM port from saved preferences or default values
+      if (prefs.enttecProPort) {
+        console.log('Initializing Enttec Pro COM port from saved config:', prefs.enttecProPort);
+        setEnttecProComPort(prefs.enttecProPort);
+      } else {
+        // If no saved preferences, initialize with default value (empty string)
+        console.log('No saved Enttec Pro COM port, using default (empty string)');
+        setEnttecProComPort('');
+      }
+      
+      // Initialize Stage Kit preferences if not present
+      if (!prefs.stageKitPrefs) {
+        const defaultStageKitPrefs = {
+          yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never'
+        };
+        console.log('No saved Stage Kit preferences, using defaults:', defaultStageKitPrefs);
+        updatedPrefs.stageKitPrefs = defaultStageKitPrefs;
+      }
+      
+      // Initialize DMX settings preferences if not present
+      if (!prefs.dmxSettingsPrefs) {
+        const defaultDmxSettingsPrefs = {
+          artNetExpanded: false,
+          enttecProExpanded: false
+        };
+        console.log('No saved DMX settings preferences, using defaults:', defaultDmxSettingsPrefs);
+        updatedPrefs.dmxSettingsPrefs = defaultDmxSettingsPrefs;
+      }
+      
+      // Set all preferences at once to avoid race conditions
+      setPrefs(updatedPrefs);
+      
     }
 
     fetchAppVersion();
@@ -139,6 +227,12 @@ export const App = (): JSX.Element => {
 
     // Set up event listener for sender errors
     addIpcListener('sender-error', handleSenderError);
+
+    // Set up event listener for cue state updates
+    addIpcListener('cue-state-update', handleCueStateUpdate);
+
+    // Set up event listener for sender start failures
+    addIpcListener('sender-start-failed', handleSenderStartFailure);
 
     const saveLightLayout = async () => {
       if (activeConfig) {
@@ -155,8 +249,10 @@ export const App = (): JSX.Element => {
     // Cleanup function
     return () => {
       removeIpcListener('sender-error', handleSenderError);
+      removeIpcListener('cue-state-update', handleCueStateUpdate);
+      removeIpcListener('sender-start-failed', handleSenderStartFailure);
     };
-  }, [activeConfig]);
+  }, [activeConfig, handleSenderError, handleCueStateUpdate, handleSenderStartFailure]);
 
   const renderContent = () => {
     switch (currentPage) {
@@ -168,10 +264,14 @@ export const App = (): JSX.Element => {
         return <LightsLayout />;
       case Pages.CuePreview:
         return <DmxPreview />;
+      case Pages.CueSimulation:
+        return <CueSimulation />;
       case Pages.CueSequencer:
       //  return <CueSequencer />;
       case Pages.NetworkDebug:
         return <NetworkDebug />;
+      case Pages.Preferences:
+        return <Preferences />;
       case Pages.About:
         return <About />;
       default:

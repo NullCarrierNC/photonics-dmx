@@ -12,7 +12,7 @@
 import { TransitionEngine } from '../../controllers/sequencer/TransitionEngine';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
 import { LayerManager } from '../../controllers/sequencer/LayerManager';
-import { ActiveEffect } from '../../controllers/sequencer/interfaces';
+import { LightEffectState } from '../../controllers/sequencer/interfaces';
 import { createMockRGBIP, createMockTrackedLight } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
 import { EffectTransition } from '../../types';
@@ -29,30 +29,30 @@ describe('TransitionEngine', () => {
   const createMockEffectTransition = (overrides?: Partial<EffectTransition>): EffectTransition => ({
     lights: [createMockTrackedLight()],
     layer: 1,
-    waitFor: 'none',
-    forTime: 0,
+    waitForCondition: 'none',
+    waitForTime: 0,
     transform: {
       color: createMockRGBIP({ red: 255 }),
       easing: 'linear',
       duration: 1000
     },
-    waitUntil: 'none',
-    untilTime: 0,
+    waitUntilCondition: 'none',
+    waitUntilTime: 0,
     ...overrides
   });
   
   // Helper to create a mock active effect
-  const createMockActiveEffect = (overrides?: Partial<ActiveEffect>): ActiveEffect => ({
+  const createMockActiveEffect = (overrides?: Partial<LightEffectState>): LightEffectState => ({
     name: 'test-effect',
     effect: { id: 'test', description: 'Test Effect', transitions: [] },
     transitions: [createMockEffectTransition()],
-    trackedLights: [createMockTrackedLight()],
     layer: 1,
+    lightId: 'test-light-1',
     currentTransitionIndex: 0,
     state: 'idle',
     transitionStartTime: 0,
     waitEndTime: 0,
-    lastEndStates: new Map(),
+    lastEndState: undefined,
     isPersistent: false,
     ...overrides
   });
@@ -64,10 +64,12 @@ describe('TransitionEngine', () => {
       removeTransitionsByLayer: jest.fn(),
       getFinalLightState: jest.fn(),
       getLightState: jest.fn().mockReturnValue({
-        red: 0, rp: 0,
-        green: 0, gp: 0,
-        blue: 0, bp: 0,
-        intensity: 0, ip: 0
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 1.0,
+        blendMode: 'replace'
       }),
       removeLightLayer: jest.fn()
     } as unknown as jest.Mocked<LightTransitionController>;
@@ -105,56 +107,9 @@ describe('TransitionEngine', () => {
     jest.clearAllMocks();
   });
 
-  describe('startAnimationLoop', () => {
-    it('should set up the animation loop interval', () => {
-      // Mock the global setInterval
-      const originalSetInterval = global.setInterval;
-      global.setInterval = jest.fn().mockReturnValue(123) as any;
-      
-      // Call startAnimationLoop
-      transitionEngine.startAnimationLoop();
-      
-      // Verify setInterval was called with correct parameters
-      expect(global.setInterval).toHaveBeenCalledWith(
-        expect.any(Function),
-        expect.any(Number)
-      );
-      
-      // Get the actual value that was passed
-      const actualValue = ((global.setInterval as unknown) as jest.Mock).mock.calls[0][1];
-      
-      // Check that it's approximately 16.67ms (1000/60)
-      expect(actualValue).toBeCloseTo(16.67, 1);
-      
-      // Restore original setInterval
-      global.setInterval = originalSetInterval;
-    });
-  });
 
-  describe('stopAnimationLoop', () => {
-    it('should clear the animation loop interval', () => {
-      // Mock global clearInterval
-      const originalClearInterval = global.clearInterval;
-      global.clearInterval = jest.fn() as any;
-      
-      // Setup the animation loop interval
-      const originalSetInterval = global.setInterval;
-      global.setInterval = jest.fn().mockReturnValue(123) as any;
-      
-      // Start the animation loop
-      transitionEngine.startAnimationLoop();
-      
-      // Now stop it
-      transitionEngine.stopAnimationLoop();
-      
-      // Verify clearInterval was called with the interval ID
-      expect(global.clearInterval).toHaveBeenCalledWith(123);
-      
-      // Restore original functions
-      global.clearInterval = originalClearInterval;
-      global.setInterval = originalSetInterval;
-    });
-  });
+
+
 
   describe('updateTransitions', () => {
     it('should process active effects through their transitions', () => {
@@ -162,8 +117,10 @@ describe('TransitionEngine', () => {
       const mockActiveEffect = createMockActiveEffect();
       
       // Set up the layerManager to return our mock effect
-      const activeEffectsMap = new Map<number, ActiveEffect>();
-      activeEffectsMap.set(1, mockActiveEffect);
+      const activeEffectsMap = new Map<number, Map<string, LightEffectState>>();
+      const lightMap = new Map<string, LightEffectState>();
+      lightMap.set('test-light-1', mockActiveEffect);
+      activeEffectsMap.set(1, lightMap);
       layerManager.getActiveEffects.mockReturnValue(activeEffectsMap);
       
       // Call updateTransitions
@@ -185,8 +142,10 @@ describe('TransitionEngine', () => {
       });
       
       // Set up the layerManager to return our mock effect
-      const activeEffectsMap = new Map<number, ActiveEffect>();
-      activeEffectsMap.set(1, mockActiveEffect);
+      const activeEffectsMap = new Map<number, Map<string, LightEffectState>>();
+      const lightMap = new Map<string, LightEffectState>();
+      lightMap.set('test-light-1', mockActiveEffect);
+      activeEffectsMap.set(1, lightMap);
       layerManager.getActiveEffects.mockReturnValue(activeEffectsMap);
       layerManager.getActiveEffect.mockReturnValue(mockActiveEffect);
       
@@ -194,7 +153,32 @@ describe('TransitionEngine', () => {
       transitionEngine.updateTransitions();
       
       // Verify the effect was removed since it completed all transitions
-      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1);
+      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1, 'test-light-1');
+    });
+  });
+
+  describe('clock integration', () => {
+    it('should register with clock', () => {
+      const mockClock = {
+        onTick: jest.fn(),
+        offTick: jest.fn()
+      };
+      
+      transitionEngine.registerWithClock(mockClock as any);
+      
+      expect(mockClock.onTick).toHaveBeenCalledWith(expect.any(Function));
+    });
+
+    it('should unregister from clock', () => {
+      const mockClock = {
+        onTick: jest.fn(),
+        offTick: jest.fn()
+      };
+      
+      transitionEngine.registerWithClock(mockClock as any);
+      transitionEngine.unregisterFromClock();
+      
+      expect(mockClock.offTick).toHaveBeenCalledWith(expect.any(Function));
     });
   });
 
@@ -218,29 +202,32 @@ describe('TransitionEngine', () => {
     
     it('should handle the transitioning state correctly', () => {
       // Create a mock effect in transitioning state
-      const now = Date.now();
       const mockEffect = createMockActiveEffect({
         state: 'transitioning',
-        waitEndTime: now - 100,  // Time already passed
-        trackedLights: [createMockTrackedLight({ id: 'test-light' })],
-        lastEndStates: new Map<string, any>()
+        waitEndTime: 100,  // Set a reasonable wait time
+        lightId: 'test-light'
       });
       
       const transition = mockEffect.transitions[0];
       
-      // Call handleTransitioning
-      transitionEngine.handleTransitioning(mockEffect, transition, now);
+      // Set up the layer manager to return our test effect
+      const activeEffectsMap = new Map();
+      activeEffectsMap.set(1, new Map([[mockEffect.lightId, mockEffect]]));
+      layerManager.getActiveEffects.mockReturnValue(activeEffectsMap);
+      
+      // Advance time by calling updateTransitions with deltaTime
+      transitionEngine.updateTransitions(150); // Advance past the waitEndTime
       
       // Verify state changed to waitingUntil if untilTime > 0
-      if (transition.untilTime > 0) {
+      if (transition.waitUntilTime > 0) {
         expect(mockEffect.state).toBe('waitingUntil');
       } else {
         expect(mockEffect.state).toBe('idle');
         expect(mockEffect.currentTransitionIndex).toBe(1);  // Advanced to next transition
       }
       
-      // Verify last end states were updated
-      expect(mockEffect.lastEndStates?.has('test-light')).toBeTruthy();
+      // Verify last end state was updated (now single state instead of map)
+      expect(mockEffect.lastEndState).toBeDefined();
     });
     
     it('should handle the waitingUntil state correctly', () => {
@@ -252,7 +239,7 @@ describe('TransitionEngine', () => {
       });
       
       const transition = createMockEffectTransition({
-        untilTime: 500
+        waitUntilTime: 500
       });
       
       // Call handleWaitingUntil

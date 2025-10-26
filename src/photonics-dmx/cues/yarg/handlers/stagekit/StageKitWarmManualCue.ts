@@ -1,0 +1,314 @@
+import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { CueData, CueType } from '../../../cueTypes';
+import { ILightingController } from '../../../../controllers/sequencer/interfaces';
+import { DmxLightManager } from '../../../../controllers/DmxLightManager';
+import { getColor } from '../../../../helpers/dmxHelpers';
+import { Effect, EffectTransition } from '../../../../types';
+
+/**
+ * StageKit Warm Manual Cue 
+ * 2x red, 1x yellow. Red animating clockwise, yellow animating counter-clockwise.
+ */
+export class StageKitWarmManualCue implements ICue {
+  id = 'stagekit-warmManual';
+  cueId = CueType.Warm_Manual;
+  description = '2x red, 1x yellow. Red animating clockwise, yellow animating counter-clockwise, on keyframe.';
+  style = CueStyle.Primary;
+
+  // Track whether this is the first execution or a repeat
+  private isFirstExecution: boolean = true;
+
+  async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
+    const allLights = lightManager.getLights(['front', 'back'], ['all']);
+    const redColor = getColor('red', 'medium', 'add');
+    const yellowColor = getColor('yellow', 'medium', 'add');
+
+    const blackColor = getColor('black', 'medium');
+    const transparentColor = getColor('transparent', 'medium');
+    
+    // Calculate number of light pairs and steps
+    const lightPairs = Math.floor(allLights.length / 2);
+    
+    // Create transitions for red light pairs
+    const redTransitions: EffectTransition[] = [];
+    
+    // For each light pair, create the appropriate number of transparent transitions
+    // followed by red, then more transparent transitions
+    for (let pairIndex = 0; pairIndex < lightPairs; pairIndex++) {
+        const light1Index = pairIndex;
+        const light2Index = (pairIndex + lightPairs) % allLights.length;
+        
+        const light1 = allLights[light1Index];
+        const light2 = allLights[light2Index];
+        
+        // Calculate when this pair should be active
+        const stepsUntilActive = pairIndex;
+        
+        // Add transparent transitions before red (to wait for the right keyframe)
+        if (stepsUntilActive > 0) {
+            // Light 1 transparent - wait for stepsUntilActive keyframes
+            redTransitions.push({
+                lights: [light1],
+                layer: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
+                transform: {
+                    color: blackColor,
+                    easing: 'linear',
+                    duration: 100,
+                },
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
+            });
+            
+            // Light 2 transparent - wait for stepsUntilActive keyframes
+            redTransitions.push({
+                lights: [light2],
+                layer: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
+                transform: {
+                    color: blackColor,
+                    easing: 'linear',
+                    duration: 100,
+                },
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
+            });
+        }
+        
+        // Add the red transition for both lights
+        redTransitions.push({
+            lights: [light1],
+            layer: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+                color: redColor,
+                easing: 'linear',
+                duration: 100,
+            },
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
+        });
+        
+        redTransitions.push({
+            lights: [light2],
+            layer: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+                color: redColor,
+                easing: 'linear',
+                duration: 100,
+            },
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
+        });
+        
+        // Add transparent transitions after red (to wait until the cycle completes)
+        const stepsAfterRed = lightPairs - stepsUntilActive - 1;
+        if (stepsAfterRed > 0) {
+            // Light 1 transparent - wait for stepsAfterRed keyframes
+            redTransitions.push({
+                lights: [light1],
+                layer: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
+                transform: {
+                    color: blackColor,
+                    easing: 'linear',
+                    duration: 100,
+                },
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterRed
+            });
+            
+            // Light 2 transparent - wait for stepsAfterRed keyframes
+            redTransitions.push({
+                lights: [light2],
+                layer: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
+                transform: {
+                    color: blackColor,
+                    easing: 'linear',
+                    duration: 100,
+                },
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterRed
+            });
+        }
+    }
+    
+    // Handle center light if odd number of lights
+    if (allLights.length % 2 !== 0) {
+        const centerLight = allLights[lightPairs];
+        
+        // Center light follows pair 0 timing
+        const stepsUntilActive = 0;
+        
+        // Add transparent transitions before red (to wait for the right keyframe)
+        if (stepsUntilActive > 0) {
+            redTransitions.push({
+                lights: [centerLight],
+                layer: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
+                transform: {
+                    color: blackColor,
+                    easing: 'linear',
+                    duration: 100,
+                },
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilActive
+            });
+        }
+        
+        // Add the red transition
+        redTransitions.push({
+            lights: [centerLight],
+            layer: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+                color: redColor,
+                easing: 'linear',
+                duration: 100,
+            },
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
+        });
+        
+        // Add transparent transitions after red (to wait until the cycle completes)
+        const stepsAfterRed = lightPairs - stepsUntilActive - 1;
+        if (stepsAfterRed > 0) {
+            redTransitions.push({
+                lights: [centerLight],
+                layer: 0,
+                waitForCondition: 'none',
+                waitForTime: 0,
+                transform: {
+                    color: blackColor,
+                    easing: 'linear',
+                    duration: 100,
+                },
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterRed
+            });
+        }
+    }
+    
+    // Create transitions for yellow light stepping
+    const yellowTransitions: EffectTransition[] = [];
+    
+    // For each light, create the appropriate number of transparent transitions
+    // followed by yellow, then more transparent transitions
+    for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
+        const light = allLights[lightIndex];
+        
+        // Calculate when this light should be yellow based on its position
+        // Yellow starts at 90 degrees (1/4 of ring) and steps counter-clockwise
+        const yellowStartIndex = Math.floor(allLights.length / 4);
+        const stepsUntilYellow = (yellowStartIndex - lightIndex + allLights.length) % allLights.length;
+        
+        // Add transparent transitions before yellow (to wait for the right keyframe)
+        if (stepsUntilYellow > 0) {
+            yellowTransitions.push({
+                lights: [light],
+                layer: 5,
+                waitForCondition: 'none',
+                waitForTime: 0,
+                transform: {
+                    color: transparentColor,
+                    easing: 'linear',
+                    duration: 0,
+                },
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsUntilYellow
+            });
+        }
+        
+        // Add the yellow transition
+        yellowTransitions.push({
+            lights: [light],
+            layer: 5,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+                color: yellowColor,
+                easing: 'linear',
+                duration: 0,
+            },
+            waitUntilCondition: 'keyframe',
+            waitUntilTime: 0
+        });
+        
+        // Add transparent transitions after yellow (to wait until the cycle completes)
+        const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
+        if (stepsAfterYellow > 0) {
+            yellowTransitions.push({
+                lights: [light],
+                layer: 5,
+                waitForCondition: 'none',
+                waitForTime: 0,
+                transform: {
+                    color: transparentColor,
+                    easing: 'linear',
+                    duration: 0,
+                },
+                waitUntilCondition: 'keyframe',
+                waitUntilTime: 0,
+                waitUntilConditionCount: stepsAfterYellow
+            });
+        }
+    }
+    
+    // Create the red effect
+    const redEffect: Effect = {
+        id: "warm-manual-red",
+        description: "Warm manual pattern - red pairs stepping clockwise",
+        transitions: redTransitions
+    };
+    
+    // Create the yellow effect
+    const yellowEffect: Effect = {
+        id: "warm-manual-yellow",
+        description: "Warm manual pattern - yellow light stepping counter-clockwise",
+        transitions: yellowTransitions
+    };
+    
+    // Add both effects to the sequencer
+    if (this.isFirstExecution) {
+      // First time: use setEffect to clear any existing effects and start fresh
+      sequencer.setEffect('warm-manual-red', redEffect);
+      sequencer.addEffect('warm-manual-yellow', yellowEffect);
+      this.isFirstExecution = false;
+    } else {
+      // Repeat call: use addEffect to add to existing effects
+      sequencer.addEffect('warm-manual-red', redEffect);
+      sequencer.addEffect('warm-manual-yellow', yellowEffect);
+    }
+  }
+
+  onStop(): void {
+    // Reset the first execution flag so next time this cue runs it will use setEffect
+    this.isFirstExecution = true;
+    // Cleanup handled by effect system
+  }
+
+  onPause(): void {
+    // Pause handled by effect system
+  }
+
+  onDestroy(): void {
+    // Cleanup handled by effect system
+  }
+} 

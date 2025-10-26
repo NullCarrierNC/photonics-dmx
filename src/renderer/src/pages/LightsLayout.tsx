@@ -9,6 +9,7 @@ import {
     DmxLight,
     FixtureTypes
 } from '../../../photonics-dmx/types';
+import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers';
 import { v4 as uuidv4 } from 'uuid';
 import { activeDmxLightsConfigAtom, myValidDmxLightsAtom, myDmxLightsAtom } from '@renderer/atoms';
 
@@ -95,31 +96,52 @@ const LightsLayout = () => {
 
 
     //  Create a New Light Instance
-    const createLightInstance = useCallback(
-        (group: string): DmxLight => {
-            const totalExisting = allPrimaryLights.length;
-            const templateIndex = totalExisting % myFixtures.length;
-            const selectedFixture = myFixtures[templateIndex];
+    const createLightInstance = useCallback((group: 'front' | 'back' | 'strobe') => {
+        const totalExisting = allPrimaryLights.length;
+        const templateIndex = totalExisting % myFixtures.length;
+        const selectedFixture = myFixtures[templateIndex];
 
-            return {
-                id: uuidv4(),
-                fixtureId: selectedFixture.id!,
-                position: totalExisting + 1,
-                fixture: selectedFixture.fixture,
-                label: selectedFixture.label,
-                name: selectedFixture.name,
-                isStrobeEnabled: selectedFixture.isStrobeEnabled,
-                group,
-                channels: {
-                    ...selectedFixture.channels,
-                    masterDimmer: 1 + totalExisting * 10,
-                },
-                config: selectedFixture.config || undefined, // Include config if present (e.g. MH lights)
-                universe: selectedFixture.universe,
-            };
-        },
-        [allPrimaryLights.length, myFixtures]
-    );
+        // Calculate the new master dimmer channel
+        const newMasterDimmer = 1 + totalExisting * 10;
+        
+        // Calculate channel offsets from the template
+        const templateChannels = selectedFixture.channels;
+        const offsets: { [key: string]: number } = {};
+        Object.entries(templateChannels).forEach(([channelName, value]) => {
+            if (channelName !== 'masterDimmer') {
+                offsets[channelName] = value - templateChannels.masterDimmer;
+            }
+        });
+
+        // Recalculate all channels using the new master dimmer and template offsets
+        const recalculatedChannels: { [key: string]: number } = {};
+        Object.entries(templateChannels).forEach(([channelName, _]) => {
+            if (channelName === 'masterDimmer') {
+                recalculatedChannels[channelName] = newMasterDimmer;
+            } else {
+                recalculatedChannels[channelName] = newMasterDimmer + (offsets[channelName] || 0);
+            }
+        });
+
+        // Cast the channels to the correct type based on the fixture
+        const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels);
+
+        return {
+            id: uuidv4(),
+            fixtureId: selectedFixture.id!,
+            position: totalExisting + 1,
+            fixture: selectedFixture.fixture,
+            label: selectedFixture.label,
+            name: selectedFixture.name,
+            isStrobeEnabled: selectedFixture.isStrobeEnabled,
+            group,
+            channels: castChannels,
+            config: selectedFixture.config || undefined, // Include config if present (e.g. MH lights)
+            universe: selectedFixture.universe,
+        };
+    },
+    [allPrimaryLights.length, myFixtures]
+);
 
 
 
@@ -136,6 +158,31 @@ const LightsLayout = () => {
             if (myFixtures.length > 0 && selectedCount) {
               const firstFixture = myFixtures[0];
               for (let i = 0; i < selectedCount; i++) {
+                // Calculate the new master dimmer channel
+                const newMasterDimmer = 1 + i * 10;
+                
+                // Calculate channel offsets from the template
+                const templateChannels = firstFixture.channels;
+                const offsets: { [key: string]: number } = {};
+                Object.entries(templateChannels).forEach(([channelName, value]) => {
+                    if (channelName !== 'masterDimmer') {
+                        offsets[channelName] = value - templateChannels.masterDimmer;
+                    }
+                });
+
+                // Recalculate all channels using the new master dimmer and template offsets
+                const recalculatedChannels: { [key: string]: number } = {};
+                Object.entries(templateChannels).forEach(([channelName, _]) => {
+                    if (channelName === 'masterDimmer') {
+                        recalculatedChannels[channelName] = newMasterDimmer;
+                    } else {
+                        recalculatedChannels[channelName] = newMasterDimmer + (offsets[channelName] || 0);
+                    }
+                });
+
+                // Cast the channels to the correct type based on the fixture
+                const castChannels = castToChannelType(firstFixture.fixture, recalculatedChannels);
+
                 updated.push({
                   id: uuidv4(),
                   fixtureId: firstFixture.id!,
@@ -145,10 +192,7 @@ const LightsLayout = () => {
                   name: firstFixture.name,
                   isStrobeEnabled: firstFixture.isStrobeEnabled,
                   group: 'front',
-                  channels: {
-                    ...firstFixture.channels,
-                    masterDimmer: 1 + i * 10,
-                  },
+                  channels: castChannels,
                   config: firstFixture.config || undefined,
                   universe: firstFixture.universe,
                 });
@@ -431,18 +475,32 @@ const LightsLayout = () => {
    
     return (
         <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-            <h1 className="text-2xl font-bold mb-4">Lights Layout</h1>
-            <p className="text-md text-gray-700 dark:text-gray-300 mb-6">
+            <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Lights Layout</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 The Lights Layout allows you to assign the lights you created in My Lights to specific
                 lighting fixture positions and to configure their DMX channels.
             </p>
-            <p className="text-md text-gray-700 dark:text-gray-300 mb-6">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 The Master Dimmer channel acts like the light's index, and all other channels will be
                 calculated for you automatically.
             </p>
-            <p className="text-md text-gray-700 dark:text-gray-300 mb-6">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 E.g. If you defined your light as MasterDimmer=1, Red=2, Green=3, Blue=4 and here you set
                 Front 1 Master Dimmer to 11, your R/G/B channels automatically become 12/13/14.
+            </p>
+            <p className='mb-1 italic font-bold text-orange-400  text-[9pt] '>
+                RBE3 requires either 4 or 8 lights in your layout. If you have &gt; 4 but &lt; 8, only the first 4 lights will be used. 
+                
+            </p>
+            <p className='mb-3 italic font-bold text-orange-400  text-[9pt] '>
+                Using 8 lights provides the most Stage Kit like experience. 4 lights is good, but will look somewhat different.
+            </p>
+            <p className='mb-6 italic font-bold text-orange-400  text-[9pt]'>
+                YARG can scale from 2 lights up, but we recommend and have tested mostly 4 and 8 light configurations. A minimum of 4 lights is recommended.
+            </p>
+
+            <p className='mb-8 italic font-bold text-yellow-400 '>
+                For the most Stage Kit like experience: assign 4 lights to the front. If you have 8, assign the remaining 4 to the back.
             </p>
 
             {/* Check if any lights are configured at all */}
@@ -460,7 +518,7 @@ const LightsLayout = () => {
                         <div className="flex flex-wrap gap-4">
                             {/* Number of Lights */}
                             <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                <span className="mb-2">Number of Primary Lights</span>
+                                <span className="mb-2 text-gray-700 dark:text-gray-300">Number of Primary Lights</span>
                                 <select
                                     value={selectedCount || ''}
                                     onChange={(e) => {
@@ -483,7 +541,7 @@ const LightsLayout = () => {
 
                             {/* Light Layout */}
                             <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                <span className="mb-2">Primary Light Layout</span>
+                                <span className="mb-2 text-gray-700 dark:text-gray-300">Primary Light Layout</span>
                                 <select
                                     value={selectedLayout}
                                     onChange={(e) => {
@@ -511,7 +569,7 @@ const LightsLayout = () => {
                             {/* Assigned to Back */}
                             {selectedLayout === 'front-back' && (
                                 <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                    <span className="mb-2">Assigned to Back</span>
+                                    <span className="mb-2 text-gray-700 dark:text-gray-300">Assigned to Back</span>
                                     <select
                                         value={assignedToBack}
                                         onChange={(e) => {
@@ -531,7 +589,7 @@ const LightsLayout = () => {
 
                             {/* Strobe Effects */}
                             <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                <span className="mb-2">Strobe Effects</span>
+                                <span className="mb-2 text-gray-700 dark:text-gray-300">Strobe Effects</span>
                                 <select
                                     value={selectedStrobe}
                                     onChange={(e) => {
@@ -558,7 +616,7 @@ const LightsLayout = () => {
                             {/* Number of Strobes dropdown (only for Dedicated Strobe) */}
                             {selectedStrobe === ConfigStrobeType.Dedicated && (
                                 <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                    <span className="mb-2">Number of Strobes</span>
+                                    <span className="mb-2 text-gray-700 dark:text-gray-300">Number of Strobes</span>
                                     <select
                                         value={dedicatedStrobeCount}
                                         onChange={(e) => setDedicatedStrobeCount(Number(e.target.value))}
@@ -588,7 +646,7 @@ const LightsLayout = () => {
                         {/* Front Lights */}
                         {frontLights.map((light, index) => (
                             <div key={light.id} className="flex flex-col">
-                                <div className="text-center mb-2 font-semibold">
+                                <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
                                     Front {index + 1} (Position {light.position})
                                 </div>
                                 <LightChannelsConfig
@@ -605,7 +663,7 @@ const LightsLayout = () => {
                         {selectedLayout === 'front-back' &&
                             backLights.map((light, index) => (
                                 <div key={light.id} className="flex flex-col">
-                                    <div className="text-center mb-2 font-semibold">
+                                    <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
                                         Back {index + 1} (Position {light.position})
                                     </div>
                                     <LightChannelsConfig
@@ -624,7 +682,7 @@ const LightsLayout = () => {
                                 .filter((l) => l.group === 'strobe')
                                 .map((light, _index) => (
                                     <div key={light.id} className="flex flex-col">
-                                        <div className="text-center mb-2 font-semibold">
+                                        <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
                                             Dedicated Strobe (Position {light.position})
                                         </div>
                                         <LightChannelsConfig

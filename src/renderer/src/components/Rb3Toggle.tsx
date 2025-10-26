@@ -1,10 +1,15 @@
 import { useAtom } from 'jotai';
 import { useEffect } from 'react';
-import { rb3eListenerEnabledAtom } from '../atoms';
+import { rb3eListenerEnabledAtom, yargListenerEnabledAtom } from '../atoms';
 import { useIpcListener } from '../utils/ipcHelpers';
 
-const Rb3Toggle = () => {
+interface Rb3ToggleProps {
+  disabled?: boolean;
+}
+
+const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
   const [isRb3Enabled, setIsRb3Enabled] = useAtom(rb3eListenerEnabledAtom);
+  const [isYargEnabled] = useAtom(yargListenerEnabledAtom);
 
   useEffect(() => {
     // Initialize toggle state from system status
@@ -48,13 +53,20 @@ const Rb3Toggle = () => {
   };
 
   return (
-    <div className="flex items-center mb-4  w-[200px] justify-between">
-      <label className="mr-4 text-lg font-semibold">Enable RB3E</label>
+    <div className="flex items-center mb-4  w-[220px] justify-between">
+      <label className={`mr-4 text-lg font-semibold ${
+        (isYargEnabled || disabled) ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
+      }`}>
+        Enable RB3E
+      </label>
       <button
         onClick={handleToggle}
+        disabled={isYargEnabled || disabled}
         className={`w-12 h-6 rounded-full ${
           isRb3Enabled ? 'bg-green-500' : 'bg-gray-400'
-        } relative focus:outline-none`}
+        } relative focus:outline-none ${
+          (isYargEnabled || disabled) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+        }`}
       >
         <div
           className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${

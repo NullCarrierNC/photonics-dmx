@@ -1,18 +1,27 @@
-import { Effect, TrackedLight, RGBIP, WaitCondition } from "../types";
+import { Effect, RGBIO, WaitCondition } from "../types";
+import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
-interface GetSingleColorEffectParams {
-    color: RGBIP;
+/**
+ * Interface for flash colour effect parameters, extending the base effect interface
+ */
+interface FlashColorEffectParams extends IEffect {
+    /** The colour to flash to */
+    color: RGBIO;
+    /** The condition that triggers the start of the flash */
     startTrigger: WaitCondition;
+    /** Time to wait before starting the flash */
     startWait?: number;
-    endTrigger?:WaitCondition,
-    endWait?:number,
-    durationIn: number;
+    /** The condition that triggers the end of the flash */
+    endTrigger?: WaitCondition;
+    /** Time to wait before ending the flash */
+    endWait?: number;
+    /** Time to hold the flash colour */
     holdTime: number;
+    /** Duration of the fade in */
+    durationIn: number;
+    /** Duration of the fade out */
     durationOut: number;
-    lights: TrackedLight[];
-    layer?: number;
-    easing?: string;
 }
 
 export const getEffectFlashColor = ({
@@ -27,45 +36,43 @@ export const getEffectFlashColor = ({
     lights,
     layer = 0,
     easing = EasingType.SIN_OUT
-}: GetSingleColorEffectParams): Effect => {
+}: FlashColorEffectParams): Effect => {
     const effect: Effect = {
         id: "flash-color",
-        description: "Sets the light a color then quickly fades it out with P",
+        description: "Sets the light a colour then quickly fades it out",
         transitions: [
             {
                 lights: lights,
                 layer: layer,
-                waitFor: startTrigger,
-                forTime: startWait,
+                waitForCondition: startTrigger,
+                waitForTime: startWait,
                 transform: {
                     color: color,
                     easing: easing,
                     duration: durationIn,
                 },
-                waitUntil: "delay",
-                untilTime: holdTime,
+                waitUntilCondition: "delay",
+                waitUntilTime: holdTime,
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: endTrigger,
-                forTime: endWait,
+                waitForCondition: endTrigger,
+                waitForTime: endWait,
                 transform: {
                     color: {
-                        red: 0,
-                        rp: 0,
-                        green: 0,
-                        gp: 0,
-                        blue: 0,
-                        bp: 0,
+                        red: color.red,
+                        green: color.green,
+                        blue: color.blue,
                         intensity: 0,
-                        ip: 0,
+                        opacity: 0.0,
+                        blendMode: 'replace',
                     },
                     easing: easing,
                     duration: durationOut,
                 },
-                waitUntil: "delay",
-                untilTime: holdTime,
+                waitUntilCondition: "delay",
+                waitUntilTime: holdTime,
             },
         ],
     };

@@ -1,9 +1,35 @@
 export type InstrumentNote = "None" | "Open" | "Green" | "Red" | "Yellow" | "Blue" | "Orange";
 export type DrumNote = "None" | "Kick" | "RedDrum" | "YellowDrum" | "BlueDrum" | "GreenDrum" | "YellowCymbal" | "BlueCymbal" | "GreenCymbal";
 
+// Enums for note types to avoid string literal mistakes
+export enum InstrumentNoteType {
+  None = "None",
+  Open = "Open",
+  Green = "Green",
+  Red = "Red",
+  Yellow = "Yellow",
+  Blue = "Blue",
+  Orange = "Orange"
+}
+
+export enum DrumNoteType {
+  None = "None",
+  Kick = "Kick",
+  RedDrum = "RedDrum",
+  YellowDrum = "YellowDrum",
+  BlueDrum = "BlueDrum",
+  GreenDrum = "GreenDrum",
+  YellowCymbal = "YellowCymbal",
+  BlueCymbal = "BlueCymbal",
+  GreenCymbal = "GreenCymbal"
+}
+
+// Import RB3E types
+import { Rb3Difficulty, Rb3TrackType } from '../listeners/RB3/rb3eTypes';
+
 
 export type SongSection = "None" | "Chorus" | "Verse" | "Unknown";
-export type PostProcessing = "Default" | "Bloom" | "Bright" | "Unknown";
+export type PostProcessing = "Default" | "Bloom" | "Bright" | "Saturation" | "Contrast" | "Sharpness" | "Vignette" | "ChromaticAberration" | "MotionBlur" | "DepthOfField" | "AmbientOcclusion" | "Unknown";
 export type Beat = "Measure" | "Strong" | "Weak" | "Off" | "Unknown";
 export type StrobeState = "Strobe_Fastest" | "Strobe_Fast" | "Strobe_Medium" | "Strobe_Slow" | "Strobe_Off" | "Unknown";
 
@@ -18,10 +44,10 @@ export type CueData = {
     venueSize: "NoVenue" | "Small" | "Large";
     beatsPerMinute: number;
     songSection: SongSection;
-    guitarNotes: InstrumentNote[];
-    bassNotes: InstrumentNote[];
-    drumNotes: DrumNote[];
-    keysNotes: InstrumentNote[];
+    guitarNotes: InstrumentNoteType[];
+    bassNotes: InstrumentNoteType[];
+    drumNotes: DrumNoteType[];
+    keysNotes: InstrumentNoteType[];
     vocalNote: number;
     harmony0Note: number;
     harmony1Note: number;
@@ -31,13 +57,23 @@ export type CueData = {
     fogState: boolean;
     strobeState: StrobeState;
     performer: number;
+    trackMode?: 'tracked' | 'autogen' | 'simulated';
     beat: Beat;
     keyframe: string;
     bonusEffect: boolean;
     
+    // Cue history and context
+    previousCue?: CueType;
+    cueHistory?: CueType[];
+    executionCount?: number;
+    cueStartTime?: number;
+    timeSinceLastCue?: number;
+    previousFrame?: Partial<CueData>;
+    
   
     // Optional RB3E-specific properties
     ledColor?: string | null;
+    ledPositions?: number[];
     
     sustainDurationMs?: number;
     measureOrBeat?: number;
@@ -45,6 +81,26 @@ export type CueData = {
     totalScore?: number;          
     memberScores?: number[];  
     stars?: number;  
+    
+    // Additional RB3E data fields
+    rb3Platform?: string;
+    rb3BuildTag?: string;
+    rb3SongName?: string;
+    rb3SongArtist?: string;
+    rb3SongShortName?: string;
+    rb3VenueName?: string;
+    rb3ScreenName?: string;
+    rb3BandInfo?: {
+      members: Array<{
+        exists: boolean;
+        difficulty: Rb3Difficulty;
+        trackType: Rb3TrackType;
+      }>;
+    };
+    rb3ModData?: {
+      identifyValue: string;
+      string: string;
+    };
   };
 
 
@@ -72,7 +128,32 @@ export type CueData = {
     beat: "Unknown",
     keyframe: "Unknown",
     bonusEffect: false,
+    
+    // Cue history defaults
+    cueHistory: [],
+    executionCount: 0,
+    cueStartTime: 0,
+    timeSinceLastCue: 0,
     ledColor: null,
+    rb3Platform: "Unknown",
+    rb3BuildTag: "",
+    rb3SongName: "",
+    rb3SongArtist: "",
+    rb3SongShortName: "",
+    rb3VenueName: "",
+    rb3ScreenName: "",
+    rb3BandInfo: {
+      members: [
+        { exists: false, difficulty: 'Unknown' as Rb3Difficulty, trackType: 'Unknown' as Rb3TrackType },
+        { exists: false, difficulty: 'Unknown' as Rb3Difficulty, trackType: 'Unknown' as Rb3TrackType },
+        { exists: false, difficulty: 'Unknown' as Rb3Difficulty, trackType: 'Unknown' as Rb3TrackType },
+        { exists: false, difficulty: 'Unknown' as Rb3Difficulty, trackType: 'Unknown' as Rb3TrackType }
+      ]
+    },
+    rb3ModData: {
+      identifyValue: "",
+      string: ""
+    }
   };
 
 
@@ -111,6 +192,7 @@ export type CueData = {
     Strobe_Medium = "Strobe_Medium",
     Strobe_Slow = "Strobe_Slow",
     Strobe_Off = "Strobe_Off",
+    Solo = "Solo",
     Sweep = "Sweep",
     Verse = "Verse",
     Warm_Automatic = "Warm_Automatic",

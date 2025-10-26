@@ -26,7 +26,9 @@ const CueStyleToggle = () => {
   };
 
   useEffect(()=>{
-    setIsComplexCues(lightingPrefs.complex);
+    if (lightingPrefs.complex !== undefined) {
+      setIsComplexCues(lightingPrefs.complex);
+    }
   },[lightingPrefs]);
 
  

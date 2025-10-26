@@ -1,113 +1,104 @@
-# Photonics DMX Tests
+# Color Blending Tests
 
-This directory contains the test suites for the Photonics DMX lighting system. The tests are organized by module type, with each suite focusing on testing specific functionality.
+This directory contains tests to validate color blending behavior with layers in the photonics DMX system.
 
-## Structure
+## Test Files
 
-- `controllers/`: Tests for the controller components that manage lighting effects and transitions
-- `cueHandlers/`: Tests for the cue handler components that process lighting cues from games
-- `helpers/`: Utility functions and fixtures for testing
-- `jest.setup.ts`: Jest setup configuration
+### ReplaceBlendModeFade.test.ts
+Tests the interaction of `blendMode: 'replace'` with fading effects:
+- Validates that higher layers properly reveal lower layers during fades
+- Ensures no additive blending occurs when using replace mode
+- Tests cross-fading behavior between colors
 
-## Controller Tests
+### ColorBlendingAnalysis.ts
+A detailed analysis tool that:
+- Calculates expected blending results using opacity and blend modes
+- Shows step-by-step blending calculations
+- Identifies potential issues with opacity values
+- Helps diagnose why blending might not work as expected
 
-### Sequencer.test.ts
+## Running the Tests
 
-Tests the Sequencer facade, which serves as the primary API for the lighting system. The Sequencer delegates to appropriate controllers to handle specific tasks.
+### Quick Analysis (Recommended First)
+Run just the analysis to see what should happen:
+```bash
+npm run test:color-analysis
+```
 
-- **addEffect**: Verifies that the Sequencer correctly delegates to the EffectManager
-- **setEffect**: Ensures proper delegation to the EffectManager when setting effects
-- **setState**: Confirms that the Sequencer properly delegates to the EffectManager for state changes
-- **blackout**: Tests that the Sequencer correctly delegates to the SystemEffectsController
-- **cancelBlackout**: Verifies delegation to the SystemEffectsController when cancelling blackouts
-- **onBeat/onMeasure/onKeyframe**: Tests proper event handling delegation to the SongEventHandler
-- **shutdown**: Ensures the animation loop is stopped and resources are cleaned up
+This will show you:
+- Expected blending calculations
+- Opacity analysis
+- Potential issues
+- Step-by-step blending process
 
-### EffectManager.test.ts
+### Full Test Suite
+Run the complete test suite:
+```bash
+npm test
+```
 
-Tests the EffectManager which manages lighting effects, including adding, setting, and removing effects.
+This will:
+- Run all tests including color blending validation
+- Test opacity-based blending behavior
+- Validate blend mode interactions
+- Ensure proper layer behavior
 
-- **addEffect**: Tests that effects are added correctly and layer management works as expected
-- **setEffect**: Verifies that existing effects on target layers are removed before adding new ones
-- **addEffectUnblockedName**: Confirms that effects with duplicate names are handled correctly
-- **setEffectUnblockedName**: Tests proper replacement behavior when name conflicts exist
-- **removeEffect**: Verifies that effects can be correctly removed by name and layer
-- **removeAllEffects**: Tests that all active effects can be removed
-- **blackout handling**: Verifies proper interaction with SystemEffectsController
+## What to Look For
 
-### LayerManager.test.ts
+### Expected Result
+Blue (R:0, G:0, B:100) + Green (R:0, G:100, B:0) with `blendMode: 'add'` should = Cyan (R:0, G:100, B:100)
 
-Tests the LayerManager which manages effect layers and their priorities.
+### Key Behaviors to Validate
+1. **Opacity Values**: 0.0 = transparent, 1.0 = fully opaque
+2. **Layer Order**: Higher layers should blend on top of lower layers
+3. **Blend Modes**: Each mode has distinct blending behavior
 
-- **Active Effects Management**: Tests adding, retrieving, and removing active effects
-- **Queued Effects Management**: Verifies proper handling of queued effects
-- **Layer Cleanup**: Ensures unused layers are cleaned up after the grace period
-- **Blackout Layer Management**: Tests layer threshold handling for blackout effects
+### Common Test Scenarios
+- `blendMode: 'replace'` with fading - should reveal underlying colors
+- `blendMode: 'add'` with partial opacity - should blend colors naturally
+- Layer transitions - should respect opacity and blend mode settings
 
-### TransitionEngine.test.ts
+## Debugging Steps
 
-Tests the TransitionEngine which handles animations, state transitions, and timing of effects.
+1. **Run the analysis first** to see what should happen
+2. **Check opacity values** - they control blending contribution
+3. **Verify blend modes** - ensure correct blending algorithm is used
+4. **Examine final states** - compare actual vs expected results
+5. **Check individual layers** - verify each layer has correct color values
 
-- **startAnimationLoop/stopAnimationLoop**: Tests animation loop initialization and cleanup
-- **updateTransitions**: Verifies proper processing of active effects and transitions
-- **Transition State Management**: Tests handling of various transition states (waitingFor, transitioning, waitingUntil)
-- **getFinalState/clearFinalStates**: Validates state retrieval and management for specific layers
+## Understanding the Blending
 
-### SystemEffectsController.test.ts
+The system uses an opacity-based blending approach:
 
-Tests the SystemEffectsController which manages system-wide effects like blackouts.
+### Opacity-Based System
+- **opacity**: 0.0 to 1.0, controls contribution strength
+- **blendMode**: How colors interact ('replace', 'add', 'multiply', 'overlay')
+- **Intuitive**: 0.5 opacity = 50% contribution
+- **Predictable**: Colors blend naturally based on blend mode
 
-- **blackout**: Verifies that blackout transitions are correctly applied to all lights
-- **cancelBlackout**: Tests that existing blackouts can be cancelled
-- **getBlackoutLayersUnder**: Validates that the correct blackout layer threshold is returned
+## Blend Modes
 
-### LightTransitionController.test.ts
+- **replace**: Overwrites lower layer colors (default)
+- **add**: Adds to lower layer colors (good for additive blending)
+- **multiply**: Multiplies with lower layer colors (good for darkening)
+- **overlay**: Combines multiply and screen blending (good for contrast)
 
-Tests the LightTransitionController which manages light transitions at the lowest level.
+## For Proper Additive Blending (Blue + Green = Cyan)
 
-- **setTransition**: Tests that transitions are added and updated correctly
-- **getLightState**: Verifies correct light state retrieval
-- **removeTransitionsByLayer**: Tests removal of transitions by layer
-- **applyTransition**: Validates that transition objects are set up correctly
-- **calculateLayeredState**: Tests proper prioritization of higher layer states
-- **independent channel priority blending**: Verifies that each RGB and intensity channel blends according to its own priority value
-- **multi-layer blending**: Tests blending of multiple layers with different priorities for each channel
-- **full priority override**: Confirms that a higher layer with all priorities of 255 completely overrides the lower layer
+```typescript
+blue.opacity = 1.0;      // Full contribution
+blue.blendMode = 'add';  // Additive blending
 
-### EffectTransformer.test.ts
+green.opacity = 1.0;     // Full contribution  
+green.blendMode = 'add'; // Additive blending
+```
 
-Tests the EffectTransformer which processes and transforms lighting effects.
+## Test Coverage
 
-- **groupTransitionsByLayer**: Tests correct grouping of transitions by their layer property
-
-### TimeoutManager.test.ts
-
-Tests the TimeoutManager which handles timeouts and intervals for effects.
-
-- **setTimeout/clearTimeout**: Tests creation and clearing of timeouts
-- **setInterval/clearInterval**: Verifies interval creation and management
-- **clearAllTimeouts**: Tests that all timeouts can be cleared at once
-- **removeTimeout**: Verifies that timeouts can be removed from tracking without clearing
-
-## Cue Handler Tests
-
-### AbstractCueHandler.test.ts
-
-Tests the AbstractCueHandler base class which provides common functionality for all cue handlers.
-
-- **handleCue**: Tests that rapid cue calls are debounced to prevent issues from quick successive calls
-
-
-## Helpers
-
-### testFixtures.ts
-
-Provides utility functions to create test fixtures for use in tests.
-
-- **createMockRGBIP**: Creates a mock RGBIP object with customizable properties
-- **createMockTrackedLight**: Creates a mock TrackedLight object
-- **createMockLightingConfig**: Creates a mock lighting configuration
-
-## Note on Architecture
-
-All controller components should be accessed through the Sequencer facade which acts as a central point for interacting with the lighting system. The individual controller tests validate the internal implementation that is used by the Sequencer.
+The test suite covers:
+- Basic opacity blending behavior
+- Blend mode interactions
+- Layer order validation
+- Fade effect behavior
+- Cross-fading scenarios
+- Edge cases and error conditions

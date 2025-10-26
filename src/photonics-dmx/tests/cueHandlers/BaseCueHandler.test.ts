@@ -8,17 +8,25 @@
  *  - Rapid cue calls are debounced, meaning that multiple quick calls only invoke the handler once.
  */
 
-import { AbstractCueHandler } from '../../cueHandlers/AbstractCueHandler';
+import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler';
 import { DmxLightManager } from '../../controllers/DmxLightManager';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
 
 import { createMockLightingConfig } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest ,it, expect } from '@jest/globals';
-import { CueData, CueType } from '../../cues/cueTypes';
+import { CueData, CueType, InstrumentNoteType, DrumNoteType } from '../../cues/cueTypes';
 
-class TestCueHandler extends AbstractCueHandler {
+class TestCueHandler extends BaseCueHandler {
   // Implement abstract methods for testing
   protected handleCueDefault = jest.fn(async (_: CueData): Promise<void> => {});
+  
+  // Implement abstract methods
+  public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
+    if (cueType === CueType.Default) {
+      await this.handleCueDefault(parameters);
+    }
+  }
+  public handleCueNoCue = jest.fn(async (_: CueData): Promise<void> => {});
   protected handleCueDischord = jest.fn(async (_: CueData): Promise<void> => {});
   protected handleCueChorus = jest.fn(async (_: CueData): Promise<void> => {});
   protected handleCueCool_Manual = jest.fn(async (_: CueData): Promise<void> => {});
@@ -50,6 +58,8 @@ class TestCueHandler extends AbstractCueHandler {
   protected handleCueKeyframe_Previous = jest.fn(async (_: CueData): Promise<void> => {});
   protected handleCueMenu = jest.fn(async (_: CueData): Promise<void> => {});
   protected handleCueScore = jest.fn(async (_: CueData): Promise<void> => {});
+  
+
 }
 
 describe('AbstractCueHandler', () => {
@@ -69,14 +79,22 @@ describe('AbstractCueHandler', () => {
       setEffectUnblockedName: jest.fn().mockReturnValue(true),
       removeEffect: jest.fn(),
       removeAllEffects: jest.fn(),
+      removeAllEffectsForced: jest.fn(),
       setState: jest.fn(),
       onBeat: jest.fn(),
       onMeasure: jest.fn(),
       onKeyframe: jest.fn(),
+      onDrumNote: jest.fn(),
+      onGuitarNote: jest.fn(),
+      onBassNote: jest.fn(),
+      onKeysNote: jest.fn(),
       blackout: jest.fn().mockImplementation(async () => {}),
       cancelBlackout: jest.fn(),
       enableDebug: jest.fn(),
       debugLightLayers: jest.fn(),
+      removeEffectByLayer: jest.fn(),
+      getActiveEffectsForLight: jest.fn(),
+      isLayerFreeForLight: jest.fn(),
       shutdown: jest.fn()
     } as ILightingController;
     
@@ -88,8 +106,10 @@ describe('AbstractCueHandler', () => {
     jest.clearAllMocks();
   });
 
-  describe('handleCue', () => {
-    it('should debounce rapid cue calls', () => {
+
+
+  describe('note handling', () => {
+    it('should handle drum notes correctly', () => {
       const cueData: CueData = {
         datagramVersion: 1,
         platform: 'Windows',
@@ -111,17 +131,126 @@ describe('AbstractCueHandler', () => {
         fogState: false,
         strobeState: 'Strobe_Off',
         performer: 0,
+        trackMode: 'tracked',
         beat: 'Off',
         keyframe: 'Off',
-        bonusEffect: false
+        bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
       };
 
-      // Call cue multiple times rapidly
-      cueHandler.handleCue(CueType.Default, cueData);
-      cueHandler.handleCue(CueType.Default, cueData);
-      cueHandler.handleCue(CueType.Default, cueData);
+      cueHandler.handleDrumNote(DrumNoteType.Kick, cueData);
+      expect(sequencer.onDrumNote).toHaveBeenCalledWith(DrumNoteType.Kick);
+    });
 
-      expect(cueHandler['handleCueDefault']).toHaveBeenCalledTimes(1);
+    it('should handle guitar notes correctly', () => {
+      const cueData: CueData = {
+        datagramVersion: 1,
+        platform: 'Windows',
+        currentScene: 'Gameplay',
+        pauseState: 'Unpaused',
+        venueSize: 'Large',
+        beatsPerMinute: 120,
+        songSection: 'Verse',
+        guitarNotes: [],
+        bassNotes: [],
+        drumNotes: [],
+        keysNotes: [],
+        vocalNote: 0,
+        harmony0Note: 0,
+        harmony1Note: 0,
+        harmony2Note: 0,
+        lightingCue: CueType.Default,
+        postProcessing: 'Default',
+        fogState: false,
+        strobeState: 'Strobe_Off',
+        performer: 0,
+        trackMode: 'tracked',
+        beat: 'Off',
+        keyframe: 'Off',
+        bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
+      };
+
+      cueHandler.handleGuitarNote(InstrumentNoteType.Green, cueData);
+      expect(sequencer.onGuitarNote).toHaveBeenCalledWith(InstrumentNoteType.Green);
+    });
+
+    it('should handle bass notes correctly', () => {
+      const cueData: CueData = {
+        datagramVersion: 1,
+        platform: 'Windows',
+        currentScene: 'Gameplay',
+        pauseState: 'Unpaused',
+        venueSize: 'Large',
+        beatsPerMinute: 120,
+        songSection: 'Verse',
+        guitarNotes: [],
+        bassNotes: [],
+        drumNotes: [],
+        keysNotes: [],
+        vocalNote: 0,
+        harmony0Note: 0,
+        harmony1Note: 0,
+        harmony2Note: 0,
+        lightingCue: CueType.Default,
+        postProcessing: 'Default',
+        fogState: false,
+        strobeState: 'Strobe_Off',
+        performer: 0,
+        trackMode: 'tracked',
+        beat: 'Off',
+        keyframe: 'Off',
+        bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
+      };
+
+      cueHandler.handleBassNote(InstrumentNoteType.Red, cueData);
+      expect(sequencer.onBassNote).toHaveBeenCalledWith(InstrumentNoteType.Red);
+    });
+
+    it('should handle keys notes correctly', () => {
+      const cueData: CueData = {
+        datagramVersion: 1,
+        platform: 'Windows',
+        currentScene: 'Gameplay',
+        pauseState: 'Unpaused',
+        venueSize: 'Large',
+        beatsPerMinute: 120,
+        songSection: 'Verse',
+        guitarNotes: [],
+        bassNotes: [],
+        drumNotes: [],
+        keysNotes: [],
+        vocalNote: 0,
+        harmony0Note: 0,
+        harmony1Note: 0,
+        harmony2Note: 0,
+        lightingCue: CueType.Default,
+        postProcessing: 'Default',
+        fogState: false,
+        strobeState: 'Strobe_Off',
+        performer: 0,
+        trackMode: 'tracked',
+        beat: 'Off',
+        keyframe: 'Off',
+        bonusEffect: false,
+        cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
+      };
+
+      cueHandler.handleKeysNote(InstrumentNoteType.Blue, cueData);
+      expect(sequencer.onKeysNote).toHaveBeenCalledWith(InstrumentNoteType.Blue);
     });
   });
 

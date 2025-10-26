@@ -11,9 +11,9 @@
 
 import { LayerManager } from '../../controllers/sequencer/LayerManager';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
-import { ActiveEffect, QueuedEffect } from '../../controllers/sequencer/interfaces';
+import { LightEffectState, QueuedEffect } from '../../controllers/sequencer/interfaces';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
-import { createMockTrackedLight } from '../helpers/testFixtures';
+import { createMockTrackedLight, createMockRGBIP } from '../helpers/testFixtures';
 
 jest.mock('../../controllers/sequencer/LightTransitionController');
 
@@ -28,10 +28,12 @@ describe('LayerManager', () => {
       removeTransitionsByLayer: jest.fn(),
       removeLightLayer: jest.fn(),
       getLightState: jest.fn().mockReturnValue({
-        red: 0, rp: 0,
-        green: 0, gp: 0,
-        blue: 0, bp: 0,
-        intensity: 0, ip: 0
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 1.0,
+        blendMode: 'replace'
       })
     } as unknown as jest.Mocked<LightTransitionController>;
     
@@ -46,55 +48,81 @@ describe('LayerManager', () => {
   describe('Active Effects Management', () => {
     it('should add and retrieve active effects', () => {
       // Create a mock active effect
-      const mockEffect: ActiveEffect = {
+      const mockEffect: LightEffectState = {
         name: 'test-effect',
         effect: { id: 'test', description: 'Test Effect', transitions: [] },
-        transitions: [],
-        trackedLights: [createMockTrackedLight()],
+        transitions: [{
+          lights: [createMockTrackedLight()],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: createMockRGBIP(),
+            easing: 'linear',
+            duration: 1000
+          },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }],
         layer: 1,
+        lightId: 'test-light-1',
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map(),
+        lastEndState: undefined,
         isPersistent: false
       };
 
-      // Add the effect to layer 1
-      layerManager.addActiveEffect(1, mockEffect);
+      // Add the effect to layer 1 for a specific light
+      layerManager.addActiveEffect(1, 'test-light-1', mockEffect);
 
       // Retrieve all active effects
       const activeEffects = layerManager.getActiveEffects();
       expect(activeEffects.size).toBe(1);
-      expect(activeEffects.get(1)).toBe(mockEffect);
+      const layerEffects = activeEffects.get(1);
+      expect(layerEffects).toBeDefined();
+      expect(layerEffects!.get('test-light-1')).toBe(mockEffect);
 
       // Get a specific effect
-      const retrievedEffect = layerManager.getActiveEffect(1);
+      const retrievedEffect = layerManager.getActiveEffect(1, 'test-light-1');
       expect(retrievedEffect).toBe(mockEffect);
     });
 
     it('should remove active effects', () => {
       // Create and add a mock active effect
-      const mockEffect: ActiveEffect = {
+      const mockEffect: LightEffectState = {
         name: 'test-effect',
         effect: { id: 'test', description: 'Test Effect', transitions: [] },
-        transitions: [],
-        trackedLights: [createMockTrackedLight()],
+        transitions: [{
+          lights: [createMockTrackedLight()],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: createMockRGBIP(),
+            easing: 'linear',
+            duration: 1000
+          },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }],
         layer: 1,
+        lightId: 'test-light-1',
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map(),
+        lastEndState: undefined,
         isPersistent: false
       };
 
-      layerManager.addActiveEffect(1, mockEffect);
-      expect(layerManager.getActiveEffect(1)).toBe(mockEffect);
+      layerManager.addActiveEffect(1, 'test-light-1', mockEffect);
+      expect(layerManager.getActiveEffect(1, 'test-light-1')).toBe(mockEffect);
 
       // Remove the effect
-      layerManager.removeActiveEffect(1);
-      expect(layerManager.getActiveEffect(1)).toBeUndefined();
+      layerManager.removeActiveEffect(1, 'test-light-1');
+      expect(layerManager.getActiveEffect(1, 'test-light-1')).toBeUndefined();
     });
 
     it('should track layer usage time', () => {
@@ -104,21 +132,33 @@ describe('LayerManager', () => {
       layerManager.setLayerLastUsed(1, currentTime);
       
       // Add an effect to verify the layer is active
-      const mockEffect: ActiveEffect = {
+      const mockEffect: LightEffectState = {
         name: 'test-effect',
         effect: { id: 'test', description: 'Test Effect', transitions: [] },
-        transitions: [],
-        trackedLights: [createMockTrackedLight()],
+        transitions: [{
+          lights: [createMockTrackedLight()],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: createMockRGBIP(),
+            easing: 'linear',
+            duration: 1000
+          },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }],
         layer: 1,
+        lightId: 'test-light-1',
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map(),
+        lastEndState: undefined,
         isPersistent: false
       };
       
-      layerManager.addActiveEffect(1, mockEffect);
+      layerManager.addActiveEffect(1, 'test-light-1', mockEffect);
       
       // Get all layers
       const layers = layerManager.getAllLayers();
@@ -132,20 +172,23 @@ describe('LayerManager', () => {
       const mockQueuedEffect: QueuedEffect = {
         name: 'test-effect-queued',
         effect: { id: 'test', description: 'Test Effect', transitions: [] },
+        lightId: 'test-light-1',
         isPersistent: true
       };
 
-      // Add the queued effect to layer 1
-      layerManager.addQueuedEffect(1, mockQueuedEffect);
+      // Add the queued effect to layer 1 for a specific light
+      layerManager.addQueuedEffect(1, 'test-light-1', mockQueuedEffect);
 
       // Retrieve the queued effect
-      const queuedEffect = layerManager.getQueuedEffect(1);
+      const queuedEffect = layerManager.getQueuedEffect(1, 'test-light-1');
       expect(queuedEffect).toBe(mockQueuedEffect);
       
       // Get all queued effects
       const queuedEffects = layerManager.getEffectQueue();
       expect(queuedEffects.size).toBe(1);
-      expect(queuedEffects.get(1)).toBe(mockQueuedEffect);
+      const layerQueuedEffects = queuedEffects.get(1);
+      expect(layerQueuedEffects).toBeDefined();
+      expect(layerQueuedEffects!.get('test-light-1')).toBe(mockQueuedEffect);
     });
 
     it('should remove queued effects', () => {
@@ -153,15 +196,16 @@ describe('LayerManager', () => {
       const mockQueuedEffect: QueuedEffect = {
         name: 'test-effect-queued',
         effect: { id: 'test', description: 'Test Effect', transitions: [] },
+        lightId: 'test-light-1',
         isPersistent: true
       };
 
-      layerManager.addQueuedEffect(1, mockQueuedEffect);
-      expect(layerManager.getQueuedEffect(1)).toBe(mockQueuedEffect);
+      layerManager.addQueuedEffect(1, 'test-light-1', mockQueuedEffect);
+      expect(layerManager.getQueuedEffect(1, 'test-light-1')).toBe(mockQueuedEffect);
 
       // Remove the queued effect
-      layerManager.removeQueuedEffect(1);
-      expect(layerManager.getQueuedEffect(1)).toBeUndefined();
+      layerManager.removeQueuedEffect(1, 'test-light-1');
+      expect(layerManager.getQueuedEffect(1, 'test-light-1')).toBeUndefined();
     });
   });
 
@@ -175,8 +219,9 @@ describe('LayerManager', () => {
       // Clean up unused layers
       layerManager.cleanupUnusedLayers(currentTime);
       
-      // Verify removeTransitionsByLayer was called for the stale layer
-      expect(lightTransitionController.removeTransitionsByLayer).toHaveBeenCalledWith(1);
+      // Verify the layer was removed from tracking (cleanupUnusedLayers removes from internal maps)
+      // The method doesn't call removeTransitionsByLayer, it just cleans up internal state
+      expect(layerManager.getAllLayers()).not.toContain(1);
     });
 
     it('should not clean up layer 0', () => {
@@ -212,21 +257,33 @@ describe('LayerManager', () => {
       layerManager.setLayerLastUsed(1, currentTime - 5000);
       
       // Add an active effect to the layer
-      const mockEffect: ActiveEffect = {
+      const mockEffect: LightEffectState = {
         name: 'test-effect',
         effect: { id: 'test', description: 'Test Effect', transitions: [] },
-        transitions: [],
-        trackedLights: [createMockTrackedLight()],
+        transitions: [{
+          lights: [createMockTrackedLight()],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: createMockRGBIP(),
+            easing: 'linear',
+            duration: 1000
+          },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }],
         layer: 1,
+        lightId: 'test-light-1',
         currentTransitionIndex: 0,
         state: 'idle',
         transitionStartTime: 0,
         waitEndTime: 0,
-        lastEndStates: new Map(),
+        lastEndState: undefined,
         isPersistent: false
       };
       
-      layerManager.addActiveEffect(1, mockEffect);
+      layerManager.addActiveEffect(1, 'test-light-1', mockEffect);
       
       // Clean up unused layers
       layerManager.cleanupUnusedLayers(currentTime);
@@ -245,10 +302,11 @@ describe('LayerManager', () => {
       const mockQueuedEffect: QueuedEffect = {
         name: 'test-queued-effect',
         effect: { id: 'test', description: 'Test Effect', transitions: [] },
+        lightId: 'test-light-1',
         isPersistent: true
       };
       
-      layerManager.addQueuedEffect(1, mockQueuedEffect);
+      layerManager.addQueuedEffect(1, 'test-light-1', mockQueuedEffect);
       
       // Clean up unused layers
       layerManager.cleanupUnusedLayers(currentTime);

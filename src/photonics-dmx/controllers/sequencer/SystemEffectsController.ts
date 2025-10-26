@@ -1,6 +1,6 @@
-import { RGBIP, Transition } from '../../types';
+import { RGBIO, Transition } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
-import { ILayerManager, ISystemEffectsController, ITimeoutManager } from './interfaces';
+import { ILayerManager, ISystemEffectsController } from './interfaces';
 
 /**
  * @class SystemEffectsController
@@ -9,7 +9,6 @@ import { ILayerManager, ISystemEffectsController, ITimeoutManager } from './inte
 export class SystemEffectsController implements ISystemEffectsController {
   private lightTransitionController: LightTransitionController;
   private layerManager: ILayerManager;
-  private timeoutManager: ITimeoutManager;
   private isBlackingOut: boolean = false;
   private _blackoutLayersUnder: number = 200;
   
@@ -25,11 +24,9 @@ export class SystemEffectsController implements ISystemEffectsController {
   constructor(
     lightTransitionController: LightTransitionController,
     layerManager: ILayerManager,
-    timeoutManager: ITimeoutManager
   ) {
     this.lightTransitionController = lightTransitionController;
     this.layerManager = layerManager;
-    this.timeoutManager = timeoutManager;
   }
 
   /**
@@ -64,8 +61,12 @@ export class SystemEffectsController implements ISystemEffectsController {
     }
     
     if (duration === 0) {
-      this.layerManager.getActiveEffects().clear();
-      this.layerManager.getEffectQueue().clear();
+      // Clear all active effects and queues for all layers
+      const allLayers = this.layerManager.getAllLayers();
+      for (const layer of allLayers) {
+        this.layerManager.removeActiveEffect(layer, 'all');
+        this.layerManager.removeQueuedEffect(layer, 'all');
+      }
       this.lightTransitionController.immediateBlackout();
       
       // Trigger the immediate blackout callback if registered
@@ -77,7 +78,7 @@ export class SystemEffectsController implements ISystemEffectsController {
     }
 
     this.isBlackingOut = true;
-    this.timeoutManager.clearAllTimeouts();
+   
     console.log(`Initiating blackout for ${duration}ms.`);
     
     try {
@@ -93,11 +94,13 @@ export class SystemEffectsController implements ISystemEffectsController {
             const currentLightState = this.lightTransitionController.getFinalLightState(lightId);
 
             // Create a base blackout color without pan/tilt
-            const blackoutColor: RGBIP = {
-              red: 0, rp: 255,
-              green: 0, gp: 255,
-              blue: 0, bp: 255,
-              intensity: 0, ip: 255
+            const blackoutColor: RGBIO = {
+              red: 0,
+              green: 0,
+              blue: 0,
+              intensity: 0,
+              opacity: 1.0,
+              blendMode: 'replace'
             };
             
             // Only preserve pan/tilt for fixtures that already have them
@@ -136,8 +139,11 @@ export class SystemEffectsController implements ISystemEffectsController {
         await Promise.all(transitionPromises);
 
         // Clear all effects and force black state
-        this.layerManager.getActiveEffects().clear();
-        this.layerManager.getEffectQueue().clear();
+        const allLayers = this.layerManager.getAllLayers();
+        for (const layer of allLayers) {
+          this.layerManager.removeActiveEffect(layer, 'all');
+          this.layerManager.removeQueuedEffect(layer, 'all');
+        }
         
         // Force immediate black state for all lights while preserving pan/tilt
         allLightIds.forEach(lightId => {
@@ -145,11 +151,13 @@ export class SystemEffectsController implements ISystemEffectsController {
           const currentLightState = this.lightTransitionController.getFinalLightState(lightId);
           
           // Create a base black state
-          const blackState: RGBIP = {
-            red: 0, rp: 255,
-            green: 0, gp: 255,
-            blue: 0, bp: 255,
-            intensity: 0, ip: 255
+          const blackState: RGBIO = {
+            red: 0,
+            green: 0,
+            blue: 0,
+            intensity: 0,
+            opacity: 1.0,
+            blendMode: 'replace'
           };
           
           // Only preserve pan/tilt for fixtures that already have them

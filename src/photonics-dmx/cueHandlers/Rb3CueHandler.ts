@@ -28,7 +28,7 @@ import { getEffectSingleColor } from '../effects/effectSingleColor';
 import { getColor } from '../helpers/dmxHelpers';
 import { randomBetween } from '../helpers/utils';
 
-import { Brightness, Color, Effect,  RGBIP, TrackedLight } from '../types';
+import { Brightness, Color, Effect,  RGBIO, TrackedLight } from '../types';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 
@@ -37,6 +37,7 @@ import { AbstractCueHandler } from './AbstractCueHandler';
 import { getSweepEffect } from '../effects/sweepEffect';
 import { Rb3GameState } from '../listeners/RB3/rb3eTypes';
 import { getEffectCrossFadeColors } from '../effects/effectCrossFadeColors';
+import { CueGroup } from '../types';
 
 
 
@@ -174,7 +175,7 @@ class Rb3CueHandler extends AbstractCueHandler {
     const actualBrightness = brightness as Brightness;
     const actualColor = colorName as Color;
 
-    let color:RGBIP;
+    let color:RGBIO;
     color = getColor(actualColor, actualBrightness); 
    
     this._sequencer.setState(this._targetLights,color, 100);
@@ -228,7 +229,7 @@ class Rb3CueHandler extends AbstractCueHandler {
       duration: 10,
     })
     
-    this._sequencer.setEffect('default-base', baseLayer);
+    this._sequencer.addEffect('default-base', baseLayer);
 
     // RB3 doesn't call this as frequently as YARG.
     // So we're making the effect last longer to cover the gap. 
@@ -389,8 +390,8 @@ class Rb3CueHandler extends AbstractCueHandler {
     const even = this.getLights(['front'], 'even');
     const odd = this.getLights(['front'], 'odd');
     //const all = this.getLights(['front'], 'all');
-    const blue: RGBIP = getColor('blue', 'medium');
-    const green: RGBIP = getColor('green', 'medium');
+    const blue: RGBIO = getColor('blue', 'medium');
+    const green: RGBIO = getColor('green', 'medium');
     
 
     const oddEffect:Effect = getEffectSingleColor({
@@ -419,7 +420,7 @@ class Rb3CueHandler extends AbstractCueHandler {
    */
   protected async handleCueStomp(_parameters: CueData): Promise<void> {
     console.warn("Stomp");
-    const white: RGBIP = getColor('white', 'max');
+    const white: RGBIO = getColor('white', 'max');
     const lights = this.getLights(['front'], 'all');
     const flash = getEffectFlashColor({
       color: white,
@@ -540,8 +541,8 @@ class Rb3CueHandler extends AbstractCueHandler {
     const even = this.getLights(['front'], 'all');
     const odd = this.getLights(['back'], 'all');
   //  const all = this.getLights(['front', 'back'], 'all');
-    const red: RGBIP = getColor('red', 'medium');
-    const yellow: RGBIP = getColor('yellow', 'medium');
+    const red: RGBIO = getColor('red', 'medium');
+    const yellow: RGBIO = getColor('yellow', 'medium');
     
 
     
@@ -576,10 +577,10 @@ class Rb3CueHandler extends AbstractCueHandler {
       return;
     }
 
-    const red: RGBIP = getColor('red', 'max');
-    const green: RGBIP = getColor('green', 'max');
-    const blue: RGBIP = getColor('blue', 'max');
-    const orange: RGBIP = getColor('orange', 'max');
+    const red: RGBIO = getColor('red', 'max');
+    const green: RGBIO = getColor('green', 'max');
+    const blue: RGBIO = getColor('blue', 'max');
+    const orange: RGBIO = getColor('orange', 'max');
     const lights = this.getLights(['front', 'back'], 'all');
     const numLights = lights.length;
     try {
@@ -631,7 +632,7 @@ class Rb3CueHandler extends AbstractCueHandler {
    */
   protected async handleCueFlare_Fast(_parameters: CueData): Promise<void> {
 
-    const white: RGBIP = getColor('white', 'max');
+    const white: RGBIO = getColor('white', 'max');
     const lights = this.getLights(['front'], 'all');
     const numLights = lights.length;
     for (let i = 0; i < numLights; i++) {
@@ -655,7 +656,7 @@ class Rb3CueHandler extends AbstractCueHandler {
    * @param _parameters 
    */
   protected async handleCueFlare_Slow(_parameters: CueData): Promise<void> {
-    const white: RGBIP = getColor('white', 'max');
+    const white: RGBIO = getColor('white', 'max');
     const lights = this.getLights(['front'], 'all');
     const numLights = lights.length;
     for (let i = 0; i < numLights; i++) {
@@ -684,10 +685,10 @@ class Rb3CueHandler extends AbstractCueHandler {
     // const cueName = 'frenzy';
      // console.log(cueName);
    
-     const red: RGBIP = getColor('red', 'high');
-     const green: RGBIP = getColor('green', 'high');
-     const blue: RGBIP = getColor('blue', 'high');
-     const orange: RGBIP = getColor('orange', 'high');
+     const red: RGBIO = getColor('red', 'high');
+     const green: RGBIO = getColor('green', 'high');
+     const blue: RGBIO = getColor('blue', 'high');
+     const orange: RGBIO = getColor('orange', 'high');
      const lights = this.getLights(['front', 'back'], 'all');
      const colors = [red, green, blue, orange];
  
@@ -735,7 +736,7 @@ class Rb3CueHandler extends AbstractCueHandler {
       return;
     }
     const lights = this.getLights(['front'], 'all');
-    const green: RGBIP = getColor('green', 'low');
+    const green: RGBIO = getColor('green', 'low');
     const effect = getEffectSingleColor({
       color: green,
       duration: 500,
@@ -757,8 +758,8 @@ class Rb3CueHandler extends AbstractCueHandler {
     if(this._isDirectLedControl){
       return;
     }
-    const green: RGBIP = getColor('green', 'high');
-    const blue: RGBIP = getColor('blue', 'high');
+    const green: RGBIO = getColor('green', 'high');
+    const blue: RGBIO = getColor('blue', 'high');
    
     const lights = this.getLights(['front'], 'all');
 
@@ -794,8 +795,8 @@ class Rb3CueHandler extends AbstractCueHandler {
 
     const back = this.getLights(['back'], 'all');
     const front = this.getLights(['front'], 'all');
-    const green: RGBIP = getColor('green', 'medium');
-    const blue: RGBIP = getColor('blue', 'medium');
+    const green: RGBIO = getColor('green', 'medium');
+    const blue: RGBIO = getColor('blue', 'medium');
     const magenta = getColor('magenta', 'medium');
     const teal = getColor('teal', 'medium');
     
@@ -826,7 +827,7 @@ class Rb3CueHandler extends AbstractCueHandler {
     if(this._isDirectLedControl){
       return;
     }
-    const low: RGBIP = getColor('blue', 'low');
+    const low: RGBIO = getColor('blue', 'low');
     const singleColor = getEffectSingleColor({
       waitFor: 'none',
       forTime: 0,
@@ -856,7 +857,7 @@ class Rb3CueHandler extends AbstractCueHandler {
 
   protected async handleCueStrobe_Fastest(_parameters: CueData): Promise<void> {
     
-    const white: RGBIP = getColor('white', 'max');
+    const white: RGBIO = getColor('white', 'max');
     const strobes = this.getLights(['strobe'], 'all');
 
 
@@ -870,13 +871,13 @@ class Rb3CueHandler extends AbstractCueHandler {
       lights: strobes,
       layer: 255,
     });
-    this._sequencer.addEffectUnblockedName('strobe', flash, 0, true);
+    this._sequencer.addEffectUnblockedName('strobe', flash, true);
     
   }
 
   protected async handleCueStrobe_Fast(_parameters: CueData): Promise<void> {
     
-    const white: RGBIP = getColor('white', 'max');
+    const white: RGBIO = getColor('white', 'max');
     const strobes = this.getLights(['strobe'], 'all');
     const flash = getEffectFlashColor({
       color: white,
@@ -888,14 +889,14 @@ class Rb3CueHandler extends AbstractCueHandler {
       lights: strobes,
       layer: 255,
     });
-    this._sequencer.addEffectUnblockedName('strobe', flash, 0, true);
+    this._sequencer.addEffectUnblockedName('strobe', flash, true);
     
   }
 
   
   protected async handleCueStrobe_Medium(_parameters: CueData): Promise<void> {
     
-    const white: RGBIP = getColor('white', 'max');
+    const white: RGBIO = getColor('white', 'max');
     const strobes = this.getLights(['strobe'], 'all');
     const flash = getEffectFlashColor({
       color: white,
@@ -907,13 +908,13 @@ class Rb3CueHandler extends AbstractCueHandler {
       lights: strobes,
       layer: 255,
     });
-    this._sequencer.addEffectUnblockedName('strobe', flash, 0, true);
+    this._sequencer.addEffectUnblockedName('strobe', flash, true);
     
   }
 
   protected async handleCueStrobe_Slow(_parameters: CueData): Promise<void> {
     
-    const white: RGBIP = getColor('white', 'max');
+    const white: RGBIO = getColor('white', 'max');
     const strobes = this.getLights(['strobe'], 'all');
     const flash = getEffectFlashColor({
       color: white,
@@ -925,7 +926,7 @@ class Rb3CueHandler extends AbstractCueHandler {
       lights: strobes,
       layer: 255,
     });
-    this._sequencer.addEffectUnblockedName('strobe', flash, 0, true);
+    this._sequencer.addEffectUnblockedName('strobe', flash, true);
     
   }
 
@@ -938,11 +939,11 @@ class Rb3CueHandler extends AbstractCueHandler {
 
   protected async handleCueSweep(_parameters: CueData): Promise<void> {
     
-        const transparent: RGBIP = getColor('transparent', 'high');
-        const red: RGBIP = getColor('red', 'max');
-        const yellow: RGBIP = getColor('yellow', 'max');
-        const g: RGBIP = getColor('green', 'max');
-        const b: RGBIP = getColor('blue', 'max');
+        const transparent: RGBIO = getColor('transparent', 'high');
+        const red: RGBIO = getColor('red', 'max');
+        const yellow: RGBIO = getColor('yellow', 'max');
+        const g: RGBIO = getColor('green', 'max');
+        const b: RGBIO = getColor('blue', 'max');
     
     
         const lights = this.getLights(['front'], 'all');
@@ -1016,8 +1017,8 @@ class Rb3CueHandler extends AbstractCueHandler {
      // console.log(cueName);
      
     const frontLights = this.getLights(['front'], 'all');
-    const blue: RGBIP = getColor('blue', 'low');
-    const yellow: RGBIP = getColor('yellow', 'low');
+    const blue: RGBIO = getColor('blue', 'low');
+    const yellow: RGBIO = getColor('yellow', 'low');
     const fade = getEffectFadeInColorFadeOut({
       startColor: blue,
       waitBeforeFadeIn: randomBetween(100, 1200),
@@ -1029,7 +1030,7 @@ class Rb3CueHandler extends AbstractCueHandler {
       lights: frontLights,
       layer: 0,
     });
-    this._sequencer.setEffect('score-yellow', fade, 0, true);
+    this._sequencer.setEffect('score-yellow', fade, true);
   }
 
   protected async handleCueNoCue(_parameters: CueData): Promise<void> {
@@ -1076,6 +1077,20 @@ class Rb3CueHandler extends AbstractCueHandler {
     });
     
     this._sequencer.addEffect('sustain', effect);
+  }
+
+  public getAvailableCueGroups(): CueGroup[] {
+    return [];
+  }
+
+  public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
+    // RB3 direct LED control is handled separately, cue logic will be expanded later.
+    console.log(`RB3 Cue received: ${cueType}`, parameters);
+    
+    // Emit events for network debugging
+    this.emit('cueHandled', parameters);
+    
+    return Promise.resolve();
   }
 
 }

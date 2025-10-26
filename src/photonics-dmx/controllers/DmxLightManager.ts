@@ -18,6 +18,7 @@ export class DmxLightManager {
   private _strobeLights: TrackedLight[] = [];
 
   private _dmxLights: Map<string, DmxFixture> = new Map<string, DmxFixture>();
+  private _lightsCache: Map<string, TrackedLight[]> = new Map<string, TrackedLight[]>();
 
 
   constructor(private config: LightingConfiguration) {
@@ -82,6 +83,7 @@ export class DmxLightManager {
 
   /**
    * Retrieves lights based on group(s) and target(s).
+   * Results are cached for performance optimization.
    * @param group Single or array of LocationGroup
    * @param target Single or array of LightTarget
    * @returns Array of TrackedLight
@@ -93,6 +95,15 @@ export class DmxLightManager {
     const groups = Array.isArray(group) ? group : [group];
     const targets = Array.isArray(target) ? target : [target];
 
+    // Generate cache key by sorting groups and targets for consistency
+    const cacheKey = `${[...groups].sort().join(',')}|${[...targets].sort().join(',')}`;
+    
+    // Check cache first
+    if (this._lightsCache.has(cacheKey)) {
+      return this._lightsCache.get(cacheKey)!;
+    }
+
+    // Cache miss - perform calculation
     const lightsSet = new Set<TrackedLight>();
 
     groups.forEach((g) => {
@@ -103,7 +114,12 @@ export class DmxLightManager {
       });
     });
 
-    return Array.from(lightsSet).sort((a, b) => a.position - b.position);
+    const result = Array.from(lightsSet).sort((a, b) => a.position - b.position);
+    
+    // Cache the result
+    this._lightsCache.set(cacheKey, result);
+    
+    return result;
   }
 
   /**
@@ -159,6 +175,14 @@ export class DmxLightManager {
         return this.getHalf1(lights);
       case 'half-2':
         return this.getHalf2(lights);
+      case 'outter-half-major':
+        return this.getOutterHalfMajor(lights);
+      case 'outter-half-minor':
+        return this.getOutterHalfMinor(lights);
+      case 'inner-half-major':
+        return this.getInnerHalfMajor(lights);
+      case 'inner-half-minor':
+        return this.getInnerHalfMinor(lights);
       case 'third-1':
         return this.getThird(lights, 1);
       case 'third-2':
@@ -317,6 +341,132 @@ export class DmxLightManager {
   }
 
   /**
+   * Retrieves the outter half of lights. Major variant gives more lights to outter areas.
+   * 
+   * Examples:
+   * - 4 lights: outter = [1,4], inner = [2,3] (50% outter, 50% inner)
+   * - 6 lights: outter = [1,2,5,6], inner = [3,4] (67% outter, 33% inner)  
+   * - 8 lights: outter = [1,2,7,8], inner = [3,4,5,6] (50% outter, 50% inner)
+   * 
+   * Note: Major/minor only differs when lights don't divide evenly into halves.
+   * 
+   * @param lights Array of TrackedLight
+   * @returns Array of TrackedLight
+   */
+  private getOutterHalfMajor(lights: TrackedLight[]): TrackedLight[] {
+    const len = lights.length;
+    if (len <= 2) return [...lights];
+    
+    // For even numbers that divide nicely into halves
+    if (len % 4 === 0) {
+      const outterPerSide = len / 4; // 25% on each side = 50% total outter
+      
+      const leftOutter = lights.slice(0, outterPerSide);
+      const rightOutter = lights.slice(len - outterPerSide);
+      return [...leftOutter, ...rightOutter];
+    } else {
+      // For odd numbers or numbers that don't divide evenly, major gives more to outter
+      const outterPerSide = Math.ceil(len / 4);
+      const middleIndex = Math.floor(len / 2);
+      
+      const leftOutter = lights.slice(0, outterPerSide);
+      const rightOutter = lights.slice(len - outterPerSide);
+      
+      // Include middle light in outter for major variant
+      if (len % 2 === 1) {
+        const middle = [lights[middleIndex]];
+        return [...leftOutter, ...middle, ...rightOutter];
+      }
+      
+      return [...leftOutter, ...rightOutter];
+    }
+  }
+
+  /**
+   * Retrieves the outter half of lights. Minor variant gives fewer lights to outter areas.
+   * 
+   * Examples:
+   * - 4 lights: outter = [1,4], inner = [2,3] (50% outter, 50% inner)
+   * - 6 lights: outter = [1,6], inner = [2,3,4,5] (33% outter, 67% inner)
+   * - 8 lights: outter = [1,2,7,8], inner = [3,4,5,6] (50% outter, 50% inner)
+   * 
+   * Note: Major/minor only differs when lights don't divide evenly into halves.
+   * 
+   * @param lights Array of TrackedLight
+   * @returns Array of TrackedLight
+   */
+  private getOutterHalfMinor(lights: TrackedLight[]): TrackedLight[] {
+    const len = lights.length;
+    if (len <= 2) return [...lights];
+    
+    // For even numbers that divide nicely into halves
+    if (len % 4 === 0) {
+      const outterPerSide = len / 4; // 25% on each side = 50% total outter
+      
+      const leftOutter = lights.slice(0, outterPerSide);
+      const rightOutter = lights.slice(len - outterPerSide);
+      return [...leftOutter, ...rightOutter];
+    } else {
+      // For odd numbers or numbers that don't divide evenly, minor gives less to outter
+      const outterPerSide = Math.floor(len / 4);
+      
+      const leftOutter = lights.slice(0, outterPerSide);
+      const rightOutter = lights.slice(len - outterPerSide);
+      
+      return [...leftOutter, ...rightOutter];
+    }
+  }
+
+  /**
+   * Retrieves the inner half of lights with more lights in inner area.
+   * 
+   * Examples:
+   * - 4 lights: inner = [2,3], outter = [1,4] (50% inner, 50% outter)
+   * - 6 lights: inner = [3,4], outter = [1,2,5,6] (33% inner, 67% outter)
+   * - 8 lights: inner = [3,4,5,6], outter = [1,2,7,8] (50% inner, 50% outter)
+   * 
+   * @param lights Array of TrackedLight
+   * @returns Array of TrackedLight
+   */
+  private getInnerHalfMajor(lights: TrackedLight[]): TrackedLight[] {
+    const len = lights.length;
+    if (len <= 2) return [...lights];
+    
+    const outterLights = this.getOutterHalfMinor(lights);
+    const outterIds = new Set(outterLights.map(l => l.id));
+    return lights.filter(light => !outterIds.has(light.id));
+  }
+
+  /**
+   * Retrieves the inner half of lights with fewer lights in inner area.
+   * 
+   * Examples:
+   * - 4 lights: inner = [2,3], outter = [1,4] (50% inner, 50% outter)
+   * - 6 lights: inner = [2,3,4,5], outter = [1,6] (67% inner, 33% outter)
+   * - 8 lights: inner = [3,4,5,6], outter = [1,2,7,8] (50% inner, 50% outter)
+   * 
+   * Note: Major/minor only differs when lights don't divide evenly into halves.
+   * 
+   * @param lights Array of TrackedLight
+   * @returns Array of TrackedLight
+   */
+  private getInnerHalfMinor(lights: TrackedLight[]): TrackedLight[] {
+    const len = lights.length;
+    if (len <= 2) return [...lights];
+    
+    const outterLights = this.getOutterHalfMajor(lights);
+    const outterIds = new Set(outterLights.map(l => l.id));
+    return lights.filter(light => !outterIds.has(light.id));
+  }
+
+  /**
+   * Get the total number of DMX lights in the configuration
+   */
+  public getTotalDmxLightCount(): number {
+    return this.config.numLights;
+  }
+
+  /**
    * Sets a new lighting configuration.
    * Erases all existing data and initializes with the new configuration.
    * @param config New LightingConfiguration
@@ -325,6 +475,7 @@ export class DmxLightManager {
     this.config = config;
     this.initializeLights();
     this.initializeDmxLights(); // Re-initialize the _dmxLights map with the new configuration
+    this._lightsCache.clear(); // Clear cache when configuration changes
   }
 
   /**
@@ -335,6 +486,7 @@ export class DmxLightManager {
     this._backLights = [];
     this._strobeLights = [];
     this._dmxLights.clear();
+    this._lightsCache.clear(); // Clear cache during shutdown
     this.config = {} as LightingConfiguration;
   }
 }

@@ -3,7 +3,11 @@ import { CueData, CueType } from '../cues/cueTypes';
 import { LightTarget, LocationGroup,  TrackedLight } from '../types';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
-
+/** 
+ * TODO: WE're moving away from this class to use BaseCueHandler instead.
+ * The current RB3E cue handler is still using it pending refactor to use 
+ * external cue definitions.
+*/
 export abstract class AbstractCueHandler extends EventEmitter {
   protected _lightManager: DmxLightManager;
   /**
@@ -127,6 +131,7 @@ export abstract class AbstractCueHandler extends EventEmitter {
     this.off('cueHandled', listener);
   }
 
+  /*
   public addCueDebouncedListener(listener: (data: CueData) => void): void {
     this.on('cueDebounced', listener);
   }
@@ -134,6 +139,7 @@ export abstract class AbstractCueHandler extends EventEmitter {
   public removeCueDebouncedListener(listener: (data: CueData) => void): void {
     this.off('cueDebounced', listener);
   }
+  */
 
   public setEffectDebouncePeriod(time: number): void {
     this.debouncePeriod = time;
@@ -181,7 +187,7 @@ export abstract class AbstractCueHandler extends EventEmitter {
         if (this.lastDebouncedCueCallback) {
           this.lastDebouncedCueCallback();
         }
-        this.emit('cueDebounced', parameters);
+        // this.emit('cueDebounced', parameters); // Commented out as debounced cues are unnecessary
         this.handleStrobe(parameters);
         return;
       }

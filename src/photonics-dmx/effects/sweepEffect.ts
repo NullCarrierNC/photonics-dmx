@@ -1,19 +1,47 @@
-import { Effect, EffectTransition, TrackedLight, RGBIP, WaitCondition } from "../types";
+import { Effect, EffectTransition, TrackedLight, RGBIO, WaitCondition } from "../types";
+import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
-interface SweepEffectParams {
-  // Accept a 1D array of TrackedLight or an array of arrays of TrackedLight.
-  lights: TrackedLight[] | TrackedLight[][]; 
-  high: RGBIP;           // On state colour
-  low: RGBIP;            // Off state colour
-  sweepTime: number;     // Total time (ms) for one complete sweep across all groups
-  fadeInDuration: number;// Desired fade‐in duration (ms)
-  fadeOutDuration: number;// Desired fade‐out duration (ms)
-  layer?: number;       
-  easing?: EasingType | string;
-  waitFor?: WaitCondition; // Wait condition for the fade‐in transition; defaults to "delay"
-  lightOverlap?: number; // Percentage (0 to 100) by which subsequent lights overlap. 0 means no overlap.
-  betweenSweepDelay?: number; // How long to wait until the next sweep can run
+/**
+ * Base interface for sweep effect parameters
+ */
+interface SweepEffectBaseParams {
+    /** On state colour */
+    high: RGBIO;
+    /** Off state colour */
+    low: RGBIO;
+    /** Total time (ms) for one complete sweep across all groups */
+    sweepTime: number;
+    /** Desired fade‐in duration (ms) */
+    fadeInDuration: number;
+    /** Desired fade‐out duration (ms) */
+    fadeOutDuration: number;
+    /** Percentage (0 to 100) by which subsequent lights overlap. 0 means no overlap */
+    lightOverlap?: number;
+    /** How long to wait until the next sweep can run */
+    betweenSweepDelay?: number;
+}
+
+/**
+ * Interface for sweep effect with single array of lights
+ */
+interface SweepEffectSingleParams extends IEffect, SweepEffectBaseParams {
+    /** Array of lights to sweep across */
+    lights: TrackedLight[];
+}
+
+/**
+ * Interface for sweep effect with grouped lights
+ */
+interface SweepEffectGroupedParams extends SweepEffectBaseParams {
+    /** Array of light groups to sweep across */
+    lights: TrackedLight[][];
+    /** The layer to apply the effect on */
+    layer?: number;
+    /** The easing function to use for the effect */
+    easing?: EasingType;
+    /** The condition that triggers the start of the effect */
+    waitFor?: WaitCondition;
 }
 
 /**
@@ -35,6 +63,9 @@ interface SweepEffectParams {
  * 
  * NOTE: Use addEffectUnblocked: unblocked waits for the current pass to end before triggering, 
  *  preventing the timing getting borked.
+ *
+ * NOTE: If waitFor is "beat" or "measure", the entire sweep will trigger on that event,
+ * then run across all light groups with proper sequencing.
  */
 export const getSweepEffect = ({
   lights,
@@ -48,7 +79,7 @@ export const getSweepEffect = ({
   waitFor = "delay",
   lightOverlap = 0,
   betweenSweepDelay = 0,
-}: SweepEffectParams): Effect => {
+}: SweepEffectSingleParams | SweepEffectGroupedParams): Effect => {
   
   // Normalize the lights into groups.
   // If lights[0] is an array, assume a 2D array was passed.
@@ -57,8 +88,9 @@ export const getSweepEffect = ({
     : (lights as TrackedLight[]).map(light => [light]);
 
   const numGroups = groups.length;
-  // Base slot time if there were no overlap.
-  const slotTime = sweepTime / numGroups;
+  // Base slot time if there were no overlap (integerized).
+  const slotTimeFloat = sweepTime / numGroups;
+  const slotTime = Math.round(slotTimeFloat);
   
   // Calculate effective delay factor based on lightOverlap.
   // For example, if lightOverlap is 50, then effectiveDelayFactor is 0.5.
@@ -71,34 +103,56 @@ export const getSweepEffect = ({
   // Without overlap the last group would start at (numGroups - 1) * slotTime.
   // With overlap it starts at (numGroups - 1) * slotTime * effectiveDelayFactor.
   // So the total speed-up is:
-  const totalSpeedup = (numGroups - 1) * slotTime * (1 - effectiveDelayFactor);
-  // Distribute this extra time evenly across all groups.
-  const additionalHold = totalSpeedup / numGroups;
+  const totalSpeedupFloat = (numGroups - 1) * slotTime * (1 - effectiveDelayFactor);
+  // Distribute this extra time evenly across all groups (integerized).
+  const additionalHold = Math.round(totalSpeedupFloat / numGroups);
 
   const desiredTotalFade = fadeInDuration + fadeOutDuration;
 
-  let actualFadeIn = fadeInDuration;
-  let actualFadeOut = fadeOutDuration;
+  let actualFadeIn = Math.round(fadeInDuration);
+  let actualFadeOut = Math.round(fadeOutDuration);
   let holdTime = 0;
   
   // Calculate the base hold time using the base slotTime.
   if (desiredTotalFade <= slotTime) {
     // Add the extra hold time so that each group's overall cycle is lengthened.
-    holdTime = (slotTime - desiredTotalFade) + additionalHold;
+    holdTime = Math.round((slotTime - desiredTotalFade) + additionalHold);
   } else {
     // Scale down the fade times so they fit in the base slot.
     // (fade times are too long for the provided duration)
     const scale = slotTime / desiredTotalFade;
-    actualFadeIn = fadeInDuration * scale;
-    actualFadeOut = fadeOutDuration * scale;
-    holdTime = additionalHold;
+    actualFadeIn = Math.round(fadeInDuration * scale);
+    actualFadeOut = Math.round(fadeOutDuration * scale);
+    holdTime = Math.round(additionalHold);
   }
 
   const transitions: EffectTransition[] = [];
+  
+  // Handle event-based triggering
+  if (waitFor === "beat" || waitFor === "measure") {
+    // If we're waiting for a beat or measure, add a trigger transition with an empty light list
+    // This will wait for the event but not change any lights
+    transitions.push({
+      lights: [],  // Empty array, so no lights change
+      layer: 200,  // Use a high layer that won't conflict with anything
+      waitForCondition: waitFor,  // Wait for beat or measure
+      waitForTime: 0,
+      transform: {
+        color: low,  // This doesn't matter since no lights are affected
+        easing: easing,
+        duration: 1,  // Minimal duration
+      },
+      waitUntilCondition: "none",
+      waitUntilTime: 0,
+    });
+    
+    // The rest of the transitions should run immediately after
+    // this trigger transition completes (no additional waiting)
+  }
 
   groups.forEach((group, index) => {
     // Each group's start delay is scaled by the effectiveDelayFactor.
-    const groupDelay = index * slotTime * effectiveDelayFactor;
+    const groupDelay = Math.round(index * slotTime * effectiveDelayFactor);
     // Assign each group a unique layer (base layer plus index)
     const groupLayer = layer + index;
 
@@ -106,60 +160,67 @@ export const getSweepEffect = ({
     transitions.push({
       lights: group,
       layer: groupLayer,
-      waitFor: waitFor,        // Use the provided waitFor condition
-      forTime: groupDelay,     // Delay before starting this group's fade in
+      waitForCondition: "delay",  // Always delay - if we need to wait for beat/measure, the trigger transition handles that
+      waitForTime: groupDelay,  // Delay before starting this group's fade in
       transform: {
         color: high,
         easing: easing,
         duration: actualFadeIn,
       },
-      waitUntil: "delay",
-      untilTime: holdTime,     // Hold time at the high state (adjusted with additionalHold)
+      waitUntilCondition: "delay",
+      waitUntilTime: holdTime,  // Hold time at the high state (adjusted with additionalHold)
     });
     
     // Calculate the total time used by the transitions for this group.
-    const totalTransitionTime = actualFadeIn + holdTime + actualFadeOut;
+    let totalTransitionTime = actualFadeIn + holdTime + actualFadeOut;
     let extraWait = (sweepTime - groupDelay) - totalTransitionTime;
     
     // Overlap logic for fade out: if extraWait is negative, shorten fade-out duration.
     let finalFadeOutDuration = actualFadeOut;
     let fadeOutWaitUntil: WaitCondition = "delay";
-    let fadeOutWaitTime = extraWait;
+    let fadeOutWaitTime = Math.round(extraWait);
     
     if (extraWait < 0) {
-      finalFadeOutDuration = actualFadeOut + extraWait; // extraWait is negative so reduces the duration
+      finalFadeOutDuration = Math.max(0, actualFadeOut + extraWait); // clamp at 0
       fadeOutWaitUntil = "none";
       fadeOutWaitTime = 0;
+    }
+
+    // After rounding, adjust final wait so the per-group total equals sweepTime
+    totalTransitionTime = actualFadeIn + holdTime + finalFadeOutDuration;
+    const roundedExtraWait = (sweepTime - groupDelay) - totalTransitionTime;
+    if (fadeOutWaitUntil === "delay") {
+      fadeOutWaitTime = Math.max(0, Math.round(roundedExtraWait));
     }
 
     // Transition 2: Fade out from high back to low.
     transitions.push({
       lights: group,
       layer: groupLayer,
-      waitFor: "none",
-      forTime: 0,           
+      waitForCondition: "none",
+      waitForTime: 0,           
       transform: {
         color: low,
         easing: easing,
         duration: finalFadeOutDuration,
       },
-      waitUntil: fadeOutWaitUntil,
-      untilTime: fadeOutWaitTime,
+      waitUntilCondition: fadeOutWaitUntil,
+      waitUntilTime: fadeOutWaitTime,
     });
 
     if(betweenSweepDelay > 0){
       transitions.push({
         lights: group,
         layer: groupLayer,
-        waitFor: "none",
-        forTime: 0,
+        waitForCondition: "none",
+        waitForTime: 0,
         transform: {
           color: low,
           easing: easing,
           duration: 1,
         },
-        waitUntil: "delay",
-        untilTime: betweenSweepDelay,
+        waitUntilCondition: "delay",
+        waitUntilTime: Math.max(0, Math.round(betweenSweepDelay)),
       })
     }
   });
@@ -169,5 +230,9 @@ export const getSweepEffect = ({
     id: "SweepEffect",
     description: "Sequentially sweeps across light groups, fading in to the high state and fading out to the low state. Extra hold time is added when lights overlap so that the overall effect always lasts sweepTime.",
     transitions: transitions,
+    timingHints: {
+      cycleDuration: Math.max(0, Math.round(sweepTime + Math.max(0, Math.round(betweenSweepDelay || 0)))),
+      perLightOffset: Math.max(0, Math.round(slotTime * effectiveDelayFactor))
+    }
   };
 };

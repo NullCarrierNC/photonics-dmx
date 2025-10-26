@@ -1,11 +1,13 @@
 import { useAtom } from 'jotai';
-import { enttecProComPortAtom, lightingPrefsAtom, senderEnttecProEnabledAtom } from '../atoms';
+import { enttecProComPortAtom, senderEnttecProEnabledAtom, lightingPrefsAtom } from '../atoms';
 
-import { useEffect } from 'react';
+interface EnttecProToggleProps {
+  disabled?: boolean;
+}
 
-const EnttecProToggle = () => {
+const EnttecProToggle = ({ disabled = false }: EnttecProToggleProps) => {
   const [isEnttecProEnabled, setIsEnttecProEnabled] = useAtom(senderEnttecProEnabledAtom);
-  const [comPort, setComPort] = useAtom(enttecProComPortAtom);
+  const [comPort] = useAtom(enttecProComPortAtom);
   const [prefs] = useAtom(lightingPrefsAtom);
 
   const handleToggle = () => {
@@ -21,27 +23,29 @@ const EnttecProToggle = () => {
     }
   };
 
-  const handlePortChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setComPort(e.target.value);
-  };
 
-  useEffect(()=>{
 
-    if (prefs.enttecProPort) {
-      setComPort(prefs.enttecProPort);
-    }
-  },[prefs]);
+  // Only show the toggle if Enttec Pro is enabled in preferences
+  if (!prefs.dmxOutputConfig?.enttecProEnabled) {
+    return null;
+  }
 
   return (
-    <div className="flex flex-col gap-2 mb-4  w-[200px] justify-between">
+    <div className="flex flex-col gap-2 mb-4  w-[220px] justify-between">
       <div className="flex items-center gap-4 justify-between">
-        <label className="text-lg font-semibold">Enttec Pro Out</label>
+        <label className={`text-lg font-semibold ${
+          disabled ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
+        }`}>
+          Enttec Pro Out
+        </label>
         <button
           onClick={handleToggle}
-          disabled={comPort.length < 3}
+          disabled={comPort.length < 3 || disabled}
           className={`w-12 h-6 rounded-full transition-colors ${
             isEnttecProEnabled ? 'bg-green-500' : 'bg-gray-400'
-          } relative focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed`}
+          } relative focus:outline-none ${
+            (comPort.length < 3 || disabled) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+          }`}
         >
           <div
             className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
@@ -49,18 +53,6 @@ const EnttecProToggle = () => {
             }`}
           ></div>
         </button>
-
-      </div>
-
-      <div className="flex items-center gap-2">
-        <label className="text-sm font-medium">COM:</label>
-        <input
-          type="text"
-          value={comPort}
-          onChange={handlePortChange}
-          className="border rounded px-2 py-1 w-[156px] text-black"
-          placeholder="COM3"
-        />
       </div>
     </div>
   );

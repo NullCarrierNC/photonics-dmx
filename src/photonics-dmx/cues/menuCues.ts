@@ -6,7 +6,7 @@ import { getSweepEffect } from "../effects/sweepEffect";
 import { getColor } from "../helpers/dmxHelpers";
 import { randomBetween } from "../helpers/utils";
 
-import { RGBIP, TrackedLight } from "../types";
+import { RGBIO, TrackedLight } from "../types";
 
 
 
@@ -19,8 +19,8 @@ import { RGBIP, TrackedLight } from "../types";
 export function cueMenuRandomFlash(effectController: ILightingController, lightManager: DmxLightManager) {
     const lights = lightManager.getLights(['front', 'back'], 'all');
 
-    const blueLow: RGBIP = getColor('blue', 'low');
-    const blueHigh: RGBIP = getColor('blue', 'high');
+    const blueLow: RGBIO = getColor('blue', 'low');
+    const blueHigh: RGBIO = getColor('blue', 'high');
 
 
     const effect = getEffectSingleColor({
@@ -43,8 +43,8 @@ export function cueMenuRandomFlash(effectController: ILightingController, lightM
         layer: 5,
     })
 
-    effectController.addEffect("menu", effect, 0, true);
-    effectController.addEffect("menuflash", flashBlue, 0, true);
+    effectController.addEffect("menu", effect, true);
+    effectController.addEffect("menuflash", flashBlue, true);
 }
 
 
@@ -63,8 +63,8 @@ export function cueMenuCircleChase(effectController: ILightingController, lightM
     // Merge the sorted arrays into allLights
     const allLights = [...sortedFrontLights, ...sortedBackLights];
    
-    const blue: RGBIP = getColor('blue', 'low');
-    const brightBlue: RGBIP = getColor('blue', 'high');
+    const blue: RGBIO = getColor('blue', 'low');
+    const brightBlue: RGBIO = getColor('blue', 'high');
 
 
     const sweep = getSweepEffect({
@@ -79,7 +79,7 @@ export function cueMenuCircleChase(effectController: ILightingController, lightM
       layer: 0,
     })
     // Use unblocked to avoid breaking the sweep timing.
-    effectController.addEffectUnblockedName('menu', sweep, 0, true);
+    effectController.addEffectUnblockedName('menu', sweep, true);
 
 
 }

@@ -15,9 +15,29 @@ export default defineConfig({
       minify: 'terser',
       terserOptions: {
         compress: {
-          drop_console: false, 
+          drop_console: false,
         },
-        mangle: true, 
+        mangle: true,
+      },
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          // Include worker files as separate entry points
+          'workers/NetworkWorker': resolve('src/photonics-dmx/workers/NetworkWorker.ts'),
+        },
+        output: {
+          entryFileNames: (chunkInfo) => {
+            // Main entry should be index.js for electron-vite
+            if (chunkInfo.name === 'index') {
+              return 'index.js';
+            }
+            // Put worker files in a workers subdirectory
+            if (chunkInfo.name.startsWith('workers/')) {
+              return `workers/${chunkInfo.name.replace('workers/', '')}.js`;
+            }
+            return '[name].js';
+          },
+        },
       },
     },
     publicDir: 'static',

@@ -1,21 +1,44 @@
-import { Brightness, Color, FixtureTypes, RgbDmxChannels, RGBIP, RgbMovingHeadDmxChannels, RgbStrobeDmxChannels, RgbwDmxChannels, RgbwMovingHeadDmxChannels, RgbwStrobeDmxCannels, StrobeDmxChannels } from "../types";
+import { BlendMode, Brightness, Color, FixtureTypes, RgbDmxChannels, RGBIO, RgbMovingHeadDmxChannels, RgbStrobeDmxChannels, RgbwDmxChannels, RgbwMovingHeadDmxChannels, RgbwStrobeDmxCannels, StrobeDmxChannels } from "../types";
+
+// Global brightness configuration - will be set by the application
+let globalBrightnessConfig: { low: number; medium: number; high: number; max: number } | null = null;
+
+/**
+ * Sets the global brightness configuration
+ * @param config - The brightness configuration to use globally
+ */
+export const setGlobalBrightnessConfig = (config: { low: number; medium: number; high: number; max: number }): void => {
+  globalBrightnessConfig = config;
+};
+
+/**
+ * Gets the current global brightness configuration
+ * @returns The current brightness configuration or null if not set
+ */
+export const getGlobalBrightnessConfig = (): { low: number; medium: number; high: number; max: number } | null => {
+  return globalBrightnessConfig;
+};
+
 
 /**
  * Generates an RGBIP object based on the specified color and brightness.
  * 
  * @param color - The base color from the color wheel, 'white', 'black', or 'transparent'.
  * @param brightness - The brightness level ('low', 'medium', 'high', 'max'). Ignored for black/transparent.
+ * @param blendMode - The blend mode for color mixing
  * @returns An RGBIP object with the specified color and brightness.
  */
 export const getColor = (
   color: Color,
-  brightness: Brightness
-): RGBIP => {
+  brightness: Brightness,
+  blendMode: BlendMode = 'replace'
+): RGBIO => {
   const colorMap: { [key in typeof color]: { r: number; g: number; b: number } } = {
     red:        { r: 255, g: 0,   b: 0 },
     blue:       { r: 0,   g: 0,   b: 255 },
     yellow:     { r: 255, g: 255, b: 0 },
     green:      { r: 0,   g: 255, b: 0 },
+    cyan:       { r: 0,   g: 255, b: 255 },
     orange:     { r: 255, g: 127, b: 0 },
     purple:     { r: 128, g: 0,   b: 128 },
     chartreuse: { r: 127, g: 255, b: 0 },
@@ -29,24 +52,27 @@ export const getColor = (
     transparent: { r: 0,  g: 0,    b: 0 } 
   };
 
-  const brightnessMap: { [key in typeof brightness]: number } = {
+  // Use global brightness config or fall back to defaults
+  const defaultBrightnessMap: { [key in typeof brightness]: number } = {
     low:    40,
     medium: 100,
     high:   180,
     max:    255,
   };
+  
+  const brightnessMap = globalBrightnessConfig || defaultBrightnessMap;
 
   if (color === 'black') {
     return {
       red: 0, green: 0, blue: 0, intensity: 0,
-      rp: 255, gp: 255, bp: 255, ip: 255, // Priority is 255 so that the RGBI values forcibly set 0 (black)
+      opacity: 1.0, blendMode: blendMode,
     };
   }
   
   if (color === 'transparent') {
     return {
       red: 0, green: 0, blue: 0, intensity: 0,
-      rp: 0, gp: 0, bp: 0, ip: 0, // Priority all zeroed out, otherwise it would be black.
+      opacity: 0.0, blendMode: blendMode,
     };
   }
 
@@ -56,13 +82,12 @@ export const getColor = (
   // Construct the RGBIP object
   return {
     red: selectedColor.r,
-    rp: 255, 
     green: selectedColor.g,
-    gp: 255, 
     blue: selectedColor.b,
-    bp: 255, 
     intensity: selectedIntensity,
-    ip: 255, 
+    
+    opacity: 1.0,
+    blendMode: blendMode,
   };
 };
 

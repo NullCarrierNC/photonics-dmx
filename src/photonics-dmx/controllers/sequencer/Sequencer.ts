@@ -1,14 +1,16 @@
-import { Effect, RGBIP, TrackedLight } from '../../types';
+import { Effect, RGBIO, TrackedLight } from '../../types';
+import { InstrumentNoteType, DrumNoteType } from '../../cues/cueTypes';
 import { LightTransitionController } from './LightTransitionController';
 import { DebugMonitor } from './DebugMonitor';
 import { EffectManager } from './EffectManager';
 import { EffectTransformer } from './EffectTransformer';
 import { SongEventHandler } from './SongEventHandler';
-import { ILightingController } from './interfaces';
+import { ILightingController, LightEffectState } from './interfaces';
 import { LayerManager } from './LayerManager';
 import { SystemEffectsController } from './SystemEffectsController';
-import { TimeoutManager } from './TimeoutManager';
+import { EventScheduler } from './EventScheduler';
 import { TransitionEngine } from './TransitionEngine';
+import { Clock } from './Clock';
 
 /**
  * @class Sequencer
@@ -23,20 +25,23 @@ export class Sequencer implements ILightingController {
   private layerManager: LayerManager;
   private transitionEngine: TransitionEngine;
   private effectTransformer: EffectTransformer;
-  private timeoutManager: TimeoutManager;
+  private eventScheduler: EventScheduler;
   private effectManager: EffectManager;
   private eventHandler: SongEventHandler;
   private systemEffectsController: SystemEffectsController;
   private debugMonitor: DebugMonitor;
+  private clock: Clock;
 
   /**
    * @constructor
    * @param lightTransitionController The underlying light transition controller
+   * @param clock The shared Clock instance for timing synchronization
    */
-  constructor(lightTransitionController: LightTransitionController) {
+  constructor(lightTransitionController: LightTransitionController, clock: Clock) {
+    this.clock = clock;
     this.lightTransitionController = lightTransitionController;
     this.effectTransformer = new EffectTransformer();
-    this.timeoutManager = new TimeoutManager();
+    this.eventScheduler = new EventScheduler();
     this.layerManager = new LayerManager(this.lightTransitionController);
     this.transitionEngine = new TransitionEngine(
       this.lightTransitionController, 
@@ -45,21 +50,22 @@ export class Sequencer implements ILightingController {
     this.systemEffectsController = new SystemEffectsController(
       this.lightTransitionController,
       this.layerManager,
-      this.timeoutManager
     );
     this.effectManager = new EffectManager(
       this.layerManager,
       this.transitionEngine,
       this.effectTransformer,
-      this.timeoutManager,
       this.systemEffectsController
     );
     this.eventHandler = new SongEventHandler(this.layerManager, this.transitionEngine);
     this.debugMonitor = new DebugMonitor(this.lightTransitionController, this.layerManager);
 
-    // Start the animation loop
-    this.transitionEngine.startAnimationLoop();
+    // Register components with the clock
+    this.transitionEngine.registerWithClock(this.clock);
+    this.lightTransitionController.registerWithClock(this.clock);
+    this.eventScheduler.registerWithClock(this.clock);
   }
+
 
   /**
    * Adds a new effect without affecting effects on other layers.
@@ -71,8 +77,8 @@ export class Sequencer implements ILightingController {
    * @param offset How long to wait before applying this effect (in ms)
    * @param isPersistent If true, the effect re-queues itself after completing
    */
-  public addEffect(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): void {
-    this.effectManager.addEffect(name, effect, offset, isPersistent);
+  public addEffect(name: string, effect: Effect,  isPersistent: boolean = false): void {
+    this.effectManager.addEffect(name, effect, isPersistent);
   }
 
   /**
@@ -84,8 +90,8 @@ export class Sequencer implements ILightingController {
    * @param offset How long to wait before applying this effect (in ms)
    * @param isPersistent If true, the effect re-queues itself after completing
    */
-  public async setEffect(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): Promise<void> {
-    await this.effectManager.setEffect(name, effect, offset, isPersistent);
+  public async setEffect(name: string, effect: Effect, isPersistent: boolean = false): Promise<void> {
+    await this.effectManager.setEffect(name, effect, isPersistent);
   }
 
   /**
@@ -98,8 +104,8 @@ export class Sequencer implements ILightingController {
    * @param isPersistent If true, the effect re-queues itself after completing
    * @returns True if the effect was added, false otherwise
    */
-  public addEffectUnblockedName(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): boolean {
-    return this.effectManager.addEffectUnblockedName(name, effect, offset, isPersistent);
+  public addEffectUnblockedName(name: string, effect: Effect, isPersistent: boolean = false): boolean {
+    return this.effectManager.addEffectUnblockedName(name, effect, isPersistent);
   }
 
   /**
@@ -112,8 +118,8 @@ export class Sequencer implements ILightingController {
    * @param isPersistent If true, the effect re-queues itself after completing
    * @returns True if the effect was set, false otherwise
    */
-  public setEffectUnblockedName(name: string, effect: Effect, offset: number = 0, isPersistent: boolean = false): boolean {
-    return this.effectManager.setEffectUnblockedName(name, effect, offset, isPersistent);
+  public setEffectUnblockedName(name: string, effect: Effect, isPersistent: boolean = false): boolean {
+    return this.effectManager.setEffectUnblockedName(name, effect, isPersistent);
   }
 
   /**
@@ -132,6 +138,35 @@ export class Sequencer implements ILightingController {
     this.effectManager.removeAllEffects();
   }
 
+
+  /**
+   * Removes an effect from a specific layer
+   * @param layer The layer from which to remove the effect
+   * @param shouldRemoveTransitions Whether to remove transition data as well
+   */
+  public removeEffectByLayer(layer: number, shouldRemoveTransitions: boolean = false): void {
+    this.effectManager.removeEffectByLayer(layer, shouldRemoveTransitions);
+  }
+
+  /**
+   * Gets all active effects for a specific light across all layers
+   * @param lightId The ID of the light
+   * @returns A map from layer number to LightEffectState
+   */
+  public getActiveEffectsForLight(lightId: string): Map<number, LightEffectState> {
+    return this.effectManager.getActiveEffectsForLight(lightId);
+  }
+
+  /**
+   * Checks if a specific layer is free for a specific light
+   * @param layer The layer number to check
+   * @param lightId The ID of the light
+   * @returns True if the layer is free for the light, false otherwise
+   */
+  public isLayerFreeForLight(layer: number, lightId: string): boolean {
+    return this.effectManager.isLayerFreeForLight(layer, lightId);
+  }
+
   /**
    * Sets the state of a group of lights to a specific colour over time.
    * 
@@ -139,7 +174,7 @@ export class Sequencer implements ILightingController {
    * @param color Target colour to transition to
    * @param time Duration of the transition in milliseconds
    */
-  public setState(lights: TrackedLight[], color: RGBIP, time: number): void {
+  public setState(lights: TrackedLight[], color: RGBIO, time: number): void {
     this.effectManager.setState(lights, color, time);
   }
 
@@ -162,6 +197,34 @@ export class Sequencer implements ILightingController {
    */
   public onKeyframe(): void {
     this.eventHandler.onKeyframe();
+  }
+
+  /**
+   * Handle individual drum note events
+   */
+  public onDrumNote(noteType: DrumNoteType): void {
+    this.eventHandler.onDrumNote(noteType);
+  }
+
+  /**
+   * Handle individual guitar note events
+   */
+  public onGuitarNote(noteType: InstrumentNoteType): void {
+    this.eventHandler.onGuitarNote(noteType);
+  }
+
+  /**
+   * Handle individual bass note events
+   */
+  public onBassNote(noteType: InstrumentNoteType): void {
+    this.eventHandler.onBassNote(noteType);
+  }
+
+  /**
+   * Handle individual keys note events
+   */
+  public onKeysNote(noteType: InstrumentNoteType): void {
+    this.eventHandler.onKeysNote(noteType);
   }
 
   /**
@@ -205,14 +268,19 @@ export class Sequencer implements ILightingController {
     console.log('PhotonicsSequencer shutdown: starting');
     
     try {
-      // Stop the animation loop
-      this.transitionEngine.stopAnimationLoop();
+      // Stop the clock
+      this.clock.stop();
       
-      // Clear all timeouts
-      this.timeoutManager.clearAllTimeouts();
+      // Unregister components from clock
+      this.transitionEngine.unregisterFromClock();
+      this.lightTransitionController.unregisterFromClock();
+      this.eventScheduler.unregisterFromClock();
       
       // Remove all effects
       this.removeAllEffects();
+      
+      // Clean up other resources
+      this.eventScheduler.destroy();
       
       console.log('PhotonicsSequencer shutdown: completed');
     } catch (error) {

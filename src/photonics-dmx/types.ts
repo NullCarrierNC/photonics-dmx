@@ -3,9 +3,14 @@ import { cubicIn, cubicInOut, cubicOut, EasingFunction, linear, quadraticIn, qua
 /**
  * Represents available colors in the lighting system
  */
-export type Color =  'red' | 'blue' | 'yellow' | 'green' | 'orange' | 'purple' |
+export type Color =  'red' | 'blue' | 'yellow' | 'green' | 'cyan' | 'orange' | 'purple' |
 'chartreuse' | 'teal' | 'violet' | 'magenta' | 'vermilion' | 'amber' |
 'white' | 'black' | 'transparent';
+
+/**
+ * Represents how a color should blend with colors on lower layers
+ */
+export type BlendMode = 'replace' | 'add' | 'multiply' | 'overlay';
 
 /**
  * Represents brightness levels for lights
@@ -15,21 +20,17 @@ export type Brightness = 'low' | 'medium' | 'high' | 'max';
 /**
  * Interface representing RGB, Intensity, Pan/Tilt values for a light
  */
-export interface RGBIP {
+export interface RGBIO {
   red: number; // 0-255
-  rp: number; // 0-255
-
   green: number; // 0-255
-  gp: number; // 0-255
-
   blue: number; // 0-255
-  bp: number; // 0-255
-
   intensity: number; // 0-255
-  ip: number; // 0-255
 
   pan?: number;
   tilt?: number;
+  
+  opacity: number; // 0.0 to 1.0, controls overall contribution strength
+  blendMode: BlendMode; // How this color should blend with lower layers
 }
 
 /**
@@ -37,7 +38,7 @@ export interface RGBIP {
  */
 export interface LightLayer {
   layer: number;
-  value: RGBIP;
+  value: RGBIO;
 }
 
 /**
@@ -53,7 +54,7 @@ export interface VirtualLight {
  */
 export interface LightState {
   id: string;
-  value: RGBIP;
+  value: RGBIO;
 }
 
 /**
@@ -61,7 +62,7 @@ export interface LightState {
  */
 export interface Transition {
   transform: {
-    color: RGBIP;
+    color: RGBIO;
     easing: string; // e.g., "sin.in"
     duration: number; // in milliseconds
   };
@@ -75,6 +76,18 @@ export interface Effect {
   id: string;
   description: string;
   transitions: EffectTransition[];
+  
+  /**
+   * Optional timing hints for absolute timing synchronization
+   * When provided, persistent/queued effects will maintain synchronization
+   * by calculating start times relative to an absolute timeline
+   */
+  timingHints?: {
+    /** Duration of one complete cycle in milliseconds */
+    cycleDuration: number;
+    /** Time offset between sequential lights in milliseconds (0 for synchronized) */
+    perLightOffset?: number;
+  };
 }
 
 /**
@@ -87,11 +100,12 @@ export type WaitCondition =
   | 'measure'
   | 'half-beat'
   | 'keyframe'
-  | 'green'
-  | 'red'
-  | 'yellow'
-  | 'blue'
-  | 'orange';
+  // Instrument note events (matching SongEventHandler)
+  | 'guitar-open' | 'guitar-green' | 'guitar-red' | 'guitar-yellow' | 'guitar-blue' | 'guitar-orange'
+  | 'bass-open' | 'bass-green' | 'bass-red' | 'bass-yellow' | 'bass-blue' | 'bass-orange'
+  | 'keys-open' | 'keys-green' | 'keys-red' | 'keys-yellow' | 'keys-blue' | 'keys-orange'
+  | 'drum-kick' | 'drum-red' | 'drum-yellow' | 'drum-blue' | 'drum-green'
+  | 'drum-yellow-cymbal' | 'drum-blue-cymbal' | 'drum-green-cymbal';
 
 /**
  * Interface defining a transition within an effect
@@ -100,15 +114,17 @@ export interface EffectTransition {
   lights: TrackedLight[];
   layer: number;
 
-  waitFor: WaitCondition;
-  forTime: number; // in milliseconds
+  waitForCondition: WaitCondition;
+  waitForTime: number; // in milliseconds
+  waitForConditionCount?: number;
   transform: {
-    color: RGBIP;
+    color: RGBIO;
     easing: string;
     duration: number; // in milliseconds
   };
-  waitUntil: WaitCondition;
-  untilTime: number; // in milliseconds
+  waitUntilCondition: WaitCondition;
+  waitUntilTime: number; // in milliseconds
+  waitUntilConditionCount?: number; 
 }
 
 /**
@@ -359,6 +375,10 @@ export type LightTarget =
   | 'odd'
   | 'half-1'
   | 'half-2'
+  | 'outter-half-major'
+  | 'outter-half-minor'
+  | 'inner-half-major'
+  | 'inner-half-minor'
   | 'third-1'
   | 'third-2'
   | 'third-3'
@@ -439,11 +459,23 @@ export interface ResolvableColor {
   w?: ResolvableValue;
 }
 
-export interface EffectSelector {
+export type EffectSelector = {
   id: string;
   yargDescription: string;
   rb3Description: string;
+  groupName?: string;
+};
+
+export interface CueGroup {
+  id: string;
+  name: string;
+  description: string;
 }
+
+export type Easing = {
+  name: string;
+  f: EasingFunction;
+};
 
 // Mapping of easing names to easing functions
 export const easingFunctions: { [key: string]: EasingFunction } = {
@@ -459,9 +491,18 @@ export const easingFunctions: { [key: string]: EasingFunction } = {
   'cubic.inout': cubicInOut,
 };
 
-export type Senders = 'sacn' | 'ipc' | 'enttecpro';
+export type Senders = 'sacn' | 'ipc' | 'enttecpro' | 'artnet';
 export interface SenderConfig {
   sender: Senders
   port?: string
+  host?: string
+  universe?: number
+  net?: number
+  subnet?: number
+  subuni?: number
+  artNetPort?: number
+  networkInterface?: string
+  useUnicast?: boolean
+  unicastDestination?: string
 }
 

@@ -13,23 +13,25 @@
 import '@jest/globals';
 import { Sequencer } from '../../controllers/sequencer/Sequencer';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
-import { Effect, RGBIP, TrackedLight } from '../../types';
+import { Clock } from '../../controllers/sequencer/Clock';
+import { Effect, RGBIO, TrackedLight } from '../../types';
 import { createMockTrackedLight, createMockRGBIP } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
 
 // Mock all dependencies that Sequencer relies on
 jest.mock('../../controllers/sequencer/LightTransitionController');
 jest.mock('../../controllers/sequencer/EffectTransformer');
-jest.mock('../../controllers/sequencer/TimeoutManager');
 jest.mock('../../controllers/sequencer/LayerManager');
 jest.mock('../../controllers/sequencer/TransitionEngine');
 jest.mock('../../controllers/sequencer/SystemEffectsController');
 jest.mock('../../controllers/sequencer/EffectManager');
 jest.mock('../../controllers/sequencer/SongEventHandler');
 jest.mock('../../controllers/sequencer/DebugMonitor');
+jest.mock('../../controllers/sequencer/Clock');
 
 describe('Sequencer', () => {
   let lightTransitionController: jest.Mocked<LightTransitionController>;
+  let clock: jest.Mocked<Clock>;
   let sequencer: Sequencer;
 
   beforeEach(() => {
@@ -40,11 +42,24 @@ describe('Sequencer', () => {
       setTransition: jest.fn(),
       removeTransitionsByLayer: jest.fn(),
       removeLightLayer: jest.fn(),
-      getFinalLightState: jest.fn()
+      getFinalLightState: jest.fn(),
+      registerWithClock: jest.fn(),
+      unregisterFromClock: jest.fn()
     } as unknown as jest.Mocked<LightTransitionController>;
 
-    // Create Sequencer with mocked LightTransitionController
-    sequencer = new Sequencer(lightTransitionController);
+    // Create mock for Clock
+    clock = {
+      onTick: jest.fn(),
+      offTick: jest.fn(),
+      start: jest.fn(),
+      stop: jest.fn(),
+      getCurrentTime: jest.fn().mockReturnValue(0),
+      getTickCount: jest.fn().mockReturnValue(0),
+      isRunning: jest.fn().mockReturnValue(false)
+    } as unknown as jest.Mocked<Clock>;
+
+    // Create Sequencer with mocked LightTransitionController and Clock
+    sequencer = new Sequencer(lightTransitionController, clock);
   });
 
   afterEach(() => {
@@ -67,26 +82,26 @@ describe('Sequencer', () => {
           {
             lights: [createMockTrackedLight()],
             layer: 1,
-            waitFor: 'none',
-            forTime: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
             transform: {
               color: createMockRGBIP(),
               easing: 'linear',
               duration: 1000
             },
-            waitUntil: 'none',
-            untilTime: 0
+            waitUntilCondition: 'none',
+            waitUntilTime: 0
           }
         ]
       };
-      const offset = 500;
+      
       const isPersistent = true;
 
       // Call the method
-      sequencer.addEffect(effectName, effect, offset, isPersistent);
+      sequencer.addEffect(effectName, effect, isPersistent);
 
       // Verify the delegation
-      expect(addEffectSpy).toHaveBeenCalledWith(effectName, effect, offset, isPersistent);
+      expect(addEffectSpy).toHaveBeenCalledWith(effectName, effect, isPersistent);
     });
   });
 
@@ -102,14 +117,14 @@ describe('Sequencer', () => {
         description: 'Test effect',
         transitions: []
       };
-      const offset = 500;
+
       const isPersistent = true;
 
       // Call the method
-      await sequencer.setEffect(effectName, effect, offset, isPersistent);
+      sequencer.setEffect(effectName, effect, isPersistent);
 
       // Verify the delegation
-      expect(setEffectSpy).toHaveBeenCalledWith(effectName, effect, offset, isPersistent);
+      expect(setEffectSpy).toHaveBeenCalledWith(effectName, effect, isPersistent);
     });
   });
 
@@ -120,7 +135,7 @@ describe('Sequencer', () => {
       
       // Create test data
       const lights: TrackedLight[] = [createMockTrackedLight()];
-      const color: RGBIP = createMockRGBIP();
+      const color: RGBIO = createMockRGBIP();
       const time = 1000;
 
       // Call the method
@@ -140,7 +155,7 @@ describe('Sequencer', () => {
       const duration = 1000;
 
       // Call the method
-      await sequencer.blackout(duration);
+      sequencer.blackout(duration);
 
       // Verify the delegation
       expect(blackoutSpy).toHaveBeenCalledWith(duration);
@@ -200,15 +215,15 @@ describe('Sequencer', () => {
   });
 
   describe('shutdown', () => {
-    it('should stop the animation loop and perform cleanup', () => {
-      // Setup spy on TransitionEngine
-      const stopAnimationLoopSpy = jest.spyOn((sequencer as any).transitionEngine, 'stopAnimationLoop');
+    it('should stop the clock and perform cleanup', () => {
+      // Setup spy on Clock
+      const clockStopSpy = jest.spyOn((sequencer as any).clock, 'stop');
       
       // Call the method
       sequencer.shutdown();
 
-      // Verify transition engine was stopped
-      expect(stopAnimationLoopSpy).toHaveBeenCalled();
+      // Verify clock was stopped
+      expect(clockStopSpy).toHaveBeenCalled();
     });
   });
 }); 

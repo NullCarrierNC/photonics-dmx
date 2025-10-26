@@ -1,6 +1,7 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
-  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/photonics-dmx/**/*"],
+  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/photonics-dmx/**/*", "src/services/**/*", "src/photonics-dmx/cues/yarg/groups/.ts"],
+  "exclude": ["**/*.test.ts", "**/*.spec.ts", "src/photonics-dmx/tests/**/*"],
   "compilerOptions": {
     "composite": true,
     "types": ["electron-vite/node"]

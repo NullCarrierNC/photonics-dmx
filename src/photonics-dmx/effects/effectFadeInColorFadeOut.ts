@@ -1,20 +1,26 @@
-import { Effect, TrackedLight, RGBIP, } from "../types";
+import { Effect, RGBIO } from "../types";
+import { IEffect } from "./interfaces/IEffect";
 import { EasingType } from "../easing";
 
-
-interface FadeInColorFadeOutEffectParams {
-    startColor:RGBIP,
-    waitBeforeFadeIn: number,
-    endColor:RGBIP,
-    fadeInDuration:number,
-    holdDuration: number,
-    fadeOutDuration: number,
-    waitAfterFadeOut: number,
-    lights: TrackedLight[];
-    layer?: number; 
-    easing?: EasingType; 
+/**
+ * Interface for fade in colour fade out effect parameters, extending the base effect interface
+ */
+interface FadeInColorFadeOutEffectParams extends IEffect {
+    /** The starting colour */
+    startColor: RGBIO;
+    /** The ending colour */
+    endColor: RGBIO;
+    /** Time to wait before starting the fade in */
+    waitBeforeFadeIn: number;
+    /** Duration of the fade in */
+    fadeInDuration: number;
+    /** Time to hold the end colour */
+    holdDuration: number;
+    /** Duration of the fade out */
+    fadeOutDuration: number;
+    /** Time to wait after the fade out */
+    waitAfterFadeOut: number;
 }
-
 
 export const getEffectFadeInColorFadeOut = ({
     startColor,
@@ -25,52 +31,54 @@ export const getEffectFadeInColorFadeOut = ({
     fadeOutDuration,
     waitAfterFadeOut,
     lights,
-    layer = 0, 
-    easing = EasingType.SIN_OUT, 
+    layer = 0,
+    easing = EasingType.SIN_OUT,
+    waitFor = 'none',
+    waitUntil = 'none',
 }: FadeInColorFadeOutEffectParams): Effect => {
     
     const effect: Effect = {
         id: "cross-fade-colors",
-        description: "Cross-fades light from one color to another.",
+        description: "Cross-fades light from one colour to another.",
         transitions: [
             {
                 lights: lights,
                 layer: layer,
-                waitFor: 'delay',
-                forTime: 0,
+                waitForCondition: waitFor,
+                waitForTime: 0,
                 transform: {
                     color: startColor,
                     easing: easing,
                     duration: 0,
                 },
-                waitUntil: 'delay',
-                untilTime: waitBeforeFadeIn
+                waitUntilCondition: waitUntil,
+                waitUntilTime: waitBeforeFadeIn
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: 'delay',
-                forTime: 0,
+                waitForCondition: waitFor,
+                waitForTime: 0,
                 transform: {
                     color: endColor,
                     easing: easing,
                     duration: fadeInDuration,
                 },
-                waitUntil: 'delay',
-                untilTime: holdDuration
+                waitUntilCondition: waitUntil,
+                waitUntilTime: holdDuration
             },
             {
                 lights: lights,
                 layer: layer,
-                waitFor: 'delay',
-                forTime: 0,
+                waitForCondition: waitFor,
+                waitForTime: 0,
                 transform: {
                     color: startColor,
                     easing: easing,
                     duration: fadeOutDuration,
                 },
-                waitUntil: 'delay',
-                untilTime: waitAfterFadeOut
+                waitUntilCondition: 'none',
+                waitUntilTime: waitAfterFadeOut
             },
         ]
     };
