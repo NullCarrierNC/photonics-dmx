@@ -1,4 +1,4 @@
-# Photonics - DMX Sequencer for YARG & RB3E
+# Photonics - DMX Sequencer for YARG & Rock Band 3 (Enhanced)
 
 Photonics is a purpose built DMX light sequencer for use with YARG and Rock Band 3 Enhanced. 
 It uses in-game lighting data to drive DMX lights in time to the music.
@@ -11,6 +11,32 @@ It sits somewhere between the original Rock Band Stage Kit and full blown DMX co
 Unlike YALCY Photonics *only* supports DMX lights and has support for Rock Band 3 (Enhanced).
 
 For more information or the Quickstart guide please visit the project site: [Photonics.rocks](https://photonics.rocks)
+
+
+## Updating from Alpha 1
+
+Alpha 2 brings a lot of new functionality to Photonics, but it also brought a breaking change:
+
+### Light Layout order: 
+
+Previously the lights were ordered _ascending_ on the front and back lights. E.g.:
+
+Font: 1, 2, 3, 4
+
+Back: 5, 6, 7, 8
+
+
+The back order has changed to _descending_. E.g.: 
+
+Font: 1, 2, 3, 4
+
+Back: **8, 7, 6, 5**
+
+
+This better reflects the linear progression of sweep style effects that loop around the front and back lights.
+You will have to update your _Light Layout_ configuration to correctly order your physical DMX lights.
+
+If you have problems feel free to reach out in our [Discord Server](https://discord.gg/2Vyqc2hYcK).
 
 
 ## Before You Begin…
@@ -56,7 +82,8 @@ Please take a look at the [Quickstart Guide](https://photonics.rocks/quickstart-
 
 ## Status
 
-Photonics is still very much in its early Alpha stages. It's quite usable, but you can expect bugs and possibly breaking changes down the road. 
+Photonics is still in its Alpha stages. The current release is Alpha 2 and has come a long way from Alpha 1. 
+That said, there's more to come and the possibility of breaking changes ahead...
 
 See the [Project Status](https://photonics.rocks/project-status/) for more details.
 
@@ -64,16 +91,23 @@ See the [Project Status](https://photonics.rocks/project-status/) for more detai
 
 ## License
 
-Photonics is licenced under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html) (or later). See the LICENCE file for details.
+Photonics is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html) (or later). See the LICENSE file for details.
 
 
-### External Licences
+### External Licenses
 
-Some libraries/assets are packaged with the source code have licenses that must be included.
+Some libraries/assets that are packaged with the source code have licenses that must be included.
 
-| Link        | Licence     | Use         |
+| Link        | License     | Use         |
 | ----------- | ----------- | ----------- |
-| [dmx-ts](https://github.com/node-dmx/dmx-ts)   | MIT license | sACN, ArtNet, and Enttec Pro USB Support |
+| [dmx-ts](https://github.com/node-dmx/dmx-ts)   | MIT license | ArtNet and Enttec Pro USB Support |
+| [sacn](https://github.com/node-dmx/sacn)   | MIT license | sACN DMX over network |
+| [@electron-toolkit/preload](https://github.com/alex8088/electron-toolkit)   | MIT license | Electron preload utilities |
+| [@electron-toolkit/utils](https://github.com/alex8088/electron-toolkit)   | MIT license | Electron utilities |
+| [jotai](https://github.com/pmndrs/jotai)   | MIT license | State Management |
+| [react-icons](https://github.com/react-icons/react-icons)   | MIT license | UI Icons |
+| [date-fns](https://github.com/date-fns/date-fns)   | MIT license | Date Formatting and Manipulation |
+| [uuid](https://github.com/uuidjs/uuid)   | MIT license | UUID Generation |
 
 
 

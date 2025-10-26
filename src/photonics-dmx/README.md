@@ -62,9 +62,14 @@ The sequencing system contains several other components, though these are mainly
 - `SongEventHandler`: Processes beat, measure, and other musical events.
 - `SystemEffectsController`: Manages system-level effects blackout, which don't act like normal cue/effects.
 - `EventScheduler`: Handles scheduling and management of timed events within the system using the centralized clock.
-- `Clock`: Provides centralized timing control with 1ms precision for all system components.
+- `Clock`: Provides centralized timing control with configurable precision (default 5ms) for all system components. Components register for tick events to synchronize updates.
 - `EffectTransformer`: Transforms generic effect definitions into concrete transition specifications.
-- `DebugMonitor`: Provides real-time monitoring and debugging capabilities (when enabled in the Cue Handler).
+- `LightStateManager`: Manages the final merged RGBIO state for each light and publishes frame-synchronized updates to external listeners.
+- `DebugMonitor`: Provides real-time monitoring and debugging capabilities (when enabled).
+
+#### Centralized Timing
+
+The `Clock` provides a single source of truth for all timing operations in the sequencer. Components register callbacks that fire on each clock tick, ensuring synchronized frame updates across the system. The default interval is 5ms, providing smooth interpolation for lighting transitions. Components such as `LightTransitionController`, `TransitionEngine`, and `LightStateManager` use the clock to maintain consistent timing and prevent desynchronization.
 
 ### Processing Components
 
@@ -169,7 +174,16 @@ The stomp transitions consists of two transforms:
 1. Fade in to full white over 40ms, hold for 0ms.
 2. Fade out to transparent over 150ms.
 
-**Wait Conditions** allow you to wait for specific game events like Beat, Measure, or Keyframe before starting or ending transitions.
+**Wait Conditions** allow you to wait for specific game events before starting or ending transitions.
+
+Available wait conditions include:
+- `none`: No waiting, transition starts immediately
+- `delay`: Wait for a fixed time period
+- `beat`: Wait for a beat event
+- `measure`: Wait for a measure event
+- `keyframe`: Wait for a keyframe event. Note: currently all YARG keyframe events like keyframe-next are treated as a single type in Photonics.
+- Instrument-specific events: `guitar-open`, `guitar-green`, `guitar-red`, etc.
+- Drum events: `drum-kick`, `drum-red`, `drum-yellow`, `drum-blue`, `drum-green`, and cymbal events
 
 ### Event Count Properties
 
@@ -211,9 +225,20 @@ See examples below.
 Cue effects are applied to the lights using a series of layers managed by the `LayerManager`. Higher numbered layers take 
 precedence over lower layers. 
 
+### Layer Conventions
+
+- **Layer 0**: Base layer (preserved by design)
+- **Layers 1-99**: Standard effect layers
+- **Layers 100+**: High priority "flash" layers
+- **Layer 200**: Blackout layers
+- **Layers 201-254**: Reserved for future use
+- **Layer 255**: Strobe effects
+
 `Layer 0` is a special layer: this is the main layer and all primary effects should use at least layer 0.
-This is important as when an effect ends, _its final state is not cleared_. This allows effects to 
-transition into another and prevents the lights turning off unexpectedly if there is a gap. 
+When an effect on Layer 0 ends, _its final state is not cleared_ (unlike higher layers which are cleaned up).
+This allows effects to transition smoothly into another and prevents the lights turning off unexpectedly 
+if there is a gap between effects. Layers above 0 are cleaned up when their effects complete with no 
+queued effects to maintain a clean state. 
 
 
 
@@ -221,6 +246,8 @@ transition into another and prevents the lights turning off unexpectedly if ther
 Layer 0 will transition into the new effect. 
 `EffectManager.addEffect`: Adds the effect without clearing other layers. This lets us add effects on 
 top of running ones without clearing them inadvertently. 
+`EffectManager.addEffectUnblockedName`: Adds an effect only if no effect with the same name is already running. Prevents queue breaking timing issues.
+`EffectManager.setEffectUnblockedName`: Sets an effect only if no effect with the same name is already running. Otherwise discards the new effect.
 `EffectManager.getActiveEffectsForLight(lightId)`: Returns all active effects for a specific light across all layers
 `EffectManager.isLayerFreeForLight(layer, lightId)`: Checks if a specific layer is free for a specific light
 
@@ -228,6 +255,7 @@ There are other methods for effect handling; look into `EffectManager` for more 
 
 
 In order to output the final light state the layers are collapsed and the final values calculated. 
+The `LightStateManager` stores the final merged state for each light after all layer blending is complete.
 `Opacity` and `blendMode` play a key role in how this works:
 
 ## Blend Mode Examples
@@ -331,7 +359,7 @@ The sequencer includes a consistency throttling mechanism to prevent rapid rando
 
 E.g. The network tells us to show cool_automatic -> frenzy -> cool_automatic. If the second cool_automatic was triggered less than 2 seconds (default) 
 after the previous use of cool_automatic we will use the same implementation as the previous call. This helps maintain consistency if the game 
-switches back and forth between cues rapdily.
+switches back and forth between cues rapidly.
 
 
 
@@ -350,34 +378,24 @@ to target any one specific light, so they run smoothly on all configurations.
 
 ## Debug Tools
 
-Photonics includes debugging tools to visualize the effects active on each layer. Currently enabling 
-them required uncommenting the appropriate line in the Cue Handler's constructor. Enabling this will console.log 
-the layering systems state when run using `npm run dev`.
+Photonics includes debugging tools to visualize the effects active on each layer.
 
+### Using the Debug Monitor
 
-### Using the Debug Helper
-
-The `DebugMonitor` provides a simple interface for debugging light states in real-time:
+The `DebugMonitor` provides real-time debugging capabilities via the Sequencer:
 
 ```typescript
-import { debugHelper } from './helpers/DebugHelper';
+// Enable real-time debug monitoring with default 1000ms refresh rate
+sequencer.enableDebug(true);
 
-// Register your cue handler or effects controller
-debugHelper.registerCueHandler(yargCueHandler);
-// or
-debugHelper.registerEffectsController(effectManager);
+// Enable with custom refresh rate in milliseconds
+sequencer.enableDebug(true, 2000);
 
-// Enable real-time monitoring
-debugHelper.enableRealTimeMonitoring(true); 
-
-// Optionally specify refresh rate in milliseconds
-debugHelper.enableRealTimeMonitoring(true, 1000);
-
-// Take a single snapshot of current state
-debugHelper.captureSnapshot();
+// Print detailed layer state information
+sequencer.debugLightLayers();
 
 // Disable when finished
-debugHelper.enableRealTimeMonitoring(false);
+sequencer.enableDebug(false);
 ```
 
 
