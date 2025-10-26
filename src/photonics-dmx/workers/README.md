@@ -2,18 +2,9 @@
 
 The worker thread architecture isolates network I/O operations from the main UI thread, preventing network activity from causing UI freezes or blocking the lighting sequencer.
 
-## Why Worker Threads?
-
-Network operations like sending DMX data over ArtNet or sACN are inherently I/O-bound and can take time to complete. When these operations run on the main thread, they can:
-- Freeze the UI during network operations
-- Block the lighting sequencer's central clock
-- Cause stuttering or dropped frames in lighting transitions
-
-By moving network operations to a separate worker thread, the main application remains responsive and lighting updates continue smoothly regardless of network latency or connection issues.
-
 ## Architecture Overview
 
-The worker architecture consists of several key components:
+The worker architecture consists of several components:
 
 1. **NetworkWorkerManager**: Manages the worker thread lifecycle from the main thread. Handles message routing and provides a clean API for creating and managing senders.
 2. **BaseWorker**: Abstract base class that provides common worker thread management functionality for both main and worker contexts.
@@ -204,7 +195,7 @@ if (hasChanges) {
 }
 ```
 
-This prevents unnecessary network traffic when lighting states remain unchanged.
+
 
 ### Pre-allocated Buffers
 
