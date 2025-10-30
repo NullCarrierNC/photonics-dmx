@@ -45,7 +45,7 @@ You can now download a build for MacOS. If you try to run it and get an error me
 `“Photonics” is damaged and can’t be opened. You should move it to the Trash.`
 
 This is Gatekeeper blocking the app because it's not currently signed. To bypass this warning you need to open your terminal and run:
-`xattr -cr /Applications/Photonics.app`
+`xattr -r -d com.apple.quarantine /Applications/Photonics.app`
 
 This should only need to be done once. After running that try opening Photonics again normally.
 
