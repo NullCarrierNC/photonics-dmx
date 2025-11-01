@@ -1,6 +1,7 @@
 import { ConfigFile } from './ConfigFile';
 import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes } from '../../photonics-dmx/types';
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio/AudioConfig';
+import type { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 
 /**
  * Application preferences interface
@@ -336,7 +337,7 @@ export class ConfigurationManager {
   /**
    * Gets audio configuration
    */
-  getAudioConfig(): AppPreferences['audioConfig'] {
+  getAudioConfig(): AudioConfig {
     const savedConfig = this.getPreference('audioConfig');
     
     // Merge saved config with defaults, then force enabled to false

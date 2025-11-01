@@ -5,10 +5,15 @@
  * - Capture audio from microphone
  * - Perform FFT analysis via AnalyserNode
  * - Calculate frequency bands (bass/mids/highs)
- * - Send processed data to main process via IPC
+ * - Update audioDataAtom for preview component
+ * - Send processed data to main process via IPC for DMX control
  */
 
 import { AudioLightingData } from '../../../photonics-dmx/listeners/Audio/AudioTypes';
+import { getDefaultStore } from 'jotai';
+import { audioDataAtom } from '../atoms';
+
+const store = getDefaultStore();
 
 export interface AudioConfig {
   deviceId?: string;
@@ -69,6 +74,9 @@ export class AudioCaptureManager {
   private energyHistory: number[] = [];
   private readonly ENERGY_HISTORY_SIZE = 43; // ~1 second at 60fps
   private frameIndex = 0;
+  private beatTimestamps: number[] = []; // Track actual beat times for BPM calculation
+  private readonly MAX_BEAT_HISTORY = 8; // Keep last 8 beats for BPM averaging
+  private currentBpm: number | null = null; // Stable BPM value
   
   // Debug logging (log status every ~60 frames ≈ 1 second at 60fps)
   private frameCounter = 0;
@@ -103,7 +111,7 @@ export class AudioCaptureManager {
       this.audioContext = new AudioContext();
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = this.config.fftSize;
-      this.analyser.smoothingTimeConstant = 0.8;
+      this.analyser.smoothingTimeConstant = 0; // No built-in smoothing - use custom smoothing instead
       
       // Connect stream to analyser
       this.source = this.audioContext.createMediaStreamSource(this.stream);
@@ -144,6 +152,9 @@ export class AudioCaptureManager {
 
     console.log('Stopping audio capture...');
     
+    // Clear audio data atom
+    store.set(audioDataAtom, null);
+    
     // Cancel animation frame
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
@@ -177,6 +188,8 @@ export class AudioCaptureManager {
     this.smoothedEnergy = 0;
     this.energyHistory = [];
     this.frameIndex = 0;
+    this.beatTimestamps = [];
+    this.currentBpm = null;
     
     console.log('Audio capture stopped');
   }
@@ -222,7 +235,10 @@ export class AudioCaptureManager {
     // Calculate frequency bands
     const audioData = this.calculateFrequencyBands(dataArray);
     
-    // Send to main process via IPC
+    // Update atom for preview component (stays in renderer - no IPC overhead!)
+    store.set(audioDataAtom, audioData);
+    
+    // Send to main process via IPC for DMX light control
     window.electron.ipcRenderer.send('audio:data', audioData);
     
     // Debug logging - show status every second
@@ -373,7 +389,6 @@ export class AudioCaptureManager {
     const beatThreshold = avgEnergy * (1 + this.config.beatDetection.threshold);
     
     let beatDetected = false;
-    let bpm: number | null = null;
     
     if (
       energy > beatThreshold &&
@@ -382,12 +397,30 @@ export class AudioCaptureManager {
       beatDetected = true;
       this.lastBeatTime = now;
       
-      // Calculate BPM from recent beats
-      if (this.energyHistory.length >= this.ENERGY_HISTORY_SIZE) {
-        // Rough BPM estimation from beat intervals
-        const beatsInWindow = this.energyHistory.filter(e => e > beatThreshold).length;
-        const timeWindowSeconds = (this.ENERGY_HISTORY_SIZE * 16) / 1000; // Assuming ~60fps
-        bpm = Math.round((beatsInWindow / timeWindowSeconds) * 60);
+      // Track beat timestamp for BPM calculation
+      this.beatTimestamps.push(now);
+      if (this.beatTimestamps.length > this.MAX_BEAT_HISTORY) {
+        this.beatTimestamps.shift();
+      }
+      
+      // Calculate BPM from intervals between beats
+      if (this.beatTimestamps.length >= 4) {
+        // Calculate average interval between consecutive beats
+        const intervals: number[] = [];
+        for (let i = 1; i < this.beatTimestamps.length; i++) {
+          intervals.push(this.beatTimestamps[i] - this.beatTimestamps[i - 1]);
+        }
+        
+        // Average interval in milliseconds
+        const avgInterval = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
+        
+        // Convert to BPM (60000 ms per minute / interval in ms)
+        const calculatedBpm = Math.round(60000 / avgInterval);
+        
+        // Only update if BPM is in a reasonable range (40-200 BPM)
+        if (calculatedBpm >= 40 && calculatedBpm <= 200) {
+          this.currentBpm = calculatedBpm;
+        }
       }
     }
     
@@ -396,7 +429,8 @@ export class AudioCaptureManager {
       this.smoothedEnergy *= this.config.beatDetection.decayRate;
     }
     
-    return { beatDetected, bpm };
+    // Return stable BPM value (doesn't flicker on/off)
+    return { beatDetected, bpm: this.currentBpm };
   }
 
   /**

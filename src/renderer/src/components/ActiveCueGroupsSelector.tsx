@@ -1,6 +1,6 @@
 import  { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { useAtom } from 'jotai';
-import { rb3eListenerEnabledAtom } from '../atoms';
+import { yargListenerEnabledAtom } from '../atoms';
 
 interface CueGroup {
   id: string;
@@ -23,7 +23,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
     const [activeGroupIds, setActiveGroupIds] = useState<string[]>([]);
     const [stageKitPriority, setStageKitPriority] = useState<string>('prefer-for-tracked');
     const [loading, setLoading] = useState(true);
-    const [rb3eListenerEnabled] = useAtom(rb3eListenerEnabledAtom);
+    const [yargListenerEnabled] = useAtom(yargListenerEnabledAtom);
 
     const fetchActiveGroups = useCallback(async () => {
       try {
@@ -117,6 +117,11 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
       );
     }
 
+    // Only show this component when YARG is enabled
+    if (!yargListenerEnabled) {
+      return null;
+    }
+
     if (enabledGroups.length === 0) {
       return (
         <div className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg ${className}`}>
@@ -130,13 +135,9 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
         <h3 className="text-lg font-semibold mb-1 text-gray-900 dark:text-gray-100 ">
           Active Cue Groups
         </h3>
-        {rb3eListenerEnabled ? (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-            Except for menus,RB3E does not use cues, the lights are driven directly. In menus the Stage Kit is off, but we'll run an idle animation.
-          </p>
-        ) : (
-          <>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+        {/* Show cue group selector and stage kit priority when YARG is enabled */}
+        <>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
               By default all enabled cue groups are active. To disable a group entirely, disable it in the Preferences menu. 
               Disabling it here is temporary.
             </p>
@@ -184,10 +185,9 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
                 ))}
               </div>
             </div>
-          </>
-        )}
+        </>
         
-        {!rb3eListenerEnabled && activeGroupIds.length === 0 && (
+        {activeGroupIds.length === 0 && (
           <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
             <p className="text-yellow-800 dark:text-yellow-200">
               <strong>Warning:</strong> No active groups selected. Cue resolution will only use the default group as fallback.

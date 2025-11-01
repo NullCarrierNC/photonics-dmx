@@ -255,9 +255,6 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Enable/disable audio
   ipcMain.handle('set-audio-enabled', async (_, enabled: boolean) => {
     try {
-      controllerManager.getConfig().updateAudioConfig({ enabled });
-      
-      // Now enable/disable audio based on the updated config
       if (enabled) {
         await controllerManager.enableAudio();
       } else {

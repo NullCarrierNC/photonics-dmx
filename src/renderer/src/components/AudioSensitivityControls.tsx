@@ -57,14 +57,29 @@ const AudioSensitivityControls: React.FC = () => {
   };
 
   return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
     <div>
-      <label htmlFor="audio-sensitivity" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
         Sensitivity
       </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Adjust the sensitivity/gain multiplier for audio input. Higher values make the lights more reactive.
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
+            {sensitivity.toFixed(1)}
+          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            / 5.0
+          </span>
+        </div>
+      </div>
+      
       <div className="flex items-center space-x-4">
         <input
           type="range"
-          id="audio-sensitivity"
           min="0.1"
           max="5.0"
           step="0.1"
@@ -73,7 +88,11 @@ const AudioSensitivityControls: React.FC = () => {
           onMouseUp={handleSliderBlur}
           disabled={isLoading || isSaving}
           className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+          style={{
+            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb 100%)`
+          }}
         />
+        
         <input
           type="number"
           min="0.1"
@@ -86,12 +105,9 @@ const AudioSensitivityControls: React.FC = () => {
           }}
           onBlur={() => handleSensitivityChange(sensitivity)}
           disabled={isLoading || isSaving}
-          className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
         />
       </div>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-        Adjust the sensitivity/gain multiplier for audio input. Higher values make the lights more reactive to audio. Range: 0.1-5.0 (default: 1.0)
-      </p>
     </div>
   );
 };

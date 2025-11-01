@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import { DmxFixture, LightingConfiguration,  } from '../../photonics-dmx/types';
+import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { Pages } from './types';
 
 /**
@@ -71,6 +72,12 @@ export const senderIpcEnabledAtom = atom<boolean>(false);
 export const yargListenerEnabledAtom = atom<boolean>(false);
 
 export const rb3eListenerEnabledAtom = atom<boolean>(false);
+
+/**
+ * Atom for storing live audio analysis data
+ * Updated by AudioCaptureManager, consumed by CuePreviewAudio
+ */
+export const audioDataAtom = atom<AudioLightingData | null>(null);
 
 export const isSenderErrorAtom = atom<boolean>(false);
 export const senderErrorAtom = atom<any>("");

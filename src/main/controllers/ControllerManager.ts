@@ -799,19 +799,16 @@ export class ControllerManager {
     }
     
     const audioConfig = this.config.getAudioConfig();
-    if (!audioConfig || !audioConfig.enabled) {
-      console.log("Audio is disabled in configuration");
-      return;
-    }
     
     try {
       console.log('Enabling audio with Web Audio API...');
       
       // Create audio processor in main process
+      // getAudioConfig() always returns a valid config (merges with defaults)
       this.audioProcessor = new AudioDirectProcessor(
         this.dmxLightManager,
         this.effectsController,
-        audioConfig
+        audioConfig 
       );
       
       // Start the processor
@@ -822,7 +819,6 @@ export class ControllerManager {
       ipcMain.on('audio:data', (_, data) => {
         if (this.audioProcessor && this.isAudioEnabled) {
           this.audioProcessor.processAudioData(data);
-          
           // Debug logging - log every ~60 frames (once per second)
           this.audioDataReceivedCount++;
           if (this.audioDataReceivedCount % 60 === 0) {

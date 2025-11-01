@@ -14,20 +14,20 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    // Initialize toggle state from audio config
+    // Initialize toggle state from runtime enabled state (not config)
     const initializeState = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke('get-audio-config');
-        setIsAudioEnabled(config?.enabled || false);
+        const enabled = await window.electron.ipcRenderer.invoke('get-audio-enabled');
+        setIsAudioEnabled(enabled);
       } catch (error) {
         console.error('Error initializing Audio toggle state:', error);
       }
     };
     
-    // Handle controllers restarted event
+    // Handle controllers restarted event - audio is disabled on restart
     const handleControllersRestarted = () => {
-      console.log('Controllers restarted, refreshing Audio toggle state');
-      initializeState();
+      console.log('Controllers restarted, audio disabled');
+      setIsAudioEnabled(false);
     };
     
     const cleanup = useIpcListener('controllers-restarted', handleControllersRestarted);
