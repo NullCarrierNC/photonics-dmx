@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useAtom } from 'jotai';
 import YargToggle from './YargToggle';
 import Rb3Toggle from './Rb3Toggle';
+import AudioToggle from './AudioToggle';
 import EnttecProToggle from './EnttecProToggle';
 import SacnToggle from './SacnToggle';
 import ArtNetToggle from './ArtNetToggle';
@@ -30,21 +31,30 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps ) => {
         className="flex flex-row gap-4 items-center text-left font-semibold bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span>Game Settings</span>
+        <span>Input/Output Settings</span>
         {isOpen ? <FaChevronCircleDown size={20} /> : <FaChevronCircleRight size={20} />}
       </button>
 
       {isOpen && (
         <div className="p-4">
-          <div className="flex flex-row gap-16 items-start">
-            <YargToggle disabled={hasInvalidConfig} /> <Rb3Toggle disabled={hasInvalidConfig} />
+          {/* Game Input Listeners */}
+          <div className="mb-6">
+            <h3 className="text-md font-medium mb-3 text-gray-700 dark:text-gray-300">Input</h3>
+            <div className="flex flex-row gap-8 items-start flex-wrap">
+              <YargToggle disabled={hasInvalidConfig} />
+              <Rb3Toggle disabled={hasInvalidConfig} />
+              <AudioToggle disabled={hasInvalidConfig} />
+            </div>
           </div>
           
-          <div className="flex flex-row gap-16 items-start">
-            <SacnToggle disabled={hasInvalidConfig} /> <EnttecProToggle disabled={hasInvalidConfig} />
-          </div>
-          <div className="flex flex-row gap-16 items-start ">
-            <ArtNetToggle disabled={hasInvalidConfig} />
+          {/* DMX Output Senders */}
+          <div>
+            <h3 className="text-md font-medium mb-3 text-gray-700 dark:text-gray-300">DMX Output</h3>
+            <div className="flex flex-row gap-8 items-start flex-wrap">
+              <SacnToggle disabled={hasInvalidConfig} />
+              <EnttecProToggle disabled={hasInvalidConfig} />
+              <ArtNetToggle disabled={hasInvalidConfig} />
+            </div>
           </div>
           
           {hasInvalidConfig && (

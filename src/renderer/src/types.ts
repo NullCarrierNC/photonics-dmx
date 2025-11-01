@@ -7,5 +7,6 @@ export enum Pages {
   CueSimulation = 'CueSimulation',
   CueSequencer = 'CueSequencer',
   Preferences = 'Preferences',
+  AudioSettings = 'AudioSettings',
   About = 'About',
 }

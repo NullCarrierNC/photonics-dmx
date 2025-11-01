@@ -152,10 +152,50 @@ export interface LightingPreferences {
     enttecProExpanded: boolean;
     sacnExpanded: boolean;
   };
+  audioConfig?: {
+    deviceId?: number;
+    sampleRate: number;
+    fftSize: number;
+    updateIntervalMs: number;
+    sensitivity: number;
+    beatDetection: {
+      threshold: number;
+      decayRate: number;
+      minInterval: number;
+    };
+    frequencyRanges: {
+      bass: [number, number];
+      mids: [number, number];
+      highs: [number, number];
+    };
+    smoothing: {
+      enabled: boolean;
+      alpha: number;
+    };
+    colorMapping: {
+      bassColor: string;
+      midsColor: string;
+      highsColor: string;
+    };
+    enabled: boolean;
+  };
 }
 
 export const lightingPrefsAtom = atom<LightingPreferences>({});
 export const useComplexCuesAtom = atom<boolean>(false);
+
+// Audio configuration atoms
+export const audioConfigAtom = atom((get) => {
+  const prefs = get(lightingPrefsAtom);
+  return prefs.audioConfig;
+});
+
+export const audioDevicesAtom = atom<Array<{ deviceId: number; label: string }>>([]);
+
+export const audioEnabledAtom = atom((get) => {
+  const config = get(audioConfigAtom);
+  return config?.enabled || false;
+});
 
 
 

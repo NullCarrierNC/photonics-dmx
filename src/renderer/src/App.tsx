@@ -16,9 +16,12 @@ import { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types';
 import { IpcRendererEvent } from 'electron';
 import About from './pages/About';
 import Preferences from './pages/Preferences';
+import AudioSettings from './pages/AudioSettings';
 import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
+import { AudioCaptureManager } from './services/AudioCaptureManager';
+import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 
 /**
  * Main application component
@@ -45,6 +48,9 @@ export const App = (): JSX.Element => {
   const setEnttecProEnabled = useSetAtom(senderEnttecProEnabledAtom);
   const setIpcEnabled = useSetAtom(senderIpcEnabledAtom);
   const [appVer, setAppVer] = useState('');
+
+  // Audio capture manager ref (created once, persists for app lifetime)
+  const audioCaptureManagerRef = useRef<AudioCaptureManager | null>(null);
 
   // Create a clearErrorTimeout callback that will be used to reset error state
   const clearErrorState = useCallback((): void => {
@@ -98,6 +104,41 @@ export const App = (): JSX.Element => {
     setSenderError(`Failed to start ${data.sender} sender: ${data.error}`);
     resetErrorTimeout();
   }, [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setIpcEnabled, setIsSenderError, setSenderError, resetErrorTimeout]);
+
+  // Handler for audio:enable from main process
+  const handleAudioEnable = useCallback(async (_evt: IpcRendererEvent, config: AudioConfig): Promise<void> => {
+    console.log('Received audio:enable from main process', config);
+    
+    try {
+      // Create AudioCaptureManager if it doesn't exist
+      if (!audioCaptureManagerRef.current) {
+        audioCaptureManagerRef.current = new AudioCaptureManager(config);
+        console.log('Created AudioCaptureManager');
+      } else {
+        // Update config if manager already exists
+        audioCaptureManagerRef.current.updateConfig(config);
+      }
+      
+      // Start capturing audio
+      await audioCaptureManagerRef.current.start(config.deviceId);
+      console.log('Audio capture started');
+    } catch (error) {
+      console.error('Failed to start audio capture:', error);
+      setIsSenderError(true);
+      setSenderError(`Failed to start audio capture: ${error instanceof Error ? error.message : String(error)}`);
+      resetErrorTimeout();
+    }
+  }, [setIsSenderError, setSenderError, resetErrorTimeout]);
+
+  // Handler for audio:disable from main process
+  const handleAudioDisable = useCallback((): void => {
+    console.log('Received audio:disable from main process');
+    
+    if (audioCaptureManagerRef.current) {
+      audioCaptureManagerRef.current.stop();
+      console.log('Audio capture stopped');
+    }
+  }, []);
 
   const toggleDarkMode = (): void => {
     setIsDarkMode((prevMode) => !prevMode);
@@ -234,6 +275,10 @@ export const App = (): JSX.Element => {
     // Set up event listener for sender start failures
     addIpcListener('sender-start-failed', handleSenderStartFailure);
 
+    // Set up event listeners for audio control
+    addIpcListener('audio:enable', handleAudioEnable);
+    addIpcListener('audio:disable', handleAudioDisable);
+
     const saveLightLayout = async () => {
       if (activeConfig) {
         try {
@@ -251,8 +296,15 @@ export const App = (): JSX.Element => {
       removeIpcListener('sender-error', handleSenderError);
       removeIpcListener('cue-state-update', handleCueStateUpdate);
       removeIpcListener('sender-start-failed', handleSenderStartFailure);
+      removeIpcListener('audio:enable', handleAudioEnable);
+      removeIpcListener('audio:disable', handleAudioDisable);
+      
+      // Cleanup audio capture manager on unmount
+      if (audioCaptureManagerRef.current) {
+        audioCaptureManagerRef.current.stop();
+      }
     };
-  }, [activeConfig, handleSenderError, handleCueStateUpdate, handleSenderStartFailure]);
+  }, [activeConfig, handleSenderError, handleCueStateUpdate, handleSenderStartFailure, handleAudioEnable, handleAudioDisable]);
 
   const renderContent = () => {
     switch (currentPage) {
@@ -272,6 +324,8 @@ export const App = (): JSX.Element => {
         return <NetworkDebug />;
       case Pages.Preferences:
         return <Preferences />;
+      case Pages.AudioSettings:
+        return <AudioSettings />;
       case Pages.About:
         return <About />;
       default:

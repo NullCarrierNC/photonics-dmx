@@ -1,5 +1,6 @@
 import { ConfigFile } from './ConfigFile';
 import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes } from '../../photonics-dmx/types';
+import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio/AudioConfig';
 
 /**
  * Application preferences interface
@@ -46,6 +47,31 @@ export interface AppPreferences {
     enttecProExpanded: boolean;
     sacnExpanded: boolean;
   };
+  audioConfig?: {
+    deviceId?: string; // Web Audio API uses MediaDeviceInfo.deviceId (string)
+    fftSize: number;
+    sensitivity: number;
+    beatDetection: {
+      threshold: number;
+      decayRate: number;
+      minInterval: number;
+    };
+    frequencyRanges: {
+      bass: [number, number];
+      mids: [number, number];
+      highs: [number, number];
+    };
+    smoothing: {
+      enabled: boolean;
+      alpha: number;
+    };
+    colorMapping: {
+      bassColor: string;
+      midsColor: string;
+      highsColor: string;
+    };
+    enabled: boolean;
+  };
 }
 
 /**
@@ -91,7 +117,8 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     artNetExpanded: false,
     enttecProExpanded: false,
     sacnExpanded: false
-  }
+  },
+  audioConfig: DEFAULT_AUDIO_CONFIG
 };
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {
@@ -302,5 +329,42 @@ export class ConfigurationManager {
    */
   resetLayoutToDefaults(): void {
     this.lightingLayout.update(DEFAULT_LIGHTING_LAYOUT);
+  }
+
+  // Audio Configuration Methods
+
+  /**
+   * Gets audio configuration
+   */
+  getAudioConfig(): AppPreferences['audioConfig'] {
+    const savedConfig = this.getPreference('audioConfig');
+    
+    // Merge saved config with defaults, then force enabled to false
+    const config = savedConfig ? { ...DEFAULT_AUDIO_CONFIG, ...savedConfig } : DEFAULT_AUDIO_CONFIG;
+    
+    // Audio enabled state is runtime-only - always return false
+    return { ...config, enabled: false };
+  }
+
+  /**
+   * Sets audio configuration
+   */
+  setAudioConfig(config: AppPreferences['audioConfig']): void {
+    this.setPreference('audioConfig', config);
+  }
+
+  /**
+   * Updates audio configuration (partial update)
+   * Note: The 'enabled' field is never persisted (runtime-only state)
+   */
+  updateAudioConfig(updates: Partial<AppPreferences['audioConfig']>): void {
+    const current = this.getPreference('audioConfig') || {};
+    const updated = { ...current, ...updates };
+    
+    // Strip out 'enabled' field - it should never be persisted
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { enabled, ...configToSave } = updated;
+    
+    this.setPreference('audioConfig', configToSave as any);
   }
 } 

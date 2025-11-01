@@ -28,29 +28,44 @@ export const getGlobalBrightnessConfig = (): { low: number; medium: number; high
  * @param blendMode - The blend mode for color mixing
  * @returns An RGBIP object with the specified color and brightness.
  */
+// Color map - single source of truth for valid colors and their RGB values
+const colorMap: { [key in Color]: { r: number; g: number; b: number } } = {
+  red:        { r: 255, g: 0,   b: 0 },
+  blue:       { r: 0,   g: 0,   b: 255 },
+  yellow:     { r: 255, g: 255, b: 0 },
+  green:      { r: 0,   g: 255, b: 0 },
+  cyan:       { r: 0,   g: 255, b: 255 },
+  orange:     { r: 255, g: 127, b: 0 },
+  purple:     { r: 128, g: 0,   b: 128 },
+  chartreuse: { r: 127, g: 255, b: 0 },
+  teal:       { r: 0,   g: 128, b: 128 },
+  violet:     { r: 138, g: 43,  b: 226 },
+  magenta:    { r: 255, g: 0,   b: 255 },
+  vermilion:  { r: 227, g: 66,  b: 52 },
+  amber:      { r: 255, g: 191, b: 0 },
+  white:      { r: 255, g: 255, b: 255 },
+  black:      { r: 0,   g: 0,   b: 0 },
+  transparent: { r: 0,  g: 0,    b: 0 } 
+};
+
+/**
+ * Validates a string and converts it to a Color type.
+ * Uses the colorMap as the single source of truth for valid colors.
+ * 
+ * @param colorString - The color string to validate
+ * @returns A valid Color type, or 'white' as fallback if invalid
+ */
+export const validateColorString = (colorString: string): Color => {
+  const normalizedColor = colorString.toLowerCase() as Color;
+  // Check if the normalized string exists as a key in colorMap
+  return normalizedColor in colorMap ? normalizedColor : 'white';
+};
+
 export const getColor = (
   color: Color,
   brightness: Brightness,
   blendMode: BlendMode = 'replace'
 ): RGBIO => {
-  const colorMap: { [key in typeof color]: { r: number; g: number; b: number } } = {
-    red:        { r: 255, g: 0,   b: 0 },
-    blue:       { r: 0,   g: 0,   b: 255 },
-    yellow:     { r: 255, g: 255, b: 0 },
-    green:      { r: 0,   g: 255, b: 0 },
-    cyan:       { r: 0,   g: 255, b: 255 },
-    orange:     { r: 255, g: 127, b: 0 },
-    purple:     { r: 128, g: 0,   b: 128 },
-    chartreuse: { r: 127, g: 255, b: 0 },
-    teal:       { r: 0,   g: 128, b: 128 },
-    violet:     { r: 138, g: 43,  b: 226 },
-    magenta:    { r: 255, g: 0,   b: 255 },
-    vermilion:  { r: 227, g: 66,  b: 52 },
-    amber:      { r: 255, g: 191, b: 0 },
-    white:      { r: 255, g: 255, b: 255 },
-    black:      { r: 0,   g: 0,   b: 0 },
-    transparent: { r: 0,  g: 0,    b: 0 } 
-  };
 
   // Use global brightness config or fall back to defaults
   const defaultBrightnessMap: { [key in typeof brightness]: number } = {

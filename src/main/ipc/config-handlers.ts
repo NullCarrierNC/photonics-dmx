@@ -210,4 +210,67 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       };
     }
   });
+
+  // Audio configuration handlers
+  
+  // Get audio configuration
+  ipcMain.handle('get-audio-config', async () => {
+    return controllerManager.getConfig().getAudioConfig();
+  });
+
+  // Save audio configuration
+  ipcMain.handle('save-audio-config', async (_, updates: any) => {
+    try {
+      controllerManager.getConfig().updateAudioConfig(updates);
+      
+      // If audio is currently enabled, reload the listener config
+      if (controllerManager.getIsAudioEnabled() && (controllerManager as any).audioListener) {
+        (controllerManager as any).audioListener.reloadConfig();
+      }
+      
+      // If enabled state changed, start/stop audio
+      if (updates.enabled !== undefined) {
+        if (updates.enabled) {
+          await controllerManager.enableAudio();
+        } else {
+          await controllerManager.disableAudio();
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving audio configuration:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get audio enabled state
+  ipcMain.handle('get-audio-enabled', async () => {
+    return controllerManager.getIsAudioEnabled();
+  });
+
+  // Enable/disable audio
+  ipcMain.handle('set-audio-enabled', async (_, enabled: boolean) => {
+    try {
+      controllerManager.getConfig().updateAudioConfig({ enabled });
+      
+      // Now enable/disable audio based on the updated config
+      if (enabled) {
+        await controllerManager.enableAudio();
+      } else {
+        await controllerManager.disableAudio();
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting audio enabled state:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
 } 

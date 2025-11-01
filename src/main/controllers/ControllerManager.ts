@@ -8,8 +8,9 @@ import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetwo
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
+import { AudioDirectProcessor } from '../../photonics-dmx/processors/AudioDirectProcessor';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces';
 import { SenderError } from '../../photonics-dmx/senders/BaseSender';
@@ -33,6 +34,7 @@ export class ControllerManager {
   private cueHandler: YargCueHandler | Rb3CueHandler | null = null;
   private yargListener: YargNetworkListener | null = null;
   private rb3eListener: Rb3eNetworkListener | null = null;
+  private audioProcessor: AudioDirectProcessor | null = null;
   private processorManager: ProcessorManager | null = null;
 
   private testEffectInterval: NodeJS.Timeout | null = null;
@@ -42,6 +44,8 @@ export class ControllerManager {
   private isInitialized = false;
   private isYargEnabled = false;
   private isRb3Enabled = false;
+  private isAudioEnabled = false;
+  private audioDataReceivedCount = 0;
 
   constructor() {
     this.config = new ConfigurationManager();
@@ -582,6 +586,13 @@ export class ControllerManager {
         console.error("Error disabling RB3:", err);
       }
       
+      try {
+        await this.disableAudio();
+        console.log("ControllerManager shutdown: Audio disabled");
+      } catch (err) {
+        console.error("Error disabling Audio:", err);
+      }
+      
       // Ensure cue handler is shut down if it still exists
       if (this.cueHandler) {
         try {
@@ -757,5 +768,139 @@ export class ControllerManager {
       console.error("Error reinitializing controllers:", error);
       throw error;
     }
+  }
+
+  /**
+   * Enable audio listener and processor
+   */
+  public async enableAudio(): Promise<void> {
+    // Check if the system is initialized, initialize if needed
+    if (!this.isInitialized) {
+      console.log("Initializing system before enabling Audio");
+      this.init().then(() => {
+        this.enableAudioInternal();
+      }).catch(error => {
+        console.error("Error during initialization:", error);
+      });
+      return;
+    }
+    
+    await this.enableAudioInternal();
+  }
+
+  /**
+   * Internal method to enable Audio without initialization checks
+   * Uses Web Audio API in renderer process
+   */
+  private async enableAudioInternal(): Promise<void> {
+    if (this.isAudioEnabled || !this.effectsController || !this.dmxLightManager) {
+      console.log("Cannot enable Audio: already enabled or missing required components");
+      return;
+    }
+    
+    const audioConfig = this.config.getAudioConfig();
+    if (!audioConfig || !audioConfig.enabled) {
+      console.log("Audio is disabled in configuration");
+      return;
+    }
+    
+    try {
+      console.log('Enabling audio with Web Audio API...');
+      
+      // Create audio processor in main process
+      this.audioProcessor = new AudioDirectProcessor(
+        this.dmxLightManager,
+        this.effectsController,
+        audioConfig
+      );
+      
+      // Start the processor
+      this.audioProcessor.start();
+      
+      // Set up IPC handler to receive audio data from renderer
+      this.audioDataReceivedCount = 0;
+      ipcMain.on('audio:data', (_, data) => {
+        if (this.audioProcessor && this.isAudioEnabled) {
+          this.audioProcessor.processAudioData(data);
+          
+          // Debug logging - log every ~60 frames (once per second)
+          this.audioDataReceivedCount++;
+          if (this.audioDataReceivedCount % 60 === 0) {
+            console.log('Audio Data Receive:', {
+              energy: data.energy.toFixed(3),
+              bass: data.frequencyBands.bass.toFixed(3),
+              mids: data.frequencyBands.mids.toFixed(3),
+              highs: data.frequencyBands.highs.toFixed(3),
+              beat: data.beatDetected ? 'YES' : 'no',
+              totalFrames: this.audioDataReceivedCount
+            });
+          }
+        }
+      });
+      
+      // Tell renderer to start capturing audio
+      const mainWindow = BrowserWindow.getFocusedWindow();
+      if (mainWindow) {
+        mainWindow.webContents.send('audio:enable', audioConfig);
+        console.log('Sent audio:enable to renderer');
+      } else {
+        console.warn('No focused window to send audio:enable command');
+      }
+      
+      this.isAudioEnabled = true;
+      console.log("Audio enabled successfully (Web Audio API)");
+    } catch (error) {
+      console.error('Failed to enable audio:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Disable audio processing
+   */
+  public async disableAudio(): Promise<void> {
+    if (!this.isAudioEnabled) {
+      return;
+    }
+    
+    console.log('Disabling audio...');
+    
+    // Clear all running effects before shutting down
+    if (this.effectsController) {
+      try {
+        this.effectsController.removeAllEffects();
+        await this.effectsController.blackout(0);
+        console.log('ControllerManager: Cleared all running effects and initiated blackout when disabling Audio');
+      } catch (error) {
+        console.error('Error clearing effects when disabling Audio:', error);
+      }
+    }
+    
+    // Tell renderer to stop capturing audio
+    const mainWindow = BrowserWindow.getFocusedWindow();
+    if (mainWindow) {
+      mainWindow.webContents.send('audio:disable');
+      console.log('Sent audio:disable to renderer');
+    }
+    
+    // Remove IPC handler
+    ipcMain.removeAllListeners('audio:data');
+    
+    // Shutdown processor
+    if (this.audioProcessor) {
+      this.audioProcessor.shutdown();
+      this.audioProcessor = null;
+    }
+    
+    this.isAudioEnabled = false;
+    console.log("Audio disabled successfully");
+  }
+
+
+  /**
+   * Get audio enabled state
+   */
+  public getIsAudioEnabled(): boolean {
+    return this.isAudioEnabled;
   }
 } 
