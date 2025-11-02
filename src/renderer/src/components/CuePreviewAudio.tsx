@@ -1,6 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useAtomValue } from 'jotai';
-import { audioDataAtom } from '../atoms';
+import { audioDataAtom, audioConfigAtom } from '../atoms';
+import type { Color } from '../../../photonics-dmx/types';
+
+// Map Color type to RGB values for preview bars (matches AudioColorMapping.tsx)
+const COLOR_TO_RGB: Record<Color, string> = {
+  red: 'rgb(255, 0, 0)',
+  blue: 'rgb(0, 0, 255)',
+  yellow: 'rgb(255, 255, 0)',
+  green: 'rgb(0, 255, 0)',
+  cyan: 'rgb(0, 255, 255)',
+  orange: 'rgb(255, 127, 0)',
+  purple: 'rgb(128, 0, 128)',
+  chartreuse: 'rgb(127, 255, 0)',
+  teal: 'rgb(0, 128, 128)',
+  violet: 'rgb(138, 43, 226)',
+  magenta: 'rgb(255, 0, 255)',
+  vermilion: 'rgb(227, 66, 52)',
+  amber: 'rgb(255, 191, 0)',
+  white: 'rgb(255, 255, 255)',
+  black: 'rgb(0, 0, 0)',
+  transparent: 'rgb(0, 0, 0)'
+};
 
 interface CuePreviewAudioProps {
   className?: string;
@@ -9,7 +30,18 @@ interface CuePreviewAudioProps {
 const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
   const audioData = useAtomValue(audioDataAtom);
+  const audioConfig = useAtomValue(audioConfigAtom);
   const [lastBeatTime, setLastBeatTime] = useState(0);
+
+  // Get configured colors with fallback to defaults
+  const bassColor = audioConfig?.colorMapping?.bassColor || 'red';
+  const midsColor = audioConfig?.colorMapping?.midsColor || 'blue';
+  const highsColor = audioConfig?.colorMapping?.highsColor || 'yellow';
+
+  // Get RGB values for the bars
+  const bassColorRgb = COLOR_TO_RGB[bassColor as Color] || COLOR_TO_RGB.red;
+  const midsColorRgb = COLOR_TO_RGB[midsColor as Color] || COLOR_TO_RGB.blue;
+  const highsColorRgb = COLOR_TO_RGB[highsColor as Color] || COLOR_TO_RGB.yellow;
 
   // Track beat detection for pulse animation
   useEffect(() => {
@@ -55,8 +87,11 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
           </div>
           <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
             <div
-              className="h-full bg-red-500 transition-all duration-150 ease-out"
-              style={{ width: `${frequencyBands.bass * 100}%` }}
+              className="h-full transition-all duration-150 ease-out"
+              style={{ 
+                width: `${frequencyBands.bass * 100}%`,
+                backgroundColor: bassColorRgb
+              }}
             />
           </div>
         </div>
@@ -71,8 +106,11 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
           </div>
           <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
             <div
-              className="h-full bg-blue-500 transition-all duration-150 ease-out"
-              style={{ width: `${frequencyBands.mids * 100}%` }}
+              className="h-full transition-all duration-150 ease-out"
+              style={{ 
+                width: `${frequencyBands.mids * 100}%`,
+                backgroundColor: midsColorRgb
+              }}
             />
           </div>
         </div>
@@ -87,8 +125,11 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
           </div>
           <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
             <div
-              className="h-full bg-yellow-500 transition-all duration-150 ease-out"
-              style={{ width: `${frequencyBands.highs * 100}%` }}
+              className="h-full transition-all duration-150 ease-out"
+              style={{ 
+                width: `${frequencyBands.highs * 100}%`,
+                backgroundColor: highsColorRgb
+              }}
             />
           </div>
         </div>

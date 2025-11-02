@@ -112,10 +112,11 @@ export class AudioDirectProcessor {
     const { frequencyBands, energy, beatDetected } = data;
     
     // Debug logging - log every ~60 calls (once per second at 60fps)
+    /*
     this.processCount++;
     if (this.processCount % this.DEBUG_LOG_INTERVAL === 0) {
       const lights = this.lightManager.getLights(['front', 'back'], 'all');
-      console.log('💡 Audio Processor Active:', {
+      console.log('Audio Processor Active:', {
         energy: energy.toFixed(3),
         bass: frequencyBands.bass.toFixed(3),
         mids: frequencyBands.mids.toFixed(3),
@@ -126,6 +127,7 @@ export class AudioDirectProcessor {
         processedFrames: this.processCount
       });
     }
+    */
     
     // Map frequency bands to lights
     this.mapFrequencyBandsToLights(frequencyBands, energy, beatDetected);

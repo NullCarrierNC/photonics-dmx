@@ -231,15 +231,26 @@ export class AudioCaptureManager {
 
   /**
    * Update configuration
+   * This is called when config changes while audio is running
    */
   updateConfig(config: Partial<AudioConfig>): void {
+    const oldConfig = { ...this.config };
     this.config = { ...this.config, ...config };
     
-    // Update analyser if active
-    if (this.analyser && config.fftSize && config.fftSize !== this.analyser.fftSize) {
+    // Update analyser if active and FFT size changed
+    if (this.analyser && config.fftSize && config.fftSize !== oldConfig.fftSize) {
       this.analyser.fftSize = config.fftSize;
       console.log(`Updated FFT size to ${config.fftSize}`);
     }
+    
+    // Log config update for debugging
+    console.log('AudioCaptureManager configuration updated:', {
+      sensitivity: config.sensitivity !== undefined ? config.sensitivity : 'unchanged',
+      smoothing: config.smoothing !== undefined ? config.smoothing : 'unchanged',
+      beatDetection: config.beatDetection !== undefined ? config.beatDetection : 'unchanged',
+      frequencyRanges: config.frequencyRanges !== undefined ? config.frequencyRanges : 'unchanged',
+      fftSize: config.fftSize !== undefined ? config.fftSize : 'unchanged'
+    });
   }
 
   /**
@@ -256,7 +267,7 @@ export class AudioCaptureManager {
     // Calculate frequency bands
     const audioData = this.calculateFrequencyBands(dataArray);
     
-    // Always send to main process via IPC for DMX light control (needs 60fps for responsiveness)
+    // Always send to main process via IPC (full frame rate)
     window.electron.ipcRenderer.send('audio:data', audioData);
     
     // Throttle UI updates

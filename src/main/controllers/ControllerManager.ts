@@ -9,6 +9,7 @@ import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
 import { AudioDirectProcessor } from '../../photonics-dmx/processors/AudioDirectProcessor';
+import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
 import { BrowserWindow, ipcMain } from 'electron';
 
@@ -822,18 +823,7 @@ export class ControllerManager {
       const audioDataHandler = (_, data) => {
         if (this.audioProcessor && this.isAudioEnabled) {
           this.audioProcessor.processAudioData(data);
-          // Debug logging - log every ~60 frames (once per second)
-          this.audioDataReceivedCount++;
-          if (this.audioDataReceivedCount % 60 === 0) {
-            console.log('Audio Data Receive:', {
-              energy: data.energy.toFixed(3),
-              bass: data.frequencyBands.bass.toFixed(3),
-              mids: data.frequencyBands.mids.toFixed(3),
-              highs: data.frequencyBands.highs.toFixed(3),
-              beat: data.beatDetected ? 'YES' : 'no',
-              totalFrames: this.audioDataReceivedCount
-            });
-          }
+          
         }
       };
       
@@ -895,6 +885,20 @@ export class ControllerManager {
     
     this.isAudioEnabled = false;
     console.log("Audio disabled successfully");
+  }
+  
+  /**
+   * Update audio configuration while audio is running
+   * This is called when config changes while audio is enabled
+   */
+  public updateAudioConfig(config: AudioConfig): void {
+    if (!this.isAudioEnabled || !this.audioProcessor) {
+      return;
+    }
+    
+    // Update the audio processor configuration
+    this.audioProcessor.updateConfig(config);
+    console.log('AudioDirectProcessor configuration updated');
   }
 
 

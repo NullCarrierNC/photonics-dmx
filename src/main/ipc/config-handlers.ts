@@ -3,6 +3,7 @@ import { ControllerManager } from '../controllers/ControllerManager';
 import '../../photonics-dmx/cues';
 import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers';
+import { BrowserWindow } from 'electron';
 
 /**
  * Set up configuration-related IPC handlers
@@ -221,11 +222,45 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Save audio configuration
   ipcMain.handle('save-audio-config', async (_, updates: any) => {
     try {
+      // Get current config to check if deviceId changed
+      const currentConfig = controllerManager.getConfig().getAudioConfig();
+      const currentDeviceId = currentConfig?.deviceId;
+      const newDeviceId = updates.deviceId;
+      
+      // Check if device changed (handle undefined/default case)
+      const deviceChanged = newDeviceId !== undefined && 
+                           newDeviceId !== currentDeviceId;
+      
+      // Save the config
       controllerManager.getConfig().updateAudioConfig(updates);
       
-      // If audio is currently enabled, reload the listener config
-      if (controllerManager.getIsAudioEnabled() && (controllerManager as any).audioListener) {
-        (controllerManager as any).audioListener.reloadConfig();
+      // Get updated config
+      const updatedConfig = controllerManager.getConfig().getAudioConfig();
+      
+      // If audio is currently enabled, apply config updates immediately
+      if (controllerManager.getIsAudioEnabled()) {
+        // If device changed, we need to restart audio capture
+        if (deviceChanged) {
+          console.log('Device changed, restarting audio capture...');
+          try {
+            // Disable and re-enable to restart with new device
+            await controllerManager.disableAudio();
+            await controllerManager.enableAudio();
+          } catch (error) {
+            console.error('Failed to restart audio with new device:', error);
+            // Don't throw - config is still saved, user can manually restart
+          }
+        } else {
+          // Update running processor and notify renderer
+          controllerManager.updateAudioConfig(updatedConfig);
+          
+          // Notify renderer process to update config
+          const mainWindow = BrowserWindow.getFocusedWindow();
+          if (mainWindow) {
+            mainWindow.webContents.send('audio:config-update', updatedConfig);
+            console.log('Sent audio:config-update to renderer');
+          }
+        }
       }
       
       // If enabled state changed, start/stop audio

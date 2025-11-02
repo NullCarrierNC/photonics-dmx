@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom, senderSacnEnabledAtom, senderArtNetEnabledAtom, senderEnttecProEnabledAtom, senderIpcEnabledAtom } from './atoms';
+import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom, senderSacnEnabledAtom, senderArtNetEnabledAtom, senderEnttecProEnabledAtom, senderIpcEnabledAtom, LightingPreferences } from './atoms';
 import { Pages } from './types';
 import squareLogo from './assets/images/photonics-icon.png';
 import LeftMenu from './components/LeftMenu';
@@ -154,6 +154,40 @@ export const App = (): JSX.Element => {
     }
   }, []);
 
+  // Handler for audio:config-update from main process
+  const handleAudioConfigUpdate = useCallback((_evt: IpcRendererEvent, config: AudioConfig): void => {
+    console.log('Received audio:config-update from main process', config);
+    
+    // Update AudioCaptureManager if it exists
+    if (audioCaptureManagerRef.current) {
+      audioCaptureManagerRef.current.updateConfig(config);
+      console.log('AudioCaptureManager configuration updated');
+    }
+    
+    // Update lightingPrefsAtom so preview components can react to color changes
+    // Merge with existing audioConfig to preserve fields like sampleRate and updateIntervalMs
+    setPrefs(prev => ({
+      ...prev,
+      audioConfig: {
+        ...prev.audioConfig,
+        // Update all compatible fields from config (exclude deviceId which has type mismatch)
+        fftSize: config.fftSize,
+        sensitivity: config.sensitivity,
+        beatDetection: config.beatDetection,
+        frequencyRanges: config.frequencyRanges,
+        smoothing: config.smoothing,
+        colorMapping: config.colorMapping,
+        enabled: config.enabled,
+        // Preserve fields that exist in frontend but not in backend config
+        sampleRate: prev.audioConfig?.sampleRate,
+        updateIntervalMs: prev.audioConfig?.updateIntervalMs,
+        // Preserve deviceId from frontend (number) rather than backend (string)
+        deviceId: prev.audioConfig?.deviceId
+      } as LightingPreferences['audioConfig']
+    }));
+    console.log('Lighting preferences updated with new audio config');
+  }, [setPrefs]);
+
   const toggleDarkMode = (): void => {
     setIsDarkMode((prevMode) => !prevMode);
     document.documentElement.classList.toggle('dark', !isDarkMode); 
@@ -292,6 +326,7 @@ export const App = (): JSX.Element => {
     // Set up event listeners for audio control
     addIpcListener('audio:enable', handleAudioEnable);
     addIpcListener('audio:disable', handleAudioDisable);
+    addIpcListener('audio:config-update', handleAudioConfigUpdate);
 
     const saveLightLayout = async () => {
       if (activeConfig) {
@@ -312,6 +347,7 @@ export const App = (): JSX.Element => {
       removeIpcListener('sender-start-failed', handleSenderStartFailure);
       removeIpcListener('audio:enable', handleAudioEnable);
       removeIpcListener('audio:disable', handleAudioDisable);
+      removeIpcListener('audio:config-update', handleAudioConfigUpdate);
       
       // Cleanup audio capture manager on unmount
       if (audioCaptureManagerRef.current) {
