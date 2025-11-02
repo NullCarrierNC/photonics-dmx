@@ -48,31 +48,7 @@ export interface AppPreferences {
     enttecProExpanded: boolean;
     sacnExpanded: boolean;
   };
-  audioConfig?: {
-    deviceId?: string; // Web Audio API uses MediaDeviceInfo.deviceId (string)
-    fftSize: number;
-    sensitivity: number;
-    beatDetection: {
-      threshold: number;
-      decayRate: number;
-      minInterval: number;
-    };
-    frequencyRanges: {
-      bass: [number, number];
-      mids: [number, number];
-      highs: [number, number];
-    };
-    smoothing: {
-      enabled: boolean;
-      alpha: number;
-    };
-    colorMapping: {
-      bassColor: string;
-      midsColor: string;
-      highsColor: string;
-    };
-    enabled: boolean;
-  };
+  audioConfig?: AudioConfig;
 }
 
 /**

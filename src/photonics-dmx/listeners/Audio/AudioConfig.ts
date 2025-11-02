@@ -15,20 +15,20 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
     decayRate: 0.95,
     minInterval: 100
   },
-  frequencyRanges: {
-    bass: [20, 250],
-    mids: [250, 4000],
-    highs: [4000, 20000]
-  },
   smoothing: {
     enabled: true,
     alpha: 0.7
   },
   colorMapping: {
-    bassColor: 'red',
-    midsColor: 'blue',
-    highsColor: 'yellow'
+    ranges: [
+      { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red', brightness: 'medium', sensitivity: 1.0 },
+      { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue', brightness: 'medium', sensitivity: 1.0 },
+      { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow', brightness: 'medium', sensitivity: 1.0 },
+      { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green', brightness: 'medium', sensitivity: 1.0 },
+      { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan', brightness: 'medium', sensitivity: 1.0 }
+    ]
   },
+  activeCueType: 'BasicLayered',
   enabled: false
 };
 

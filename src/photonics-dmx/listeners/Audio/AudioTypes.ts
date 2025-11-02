@@ -86,6 +86,9 @@ export interface AudioConfig {
     }>;
   };
   
+  /** Active cue type for audio-reactive lighting */
+  activeCueType?: string; // AudioCueType as string, default: 'BasicLayered'
+  
   /** Enable audio-reactive lighting */
   enabled: boolean;       // Default: false
 }

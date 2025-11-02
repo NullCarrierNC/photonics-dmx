@@ -3,6 +3,8 @@ import { ControllerManager } from '../controllers/ControllerManager';
 import { SenderConfig } from '../../photonics-dmx/types';
 import { CueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/CueRegistry';
 import { CueType } from '../../photonics-dmx/cues/cueTypes';
+// Import audio cues to ensure they're registered
+import '../../photonics-dmx/listeners/Audio/cues';
 
 /**
  * Set up light-related IPC handlers
@@ -159,6 +161,30 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     } catch (error) {
       console.error('Error updating sACN configuration:', error);
       throw error;
+    }
+  });
+
+  // Get available audio-reactive lighting cue types
+  ipcMain.handle('get-available-audio-cues', async () => {
+    try {
+      const { AudioCueRegistry } = await import('../../photonics-dmx/listeners/Audio/AudioCueRegistry');
+      const registry = AudioCueRegistry.getInstance();
+      
+      const availableCueTypes = registry.getAvailableCueTypes();
+      
+      // Get cue descriptions from registry
+      const cueDescriptions = availableCueTypes.map(cueType => {
+        const cue = registry.getCueImplementation(cueType);
+        return {
+          value: String(cueType), // Convert enum to string
+          label: cue?.description || String(cueType)
+        };
+      });
+      
+      return cueDescriptions;
+    } catch (error) {
+      console.error('Error getting available audio cues:', error);
+      return [];
     }
   });
 

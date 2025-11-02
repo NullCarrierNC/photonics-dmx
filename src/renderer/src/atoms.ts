@@ -187,6 +187,7 @@ export interface LightingPreferences {
         sensitivity: number;
       }>;
     };
+    activeCueType?: string; // AudioCueType as string
     enabled: boolean;
   };
 }

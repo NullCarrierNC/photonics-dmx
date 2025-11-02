@@ -8,7 +8,10 @@ import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetwo
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
-import { AudioDirectProcessor } from '../../photonics-dmx/processors/AudioDirectProcessor';
+import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor';
+import { AudioCueType } from '../../photonics-dmx/listeners/Audio/AudioCueTypes';
+// Import audio cues to register them
+import '../../photonics-dmx/listeners/Audio/cues';
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
 import { BrowserWindow, ipcMain } from 'electron';
@@ -35,7 +38,7 @@ export class ControllerManager {
   private cueHandler: YargCueHandler | Rb3CueHandler | null = null;
   private yargListener: YargNetworkListener | null = null;
   private rb3eListener: Rb3eNetworkListener | null = null;
-  private audioProcessor: AudioDirectProcessor | null = null;
+  private audioProcessor: AudioCueProcessor | null = null;
   private processorManager: ProcessorManager | null = null;
 
   private testEffectInterval: NodeJS.Timeout | null = null;
@@ -46,7 +49,6 @@ export class ControllerManager {
   private isYargEnabled = false;
   private isRb3Enabled = false;
   private isAudioEnabled = false;
-  private audioDataReceivedCount = 0;
 
   constructor() {
     this.config = new ConfigurationManager();
@@ -804,12 +806,17 @@ export class ControllerManager {
     try {
       console.log('Enabling audio with Web Audio API...');
       
-      // Create audio processor in main process
+      // Create audio processor in main process using cue-based system
       // getAudioConfig() always returns a valid config (merges with defaults)
-      this.audioProcessor = new AudioDirectProcessor(
+      const cueType = audioConfig.activeCueType 
+        ? (audioConfig.activeCueType as AudioCueType)
+        : AudioCueType.BasicLayered;
+      
+      this.audioProcessor = new AudioCueProcessor(
         this.dmxLightManager,
         this.effectsController,
-        audioConfig 
+        audioConfig,
+        cueType
       );
       
       // Start the processor
@@ -819,11 +826,9 @@ export class ControllerManager {
       // Remove existing listener first to prevent duplicates
       ipcMain.removeAllListeners('audio:data');
       
-      this.audioDataReceivedCount = 0;
       const audioDataHandler = (_, data) => {
         if (this.audioProcessor && this.isAudioEnabled) {
           this.audioProcessor.processAudioData(data);
-          
         }
       };
       
@@ -839,7 +844,7 @@ export class ControllerManager {
       }
       
       this.isAudioEnabled = true;
-      console.log("Audio enabled successfully (Web Audio API)");
+      console.log("Audio enabled successfully");
     } catch (error) {
       console.error('Failed to enable audio:', error);
       throw error;
@@ -896,9 +901,22 @@ export class ControllerManager {
       return;
     }
     
-    // Update the audio processor configuration
-    this.audioProcessor.updateConfig(config);
-    console.log('AudioDirectProcessor configuration updated');
+    // Update config - merge with existing config to preserve fields not in partial update
+    const currentConfig = this.config.getAudioConfig();
+    const mergedConfig = { ...currentConfig, ...config };
+    this.config.setAudioConfig(mergedConfig);
+    this.audioProcessor.updateConfig(mergedConfig);
+    
+    // If cue type changed, update it
+    const newCueType = config.activeCueType 
+      ? (config.activeCueType as AudioCueType)
+      : AudioCueType.BasicLayered;
+    
+    if (this.audioProcessor.getCueType() !== newCueType) {
+      this.audioProcessor.setCueType(newCueType);
+    }
+    
+    console.log('AudioCueProcessor configuration updated');
   }
 
 
