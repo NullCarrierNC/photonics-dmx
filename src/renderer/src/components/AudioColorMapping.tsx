@@ -39,11 +39,11 @@ const COLOR_TO_RGB: Record<Color, string> = {
 
 // Default frequency ranges
 const DEFAULT_RANGES = [
-  { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red' as Color, brightness: 'medium' as Brightness },
-  { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue' as Color, brightness: 'medium' as Brightness },
-  { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow' as Color, brightness: 'medium' as Brightness },
-  { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green' as Color, brightness: 'medium' as Brightness },
-  { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as Brightness }
+  { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
+  { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
+  { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
+  { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
+  { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 }
 ];
 
 interface FrequencyRange {
@@ -53,12 +53,15 @@ interface FrequencyRange {
   maxHz: number;
   color: Color;
   brightness: Brightness;
+  sensitivity: number;
 }
 
 const AudioColorMapping: React.FC = () => {
   const [ranges, setRanges] = useState<FrequencyRange[]>(DEFAULT_RANGES);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  // Local state for sensitivity sliders to prevent re-renders during drag
+  const [localSensitivityValues, setLocalSensitivityValues] = useState<Map<string, number>>(new Map());
 
   // Load configuration on mount
   useEffect(() => {
@@ -66,15 +69,23 @@ const AudioColorMapping: React.FC = () => {
       try {
         const config = await window.electron.ipcRenderer.invoke('get-audio-config');
         if (config?.colorMapping?.ranges && Array.isArray(config.colorMapping.ranges) && config.colorMapping.ranges.length > 0) {
-          // Use loaded ranges
-          setRanges(config.colorMapping.ranges as FrequencyRange[]);
+          // Use loaded ranges, ensuring sensitivity defaults to 1.0 if missing
+          const loadedRanges = config.colorMapping.ranges.map((range: FrequencyRange) => ({
+            ...range,
+            sensitivity: range.sensitivity ?? 1.0
+          }));
+          setRanges(loadedRanges as FrequencyRange[]);
+          // Clear any local sensitivity values when loading new config
+          setLocalSensitivityValues(new Map());
         } else {
           // Use defaults
           setRanges(DEFAULT_RANGES);
+          setLocalSensitivityValues(new Map());
         }
       } catch (error) {
         console.error('Failed to load audio color mapping:', error);
         setRanges(DEFAULT_RANGES);
+        setLocalSensitivityValues(new Map());
       } finally {
         setIsLoading(false);
       }
@@ -128,6 +139,29 @@ const AudioColorMapping: React.FC = () => {
     saveConfig(updatedRanges);
   }, [ranges, saveConfig]);
 
+  // Handle sensitivity slider change (local state only, no save)
+  const handleSensitivitySliderChange = useCallback((rangeId: string, sensitivity: number) => {
+    setLocalSensitivityValues(prev => {
+      const newMap = new Map(prev);
+      newMap.set(rangeId, sensitivity);
+      return newMap;
+    });
+  }, []);
+
+  // Handle sensitivity change (save on mouse up or blur)
+  const handleSensitivityChange = useCallback(async (rangeId: string, sensitivity: number) => {
+    const updatedRanges = ranges.map(range =>
+      range.id === rangeId ? { ...range, sensitivity } : range
+    );
+    setRanges(updatedRanges);
+    setLocalSensitivityValues(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(rangeId);
+      return newMap;
+    });
+    await saveConfig(updatedRanges);
+  }, [ranges, saveConfig]);
+
   // Handle name change
   const handleNameChange = useCallback((rangeId: string, name: string) => {
     const updatedRanges = ranges.map(range =>
@@ -155,6 +189,11 @@ const AudioColorMapping: React.FC = () => {
       </p>
 
       {ranges.map((range) => {
+        // Get current sensitivity value (local state if dragging, otherwise from range)
+        const currentSensitivity = localSensitivityValues.has(range.id) 
+          ? localSensitivityValues.get(range.id)! 
+          : (range.sensitivity ?? 1.0);
+        
         return (
           <div
             key={range.id}
@@ -214,6 +253,62 @@ const AudioColorMapping: React.FC = () => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Sensitivity slider */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Sensitivity
+                </label>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
+                    {currentSensitivity.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    / 1.0
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={currentSensitivity}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    handleSensitivitySliderChange(range.id, value);
+                  }}
+                  onMouseUp={(e) => {
+                    const value = parseFloat((e.target as HTMLInputElement).value);
+                    handleSensitivityChange(range.id, value);
+                  }}
+                  disabled={isSaving}
+                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                  style={{
+                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(currentSensitivity / 1.0) * 100}%, #e5e7eb ${(currentSensitivity / 1.0) * 100}%, #e5e7eb 100%)`
+                  }}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={currentSensitivity}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    handleSensitivitySliderChange(range.id, Math.max(0, Math.min(1, value)));
+                  }}
+                  onBlur={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    handleSensitivityChange(range.id, Math.max(0, Math.min(1, value)));
+                  }}
+                  disabled={isSaving}
+                  className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
+                />
+              </div>
             </div>
 
             {/* Frequency range slider */}

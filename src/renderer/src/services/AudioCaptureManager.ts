@@ -23,12 +23,13 @@ const DEFAULT_RANGES: Array<{
   maxHz: number;
   color: string;
   brightness: 'low' | 'medium' | 'high' | 'max';
+  sensitivity: number;
 }> = [
-  { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red', brightness: 'medium' },
-  { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue', brightness: 'medium' },
-  { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow', brightness: 'medium' },
-  { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green', brightness: 'medium' },
-  { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan', brightness: 'medium' }
+  { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red', brightness: 'medium', sensitivity: 1.0 },
+  { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue', brightness: 'medium', sensitivity: 1.0 },
+  { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow', brightness: 'medium', sensitivity: 1.0 },
+  { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green', brightness: 'medium', sensitivity: 1.0 },
+  { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan', brightness: 'medium', sensitivity: 1.0 }
 ];
 
 const DEFAULT_CONFIG: AudioConfig = {
@@ -372,10 +373,15 @@ export class AudioCaptureManager {
     }
     const overallEnergy = Math.min((totalEnergy / frequencyData.length / 255) * 2, 1.0);
     
-    // Apply sensitivity to all ranges
+    // Apply global sensitivity first, then per-range sensitivity
     const scaledEnergies: Map<string, number> = new Map();
-    for (const [rangeId, energy] of rangeEnergies.entries()) {
-      scaledEnergies.set(rangeId, Math.min(energy * this.config.sensitivity, 1.0));
+    for (const range of ranges) {
+      const energy = rangeEnergies.get(range.id) || 0;
+      // Apply global sensitivity first
+      const globallyScaled = energy * this.config.sensitivity;
+      // Then apply per-range sensitivity (0-1 multiplier)
+      const rangeSensitivity = range.sensitivity ?? 1.0;
+      scaledEnergies.set(range.id, Math.min(globallyScaled * rangeSensitivity, 1.0));
     }
     const scaledEnergy = Math.min(overallEnergy * this.config.sensitivity, 1.0);
     

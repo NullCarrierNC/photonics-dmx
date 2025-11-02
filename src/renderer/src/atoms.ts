@@ -184,6 +184,7 @@ export interface LightingPreferences {
         maxHz: number;
         color: string;
         brightness: 'low' | 'medium' | 'high' | 'max';
+        sensitivity: number;
       }>;
     };
     enabled: boolean;

@@ -81,6 +81,8 @@ export interface AudioConfig {
       color: string;
       /** Brightness level for this frequency range */
       brightness: 'low' | 'medium' | 'high' | 'max';
+      /** Sensitivity multiplier for this frequency range (0.0-1.0, default: 1.0) */
+      sensitivity: number;
     }>;
   };
   
