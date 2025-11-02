@@ -1,6 +1,6 @@
 import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
-import { yargListenerEnabledAtom, rb3eListenerEnabledAtom } from '../atoms';
+import { yargListenerEnabledAtom, rb3eListenerEnabledAtom, audioListenerEnabledAtom } from '../atoms';
 import { useIpcListener } from '../utils/ipcHelpers';
 
 interface AudioToggleProps {
@@ -8,9 +8,9 @@ interface AudioToggleProps {
 }
 
 const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
-  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
-  const [isYargEnabled] = useAtom(yargListenerEnabledAtom);
-  const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom);
+  const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom);
+  const [isYargEnabled, setIsYargEnabled] = useAtom(yargListenerEnabledAtom);
+  const [isRb3Enabled, setIsRb3Enabled] = useAtom(rb3eListenerEnabledAtom);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
     initializeState();
 
     return cleanup;
-  }, []);
+  }, [setIsAudioEnabled]);
 
   const handleToggle = async () => {
     if (isSaving || disabled) return;
@@ -50,6 +50,18 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
       if (!result.success) {
         console.error('Failed to save audio enabled state:', result.error);
         setIsAudioEnabled(!newState); // Revert on failure
+      } else {
+        // Disable YARG/RB3E when audio is enabled (mutual exclusion)
+        if (newState) {
+          if (isYargEnabled) {
+            setIsYargEnabled(false);
+            window.electron.ipcRenderer.send('yarg-listener-disabled');
+          }
+          if (isRb3Enabled) {
+            setIsRb3Enabled(false);
+            window.electron.ipcRenderer.send('rb3e-listener-disabled');
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to save audio enabled state:', error);

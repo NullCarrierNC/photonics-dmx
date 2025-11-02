@@ -133,10 +133,22 @@ export class AudioCaptureManager {
         if (error.name === 'NotAllowedError') {
           throw new Error('Microphone permission denied. Please allow microphone access in your browser settings.');
         } else if (error.name === 'NotFoundError') {
-          throw new Error('No microphone found. Please connect a microphone and try again.');
+          // Device may have been disconnected
+          if (deviceId) {
+            throw new Error(`Audio device not found. The saved device is no longer connected. Please select a different device in Audio Settings.`);
+          } else {
+            throw new Error('No microphone found. Please connect a microphone and try again.');
+          }
+        } else if (error.name === 'NotReadableError') {
+          throw new Error('Audio device is already in use by another application. Please close other applications using the microphone.');
+        } else if (error.name === 'OverconstrainedError') {
+          throw new Error(`Audio device constraints cannot be satisfied. The selected device may not support the required settings.`);
         }
+        // For other DOMException errors, include the error name and message
+        throw new Error(`${error.name}: ${error.message}`);
       }
       
+      // For non-DOMException errors, preserve the original error
       throw error;
     }
   }

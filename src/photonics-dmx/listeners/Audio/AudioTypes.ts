@@ -32,8 +32,6 @@ export interface AudioLightingData {
 /**
  * Audio configuration interface
  * Controls how audio input is processed and mapped to lighting
- * 
- * Updated for Web Audio API (browser-based capture)
  */
 export interface AudioConfig {
   /** Audio input device ID (string from MediaDeviceInfo.deviceId, undefined = default) */

@@ -125,8 +125,22 @@ export const App = (): JSX.Element => {
     } catch (error) {
       console.error('Failed to start audio capture:', error);
       setIsSenderError(true);
-      setSenderError(`Failed to start audio capture: ${error instanceof Error ? error.message : String(error)}`);
+      // Show full error message - extract message from Error objects or convert to string
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : error instanceof DOMException
+        ? `${error.name}: ${error.message}`
+        : String(error);
+      setSenderError(`Failed to start audio capture: ${errorMessage}`);
       resetErrorTimeout();
+      
+      // Automatically disable audio in main process since it failed to start
+      try {
+        await window.electron.ipcRenderer.invoke('set-audio-enabled', false);
+        console.log('Audio automatically disabled due to capture failure');
+      } catch (disableError) {
+        console.error('Failed to disable audio after capture failure:', disableError);
+      }
     }
   }, [setIsSenderError, setSenderError, resetErrorTimeout]);
 

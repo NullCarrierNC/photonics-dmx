@@ -73,6 +73,8 @@ export const yargListenerEnabledAtom = atom<boolean>(false);
 
 export const rb3eListenerEnabledAtom = atom<boolean>(false);
 
+export const audioListenerEnabledAtom = atom<boolean>(false);
+
 /**
  * Atom for storing live audio analysis data
  * Updated by AudioCaptureManager, consumed by CuePreviewAudio
