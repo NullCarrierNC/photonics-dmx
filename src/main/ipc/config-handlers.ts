@@ -237,6 +237,14 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       // Get updated config
       const updatedConfig = controllerManager.getConfig().getAudioConfig();
       
+      // Always notify renderer process to update config, even if audio is disabled
+      // This ensures the UI stays in sync with saved config
+      const mainWindow = BrowserWindow.getFocusedWindow();
+      if (mainWindow) {
+        mainWindow.webContents.send('audio:config-update', updatedConfig);
+        console.log('Sent audio:config-update to renderer');
+      }
+      
       // If audio is currently enabled, apply config updates immediately
       if (controllerManager.getIsAudioEnabled()) {
         // If device changed, we need to restart audio capture
@@ -251,15 +259,8 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
             // Don't throw - config is still saved, user can manually restart
           }
         } else {
-          // Update running processor and notify renderer
+          // Update running processor
           controllerManager.updateAudioConfig(updatedConfig);
-          
-          // Notify renderer process to update config
-          const mainWindow = BrowserWindow.getFocusedWindow();
-          if (mainWindow) {
-            mainWindow.webContents.send('audio:config-update', updatedConfig);
-            console.log('Sent audio:config-update to renderer');
-          }
         }
       }
       

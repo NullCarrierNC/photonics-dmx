@@ -5,7 +5,7 @@ import { AudioLightingData, AudioConfig } from './AudioTypes';
  */
 export enum AudioCueType {
   BasicLayered = 'BasicLayered',
-
+  SpectrumCue = 'SpectrumCue',
 }
 
 /**

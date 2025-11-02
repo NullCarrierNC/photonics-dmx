@@ -2,6 +2,7 @@ import { AudioCueRegistry } from '../AudioCueRegistry';
 import { AudioCueType } from '../AudioCueTypes';
 import { IAudioCue } from '../interfaces/IAudioCue';
 import { BasicLayeredCue } from './BasicLayeredCue';
+import { SpectrumCue } from './SpectrumCue';
 
 /**
  * Register default audio cue group
@@ -13,6 +14,7 @@ const defaultGroup = {
   description: 'Default set of audio-reactive lighting cues',
   cues: new Map<AudioCueType, IAudioCue>([
     [AudioCueType.BasicLayered, new BasicLayeredCue()],
+    [AudioCueType.SpectrumCue, new SpectrumCue()],
   ]),
 };
 
