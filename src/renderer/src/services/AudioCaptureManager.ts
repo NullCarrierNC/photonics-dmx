@@ -9,31 +9,27 @@
  * - Send processed data to main process via IPC for DMX control
  */
 
-import { AudioLightingData } from '../../../photonics-dmx/listeners/Audio/AudioTypes';
+import { AudioLightingData, AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes';
 import { getDefaultStore } from 'jotai';
 import { audioDataAtom } from '../atoms';
 
 const store = getDefaultStore();
 
-export interface AudioConfig {
-  deviceId?: string;
-  fftSize: number;
-  sensitivity: number;
-  smoothing: {
-    enabled: boolean;
-    alpha: number;
-  };
-  frequencyRanges: {
-    bass: [number, number];
-    mids: [number, number];
-    highs: [number, number];
-  };
-  beatDetection: {
-    threshold: number;
-    decayRate: number;
-    minInterval: number;
-  };
-}
+// Default frequency ranges (matching DEFAULT_RANGES in AudioColorMapping)
+const DEFAULT_RANGES: Array<{
+  id: string;
+  name: string;
+  minHz: number;
+  maxHz: number;
+  color: string;
+  brightness: 'low' | 'medium' | 'high' | 'max';
+}> = [
+  { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red', brightness: 'medium' },
+  { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue', brightness: 'medium' },
+  { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow', brightness: 'medium' },
+  { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green', brightness: 'medium' },
+  { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan', brightness: 'medium' }
+];
 
 const DEFAULT_CONFIG: AudioConfig = {
   fftSize: 2048,
@@ -42,16 +38,15 @@ const DEFAULT_CONFIG: AudioConfig = {
     enabled: true,
     alpha: 0.7
   },
-  frequencyRanges: {
-    bass: [20, 250],
-    mids: [250, 4000],
-    highs: [4000, 20000]
+  colorMapping: {
+    ranges: DEFAULT_RANGES
   },
   beatDetection: {
     threshold: 0.3,
     decayRate: 0.95,
     minInterval: 100
-  }
+  },
+  enabled: false
 };
 
 export class AudioCaptureManager {
@@ -63,10 +58,8 @@ export class AudioCaptureManager {
   private config: AudioConfig;
   private isCapturing = false;
   
-  // Smoothing state
-  private smoothedBass = 0;
-  private smoothedMids = 0;
-  private smoothedHighs = 0;
+  // Smoothing state - store per range
+  private smoothedRanges: Map<string, number> = new Map();
   private smoothedEnergy = 0;
   
   // Beat detection state
@@ -89,7 +82,14 @@ export class AudioCaptureManager {
   private readonly VALUE_CHANGE_THRESHOLD = 0.01; // Only update if values changed by >1%
 
   constructor(config?: Partial<AudioConfig>) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    // Merge with defaults, ensuring colorMapping.ranges exists
+    this.config = {
+      ...DEFAULT_CONFIG,
+      ...config,
+      colorMapping: config?.colorMapping?.ranges 
+        ? { ranges: config.colorMapping.ranges }
+        : DEFAULT_CONFIG.colorMapping
+    };
     console.log('AudioCaptureManager initialized');
   }
 
@@ -200,9 +200,7 @@ export class AudioCaptureManager {
     this.isCapturing = false;
     
     // Reset state
-    this.smoothedBass = 0;
-    this.smoothedMids = 0;
-    this.smoothedHighs = 0;
+    this.smoothedRanges.clear();
     this.smoothedEnergy = 0;
     this.energyHistory = [];
     this.frameIndex = 0;
@@ -248,7 +246,7 @@ export class AudioCaptureManager {
       sensitivity: config.sensitivity !== undefined ? config.sensitivity : 'unchanged',
       smoothing: config.smoothing !== undefined ? config.smoothing : 'unchanged',
       beatDetection: config.beatDetection !== undefined ? config.beatDetection : 'unchanged',
-      frequencyRanges: config.frequencyRanges !== undefined ? config.frequencyRanges : 'unchanged',
+      colorMapping: config.colorMapping !== undefined ? `ranges: ${config.colorMapping.ranges.length}` : 'unchanged',
       fftSize: config.fftSize !== undefined ? config.fftSize : 'unchanged'
     });
   }
@@ -290,9 +288,11 @@ export class AudioCaptureManager {
       this.frameCounter = 0;
       console.log('Audio Capture Active:', {
         energy: audioData.energy.toFixed(3),
-        bass: audioData.frequencyBands.bass.toFixed(3),
-        mids: audioData.frequencyBands.mids.toFixed(3),
-        highs: audioData.frequencyBands.highs.toFixed(3),
+        range1: audioData.frequencyBands.range1.toFixed(3),
+        range2: audioData.frequencyBands.range2.toFixed(3),
+        range3: audioData.frequencyBands.range3.toFixed(3),
+        range4: audioData.frequencyBands.range4.toFixed(3),
+        range5: audioData.frequencyBands.range5.toFixed(3),
         beat: audioData.beatDetected ? 'YES' : 'no'
       });
     }
@@ -321,20 +321,25 @@ export class AudioCaptureManager {
     }
     
     // Check if frequency bands changed significantly
-    const bassDiff = Math.abs(newData.frequencyBands.bass - this.lastAudioData.frequencyBands.bass);
-    const midsDiff = Math.abs(newData.frequencyBands.mids - this.lastAudioData.frequencyBands.mids);
-    const highsDiff = Math.abs(newData.frequencyBands.highs - this.lastAudioData.frequencyBands.highs);
+    const range1Diff = Math.abs(newData.frequencyBands.range1 - this.lastAudioData.frequencyBands.range1);
+    const range2Diff = Math.abs(newData.frequencyBands.range2 - this.lastAudioData.frequencyBands.range2);
+    const range3Diff = Math.abs(newData.frequencyBands.range3 - this.lastAudioData.frequencyBands.range3);
+    const range4Diff = Math.abs(newData.frequencyBands.range4 - this.lastAudioData.frequencyBands.range4);
+    const range5Diff = Math.abs(newData.frequencyBands.range5 - this.lastAudioData.frequencyBands.range5);
     const energyDiff = Math.abs(newData.energy - this.lastAudioData.energy);
     
     // Update if any value changed by more than threshold
-    return bassDiff > this.VALUE_CHANGE_THRESHOLD ||
-           midsDiff > this.VALUE_CHANGE_THRESHOLD ||
-           highsDiff > this.VALUE_CHANGE_THRESHOLD ||
+    return range1Diff > this.VALUE_CHANGE_THRESHOLD ||
+           range2Diff > this.VALUE_CHANGE_THRESHOLD ||
+           range3Diff > this.VALUE_CHANGE_THRESHOLD ||
+           range4Diff > this.VALUE_CHANGE_THRESHOLD ||
+           range5Diff > this.VALUE_CHANGE_THRESHOLD ||
            energyDiff > this.VALUE_CHANGE_THRESHOLD;
   }
 
   /**
    * Calculate frequency bands from FFT data
+   * Dynamically calculates energy for all configured frequency ranges
    */
   private calculateFrequencyBands(frequencyData: Uint8Array): AudioLightingData {
     if (!this.audioContext || !this.analyser) {
@@ -345,27 +350,20 @@ export class AudioCaptureManager {
     const fftSize = this.analyser.fftSize;
     const binSize = sampleRate / fftSize;
     
-    // Calculate energy in each frequency band
-    const bassEnergy = this.getEnergyInRange(
-      frequencyData,
-      binSize,
-      this.config.frequencyRanges.bass[0],
-      this.config.frequencyRanges.bass[1]
-    );
+    // Get configured ranges (default to DEFAULT_RANGES if not set)
+    const ranges = this.config.colorMapping?.ranges || DEFAULT_RANGES;
     
-    const midsEnergy = this.getEnergyInRange(
-      frequencyData,
-      binSize,
-      this.config.frequencyRanges.mids[0],
-      this.config.frequencyRanges.mids[1]
-    );
-    
-    const highsEnergy = this.getEnergyInRange(
-      frequencyData,
-      binSize,
-      this.config.frequencyRanges.highs[0],
-      this.config.frequencyRanges.highs[1]
-    );
+    // Calculate energy for each configured range
+    const rangeEnergies: Map<string, number> = new Map();
+    for (const range of ranges) {
+      const energy = this.getEnergyInRange(
+        frequencyData,
+        binSize,
+        range.minHz,
+        range.maxHz
+      );
+      rangeEnergies.set(range.id, energy);
+    }
     
     // Calculate overall energy
     let totalEnergy = 0;
@@ -374,38 +372,53 @@ export class AudioCaptureManager {
     }
     const overallEnergy = Math.min((totalEnergy / frequencyData.length / 255) * 2, 1.0);
     
-    // Apply sensitivity
-    const scaledBass = Math.min(bassEnergy * this.config.sensitivity, 1.0);
-    const scaledMids = Math.min(midsEnergy * this.config.sensitivity, 1.0);
-    const scaledHighs = Math.min(highsEnergy * this.config.sensitivity, 1.0);
+    // Apply sensitivity to all ranges
+    const scaledEnergies: Map<string, number> = new Map();
+    for (const [rangeId, energy] of rangeEnergies.entries()) {
+      scaledEnergies.set(rangeId, Math.min(energy * this.config.sensitivity, 1.0));
+    }
     const scaledEnergy = Math.min(overallEnergy * this.config.sensitivity, 1.0);
     
     // Apply smoothing if enabled
-    let finalBass = scaledBass;
-    let finalMids = scaledMids;
-    let finalHighs = scaledHighs;
+    const finalEnergies: Map<string, number> = new Map();
     let finalEnergy = scaledEnergy;
     
     if (this.config.smoothing.enabled) {
       const alpha = this.config.smoothing.alpha;
-      this.smoothedBass = alpha * scaledBass + (1 - alpha) * this.smoothedBass;
-      this.smoothedMids = alpha * scaledMids + (1 - alpha) * this.smoothedMids;
-      this.smoothedHighs = alpha * scaledHighs + (1 - alpha) * this.smoothedHighs;
+      for (const [rangeId, scaledEnergy] of scaledEnergies.entries()) {
+        const previousSmoothed = this.smoothedRanges.get(rangeId) || 0;
+        const smoothed = alpha * scaledEnergy + (1 - alpha) * previousSmoothed;
+        this.smoothedRanges.set(rangeId, smoothed);
+        finalEnergies.set(rangeId, smoothed);
+      }
       this.smoothedEnergy = alpha * scaledEnergy + (1 - alpha) * this.smoothedEnergy;
-      
-      finalBass = this.smoothedBass;
-      finalMids = this.smoothedMids;
-      finalHighs = this.smoothedHighs;
       finalEnergy = this.smoothedEnergy;
+    } else {
+      // No smoothing - use scaled values directly
+      for (const [rangeId, scaledEnergy] of scaledEnergies.entries()) {
+        finalEnergies.set(rangeId, scaledEnergy);
+      }
     }
     
     // Beat detection
     const { beatDetected, bpm } = this.detectBeat(finalEnergy);
     
-    // Calculate overall level (RMS of all bands)
-    const overallLevel = Math.sqrt((finalBass * finalBass + finalMids * finalMids + finalHighs * finalHighs) / 3);
+    // Calculate overall level (RMS of all ranges)
+    const rangeValues = Array.from(finalEnergies.values());
+    const sumOfSquares = rangeValues.reduce((sum, val) => sum + val * val, 0);
+    const overallLevel = Math.sqrt(sumOfSquares / rangeValues.length);
     
     this.frameIndex++;
+    
+    // Map final energies to range1-range5 structure
+    // Ensure we always have exactly 5 ranges (use 0 if range not configured)
+    const frequencyBands = {
+      range1: finalEnergies.get('range1') || 0,
+      range2: finalEnergies.get('range2') || 0,
+      range3: finalEnergies.get('range3') || 0,
+      range4: finalEnergies.get('range4') || 0,
+      range5: finalEnergies.get('range5') || 0
+    };
     
     // Return processed audio data
     return {
@@ -413,11 +426,7 @@ export class AudioCaptureManager {
       overallLevel,
       bpm,
       beatDetected,
-      frequencyBands: {
-        bass: finalBass,
-        mids: finalMids,
-        highs: finalHighs
-      },
+      frequencyBands,
       energy: finalEnergy
     };
   }

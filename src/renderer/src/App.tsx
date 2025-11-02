@@ -174,7 +174,6 @@ export const App = (): JSX.Element => {
         fftSize: config.fftSize,
         sensitivity: config.sensitivity,
         beatDetection: config.beatDetection,
-        frequencyRanges: config.frequencyRanges,
         smoothing: config.smoothing,
         colorMapping: config.colorMapping,
         enabled: config.enabled,

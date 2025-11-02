@@ -33,15 +33,28 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
   const audioConfig = useAtomValue(audioConfigAtom);
   const [lastBeatTime, setLastBeatTime] = useState(0);
 
-  // Get configured colors with fallback to defaults
-  const bassColor = audioConfig?.colorMapping?.bassColor || 'red';
-  const midsColor = audioConfig?.colorMapping?.midsColor || 'blue';
-  const highsColor = audioConfig?.colorMapping?.highsColor || 'yellow';
-
-  // Get RGB values for the bars
-  const bassColorRgb = COLOR_TO_RGB[bassColor as Color] || COLOR_TO_RGB.red;
-  const midsColorRgb = COLOR_TO_RGB[midsColor as Color] || COLOR_TO_RGB.blue;
-  const highsColorRgb = COLOR_TO_RGB[highsColor as Color] || COLOR_TO_RGB.yellow;
+  // Get configured ranges (default to 5 ranges if not set)
+  const ranges = audioConfig?.colorMapping?.ranges || [];
+  
+  // Default ranges if not configured
+  const defaultRanges = [
+    { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red' as Color, brightness: 'medium' as const },
+    { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue' as Color, brightness: 'medium' as const },
+    { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow' as Color, brightness: 'medium' as const },
+    { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green' as Color, brightness: 'medium' as const },
+    { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as const }
+  ];
+  
+  const displayRanges = ranges.length > 0 ? ranges : defaultRanges;
+  
+  // Get frequency band values
+  const bandValues = [
+    audioData?.frequencyBands?.range1 || 0,
+    audioData?.frequencyBands?.range2 || 0,
+    audioData?.frequencyBands?.range3 || 0,
+    audioData?.frequencyBands?.range4 || 0,
+    audioData?.frequencyBands?.range5 || 0
+  ];
 
   // Track beat detection for pulse animation
   useEffect(() => {
@@ -62,7 +75,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
     );
   }
 
-  const { frequencyBands, energy, bpm } = audioData;
+  const { energy, bpm } = audioData;
 
   return (
     <div className={`p-4 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
@@ -76,63 +89,38 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
       </div>
 
       {/* Frequency Bars */}
-      <div className="space-y-3 mb-4">
-        {/* Bass */}
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-600 dark:text-gray-300">Bass (20-250Hz)</span>
-            <span className="text-gray-600 dark:text-gray-300 font-mono">
-              {(frequencyBands.bass * 100).toFixed(0)}%
-            </span>
-          </div>
-          <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
-            <div
-              className="h-full transition-all duration-150 ease-out"
-              style={{ 
-                width: `${frequencyBands.bass * 100}%`,
-                backgroundColor: bassColorRgb
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Mids */}
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-600 dark:text-gray-300">Mids (250-4kHz)</span>
-            <span className="text-gray-600 dark:text-gray-300 font-mono">
-              {(frequencyBands.mids * 100).toFixed(0)}%
-            </span>
-          </div>
-          <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
-            <div
-              className="h-full transition-all duration-150 ease-out"
-              style={{ 
-                width: `${frequencyBands.mids * 100}%`,
-                backgroundColor: midsColorRgb
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Highs */}
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-600 dark:text-gray-300">Highs (4-20kHz)</span>
-            <span className="text-gray-600 dark:text-gray-300 font-mono">
-              {(frequencyBands.highs * 100).toFixed(0)}%
-            </span>
-          </div>
-          <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
-            <div
-              className="h-full transition-all duration-150 ease-out"
-              style={{ 
-                width: `${frequencyBands.highs * 100}%`,
-                backgroundColor: highsColorRgb
-              }}
-            />
-          </div>
-        </div>
+      <div className="space-y-2 mb-4">
+        {displayRanges.map((range, index) => {
+          const bandValue = bandValues[index] || 0;
+          const colorRgb = COLOR_TO_RGB[range.color as Color] || COLOR_TO_RGB.white;
+          const frequencyLabel = `${range.minHz}-${range.maxHz >= 1000 ? `${(range.maxHz / 1000).toFixed(1)}k` : range.maxHz}Hz`;
+          
+          return (
+            <div key={range.id}>
+              <div className="flex justify-between items-center text-xs mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 dark:text-gray-300 font-medium">{range.name}</span>
+                  <span className="text-gray-500 dark:text-gray-400">({frequencyLabel})</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                    {range.brightness}
+                  </span>
+                </div>
+                <span className="text-gray-600 dark:text-gray-300 font-mono">
+                  {(bandValue * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
+                <div
+                  className="h-full transition-all duration-150 ease-out"
+                  style={{ 
+                    width: `${bandValue * 100}%`,
+                    backgroundColor: colorRgb
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
 
         {/* Overall Energy */}
         <div>

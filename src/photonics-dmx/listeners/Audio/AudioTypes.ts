@@ -17,12 +17,16 @@ export interface AudioLightingData {
   
   /** Frequency band analysis (normalized 0.0-1.0) */
   frequencyBands: {
-    /** Bass band: combined sub-bass + bass (0-250 Hz) */
-    bass: number;
-    /** Mids band: combined low-mids + mids (250-4000 Hz) */
-    mids: number;
-    /** Highs band: combined upper-mids + highs + super-highs (4000-20000 Hz) */
-    highs: number;
+    /** Range 1: Bass frequencies */
+    range1: number;
+    /** Range 2: Low-Mids frequencies */
+    range2: number;
+    /** Range 3: Mids frequencies */
+    range3: number;
+    /** Range 4: Upper-Mids frequencies */
+    range4: number;
+    /** Range 5: Highs frequencies */
+    range5: number;
   };
   
   /** Energy level (overall intensity) */
@@ -53,13 +57,6 @@ export interface AudioConfig {
     minInterval: number;
   };
   
-  /** Frequency band ranges in Hz */
-  frequencyRanges: {
-    bass: [number, number];      // Default: [20, 250]
-    mids: [number, number];       // Default: [250, 4000]
-    highs: [number, number];      // Default: [4000, 20000]
-  };
-  
   /** Smoothing settings */
   smoothing: {
     /** Enable exponential smoothing (default: true) */
@@ -70,12 +67,21 @@ export interface AudioConfig {
   
   /** Color mapping configuration */
   colorMapping: {
-    /** Color for bass frequencies */
-    bassColor: string;    // Default: 'red'
-    /** Color for mids frequencies */
-    midsColor: string;    // Default: 'blue'
-    /** Color for highs frequencies */
-    highsColor: string;   // Default: 'yellow'
+    /** Array of frequency range configurations */
+    ranges: Array<{
+      /** Unique identifier for this range */
+      id: string;
+      /** Display name for this range */
+      name: string;
+      /** Lower frequency boundary in Hz */
+      minHz: number;
+      /** Upper frequency boundary in Hz */
+      maxHz: number;
+      /** Color for this frequency range */
+      color: string;
+      /** Brightness level for this frequency range */
+      brightness: 'low' | 'medium' | 'high' | 'max';
+    }>;
   };
   
   /** Enable audio-reactive lighting */

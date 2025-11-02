@@ -172,19 +172,19 @@ export interface LightingPreferences {
       decayRate: number;
       minInterval: number;
     };
-    frequencyRanges: {
-      bass: [number, number];
-      mids: [number, number];
-      highs: [number, number];
-    };
     smoothing: {
       enabled: boolean;
       alpha: number;
     };
     colorMapping: {
-      bassColor: string;
-      midsColor: string;
-      highsColor: string;
+      ranges: Array<{
+        id: string;
+        name: string;
+        minHz: number;
+        maxHz: number;
+        color: string;
+        brightness: 'low' | 'medium' | 'high' | 'max';
+      }>;
     };
     enabled: boolean;
   };

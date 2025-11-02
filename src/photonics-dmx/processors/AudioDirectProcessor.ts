@@ -42,10 +42,6 @@ export class AudioDirectProcessor {
   
   // Track which lights are currently active
   private activeLights: Set<number> = new Set();
-  
-  // Debug logging
-  private processCount = 0;
-  private readonly DEBUG_LOG_INTERVAL = 60; // Log every ~60 calls (once per second at 60fps)
 
   constructor(
     private lightManager: DmxLightManager,
@@ -111,24 +107,6 @@ export class AudioDirectProcessor {
     
     const { frequencyBands, energy, beatDetected } = data;
     
-    // Debug logging - log every ~60 calls (once per second at 60fps)
-    /*
-    this.processCount++;
-    if (this.processCount % this.DEBUG_LOG_INTERVAL === 0) {
-      const lights = this.lightManager.getLights(['front', 'back'], 'all');
-      console.log('Audio Processor Active:', {
-        energy: energy.toFixed(3),
-        bass: frequencyBands.bass.toFixed(3),
-        mids: frequencyBands.mids.toFixed(3),
-        highs: frequencyBands.highs.toFixed(3),
-        beat: beatDetected ? 'Y' : 'n',
-        activeLights: this.activeLights.size,
-        totalLights: lights?.length || 0,
-        processedFrames: this.processCount
-      });
-    }
-    */
-    
     // Map frequency bands to lights
     this.mapFrequencyBandsToLights(frequencyBands, energy, beatDetected);
   }
@@ -141,23 +119,23 @@ export class AudioDirectProcessor {
   }
 
   /**
-   * Map frequency bands to lights
+   * Map frequency bands to lights with additive color blending
    * 
    * This creates the visual effect by:
    * 1. Determining how many total lights should be active based on overall energy
-   * 2. Distributing those lights across bass/mids/highs zones proportionally
-   * 3. Assigning the configured color to each zone
-   * 4. Applying brightness and intensity modulation
+   * 2. Distributing lights across frequency ranges proportionally to their intensities
+   * 3. Allowing overlapping ranges (same light can belong to multiple ranges)
+   * 4. Additively blending colors when ranges overlap on the same light
+   * 5. Applying configured brightness and intensity modulation per range
    * 
    * Visual Result:
    * - Quiet music (low energy): Few lights active, dim
    * - Loud music (high energy): Many/all lights active, bright
-   * - Bass-heavy: More lights in the bass (first) zone
-   * - Treble-heavy: More lights in the highs (last) zone
-   * - Balanced: Even distribution across all zones
+   * - Overlapping ranges: Colors blend additively (e.g., red + blue = magenta)
+   * - Each range's brightness is respected independently
    */
   private mapFrequencyBandsToLights(
-    frequencyBands: { bass: number; mids: number; highs: number },
+    frequencyBands: { range1: number; range2: number; range3: number; range4: number; range5: number },
     energy: number,
     beatDetected: boolean
   ): void {
@@ -168,94 +146,137 @@ export class AudioDirectProcessor {
 
     const numLights = lights.length;
     
-    // Distribute lights based on frequency band intensity
-    // Use energy to determine how many lights to activate (0-100% of available lights)
-    const activeLightCount = Math.ceil(numLights * energy);
-    
-    // Determine which frequency band is dominant
-    const maxBand = Math.max(frequencyBands.bass, frequencyBands.mids, frequencyBands.highs);
-    
-    // Calculate how many lights for each band (proportional to band intensity)
-    const bassLightCount = Math.ceil(activeLightCount * (frequencyBands.bass / maxBand));
-    const midsLightCount = Math.ceil(activeLightCount * (frequencyBands.mids / maxBand));
-    const highsLightCount = Math.ceil(activeLightCount * (frequencyBands.highs / maxBand));
-    
-    // Determine brightness level based on energy
-    let brightness: 'low' | 'medium' | 'high' | 'max';
-    if (energy < 0.33) {
-      brightness = 'low';
-    } else if (energy < 0.66) {
-      brightness = 'medium';
-    } else if (energy < 0.9) {
-      brightness = 'high';
-    } else {
-      brightness = 'max';
+    // Get configured ranges
+    const ranges = this.config.colorMapping?.ranges || [];
+    if (ranges.length === 0) {
+      return;
     }
     
-    // Apply colors from config (validate strings to Color type)
-    const bassColor = validateColorString(this.config.colorMapping.bassColor);
-    const midsColor = validateColorString(this.config.colorMapping.midsColor);
-    const highsColor = validateColorString(this.config.colorMapping.highsColor);
+    // Get frequency band values in order
+    const bandValues = [
+      frequencyBands.range1,
+      frequencyBands.range2,
+      frequencyBands.range3,
+      frequencyBands.range4,
+      frequencyBands.range5
+    ];
+    
+    // Distribute lights based on overall energy
+    const activeLightCount = Math.ceil(numLights * energy);
+    
+    // Calculate how many lights each range should affect (proportional to band intensity)
+    // Each range can overlap with others, so we calculate proportionally
+    const totalBandIntensity = bandValues.reduce((sum, val) => sum + val, 0);
+    const lightsPerRange: number[] = [];
+    
+    if (totalBandIntensity > 0) {
+      for (let i = 0; i < bandValues.length; i++) {
+        // Proportion of total intensity this range represents
+        const proportion = bandValues[i] / totalBandIntensity;
+        // Distribute lights proportionally, but ensure each range gets at least some lights if it has energy
+        const lightCount = bandValues[i] > 0.05 
+          ? Math.max(1, Math.ceil(activeLightCount * proportion))
+          : 0;
+        lightsPerRange.push(Math.min(lightCount, numLights));
+      }
+    } else {
+      // No energy - no lights
+      lightsPerRange.fill(0);
+    }
+    
+    // Create a map: lightIndex -> Array of {range, color, brightness, intensity}
+    // This allows us to handle overlapping ranges
+    const lightAssignments: Map<number, Array<{
+      range: typeof ranges[0];
+      color: Color;
+      brightness: 'low' | 'medium' | 'high' | 'max';
+      intensity: number;
+    }>> = new Map();
+    
+    // Distribute lights for each range
+    let currentOffset = 0;
+    for (let rangeIndex = 0; rangeIndex < ranges.length; rangeIndex++) {
+      const range = ranges[rangeIndex];
+      const bandIntensity = bandValues[rangeIndex];
+      const lightCount = lightsPerRange[rangeIndex];
+      
+      if (bandIntensity > 0.05 && lightCount > 0) {
+        // Validate color
+        const color = validateColorString(range.color);
+        
+        // Use configured brightness for this range
+        const brightness = range.brightness || 'medium';
+        
+        // Assign lights starting from current offset, wrapping around if needed
+        for (let i = 0; i < lightCount; i++) {
+          const lightIndex = (currentOffset + i) % numLights;
+          
+          // Add this range to the light's assignments
+          if (!lightAssignments.has(lightIndex)) {
+            lightAssignments.set(lightIndex, []);
+          }
+          lightAssignments.get(lightIndex)!.push({
+            range,
+            color,
+            brightness,
+            intensity: bandIntensity
+          });
+        }
+        
+        // Move offset for next range (allows overlapping)
+        currentOffset = (currentOffset + Math.floor(lightCount / 2)) % numLights;
+      }
+    }
     
     // Turn off all lights first
     this.turnOffAllLights();
     
-    // Apply bass lights
-    if (frequencyBands.bass > 0.1 && bassLightCount > 0) {
-      this.applyColorToLights(lights, 0, bassLightCount, bassColor, brightness, frequencyBands.bass);
-    }
-    
-    // Apply mids lights
-    if (frequencyBands.mids > 0.1 && midsLightCount > 0) {
-      const startIndex = bassLightCount;
-      this.applyColorToLights(lights, startIndex, startIndex + midsLightCount, midsColor, brightness, frequencyBands.mids);
-    }
-    
-    // Apply highs lights
-    if (frequencyBands.highs > 0.1 && highsLightCount > 0) {
-      const startIndex = bassLightCount + midsLightCount;
-      this.applyColorToLights(lights, startIndex, Math.min(startIndex + highsLightCount, numLights), highsColor, brightness, frequencyBands.highs);
+    // Apply colors to lights with additive blending
+    for (const [lightIndex, assignments] of lightAssignments.entries()) {
+      if (assignments.length === 0) continue;
+      
+      const light = lights[lightIndex];
+      
+      if (assignments.length === 1) {
+        // Single range - simple application
+        const { color, brightness, intensity } = assignments[0];
+        const rgbColor = getColor(color, brightness, 'add');
+        rgbColor.intensity = Math.floor(rgbColor.intensity * intensity);
+        rgbColor.opacity = intensity;
+        this.photonicsSequencer.setState([light], rgbColor, 1);
+      } else {
+        // Multiple ranges - additive blending
+        // Start with first color
+        const first = assignments[0];
+        let blendedColor = getColor(first.color, first.brightness, 'add');
+        blendedColor.intensity = Math.floor(blendedColor.intensity * first.intensity);
+        blendedColor.opacity = first.intensity;
+        
+        // Add subsequent colors
+        for (let i = 1; i < assignments.length; i++) {
+          const { color, brightness, intensity } = assignments[i];
+          const nextColor = getColor(color, brightness, 'add');
+          nextColor.intensity = Math.floor(nextColor.intensity * intensity);
+          nextColor.opacity = intensity;
+          
+          // Additive blend: add RGB values and clamp to 255
+          blendedColor.red = Math.min(255, blendedColor.red + nextColor.red);
+          blendedColor.green = Math.min(255, blendedColor.green + nextColor.green);
+          blendedColor.blue = Math.min(255, blendedColor.blue + nextColor.blue);
+          blendedColor.intensity = Math.min(255, blendedColor.intensity + nextColor.intensity);
+          // Opacity: use maximum (more opaque)
+          blendedColor.opacity = Math.max(blendedColor.opacity, nextColor.opacity);
+        }
+        
+        this.photonicsSequencer.setState([light], blendedColor, 1);
+      }
+      
+      this.activeLights.add(lightIndex);
     }
     
     // If beat detected, flash all lights briefly
     if (beatDetected) {
       this.handleBeatEffect(lights, energy);
-    }
-  }
-
-  /**
-   * Apply color to a range of lights
-   * 
-   * Applies the specified color to a contiguous range of lights with:
-   * - Base brightness determined by overall energy level
-   * - Fine-tuned intensity based on the specific frequency band's strength
-   * - Opacity/transparency based on frequency intensity (stronger = more opaque)
-   * 
-   * Visual Result:
-   * - Stronger frequency bands appear brighter and more saturated
-   * - Weaker frequency bands appear dimmer and more transparent
-   */
-  private applyColorToLights(
-    lights: TrackedLight[],
-    startIndex: number,
-    endIndex: number,
-    color: Color,
-    brightness: 'low' | 'medium' | 'high' | 'max',
-    intensityMultiplier: number
-  ): void {
-    for (let i = startIndex; i < endIndex && i < lights.length; i++) {
-      const rgbColor = getColor(color, brightness, 'replace');
-      
-      // Adjust intensity based on frequency band intensity (0.0-1.0)
-      // Stronger frequency = brighter light within its zone
-      rgbColor.intensity = Math.floor(rgbColor.intensity * intensityMultiplier);
-      
-      // Apply opacity based on intensity (0.0-1.0)
-      // Stronger frequency = more opaque/saturated color
-      rgbColor.opacity = intensityMultiplier;
-      
-      this.photonicsSequencer.setState([lights[i]], rgbColor, 1);
-      this.activeLights.add(i);
     }
   }
 
