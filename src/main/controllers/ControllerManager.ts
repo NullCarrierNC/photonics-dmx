@@ -815,8 +815,11 @@ export class ControllerManager {
       this.audioProcessor.start();
       
       // Set up IPC handler to receive audio data from renderer
+      // Remove existing listener first to prevent duplicates
+      ipcMain.removeAllListeners('audio:data');
+      
       this.audioDataReceivedCount = 0;
-      ipcMain.on('audio:data', (_, data) => {
+      const audioDataHandler = (_, data) => {
         if (this.audioProcessor && this.isAudioEnabled) {
           this.audioProcessor.processAudioData(data);
           // Debug logging - log every ~60 frames (once per second)
@@ -832,7 +835,9 @@ export class ControllerManager {
             });
           }
         }
-      });
+      };
+      
+      ipcMain.on('audio:data', audioDataHandler);
       
       // Tell renderer to start capturing audio
       const mainWindow = BrowserWindow.getFocusedWindow();

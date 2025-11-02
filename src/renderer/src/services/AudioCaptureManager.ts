@@ -81,6 +81,12 @@ export class AudioCaptureManager {
   // Debug logging (log status every ~60 frames ≈ 1 second at 60fps)
   private frameCounter = 0;
   private readonly DEBUG_LOG_INTERVAL = 60;
+  
+  // Throttling for UI updates (update atom every 2 frames = 30fps)
+  private readonly UI_UPDATE_THROTTLE = 2;
+  private uiUpdateCounter = 0;
+  private lastAudioData: AudioLightingData | null = null;
+  private readonly VALUE_CHANGE_THRESHOLD = 0.01; // Only update if values changed by >1%
 
   constructor(config?: Partial<AudioConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -202,6 +208,8 @@ export class AudioCaptureManager {
     this.frameIndex = 0;
     this.beatTimestamps = [];
     this.currentBpm = null;
+    this.uiUpdateCounter = 0;
+    this.lastAudioData = null;
     
     console.log('Audio capture stopped');
   }
@@ -236,6 +244,7 @@ export class AudioCaptureManager {
 
   /**
    * Main analysis loop - runs at ~60fps
+   * UI updates are throttled to 30fps to reduce React re-rendering
    */
   private analyzeAudio(): void {
     if (!this.analyser || !this.isCapturing) return;
@@ -247,11 +256,22 @@ export class AudioCaptureManager {
     // Calculate frequency bands
     const audioData = this.calculateFrequencyBands(dataArray);
     
-    // Update atom for preview component (stays in renderer - no IPC overhead!)
-    store.set(audioDataAtom, audioData);
-    
-    // Send to main process via IPC for DMX light control
+    // Always send to main process via IPC for DMX light control (needs 60fps for responsiveness)
     window.electron.ipcRenderer.send('audio:data', audioData);
+    
+    // Throttle UI updates
+    this.uiUpdateCounter++;
+    const shouldUpdateUI = this.uiUpdateCounter >= this.UI_UPDATE_THROTTLE;
+    
+    if (shouldUpdateUI) {
+      this.uiUpdateCounter = 0;
+      
+      // Only update atom if values changed significantly to avoid unnecessary re-renders
+      if (this.shouldUpdateAtom(audioData)) {
+        store.set(audioDataAtom, audioData);
+        this.lastAudioData = audioData;
+      }
+    }
     
     // Debug logging - show status every second
     this.frameCounter++;
@@ -268,6 +288,38 @@ export class AudioCaptureManager {
     
     // Continue loop
     this.animationFrameId = requestAnimationFrame(() => this.analyzeAudio());
+  }
+  
+  /**
+   * Check if atom should be updated based on value changes
+   * Only updates if values changed significantly or beat detection changed
+   */
+  private shouldUpdateAtom(newData: AudioLightingData): boolean {
+    if (!this.lastAudioData) {
+      return true; // First update
+    }
+    
+    // Always update if beat detection changed
+    if (newData.beatDetected !== this.lastAudioData.beatDetected) {
+      return true;
+    }
+    
+    // Always update if BPM changed
+    if (newData.bpm !== this.lastAudioData.bpm) {
+      return true;
+    }
+    
+    // Check if frequency bands changed significantly
+    const bassDiff = Math.abs(newData.frequencyBands.bass - this.lastAudioData.frequencyBands.bass);
+    const midsDiff = Math.abs(newData.frequencyBands.mids - this.lastAudioData.frequencyBands.mids);
+    const highsDiff = Math.abs(newData.frequencyBands.highs - this.lastAudioData.frequencyBands.highs);
+    const energyDiff = Math.abs(newData.energy - this.lastAudioData.energy);
+    
+    // Update if any value changed by more than threshold
+    return bassDiff > this.VALUE_CHANGE_THRESHOLD ||
+           midsDiff > this.VALUE_CHANGE_THRESHOLD ||
+           highsDiff > this.VALUE_CHANGE_THRESHOLD ||
+           energyDiff > this.VALUE_CHANGE_THRESHOLD;
   }
 
   /**

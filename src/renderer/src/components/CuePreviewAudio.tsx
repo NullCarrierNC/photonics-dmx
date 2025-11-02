@@ -55,7 +55,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
           </div>
           <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
             <div
-              className="h-full bg-red-500 transition-all duration-75"
+              className="h-full bg-red-500 transition-all duration-150 ease-out"
               style={{ width: `${frequencyBands.bass * 100}%` }}
             />
           </div>
@@ -71,7 +71,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
           </div>
           <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
             <div
-              className="h-full bg-blue-500 transition-all duration-75"
+              className="h-full bg-blue-500 transition-all duration-150 ease-out"
               style={{ width: `${frequencyBands.mids * 100}%` }}
             />
           </div>
@@ -87,7 +87,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
           </div>
           <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
             <div
-              className="h-full bg-yellow-500 transition-all duration-75"
+              className="h-full bg-yellow-500 transition-all duration-150 ease-out"
               style={{ width: `${frequencyBands.highs * 100}%` }}
             />
           </div>
@@ -103,7 +103,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
           </div>
           <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all duration-75"
+              className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all duration-150 ease-out"
               style={{ width: `${energy * 100}%` }}
             />
           </div>
