@@ -73,13 +73,14 @@ export class SenderManager {
           case 'artnet':
             // ArtNet config: { host, options: { universe, net, subnet, subuni, port, base_refresh_interval } }
             const host = config.host || '127.0.0.1';
-            const artnetOptions = config.options || {
+            const artnetOptions = {
               universe: 1,
               net: 0,
               subnet: 0,
               subuni: 0,
               port: 6454,
-              base_refresh_interval: 1000
+              base_refresh_interval: 1000,
+              ...config.options  // Merge user-provided options, allowing override of defaults
             };
             sender = new ArtNetSender(host, artnetOptions);
             break;

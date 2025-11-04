@@ -22,8 +22,6 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/main/index.ts'),
-          // Include worker files as separate entry points
-          'workers/NetworkWorker': resolve('src/photonics-dmx/workers/NetworkWorker.ts'),
         },
         output: {
           entryFileNames: (chunkInfo) => {

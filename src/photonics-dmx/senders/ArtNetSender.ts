@@ -6,9 +6,6 @@ export class ArtNetSender extends BaseSender {
   private dmx: DMX = new DMX();
   private universe?: IUniverseDriver;
   private eventEmitter: EventEmitter;
-  
-  // Reusable payload buffer for performance optimization
-  private payloadBuffer: Record<number, number> = {};
 
   constructor(
     private host: string = "127.0.0.1",
@@ -23,20 +20,10 @@ export class ArtNetSender extends BaseSender {
   ) {
     super();
     this.eventEmitter = new EventEmitter();
-    
-    // Pre-allocate payload buffer with 512 channels (DMX universe size)
-    for (let i = 0; i < 512; i++) {
-      this.payloadBuffer[i] = 0;
-    }
   }
 
   public async start(): Promise<void> {
     try {
-      // Reset payload buffer on start
-      for (let i = 0; i < 512; i++) {
-        this.payloadBuffer[i] = 0;
-      }
-      
       this.universe = await this.dmx.addUniverse(
         "artnet-universe",
         new ArtnetDriver(this.host, this.options)
@@ -115,26 +102,14 @@ export class ArtNetSender extends BaseSender {
     try {
       this.verifySenderStarted();
       
-      // Check if anything changed in the incoming buffer
-      let hasChanges = false;
-      
+      // Convert from 1-based DMX indexing to 0-based ArtNet indexing
+      const convertedBuffer: Record<number, number> = {};
       for (const channelStr in universeBuffer) {
         const channel = parseInt(channelStr, 10);
-        const value = universeBuffer[channel];
-        // Channel indexing needs to be shifted by -1 for ArtNet
-        const artNetChannel = channel - 1;
-        
-        // Only update if value actually changed
-        if (this.payloadBuffer[artNetChannel] !== value) {
-          this.payloadBuffer[artNetChannel] = value;
-          hasChanges = true;
-        }
+        convertedBuffer[channel - 1] = universeBuffer[channel];
       }
       
-      // Only send if something changed
-      if (hasChanges) {
-        this.universe!.update(this.payloadBuffer);
-      }
+      this.universe!.update(convertedBuffer);
     } catch (err) {
       console.error("ArtNetSender error:", err);
       const errorEvent = new SenderError(err);
