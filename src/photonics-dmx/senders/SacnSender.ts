@@ -2,17 +2,27 @@
 import { EventEmitter } from 'events';
 import { BaseSender, SenderError } from './BaseSender';
 import { Sender } from 'sacn';
+import * as os from 'os';
+
+export interface SacnConfig {
+  universe?: number;
+  networkInterface?: string;
+  useUnicast?: boolean;
+  unicastDestination?: string;
+}
 
 export class SacnSender extends BaseSender {
   private sender: Sender | undefined;
   private eventEmitter: EventEmitter;
+  private config: SacnConfig;
   
   // Reusable payload buffer for performance optimization
   private payloadBuffer: Record<number, number> = {};
 
-  constructor() {
+  constructor(config: SacnConfig = {}) {
     super();
     this.eventEmitter = new EventEmitter();
+    this.config = config;
     
     // Pre-allocate 512 channels (DMX universe size)
     for (let i = 1; i <= 512; i++) {
@@ -26,15 +36,66 @@ export class SacnSender extends BaseSender {
       this.payloadBuffer[i] = 0;
     }
     
-    this.sender = new Sender({
-      universe: 1,
+    const universe = this.config.universe || 1;
+    const networkInterface = this.config.networkInterface;
+    const unicastDestination = this.config.unicastDestination;
+    const useUnicast = this.config.useUnicast || false;
+
+    // Ensure universe is a valid number
+    const validUniverse = Math.max(1, Math.min(63999, Number(universe)));
+
+    // Configure sender options
+    const senderOptions: any = {
+      universe: validUniverse,
+      port: 5568,
+      reuseAddr: true,
       defaultPacketOptions: {
-        sourceName: "un1",
+        sourceName: "Photonics-DMX",
         useRawDmxValues: true,
-      },
-      minRefreshRate: 30,
-      //  useUnicastDestination: "192.168.1.116",
-    });
+      }
+    };
+
+    // Only add iface if we have a specific interface selected (not auto-detect)
+    if (networkInterface) {
+      const networkInterfaces = os.networkInterfaces();
+      const iface = this.getNetworkInterfaceAddress(networkInterface, networkInterfaces);
+
+      if (!iface) {
+        throw new Error(`Network interface '${networkInterface}' not found`);
+      }
+
+      senderOptions.iface = iface;
+    }
+
+    // Add unicast destination if specified
+    if (useUnicast && unicastDestination) {
+      senderOptions.useUnicastDestination = unicastDestination;
+    }
+    
+    this.sender = new Sender(senderOptions);
+  }
+
+  private getNetworkInterfaceAddress(interfaceName: string, networkInterfaces: NodeJS.Dict<os.NetworkInterfaceInfo[]>): string | undefined {
+    const interfaces = networkInterfaces[interfaceName];
+    if (!interfaces) {
+      return undefined;
+    }
+
+    // Find the first IPv4 address that's not internal
+    for (const iface of interfaces) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+
+    // Fallback to first IPv4 address (even if internal)
+    for (const iface of interfaces) {
+      if (iface.family === 'IPv4') {
+        return iface.address;
+      }
+    }
+
+    return undefined;
   }
 
   public async stop(): Promise<void> {

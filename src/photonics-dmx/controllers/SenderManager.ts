@@ -1,8 +1,10 @@
 // src/managers/SenderManager.ts
 import { EventEmitter } from 'stream';
 import { BaseSender, SenderError } from '../senders/BaseSender';
-import { NetworkWorkerManager } from '../workers/NetworkWorkerManager';
 import { IpcSender } from '../senders/IpcSender';
+import { ArtNetSender } from '../senders/ArtNetSender';
+import { SacnSender } from '../senders/SacnSender';
+import { EnttecProSender } from '../senders/EnttecProSender';
 
 
 /**
@@ -15,14 +17,12 @@ import { IpcSender } from '../senders/IpcSender';
 export class SenderManager {
   private enabledSenders: Map<string, BaseSender>;
   private eventEmitter: EventEmitter;
-  private networkWorkerManager: NetworkWorkerManager;
   private ipcSender: IpcSender | null = null;
   private initializingSenders: Set<string> = new Set();
 
   constructor() {
     this.enabledSenders = new Map<string, BaseSender>();
     this.eventEmitter = new EventEmitter();
-    this.networkWorkerManager = new NetworkWorkerManager();
   }
 
   /**
@@ -63,24 +63,46 @@ export class SenderManager {
         console.log(`IPC sender enabled and started successfully.`);
         this.initializingSenders.delete(id);
       } else {
-        // Handle network senders through worker system
-        console.log(`Creating worker-based sender for ${senderType} with ID "${id}"`);
+        // Handle network senders directly
+        console.log(`Creating direct sender for ${senderType} with ID "${id}"`);
 
-        // Initialize network worker if not already done
-        console.log(`Initializing network worker for sender "${id}"...`);
-        try {
-          await this.networkWorkerManager.initialize();
-          console.log(`Network worker initialized for sender "${id}"`);
-        } catch (error) {
-          console.error(`Failed to initialize network worker for sender "${id}":`, error);
-          this.initializingSenders.delete(id);
-          throw error;
+        let sender: BaseSender;
+
+        // Create sender instance based on type
+        switch (senderType) {
+          case 'artnet':
+            // ArtNet config: { host, options: { universe, net, subnet, subuni, port, base_refresh_interval } }
+            const host = config.host || '127.0.0.1';
+            const artnetOptions = config.options || {
+              universe: 1,
+              net: 0,
+              subnet: 0,
+              subuni: 0,
+              port: 6454,
+              base_refresh_interval: 1000
+            };
+            sender = new ArtNetSender(host, artnetOptions);
+            break;
+
+          case 'sacn':
+            // sACN config: { universe, networkInterface, useUnicast, unicastDestination }
+            sender = new SacnSender(config);
+            break;
+
+          case 'enttecpro':
+            // EnttecPro config: { devicePath }
+            const devicePath = config.devicePath;
+            if (!devicePath) {
+              throw new Error('Device path (port) is required for EnttecPro sender');
+            }
+            sender = new EnttecProSender(devicePath, { dmxSpeed: 20 }, 'uni1');
+            break;
+
+          default:
+            throw new Error(`Unknown sender type: ${senderType}`);
         }
 
-        // Create worker-based sender
-        const { WorkerSenderAdapter } = await import('../senders/WorkerSenderAdapter');
-        const sender = new WorkerSenderAdapter(id, senderType, config, this.networkWorkerManager);
-        console.log(`WorkerSenderAdapter created for sender "${id}"`);
+        console.log(`Direct sender created for "${id}"`);
 
         // Register error handler before starting
         sender.onSendError(this.handleSenderError);
@@ -92,7 +114,7 @@ export class SenderManager {
 
         // Only add to enabled senders after successful startup
         this.enabledSenders.set(id, sender);
-        console.log(`Worker-based sender with ID "${id}" enabled and started successfully.`);
+        console.log(`Direct sender with ID "${id}" enabled and started successfully.`);
 
         // Remove from initializing set
         this.initializingSenders.delete(id);
@@ -143,7 +165,7 @@ export class SenderManager {
     sender.removeSendError(this.handleSenderError);
     this.enabledSenders.delete(id);
     this.initializingSenders.delete(id);
-    console.log(`Worker-based sender with ID "${id}" disabled.`);
+    console.log(`Sender with ID "${id}" disabled.`);
   }
 
   /**
@@ -235,7 +257,7 @@ export class SenderManager {
   }
 
   /**
-   * Shuts down the manager by disabling all senders and stopping the network worker.
+   * Shuts down the manager by disabling all senders.
    */
   public async shutdown(): Promise<void> {
     console.log("SenderManager shutdown: starting");
@@ -251,12 +273,6 @@ export class SenderManager {
         } catch (err) {
           console.error("Error shutting down IPC sender:", err);
         }
-      }
-
-      // Shutdown the network worker
-      if (this.networkWorkerManager) {
-        await this.networkWorkerManager.shutdown();
-        console.log("Network worker shutdown: completed");
       }
 
       console.log("SenderManager shutdown: completed");
@@ -302,13 +318,6 @@ export class SenderManager {
     return this.enabledSenders.has(senderId) || this.initializingSenders.has(senderId);
   }
 
-  /**
-   * Check if IPC sender is enabled
-   * @returns True if the IPC sender is enabled, false otherwise
-   */
-  public isIpcSenderEnabled(): boolean {
-    return this.ipcSender !== null;
-  }
 
   // Using an arrow function to ensure correct "this" binding.
   private handleSenderError = (senderErr: SenderError): void => {
