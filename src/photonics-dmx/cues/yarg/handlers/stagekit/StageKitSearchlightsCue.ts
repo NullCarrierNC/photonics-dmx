@@ -27,7 +27,7 @@ export class StageKitSearchlightsCue implements ICue {
     // BPM-based timing: 0.5 cycles per beat
     // For 8 lights: 0.5 cycles per beat = 2 beats per full cycle = 0.25 beats per light
     const beatDuration = 60000 / cueData.beatsPerMinute; // ms per beat
-    const lightDuration = (beatDuration * 0.25) + 10; // Normally 0.25 beats per light, adding a bit of padding for the loop
+    const lightDuration = beatDuration * 0.25; // 0.25 beats per light
     
     const singleColor = getEffectSingleColor({
       color: transparentColor,
@@ -59,7 +59,7 @@ export class StageKitSearchlightsCue implements ICue {
         controller.setEffect('stagekit-searchlights-yellow', yellowEffect);
         this.isFirstExecution = false;
       } else {
-        controller.addEffect('stagekit-searchlights-yellow', yellowEffect);
+        controller.addEffectUnblockedName('stagekit-searchlights-yellow', yellowEffect);
       }
     }
   }
@@ -78,6 +78,9 @@ export class StageKitSearchlightsCue implements ICue {
     const yellowTransitions: EffectTransition[] = [];
     
     // Yellow counter-clockwise chase (starts at position 0)
+    // Calculate all timing relative to cycle start to prevent drift
+    const cycleDuration = allLights.length * lightDuration;
+    
     for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
       const light = allLights[lightIndex];
       
@@ -87,60 +90,38 @@ export class StageKitSearchlightsCue implements ICue {
       const yellowSequencePosition = (allLights.length - lightIndex) % allLights.length;
       const stepsUntilYellow = yellowSequencePosition;
       
-      // Phase 1: Wait until it's this light's turn
-      if (stepsUntilYellow > 0) {
-        yellowTransitions.push({
-          lights: [light],
-          layer: 1,
-          waitForCondition: 'delay',
-          waitForTime: stepsUntilYellow * lightDuration,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'none',
-          waitUntilTime: 0
-        });
-      } else {
-        // Start immediately for lights that begin the pattern
-        yellowTransitions.push({
-          lights: [light],
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'none',
-          waitUntilTime: 0
-        });
-      }
+      // Calculate absolute times from cycle start
+      const turnOnTime = stepsUntilYellow * lightDuration;
+      const turnOffTime = (stepsUntilYellow + 1) * lightDuration;
       
-      // Phase 2: Turn on yellow for lightDuration
+      // Phase 1: Wait until turn-on time, then turn on
       yellowTransitions.push({
         lights: [light],
         layer: 1,
-        waitForCondition: 'none',
-        waitForTime: 0,
+        waitForCondition: 'delay',
+        waitForTime: turnOnTime,
         transform: { color: yellowColor, easing: 'linear', duration: 0 },
         waitUntilCondition: 'delay',
         waitUntilTime: lightDuration
       });
       
-      // Phase 3: Turn off and wait until cycle completes
-      const stepsAfterYellow = allLights.length - stepsUntilYellow - 1;
-      if (stepsAfterYellow > 0) {
-        yellowTransitions.push({
-          lights: [light],
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: stepsAfterYellow * lightDuration
-        });
-      }
+      // Phase 2: Turn off immediately after Phase 1 completes (at turnOffTime), then wait until cycle completes
+      // Phase 1 completes at turnOnTime + lightDuration = turnOffTime, so Phase 2 should start immediately
+      yellowTransitions.push({
+        lights: [light],
+        layer: 1,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: transparentColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'delay',
+        waitUntilTime: cycleDuration - turnOffTime
+      });
     }
 
     return {
       id: 'stagekit-searchlights-yellow',
       description: 'Yellow counter-clockwise searchlight pattern',
-      transitions: yellowTransitions
+      transitions: yellowTransitions,
     };
   }
 
@@ -158,6 +139,9 @@ export class StageKitSearchlightsCue implements ICue {
     const redTransitions: EffectTransition[] = [];
     
     // Red counter-clockwise chase (offset by 1 position from yellow)
+    // Calculate all timing relative to cycle start to prevent drift
+    const cycleDuration = allLights.length * lightDuration;
+    
     for (let lightIndex = 0; lightIndex < allLights.length; lightIndex++) {
       const light = allLights[lightIndex];
       
@@ -166,60 +150,39 @@ export class StageKitSearchlightsCue implements ICue {
       const redSequencePosition = (allLights.length - lightIndex + 1) % allLights.length;
       const stepsUntilRed = redSequencePosition;
       
-      // Phase 1: Wait until it's this light's turn  
-      if (stepsUntilRed > 0) {
-        redTransitions.push({
-          lights: [light],
-          layer: 20,
-          waitForCondition: 'delay',
-          waitForTime: stepsUntilRed * lightDuration,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'none',
-          waitUntilTime: 0
-        });
-      } else {
-        // Start immediately for lights that begin the pattern
-        redTransitions.push({
-          lights: [light],
-          layer: 20,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'none',
-          waitUntilTime: 0
-        });
-      }
+      // Calculate absolute times from cycle start
+      const turnOnTime = stepsUntilRed * lightDuration;
+      const turnOffTime = (stepsUntilRed + 1) * lightDuration;
       
-      // Phase 2: Turn on red for lightDuration
+      // Phase 1: Wait until turn-on time, then turn on
       redTransitions.push({
         lights: [light],
         layer: 20,
-        waitForCondition: 'none',
-        waitForTime: 0,
+        waitForCondition: 'delay',
+        waitForTime: turnOnTime,
         transform: { color: redColor, easing: 'linear', duration: 0 },
         waitUntilCondition: 'delay',
         waitUntilTime: lightDuration
       });
       
-      // Phase 3: Turn off and wait until cycle completes
-      const stepsAfterRed = allLights.length - stepsUntilRed - 1;
-      if (stepsAfterRed > 0) {
-        redTransitions.push({
-          lights: [light],
-          layer: 20,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          transform: { color: transparentColor, easing: 'linear', duration: 0 },
-          waitUntilCondition: 'delay',
-          waitUntilTime: stepsAfterRed * lightDuration
-        });
-      }
+      // Phase 2: Turn off immediately after Phase 1 completes (at turnOffTime), then wait until cycle completes
+      // Phase 1 completes at turnOnTime + lightDuration = turnOffTime, so Phase 2 should start immediately
+      redTransitions.push({
+        lights: [light],
+        layer: 20,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        transform: { color: transparentColor, easing: 'linear', duration: 0 },
+        waitUntilCondition: 'delay',
+        waitUntilTime: cycleDuration - turnOffTime
+      });
     }
 
     return {
       id: 'stagekit-searchlights-red',
       description: 'Red counter-clockwise searchlight pattern (offset)',
-      transitions: redTransitions
+      transitions: redTransitions,
+     
     };
   }
 
