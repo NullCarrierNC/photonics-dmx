@@ -36,6 +36,7 @@ export class SacnSender extends BaseSender {
       universe: validUniverse,
       port: 5568,
       reuseAddr: true,
+      minRefreshRate: 30,
       defaultPacketOptions: {
         sourceName: "Photonics-DMX",
         useRawDmxValues: true,
