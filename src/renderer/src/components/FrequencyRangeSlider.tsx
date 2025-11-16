@@ -65,21 +65,45 @@ const FrequencyRangeSlider: React.FC<FrequencyRangeSliderProps> = ({
     }
   }, [localMinHz, isDraggingMax, onChange]);
 
-  // Handle direct input change
-  const handleMinInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value) || minBound;
+  const sanitizeMinInput = useCallback((value: number) => {
+    if (!Number.isFinite(value)) {
+      value = minBound;
+    }
     const rounded = roundValue(value);
     const clamped = clampValue(rounded);
-    const newMin = Math.min(clamped, localMaxHz - 1);
+    return Math.min(clamped, localMaxHz - 1);
+  }, [localMaxHz, minBound]);
+
+  const sanitizeMaxInput = useCallback((value: number) => {
+    if (!Number.isFinite(value)) {
+      value = maxBound;
+    }
+    const rounded = roundValue(value);
+    const clamped = clampValue(rounded);
+    return Math.max(clamped, localMinHz + 1);
+  }, [localMinHz, maxBound]);
+
+  // Handle direct input change (local state only)
+  const handleMinInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value);
+    const newMin = sanitizeMinInput(value);
+    setLocalMinHz(newMin);
+  };
+
+  const handleMaxInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value);
+    const newMax = sanitizeMaxInput(value);
+    setLocalMaxHz(newMax);
+  };
+
+  const handleMinInputBlur = () => {
+    const newMin = sanitizeMinInput(localMinHz);
     setLocalMinHz(newMin);
     onChange(newMin, localMaxHz);
   };
 
-  const handleMaxInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value) || maxBound;
-    const rounded = roundValue(value);
-    const clamped = clampValue(rounded);
-    const newMax = Math.max(clamped, localMinHz + 1);
+  const handleMaxInputBlur = () => {
+    const newMax = sanitizeMaxInput(localMaxHz);
     setLocalMaxHz(newMax);
     onChange(localMinHz, newMax);
   };
@@ -145,6 +169,7 @@ const FrequencyRangeSlider: React.FC<FrequencyRangeSliderProps> = ({
         step="1"
         value={Math.round(localMinHz)}
         onChange={handleMinInputChange}
+        onBlur={handleMinInputBlur}
         disabled={disabled}
         className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
       />
@@ -196,6 +221,7 @@ const FrequencyRangeSlider: React.FC<FrequencyRangeSliderProps> = ({
         step="1"
         value={Math.round(localMaxHz)}
         onChange={handleMaxInputChange}
+        onBlur={handleMaxInputBlur}
         disabled={disabled}
         className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
       />

@@ -39,7 +39,8 @@ const DEFAULT_CONFIG: AudioConfig = {
     enabled: true,
     alpha: 0.7
   },
-  colorMapping: {
+  frequencyBands: {
+    bandCount: 3,
     ranges: DEFAULT_RANGES
   },
   beatDetection: {
@@ -83,13 +84,13 @@ export class AudioCaptureManager {
   private readonly VALUE_CHANGE_THRESHOLD = 0.01; // Only update if values changed by >1%
 
   constructor(config?: Partial<AudioConfig>) {
-    // Merge with defaults, ensuring colorMapping.ranges exists
+    // Merge with defaults, ensuring frequencyBands.ranges exists
     this.config = {
       ...DEFAULT_CONFIG,
       ...config,
-      colorMapping: config?.colorMapping?.ranges 
-        ? { ranges: config.colorMapping.ranges }
-        : DEFAULT_CONFIG.colorMapping
+      frequencyBands: config?.frequencyBands?.ranges
+        ? { bandCount: config.frequencyBands.bandCount ?? 3, ranges: config.frequencyBands.ranges }
+        : DEFAULT_CONFIG.frequencyBands
     };
     console.log('AudioCaptureManager initialized');
   }
@@ -247,7 +248,7 @@ export class AudioCaptureManager {
       sensitivity: config.sensitivity !== undefined ? config.sensitivity : 'unchanged',
       smoothing: config.smoothing !== undefined ? config.smoothing : 'unchanged',
       beatDetection: config.beatDetection !== undefined ? config.beatDetection : 'unchanged',
-      colorMapping: config.colorMapping !== undefined ? `ranges: ${config.colorMapping.ranges.length}` : 'unchanged',
+      frequencyBands: config.frequencyBands !== undefined ? `ranges: ${config.frequencyBands.ranges.length}` : 'unchanged',
       fftSize: config.fftSize !== undefined ? config.fftSize : 'unchanged'
     });
   }
@@ -352,7 +353,7 @@ export class AudioCaptureManager {
     const binSize = sampleRate / fftSize;
     
     // Get configured ranges (default to DEFAULT_RANGES if not set)
-    const ranges = this.config.colorMapping?.ranges || DEFAULT_RANGES;
+    const ranges = this.config.frequencyBands?.ranges || DEFAULT_RANGES;
     
     // Calculate energy for each configured range
     const rangeEnergies: Map<string, number> = new Map();

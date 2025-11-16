@@ -9,9 +9,6 @@ import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
 import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor';
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
-// Import audio cues to register them
-
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/audioTypes';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
 import { BrowserWindow, ipcMain } from 'electron';
@@ -22,6 +19,7 @@ import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/Lig
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController';
 import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
+import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues';
 
@@ -74,6 +72,7 @@ export class ControllerManager {
     await this.initializeDmxManager();
     await this.initializeSequencer();
     await this.initializeCueRegistry();
+    await this.initializeAudioCueRegistry();
     await this.initializeListeners();
 
     this.isInitialized = true;
@@ -149,6 +148,26 @@ export class ControllerManager {
     const consistencyWindow = this.config.getCueConsistencyWindow();
     registry.setCueConsistencyWindow(consistencyWindow);
     console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms');
+  }
+
+  /**
+   * Initialize the AudioCueRegistry with enabled groups from configuration
+   */
+  private async initializeAudioCueRegistry(): Promise<void> {
+    const registry = AudioCueRegistry.getInstance();
+
+    const enabledGroupIds = this.config.getEnabledAudioCueGroups();
+    if (enabledGroupIds && enabledGroupIds.length > 0) {
+      registry.setEnabledGroups(enabledGroupIds);
+      console.log('AudioCueRegistry initialized with enabled groups:', enabledGroupIds);
+    } else {
+      const allGroups = registry.getRegisteredGroups();
+      registry.setEnabledGroups(allGroups);
+      if (allGroups.length > 0) {
+        this.config.setEnabledAudioCueGroups(allGroups);
+      }
+      console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups);
+    }
   }
   
 
@@ -807,16 +826,12 @@ export class ControllerManager {
       
       // Create audio processor in main process using cue-based system
       // getAudioConfig() always returns a valid config (merges with defaults)
-      const cueType = audioConfig.activeCueType 
-        ? (audioConfig.activeCueType as AudioCueType)
-        : AudioCueType.BasicLayered;
-      
       this.audioProcessor = new AudioCueProcessor(
         this.dmxLightManager,
         this.effectsController,
-        audioConfig,
-        cueType
+        audioConfig
       );
+      this.audioProcessor.refreshCueSelection();
       
       // Start the processor
       this.audioProcessor.start();
@@ -906,16 +921,16 @@ export class ControllerManager {
     this.config.setAudioConfig(mergedConfig);
     this.audioProcessor.updateConfig(mergedConfig);
     
-    // If cue type changed, update it
-    const newCueType = config.activeCueType 
-      ? (config.activeCueType as AudioCueType)
-      : AudioCueType.BasicLayered;
-    
-    if (this.audioProcessor.getCueType() !== newCueType) {
-      this.audioProcessor.setCueType(newCueType);
-    }
-    
     console.log('AudioCueProcessor configuration updated');
+  }
+
+  /**
+   * Refresh active audio cue selection when enabled groups change
+   */
+  public refreshAudioCueSelection(): void {
+    if (this.audioProcessor) {
+      this.audioProcessor.refreshCueSelection();
+    }
   }
 
 

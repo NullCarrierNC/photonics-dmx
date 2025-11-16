@@ -31,7 +31,8 @@ export class AudioCueHandler extends EventEmitter {
   public async handleAudioData(
     audioData: AudioLightingData,
     config: AudioConfig,
-    cueType: AudioCueType
+    cueType: AudioCueType,
+    enabledBandCount: number
   ): Promise<void> {
     const cue = this.registry.getCueImplementation(cueType);
     if (!cue) {
@@ -54,6 +55,7 @@ export class AudioCueHandler extends EventEmitter {
     const cueData: AudioCueData = {
       audioData,
       config,
+      enabledBandCount,
       timestamp: Date.now(),
       executionCount: this.executionCount
     };

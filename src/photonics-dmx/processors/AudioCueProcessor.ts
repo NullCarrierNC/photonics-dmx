@@ -4,6 +4,7 @@ import { AudioCueHandler } from '../cueHandlers/AudioCueHandler';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { AudioCueType } from '../cues/types/audioCueTypes';
+import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry';
 
 /**
  * AudioCueProcessor - Processes audio data using cue-based system
@@ -16,15 +17,16 @@ export class AudioCueProcessor {
   private isActive = false;
   private cueHandler: AudioCueHandler;
   private currentCueType: AudioCueType;
+  private registry: AudioCueRegistry;
 
   constructor(
     lightManager: DmxLightManager,
     private sequencer: ILightingController,
-    audioConfig: AudioConfig,
-    cueType: AudioCueType = AudioCueType.BasicLayered
+    audioConfig: AudioConfig
   ) {
     this.config = audioConfig;
-    this.currentCueType = cueType;
+    this.registry = AudioCueRegistry.getInstance();
+    this.currentCueType = this.selectActiveCueType();
     this.cueHandler = new AudioCueHandler(lightManager, sequencer);
   }
 
@@ -73,8 +75,8 @@ export class AudioCueProcessor {
   public processAudioData(data: AudioLightingData): void {
     if (!this.isActive) return;
 
-    // Delegate to cue handler
-    this.cueHandler.handleAudioData(data, this.config, this.currentCueType);
+    const bandCount = this.getEnabledBandCount();
+    this.cueHandler.handleAudioData(data, this.config, this.currentCueType, bandCount);
   }
 
   /**
@@ -94,22 +96,37 @@ export class AudioCueProcessor {
   }
 
   /**
-   * Set the active cue type
+   * Re-evaluate which cue type should be active based on enabled audio cue groups
    */
-  public setCueType(cueType: AudioCueType): void {
-    this.currentCueType = cueType;
-    // Restart if active
-    if (this.isActive) {
-      this.stop();
-      this.start();
+  public refreshCueSelection(): void {
+    const selected = this.selectActiveCueType();
+    if (selected !== this.currentCueType) {
+      console.log(`AudioCueProcessor: Switching cue from ${this.currentCueType} to ${selected}`);
+      this.currentCueType = selected;
     }
   }
 
   /**
-   * Get the current cue type
+   * Determine which cue type should be used
    */
-  public getCueType(): AudioCueType {
-    return this.currentCueType;
+  private selectActiveCueType(): AudioCueType {
+    const availableCueTypes = this.registry.getAvailableCueTypes();
+    if (availableCueTypes.length > 0) {
+      return availableCueTypes[0];
+    }
+
+    // Fallback to first cue from any registered group
+    const allCueTypes = this.registry.getAvailableCueTypes(true);
+    if (allCueTypes.length > 0) {
+      return allCueTypes[0];
+    }
+
+    // Absolute fallback
+    return AudioCueType.BasicLayered;
+  }
+
+  private getEnabledBandCount(): number {
+    return this.config.frequencyBands?.bandCount ?? 3;
   }
 }
 

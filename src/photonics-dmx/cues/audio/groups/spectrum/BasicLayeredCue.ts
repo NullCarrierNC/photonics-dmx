@@ -1,10 +1,9 @@
-import { DmxLightManager } from "../../controllers/DmxLightManager";
-import { ILightingController } from "../../controllers/sequencer/interfaces";
-import { getEffectSingleColor } from "../../effects";
-import { getColor, validateColorString } from "../../helpers";
-import { AudioCueData, AudioCueType } from "../types/audioCueTypes";
-import { IAudioCue } from "../interfaces/IAudioCue";
-
+import { DmxLightManager } from '../../../../controllers/DmxLightManager';
+import { ILightingController } from '../../../../controllers/sequencer/interfaces';
+import { getEffectSingleColor } from '../../../../effects';
+import { getColor, validateColorString } from '../../../../helpers';
+import { AudioCueData, AudioCueType } from '../../../types/audioCueTypes';
+import { IAudioCue } from '../../../interfaces/IAudioCue';
 
 /**
  * BasicLayered cue - applies each frequency range to its own layer
@@ -28,19 +27,20 @@ export class BasicLayeredCue implements IAudioCue {
     const { audioData, config } = data;
     const { frequencyBands } = audioData;
 
-    // Get all lights
     const allLights = lightManager.getLights(['front', 'back'], 'all');
     if (!allLights || allLights.length === 0) {
       return;
     }
 
-    // Get configured ranges
-    const ranges = config.colorMapping?.ranges || [];
+    const ranges = config.frequencyBands?.ranges || [];
     if (ranges.length === 0) {
       return;
     }
 
-    // Get frequency band values in order
+    const configBandCount = config.frequencyBands?.bandCount;
+    const enabledBandCount = data.enabledBandCount ?? configBandCount ?? 3;
+    const activeRangeIndices = enabledBandCount === 3 ? [0, 2, 4] : [0, 1, 2, 3, 4];
+
     const bandValues = [
       frequencyBands.range1,
       frequencyBands.range2,
@@ -49,51 +49,44 @@ export class BasicLayeredCue implements IAudioCue {
       frequencyBands.range5
     ];
 
-    // Create an effect for each frequency range
-    // Each range gets its own layer (starting at 0 for Bass)
-    for (let rangeIndex = 0; rangeIndex < ranges.length && rangeIndex < bandValues.length; rangeIndex++) {
+    activeRangeIndices.forEach((rangeIndex, orderIndex) => {
       const range = ranges[rangeIndex];
-      const bandIntensity = bandValues[rangeIndex];
-      const layer = rangeIndex; // Bass = layer 0, Range2 = layer 1, etc.
-
-      // Skip if intensity is too low
-      if (bandIntensity < 0.01) {
-        // Remove effect for this layer if it exists
-        sequencer.removeEffectByLayer(layer);
-        continue;
+      if (!range) {
+        return;
       }
 
-      // Validate color
+      const bandIntensity = bandValues[rangeIndex];
+      const layer = orderIndex;
+
+      if (bandIntensity < 0.01) {
+        sequencer.removeEffectByLayer(layer);
+        return;
+      }
+
       const color = validateColorString(range.color);
       if (!color) {
         console.warn(`Invalid color for range ${range.name}: ${range.color}`);
-        continue;
+        return;
       }
 
-      // Get color with configured brightness
       const brightness = range.brightness || 'medium';
       const rgbColor = getColor(color, brightness, 'add');
 
-      // Scale intensity based on band intensity
       rgbColor.intensity = Math.floor(rgbColor.intensity * bandIntensity);
       rgbColor.opacity = bandIntensity;
 
-      // Create a single-color effect for this layer
       const effect = getEffectSingleColor({
         lights: allLights,
         color: rgbColor,
         duration: 100,
-        layer: layer
+        layer
       });
 
-      // Apply effect using addEffect (allows multiple layers to coexist)
       sequencer.addEffect(`audio-basic-layered-${range.id}`, effect);
-    }
+    });
 
-    // Handle beat detection if needed (optional enhancement)
     if (audioData.beatDetected) {
-      // Could add a beat effect on a higher layer (e.g., layer 10)
-      // For now, BasicLayered doesn't handle beats - layers show frequency response
+      // Reserved for future beat effect
     }
   }
 

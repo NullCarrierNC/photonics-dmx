@@ -27,34 +27,44 @@ interface CuePreviewAudioProps {
   className?: string;
 }
 
+const THREE_BAND_IDS = ['range1', 'range3', 'range5'];
+
+type PreviewRange = {
+  id: string;
+  name: string;
+  minHz: number;
+  maxHz: number;
+  color: Color;
+  brightness: 'low' | 'medium' | 'high' | 'max';
+};
+
 const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
   const audioData = useAtomValue(audioDataAtom);
   const audioConfig = useAtomValue(audioConfigAtom);
   const [lastBeatTime, setLastBeatTime] = useState(0);
 
-  // Get configured ranges (default to 5 ranges if not set)
-  const ranges = audioConfig?.colorMapping?.ranges || [];
-  
-  // Default ranges if not configured
-  const defaultRanges = [
+  const defaultRanges: PreviewRange[] = [
     { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red' as Color, brightness: 'medium' as const },
     { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue' as Color, brightness: 'medium' as const },
     { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow' as Color, brightness: 'medium' as const },
     { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green' as Color, brightness: 'medium' as const },
     { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as const }
   ];
-  
-  const displayRanges = ranges.length > 0 ? ranges : defaultRanges;
-  
-  // Get frequency band values
-  const bandValues = [
-    audioData?.frequencyBands?.range1 || 0,
-    audioData?.frequencyBands?.range2 || 0,
-    audioData?.frequencyBands?.range3 || 0,
-    audioData?.frequencyBands?.range4 || 0,
-    audioData?.frequencyBands?.range5 || 0
-  ];
+
+  const configuredRanges = (audioConfig?.frequencyBands?.ranges as PreviewRange[]) || defaultRanges;
+  const configuredBandCount = audioConfig?.frequencyBands?.bandCount ?? 3;
+  const displayRanges = configuredBandCount === 3
+    ? configuredRanges.filter((range) => THREE_BAND_IDS.includes(range.id))
+    : configuredRanges;
+
+  const bandValuesById: Record<string, number> = {
+    range1: audioData?.frequencyBands?.range1 || 0,
+    range2: audioData?.frequencyBands?.range2 || 0,
+    range3: audioData?.frequencyBands?.range3 || 0,
+    range4: audioData?.frequencyBands?.range4 || 0,
+    range5: audioData?.frequencyBands?.range5 || 0,
+  };
 
   // Track beat detection for pulse animation
   useEffect(() => {
@@ -90,8 +100,8 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
 
       {/* Frequency Bars */}
       <div className="space-y-2 mb-4">
-        {displayRanges.map((range, index) => {
-          const bandValue = bandValues[index] || 0;
+        {displayRanges.map((range) => {
+          const bandValue = bandValuesById[range.id] || 0;
           const colorRgb = COLOR_TO_RGB[range.color as Color] || COLOR_TO_RGB.white;
           const frequencyLabel = `${range.minHz}-${range.maxHz >= 1000 ? `${(range.maxHz / 1000).toFixed(1)}k` : range.maxHz}Hz`;
           

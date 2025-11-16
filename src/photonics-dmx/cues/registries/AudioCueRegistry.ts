@@ -24,7 +24,13 @@ export class AudioCueRegistry {
   /** Name of the default group */
   private defaultGroup: string | null = null;
 
-  private constructor() { }
+  /** Groups that are currently enabled */
+  private enabledGroups: Set<string> = new Set();
+
+  /** Cache of cue metadata for renderer requests */
+  private cueDetailsCache: Map<string, Array<{ id: string; description: string }>> = new Map();
+
+  private constructor() {}
 
   /**
    * Get the singleton instance of the AudioCueRegistry
@@ -43,10 +49,16 @@ export class AudioCueRegistry {
    */
   public registerGroup(group: AudioCueGroup): void {
     this.groups.set(group.id, group);
+    this.cueDetailsCache.delete(group.id);
 
     // Set as default if none exists
     if (!this.defaultGroup) {
       this.defaultGroup = group.id;
+    }
+
+    // Ensure at least one group is enabled
+    if (this.enabledGroups.size === 0) {
+      this.enabledGroups.add(group.id);
     }
   }
 
@@ -61,36 +73,50 @@ export class AudioCueRegistry {
     }
 
     this.defaultGroup = groupId;
+    this.enableGroup(groupId);
   }
 
   /**
-   * Get a cue implementation from the default group.
-   * @param cueType The type of cue to get
-   * @returns The cue implementation or null if not found
+   * Get a cue implementation from enabled groups.
+   * Falls back to the default group if none of the enabled groups contain the cue.
    */
   public getCueImplementation(cueType: AudioCueType): IAudioCue | null {
-    const group = this.defaultGroup ? this.groups.get(this.defaultGroup) : null;
-    if (!group) return null;
+    for (const groupId of this.enabledGroups) {
+      const group = this.groups.get(groupId);
+      const cue = group?.cues.get(cueType);
+      if (cue) {
+        return cue;
+      }
+    }
 
-    return group.cues.get(cueType) || null;
+    const fallback = this.defaultGroup ? this.groups.get(this.defaultGroup) : null;
+    return fallback?.cues.get(cueType) ?? null;
   }
 
   /**
-   * Get all available cue types from the default group.
-   * @returns Array of available AudioCueType values
+   * Get all cue types available within enabled groups (or across all groups if includeAll=true)
    */
-  public getAvailableCueTypes(): AudioCueType[] {
-    const group = this.defaultGroup ? this.groups.get(this.defaultGroup) : null;
-    if (!group) return [];
+  public getAvailableCueTypes(includeAll = false): AudioCueType[] {
+    const cueTypes = new Set<AudioCueType>();
+    const groupIds = includeAll ? Array.from(this.groups.keys()) : this.getEnabledGroups();
 
-    return Array.from(group.cues.keys());
+    for (const groupId of groupIds) {
+      const group = this.groups.get(groupId);
+      if (!group) continue;
+      group.cues.forEach((_cue, cueType) => cueTypes.add(cueType));
+    }
+
+    // Fallback to default group if none collected
+    if (cueTypes.size === 0 && this.defaultGroup) {
+      const fallback = this.groups.get(this.defaultGroup);
+      fallback?.cues.forEach((_cue, cueType) => cueTypes.add(cueType));
+    }
+
+    return Array.from(cueTypes);
   }
 
   /**
    * Get a cue implementation from a specific group.
-   * @param cueType The type of cue to get
-   * @param groupId The ID of the group to get the cue from
-   * @returns The cue implementation or null if not found
    */
   public getCueImplementationFromGroup(cueType: AudioCueType, groupId: string): IAudioCue | null {
     const group = this.groups.get(groupId);
@@ -100,16 +126,111 @@ export class AudioCueRegistry {
   }
 
   /**
-   * Get all registered groups.
-   * @returns Array of group IDs
+   * Get all registered group IDs.
    */
   public getRegisteredGroups(): string[] {
     return Array.from(this.groups.keys());
   }
 
   /**
+   * Get a specific group definition.
+   */
+  public getGroup(groupId: string): AudioCueGroup | undefined {
+    return this.groups.get(groupId);
+  }
+
+  /**
+   * Get full group definitions.
+   */
+  public getGroups(): AudioCueGroup[] {
+    return Array.from(this.groups.values());
+  }
+
+  /**
+   * Get summaries for all groups (used by renderer)
+   */
+  public getGroupSummaries(): Array<{ id: string; name: string; description: string }> {
+    return Array.from(this.groups.values()).map(group => ({
+      id: group.id,
+      name: group.name,
+      description: group.description
+    }));
+  }
+
+  /**
+   * Get enabled group IDs. Defaults to the default group if nothing has been set yet.
+   */
+  public getEnabledGroups(): string[] {
+    if (this.enabledGroups.size === 0 && this.defaultGroup) {
+      return [this.defaultGroup];
+    }
+
+    return Array.from(this.enabledGroups);
+  }
+
+  /**
+   * Enable a specific group.
+   */
+  public enableGroup(groupId: string): boolean {
+    if (!this.groups.has(groupId)) {
+      return false;
+    }
+
+    this.enabledGroups.add(groupId);
+    return true;
+  }
+
+  /**
+   * Disable a specific group.
+   */
+  public disableGroup(groupId: string): boolean {
+    if (groupId === this.defaultGroup) {
+      return false;
+    }
+
+    return this.enabledGroups.delete(groupId);
+  }
+
+  /**
+   * Replace the enabled group set with the provided list.
+   */
+  public setEnabledGroups(groupIds: string[]): void {
+    const validIds = groupIds.filter((id) => this.groups.has(id));
+    if (validIds.length === 0) {
+      this.enabledGroups.clear();
+      if (this.defaultGroup) {
+        this.enabledGroups.add(this.defaultGroup);
+      }
+      return;
+    }
+
+    this.enabledGroups = new Set(validIds);
+  }
+
+  /**
+   * Get cue metadata for a group (id + description).
+   */
+  public getCueDetails(groupId: string): Array<{ id: string; description: string }> {
+    if (this.cueDetailsCache.has(groupId)) {
+      return this.cueDetailsCache.get(groupId)!;
+    }
+
+    const group = this.groups.get(groupId);
+    if (!group) {
+      return [];
+    }
+
+    const cues = Array.from(group.cues.values()).map((cue) => ({
+      id: String(cue.cueType),
+      description: cue.description ?? ''
+    }));
+
+    this.cueDetailsCache.set(groupId, cues);
+    return cues;
+  }
+
+  /**
    * Get the default group ID.
-   * @returns The default group ID or null if none is set
    */
   public getDefaultGroup(): string | null {
     return this.defaultGroup;
@@ -121,6 +242,8 @@ export class AudioCueRegistry {
   public reset(): void {
     this.groups.clear();
     this.defaultGroup = null;
+    this.enabledGroups.clear();
+    this.cueDetailsCache.clear();
     console.log('AudioCueRegistry reset to initial state');
   }
 }

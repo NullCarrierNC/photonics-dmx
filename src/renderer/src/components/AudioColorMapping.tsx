@@ -1,12 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Color, Brightness } from '../../../photonics-dmx/types';
 import FrequencyRangeSlider from './FrequencyRangeSlider';
 
 // Colors suitable for audio-reactive lighting (excludes black, and colors that don't make sense for lighting)
 // Transparent is included to allow ranges to be disabled while seeing effects from other ranges
 const AUDIO_COLOR_OPTIONS: Color[] = [
-  'red', 'blue', 'yellow', 'green', 'cyan', 'magenta', 'orange', 
-  'purple', 'teal', 'violet', 'amber', 'chartreuse', 'vermilion', 'white', 'transparent'
+  'white',
+  'red',
+  'green',
+  'blue',
+  'vermilion',
+  'orange',
+  'amber',
+  'yellow',
+  'chartreuse',
+  'teal',
+  'cyan',
+  'violet',
+  'purple',
+  'magenta',
+  'transparent'
 ];
 
 // Brightness options
@@ -46,6 +59,13 @@ const DEFAULT_RANGES = [
   { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 }
 ];
 
+const THREE_BAND_VISIBLE_IDS = ['range1', 'range3', 'range5'];
+
+const BAND_OPTIONS: Array<{ value: 3 | 5; label: string }> = [
+  { value: 3, label: '3 Bands (Bass / Mids / Highs)' },
+  { value: 5, label: '5 Bands (Bass / Low-Mids / Mids / Upper-Mids / Highs)' },
+];
+
 interface FrequencyRange {
   id: string;
   name: string;
@@ -56,35 +76,65 @@ interface FrequencyRange {
   sensitivity: number;
 }
 
+const normalizeRanges = (inputRanges: FrequencyRange[]): FrequencyRange[] => {
+  const rangeMap = new Map(inputRanges.map((range) => [range.id, range]));
+  return DEFAULT_RANGES.map((defaultRange) => {
+    const existing = rangeMap.get(defaultRange.id);
+    return {
+      ...defaultRange,
+      ...existing,
+      sensitivity: existing?.sensitivity ?? defaultRange.sensitivity,
+    };
+  });
+};
+
 const AudioColorMapping: React.FC = () => {
-  const [ranges, setRanges] = useState<FrequencyRange[]>(DEFAULT_RANGES);
+  const [ranges, setRanges] = useState<FrequencyRange[]>(() => normalizeRanges(DEFAULT_RANGES));
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   // Local state for sensitivity sliders to prevent re-renders during drag
   const [localSensitivityValues, setLocalSensitivityValues] = useState<Map<string, number>>(new Map());
+  const [bandCount, setBandCount] = useState<3 | 5>(3);
+  const [activeColorPickerId, setActiveColorPickerId] = useState<string | null>(null);
+  const colorPickerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!activeColorPickerId) {
+      colorPickerRef.current = null;
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
+        setActiveColorPickerId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeColorPickerId]);
 
   // Load configuration on mount
   useEffect(() => {
     const loadConfig = async () => {
       try {
         const config = await window.electron.ipcRenderer.invoke('get-audio-config');
-        if (config?.colorMapping?.ranges && Array.isArray(config.colorMapping.ranges) && config.colorMapping.ranges.length > 0) {
-          // Use loaded ranges, ensuring sensitivity defaults to 1.0 if missing
-          const loadedRanges = config.colorMapping.ranges.map((range: FrequencyRange) => ({
-            ...range,
-            sensitivity: range.sensitivity ?? 1.0
-          }));
-          setRanges(loadedRanges as FrequencyRange[]);
-          // Clear any local sensitivity values when loading new config
+        if (config?.frequencyBands?.ranges && Array.isArray(config.frequencyBands.ranges) && config.frequencyBands.ranges.length > 0) {
+          const normalized = normalizeRanges(config.frequencyBands.ranges as FrequencyRange[]);
+          setRanges(normalized);
+          setBandCount((config.frequencyBands.bandCount as 3 | 5) ?? 3);
           setLocalSensitivityValues(new Map());
         } else {
-          // Use defaults
-          setRanges(DEFAULT_RANGES);
+          setRanges(normalizeRanges(DEFAULT_RANGES));
+          setBandCount(3);
           setLocalSensitivityValues(new Map());
         }
       } catch (error) {
-        console.error('Failed to load audio color mapping:', error);
-        setRanges(DEFAULT_RANGES);
+        console.error('Failed to load audio frequency bands:', error);
+        setRanges(normalizeRanges(DEFAULT_RANGES));
+        setBandCount(3);
         setLocalSensitivityValues(new Map());
       } finally {
         setIsLoading(false);
@@ -95,22 +145,39 @@ const AudioColorMapping: React.FC = () => {
   }, []);
 
   // Save configuration
-  const saveConfig = useCallback(async (updatedRanges: FrequencyRange[]) => {
+  const saveConfig = useCallback(async (updatedRanges: FrequencyRange[], overrideBandCount?: 3 | 5) => {
     if (isSaving) return;
     
     setIsSaving(true);
     try {
       await window.electron.ipcRenderer.invoke('save-audio-config', {
-        colorMapping: {
+        frequencyBands: {
+          bandCount: overrideBandCount ?? bandCount,
           ranges: updatedRanges
         }
       });
     } catch (error) {
-      console.error('Failed to save color mapping:', error);
+      console.error('Failed to save frequency bands:', error);
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving]);
+  }, [bandCount, isSaving]);
+
+  const handleBandCountChange = useCallback((value: 3 | 5) => {
+    setBandCount(value);
+    saveConfig(ranges, value);
+  }, [ranges, saveConfig]);
+
+  const handleColorPickerToggle = useCallback((rangeId: string) => {
+    setActiveColorPickerId((prev) => (prev === rangeId ? null : rangeId));
+  }, []);
+
+  const displayRanges = useMemo(() => {
+    if (bandCount === 3) {
+      return ranges.filter((range) => THREE_BAND_VISIBLE_IDS.includes(range.id));
+    }
+    return ranges;
+  }, [bandCount, ranges]);
 
   // Handle range frequency change
   const handleRangeChange = useCallback((rangeId: string, minHz: number, maxHz: number) => {
@@ -127,6 +194,8 @@ const AudioColorMapping: React.FC = () => {
       range.id === rangeId ? { ...range, color } : range
     );
     setRanges(updatedRanges);
+    setActiveColorPickerId(null);
+    colorPickerRef.current = null;
     saveConfig(updatedRanges);
   }, [ranges, saveConfig]);
 
@@ -176,7 +245,7 @@ const AudioColorMapping: React.FC = () => {
     return (
       <div className="space-y-4">
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Loading frequency color mapping configuration...
+          Loading frequency band configuration...
         </p>
       </div>
     );
@@ -184,11 +253,31 @@ const AudioColorMapping: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Configure frequency ranges, colors, and brightness levels for audio-reactive lighting. Overlapping ranges will blend colors additively.
+       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Configure frequency ranges, colours, and brightness levels for audio-reactive lighting. Overlapping ranges will blend colours additively.
       </p>
 
-      {ranges.map((range) => {
+
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border rounded-lg border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Number of Bands</h3>
+          
+        </div>
+        <select
+          value={bandCount}
+          onChange={(e) => handleBandCountChange(Number(e.target.value) as 3 | 5)}
+          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-auto"
+        >
+          {BAND_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      
+     
+      {displayRanges.map((range) => {
         // Get current sensitivity value (local state if dragging, otherwise from range)
         const currentSensitivity = localSensitivityValues.has(range.id) 
           ? localSensitivityValues.get(range.id)! 
@@ -213,29 +302,67 @@ const AudioColorMapping: React.FC = () => {
                 className="px-2 py-1 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
               />
 
-              {/* Color selector */}
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 ml-4">
-                Color:
-              </label>
-              <select
-                value={range.color}
-                onChange={(e) => handleColorChange(range.id, e.target.value as Color)}
-                disabled={isSaving}
-                className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {AUDIO_COLOR_OPTIONS.map(color => (
-                  <option key={color} value={color}>
-                    {color.charAt(0).toUpperCase() + color.slice(1)}
-                  </option>
-                ))}
-              </select>
-
-              {/* Color preview swatch */}
-              <div
-                className="w-12 h-8 rounded border border-gray-300 dark:border-gray-600 flex-shrink-0"
-                style={{ backgroundColor: COLOR_TO_RGB[range.color] }}
-                title={range.color}
-              />
+              {/* Color picker */}
+              <div className="flex items-center ml-4 gap-2 relative">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  Colour:
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => handleColorPickerToggle(range.id)}
+                    disabled={isSaving}
+                    className="flex items-center justify-between border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+                  >
+                    <span className="text-sm">
+                      {range.color.charAt(0).toUpperCase() + range.color.slice(1)}
+                    </span>
+                    <span
+                      className="w-10 h-6 rounded border border-gray-200 dark:border-gray-500"
+                      style={{ backgroundColor: COLOR_TO_RGB[range.color] }}
+                    />
+                  </button>
+                  {activeColorPickerId === range.id && (
+                    <div
+                      ref={(node) => {
+                        if (activeColorPickerId === range.id) {
+                          colorPickerRef.current = node;
+                        }
+                      }}
+                      className="absolute top-full left-0 z-20 mt-2 w-56 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg p-3"
+                    >
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">
+                        Choose a colour
+                      </p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {AUDIO_COLOR_OPTIONS.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className={`w-8 h-8 rounded-md border border-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              range.color === color ? 'ring-2 ring-blue-500' : ''
+                            }`}
+                            style={{ backgroundColor: COLOR_TO_RGB[color] }}
+                            onClick={() => handleColorChange(range.id, color as Color)}
+                            aria-label={`Select ${color}`}
+                            title={color.charAt(0).toUpperCase() + color.slice(1)}
+                          />
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        onClick={() => {
+                          setActiveColorPickerId(null);
+                          colorPickerRef.current = null;
+                        }}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Brightness selector */}
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300 ml-4">
@@ -257,62 +384,65 @@ const AudioColorMapping: React.FC = () => {
 
             {/* Sensitivity slider */}
             <div className="mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 sm:min-w-[90px]">
                   Sensitivity
                 </label>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
-                    {currentSensitivity.toFixed(2)}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    / 1.0
-                  </span>
+                <div className="flex items-center flex-1 gap-4">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={currentSensitivity}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value);
+                      handleSensitivitySliderChange(range.id, value);
+                    }}
+                    onMouseUp={(e) => {
+                      const value = parseFloat((e.target as HTMLInputElement).value);
+                      handleSensitivityChange(range.id, value);
+                    }}
+                    disabled={isSaving}
+                    className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                    style={{
+                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(currentSensitivity / 1.0) * 100}%, #e5e7eb ${(currentSensitivity / 1.0) * 100}%, #e5e7eb 100%)`
+                    }}
+                  />
+                  <div className="flex items-center space-x-2 min-w-[70px] justify-end">
+                    <span className="text-sm text-gray-600 dark:text-gray-400 text-right">
+                      {currentSensitivity.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      / 1.0
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={currentSensitivity}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      handleSensitivitySliderChange(range.id, Math.max(0, Math.min(1, value)));
+                    }}
+                    onBlur={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      handleSensitivityChange(range.id, Math.max(0, Math.min(1, value)));
+                    }}
+                    disabled={isSaving}
+                    className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
+                  />
                 </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={currentSensitivity}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    handleSensitivitySliderChange(range.id, value);
-                  }}
-                  onMouseUp={(e) => {
-                    const value = parseFloat((e.target as HTMLInputElement).value);
-                    handleSensitivityChange(range.id, value);
-                  }}
-                  disabled={isSaving}
-                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                  style={{
-                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(currentSensitivity / 1.0) * 100}%, #e5e7eb ${(currentSensitivity / 1.0) * 100}%, #e5e7eb 100%)`
-                  }}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={currentSensitivity}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0;
-                    handleSensitivitySliderChange(range.id, Math.max(0, Math.min(1, value)));
-                  }}
-                  onBlur={(e) => {
-                    const value = parseFloat(e.target.value) || 0;
-                    handleSensitivityChange(range.id, Math.max(0, Math.min(1, value)));
-                  }}
-                  disabled={isSaving}
-                  className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
-                />
               </div>
             </div>
 
             {/* Frequency range slider */}
-            <div className="mb-1">
+            <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 sm:min-w-[90px]">
+                Frequency
+              </label>
               <FrequencyRangeSlider
                 minHz={range.minHz}
                 maxHz={range.maxHz}

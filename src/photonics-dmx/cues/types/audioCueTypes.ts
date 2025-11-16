@@ -17,6 +17,9 @@ export interface AudioCueData {
   
   /** Audio configuration */
   config: AudioConfig;
+
+  /** Number of enabled bands (3 or 5) currently active */
+  enabledBandCount: number;
   
   /** Timestamp of the cue execution */
   timestamp: number;

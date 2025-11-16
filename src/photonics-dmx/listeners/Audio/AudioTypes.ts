@@ -65,8 +65,10 @@ export interface AudioConfig {
     alpha: number;
   };
   
-  /** Color mapping configuration */
-  colorMapping: {
+  /** Frequency band configuration */
+  frequencyBands: {
+    /** Number of enabled bands (3 or 5) */
+    bandCount: 3 | 5;
     /** Array of frequency range configurations */
     ranges: Array<{
       /** Unique identifier for this range */
@@ -87,7 +89,6 @@ export interface AudioConfig {
   };
   
   /** Active cue type for audio-reactive lighting */
-  activeCueType?: string; // AudioCueType as string, default: 'BasicLayered'
   
   /** Enable audio-reactive lighting */
   enabled: boolean;       // Default: false

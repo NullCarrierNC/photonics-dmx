@@ -147,7 +147,7 @@ export class AudioDirectProcessor {
     const numLights = lights.length;
     
     // Get configured ranges
-    const ranges = this.config.colorMapping?.ranges || [];
+    const ranges = this.config.frequencyBands?.ranges || [];
     if (ranges.length === 0) {
       return;
     }

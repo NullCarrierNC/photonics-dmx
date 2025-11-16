@@ -164,23 +164,31 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     }
   });
 
-  // Get available audio-reactive lighting cue types
-  ipcMain.handle('get-available-audio-cues', async () => {
+  // Get available audio-reactive cue groups
+  ipcMain.handle('get-audio-cue-groups', async () => {
     try {
       const registry = AudioCueRegistry.getInstance();
-      
-      const availableCueTypes = registry.getAvailableCueTypes();
-      
-      // Get cue descriptions from registry
-      const cueDescriptions = availableCueTypes.map(cueType => {
-        const cue = registry.getCueImplementation(cueType);
-        return {
-          value: String(cueType), // Convert enum to string
-          label: cue?.description || String(cueType)
-        };
-      });
-      
-      return cueDescriptions;
+      return registry.getGroupSummaries();
+    } catch (error) {
+      console.error('Error getting audio cue groups:', error);
+      return [];
+    }
+  });
+
+  // Get available audio-reactive lighting cues for a group
+  ipcMain.handle('get-available-audio-cues', async (_, groupId?: string) => {
+    try {
+      const registry = AudioCueRegistry.getInstance();
+      const targetGroupId =
+        groupId ||
+        registry.getDefaultGroup() ||
+        registry.getEnabledGroups()[0];
+
+      if (!targetGroupId) {
+        return [];
+      }
+
+      return registry.getCueDetails(targetGroupId);
     } catch (error) {
       console.error('Error getting available audio cues:', error);
       return [];

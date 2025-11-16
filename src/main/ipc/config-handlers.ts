@@ -2,6 +2,7 @@ import { IpcMain } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import '../../photonics-dmx/cues';
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
+import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers';
 import { BrowserWindow } from 'electron';
 
@@ -131,6 +132,39 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       console.error('Error setting enabled cue groups:', error);
       return { 
         success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get enabled audio cue groups
+  ipcMain.handle('get-enabled-audio-cue-groups', async () => {
+    const registry = AudioCueRegistry.getInstance();
+    const enabled = controllerManager.getConfig().getEnabledAudioCueGroups();
+
+    if (enabled && enabled.length > 0) {
+      registry.setEnabledGroups(enabled);
+      return enabled;
+    }
+
+    const defaults = registry.getEnabledGroups();
+    controllerManager.getConfig().setEnabledAudioCueGroups(defaults);
+    return defaults;
+  });
+
+  // Set enabled audio cue groups
+  ipcMain.handle('set-enabled-audio-cue-groups', async (_, groupIds: string[]) => {
+    try {
+      controllerManager.getConfig().setEnabledAudioCueGroups(groupIds);
+      const registry = AudioCueRegistry.getInstance();
+      registry.setEnabledGroups(groupIds);
+      controllerManager.refreshAudioCueSelection();
+      console.log('Updated AudioCueRegistry enabled groups:', groupIds);
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting enabled audio cue groups:', error);
+      return {
+        success: false,
         error: error instanceof Error ? error.message : String(error)
       };
     }

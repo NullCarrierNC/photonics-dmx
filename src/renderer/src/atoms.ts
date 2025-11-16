@@ -176,7 +176,7 @@ export interface LightingPreferences {
       enabled: boolean;
       alpha: number;
     };
-    colorMapping: {
+    frequencyBands: {
       ranges: Array<{
         id: string;
         name: string;
@@ -187,7 +187,6 @@ export interface LightingPreferences {
         sensitivity: number;
       }>;
     };
-    activeCueType?: string; // AudioCueType as string
     enabled: boolean;
   };
 }

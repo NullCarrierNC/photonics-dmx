@@ -31,6 +31,7 @@ export interface AppPreferences {
     max: number;
   };
   enabledCueGroups: string[];
+  enabledAudioCueGroups?: string[];
   cueConsistencyWindow: number;
   clockRate: number;
   
@@ -65,6 +66,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
   enabledCueGroups: ['stagekit'],
+  enabledAudioCueGroups: ['audio-spectrum'],
   cueConsistencyWindow: 60000,
   clockRate: 5, // 5ms interval for smooth animations
 
@@ -209,6 +211,20 @@ export class ConfigurationManager {
   }
 
   /**
+   * Gets the enabled audio cue groups preference
+   */
+  getEnabledAudioCueGroups(): string[] | undefined {
+    return this.preferences.get().enabledAudioCueGroups;
+  }
+
+  /**
+   * Sets the enabled audio cue groups by their IDs
+   */
+  setEnabledAudioCueGroups(groupIds: string[]): void {
+    this.setPreference('enabledAudioCueGroups', groupIds);
+  }
+
+  /**
    * Gets the cue consistency window preference
    */
   getCueConsistencyWindow(): number {
@@ -315,11 +331,9 @@ export class ConfigurationManager {
    */
   getAudioConfig(): AudioConfig {
     const savedConfig = this.getPreference('audioConfig');
-    
-    // Merge saved config with defaults, then force enabled to false
+
     const config = savedConfig ? { ...DEFAULT_AUDIO_CONFIG, ...savedConfig } : DEFAULT_AUDIO_CONFIG;
-    
-    // Audio enabled state is runtime-only - always return false
+
     return { ...config, enabled: false };
   }
 
@@ -337,11 +351,9 @@ export class ConfigurationManager {
   updateAudioConfig(updates: Partial<AppPreferences['audioConfig']>): void {
     const current = this.getPreference('audioConfig') || {};
     const updated = { ...current, ...updates };
-    
-    // Strip out 'enabled' field - it should never be persisted
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     const { enabled, ...configToSave } = updated;
-    
+
     this.setPreference('audioConfig', configToSave as any);
   }
 } 
