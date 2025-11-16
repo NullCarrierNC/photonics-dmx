@@ -45,7 +45,7 @@ const DEFAULT_CONFIG: AudioConfig = {
   },
   beatDetection: {
     threshold: 0.3,
-    decayRate: 0.95,
+    decayRate: 0.8,
     minInterval: 100
   },
   enabled: false
@@ -68,6 +68,14 @@ export class AudioCaptureManager {
   private lastBeatTime = 0;
   private energyHistory: number[] = [];
   private readonly ENERGY_HISTORY_SIZE = 43; // ~1 second at 60fps
+  private bassEnergyHistory: number[] = [];
+  private spectralFluxHistory: number[] = [];
+  private readonly SPECTRAL_HISTORY_SIZE = 86; // ~1.5 seconds of history for adaptive thresholding
+  private previousSpectrum: Float32Array | null = null;
+  private readonly MINIMUM_ENERGY_FOR_BEAT = 0.05;
+  private readonly MAX_BEAT_FREQUENCY = 2000; // Focus spectral flux on content under 2kHz
+  private recentEnergyHistory: number[] = [];
+  private readonly SHORT_ENERGY_HISTORY_SIZE = 12; // ~200ms window
   private frameIndex = 0;
   private beatTimestamps: number[] = []; // Track actual beat times for BPM calculation
   private readonly MAX_BEAT_HISTORY = 8; // Keep last 8 beats for BPM averaging
@@ -205,6 +213,10 @@ export class AudioCaptureManager {
     this.smoothedRanges.clear();
     this.smoothedEnergy = 0;
     this.energyHistory = [];
+    this.recentEnergyHistory = [];
+    this.bassEnergyHistory = [];
+    this.spectralFluxHistory = [];
+    this.previousSpectrum = null;
     this.frameIndex = 0;
     this.beatTimestamps = [];
     this.currentBpm = null;
@@ -408,7 +420,13 @@ export class AudioCaptureManager {
     }
     
     // Beat detection
-    const { beatDetected, bpm } = this.detectBeat(finalEnergy);
+    const bassEnergy = finalEnergies.get('range1') || 0;
+    const { beatDetected, bpm } = this.detectBeat({
+      finalEnergy,
+      bassEnergy,
+      spectrumData: frequencyData,
+      binSize
+    });
     
     // Calculate overall level (RMS of all ranges)
     const rangeValues = Array.from(finalEnergies.values());
@@ -462,27 +480,86 @@ export class AudioCaptureManager {
   }
 
   /**
-   * Detect beats in the audio
+   * Detect beats in the audio using adaptive energy + spectral flux analysis
    */
-  private detectBeat(energy: number): { beatDetected: boolean; bpm: number | null } {
-    // Maintain energy history
-    this.energyHistory.push(energy);
+  private detectBeat(params: {
+    finalEnergy: number;
+    bassEnergy: number;
+    spectrumData: Uint8Array;
+    binSize: number;
+  }): { beatDetected: boolean; bpm: number | null } {
+    const { finalEnergy, bassEnergy, spectrumData, binSize } = params;
+    
+    // Maintain energy history (used for adaptive threshold)
+    this.energyHistory.push(finalEnergy);
     if (this.energyHistory.length > this.ENERGY_HISTORY_SIZE) {
       this.energyHistory.shift();
     }
+    const energyStats = this.computeStats(this.energyHistory);
     
-    // Calculate average energy
-    const avgEnergy = this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length;
+    // Maintain short-term energy window (captures quick punches)
+    this.recentEnergyHistory.push(finalEnergy);
+    if (this.recentEnergyHistory.length > this.SHORT_ENERGY_HISTORY_SIZE) {
+      this.recentEnergyHistory.shift();
+    }
+    const shortEnergyStats = this.computeStats(this.recentEnergyHistory);
     
-    // Detect beat if energy is significantly above average
+    // Track bass history separately so low-frequency punches can trigger beats even when mids/highs dominate
+    this.bassEnergyHistory.push(bassEnergy);
+    if (this.bassEnergyHistory.length > this.ENERGY_HISTORY_SIZE) {
+      this.bassEnergyHistory.shift();
+    }
+    const avgBass = this.bassEnergyHistory.length > 0
+      ? this.bassEnergyHistory.reduce((sum, value) => sum + value, 0) / this.bassEnergyHistory.length
+      : 0;
+    
+    // Compute spectral flux (positive changes in spectrum focused on <2kHz)
+    const spectralFlux = this.computeSpectralFlux(spectrumData, binSize);
+    const fluxStats = this.computeStats(this.spectralFluxHistory);
+    const fluxSensitivity = 0.35 + this.config.beatDetection.threshold * 0.6; // lower threshold => smaller multiplier
+    const fluxThreshold = fluxStats.mean + fluxStats.stdDev * fluxSensitivity;
+    const hasFluxHistory = fluxStats.count >= 4;
+    const fluxGate = hasFluxHistory ? spectralFlux > fluxThreshold : false;
+    
+    // Update spectral flux history after computing gate
+    this.spectralFluxHistory.push(spectralFlux);
+    if (this.spectralFluxHistory.length > this.SPECTRAL_HISTORY_SIZE) {
+      this.spectralFluxHistory.shift();
+    }
+    
+    // Adaptive thresholds for energy & bass
+    const dynamicEnergyMultiplier = 0.35 + this.config.beatDetection.threshold * 0.45;
+    const dynamicEnergyThreshold = energyStats.mean + energyStats.stdDev * dynamicEnergyMultiplier;
+    const minEnergyGate = Math.max(this.MINIMUM_ENERGY_FOR_BEAT, dynamicEnergyThreshold);
+    const energyGate = finalEnergy > minEnergyGate;
+    
+    const bassMultiplier = 1 + this.config.beatDetection.threshold * 0.75;
+    const bassBaseline = avgBass > 0 ? avgBass * bassMultiplier : this.MINIMUM_ENERGY_FOR_BEAT * 0.5;
+    const bassGate = bassEnergy > bassBaseline;
+    
+    // Capture short, sharp increases in energy to avoid missing transient beats
+    const shortTermGate = shortEnergyStats.count >= 4
+      ? finalEnergy > shortEnergyStats.mean * (1.05 + this.config.beatDetection.threshold * 0.3)
+      : false;
+    
+    const previousEnergy = this.energyHistory.length > 1
+      ? this.energyHistory[this.energyHistory.length - 2]
+      : finalEnergy;
+    const energyDelta = finalEnergy - previousEnergy;
+    const derivativeGate = energyDelta > (energyStats.stdDev * (0.3 + this.config.beatDetection.threshold * 0.25) + 0.01);
+    
+    const combinedEnergyGate = energyGate || shortTermGate || derivativeGate;
+    
+    // Final detection: spectral onset + (overall energy OR bass punch) + debounce
+    let beatDetected = false;
     const now = Date.now();
     const timeSinceLastBeat = now - this.lastBeatTime;
-    const beatThreshold = avgEnergy * (1 + this.config.beatDetection.threshold);
-    
-    let beatDetected = false;
     
     if (
-      energy > beatThreshold &&
+      (
+        (fluxGate && (combinedEnergyGate || bassGate)) ||
+        ((shortTermGate || derivativeGate) && bassGate)
+      ) &&
       timeSinceLastBeat > this.config.beatDetection.minInterval
     ) {
       beatDetected = true;
@@ -496,32 +573,81 @@ export class AudioCaptureManager {
       
       // Calculate BPM from intervals between beats
       if (this.beatTimestamps.length >= 4) {
-        // Calculate average interval between consecutive beats
         const intervals: number[] = [];
         for (let i = 1; i < this.beatTimestamps.length; i++) {
           intervals.push(this.beatTimestamps[i] - this.beatTimestamps[i - 1]);
         }
-        
-        // Average interval in milliseconds
         const avgInterval = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
-        
-        // Convert to BPM (60000 ms per minute / interval in ms)
         const calculatedBpm = Math.round(60000 / avgInterval);
-        
-        // Only update if BPM is in a reasonable range (40-200 BPM)
         if (calculatedBpm >= 40 && calculatedBpm <= 200) {
           this.currentBpm = calculatedBpm;
         }
       }
     }
     
-    // Apply decay
     if (this.config.smoothing.enabled) {
       this.smoothedEnergy *= this.config.beatDetection.decayRate;
     }
     
-    // Return stable BPM value (doesn't flicker on/off)
     return { beatDetected, bpm: this.currentBpm };
+  }
+  
+  /**
+   * Compute spectral flux focused on low-frequency bins
+   */
+  private computeSpectralFlux(spectrumData: Uint8Array, binSize: number): number {
+    const invByteMax = 1 / 255;
+    const length = spectrumData.length;
+    const hadPrevious = this.previousSpectrum && this.previousSpectrum.length === length;
+    
+    if (!hadPrevious) {
+      this.previousSpectrum = new Float32Array(length);
+    }
+    
+    if (!hadPrevious || !this.previousSpectrum) {
+      for (let i = 0; i < length; i++) {
+        this.previousSpectrum![i] = spectrumData[i] * invByteMax;
+      }
+      return 0;
+    }
+    
+    const maxBin = Math.min(length, Math.max(1, Math.floor(this.MAX_BEAT_FREQUENCY / binSize)));
+    let flux = 0;
+    
+    for (let i = 0; i < maxBin; i++) {
+      const current = spectrumData[i] * invByteMax;
+      const diff = current - this.previousSpectrum[i];
+      if (diff > 0) {
+        const emphasis = 1 - (i / maxBin) * 0.4; // weight bass slightly higher
+        flux += diff * emphasis;
+      }
+      this.previousSpectrum[i] = current;
+    }
+    
+    // Keep remaining bins in sync to avoid stale data if FFT window changes
+    for (let i = maxBin; i < length; i++) {
+      this.previousSpectrum[i] = spectrumData[i] * invByteMax;
+    }
+    
+    return flux;
+  }
+  
+  /**
+   * Utility to compute mean & std dev for adaptive thresholds
+   */
+  private computeStats(values: number[]): { mean: number; stdDev: number; count: number } {
+    const count = values.length;
+    if (count === 0) {
+      return { mean: 0, stdDev: 0, count };
+    }
+    
+    const mean = values.reduce((sum, value) => sum + value, 0) / count;
+    const variance = values.reduce((sum, value) => {
+      const diff = value - mean;
+      return sum + diff * diff;
+    }, 0) / count;
+    
+    return { mean, stdDev: Math.sqrt(variance), count };
   }
 
   /**
