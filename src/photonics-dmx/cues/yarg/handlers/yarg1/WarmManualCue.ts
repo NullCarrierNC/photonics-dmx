@@ -1,13 +1,13 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
 import { TimingPresets } from '../../../../helpers/bpmUtils';
 
-export class WarmManualCue implements ICue {
+export class WarmManualCue implements INetCue {
   id = 'default-warm-manual';
   cueId = CueType.Warm_Manual;
   description = 'Alternates between red and yellow on even/odd front lights triggered by measure events';

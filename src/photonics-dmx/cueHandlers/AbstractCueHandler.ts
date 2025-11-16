@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { CueData, CueType } from '../cues/cueTypes';
+import { CueData, CueType } from '../cues/types/cueTypes';
 import { LightTarget, LocationGroup,  TrackedLight } from '../types';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';

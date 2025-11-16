@@ -1,7 +1,7 @@
 import * as dgram from 'dgram';
 import { EventEmitter } from 'events';
 import { Rb3ePacketType, Rb3GameState, Rb3PlatformID, Rb3TrackType, Rb3Difficulty } from './rb3eTypes';
-import { CueData, StrobeState } from '../../cues/cueTypes';
+import { CueData, StrobeState } from '../../cues/types/cueTypes';
 
 
 // Use the same port that RB3Enhanced sends to.

@@ -1,10 +1,10 @@
-import { ICue, CueStyle } from '../../cues/interfaces/ICue';
-import { CueData } from '../../cues/cueTypes';
+import { INetCue, CueStyle } from '../../cues/interfaces/INetCue';
+import { CueData } from '../../cues/types/cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../controllers/DmxLightManager';
 
 // Simple test for ICue lifecycle methods
-class TestLifecycleCue implements ICue {
+class TestLifecycleCue implements INetCue {
   cueId = 'test-cue';
   id = `test-cue-${Math.random().toString(36).substring(2, 11)}`;
   description = 'Test cue for lifecycle';

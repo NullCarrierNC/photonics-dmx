@@ -21,7 +21,7 @@ import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
 import { AudioCaptureManager } from './services/AudioCaptureManager';
-import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
+import { AudioConfig } from '../../photonics-dmx/listeners/Audio/audioTypes';
 
 /**
  * Main application component

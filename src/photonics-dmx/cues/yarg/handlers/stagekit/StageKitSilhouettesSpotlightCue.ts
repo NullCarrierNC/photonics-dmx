@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getEffectFlashColor } from '../../../../effects/effectFlashColor';
@@ -9,7 +9,7 @@ import { getEffectSingleColor } from '../../../../effects';
 /**
  * StageKit Silhouettes Spotlight Cue - Beat-synchronized flash on front and back lights
  */
-export class StageKitSilhouettesSpotlightCue implements ICue {
+export class StageKitSilhouettesSpotlightCue implements INetCue {
   id = 'stagekit-silhouettesspotlight';
   cueId = CueType.Silhouettes_Spotlight;
   description = 'Context-aware cue: Intro=blue flash on drum-red, Dischord=green backdrop+blue odd+vocal toggle, Stomp=darkness';

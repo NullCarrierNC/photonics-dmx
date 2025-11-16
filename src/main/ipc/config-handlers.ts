@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import '../../photonics-dmx/cues';
-import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
+import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers';
 import { BrowserWindow } from 'electron';
 
@@ -97,12 +97,12 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
     // If the preference hasn't been set, default to all groups enabled
     if (enabled === undefined) {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       return registry.getAllGroups();
     }
 
     // Initialize stage kit priority in the registry if not already set
-    const registry = CueRegistry.getInstance();
+    const registry = YargCueRegistry.getInstance();
     const prefs = controllerManager.getConfig().getAllPreferences();
     const currentPriority = registry.getStageKitPriority();
     const configPriority = prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked';
@@ -120,7 +120,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       controllerManager.getConfig().setEnabledCueGroups(groupIds);
       
       // Update the CueRegistry with the new enabled groups
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       
       registry.setEnabledGroups(groupIds);
       
@@ -151,7 +151,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       });
 
       // Sync with the CueRegistry
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       registry.setStageKitPriority(priority);
 
       // Clear any existing consistency tracking to ensure new priority takes effect immediately

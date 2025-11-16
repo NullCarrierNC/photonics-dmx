@@ -1,6 +1,6 @@
 import { performance } from 'perf_hooks';
 import { ISongEventHandler, ILayerManager, ITransitionEngine } from './interfaces';
-import { InstrumentNoteType, DrumNoteType } from '../../cues/cueTypes';
+import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes';
 
 /**
  * @class EventHandler

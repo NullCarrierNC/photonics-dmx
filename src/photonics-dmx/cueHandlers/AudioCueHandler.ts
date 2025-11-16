@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
-import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes';
-import { AudioCueData, AudioCueType } from '../listeners/Audio/AudioCueTypes';
-import { IAudioCue } from '../listeners/Audio/interfaces/IAudioCue';
-import { AudioCueRegistry } from '../listeners/Audio/AudioCueRegistry';
+import { AudioLightingData, AudioConfig } from '../listeners/Audio/audioTypes';
+import { AudioCueData, AudioCueType } from '../cues/types/audioCueTypes';
+import { IAudioCue } from '../cues/interfaces/IAudioCue';
+import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 

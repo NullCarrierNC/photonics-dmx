@@ -1,4 +1,4 @@
-import { AudioLightingData, AudioConfig } from './AudioTypes';
+import { AudioLightingData, AudioConfig } from '../../listeners/Audio/audioTypes';
 
 /**
  * Audio cue types for audio-reactive lighting

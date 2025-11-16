@@ -1,13 +1,13 @@
-import { CueRegistry } from '../../cues/CueRegistry';
-import { ICue, CueStyle } from '../../cues/interfaces/ICue';
-import { ICueGroup } from '../../cues/interfaces/ICueGroup';
-import { CueData, CueType } from '../../cues/cueTypes';
+import { YargCueRegistry } from '../../cues/registries/YargCueRegistry';
+import { INetCue, CueStyle } from '../../cues/interfaces/INetCue';
+import { ICueGroup } from '../../cues/interfaces/INetCueGroup';
+import { CueData, CueType } from '../../cues/types/cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../controllers/DmxLightManager';
 import { beforeEach, describe, it, expect } from '@jest/globals';
 
 // Mock implementations
-class MockCueImplementation implements ICue {
+class MockCueImplementation implements INetCue {
   private _id: string;
   constructor(private _name: string) {
     this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`;
@@ -33,13 +33,13 @@ class MockCueImplementation implements ICue {
   }
 }
 
-describe('CueRegistry', () => {
-  let registry: CueRegistry;
+describe('YargCueRegistry', () => {
+  let registry: YargCueRegistry;
   let defaultGroup: ICueGroup;
   let customGroup: ICueGroup;
 
   beforeEach(() => {
-    registry = CueRegistry.getInstance();
+    registry = YargCueRegistry.getInstance();
     registry.reset(); // Clear any existing groups
 
     // Create default group
@@ -140,7 +140,7 @@ describe('CueRegistry', () => {
 
   describe('Consistency Throttling', () => {
     it('should use consistent group selection within the consistency window', () => {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       registry.reset();
       
       // Set up test groups
@@ -180,7 +180,7 @@ describe('CueRegistry', () => {
     });
 
     it('should allow new randomization after consistency window expires', () => {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       registry.reset();
       
       // Set up test groups
@@ -220,7 +220,7 @@ describe('CueRegistry', () => {
     });
 
     it('should clear consistency tracking when active groups change', () => {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       registry.reset();
       
       // Set up test groups
@@ -259,7 +259,7 @@ describe('CueRegistry', () => {
     });
 
     it('should provide consistency status information', () => {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       registry.reset();
       
       // Set up test groups
@@ -290,7 +290,7 @@ describe('CueRegistry', () => {
     });
 
     it('should properly handle fallback logic with consistency system', () => {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       registry.reset();
       
       // Set up test groups with fallback scenario
@@ -339,7 +339,7 @@ describe('CueRegistry', () => {
     });
 
     it('should use default group as fallback even when default is active', () => {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       registry.reset();
       
       // Set up test groups where default is active but other active groups don't have the cue
@@ -379,7 +379,7 @@ describe('CueRegistry', () => {
     });
 
     it('should prefer stage kit group when autoGen is false and stageKitPriority is prefer-for-tracked', () => {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       registry.reset();
       
       // Set up test groups including a stage kit group

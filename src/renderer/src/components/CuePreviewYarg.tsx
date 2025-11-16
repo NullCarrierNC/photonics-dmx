@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CueData, InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/cueTypes';
+import { CueData, InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/types/cueTypes';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import { useAtom } from 'jotai';
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms';

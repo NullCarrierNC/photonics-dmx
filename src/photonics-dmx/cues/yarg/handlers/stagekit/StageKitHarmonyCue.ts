@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -10,7 +10,7 @@ import {
 /**
  * StageKit Harmony Cue - Venue-dependent clockwise chase patterns
  */
-export class StageKitHarmonyCue implements ICue {
+export class StageKitHarmonyCue implements INetCue {
   id = 'stagekit-harmony';
   cueId = CueType.Harmony;
   description = 'Small venue: Green/blue clockwise chase on beat (= high cyan). Large venue: Yellow/red dual rotation patterns with 3-step and 4-step offsets (= additive blending).';

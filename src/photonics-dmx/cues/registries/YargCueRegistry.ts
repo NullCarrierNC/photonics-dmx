@@ -1,6 +1,6 @@
-import { CueType } from './cueTypes';
-import { ICueGroup } from './interfaces/ICueGroup';
-import { ICue, CueStyle } from './interfaces/ICue';
+import { CueType } from '../types/cueTypes';
+import { ICueGroup } from '../interfaces/INetCueGroup';
+import { INetCue, CueStyle } from '../interfaces/INetCue';
 
 /**
  * Interface for cue state updates sent to frontend
@@ -25,9 +25,9 @@ export interface CueStateUpdate {
  * Enabled Groups: Groups that are enabled in user preferences (can be activated).
  * Active Groups: Groups that are currently active during gameplay (subset of enabled).
  */
-export class CueRegistry {
+export class YargCueRegistry {
   /** The singleton instance of the CueRegistry */
-  private static instance: CueRegistry;
+  private static instance: YargCueRegistry;
 
   /** Map of all registered cue groups by their name */
   private groups: Map<string, ICueGroup> = new Map();
@@ -140,11 +140,11 @@ export class CueRegistry {
    * Get the singleton instance of the CueRegistry
    * @returns The CueRegistry instance
    */
-  public static getInstance(): CueRegistry {
-    if (!CueRegistry.instance) {
-      CueRegistry.instance = new CueRegistry();
+  public static getInstance(): YargCueRegistry {
+    if (!YargCueRegistry.instance) {
+      YargCueRegistry.instance = new YargCueRegistry();
     }
-    return CueRegistry.instance;
+    return YargCueRegistry.instance;
   }
 
   /**
@@ -193,7 +193,7 @@ export class CueRegistry {
    * @param trackMode The track mode ('tracked', 'autogen', or 'simulated')
    * @returns The cue implementation or null if not found
    */
-  public getCueImplementation(cueType: CueType, trackMode: 'tracked' | 'autogen' | 'simulated' = 'tracked'): ICue | null {
+  public getCueImplementation(cueType: CueType, trackMode: 'tracked' | 'autogen' | 'simulated' = 'tracked'): INetCue | null {
     // Check if we should prefer stage kit group based on priority and trackMode
     // When trackMode='tracked' and stageKitPriority='prefer-for-tracked', prefer stage kit group
     // When trackMode='simulated', ignore stage kit priority to allow testing all groups
@@ -340,7 +340,7 @@ export class CueRegistry {
    * @param autoGen Whether the song is auto-generated (affects stage kit priority)
    * @returns The cue implementation or null if not found
    */
-  private handlePrimaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }, autoGen: boolean = false): ICue | null {
+  private handlePrimaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }, autoGen: boolean = false): INetCue | null {
     // If we have a pre-selection, use it directly
     if (preSelection) {
       const group = this.groups.get(preSelection.groupId);
@@ -416,7 +416,7 @@ export class CueRegistry {
    * @param autoGen Whether the song is auto-generated (affects stage kit priority)
    * @returns The cue implementation or null if not found
    */
-  private handleSecondaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }, autoGen: boolean = false): ICue | null {
+  private handleSecondaryCue(cueType: CueType, preSelection?: { groupId: string; isFallback: boolean }, autoGen: boolean = false): INetCue | null {
     // If we have a pre-selection (from stage kit priority), use it directly and bypass consistency
     if (preSelection) {
       const group = this.groups.get(preSelection.groupId);

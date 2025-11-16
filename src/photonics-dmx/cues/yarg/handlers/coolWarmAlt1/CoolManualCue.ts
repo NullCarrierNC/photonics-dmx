@@ -1,13 +1,13 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../../effects/sweepEffect';
 import { randomBetween } from '../../../../helpers/utils';
 import { getEffectSingleColor } from '../../../../effects';
-import { CueStyle, ICue } from '../../../interfaces/ICue';
+import { CueStyle, INetCue } from '../../../interfaces/INetCue';
 
-export class CoolManualCue implements ICue {
+export class CoolManualCue implements INetCue {
   id = 'alt-cool-manual-1';
   cueId = CueType.Cool_Manual;
   description = 'Low blue on all lights, green sweep on front on measure.';

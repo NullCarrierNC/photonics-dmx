@@ -9,10 +9,10 @@ import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
 import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor';
-import { AudioCueType } from '../../photonics-dmx/listeners/Audio/AudioCueTypes';
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 // Import audio cues to register them
-import '../../photonics-dmx/listeners/Audio/cues';
-import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
+
+import { AudioConfig } from '../../photonics-dmx/listeners/Audio/audioTypes';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
 import { BrowserWindow, ipcMain } from 'electron';
 
@@ -20,8 +20,8 @@ import { ILightingController } from '../../photonics-dmx/controllers/sequencer/i
 import { SenderError } from '../../photonics-dmx/senders/BaseSender';
 import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager';
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController';
-import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/cueTypes';
-import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
+import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
+import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues';
 
@@ -131,7 +131,7 @@ export class ControllerManager {
    * Initialize the CueRegistry with enabled groups from configuration
    */
   private async initializeCueRegistry(): Promise<void> {
-    const registry = CueRegistry.getInstance();
+    const registry = YargCueRegistry.getInstance();
     
     // Get enabled groups from configuration
     const enabledGroupIds = this.config.getEnabledCueGroups();

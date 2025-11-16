@@ -1,10 +1,10 @@
 import { IpcMain, BrowserWindow } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { SenderConfig } from '../../photonics-dmx/types';
-import { CueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/CueRegistry';
-import { CueType } from '../../photonics-dmx/cues/cueTypes';
-// Import audio cues to ensure they're registered
-import '../../photonics-dmx/listeners/Audio/cues';
+import { YargCueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/registries/YargCueRegistry';
+import { CueType } from '../../photonics-dmx/cues/types/cueTypes';
+import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
+
 
 /**
  * Set up light-related IPC handlers
@@ -17,7 +17,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     const allWindows = BrowserWindow.getAllWindows();
     const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
     if (mainWindow) {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       const group = registry.getGroup(cueState.groupId);
       const groupName = group ? group.name : null;
       
@@ -36,7 +36,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   };
   
   // Set up the callback with the CueRegistry
-  const registry = CueRegistry.getInstance();
+  const registry = YargCueRegistry.getInstance();
   registry.setCueStateUpdateCallback(sendCueStateUpdate);
 
   // Enable a sender
@@ -167,7 +167,6 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Get available audio-reactive lighting cue types
   ipcMain.handle('get-available-audio-cues', async () => {
     try {
-      const { AudioCueRegistry } = await import('../../photonics-dmx/listeners/Audio/AudioCueRegistry');
       const registry = AudioCueRegistry.getInstance();
       
       const availableCueTypes = registry.getAvailableCueTypes();
@@ -192,7 +191,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   ipcMain.handle('get-available-cues', async (_, groupId?: string) => {
     try {
       // Get the registry instance
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       
       // Default to 'default' if no group ID is provided
       const targetGroupId = groupId || 'default';
@@ -315,7 +314,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         // Set active cue group if specified
         if (cueGroup) {
           try {
-            const registry = CueRegistry.getInstance();
+            const registry = YargCueRegistry.getInstance();
             registry.setActiveGroups([cueGroup]);
           } catch (error) {
             console.warn(`Failed to set active cue group: ${error}`);
@@ -380,7 +379,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         // Set active cue group if specified
         if (cueGroup) {
           try {
-            const registry = CueRegistry.getInstance();
+            const registry = YargCueRegistry.getInstance();
             registry.setActiveGroups([cueGroup]);
           } catch (error) {
             console.warn(`Failed to set active cue group: ${error}`);
@@ -445,7 +444,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         // Set active cue group if specified
         if (cueGroup) {
           try {
-            const registry = CueRegistry.getInstance();
+            const registry = YargCueRegistry.getInstance();
             registry.setActiveGroups([cueGroup]);
           } catch (error) {
             console.warn(`Failed to set active cue group: ${error}`);
@@ -544,7 +543,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         // Set active cue group if specified
         if (cueGroup) {
           try {
-            const registry = CueRegistry.getInstance();
+            const registry = YargCueRegistry.getInstance();
             registry.setActiveGroups([cueGroup]);
           } catch (error) {
             console.warn(`Failed to set active cue group: ${error}`);
@@ -591,7 +590,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
 
   // Get available cue groups from registry
   ipcMain.handle('get-cue-groups', async () => {
-    const registry = CueRegistry.getInstance();
+    const registry = YargCueRegistry.getInstance();
     const groupIds = registry.getAllGroups();
     
     // Get descriptions for each group
@@ -611,7 +610,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   
   // Get active cue groups
   ipcMain.handle('get-active-cue-groups', async () => {
-    const registry = CueRegistry.getInstance();
+    const registry = YargCueRegistry.getInstance();
     const activeGroupIds = registry.getActiveGroups();
     
     console.log('Active group IDs:', activeGroupIds);
@@ -636,7 +635,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Activate a single cue group
   ipcMain.handle('activate-cue-group', async (_, groupId: string) => {
     try {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       
       // Check if the group exists
       const group = registry.getGroup(groupId);
@@ -671,7 +670,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Deactivate a single cue group
   ipcMain.handle('deactivate-cue-group', async (_, groupId: string) => {
     try {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       
       // Check if the group exists
       const group = registry.getGroup(groupId);
@@ -706,7 +705,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Enable a single cue group
   ipcMain.handle('enable-cue-group', async (_, groupId: string) => {
     try {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       
       // Check if the group exists
       const group = registry.getGroup(groupId);
@@ -741,7 +740,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Disable a single cue group
   ipcMain.handle('disable-cue-group', async (_, groupId: string) => {
     try {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       
       // Check if the group exists
       const group = registry.getGroup(groupId);
@@ -776,7 +775,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Set active cue groups
   ipcMain.handle('set-active-cue-groups', async (_, groupIds: string[]) => {
     try {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       
       // Validate that each group exists and is enabled before setting them as active
       const invalidGroups: string[] = [];
@@ -831,7 +830,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Get the source group for a specific cue
   ipcMain.handle('get-cue-source-group', async (_, cueType: string) => {
     try {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       const cueState = registry.getCueState(cueType as CueType);
       
       if (cueState) {
@@ -866,7 +865,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       controllerManager.getConfig().setCueConsistencyWindow(windowMs);
       
       // Also update the CueRegistry to apply the change immediately
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       registry.setCueConsistencyWindow(windowMs);
       
       return { 
@@ -902,7 +901,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   // Get the current consistency status
   ipcMain.handle('get-consistency-status', async () => {
     try {
-      const registry = CueRegistry.getInstance();
+      const registry = YargCueRegistry.getInstance();
       const status = registry.getConsistencyStatus();
 
       return {

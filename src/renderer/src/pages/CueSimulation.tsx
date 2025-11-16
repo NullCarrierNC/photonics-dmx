@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAtom } from 'jotai';
 import { senderIpcEnabledAtom, activeDmxLightsConfigAtom } from '@renderer/atoms';
 import { EffectSelector } from '../../../photonics-dmx/types';
-import { InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/cueTypes';
+import { InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/types/cueTypes';
 import EffectsDropdown from '../components/EffectSelector';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 import CuePreviewYarg from '@renderer/components/CuePreviewYarg';

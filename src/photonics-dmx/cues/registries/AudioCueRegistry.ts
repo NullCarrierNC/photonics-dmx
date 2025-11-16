@@ -1,5 +1,5 @@
-import { AudioCueType } from './AudioCueTypes';
-import { IAudioCue } from './interfaces/IAudioCue';
+import { AudioCueType } from '../types/audioCueTypes';
+import { IAudioCue } from '../interfaces/IAudioCue';
 
 /**
  * Interface for an audio cue group

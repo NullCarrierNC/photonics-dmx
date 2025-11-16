@@ -1,13 +1,13 @@
-import { CueRegistry } from '../../cues/CueRegistry';
-import { ICue, CueStyle } from '../../cues/interfaces/ICue';
-import { ICueGroup } from '../../cues/interfaces/ICueGroup';
-import { CueData, CueType } from '../../cues/cueTypes';
+import { YargCueRegistry } from '../../cues/registries/YargCueRegistry';
+import { INetCue, CueStyle } from '../../cues/interfaces/INetCue';
+import { ICueGroup } from '../../cues/interfaces/INetCueGroup';
+import { CueData, CueType } from '../../cues/types/cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../controllers/DmxLightManager';
 import { beforeEach, describe, it, expect } from '@jest/globals';
 
 // Mock implementations with descriptions
-class MockCueImplementation implements ICue {
+class MockCueImplementation implements INetCue {
   private _id: string;
   constructor(
     private _name: string,
@@ -39,12 +39,12 @@ class MockCueImplementation implements ICue {
 }
 
 describe('Cue Descriptions', () => {
-  let registry: CueRegistry;
+  let registry: YargCueRegistry;
   let defaultGroup: ICueGroup;
   let customGroup: ICueGroup;
 
   beforeEach(() => {
-    registry = CueRegistry.getInstance();
+    registry = YargCueRegistry.getInstance();
     registry.reset(); // Clear any existing groups
 
     // Create default group with descriptions
@@ -131,7 +131,7 @@ describe('Cue Descriptions', () => {
       expect(group).toBeDefined();
       
       if (group) {
-        const cueDescriptions = Array.from(group.cues.entries()).map(([cueType, implementation]) => ({
+        const cueDescriptions = Array.from<[CueType, INetCue]>(group.cues.entries()).map(([cueType, implementation]) => ({
           id: cueType,
           description: implementation.description!
         }));

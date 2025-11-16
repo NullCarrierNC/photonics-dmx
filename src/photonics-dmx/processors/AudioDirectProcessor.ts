@@ -32,7 +32,7 @@
  */
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
-import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes';
+import { AudioLightingData, AudioConfig } from '../listeners/Audio/audioTypes';
 import { getColor, validateColorString } from '../helpers/dmxHelpers';
 import { Color, TrackedLight } from '../types';
 

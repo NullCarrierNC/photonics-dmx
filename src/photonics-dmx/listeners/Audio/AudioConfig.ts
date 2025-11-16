@@ -1,4 +1,4 @@
-import { AudioConfig } from './AudioTypes';
+import { AudioConfig } from "./audioTypes";
 
 /**
  * Default audio configuration for Web Audio API

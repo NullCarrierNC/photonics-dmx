@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers';
@@ -10,7 +10,7 @@ import { Effect, EffectTransition } from '../../../../types';
  * Large venue: Red diagonal sweep (6|2) → (5|1) → (4|0) → (3|7)
  * Small venue: Yellow diagonal sweep + Blue sequential + Green delayed reverse
  */
-export class StageKitSweepCue implements ICue {
+export class StageKitSweepCue implements INetCue {
   id = 'stagekit-sweep';
   cueId = CueType.Sweep;
   description = 'Large venue: Red diagonal sweep (6|2) → (5|1) → (4|0) → (3|7). Small venue: Yellow diagonal + Blue sequential + Green delayed reverse. Green and blue only use lights 1-5.';

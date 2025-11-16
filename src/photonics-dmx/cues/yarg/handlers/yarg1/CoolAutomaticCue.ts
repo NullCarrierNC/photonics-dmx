@@ -1,12 +1,12 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
 
-export class CoolAutomaticCue implements ICue {
+export class CoolAutomaticCue implements INetCue {
   id = 'default-cool-auto';
   cueId = CueType.Cool_Automatic;
   description = 'Alternates blue and green between front and back lights, triggered by measure events';

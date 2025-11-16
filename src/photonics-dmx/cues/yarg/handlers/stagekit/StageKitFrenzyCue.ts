@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -10,7 +10,7 @@ import { Effect, EffectTransition } from '../../../../types';
  * StageKit Frenzy Cue - Fast, chaotic lighting patterns
  * Venue-dependent frenzy patterns
  */
-export class StageKitFrenzyCue implements ICue {
+export class StageKitFrenzyCue implements INetCue {
   id = 'stagekit-frenzy';
   cueId = CueType.Frenzy;
   description = 'Large venue: Red->Blue->Yellow cycle with 25% beat delays. Small venue: Red->Green->Blue cycle with 25% beat delays. NOTE: Differs from StageKit/YALCY as they change LEDs at different times, but this doesn\'t map well to a lower number of lights.';

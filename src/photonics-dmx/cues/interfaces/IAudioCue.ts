@@ -1,6 +1,7 @@
-import { AudioCueData, AudioCueType } from '../AudioCueTypes';
-import { ILightingController } from '../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../controllers/DmxLightManager';
+import { AudioCueData, AudioCueType } from '../types/audioCueTypes';
+import { ILightingController } from '../../controllers/sequencer/interfaces';
+import { DmxLightManager } from '../../controllers/DmxLightManager';
+
 
 /**
  * Interface for audio-reactive lighting cues

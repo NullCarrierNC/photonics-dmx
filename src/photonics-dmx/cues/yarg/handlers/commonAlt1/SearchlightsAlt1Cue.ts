@@ -1,7 +1,7 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects';
 import { TrackedLight } from '../../../../types';
@@ -13,7 +13,7 @@ let isNewSession = true;
 let transitionStartTime: number | null = null;
 let transitionDuration: number = 0;
 
-export class SearchlightsAlt1Cue implements ICue {
+export class SearchlightsAlt1Cue implements INetCue {
   id = 'common-alt-1-searchlights';
   cueId = CueType.Searchlights;
   description = 'Randomly cross fade brightness between two lights.';

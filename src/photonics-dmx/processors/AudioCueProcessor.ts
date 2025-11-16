@@ -1,8 +1,9 @@
-import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes';
-import { AudioCueType } from '../listeners/Audio/AudioCueTypes';
+import { AudioLightingData, AudioConfig } from '../listeners/Audio/audioTypes';
+
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
+import { AudioCueType } from '../cues/types/audioCueTypes';
 
 /**
  * AudioCueProcessor - Processes audio data using cue-based system
@@ -17,14 +18,14 @@ export class AudioCueProcessor {
   private currentCueType: AudioCueType;
 
   constructor(
-    private _lightManager: DmxLightManager,
+    lightManager: DmxLightManager,
     private sequencer: ILightingController,
     audioConfig: AudioConfig,
     cueType: AudioCueType = AudioCueType.BasicLayered
   ) {
     this.config = audioConfig;
     this.currentCueType = cueType;
-    this.cueHandler = new AudioCueHandler(_lightManager, sequencer);
+    this.cueHandler = new AudioCueHandler(lightManager, sequencer);
   }
 
   /**

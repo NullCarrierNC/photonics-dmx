@@ -1,11 +1,11 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 
-export class IntroCue implements ICue {
+export class IntroCue implements INetCue {
   id = 'default-intro';
   cueId = CueType.Intro;
   description = 'Solid low green color on front lights.';

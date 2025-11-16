@@ -1,14 +1,14 @@
 import { YargCueHandler } from '../../cueHandlers/YargCueHandler';
 import { DmxLightManager } from '../../controllers/DmxLightManager';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
-import { CueData, CueType } from '../../cues/cueTypes';
+import { CueData, CueType } from '../../cues/types/cueTypes';
 import { beforeEach, describe, jest, it, expect } from '@jest/globals';
-import { CueRegistry } from '../../cues/CueRegistry';
-import { ICueGroup } from '../../cues/interfaces/ICueGroup';
-import { ICue, CueStyle } from '../../cues/interfaces/ICue';
+import { YargCueRegistry } from '../../cues/registries/YargCueRegistry';
+import { ICueGroup } from '../../cues/interfaces/INetCueGroup';
+import { INetCue, CueStyle } from '../../cues/interfaces/INetCue';
 
 // Mock implementation for the test  
-class MockCueImplementation implements ICue {
+class MockCueImplementation implements INetCue {
   private _id: string;
   constructor(private _name: string) {
     this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`;
@@ -36,11 +36,11 @@ describe('YargCueHandler', () => {
   let cueHandler: YargCueHandler;
   let mockLightManager: jest.Mocked<DmxLightManager>;
   let mockSequencer: jest.Mocked<ILightingController>;
-  let registry: CueRegistry;
+  let registry: YargCueRegistry;
 
   beforeEach(() => {
-    // Get and reset the CueRegistry
-    registry = CueRegistry.getInstance();
+    // Get and reset the YargCueRegistry
+    registry = YargCueRegistry.getInstance();
     registry.reset();
 
     // Define and register a minimal mock default group for this test suite

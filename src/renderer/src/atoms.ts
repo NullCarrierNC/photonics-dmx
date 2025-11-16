@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 import { DmxFixture, LightingConfiguration,  } from '../../photonics-dmx/types';
-import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes';
+import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/audioTypes';
 import { Pages } from './types';
 
 /**

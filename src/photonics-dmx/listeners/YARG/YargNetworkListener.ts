@@ -11,7 +11,7 @@ import {
   lightingCueMap,
   InstrumentNoteType,
   DrumNoteType
-} from '../../cues/cueTypes';
+} from '../../cues/types/cueTypes';
 
 
 import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler';

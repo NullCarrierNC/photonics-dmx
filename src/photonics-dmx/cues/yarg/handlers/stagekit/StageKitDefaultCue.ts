@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -11,7 +11,7 @@ import { EasingType } from '../../../../easing';
  * Large venue: Blue/red alternating on keyframes
  * Small venue: Yellow LEDs normally ON but flash OFF on red drum hits, red/blue alternating on keyframes
  */
-export class StageKitDefaultCue implements ICue {
+export class StageKitDefaultCue implements INetCue {
   id = 'stagekit-default';
   cueId = CueType.Default;
   description = 'Large venue: Blue/red alternating on keyframes, small venue: Red/blue alternating on keyframes and yellow lights normally ON but flash OFF on red drum.';

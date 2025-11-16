@@ -18,7 +18,7 @@
  * a distinct effect v.s. literally toggling between the two cue's effects.
  * 
  */
-import { CueData, CueType, StrobeState,  } from '../cues/cueTypes';
+import { CueData, CueType, StrobeState,  } from '../cues/types/cueTypes';
 import { cueMenuCircleChase } from '../cues/menuCues';
 import { cueSearchlightsChase } from '../cues/searchlightsCues';
 

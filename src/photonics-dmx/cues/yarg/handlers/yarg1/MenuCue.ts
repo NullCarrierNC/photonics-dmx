@@ -1,12 +1,12 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getSweepEffect } from '../../../../effects/sweepEffect';
 import { RGBIO } from '../../../../types';
 
-export class MenuCue implements ICue {
+export class MenuCue implements INetCue {
   id = 'default-menu';
   cueId = CueType.Menu;
   description = 'Continuous slow blue sweep effect that moves around all lights in a circular pattern with a 2 sec delay between passes';

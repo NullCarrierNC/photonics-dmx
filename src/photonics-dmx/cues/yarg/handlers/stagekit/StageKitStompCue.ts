@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -12,7 +12,7 @@ import { Effect } from '../../../../types';
  * Front: quarter 1 yellow, quarter 4 red. Back: quarter 1 red, quarter 4 yellow. Inner green.
  * Toggles on/off with each keyframe.
  */
-export class StageKitStompCue implements ICue {
+export class StageKitStompCue implements INetCue {
   id = 'stagekit-stomp';
   cueId = CueType.Stomp;
   description = 'Front: quarter 1 yellow, quarter 4 red. Back: quarter 1 red, quarter 4 yellow. Inner green. Toggles on/off with each keyframe.';

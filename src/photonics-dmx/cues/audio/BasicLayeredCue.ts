@@ -1,10 +1,10 @@
-import { AudioCueType } from '../AudioCueTypes';
-import { IAudioCue } from '../interfaces/IAudioCue';
-import { AudioCueData } from '../AudioCueTypes';
-import { ILightingController } from '../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { getColor, validateColorString } from '../../../helpers/dmxHelpers';
-import { getEffectSingleColor } from '../../../effects/effectSingleColor';
+import { DmxLightManager } from "../../controllers/DmxLightManager";
+import { ILightingController } from "../../controllers/sequencer/interfaces";
+import { getEffectSingleColor } from "../../effects";
+import { getColor, validateColorString } from "../../helpers";
+import { AudioCueData, AudioCueType } from "../types/audioCueTypes";
+import { IAudioCue } from "../interfaces/IAudioCue";
+
 
 /**
  * BasicLayered cue - applies each frequency range to its own layer

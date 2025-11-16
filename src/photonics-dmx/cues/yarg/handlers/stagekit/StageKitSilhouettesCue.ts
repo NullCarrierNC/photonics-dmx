@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -9,7 +9,7 @@ import { Effect, EffectTransition } from '../../../../types';
  * StageKit Silhouettes Cue - All green lights for silhouette effect
  * Creates silhouette lighting effect with green lights
  */
-export class StageKitSilhouettesCue implements ICue {
+export class StageKitSilhouettesCue implements INetCue {
   id = 'stagekit-silhouettes';
   cueId = CueType.Silhouettes;
   description = 'Solid green on all lights.';

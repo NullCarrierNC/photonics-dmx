@@ -1,7 +1,7 @@
 import { CueRegistry } from '../../../photonics-dmx/cues/CueRegistry';
 import { ICue, CueStyle } from '../../../photonics-dmx/cues/interfaces/ICue';
 import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/ICueGroup';
-import { CueData, CueType } from '../../../photonics-dmx/cues/cueTypes';
+import { CueData, CueType } from '../../../photonics-dmx/cues/types/cueTypes';
 import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager';
 import { beforeEach, describe, it, expect, jest } from '@jest/globals';

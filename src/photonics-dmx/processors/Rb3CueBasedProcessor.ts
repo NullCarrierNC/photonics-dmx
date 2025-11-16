@@ -5,7 +5,7 @@
  */
 import { EventEmitter } from 'events';
 import { AbstractCueHandler } from '../cueHandlers/AbstractCueHandler';
-import { CueData, CueType, lightingCueMap } from '../cues/cueTypes';
+import { CueData, CueType, lightingCueMap } from '../cues/types/cueTypes';
 import { Rb3RightChannel, Rb3Difficulty, Rb3TrackType } from '../listeners/RB3/rb3eTypes';
 
 /**

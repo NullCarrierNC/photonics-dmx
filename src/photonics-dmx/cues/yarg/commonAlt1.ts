@@ -1,6 +1,6 @@
-import { CueRegistry } from '../CueRegistry';
-import { CueType } from '../cueTypes';
-import { ICueGroup } from '../interfaces/ICueGroup';
+import { YargCueRegistry } from '../registries/YargCueRegistry';
+import { CueType } from '../types/cueTypes';
+import { ICueGroup } from '../interfaces/INetCueGroup';
 import { SearchlightsAlt1Cue } from './handlers/commonAlt1/SearchlightsAlt1Cue';
 
 const group: ICueGroup = {
@@ -14,6 +14,6 @@ const group: ICueGroup = {
 };
 
 
-const registry = CueRegistry.getInstance();
+const registry = YargCueRegistry.getInstance();
 registry.registerGroup(group);
 registry.activateGroup(group.id);

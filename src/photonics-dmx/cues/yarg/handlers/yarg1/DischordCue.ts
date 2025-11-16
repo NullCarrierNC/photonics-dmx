@@ -1,7 +1,7 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { 
   getEffectFlashColor, 
@@ -17,7 +17,7 @@ import {
  * Blue LEDs: Two alternating patterns on keyframe events - Pattern A: side positions, Pattern B: even positions
  * Red LEDs: Flash all lights on red drum hits
  */
-export class DischordCue implements ICue {
+export class DischordCue implements INetCue {
   id = 'default-dischord';
   cueId = CueType.Dischord;
   description = 'Yellow clockwise rotation on beat, green dual-mode (spinning/solid) on measure, blue alternating patterns on keyframe, red flash on red drum';
