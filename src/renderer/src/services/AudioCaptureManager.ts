@@ -25,12 +25,14 @@ const DEFAULT_RANGES: Array<{
   brightness: 'low' | 'medium' | 'high' | 'max';
   sensitivity: number;
 }> = [
-  { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red', brightness: 'medium', sensitivity: 1.0 },
-  { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue', brightness: 'medium', sensitivity: 1.0 },
-  { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow', brightness: 'medium', sensitivity: 1.0 },
-  { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green', brightness: 'medium', sensitivity: 1.0 },
-  { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan', brightness: 'medium', sensitivity: 1.0 }
+  { id: 'range1', name: 'Bass', minHz: 20, maxHz: 220, color: 'red', brightness: 'medium', sensitivity: 1.0 },
+  { id: 'range2', name: 'Lower-Mids', minHz: 220, maxHz: 800, color: 'blue', brightness: 'medium', sensitivity: 1.0 },
+  { id: 'range3', name: 'Upper-Mids', minHz: 800, maxHz: 2500, color: 'yellow', brightness: 'medium', sensitivity: 1.0 },
+  { id: 'range4', name: 'Highs', minHz: 2500, maxHz: 6000, color: 'green', brightness: 'medium', sensitivity: 1.0 },
+  { id: 'range5', name: 'Air', minHz: 6000, maxHz: 20000, color: 'cyan', brightness: 'medium', sensitivity: 1.0 }
 ];
+
+const DEFAULT_BAND_COUNT = 4 as AudioConfig['frequencyBands']['bandCount'];
 
 const DEFAULT_CONFIG: AudioConfig = {
   fftSize: 2048,
@@ -40,7 +42,7 @@ const DEFAULT_CONFIG: AudioConfig = {
     alpha: 0.7
   },
   frequencyBands: {
-    bandCount: 3,
+    bandCount: DEFAULT_BAND_COUNT,
     ranges: DEFAULT_RANGES
   },
   beatDetection: {
@@ -97,7 +99,10 @@ export class AudioCaptureManager {
       ...DEFAULT_CONFIG,
       ...config,
       frequencyBands: config?.frequencyBands?.ranges
-        ? { bandCount: config.frequencyBands.bandCount ?? 3, ranges: config.frequencyBands.ranges }
+        ? {
+            bandCount: (config.frequencyBands.bandCount ?? DEFAULT_BAND_COUNT) as AudioConfig['frequencyBands']['bandCount'],
+            ranges: config.frequencyBands.ranges
+          }
         : DEFAULT_CONFIG.frequencyBands
     };
     console.log('AudioCaptureManager initialized');

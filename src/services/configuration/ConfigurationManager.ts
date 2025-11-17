@@ -2,6 +2,7 @@ import { ConfigFile } from './ConfigFile';
 import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes } from '../../photonics-dmx/types';
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio/audioConfig';
 import type { AudioConfig } from '../../photonics-dmx/listeners/Audio/audioTypes';
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 
 /**
  * Application preferences interface
@@ -50,6 +51,7 @@ export interface AppPreferences {
     sacnExpanded: boolean;
   };
   audioConfig?: AudioConfig;
+  activeAudioCueType?: AudioCueType;
 }
 
 /**
@@ -69,6 +71,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledAudioCueGroups: ['audio-spectrum'],
   cueConsistencyWindow: 60000,
   clockRate: 5, // 5ms interval for smooth animations
+  activeAudioCueType: AudioCueType.BasicLayered,
 
   // Brightness configuration defaults
   brightness: {
@@ -222,6 +225,20 @@ export class ConfigurationManager {
    */
   setEnabledAudioCueGroups(groupIds: string[]): void {
     this.setPreference('enabledAudioCueGroups', groupIds);
+  }
+
+  /**
+   * Gets the preferred audio cue type
+   */
+  getActiveAudioCueType(): AudioCueType | undefined {
+    return this.preferences.get().activeAudioCueType;
+  }
+
+  /**
+   * Persists the preferred audio cue type
+   */
+  setActiveAudioCueType(cueType: AudioCueType): void {
+    this.setPreference('activeAudioCueType', cueType);
   }
 
   /**

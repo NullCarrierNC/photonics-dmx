@@ -20,6 +20,7 @@ import { LightTransitionController } from '../../photonics-dmx/controllers/seque
 import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues';
 
@@ -826,12 +827,14 @@ export class ControllerManager {
       
       // Create audio processor in main process using cue-based system
       // getAudioConfig() always returns a valid config (merges with defaults)
+      const preferredCueType = this.config.getActiveAudioCueType();
       this.audioProcessor = new AudioCueProcessor(
         this.dmxLightManager,
         this.effectsController,
-        audioConfig
+        audioConfig,
+        preferredCueType
       );
-      this.audioProcessor.refreshCueSelection();
+      this.config.setActiveAudioCueType(this.audioProcessor.getCurrentCueType());
       
       // Start the processor
       this.audioProcessor.start();
@@ -930,7 +933,103 @@ export class ControllerManager {
   public refreshAudioCueSelection(): void {
     if (this.audioProcessor) {
       this.audioProcessor.refreshCueSelection();
+      this.config.setActiveAudioCueType(this.audioProcessor.getCurrentCueType());
     }
+  }
+
+  /**
+   * Get the current audio cue selection, preferring the processor state
+   */
+  public getActiveAudioCueType(): AudioCueType {
+    if (this.audioProcessor) {
+      return this.audioProcessor.getCurrentCueType();
+    }
+
+    const saved = this.config.getActiveAudioCueType();
+    if (saved) {
+      return saved;
+    }
+
+    const registry = AudioCueRegistry.getInstance();
+    const enabled = registry.getAvailableCueTypes();
+    if (enabled.length > 0) {
+      return enabled[0];
+    }
+
+    const fallback = registry.getAvailableCueTypes(true);
+    if (fallback.length > 0) {
+      return fallback[0];
+    }
+
+    return AudioCueType.BasicLayered;
+  }
+
+  /**
+   * Persist and apply a new audio cue selection
+   */
+  public setActiveAudioCueType(cueType: AudioCueType): { success: boolean; error?: string } {
+    const registry = AudioCueRegistry.getInstance();
+    const available = registry.getAvailableCueTypes();
+
+    if (!available.includes(cueType)) {
+      return {
+        success: false,
+        error: `Cue ${cueType} is not available in enabled groups`
+      };
+    }
+
+    this.config.setActiveAudioCueType(cueType);
+
+    if (this.audioProcessor) {
+      const applied = this.audioProcessor.setActiveCueType(cueType);
+      if (!applied) {
+        return {
+          success: false,
+          error: `Cue ${cueType} could not be activated`
+        };
+      }
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Return cue options sourced from enabled audio cue groups
+   */
+  public getAudioCueOptions(): Array<{
+    id: AudioCueType;
+    label: string;
+    description: string;
+    groupId: string;
+    groupName: string;
+  }> {
+    const registry = AudioCueRegistry.getInstance();
+    const enabledGroupIds = registry.getEnabledGroups();
+    const targetGroups = enabledGroupIds.length > 0 ? enabledGroupIds : registry.getRegisteredGroups();
+    const cueMap = new Map<AudioCueType, {
+      id: AudioCueType;
+      label: string;
+      description: string;
+      groupId: string;
+      groupName: string;
+    }>();
+
+    for (const groupId of targetGroups) {
+      const group = registry.getGroup(groupId);
+      if (!group) continue;
+
+      group.cues.forEach((cue) => {
+        cueMap.set(cue.cueType, {
+          id: cue.cueType,
+          label: cue.id,
+          description: cue.description,
+          groupId: group.id,
+          groupName: group.name
+        });
+      });
+    }
+
+    return Array.from(cueMap.values());
   }
 
 

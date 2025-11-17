@@ -12,7 +12,7 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   sensitivity: 1.0,
   beatDetection: {
     threshold: 0.3,
-    decayRate: 0.95,
+    decayRate: 0.8,
     minInterval: 100,
   },
   smoothing: {
@@ -20,13 +20,13 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
     alpha: 0.7,
   },
   frequencyBands: {
-    bandCount: 3,
+    bandCount: 4,
     ranges: [
-      { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red', brightness: 'medium', sensitivity: 1.0 },
-      { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue', brightness: 'medium', sensitivity: 1.0 },
-      { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow', brightness: 'medium', sensitivity: 1.0 },
-      { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green', brightness: 'medium', sensitivity: 1.0 },
-      { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan', brightness: 'medium', sensitivity: 1.0 },
+      { id: 'range1', name: 'Bass', minHz: 20, maxHz: 220, color: 'red', brightness: 'medium', sensitivity: 1.0 },
+      { id: 'range2', name: 'Lower-Mids', minHz: 220, maxHz: 800, color: 'blue', brightness: 'medium', sensitivity: 1.0 },
+      { id: 'range3', name: 'Upper-Mids', minHz: 800, maxHz: 2500, color: 'yellow', brightness: 'medium', sensitivity: 1.0 },
+      { id: 'range4', name: 'Highs', minHz: 2500, maxHz: 6000, color: 'green', brightness: 'medium', sensitivity: 1.0 },
+      { id: 'range5', name: 'Air', minHz: 6000, maxHz: 20000, color: 'cyan', brightness: 'medium', sensitivity: 1.0 },
     ],
   },
   enabled: false,

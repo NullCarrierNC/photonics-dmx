@@ -52,18 +52,20 @@ const COLOR_TO_RGB: Record<Color, string> = {
 
 // Default frequency ranges
 const DEFAULT_RANGES = [
-  { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
-  { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
-  { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
-  { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
-  { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 }
+  { id: 'range1', name: 'Bass', minHz: 20, maxHz: 220, color: 'red' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
+  { id: 'range2', name: 'Lower-Mids', minHz: 220, maxHz: 800, color: 'blue' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
+  { id: 'range3', name: 'Upper-Mids', minHz: 800, maxHz: 2500, color: 'yellow' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
+  { id: 'range4', name: 'Highs', minHz: 2500, maxHz: 6000, color: 'green' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 },
+  { id: 'range5', name: 'Air', minHz: 6000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as Brightness, sensitivity: 1.0 }
 ];
 
-const THREE_BAND_VISIBLE_IDS = ['range1', 'range3', 'range5'];
+const THREE_BAND_VISIBLE_IDS = ['range1', 'range3', 'range4'];
+const FOUR_BAND_VISIBLE_IDS = ['range1', 'range2', 'range3', 'range4'];
 
-const BAND_OPTIONS: Array<{ value: 3 | 5; label: string }> = [
+const BAND_OPTIONS: Array<{ value: 3 | 4 | 5; label: string }> = [
   { value: 3, label: '3 Bands (Bass / Mids / Highs)' },
-  { value: 5, label: '5 Bands (Bass / Low-Mids / Mids / Upper-Mids / Highs)' },
+  { value: 4, label: '4 Bands (Bass / Lower-Mids / Upper-Mids / Highs)' },
+  { value: 5, label: '5 Bands (Bass / Lower-Mids / Upper-Mids / Highs / Air)' },
 ];
 
 interface FrequencyRange {
@@ -94,7 +96,7 @@ const AudioColorMapping: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   // Local state for sensitivity sliders to prevent re-renders during drag
   const [localSensitivityValues, setLocalSensitivityValues] = useState<Map<string, number>>(new Map());
-  const [bandCount, setBandCount] = useState<3 | 5>(3);
+  const [bandCount, setBandCount] = useState<3 | 4 | 5>(4);
   const [activeColorPickerId, setActiveColorPickerId] = useState<string | null>(null);
   const colorPickerRef = useRef<HTMLDivElement | null>(null);
 
@@ -124,7 +126,7 @@ const AudioColorMapping: React.FC = () => {
         if (config?.frequencyBands?.ranges && Array.isArray(config.frequencyBands.ranges) && config.frequencyBands.ranges.length > 0) {
           const normalized = normalizeRanges(config.frequencyBands.ranges as FrequencyRange[]);
           setRanges(normalized);
-          setBandCount((config.frequencyBands.bandCount as 3 | 5) ?? 3);
+          setBandCount((config.frequencyBands.bandCount as 3 | 4 | 5) ?? 4);
           setLocalSensitivityValues(new Map());
         } else {
           setRanges(normalizeRanges(DEFAULT_RANGES));
@@ -145,7 +147,7 @@ const AudioColorMapping: React.FC = () => {
   }, []);
 
   // Save configuration
-  const saveConfig = useCallback(async (updatedRanges: FrequencyRange[], overrideBandCount?: 3 | 5) => {
+  const saveConfig = useCallback(async (updatedRanges: FrequencyRange[], overrideBandCount?: 3 | 4 | 5) => {
     if (isSaving) return;
     
     setIsSaving(true);
@@ -163,7 +165,7 @@ const AudioColorMapping: React.FC = () => {
     }
   }, [bandCount, isSaving]);
 
-  const handleBandCountChange = useCallback((value: 3 | 5) => {
+  const handleBandCountChange = useCallback((value: 3 | 4 | 5) => {
     setBandCount(value);
     saveConfig(ranges, value);
   }, [ranges, saveConfig]);
@@ -175,6 +177,9 @@ const AudioColorMapping: React.FC = () => {
   const displayRanges = useMemo(() => {
     if (bandCount === 3) {
       return ranges.filter((range) => THREE_BAND_VISIBLE_IDS.includes(range.id));
+    }
+    if (bandCount === 4) {
+      return ranges.filter((range) => FOUR_BAND_VISIBLE_IDS.includes(range.id));
     }
     return ranges;
   }, [bandCount, ranges]);
@@ -265,7 +270,7 @@ const AudioColorMapping: React.FC = () => {
         </div>
         <select
           value={bandCount}
-          onChange={(e) => handleBandCountChange(Number(e.target.value) as 3 | 5)}
+          onChange={(e) => handleBandCountChange(Number(e.target.value) as 3 | 4 | 5)}
           className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-auto"
         >
           {BAND_OPTIONS.map((option) => (

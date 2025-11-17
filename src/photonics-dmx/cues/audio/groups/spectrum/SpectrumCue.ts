@@ -26,12 +26,12 @@ export class SpectrumCue implements IAudioCue {
     const { frequencyBands } = audioData;
 
     const ranges = config.frequencyBands?.ranges || [];
-    if (ranges.length < 5) {
+    if (ranges.length === 0) {
       return;
     }
 
     const configBandCount = config.frequencyBands?.bandCount;
-    const enabledBandCount = data.enabledBandCount ?? configBandCount ?? 3;
+    const enabledBandCount = data.enabledBandCount ?? configBandCount ?? 4;
 
     const bandValues = [
       frequencyBands.range1,
@@ -41,75 +41,93 @@ export class SpectrumCue implements IAudioCue {
       frequencyBands.range5
     ];
 
-    const frontThird1 = lightManager.getLights(['front'], 'third-1');
-    const frontThird2 = lightManager.getLights(['front'], 'third-2');
-    const frontThird3 = lightManager.getLights(['front'], 'third-3');
+    const allLights = lightManager.getLights(['front', 'back'], 'all');
+    if (!allLights || allLights.length === 0) {
+      return;
+    }
 
-    const backThird1 = lightManager.getLights(['back'], 'third-3');
-    const backThird2 = lightManager.getLights(['back'], 'third-2');
-    const backThird3 = lightManager.getLights(['back'], 'third-1');
-
-    const range2Enabled = enabledBandCount === 5 && ranges[1]?.sensitivity > 0;
-    const range4Enabled = enabledBandCount === 5 && ranges[3]?.sensitivity > 0;
-
-    // Bass front third-1
-    this.applyBandToLights({
-      lights: frontThird1,
-      range: ranges[0],
-      bandIntensity: bandValues[0],
-      layer: 0,
-      fallbackKey: 'front-third-1-bass',
-      sequencer
+    const orderedLights = [...allLights].sort((a, b) => {
+      const positionDiff = (a.position ?? 0) - (b.position ?? 0);
+      if (positionDiff !== 0) {
+        return positionDiff;
+      }
+      return a.id.localeCompare(b.id);
     });
 
-    // Back third-1: low-mids if enabled else bass
-    this.applyBandToLights({
-      lights: backThird1,
-      range: range2Enabled ? ranges[1] : ranges[0],
-      bandIntensity: range2Enabled ? bandValues[1] : bandValues[0],
-      layer: 1,
-      fallbackKey: `back-third-1-${range2Enabled ? 'low-mids' : 'bass'}`,
-      sequencer
-    });
+    const bandIndices =
+      enabledBandCount >= 5
+        ? [0, 1, 2, 3, 4]
+        : enabledBandCount === 4
+          ? [0, 1, 2, 3]
+          : [0, 2, 4];
+    type ActiveBand = { range: AudioRangeConfig; bandIntensity: number };
+    const activeBands: ActiveBand[] = bandIndices
+      .map((bandIndex) => {
+        const range = ranges[bandIndex];
+        if (!range) {
+          return null;
+        }
+        return {
+          range,
+          bandIntensity: bandValues[bandIndex] ?? 0
+        };
+      })
+      .filter((band): band is ActiveBand => band !== null);
 
-    // Front third-2: mids
-    this.applyBandToLights({
-      lights: frontThird2,
-      range: ranges[2],
-      bandIntensity: bandValues[2],
-      layer: 2,
-      fallbackKey: 'front-third-2-mids',
-      sequencer
-    });
+    if (activeBands.length === 0) {
+      return;
+    }
 
-    // Back third-2: upper-mids if enabled else mids
-    this.applyBandToLights({
-      lights: backThird2,
-      range: range4Enabled ? ranges[3] : ranges[2],
-      bandIntensity: range4Enabled ? bandValues[3] : bandValues[2],
-      layer: 3,
-      fallbackKey: `back-third-2-${range4Enabled ? 'upper-mids' : 'mids'}`,
-      sequencer
-    });
+    if (enabledBandCount === 4) {
+      const specialMapping = this.mapLightsForFourBandMode(orderedLights);
+      if (specialMapping) {
+        specialMapping.forEach((lightsForBand, index) => {
+          const band = activeBands[index];
+          if (!band) {
+            return;
+          }
+          this.applyBandToLights({
+            lights: lightsForBand,
+            range: band.range,
+            bandIntensity: band.bandIntensity,
+            layer: index,
+            sequencer
+          });
+        });
+        return;
+      }
+    }
 
-    // Front third-3: highs
-    this.applyBandToLights({
-      lights: frontThird3,
-      range: ranges[4],
-      bandIntensity: bandValues[4],
-      layer: 4,
-      fallbackKey: 'front-third-3-highs',
-      sequencer
-    });
+    let startIndex = 0;
+    let remainingLights = orderedLights.length;
+    let remainingBands = activeBands.length;
 
-    // Back third-3: highs
-    this.applyBandToLights({
-      lights: backThird3,
-      range: ranges[4],
-      bandIntensity: bandValues[4],
-      layer: 5,
-      fallbackKey: 'back-third-3-highs',
-      sequencer
+    activeBands.forEach((band, index) => {
+      if (remainingBands <= 0) {
+        return;
+      }
+
+      let lightsForBand: TrackedLight[] = [];
+      if (remainingLights > 0) {
+        const isLastBand = index === activeBands.length - 1;
+        let count = isLastBand
+          ? remainingLights
+          : Math.max(1, Math.floor(remainingLights / remainingBands));
+        count = Math.min(count, remainingLights);
+        lightsForBand = orderedLights.slice(startIndex, startIndex + count);
+        startIndex += count;
+        remainingLights -= count;
+      }
+
+      remainingBands -= 1;
+
+      this.applyBandToLights({
+        lights: lightsForBand,
+        range: band.range,
+        bandIntensity: band.bandIntensity,
+        layer: index,
+        sequencer
+      });
     });
   }
 
@@ -118,22 +136,29 @@ export class SpectrumCue implements IAudioCue {
     range,
     bandIntensity,
     layer,
-    fallbackKey,
     sequencer
   }: {
     lights: TrackedLight[] | undefined;
     range: AudioRangeConfig;
     bandIntensity: number;
     layer: number;
-    fallbackKey: string;
     sequencer: ILightingController;
   }): void {
+    sequencer.removeEffectByLayer(layer);
+
     if (!lights || lights.length === 0 || !range) {
       return;
     }
 
-    if (bandIntensity < 0.01) {
-      sequencer.removeEffectByLayer(layer);
+    const normalizedIntensity = Math.max(0, Math.min(1, bandIntensity));
+    if (normalizedIntensity < 0.02 || range.sensitivity === 0) {
+      return;
+    }
+
+    const activeLightCount = Math.max(1, Math.round(normalizedIntensity * lights.length));
+    const activeLights = lights.slice(0, activeLightCount);
+
+    if (activeLights.length === 0) {
       return;
     }
 
@@ -145,17 +170,17 @@ export class SpectrumCue implements IAudioCue {
 
     const brightness = range.brightness || 'medium';
     const rgbColor = getColor(color, brightness, 'replace');
-    rgbColor.intensity = Math.floor(rgbColor.intensity * bandIntensity);
-    rgbColor.opacity = bandIntensity;
+    rgbColor.intensity = Math.floor(rgbColor.intensity * normalizedIntensity);
+    rgbColor.opacity = normalizedIntensity;
 
     const effect = getEffectSingleColor({
-      lights,
+      lights: activeLights,
       color: rgbColor,
       duration: 100,
       layer
     });
 
-    sequencer.addEffect(`audio-spectrum-${fallbackKey}`, effect);
+    sequencer.addEffect(`audio-spectrum-band-${layer}`, effect);
   }
 
   onStop(): void {
@@ -164,6 +189,23 @@ export class SpectrumCue implements IAudioCue {
 
   onDestroy(): void {
     // Cleanup if needed
+  }
+
+  private mapLightsForFourBandMode(lights: TrackedLight[]): TrackedLight[][] | null {
+    if (lights.length === 4) {
+      return lights.map((light) => [light]);
+    }
+
+    if (lights.length === 8) {
+      return [
+        [lights[0], lights[7]],
+        [lights[1], lights[6]],
+        [lights[2], lights[5]],
+        [lights[3], lights[4]]
+      ];
+    }
+
+    return null;
   }
 }
 

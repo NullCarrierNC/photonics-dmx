@@ -67,8 +67,8 @@ export interface AudioConfig {
   
   /** Frequency band configuration */
   frequencyBands: {
-    /** Number of enabled bands (3 or 5) */
-    bandCount: 3 | 5;
+    /** Number of enabled bands (3, 4, or 5) */
+    bandCount: 3 | 4 | 5;
     /** Array of frequency range configurations */
     ranges: Array<{
       /** Unique identifier for this range */

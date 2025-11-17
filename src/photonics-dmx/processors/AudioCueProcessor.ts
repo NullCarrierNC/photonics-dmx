@@ -22,11 +22,12 @@ export class AudioCueProcessor {
   constructor(
     lightManager: DmxLightManager,
     private sequencer: ILightingController,
-    audioConfig: AudioConfig
+    audioConfig: AudioConfig,
+    preferredCueType?: AudioCueType
   ) {
     this.config = audioConfig;
     this.registry = AudioCueRegistry.getInstance();
-    this.currentCueType = this.selectActiveCueType();
+    this.currentCueType = this.selectActiveCueType(preferredCueType);
     this.cueHandler = new AudioCueHandler(lightManager, sequencer);
   }
 
@@ -99,7 +100,7 @@ export class AudioCueProcessor {
    * Re-evaluate which cue type should be active based on enabled audio cue groups
    */
   public refreshCueSelection(): void {
-    const selected = this.selectActiveCueType();
+    const selected = this.selectActiveCueType(this.currentCueType);
     if (selected !== this.currentCueType) {
       console.log(`AudioCueProcessor: Switching cue from ${this.currentCueType} to ${selected}`);
       this.currentCueType = selected;
@@ -107,9 +108,40 @@ export class AudioCueProcessor {
   }
 
   /**
+   * Force a specific cue type when it is available
+   */
+  public setActiveCueType(cueType: AudioCueType): boolean {
+    const cue = this.registry.getCueImplementation(cueType);
+    if (!cue) {
+      console.warn(`AudioCueProcessor: Requested cue ${cueType} is not available in enabled groups`);
+      return false;
+    }
+
+    if (this.currentCueType !== cueType) {
+      console.log(`AudioCueProcessor: Active cue set to ${cueType}`);
+      this.currentCueType = cueType;
+    }
+    return true;
+  }
+
+  /**
+   * Current cue type being executed
+   */
+  public getCurrentCueType(): AudioCueType {
+    return this.currentCueType;
+  }
+
+  /**
    * Determine which cue type should be used
    */
-  private selectActiveCueType(): AudioCueType {
+  private selectActiveCueType(preferredCueType?: AudioCueType): AudioCueType {
+    if (preferredCueType) {
+      const preferred = this.registry.getCueImplementation(preferredCueType);
+      if (preferred) {
+        return preferredCueType;
+      }
+    }
+
     const availableCueTypes = this.registry.getAvailableCueTypes();
     if (availableCueTypes.length > 0) {
       return availableCueTypes[0];
@@ -126,7 +158,7 @@ export class AudioCueProcessor {
   }
 
   private getEnabledBandCount(): number {
-    return this.config.frequencyBands?.bandCount ?? 3;
+    return this.config.frequencyBands?.bandCount ?? 4;
   }
 }
 

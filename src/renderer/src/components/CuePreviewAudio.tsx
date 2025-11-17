@@ -27,7 +27,8 @@ interface CuePreviewAudioProps {
   className?: string;
 }
 
-const THREE_BAND_IDS = ['range1', 'range3', 'range5'];
+const THREE_BAND_IDS = ['range1', 'range3', 'range4'];
+const FOUR_BAND_IDS = ['range1', 'range2', 'range3', 'range4'];
 
 type PreviewRange = {
   id: string;
@@ -45,18 +46,20 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
   const [lastBeatTime, setLastBeatTime] = useState(0);
 
   const defaultRanges: PreviewRange[] = [
-    { id: 'range1', name: 'Bass', minHz: 20, maxHz: 250, color: 'red' as Color, brightness: 'medium' as const },
-    { id: 'range2', name: 'Low-Mids', minHz: 250, maxHz: 800, color: 'blue' as Color, brightness: 'medium' as const },
-    { id: 'range3', name: 'Mids', minHz: 800, maxHz: 4000, color: 'yellow' as Color, brightness: 'medium' as const },
-    { id: 'range4', name: 'Upper-Mids', minHz: 4000, maxHz: 10000, color: 'green' as Color, brightness: 'medium' as const },
-    { id: 'range5', name: 'Highs', minHz: 10000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as const }
+    { id: 'range1', name: 'Bass', minHz: 20, maxHz: 220, color: 'red' as Color, brightness: 'medium' as const },
+    { id: 'range2', name: 'Lower-Mids', minHz: 220, maxHz: 800, color: 'blue' as Color, brightness: 'medium' as const },
+    { id: 'range3', name: 'Upper-Mids', minHz: 800, maxHz: 2500, color: 'yellow' as Color, brightness: 'medium' as const },
+    { id: 'range4', name: 'Highs', minHz: 2500, maxHz: 6000, color: 'green' as Color, brightness: 'medium' as const },
+    { id: 'range5', name: 'Air', minHz: 6000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as const }
   ];
 
   const configuredRanges = (audioConfig?.frequencyBands?.ranges as PreviewRange[]) || defaultRanges;
-  const configuredBandCount = audioConfig?.frequencyBands?.bandCount ?? 3;
+  const configuredBandCount = audioConfig?.frequencyBands?.bandCount ?? 4;
   const displayRanges = configuredBandCount === 3
     ? configuredRanges.filter((range) => THREE_BAND_IDS.includes(range.id))
-    : configuredRanges;
+    : configuredBandCount === 4
+      ? configuredRanges.filter((range) => FOUR_BAND_IDS.includes(range.id))
+      : configuredRanges;
 
   const bandValuesById: Record<string, number> = {
     range1: audioData?.frequencyBands?.range1 || 0,

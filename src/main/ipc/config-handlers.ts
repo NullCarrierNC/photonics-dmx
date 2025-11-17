@@ -3,6 +3,7 @@ import { ControllerManager } from '../controllers/ControllerManager';
 import '../../photonics-dmx/cues';
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers';
 import { BrowserWindow } from 'electron';
 
@@ -163,6 +164,44 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error setting enabled audio cue groups:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Get cue options + active selection for audio reactive mode
+  ipcMain.handle('get-audio-reactive-cues', async () => {
+    try {
+      const cues = controllerManager.getAudioCueOptions();
+      const activeCueType = controllerManager.getActiveAudioCueType();
+      return {
+        success: true,
+        activeCueType,
+        cues
+      };
+    } catch (error) {
+      console.error('Error getting audio reactive cue state:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        activeCueType: null,
+        cues: []
+      };
+    }
+  });
+
+  // Set the active audio cue type
+  ipcMain.handle('set-active-audio-cue', async (_, cueType: AudioCueType) => {
+    try {
+      const result = controllerManager.setActiveAudioCueType(cueType);
+      if (!result.success) {
+        return result;
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting active audio cue:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)

@@ -38,8 +38,13 @@ export class BasicLayeredCue implements IAudioCue {
     }
 
     const configBandCount = config.frequencyBands?.bandCount;
-    const enabledBandCount = data.enabledBandCount ?? configBandCount ?? 3;
-    const activeRangeIndices = enabledBandCount === 3 ? [0, 2, 4] : [0, 1, 2, 3, 4];
+    const enabledBandCount = data.enabledBandCount ?? configBandCount ?? 4;
+    const activeRangeIndices =
+      enabledBandCount === 3
+        ? [0, 2, 4]
+        : enabledBandCount === 4
+          ? [0, 1, 2, 3]
+          : [0, 1, 2, 3, 4];
 
     const bandValues = [
       frequencyBands.range1,

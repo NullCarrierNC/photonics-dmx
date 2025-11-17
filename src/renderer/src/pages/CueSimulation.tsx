@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAtom } from 'jotai';
-import { senderIpcEnabledAtom, activeDmxLightsConfigAtom } from '@renderer/atoms';
+import { senderIpcEnabledAtom, activeDmxLightsConfigAtom, audioListenerEnabledAtom } from '@renderer/atoms';
 import { EffectSelector } from '../../../photonics-dmx/types';
 import { InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/types/cueTypes';
 import EffectsDropdown from '../components/EffectSelector';
@@ -14,6 +14,7 @@ import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa';
 import { ActiveGroupsSelectorRef } from '../components/ActiveCueGroupsSelector';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 import { startTestEffect, stopTestEffect } from '../ipcApi';
+import AudioCueSelectorPanel from '@renderer/components/AudioCueSelectorPanel';
 
 type CueRegistryType = 'YARG' | 'RB3E';
 
@@ -27,6 +28,7 @@ type CueGroup = {
 const CueSimulation: React.FC = () => {
   const [_isIpcEnabled] = useAtom(senderIpcEnabledAtom);
   const [lightingConfig] = useAtom(activeDmxLightsConfigAtom);
+  const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom);
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null);
   const [selectedRegistryType, setSelectedRegistryType] = useState<CueRegistryType>('YARG');
   const [selectedGroup, setSelectedGroup] = useState<string>('Select');
@@ -331,7 +333,13 @@ const CueSimulation: React.FC = () => {
       </div>
      
       <div className="my-6">
-        <h2 className="text-xl font-bold mb-1 text-gray-800 dark:text-gray-200">Simulation Settings</h2>
+        <h2 className="text-xl font-bold mb-2 text-gray-800 dark:text-gray-200">Simulation Settings</h2>
+        {isAudioReactiveEnabled ? (
+          <p className="t text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            When Reactive Audio mode is enabled you can select which audio-reactive cue is used to drive the DMX output.
+          </p>
+        ) : (
+          <>
         <div className="flex flex-wrap gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -382,9 +390,17 @@ const CueSimulation: React.FC = () => {
           <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             <strong>Effect Description:</strong> {selectedEffect.yargDescription}
           </div>
+            )}
+          </>
         )}
       </div>
 
+      {isAudioReactiveEnabled && (
+        <AudioCueSelectorPanel className="mt-2" />
+      )}
+
+      {!isAudioReactiveEnabled && (
+        <>
       <div className="flex items-center mt-4 flex-wrap gap-4">
         <div className="flex flex-wrap gap-2">
           <button
@@ -474,7 +490,16 @@ const CueSimulation: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               {selectedInstrument === 'drums' ? (
                 // Drum notes - ordered as Green, Red, Yellow, Blue, then cymbals, then kick
-                [DrumNoteType.GreenDrum, DrumNoteType.RedDrum, DrumNoteType.YellowDrum, DrumNoteType.BlueDrum, DrumNoteType.GreenCymbal, DrumNoteType.YellowCymbal, DrumNoteType.BlueCymbal, DrumNoteType.Kick]
+                    [
+                      DrumNoteType.GreenDrum,
+                      DrumNoteType.RedDrum,
+                      DrumNoteType.YellowDrum,
+                      DrumNoteType.BlueDrum,
+                      DrumNoteType.GreenCymbal,
+                      DrumNoteType.YellowCymbal,
+                      DrumNoteType.BlueCymbal,
+                      DrumNoteType.Kick
+                    ]
                   .map((note) => (
                     <button
                       key={note}
@@ -494,7 +519,13 @@ const CueSimulation: React.FC = () => {
                   ))
               ) : (
                 // Guitar, Bass, Keys notes - ordered as Green, Red, Yellow, Blue, Orange
-                [InstrumentNoteType.Green, InstrumentNoteType.Red, InstrumentNoteType.Yellow, InstrumentNoteType.Blue, InstrumentNoteType.Orange]
+                    [
+                      InstrumentNoteType.Green,
+                      InstrumentNoteType.Red,
+                      InstrumentNoteType.Yellow,
+                      InstrumentNoteType.Blue,
+                      InstrumentNoteType.Orange
+                    ]
                   .map((note) => (
                     <button
                       key={note}
@@ -518,6 +549,8 @@ const CueSimulation: React.FC = () => {
           </div>
         </div>
       </div>
+        </>
+      )}
   
       <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
