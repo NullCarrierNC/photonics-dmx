@@ -73,13 +73,11 @@ export class EffectManager implements IEffectManager {
     this.transitionEngine.setEffectManager(this);
 
     // Register a callback to reset our state when a blackout completes
-    if ('setOnBlackoutCompleteCallback' in this.systemEffects) {
-      (this.systemEffects as any).setOnBlackoutCompleteCallback(() => {
-        // Reset layer 0 effect tracking when a blackout completes
-        this._lastCalled0LayerEffect = "";
-        //  console.debug("EffectManager: Reset _lastCalled0LayerEffect after blackout");
-      });
-    }
+    this.systemEffects.setOnBlackoutCompleteCallback(() => {
+      // Reset layer 0 effect tracking when a blackout completes
+      this._lastCalled0LayerEffect = "";
+      //  console.debug("EffectManager: Reset _lastCalled0LayerEffect after blackout");
+    });
   }
 
   /**
@@ -385,9 +383,7 @@ export class EffectManager implements IEffectManager {
 
       // Try transition controller if layer manager has no state
       if (!initialState) {
-        if (this.lightTransitionController && typeof this.lightTransitionController.getLightState === 'function') {
-          initialState = this.lightTransitionController.getLightState(light.id, layer);
-        }
+        initialState = this.lightTransitionController.getLightState(light.id, layer);
       }
 
       // If no state exists, use default (create once per light)
@@ -436,16 +432,14 @@ export class EffectManager implements IEffectManager {
         }
 
         // Set transition directly on the controller
-        if (this.lightTransitionController && typeof this.lightTransitionController.setTransition === 'function') {
-          this.lightTransitionController.setTransition(
-            light.id,
-            layer,
-            initialStates.get(light.id),
-            color,
-            firstTransition.transform.duration,
-            firstTransition.transform.easing
-          );
-        }
+        this.lightTransitionController.setTransition(
+          light.id,
+          layer,
+          initialStates.get(light.id),
+          color,
+          firstTransition.transform.duration,
+          firstTransition.transform.easing
+        );
 
         // Update effect state to transitioning
         lightEffect.state = 'transitioning';

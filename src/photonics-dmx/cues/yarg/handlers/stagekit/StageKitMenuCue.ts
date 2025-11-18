@@ -3,8 +3,7 @@ import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
-import { RGBIO } from '../../../../types';
-import { getSweepEffect } from '../../../../effects';
+import { Effect, EffectTransition,  } from '../../../../types';
 
 /**
  * StageKit Menu Cue - Blue lights rotating in sequence
@@ -13,15 +12,38 @@ import { getSweepEffect } from '../../../../effects';
 export class StageKitMenuCue implements ICue {
   id = 'stagekit-menu';
   cueId = CueType.Menu;
-  description = 'StageKit menu pattern - blue lights rotating in sequence';
+  description = 'StageKit menu pattern - solid blue lights, no motion in this implementation.';
   style = CueStyle.Primary;
-
+  
   async execute(_cueData: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const frontLights = lightManager.getLights(['front'], 'all');
-    const backLights = lightManager.getLights(['back'], 'all');
+    const allLights = lightManager.getLights(['front', 'back'], ['all']);
+    const blue = getColor('blue', 'low');
+    
+    const transitions: EffectTransition[] = [
+      {
+        lights: allLights,
+        layer: 0,
+        waitForCondition: 'none',
+        waitForTime: 0,
+        waitUntilCondition: 'delay',
+        waitUntilTime: 100,
+        transform: {
+          color: blue,
+          easing: 'linear',
+          duration: 0 
+        }
+      }
+    ];
+    
+    const introEffect: Effect = {
+      id: 'stagekit-intro',
+      description: 'All green lights on',
+      transitions: transitions
+    };
+    
+    sequencer.setEffectUnblockedName('sk-menu', introEffect, true);
 
-    // Merge the sorted arrays into allLights
-    const allLights = [...frontLights, ...backLights];
+   /*
    
     const blue: RGBIO = getColor('blue', 'low');
     const brightBlue: RGBIO = getColor('blue', 'high');
@@ -37,12 +59,18 @@ export class StageKitMenuCue implements ICue {
       betweenSweepDelay: 0,
       layer: 0,
     });
-    // Use unblocked to avoid breaking the sweep timing.
-    sequencer.setEffectUnblockedName('menu', sweep, true);
+    // Use unblocked to avoid breaking the sweep timing and keep the sweep atomic.
+    if (this.isFirstExecution) {
+      sequencer.setEffectUnblockedName('menu', sweep, true);
+      this.isFirstExecution = false;
+    } else {
+      sequencer.addEffectUnblockedName('menu', sweep, true);
+    }
+    */
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {
