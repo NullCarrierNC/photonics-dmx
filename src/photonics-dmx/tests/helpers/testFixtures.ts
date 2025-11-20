@@ -19,7 +19,7 @@ export const createMockDmxFixture = (overrides?: Partial<DmxFixture>): DmxFixtur
   ...overrides
 });
 
-const createMockDmxLight = (overrides?: Partial<DmxLight>): DmxLight => ({
+export const createMockDmxLight = (overrides?: Partial<DmxLight>): DmxLight => ({
   ...createMockDmxFixture(),
   fixtureId: 'test-fixture-1',
   ...overrides

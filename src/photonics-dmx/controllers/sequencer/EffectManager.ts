@@ -11,6 +11,19 @@ import { LightTransitionController } from './LightTransitionController';
 import { performance } from 'perf_hooks';
 
 /**
+ * Tracks the lifecycle of a persistent effect that should restart only after
+ * all participating lights complete their transitions.
+ */
+type PersistentEffectRun = {
+  id: string;
+  name: string;
+  effect: Effect;
+  transitionsByLayerAndLight: Map<number, Map<string, EffectTransition[]>>;
+  totalLights: number;
+  remainingLights: number;
+};
+
+/**
  * @class EffectManager
  * @description 
  * Coordinates the addition, removal, and updating of effects.
@@ -37,8 +50,10 @@ export class EffectManager implements IEffectManager {
   // Cached reference to avoid repeated method calls
   private lightTransitionController: LightTransitionController;
   private _lastCalled0LayerEffect: string = ""; // Tracks the last effect name that targeted layer 0
+  /** Active effect-level persistence runs keyed by run id */
+  private persistentRuns: Map<string, PersistentEffectRun> = new Map();
 
-  // Reusable default state template for performance
+  // Reusable default state template
   private defaultStateTemplate: RGBIO = {
     red: 0,
     green: 0,
@@ -73,13 +88,9 @@ export class EffectManager implements IEffectManager {
     this.transitionEngine.setEffectManager(this);
 
     // Register a callback to reset our state when a blackout completes
-    if ('setOnBlackoutCompleteCallback' in this.systemEffects) {
-      (this.systemEffects as any).setOnBlackoutCompleteCallback(() => {
-        // Reset layer 0 effect tracking when a blackout completes
-        this._lastCalled0LayerEffect = "";
-        //  console.debug("EffectManager: Reset _lastCalled0LayerEffect after blackout");
-      });
-    }
+    this.systemEffects.setOnBlackoutCompleteCallback(() => {
+      this._lastCalled0LayerEffect = "";
+    });
   }
 
   /**
@@ -110,27 +121,11 @@ export class EffectManager implements IEffectManager {
       this._lastCalled0LayerEffect = name;
     }
 
-   
-    transitionsByLayerAndLight.forEach((layerMap, layer) => {
-      layerMap.forEach((transitionsForLight, lightId) => {
-        const activeEffect = this.layerManager.getActiveEffect(layer, lightId);
+    const persistentRunId = isPersistent
+      ? this.registerPersistentRun(name, effect, transitionsByLayerAndLight)
+      : undefined;
 
-        if (activeEffect) {
-          if (activeEffect.name === name) {
-            // Same effect name - queue it for this light
-            this.layerManager.addQueuedEffect(layer, lightId, { name, effect, isPersistent, lightId });
-          } else {
-            // Different effect name - remove current effect and start new one
-            this.removeEffectByLayer(layer, false);
-            this.layerManager.removeQueuedEffect(layer, lightId);
-            this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
-          }
-        } else {
-          // No active effect - start new one
-          this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
-        }
-      });
-    });
+    this.applyEffectTransitions(name, effect, transitionsByLayerAndLight, isPersistent, persistentRunId);
   }
 
   /**
@@ -217,25 +212,50 @@ export class EffectManager implements IEffectManager {
       this._lastCalled0LayerEffect = name;
     }
 
-    const startEffectForLight = (layer: number, lightId: string, transitionsForLight: EffectTransition[]) => {
-      // Check if there are any active effects on this layer for this specific light
-      const hasActiveEffects = this.layerManager.getActiveEffect(layer, lightId);
+    const persistentRunId = isPersistent
+      ? this.registerPersistentRun(name, effect, transitionsByLayerAndLight)
+      : undefined;
 
-      if (hasActiveEffects) {
-        this.removeEffectByLayer(layer, false);
-        // Remove queued effects for this specific light
-        this.layerManager.removeQueuedEffect(layer, lightId);
-      }
-      this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
-    };
-
-    transitionsByLayerAndLight.forEach((layerMap, layer) => {
-      layerMap.forEach((transitionsForLight, lightId) => {
-        startEffectForLight(layer, lightId, transitionsForLight);
-      });
-    });
+    this.applyEffectTransitions(name, effect, transitionsByLayerAndLight, isPersistent, persistentRunId);
 
     return true;
+  }
+
+  /**
+   * Applies the supplied transitions to their respective layers/lights.
+   * Handles replacement vs queue logic and passes through the effect-level
+   * run identifier when the effect is persistent.
+   */
+  private applyEffectTransitions(
+    name: string,
+    effect: Effect,
+    transitionsByLayerAndLight: Map<number, Map<string, EffectTransition[]>>,
+    isPersistent: boolean,
+    effectRunId?: string
+  ): void {
+    transitionsByLayerAndLight.forEach((layerMap, layer) => {
+      layerMap.forEach((transitionsForLight, lightId) => {
+        const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId);
+        if (!targetLight) {
+          console.warn(`No tracked light found for ${lightId} on layer ${layer} when applying effect ${name}`);
+          return;
+        }
+
+        const activeEffect = this.layerManager.getActiveEffect(layer, lightId);
+
+        if (activeEffect) {
+          if (activeEffect.name === name) {
+            this.layerManager.addQueuedEffect(layer, lightId, { name, effect, isPersistent, lightId });
+          } else {
+            this.removeEffectByLayer(layer, false);
+            this.layerManager.removeQueuedEffect(layer, lightId);
+            this.startEffect(name, effect, [targetLight], layer, transitionsForLight, isPersistent, effectRunId);
+          }
+        } else {
+          this.startEffect(name, effect, [targetLight], layer, transitionsForLight, isPersistent, effectRunId);
+        }
+      });
+    });
   }
 
   /**
@@ -281,11 +301,13 @@ export class EffectManager implements IEffectManager {
     if (hasLayer0) {
       this._lastCalled0LayerEffect = name;
     }
-    transitionsByLayerAndLight.forEach((layerMap, layer) => {
-      layerMap.forEach((transitionsForLight, lightId) => {
-        this.startEffect(name, effect, [transitionsForLight[0].lights.find(l => l.id === lightId)!], layer, transitionsForLight, isPersistent);
-      });
-    });
+
+    const persistentRunId = isPersistent
+      ? this.registerPersistentRun(name, effect, transitionsByLayerAndLight)
+      : undefined;
+
+    this.applyEffectTransitions(name, effect, transitionsByLayerAndLight, isPersistent, persistentRunId);
+
     return true;
   }
 
@@ -335,6 +357,7 @@ export class EffectManager implements IEffectManager {
 
       // 4. Reset effect tracking state
       this._lastCalled0LayerEffect = "";
+      this.persistentRuns.clear();
     } finally {
       // Always release the clearing lock, even if an error occurs
       this.lightTransitionController.endClearingSequence();
@@ -372,6 +395,7 @@ export class EffectManager implements IEffectManager {
     layer: number,
     transitions: EffectTransition[],
     isPersistent = false,
+    effectRunId?: string
   ): void {
     // Get current time once for all lights - atomic synchronization
     const currentTime = performance.now();
@@ -417,7 +441,8 @@ export class EffectManager implements IEffectManager {
         transitionStartTime: currentTime,
         waitEndTime: currentTime,
         isPersistent,
-        lastEndState: initialStates.get(light.id)  // Pre-computed state
+        lastEndState: initialStates.get(light.id),  // Pre-computed state
+        effectRunId
       };
 
       // Get the first transition
@@ -477,6 +502,10 @@ export class EffectManager implements IEffectManager {
 
     // Process each light's effect on this layer
     for (const lightId of lightIds) {
+      const effectState = activeEffects.get(lightId);
+      if (effectState?.effectRunId) {
+        this.cancelPersistentRun(effectState.effectRunId);
+      }
       // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId);
 
@@ -534,10 +563,88 @@ export class EffectManager implements IEffectManager {
       trackedLights.length > 0 ? trackedLights : transitions[0].lights,
       layer,
       transitions,
-      nextEffect.isPersistent
+      nextEffect.isPersistent,
+      undefined
     );
 
     return true;
+  }
+
+  /**
+   * Called when a light finishes its active effect so effect-level persistence
+   * can determine whether the overall run should restart.
+   */
+  public onLightEffectComplete(effectState: LightEffectState): void {
+    if (!effectState.effectRunId) {
+      return;
+    }
+
+    const run = this.persistentRuns.get(effectState.effectRunId);
+    if (!run) {
+      return;
+    }
+
+    run.remainingLights = Math.max(0, run.remainingLights - 1);
+    if (run.remainingLights === 0) {
+      this.restartPersistentRun(run);
+    }
+  }
+
+  /**
+   * Stores the transitions required to re-run a persistent effect once every
+   * light completes. Returns the run identifier assigned to this effect.
+   */
+  private registerPersistentRun(
+    name: string,
+    effect: Effect,
+    transitionsByLayerAndLight: Map<number, Map<string, EffectTransition[]>>
+  ): string | undefined {
+    let totalLights = 0;
+    const storedMap = new Map<number, Map<string, EffectTransition[]>>();
+
+    transitionsByLayerAndLight.forEach((layerMap, layer) => {
+      const clonedLayerMap = new Map<string, EffectTransition[]>();
+      layerMap.forEach((transitionList, lightId) => {
+        clonedLayerMap.set(lightId, transitionList);
+        totalLights += 1;
+      });
+      storedMap.set(layer, clonedLayerMap);
+    });
+
+    if (totalLights === 0) {
+      return undefined;
+    }
+
+    const runId = `${name}-${performance.now()}-${Math.floor(Math.random() * 1000000)}`;
+    this.persistentRuns.set(runId, {
+      id: runId,
+      name,
+      effect,
+      transitionsByLayerAndLight: storedMap,
+      totalLights,
+      remainingLights: totalLights
+    });
+    return runId;
+  }
+
+  /**
+   * Restarts the supplied persistent run by re-applying its original
+   * transitions while preserving the shared run identifier.
+   */
+  private restartPersistentRun(run: PersistentEffectRun): void {
+    if (!this.persistentRuns.has(run.id)) {
+      return;
+    }
+    run.remainingLights = run.totalLights;
+    this.applyEffectTransitions(run.name, run.effect, run.transitionsByLayerAndLight, true, run.id);
+  }
+
+  /**
+   * Cancels the persistent run so it no longer schedules restarts.
+   */
+  private cancelPersistentRun(runId?: string): void {
+    if (!runId) return;
+    this.persistentRuns.delete(runId);
   }
 
 
