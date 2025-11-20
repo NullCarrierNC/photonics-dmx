@@ -70,7 +70,7 @@ export class StageKitMenuCue implements ICue {
   }
 
   onStop(): void {
-    this.isFirstExecution = true;
+   // this.isFirstExecution = true;
   }
 
   onPause(): void {
