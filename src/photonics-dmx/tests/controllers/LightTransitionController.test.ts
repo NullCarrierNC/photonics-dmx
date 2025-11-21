@@ -23,7 +23,8 @@ describe('LightTransitionController', () => {
     const mockLightStateManager = {
       setLightState: jest.fn(),
       getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-      publishLightStates: jest.fn()
+      publishLightStates: jest.fn(),
+      getTrackedLightIds: jest.fn().mockReturnValue([])
     };
     
     // Create a fresh instance for each test

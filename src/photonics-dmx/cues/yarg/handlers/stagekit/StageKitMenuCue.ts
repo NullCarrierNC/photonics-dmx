@@ -3,7 +3,8 @@ import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
-import { Effect, EffectTransition,  } from '../../../../types';
+import {  RGBIO,  } from '../../../../types';
+import { getSweepEffect } from '../../../../effects';
 
 /**
  * StageKit Menu Cue - Blue lights rotating in sequence
@@ -14,36 +15,11 @@ export class StageKitMenuCue implements ICue {
   cueId = CueType.Menu;
   description = 'StageKit menu pattern - solid blue lights, no motion in this implementation.';
   style = CueStyle.Primary;
+  private isFirstExecution: boolean = true;
   
   async execute(_cueData: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const allLights = lightManager.getLights(['front', 'back'], ['all']);
-    const blue = getColor('blue', 'low');
     
-    const transitions: EffectTransition[] = [
-      {
-        lights: allLights,
-        layer: 0,
-        waitForCondition: 'none',
-        waitForTime: 0,
-        waitUntilCondition: 'delay',
-        waitUntilTime: 100,
-        transform: {
-          color: blue,
-          easing: 'linear',
-          duration: 0 
-        }
-      }
-    ];
-    
-    const introEffect: Effect = {
-      id: 'stagekit-intro',
-      description: 'All green lights on',
-      transitions: transitions
-    };
-    
-    sequencer.setEffectUnblockedName('sk-menu', introEffect, true);
-
-   /*
    
     const blue: RGBIO = getColor('blue', 'low');
     const brightBlue: RGBIO = getColor('blue', 'high');
@@ -66,11 +42,11 @@ export class StageKitMenuCue implements ICue {
     } else {
       sequencer.addEffectUnblockedName('menu', sweep, true);
     }
-    */
+    
   }
 
   onStop(): void {
-   // this.isFirstExecution = true;
+    this.isFirstExecution = true;
   }
 
   onPause(): void {

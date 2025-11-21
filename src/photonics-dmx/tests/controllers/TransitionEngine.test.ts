@@ -12,7 +12,7 @@
 import { TransitionEngine } from '../../controllers/sequencer/TransitionEngine';
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController';
 import { LayerManager } from '../../controllers/sequencer/LayerManager';
-import { LightEffectState } from '../../controllers/sequencer/interfaces';
+import { FrameContext, LightEffectState } from '../../controllers/sequencer/interfaces';
 import { createMockRGBIP, createMockTrackedLight } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
 import { EffectTransition } from '../../types';
@@ -157,28 +157,12 @@ describe('TransitionEngine', () => {
     });
   });
 
-  describe('clock integration', () => {
-    it('should register with clock', () => {
-      const mockClock = {
-        onTick: jest.fn(),
-        offTick: jest.fn()
-      };
-      
-      transitionEngine.registerWithClock(mockClock as any);
-      
-      expect(mockClock.onTick).toHaveBeenCalledWith(expect.any(Function));
-    });
-
-    it('should unregister from clock', () => {
-      const mockClock = {
-        onTick: jest.fn(),
-        offTick: jest.fn()
-      };
-      
-      transitionEngine.registerWithClock(mockClock as any);
-      transitionEngine.unregisterFromClock();
-      
-      expect(mockClock.offTick).toHaveBeenCalledWith(expect.any(Function));
+  describe('frame advancement', () => {
+    it('delegates advanceFrame to updateTransitions', () => {
+      const frame: FrameContext = { frameStartTime: 100, deltaTime: 5, frameIndex: 1 };
+      const spy = jest.spyOn(transitionEngine as any, 'updateTransitions');
+      transitionEngine.advanceFrame(frame);
+      expect(spy).toHaveBeenCalledWith(frame);
     });
   });
 
@@ -215,8 +199,13 @@ describe('TransitionEngine', () => {
       activeEffectsMap.set(1, new Map([[mockEffect.lightId, mockEffect]]));
       layerManager.getActiveEffects.mockReturnValue(activeEffectsMap);
       
-      // Advance time by calling updateTransitions with deltaTime
-      transitionEngine.updateTransitions(150); // Advance past the waitEndTime
+      // Advance time by calling updateTransitions with a frame context
+      const frame: FrameContext = {
+        frameStartTime: mockEffect.waitEndTime + 150,
+        deltaTime: 150,
+        frameIndex: 1
+      };
+      transitionEngine.updateTransitions(frame);
       
       // Verify state changed to waitingUntil if untilTime > 0
       if (transition.waitUntilTime > 0) {

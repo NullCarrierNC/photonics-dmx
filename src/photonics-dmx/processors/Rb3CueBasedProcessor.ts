@@ -5,7 +5,7 @@
  */
 import { EventEmitter } from 'events';
 import { AbstractCueHandler } from '../cueHandlers/AbstractCueHandler';
-import { CueData, CueType, lightingCueMap } from '../cues/cueTypes';
+import { CueData, CueType, lightingCueMap, StrobeState } from '../cues/cueTypes';
 import { Rb3RightChannel, Rb3Difficulty, Rb3TrackType } from '../listeners/RB3/rb3eTypes';
 
 /**
@@ -207,27 +207,27 @@ export class Rb3CueBasedProcessor extends EventEmitter {
 
     // Handle strobe control
     if (rightChannel >= Rb3RightChannel.StrobeSlow && rightChannel <= Rb3RightChannel.StrobeOff) {
-      let strobeState: string;
+      let strobeState: StrobeState = 'Strobe_Off';
       switch (rightChannel) {
         case Rb3RightChannel.StrobeSlow:
-          strobeState = "Strobe_Slow";
+          strobeState = 'Strobe_Slow';
           break;
         case Rb3RightChannel.StrobeMedium:
-          strobeState = "Strobe_Medium";
+          strobeState = 'Strobe_Medium';
           break;
         case Rb3RightChannel.StrobeFast:
-          strobeState = "Strobe_Fast";
+          strobeState = 'Strobe_Fast';
           break;
         case Rb3RightChannel.StrobeFastest:
-          strobeState = "Strobe_Fastest";
+          strobeState = 'Strobe_Fastest';
           break;
         case Rb3RightChannel.StrobeOff:
         default:
-          strobeState = "Strobe_Off";
+          strobeState = 'Strobe_Off';
           break;
       }
-      this.currentCueData.strobeState = strobeState as any;
-      this.callStrobeHandler(strobeState as any);
+      this.currentCueData.strobeState = strobeState;
+      this.callStrobeHandler();
     }
 
     // Handle LED color commands
@@ -355,9 +355,9 @@ export class Rb3CueBasedProcessor extends EventEmitter {
   /**
    * Call strobe handler if available
    */
-  private callStrobeHandler(strobeState: string): void {
+  private callStrobeHandler(): void {
     if (typeof this.cueHandler['handleStrobe'] === 'function') {
-      this.cueHandler['handleStrobe'](strobeState as any);
+      this.cueHandler['handleStrobe'](this.currentCueData);
     }
   }
 

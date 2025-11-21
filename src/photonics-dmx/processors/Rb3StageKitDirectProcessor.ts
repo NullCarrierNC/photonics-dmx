@@ -14,7 +14,7 @@ import { StageKitLightMapper } from './StageKitLightMapper';
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes';
 import { getColor } from '../helpers/dmxHelpers';
 import { CueData } from '../cues/cueTypes';
-import { RGBIO, TrackedLight } from '../types';
+import { RGBIO, TrackedLight, Color } from '../types';
 
 /**
  * StageKit data structure
@@ -35,7 +35,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private lightColorState: Map<number, Set<string>> = new Map(); // DMX light index -> Set of persistent colors
   private currentPassColors: Map<number, Set<string>> = new Map(); // DMX light index -> Set of colors active in current pass
   private colorToLights: Map<string, Set<number>> = new Map(); // Color -> Set of DMX light indices
-  private pendingUpdates: Map<number, { colors: Set<string>; timeout: NodeJS.Timeout }> = new Map(); // DMX light index -> pending update
+  private pendingUpdates: Map<number, { colors: Set<string>; timeout: NodeJS.Timeout | null }> = new Map(); // DMX light index -> pending update
   private readonly ACCUMULATION_DELAY_MS = 5; 
   
 
@@ -608,13 +608,17 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     const existingPending = this.pendingUpdates.get(lightIndex);
     if (existingPending) {
       // Clear existing timeout
-      clearTimeout(existingPending.timeout);
+      if (existingPending.timeout) {
+        if (existingPending.timeout) {
+          clearTimeout(existingPending.timeout);
+        }
+      }
       // Add new color to pending set
       existingPending.colors.add(color);
     } else {
       // Create new pending update
       const pendingColors = new Set([color]);
-      this.pendingUpdates.set(lightIndex, { colors: pendingColors, timeout: null as any });
+      this.pendingUpdates.set(lightIndex, { colors: pendingColors, timeout: null });
     }
     
     // Set timeout to apply accumulated colors after delay
@@ -647,13 +651,17 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     const existingPending = this.pendingUpdates.get(lightIndex);
     if (existingPending) {
       // Clear existing timeout
-      clearTimeout(existingPending.timeout);
+      if (existingPending.timeout) {
+        if (existingPending.timeout) {
+          clearTimeout(existingPending.timeout);
+        }
+      }
       // Remove color from pending set
       existingPending.colors.delete(color);
     } else {
       // Create new pending update with remaining colors
       const remainingColors = new Set(Array.from(this.lightColorState.get(lightIndex)!));
-      this.pendingUpdates.set(lightIndex, { colors: remainingColors, timeout: null as any });
+      this.pendingUpdates.set(lightIndex, { colors: remainingColors, timeout: null });
     }
     
     // Set timeout to apply accumulated colors after delay
@@ -729,7 +737,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       
       // Clear all pending updates
       for (const pendingUpdate of this.pendingUpdates.values()) {
-        clearTimeout(pendingUpdate.timeout);
+        if (pendingUpdate.timeout) {
+        if (pendingUpdate.timeout) {
+          clearTimeout(pendingUpdate.timeout);
+        }
+        }
       }
       this.pendingUpdates.clear();
       
@@ -787,31 +799,49 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Blend multiple colors into a single color value
    * This handles cases where multiple StageKit color banks are active simultaneously
    */
-  private blendColors(colors: string[]): any {
+  private blendColors(colors: string[]): RGBIO {
     if (colors.length === 0 || colors.includes('off')) {
       return getColor('black', 'medium');
     }
     
     if (colors.length === 1) {
       // Single color - no blending needed
-      return getColor(colors[0] as any, 'medium');
+      return getColor(this.mapStageKitColor(colors[0]), 'medium');
     }
     
     // Multiple colors - blend them together
  //   //console.log(`StageKit: Blending colors: ${colors.join(' + ')}`);
     
     // Get individual color values and log them
-    const colorValues = colors.map(color => {
-      const colorValue = getColor(color as any, 'medium');
-//      //console.log(`StageKit: Color ${color} = ${JSON.stringify(colorValue)}`);
-      return colorValue;
-    });
+    const colorValues = colors.map((color) => getColor(this.mapStageKitColor(color), 'medium'));
     
     // Simple additive blending (can be enhanced with more sophisticated algorithms)
     const blendedColor = this.addColors(colorValues);
     
  //   //console.log(`StageKit: Blended result: ${JSON.stringify(blendedColor)}`);
     return blendedColor;
+  }
+  
+  private mapStageKitColor(color: string): Color {
+    const normalized = color.toLowerCase();
+    const colorMap: Record<string, Color> = {
+      red: 'red',
+      blue: 'blue',
+      yellow: 'yellow',
+      green: 'green',
+      cyan: 'cyan',
+      orange: 'orange',
+      purple: 'purple',
+      chartreuse: 'chartreuse',
+      teal: 'teal',
+      violet: 'violet',
+      magenta: 'magenta',
+      vermilion: 'vermilion',
+      amber: 'amber',
+      white: 'white',
+      black: 'black'
+    };
+    return colorMap[normalized] ?? 'black';
   }
 
   /**
@@ -921,7 +951,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     // Clear any pending updates for this light
     const existingPending = this.pendingUpdates.get(lightIndex);
     if (existingPending) {
-      clearTimeout(existingPending.timeout);
+      if (existingPending.timeout) {
+        clearTimeout(existingPending.timeout);
+      }
       this.pendingUpdates.delete(lightIndex);
     }
 

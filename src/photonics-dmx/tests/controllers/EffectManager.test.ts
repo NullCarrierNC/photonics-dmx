@@ -22,7 +22,7 @@ import { LightTransitionController } from '../../controllers/sequencer/LightTran
 import { Effect, EffectTransition } from '../../types';
 import { createMockTrackedLight, createMockRGBIP } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals';
-import { ILayerManager, ITransitionEngine, IEffectTransformer, ISystemEffectsController } from '../../controllers/sequencer/interfaces';
+import { ILayerManager, ITransitionEngine, IEffectTransformer, ISystemEffectsController, LightEffectState } from '../../controllers/sequencer/interfaces';
 
 // Mock all dependencies
 jest.mock('../../controllers/sequencer/LayerManager');
@@ -128,7 +128,8 @@ describe('EffectManager', () => {
     systemEffects = {
       isBlackoutActive: jest.fn().mockReturnValue(false),
       cancelBlackout: jest.fn(),
-      blackout: jest.fn()
+      blackout: jest.fn(),
+      setOnBlackoutCompleteCallback: jest.fn()
     } as unknown as jest.Mocked<SystemEffectsController>;
 
     lightTransitionController = {
@@ -136,6 +137,7 @@ describe('EffectManager', () => {
       removeTransitionsByLayer: jest.fn(),
       removeLightLayer: jest.fn(),
       getFinalLightState: jest.fn(),
+      getLightState: jest.fn(),
       resetLightStates: jest.fn(),
       clearAllTransitions: jest.fn(),
       beginClearingSequence: jest.fn(),
@@ -600,6 +602,66 @@ describe('EffectManager', () => {
           lightId: 'test-light-1'
         })
       );
+    });
+  });
+
+  describe('persistent effect runs', () => {
+    it('restarts after all lights in the run complete', () => {
+      const lightA = createMockTrackedLight({ id: 'light-a', position: 1 });
+      const lightB = createMockTrackedLight({ id: 'light-b', position: 2 });
+
+      const effect: Effect = {
+        id: 'persistent-effect',
+        description: 'Persistent test effect',
+        transitions: [
+          {
+            lights: [lightA],
+            layer: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+              color: createMockRGBIP(),
+              easing: 'linear',
+              duration: 100
+            },
+            waitUntilCondition: 'none',
+            waitUntilTime: 0
+          },
+          {
+            lights: [lightB],
+            layer: 1,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+              color: createMockRGBIP({ red: 100 }),
+              easing: 'linear',
+              duration: 100
+            },
+            waitUntilCondition: 'none',
+            waitUntilTime: 0
+          }
+        ]
+      };
+
+      effectManager.addEffect('persistent-effect', effect, true);
+
+      // Capture the light effect states that were registered
+      expect(layerManager.addActiveEffect).toHaveBeenCalledTimes(2);
+      const firstCall = layerManager.addActiveEffect.mock.calls[0];
+      const secondCall = layerManager.addActiveEffect.mock.calls[1];
+      const firstState = firstCall[2] as LightEffectState;
+      const secondState = secondCall[2] as LightEffectState;
+
+      expect(firstState.effectRunId).toBeTruthy();
+      expect(secondState.effectRunId).toBe(firstState.effectRunId);
+
+      // Complete the first light - should not restart yet
+      effectManager.onLightEffectComplete(firstState);
+      expect(layerManager.addActiveEffect).toHaveBeenCalledTimes(2);
+
+      // Complete the second light - should restart the effect (adds two more active effects)
+      effectManager.onLightEffectComplete(secondState);
+      expect(layerManager.addActiveEffect).toHaveBeenCalledTimes(4);
     });
   });
 
