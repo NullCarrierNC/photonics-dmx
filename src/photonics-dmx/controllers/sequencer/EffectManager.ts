@@ -88,9 +88,11 @@ export class EffectManager implements IEffectManager {
     this.transitionEngine.setEffectManager(this);
 
     // Register a callback to reset our state when a blackout completes
-    this.systemEffects.setOnBlackoutCompleteCallback(() => {
-      this._lastCalled0LayerEffect = "";
-    });
+    if (typeof this.systemEffects.setOnBlackoutCompleteCallback === 'function') {
+      this.systemEffects.setOnBlackoutCompleteCallback(() => {
+        this._lastCalled0LayerEffect = "";
+      });
+    }
   }
 
   /**
