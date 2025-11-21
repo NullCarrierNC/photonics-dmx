@@ -32,7 +32,7 @@ const Status = () => {
           For more details about how Photoincs works, how many lights you need, and how things differ between YARG and RB3E, please visit the <a href="https://photonics.rocks/documentation/" className="text-blue-600 dark:text-blue-500 hover:underline" target="_blank">Documentation</a>.
         </p>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Still having trouble? Looking for hardware recommendations? Visit our <a href="https://discord.com/invite/2Vyqc2hYcK" className="text-blue-600 dark:text-blue-500 hover:underline" target="_blank">Discord Server</a>.
+          Still having trouble? Looking for hardware recommendations? Just want to chat? Visit our <a href="https://discord.com/invite/2Vyqc2hYcK" className="text-blue-600 dark:text-blue-500 hover:underline" target="_blank">Discord Server</a>!
         </p>
       </div>
 

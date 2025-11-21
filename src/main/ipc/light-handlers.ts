@@ -85,6 +85,13 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           return;
         }
         config = { devicePath: port };
+      } else if (sender === 'opendmx') {
+        if (!port) {
+          console.error('Port is required for OpenDMX sender');
+          return;
+        }
+        const dmxSpeed = typeof data.dmxSpeed === 'number' && data.dmxSpeed > 0 ? data.dmxSpeed : undefined;
+        config = { devicePath: port, dmxSpeed };
       } else if (sender === 'artnet') {
         config = {
           host: host || '127.0.0.1',
@@ -102,7 +109,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       // Use the new sender API (supports both worker-based and IPC senders)
       console.log(`Enabling ${sender} sender with config:`, config);
       try {
-        await senderManager.enableSender(sender, sender as 'artnet' | 'sacn' | 'enttecpro' | 'ipc', config);
+        await senderManager.enableSender(sender, sender as 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc', config);
         console.log(`Successfully enabled ${sender} sender`);
       } catch (error) {
         console.error(`Failed to enable ${sender} sender:`, error);

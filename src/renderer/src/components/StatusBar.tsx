@@ -6,7 +6,8 @@ import {
   lightingPrefsAtom,
   senderSacnEnabledAtom,
   senderArtNetEnabledAtom,
-  senderEnttecProEnabledAtom
+  senderEnttecProEnabledAtom,
+  senderOpenDmxEnabledAtom
 } from '../atoms';
 
 const StatusBar: React.FC = () => {
@@ -15,6 +16,7 @@ const StatusBar: React.FC = () => {
   const [isSacnEnabled] = useAtom(senderSacnEnabledAtom);
   const [isArtNetEnabled] = useAtom(senderArtNetEnabledAtom);
   const [isEnttecProEnabled] = useAtom(senderEnttecProEnabledAtom);
+  const [isOpenDmxEnabled] = useAtom(senderOpenDmxEnabledAtom);
   const [prefs] = useAtom(lightingPrefsAtom);
 
   return (
@@ -43,6 +45,11 @@ const StatusBar: React.FC = () => {
           label="EnttecPro USB" 
           isActive={isEnttecProEnabled}
           isEnabledInPrefs={prefs.dmxOutputConfig?.enttecProEnabled || false}
+        />
+        <StatusIndicator 
+          label="OpenDMX USB"
+          isActive={isOpenDmxEnabled}
+          isEnabledInPrefs={prefs.dmxOutputConfig?.openDmxEnabled || false}
         />
       </div>
     </div>
