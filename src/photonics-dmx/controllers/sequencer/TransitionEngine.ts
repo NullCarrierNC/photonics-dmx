@@ -1,9 +1,8 @@
 import { performance } from 'perf_hooks';
 import { EffectTransition, RGBIO } from '../../types';
 import { LightTransitionController } from './LightTransitionController';
-import { LightEffectState, ILayerManager, ITransitionEngine } from './interfaces';
+import { FrameContext, LightEffectState, ILayerManager, ITransitionEngine } from './interfaces';
 import { IEffectManager } from './interfaces';
-import { Clock } from './Clock';
 
 /**
  * @class TransitionEngine
@@ -14,8 +13,6 @@ export class TransitionEngine implements ITransitionEngine {
   private lightTransitionController: LightTransitionController;
   private layerManager: ILayerManager;
   private effectManager!: IEffectManager;
-  private clock: Clock | null = null;
-  private updateCallback: (deltaTime: number) => void; 
   
   /**
    * @constructor
@@ -28,9 +25,6 @@ export class TransitionEngine implements ITransitionEngine {
   ) {
     this.lightTransitionController = lightTransitionController;
     this.layerManager = layerManager;
-    
-    // Create the update callback bound to this instance
-    this.updateCallback = this.updateTransitions.bind(this);
   }
 
 
@@ -42,23 +36,8 @@ export class TransitionEngine implements ITransitionEngine {
     return performance.now();
   }
 
-  /**
-   * Register this component with the clock
-   * @param clock The clock instance
-   */
-  public registerWithClock(clock: Clock): void {
-    this.clock = clock;
-    clock.onTick(this.updateCallback);
-  }
-
-  /**
-   * Unregister from the clock
-   */
-  public unregisterFromClock(): void {
-    if (this.clock) {
-      this.clock.offTick(this.updateCallback);
-      this.clock = null;
-    }
+  public advanceFrame(frame: FrameContext): void {
+    this.updateTransitions(frame);
   }
 
   /**
@@ -110,10 +89,8 @@ export class TransitionEngine implements ITransitionEngine {
    * 
    * @param deltaTime The time elapsed since last update in milliseconds (unused)
    */
-  public updateTransitions(_deltaTime: number = 0): void {
-   
-    // Single timestamp for all effect state machines
-    const currentTime = this.getCurrentTime();
+  public updateTransitions(frame?: FrameContext): void {
+    const currentTime = frame?.frameStartTime ?? this.getCurrentTime();
 
     const effectsToRemove: Array<{layer: number, lightId: string}> = [];
 
@@ -157,38 +134,27 @@ export class TransitionEngine implements ITransitionEngine {
       // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId);
 
-      // If the effect is persistent, re-queue it for immediate restart
-      if (justFinishedEffect.isPersistent) {
-        this.layerManager.addQueuedEffect(layer, lightId, {
-          name: justFinishedEffect.name,
-          effect: justFinishedEffect.effect,
-          lightId: lightId,
-          isPersistent: true
-        });
-        
-        // Start the next cycle immediately for persistent effects
-        if (this.effectManager) {
-          this.effectManager.startNextEffectInQueue(layer, lightId);
-        }
+      if (this.effectManager && typeof this.effectManager.onLightEffectComplete === 'function') {
+        this.effectManager.onLightEffectComplete(justFinishedEffect);
+      }
+
+      let startedQueuedEffect = false;
+      if (this.effectManager) {
+        startedQueuedEffect = this.effectManager.startNextEffectInQueue(layer, lightId);
       } else {
-        // Non-persistent effect - check for queued effects
         const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId);
         if (nextQueuedEffect) {
-          // Start the next effect if we have an effect manager
-          if (this.effectManager) {
-            this.effectManager.startNextEffectInQueue(layer, lightId);
-          } else {
-            console.warn(`Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`);
-          }
-        } else {
-          // Only if there's no next effect, remove transitions for non-base layers
-          if (layer > 0) {
-            // Only remove transitions if we've confirmed no new effect is queued
-            this.lightTransitionController.removeLightLayer(lightId, layer);
-            
-            // Only clear final states if there's no next effect and we've removed transitions
-            this.layerManager.clearLayerStates(layer);
-          }
+          console.warn(`Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`);
+          this.layerManager.removeQueuedEffect(layer, lightId);
+          startedQueuedEffect = true;
+        }
+      }
+
+      if (!startedQueuedEffect) {
+        // Only if there's no next effect, remove transitions for non-base layers
+        if (layer > 0) {
+          this.lightTransitionController.removeLightLayer(lightId, layer);
+          this.layerManager.clearLayerStates(layer);
         }
       }
     }

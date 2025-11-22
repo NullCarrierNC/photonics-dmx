@@ -89,6 +89,8 @@ export const effectDebounceTimeAtom = atom<number>(1600);
 
 export const senderEnttecProEnabledAtom = atom<boolean>(false);
 export const enttecProComPortAtom = atom<string>("");
+export const senderOpenDmxEnabledAtom = atom<boolean>(false);
+export const openDmxComPortAtom = atom<string>("");
 
 export const senderArtNetEnabledAtom = atom<boolean>(false);
 
@@ -124,7 +126,13 @@ export interface LightingPreferences {
   // Backend preferences
   effectDebounce?: number;
   complex?: boolean;
-  enttecProPort?: string;
+  enttecProConfig?: {
+    port: string;
+  };
+  openDmxConfig?: {
+    port: string;
+    dmxSpeed: number;
+  };
   artNetConfig?: {
     host: string;
     universe: number;
@@ -154,6 +162,7 @@ export interface LightingPreferences {
     sacnEnabled: boolean;
     artNetEnabled: boolean;
     enttecProEnabled: boolean;
+    openDmxEnabled: boolean;
   };
   stageKitPrefs?: {
     yargPriority: 'prefer-for-tracked' | 'random' | 'never';
@@ -162,6 +171,7 @@ export interface LightingPreferences {
     artNetExpanded: boolean;
     enttecProExpanded: boolean;
     sacnExpanded: boolean;
+    openDmxExpanded: boolean;
   };
   audioConfig?: {
     deviceId?: number;

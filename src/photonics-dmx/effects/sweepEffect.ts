@@ -230,9 +230,5 @@ export const getSweepEffect = ({
     id: "SweepEffect",
     description: "Sequentially sweeps across light groups, fading in to the high state and fading out to the low state. Extra hold time is added when lights overlap so that the overall effect always lasts sweepTime.",
     transitions: transitions,
-    timingHints: {
-      cycleDuration: Math.max(0, Math.round(sweepTime + Math.max(0, Math.round(betweenSweepDelay || 0)))),
-      perLightOffset: Math.max(0, Math.round(slotTime * effectiveDelayFactor))
-    }
   };
 };

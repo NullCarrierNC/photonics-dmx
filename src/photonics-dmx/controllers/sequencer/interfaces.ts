@@ -2,6 +2,12 @@ import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types';
 import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes';
 import { LightTransitionController } from './LightTransitionController';
 
+export interface FrameContext {
+  frameStartTime: number;
+  deltaTime: number;
+  frameIndex: number;
+}
+
 /**
  * @interface LightEffectState
  * @description Holds the state for a single light's effect on a specific layer
@@ -18,6 +24,11 @@ export interface LightEffectState {
   waitEndTime: number;
   lastEndState?: RGBIO;
   isPersistent?: boolean;
+  /**
+   * Identifier for grouping lights that belong to the same effect-level
+   * persistent run so they can restart in sync once all complete.
+   */
+  effectRunId?: string;
 }
 
 
@@ -108,7 +119,8 @@ export interface IEventScheduler {
  */
 export interface ITransitionEngine {
   setEffectManager(effectManager: IEffectManager): void;
-  updateTransitions(deltaTime?: number): void;
+  advanceFrame(frame: FrameContext): void;
+  updateTransitions(frame?: FrameContext): void;
   prepareTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
   handleWaitingFor(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
   startTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void;
@@ -117,10 +129,6 @@ export interface ITransitionEngine {
   getFinalState(lightId: string, layer: number): RGBIO | undefined;
   clearFinalStates(layer: number): void;
   getLightTransitionController(): LightTransitionController;
-  
-  // Clock integration
-  registerWithClock(clock: any): void;
-  unregisterFromClock(): void;
 }
 
 /**
@@ -134,6 +142,11 @@ export interface IEffectManager {
   setEffectUnblockedName(name: string, effect: Effect,isPersistent?: boolean): boolean;
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void;
   startNextEffectInQueue(layer: number, lightId: string): boolean;
+  /**
+   * Notifies the manager that a light finished its effect so that effect-level
+   * persistence can determine whether to restart the effect.
+   */
+  onLightEffectComplete(effect: LightEffectState): void;
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>;
   isLayerFreeForLight(layer: number, lightId: string): boolean;
   setState(lights: TrackedLight[], color: RGBIO, time: number): void;

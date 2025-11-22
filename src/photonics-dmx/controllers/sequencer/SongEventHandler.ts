@@ -168,7 +168,7 @@ export class SongEventHandler implements ISongEventHandler {
 
     // Guard against processing while transitions are being globally cleared
     const ltc = this.transitionEngine.getLightTransitionController();
-    if (ltc && typeof (ltc as any).isClearing === 'function' && (ltc as any).isClearing()) {
+    if ('isClearing' in ltc && typeof ltc.isClearing === 'function' && ltc.isClearing()) {
       return;
     }
     

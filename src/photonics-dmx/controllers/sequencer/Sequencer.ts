@@ -5,12 +5,13 @@ import { DebugMonitor } from './DebugMonitor';
 import { EffectManager } from './EffectManager';
 import { EffectTransformer } from './EffectTransformer';
 import { SongEventHandler } from './SongEventHandler';
-import { ILightingController, LightEffectState } from './interfaces';
+import { FrameContext, ILightingController, LightEffectState } from './interfaces';
 import { LayerManager } from './LayerManager';
 import { SystemEffectsController } from './SystemEffectsController';
 import { EventScheduler } from './EventScheduler';
 import { TransitionEngine } from './TransitionEngine';
 import { Clock } from './Clock';
+import { performance } from 'perf_hooks';
 
 /**
  * @class Sequencer
@@ -31,6 +32,8 @@ export class Sequencer implements ILightingController {
   private systemEffectsController: SystemEffectsController;
   private debugMonitor: DebugMonitor;
   private clock: Clock;
+  private frameIndex: number = 0;
+  private readonly handleClockTick: (deltaTime: number) => void;
 
   /**
    * @constructor
@@ -60,9 +63,18 @@ export class Sequencer implements ILightingController {
     this.eventHandler = new SongEventHandler(this.layerManager, this.transitionEngine);
     this.debugMonitor = new DebugMonitor(this.lightTransitionController, this.layerManager);
 
-    // Register components with the clock
-    this.transitionEngine.registerWithClock(this.clock);
-    this.lightTransitionController.registerWithClock(this.clock);
+    // Bind frame processing to the shared clock
+    this.handleClockTick = (deltaTime: number) => {
+      const frameContext: FrameContext = {
+        frameStartTime: performance.now(),
+        deltaTime,
+        frameIndex: this.frameIndex++
+      };
+      this.transitionEngine.advanceFrame(frameContext);
+      this.lightTransitionController.advanceFrame(frameContext);
+    };
+
+    this.clock.onTick(this.handleClockTick);
     this.eventScheduler.registerWithClock(this.clock);
   }
 
@@ -272,8 +284,7 @@ export class Sequencer implements ILightingController {
       this.clock.stop();
       
       // Unregister components from clock
-      this.transitionEngine.unregisterFromClock();
-      this.lightTransitionController.unregisterFromClock();
+      this.clock.offTick(this.handleClockTick);
       this.eventScheduler.unregisterFromClock();
       
       // Remove all effects
