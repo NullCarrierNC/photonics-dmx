@@ -68,6 +68,10 @@ export class AudioCueHandler extends EventEmitter {
    * Stop the current cue
    */
   public stop(): void {
+    this.clearCurrentCue();
+  }
+
+  public clearCurrentCue(): void {
     if (this.currentCue?.onStop) {
       this.currentCue.onStop();
     }

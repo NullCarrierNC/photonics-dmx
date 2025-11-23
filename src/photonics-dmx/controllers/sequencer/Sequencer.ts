@@ -103,7 +103,7 @@ export class Sequencer implements ILightingController {
    * @param isPersistent If true, the effect re-queues itself after completing
    */
   public async setEffect(name: string, effect: Effect, isPersistent: boolean = false): Promise<void> {
-    await this.effectManager.setEffect(name, effect, isPersistent);
+    this.effectManager.setEffect(name, effect, isPersistent);
   }
 
   /**

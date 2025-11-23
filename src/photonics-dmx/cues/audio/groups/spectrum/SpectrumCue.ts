@@ -5,7 +5,9 @@ import { getColor, validateColorString } from '../../../../helpers';
 import type { AudioConfig } from '../../../../listeners/Audio/audioTypes';
 import { AudioCueData, AudioCueType } from '../../../types/audioCueTypes';
 import { IAudioCue } from '../../../interfaces/IAudioCue';
-import type { TrackedLight } from '../../../../types';
+import type { TrackedLight, RGBIO } from '../../../../types';
+import { clearCueLayers } from '../../utils/cueLayerUtils';
+import { getIntensityScale, applyIntensityScale } from '../../utils/bandUtils';
 
 type AudioRangeConfig = AudioConfig['frequencyBands']['ranges'][number];
 
@@ -16,12 +18,17 @@ export class SpectrumCue implements IAudioCue {
   id = 'audio-spectrum';
   cueType = AudioCueType.SpectrumCue;
   description = 'Spectrum analyzer: spreads frequency bands across front and back lights';
+  private readonly layers = [0, 1, 2, 3, 4];
+  private sequencerRef: ILightingController | null = null;
+  private lightManagerRef: DmxLightManager | null = null;
 
   async execute(
     data: AudioCueData,
     sequencer: ILightingController,
     lightManager: DmxLightManager
   ): Promise<void> {
+    this.sequencerRef = sequencer;
+    this.lightManagerRef = lightManager;
     const { audioData, config } = data;
     const { frequencyBands } = audioData;
 
@@ -90,6 +97,7 @@ export class SpectrumCue implements IAudioCue {
             lights: lightsForBand,
             range: band.range,
             bandIntensity: band.bandIntensity,
+            linearResponse: config.linearResponse !== false,
             layer: index,
             sequencer
           });
@@ -101,6 +109,8 @@ export class SpectrumCue implements IAudioCue {
     let startIndex = 0;
     let remainingLights = orderedLights.length;
     let remainingBands = activeBands.length;
+
+    const linearResponse = config.linearResponse !== false;
 
     activeBands.forEach((band, index) => {
       if (remainingBands <= 0) {
@@ -125,6 +135,7 @@ export class SpectrumCue implements IAudioCue {
         lights: lightsForBand,
         range: band.range,
         bandIntensity: band.bandIntensity,
+        linearResponse,
         layer: index,
         sequencer
       });
@@ -135,18 +146,19 @@ export class SpectrumCue implements IAudioCue {
     lights,
     range,
     bandIntensity,
+    linearResponse,
     layer,
     sequencer
   }: {
     lights: TrackedLight[] | undefined;
     range: AudioRangeConfig;
     bandIntensity: number;
+    linearResponse: boolean;
     layer: number;
     sequencer: ILightingController;
   }): void {
-    sequencer.removeEffectByLayer(layer);
-
     if (!lights || lights.length === 0 || !range) {
+      sequencer.removeEffectByLayer(layer);
       return;
     }
 
@@ -157,6 +169,27 @@ export class SpectrumCue implements IAudioCue {
 
     const activeLightCount = Math.max(1, Math.round(normalizedIntensity * lights.length));
     const activeLights = lights.slice(0, activeLightCount);
+    const inactiveLights = lights.slice(activeLightCount);
+
+    sequencer.removeEffectByLayer(layer);
+
+    if (inactiveLights.length > 0) {
+      const offColor = {
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 0,
+        blendMode: 'replace' as RGBIO['blendMode']
+      };
+      const baseEffect = getEffectSingleColor({
+        lights: inactiveLights,
+        color: offColor,
+        duration: 50,
+        layer
+      });
+      sequencer.addEffect(`audio-spectrum-base-${layer}`, baseEffect);
+    }
 
     if (activeLights.length === 0) {
       return;
@@ -170,8 +203,8 @@ export class SpectrumCue implements IAudioCue {
 
     const brightness = range.brightness || 'medium';
     const rgbColor = getColor(color, brightness, 'replace');
-    rgbColor.intensity = Math.floor(rgbColor.intensity * normalizedIntensity);
-    rgbColor.opacity = normalizedIntensity;
+    const intensityScale = getIntensityScale(normalizedIntensity, linearResponse);
+    applyIntensityScale(rgbColor, intensityScale);
 
     const effect = getEffectSingleColor({
       lights: activeLights,
@@ -184,11 +217,11 @@ export class SpectrumCue implements IAudioCue {
   }
 
   onStop(): void {
-    // Cleanup if needed
+    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef);
   }
 
   onDestroy(): void {
-    // Cleanup if needed
+    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef);
   }
 
   private mapLightsForFourBandMode(lights: TrackedLight[]): TrackedLight[][] | null {

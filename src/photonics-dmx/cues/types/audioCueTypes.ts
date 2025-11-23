@@ -6,6 +6,26 @@ import { AudioLightingData, AudioConfig } from '../../listeners/Audio/audioTypes
 export enum AudioCueType {
   BasicLayered = 'BasicLayered',
   SpectrumCue = 'SpectrumCue',
+  PulseChaser = 'PulseChaser',
+  BeatSplitPulse = 'BeatSplitPulse',
+  BassSnareRipple = 'BassSnareRipple',
+  EnergyStrobePulse = 'EnergyStrobePulse',
+  MirrorBandBounce = 'MirrorBandBounce',
+  BandShell = 'BandShell',
+  PrismSweep = 'PrismSweep',
+  TrebleSpark = 'TrebleSpark',
+  SubHarmonicWave = 'SubHarmonicWave',
+  SpectrumStepper = 'SpectrumStepper',
+  BeatSpectrumMorph = 'BeatSpectrumMorph',
+  TriadCascade = 'TriadCascade',
+  AuroraDrift = 'AuroraDrift',
+  TempoFlutter = 'TempoFlutter',
+  DynamicSurge = 'DynamicSurge',
+  LinearLightOrgan = 'LinearLightOrgan',
+  SplitLightOrgan = 'SplitLightOrgan',
+  StackedLightOrgan = 'StackedLightOrgan',
+  DiagonalLightOrgan = 'DiagonalLightOrgan',
+  GatedLightOrgan = 'GatedLightOrgan',
 }
 
 /**

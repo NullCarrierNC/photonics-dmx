@@ -53,12 +53,10 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps ) => {
             <h3 className="text-md font-medium mb-3 text-gray-700 dark:text-gray-300">DMX Output</h3>
             <div className="flex flex-row gap-8 items-start flex-wrap">
               <SacnToggle disabled={hasInvalidConfig} />
-              <EnttecProToggle disabled={hasInvalidConfig} />
               <ArtNetToggle disabled={hasInvalidConfig} />
+              <EnttecProToggle disabled={hasInvalidConfig} />
+              <OpenDmxToggle disabled={hasInvalidConfig} />
             </div>
-          </div>
-          <div className="flex flex-row gap-16 items-start ">
-            <ArtNetToggle disabled={hasInvalidConfig} /> <OpenDmxToggle disabled={hasInvalidConfig} />
           </div>
           
           {hasInvalidConfig && (

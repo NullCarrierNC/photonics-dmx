@@ -201,6 +201,7 @@ export interface LightingPreferences {
       }>;
     };
     enabled: boolean;
+    linearResponse?: boolean;
   };
 }
 

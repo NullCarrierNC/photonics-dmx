@@ -4,6 +4,8 @@ import { getEffectSingleColor } from '../../../../effects';
 import { getColor, validateColorString } from '../../../../helpers';
 import { AudioCueData, AudioCueType } from '../../../types/audioCueTypes';
 import { IAudioCue } from '../../../interfaces/IAudioCue';
+import { clearCueLayers } from '../../utils/cueLayerUtils';
+import { getIntensityScale, applyIntensityScale } from '../../utils/bandUtils';
 
 /**
  * BasicLayered cue - applies each frequency range to its own layer
@@ -18,12 +20,17 @@ export class BasicLayeredCue implements IAudioCue {
   id = 'audio-basic-layered';
   cueType = AudioCueType.BasicLayered;
   description = 'Applies each frequency range to its own layer, starting with Bass on layer 0';
+  private readonly layers = [0, 1, 2, 3, 4];
+  private sequencerRef: ILightingController | null = null;
+  private lightManagerRef: DmxLightManager | null = null;
 
   async execute(
     data: AudioCueData,
     sequencer: ILightingController,
     lightManager: DmxLightManager
   ): Promise<void> {
+    this.sequencerRef = sequencer;
+    this.lightManagerRef = lightManager;
     const { audioData, config } = data;
     const { frequencyBands } = audioData;
 
@@ -54,6 +61,8 @@ export class BasicLayeredCue implements IAudioCue {
       frequencyBands.range5
     ];
 
+    const linearResponse = config.linearResponse !== false;
+
     activeRangeIndices.forEach((rangeIndex, orderIndex) => {
       const range = ranges[rangeIndex];
       if (!range) {
@@ -77,8 +86,8 @@ export class BasicLayeredCue implements IAudioCue {
       const brightness = range.brightness || 'medium';
       const rgbColor = getColor(color, brightness, 'add');
 
-      rgbColor.intensity = Math.floor(rgbColor.intensity * bandIntensity);
-      rgbColor.opacity = bandIntensity;
+      const intensityScale = getIntensityScale(bandIntensity, linearResponse);
+      applyIntensityScale(rgbColor, intensityScale);
 
       const effect = getEffectSingleColor({
         lights: allLights,
@@ -96,11 +105,11 @@ export class BasicLayeredCue implements IAudioCue {
   }
 
   onStop(): void {
-    // Cleanup if needed
+    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef);
   }
 
   onDestroy(): void {
-    // Cleanup if needed
+    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef);
   }
 }
 

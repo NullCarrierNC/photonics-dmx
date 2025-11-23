@@ -7,6 +7,7 @@ import AudioBeatDetection from '../components/AudioBeatDetection';
 import AudioSmoothingSettings from '../components/AudioSmoothingSettings';
 import CuePreviewAudio from '../components/CuePreviewAudio';
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa';
+import AudioLinearResponseToggle from '../components/AudioLinearResponseToggle';
 
 const AudioSettings: React.FC = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -63,6 +64,13 @@ const AudioSettings: React.FC = () => {
           Smoothing
         </h2>
         <AudioSmoothingSettings />
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 dark:border-gray-700">
+        <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
+          Brightness Response
+        </h2>
+        <AudioLinearResponseToggle />
       </div>
 
       {/* Audio Preview Accordion - Sticky at bottom of content area */}
