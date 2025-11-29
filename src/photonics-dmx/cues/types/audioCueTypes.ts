@@ -2,11 +2,18 @@ import { AudioLightingData, AudioConfig } from '../../listeners/Audio/audioTypes
 
 /**
  * Audio cue types for audio-reactive lighting
+ * Built-in cues are expressed as constants, while user-defined cues can provide any string identifier.
  */
-export enum AudioCueType {
-  BasicLayered = 'BasicLayered',
-  SpectrumCue = 'SpectrumCue',
-}
+export type AudioCueType = string;
+
+export const BuiltInAudioCues = {
+  BasicLayered: 'BasicLayered',
+  SpectrumCue: 'SpectrumCue',
+} as const;
+
+export type BuiltInAudioCueType = typeof BuiltInAudioCues[keyof typeof BuiltInAudioCues];
+
+export const builtInAudioCueList: BuiltInAudioCueType[] = Object.values(BuiltInAudioCues);
 
 /**
  * Audio cue data structure passed to cue implementations

@@ -2,7 +2,7 @@ import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { getEffectSingleColor } from '../../../../effects';
 import { getColor, validateColorString } from '../../../../helpers';
-import { AudioCueData, AudioCueType } from '../../../types/audioCueTypes';
+import { AudioCueData, BuiltInAudioCues } from '../../../types/audioCueTypes';
 import { IAudioCue } from '../../../interfaces/IAudioCue';
 
 /**
@@ -16,7 +16,7 @@ import { IAudioCue } from '../../../interfaces/IAudioCue';
  */
 export class BasicLayeredCue implements IAudioCue {
   id = 'audio-basic-layered';
-  cueType = AudioCueType.BasicLayered;
+  cueType = BuiltInAudioCues.BasicLayered;
   description = 'Applies each frequency range to its own layer, starting with Bass on layer 0';
 
   async execute(

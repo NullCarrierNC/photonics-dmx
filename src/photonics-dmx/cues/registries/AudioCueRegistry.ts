@@ -63,6 +63,26 @@ export class AudioCueRegistry {
   }
 
   /**
+   * Unregister a cue group.
+   * @param groupId The group identifier
+   */
+  public unregisterGroup(groupId: string): boolean {
+    if (!this.groups.has(groupId)) {
+      return false;
+    }
+
+    this.groups.delete(groupId);
+    this.enabledGroups.delete(groupId);
+    this.cueDetailsCache.delete(groupId);
+
+    if (this.defaultGroup === groupId) {
+      this.defaultGroup = null;
+    }
+
+    return true;
+  }
+
+  /**
    * Set the default group.
    * @param groupId The ID of the group to set as default
    * @throws Error if the group doesn't exist

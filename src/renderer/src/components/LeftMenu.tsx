@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { FaMoon, FaSun, FaLightbulb, FaPlay, FaInfinity } from 'react-icons/fa';
-import { FiActivity, FiLayout, FiCpu, FiInfo, FiSliders, FiVolume2 } from 'react-icons/fi';
+import { FiActivity, FiLayout, FiCpu, FiInfo, FiSliders, FiVolume2, FiPenTool } from 'react-icons/fi';
 import { useAtom, useSetAtom } from 'jotai';
 import { Pages } from './../types';
 import { currentPageAtom } from './../atoms';
@@ -73,6 +73,15 @@ const LeftMenu: React.FC<LeftMenuProps> = ({ isDarkMode, toggleDarkMode }) => {
         >
           <FaInfinity className="text-xl" />
           <span className="text-[12pt]">Cue Simulation</span>
+        </button>
+
+        {/* Cue Editor Button */}
+        <button
+          onClick={() => handleMenuClick(Pages.CueEditor)}
+          className={buttonClasses(Pages.CueEditor)}
+        >
+          <FiPenTool className="text-xl" />
+          <span className="text-[12pt]">Cue Editor</span>
         </button>
 
         {/* Network Debug Button */}

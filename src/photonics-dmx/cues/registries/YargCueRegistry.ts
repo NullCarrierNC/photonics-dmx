@@ -161,6 +161,31 @@ export class YargCueRegistry {
   }
 
   /**
+   * Unregister an existing group of cues.
+   * @param groupId The group identifier to remove
+   */
+  public unregisterGroup(groupId: string): boolean {
+    if (!this.groups.has(groupId)) {
+      return false;
+    }
+
+    this.groups.delete(groupId);
+    this.enabledGroups.delete(groupId);
+    this.activeGroups.delete(groupId);
+
+    if (this.defaultGroup === groupId) {
+      this.defaultGroup = null;
+    }
+
+    if (this.stageKitGroup === groupId) {
+      this.stageKitGroup = null;
+    }
+
+    this.clearGroupConsistencyTracking(groupId);
+    return true;
+  }
+
+  /**
    * Set the default group.
    * @param groupName The name of the group to set as default
    * @throws Error if the group doesn't exist

@@ -3,7 +3,7 @@ import { ILightingController } from '../../../../controllers/sequencer/interface
 import { getEffectSingleColor } from '../../../../effects';
 import { getColor, validateColorString } from '../../../../helpers';
 import type { AudioConfig } from '../../../../listeners/Audio/audioTypes';
-import { AudioCueData, AudioCueType } from '../../../types/audioCueTypes';
+import { AudioCueData, BuiltInAudioCues } from '../../../types/audioCueTypes';
 import { IAudioCue } from '../../../interfaces/IAudioCue';
 import type { TrackedLight } from '../../../../types';
 
@@ -14,7 +14,7 @@ type AudioRangeConfig = AudioConfig['frequencyBands']['ranges'][number];
  */
 export class SpectrumCue implements IAudioCue {
   id = 'audio-spectrum';
-  cueType = AudioCueType.SpectrumCue;
+  cueType = BuiltInAudioCues.SpectrumCue;
   description = 'Spectrum analyzer: spreads frequency bands across front and back lights';
 
   async execute(

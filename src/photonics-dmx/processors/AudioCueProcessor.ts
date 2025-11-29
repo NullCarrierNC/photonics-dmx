@@ -3,7 +3,7 @@ import { AudioLightingData, AudioConfig } from '../listeners/Audio/audioTypes';
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
-import { AudioCueType } from '../cues/types/audioCueTypes';
+import { AudioCueType, BuiltInAudioCues } from '../cues/types/audioCueTypes';
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry';
 
 /**
@@ -154,7 +154,7 @@ export class AudioCueProcessor {
     }
 
     // Absolute fallback
-    return AudioCueType.BasicLayered;
+    return BuiltInAudioCues.BasicLayered;
   }
 
   private getEnabledBandCount(): number {

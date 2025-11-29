@@ -11,7 +11,8 @@ import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManage
 import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor';
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/audioTypes';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, app } from 'electron';
+import * as path from 'path';
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces';
 import { SenderError } from '../../photonics-dmx/senders/BaseSender';
@@ -20,7 +21,8 @@ import { LightTransitionController } from '../../photonics-dmx/controllers/seque
 import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
+import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes';
+import { NodeCueLoader, NodeCueListSummary } from '../../photonics-dmx/cues/node/loader/NodeCueLoader';
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues';
 
@@ -39,6 +41,7 @@ export class ControllerManager {
   private rb3eListener: Rb3eNetworkListener | null = null;
   private audioProcessor: AudioCueProcessor | null = null;
   private processorManager: ProcessorManager | null = null;
+  private nodeCueLoader: NodeCueLoader | null = null;
 
   private testEffectInterval: NodeJS.Timeout | null = null;
   private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large';
@@ -74,6 +77,7 @@ export class ControllerManager {
     await this.initializeSequencer();
     await this.initializeCueRegistry();
     await this.initializeAudioCueRegistry();
+    await this.initializeNodeCueLoader();
     await this.initializeListeners();
 
     this.isInitialized = true;
@@ -169,6 +173,28 @@ export class ControllerManager {
       }
       console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups);
     }
+  }
+
+  private async initializeNodeCueLoader(): Promise<void> {
+    if (this.nodeCueLoader) {
+      return;
+    }
+
+    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks');
+    this.nodeCueLoader = new NodeCueLoader({
+      baseDir,
+      yargRegistry: YargCueRegistry.getInstance(),
+      audioRegistry: AudioCueRegistry.getInstance()
+    });
+
+    const summary = await this.nodeCueLoader.loadAll();
+    console.log(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`);
+    await this.nodeCueLoader.startWatching();
+
+    this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window?.webContents.send('node-cues:changed', payload);
+    });
   }
   
 
@@ -615,6 +641,17 @@ export class ControllerManager {
       } catch (err) {
         console.error("Error disabling Audio:", err);
       }
+
+      if (this.nodeCueLoader) {
+        try {
+          await this.nodeCueLoader.dispose();
+          this.nodeCueLoader.removeAllListeners();
+          this.nodeCueLoader = null;
+          console.log("ControllerManager shutdown: node cue loader stopped");
+        } catch (err) {
+          console.error("Error shutting down node cue loader:", err);
+        }
+      }
       
       // Ensure cue handler is shut down if it still exists
       if (this.cueHandler) {
@@ -684,6 +721,10 @@ export class ControllerManager {
 
   public getCueHandler(): YargCueHandler | Rb3CueHandler | null {
     return this.cueHandler;
+  }
+
+  public getNodeCueLoader(): NodeCueLoader | null {
+    return this.nodeCueLoader;
   }
 
   public getProcessorManager(): any | null {
@@ -961,7 +1002,7 @@ export class ControllerManager {
       return fallback[0];
     }
 
-    return AudioCueType.BasicLayered;
+    return BuiltInAudioCues.BasicLayered;
   }
 
   /**

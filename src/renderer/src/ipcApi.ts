@@ -110,3 +110,31 @@ export const startTestEffect = (effectId: string, venueSize?: 'NoVenue' | 'Small
 
 export const stopTestEffect = () => 
   window.electron.ipcRenderer.invoke('stop-test-effect');
+
+// Node cue management
+export const listNodeCueFiles = () =>
+  window.electron.ipcRenderer.invoke('node-cues:list');
+
+export const reloadNodeCueFiles = () =>
+  window.electron.ipcRenderer.invoke('node-cues:reload');
+
+export const readNodeCueFile = (filePath: string) =>
+  window.electron.ipcRenderer.invoke('node-cues:read', filePath);
+
+export const saveNodeCueFile = (payload: { mode: 'yarg' | 'audio'; filename: string; content: any }) =>
+  window.electron.ipcRenderer.invoke('node-cues:save', payload);
+
+export const deleteNodeCueFile = (filePath: string) =>
+  window.electron.ipcRenderer.invoke('node-cues:delete', filePath);
+
+export const validateNodeCue = (payload: { path?: string; content?: any }) =>
+  window.electron.ipcRenderer.invoke('node-cues:validate', payload);
+
+export const getNodeCueTypes = (mode: 'yarg' | 'audio') =>
+  window.electron.ipcRenderer.invoke('node-cues:get-cue-types', mode);
+
+export const importNodeCueFile = (mode?: 'yarg' | 'audio') =>
+  window.electron.ipcRenderer.invoke('node-cues:import', mode);
+
+export const exportNodeCueFile = (filePath: string) =>
+  window.electron.ipcRenderer.invoke('node-cues:export', filePath);

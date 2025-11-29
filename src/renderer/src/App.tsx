@@ -17,6 +17,7 @@ import { IpcRendererEvent } from 'electron';
 import About from './pages/About';
 import Preferences from './pages/Preferences';
 import AudioSettings from './pages/AudioSettings';
+import CueEditor from './pages/CueEditor';
 import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
@@ -369,6 +370,8 @@ export const App = (): JSX.Element => {
         return <CueSimulation />;
       case Pages.CueSequencer:
       //  return <CueSequencer />;
+      case Pages.CueEditor:
+        return <CueEditor />;
       case Pages.NetworkDebug:
         return <NetworkDebug />;
       case Pages.Preferences:

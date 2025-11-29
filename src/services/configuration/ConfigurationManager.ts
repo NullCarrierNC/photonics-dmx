@@ -2,7 +2,7 @@ import { ConfigFile } from './ConfigFile';
 import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes } from '../../photonics-dmx/types';
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio/audioConfig';
 import type { AudioConfig } from '../../photonics-dmx/listeners/Audio/audioTypes';
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
+import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes';
 
 /**
  * Application preferences interface
@@ -71,7 +71,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledAudioCueGroups: ['audio-spectrum'],
   cueConsistencyWindow: 60000,
   clockRate: 5, // 5ms interval for smooth animations
-  activeAudioCueType: AudioCueType.BasicLayered,
+  activeAudioCueType: BuiltInAudioCues.BasicLayered,
 
   // Brightness configuration defaults
   brightness: {
