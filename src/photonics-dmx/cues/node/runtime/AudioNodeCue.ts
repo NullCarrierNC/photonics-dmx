@@ -2,9 +2,10 @@ import { IAudioCue } from '../../interfaces/IAudioCue';
 import { AudioCueData } from '../../types/audioCueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { CompiledActionPlan, CompiledAudioCue } from '../compiler/NodeCueCompiler';
+import { CompiledActionChain, CompiledAudioCue } from '../compiler/NodeCueCompiler';
 import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
 import { AudioEventNode } from '../../types/nodeCueTypes';
+import { Effect } from '../../../types';
 
 interface AudioEventState {
   previousValue: number;
@@ -46,36 +47,40 @@ export class AudioNodeCue implements IAudioCue {
   async execute(data: AudioCueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const tasks: Promise<unknown>[] = [];
 
-    for (const plan of this.compiledCue.actions) {
-      const lights = ActionEffectFactory.resolveLights(lightManager, plan.action.target);
-      if (!lights.length) {
-        continue;
-      }
-
-      const state = this.getEventState(plan.event.id);
-      const evaluation = this.evaluateEvent(plan.event, data, state);
-      const effectKey = this.effectKey(plan);
-      const layer = plan.action.layer ?? 0;
+    for (const chain of this.compiledCue.chains) {
+      const state = this.getEventState(chain.event.id);
+      const evaluation = this.evaluateEvent(chain.event, data, state);
+      const effectKey = this.effectKey(chain);
+      const rootStep = chain.actions[0];
+      const rootLayer = rootStep?.action.layer ?? 0;
 
       if (evaluation.mode === 'edge') {
         if (!evaluation.triggered) {
           continue;
         }
 
-        const effect = ActionEffectFactory.buildEffect({
-          action: plan.action,
-          lights,
-          waitCondition: 'none',
-          intensityScale: evaluation.intensity
-        });
-
+        const effect = this.buildChainEffect(chain, lightManager, evaluation.intensity);
         if (effect) {
           sequencer.addEffect(`${effectKey}:${Date.now()}`, effect);
         }
       } else {
+        if (!rootStep) {
+          continue;
+        }
+
+        // Level-triggered events ignore chained steps beyond the first
+        if (chain.actions.some(step => step.chainPosition > 0)) {
+          continue;
+        }
+
+        const lights = ActionEffectFactory.resolveLights(lightManager, rootStep.action.target);
+        if (!lights.length) {
+          continue;
+        }
+
         if (evaluation.active) {
           const effect = ActionEffectFactory.buildEffect({
-            action: plan.action,
+            action: rootStep.action,
             lights,
             waitCondition: 'none',
             intensityScale: evaluation.intensity
@@ -83,10 +88,10 @@ export class AudioNodeCue implements IAudioCue {
 
           if (effect) {
             tasks.push(sequencer.setEffect(effectKey, effect));
-            this.activeLevelEffects.set(effectKey, layer);
+            this.activeLevelEffects.set(effectKey, rootLayer);
           }
         } else if (this.activeLevelEffects.has(effectKey)) {
-          sequencer.removeEffect(effectKey, layer);
+          sequencer.removeEffect(effectKey, rootLayer);
           this.activeLevelEffects.delete(effectKey);
         }
       }
@@ -164,8 +169,53 @@ export class AudioNodeCue implements IAudioCue {
     }
   }
 
-  private effectKey(plan: CompiledActionPlan<AudioEventNode>): string {
-    return `${this.id}:${plan.action.id}:${plan.event.id}`;
+  private buildChainEffect(
+    chain: CompiledActionChain<AudioEventNode>,
+    lightManager: DmxLightManager,
+    intensityScale: number
+  ): Effect | null {
+    let combinedEffect: Effect | null = null;
+    let lastScheduledDelay = 0;
+
+    for (const step of chain.actions) {
+      const lights = ActionEffectFactory.resolveLights(lightManager, step.action.target);
+      if (!lights.length) {
+        continue;
+      }
+
+      const isFirstEffect = combinedEffect === null;
+      const waitCondition = isFirstEffect ? 'none' : 'delay';
+      const waitTime = isFirstEffect ? step.delayMs : Math.max(0, step.delayMs - lastScheduledDelay);
+
+      const effect = ActionEffectFactory.buildEffect({
+        action: step.action,
+        lights,
+        waitCondition,
+        waitTime,
+        intensityScale
+      });
+
+      if (!effect) {
+        continue;
+      }
+
+      if (!combinedEffect) {
+        combinedEffect = {
+          ...effect,
+          transitions: [...effect.transitions]
+        };
+      } else {
+        combinedEffect.transitions.push(...effect.transitions);
+      }
+
+      lastScheduledDelay = step.delayMs;
+    }
+
+    return combinedEffect;
+  }
+
+  private effectKey(chain: CompiledActionChain<AudioEventNode>): string {
+    return `${this.id}:${chain.chainId}`;
   }
 }
 

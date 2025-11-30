@@ -3,6 +3,7 @@ import {
   AudioEventNode,
   AudioNodeCueDefinition,
   Connection,
+  EnvelopeConfig,
   YargEventNode,
   YargNodeCueDefinition
 } from '../../types/nodeCueTypes';
@@ -14,24 +15,51 @@ export class NodeCueCompilationError extends Error {
   }
 }
 
-export interface CompiledActionPlan<TEvent extends YargEventNode | AudioEventNode> {
+export interface CompiledActionStep<TEvent extends YargEventNode | AudioEventNode> {
   action: ActionNode;
   event: TEvent;
+  /** Cumulative delay in milliseconds from when the triggering event fires */
+  delayMs: number;
+  /** Position in chain: 0 for actions triggered directly by events, 1+ for chained actions */
+  chainPosition: number;
+}
+
+export interface CompiledActionChain<TEvent extends YargEventNode | AudioEventNode> {
+  chainId: string;
+  event: TEvent;
+  actions: CompiledActionStep<TEvent>[];
 }
 
 export interface CompiledYargCue {
   definition: YargNodeCueDefinition;
-  actions: CompiledActionPlan<YargEventNode>[];
+  chains: CompiledActionChain<YargEventNode>[];
 }
 
 export interface CompiledAudioCue {
   definition: AudioNodeCueDefinition;
-  actions: CompiledActionPlan<AudioEventNode>[];
+  chains: CompiledActionChain<AudioEventNode>[];
 }
+
+/**
+ * Calculates the total duration of an action based on its envelope settings.
+ */
+const calculateActionDuration = (action: ActionNode): number => {
+  const env: EnvelopeConfig = action.envelope ?? {
+    attack: 0,
+    decay: 0,
+    sustainLevel: 1,
+    sustainTime: 100,
+    release: 150
+  };
+  return Math.max(0, env.attack) +
+         Math.max(0, env.decay) +
+         Math.max(0, env.sustainTime) +
+         Math.max(0, env.release);
+};
 
 export class NodeCueCompiler {
   public static compileYargCue(definition: YargNodeCueDefinition): CompiledYargCue {
-    const actions = this.expandConnections(
+    const chains = this.expandConnections(
       definition.nodes.events,
       definition.nodes.actions,
       definition.connections
@@ -39,12 +67,12 @@ export class NodeCueCompiler {
 
     return {
       definition,
-      actions
+      chains
     };
   }
 
   public static compileAudioCue(definition: AudioNodeCueDefinition): CompiledAudioCue {
-    const actions = this.expandConnections(
+    const chains = this.expandConnections(
       definition.nodes.events,
       definition.nodes.actions,
       definition.connections
@@ -52,7 +80,7 @@ export class NodeCueCompiler {
 
     return {
       definition,
-      actions
+      chains
     };
   }
 
@@ -60,7 +88,7 @@ export class NodeCueCompiler {
     events: TEvent[],
     actions: ActionNode[],
     connections: Connection[]
-  ): CompiledActionPlan<TEvent>[] {
+  ): CompiledActionChain<TEvent>[] {
     if (!events.length) {
       throw new NodeCueCompilationError('At least one event node is required.');
     }
@@ -71,38 +99,105 @@ export class NodeCueCompiler {
 
     const eventMap = new Map(events.map(event => [event.id, event]));
     const actionMap = new Map(actions.map(action => [action.id, action]));
-    const actionConnections = new Map<string, number>();
-    const plans: CompiledActionPlan<TEvent>[] = [];
 
-    connections.forEach(connection => {
-      const event = eventMap.get(connection.from);
-      if (!event) {
-        throw new NodeCueCompilationError(`Connection references unknown event node '${connection.from}'.`);
+    // Build adjacency lists for the connection graph
+    const eventToActions = new Map<string, string[]>();
+    const actionToActions = new Map<string, string[]>();
+
+    for (const conn of connections) {
+      if (eventMap.has(conn.from)) {
+        // Event → Action connection
+        const list = eventToActions.get(conn.from) ?? [];
+        list.push(conn.to);
+        eventToActions.set(conn.from, list);
+      } else if (actionMap.has(conn.from) && actionMap.has(conn.to)) {
+        // Action → Action connection
+        const list = actionToActions.get(conn.from) ?? [];
+        list.push(conn.to);
+        actionToActions.set(conn.from, list);
+      }
+    }
+
+    const chains: CompiledActionChain<TEvent>[] = [];
+    const reachableActions = new Set<string>();
+
+    /**
+     * Recursively traverses action chains starting from an event-triggered action.
+     * Builds compiled plans with cumulative delays.
+     */
+    const traverseChain = (
+      actionId: string,
+      event: TEvent,
+      cumulativeDelay: number,
+      chainPosition: number,
+      visited: Set<string>,
+      currentChain: CompiledActionStep<TEvent>[]
+    ): void => {
+      if (visited.has(actionId)) {
+        return; // Prevent infinite loops (cycles should be caught by validation)
       }
 
-      const action = actionMap.get(connection.to);
+      const action = actionMap.get(actionId);
       if (!action) {
-        throw new NodeCueCompilationError(`Connection references unknown action node '${connection.to}'.`);
+        return;
       }
+
+      visited.add(actionId);
+      reachableActions.add(actionId);
 
       this.validateAction(action);
 
-      plans.push({
+      const step: CompiledActionStep<TEvent> = {
         action,
-        event
-      });
+        event,
+        delayMs: cumulativeDelay,
+        chainPosition
+      };
 
-      actionConnections.set(action.id, (actionConnections.get(action.id) || 0) + 1);
-    });
+      const nextChain = [...currentChain, step];
 
-    const unconnectedActions = actions.filter(action => !actionConnections.has(action.id));
-    if (unconnectedActions.length > 0) {
+      const actionDuration = calculateActionDuration(action);
+      const nextDelay = cumulativeDelay + actionDuration;
+
+      const chainedActions = actionToActions.get(actionId) ?? [];
+      if (chainedActions.length === 0) {
+        const pathId = nextChain.map(step => step.action.id).join('>');
+        chains.push({
+          chainId: `${event.id}:${pathId}`,
+          event,
+          actions: nextChain
+        });
+      } else {
+        for (const nextActionId of chainedActions) {
+          traverseChain(
+            nextActionId,
+            event,
+            nextDelay,
+            chainPosition + 1,
+            new Set(visited),
+            nextChain
+          );
+        }
+      }
+    };
+
+    // Start traversal from each event node
+    for (const event of events) {
+      const rootActions = eventToActions.get(event.id) ?? [];
+      for (const actionId of rootActions) {
+        traverseChain(actionId, event, 0, 0, new Set(), []);
+      }
+    }
+
+    // Check for orphaned actions (not reachable from any event)
+    const unreachableActions = actions.filter(action => !reachableActions.has(action.id));
+    if (unreachableActions.length > 0) {
       throw new NodeCueCompilationError(
-        `Action node(s) ${unconnectedActions.map(node => `'${node.label ?? node.id}'`).join(', ')} are not connected to any events.`
+        `Action node(s) ${unreachableActions.map(node => `'${node.label ?? node.id}'`).join(', ')} are not reachable from any event.`
       );
     }
 
-    return plans;
+    return chains;
   }
 
   private static validateAction(action: ActionNode): void {
@@ -115,6 +210,25 @@ export class NodeCueCompiler {
         `Action '${action.label ?? action.id}' requires a secondary colour for the cross-fade effect.`
       );
     }
+  }
+
+  /**
+   * Calculates the total duration of an action chain starting from an event.
+   * Useful for displaying chain duration in the UI.
+   */
+  public static calculateChainDuration(chains: CompiledActionChain<YargEventNode | AudioEventNode>[]): number {
+    if (chains.length === 0) return 0;
+
+    let maxEndTime = 0;
+    for (const chain of chains) {
+      for (const step of chain.actions) {
+        const endTime = step.delayMs + calculateActionDuration(step.action);
+        if (endTime > maxEndTime) {
+          maxEndTime = endTime;
+        }
+      }
+    }
+    return maxEndTime;
   }
 }
 

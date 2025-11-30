@@ -6,6 +6,7 @@ import {
   AudioNodeCueDefinition,
   AudioNodeCueFile,
   AudioEventType,
+  Connection,
   EnvelopeConfig,
   NodeActionConfig,
   NodeActionTarget,
@@ -181,6 +182,11 @@ const actionSchema: JSONSchemaType<ActionNode> = {
     layer: { type: 'integer', nullable: true, minimum: 0 },
     label: { type: 'string', nullable: true },
     inputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    outputs: {
       type: 'array',
       nullable: true,
       items: { type: 'string' }
@@ -432,35 +438,117 @@ const formatErrors = (errors: DefinedError[] | null | undefined): string[] => {
   });
 };
 
+/**
+ * Detects circular dependencies in action node chains using depth-first search.
+ * Returns an array of error messages describing any cycles found.
+ */
+const detectCycles = (
+  connections: Connection[],
+  actionIds: Set<string>
+): string[] => {
+  const errors: string[] = [];
+
+  const actionToAction = new Map<string, string[]>();
+  for (const conn of connections) {
+    if (actionIds.has(conn.from) && actionIds.has(conn.to)) {
+      const existing = actionToAction.get(conn.from) ?? [];
+      existing.push(conn.to);
+      actionToAction.set(conn.from, existing);
+    }
+  }
+
+  const visited = new Set<string>();
+  const recursionStack = new Set<string>();
+
+  const dfs = (nodeId: string, path: string[]): boolean => {
+    visited.add(nodeId);
+    recursionStack.add(nodeId);
+
+    const neighbours = actionToAction.get(nodeId) ?? [];
+    for (const neighbour of neighbours) {
+      if (!visited.has(neighbour)) {
+        if (dfs(neighbour, [...path, neighbour])) {
+          return true;
+        }
+      } else if (recursionStack.has(neighbour)) {
+        const cycleStart = path.indexOf(neighbour);
+        const cycle = cycleStart >= 0 ? path.slice(cycleStart) : path;
+        cycle.push(neighbour);
+        errors.push(`Circular dependency detected: ${cycle.join(' → ')}`);
+        return true;
+      }
+    }
+
+    recursionStack.delete(nodeId);
+    return false;
+  };
+
+  for (const actionId of actionIds) {
+    if (!visited.has(actionId)) {
+      dfs(actionId, [actionId]);
+    }
+  }
+
+  return errors;
+};
+
 export const validateYargNodeCueFile = (value: unknown): NodeCueValidationResult<YargNodeCueFile> => {
-  if (validateYargSchema(value)) {
+  if (!validateYargSchema(value)) {
     return {
-      valid: true,
-      data: value,
-      errors: [],
-      mode: 'yarg'
+      valid: false,
+      errors: formatErrors(validateYargSchema.errors as DefinedError[])
+    };
+  }
+
+  const semanticErrors: string[] = [];
+  for (const cue of value.cues) {
+    const actionIds = new Set(cue.nodes.actions.map(a => a.id));
+    const cycleErrors = detectCycles(cue.connections, actionIds);
+    semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
+  }
+
+  if (semanticErrors.length > 0) {
+    return {
+      valid: false,
+      errors: semanticErrors
     };
   }
 
   return {
-    valid: false,
-    errors: formatErrors(validateYargSchema.errors as DefinedError[])
+    valid: true,
+    data: value,
+    errors: [],
+    mode: 'yarg'
   };
 };
 
 export const validateAudioNodeCueFile = (value: unknown): NodeCueValidationResult<AudioNodeCueFile> => {
-  if (validateAudioSchema(value)) {
+  if (!validateAudioSchema(value)) {
     return {
-      valid: true,
-      data: value,
-      errors: [],
-      mode: 'audio'
+      valid: false,
+      errors: formatErrors(validateAudioSchema.errors as DefinedError[])
+    };
+  }
+
+  const semanticErrors: string[] = [];
+  for (const cue of value.cues) {
+    const actionIds = new Set(cue.nodes.actions.map(a => a.id));
+    const cycleErrors = detectCycles(cue.connections, actionIds);
+    semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
+  }
+
+  if (semanticErrors.length > 0) {
+    return {
+      valid: false,
+      errors: semanticErrors
     };
   }
 
   return {
-    valid: false,
-    errors: formatErrors(validateAudioSchema.errors as DefinedError[])
+    valid: true,
+    data: value,
+    errors: [],
+    mode: 'audio'
   };
 };
 

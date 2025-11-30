@@ -29,7 +29,7 @@ import type {
   YargNodeCueFile
 } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { ActionNode } from '../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { Color, Brightness, LightTarget, LocationGroup, WaitCondition } from '../../../photonics-dmx/types';
+import type { Color, Brightness, BlendMode, LightTarget, LocationGroup, WaitCondition } from '../../../photonics-dmx/types';
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes';
 import {
   deleteNodeCueFile,
@@ -117,6 +117,7 @@ const COLOR_OPTIONS: Color[] = [
 ];
 
 const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max'];
+const BLEND_MODE_OPTIONS: BlendMode[] = ['replace', 'add', 'multiply', 'overlay'];
 const LOCATION_OPTIONS: LocationGroup[] = ['front', 'back', 'strobe'];
 const LIGHT_TARGETS: LightTarget[] = [
   'all', 'even', 'odd', 'half-1', 'half-2', 'outter-half-major', 'outter-half-minor',
@@ -261,6 +262,90 @@ const getBasename = (value: string): string => {
   return segments[segments.length - 1] || value;
 };
 
+/**
+ * Calculates the total duration of an action based on its envelope settings.
+ */
+const calculateActionDuration = (action: ActionNode): number => {
+  const env = action.envelope ?? {
+    attack: 0,
+    decay: 0,
+    sustainLevel: 1,
+    sustainTime: 100,
+    release: 150
+  };
+  return Math.max(0, env.attack) +
+         Math.max(0, env.decay) +
+         Math.max(0, env.sustainTime) +
+         Math.max(0, env.release);
+};
+
+/**
+ * Calculates the total chain duration for a cue by traversing all action chains.
+ * Returns the maximum end time across all chains.
+ */
+const calculateChainDuration = (
+  nodes: EditorNode[],
+  edges: Edge[]
+): number => {
+  const eventNodes = nodes.filter(n => n.data.kind === 'event');
+  const actionNodes = nodes.filter(n => n.data.kind === 'action');
+
+  if (eventNodes.length === 0 || actionNodes.length === 0) return 0;
+
+  const actionMap = new Map(actionNodes.map(n => [n.id, n.data.payload as ActionNode]));
+  const eventToActions = new Map<string, string[]>();
+  const actionToActions = new Map<string, string[]>();
+
+  for (const edge of edges) {
+    const sourceNode = nodes.find(n => n.id === edge.source);
+    const targetNode = nodes.find(n => n.id === edge.target);
+    if (!sourceNode || !targetNode) continue;
+
+    if (sourceNode.data.kind === 'event' && targetNode.data.kind === 'action') {
+      const list = eventToActions.get(edge.source) ?? [];
+      list.push(edge.target);
+      eventToActions.set(edge.source, list);
+    } else if (sourceNode.data.kind === 'action' && targetNode.data.kind === 'action') {
+      const list = actionToActions.get(edge.source) ?? [];
+      list.push(edge.target);
+      actionToActions.set(edge.source, list);
+    }
+  }
+
+  let maxEndTime = 0;
+
+  const traverse = (actionId: string, cumulativeDelay: number, visited: Set<string>): void => {
+    if (visited.has(actionId)) return;
+    visited.add(actionId);
+
+    const action = actionMap.get(actionId);
+    if (!action) return;
+
+    const duration = calculateActionDuration(action);
+    const endTime = cumulativeDelay + duration;
+    if (endTime > maxEndTime) maxEndTime = endTime;
+
+    const chainedActions = actionToActions.get(actionId) ?? [];
+    for (const nextId of chainedActions) {
+      traverse(nextId, endTime, visited);
+    }
+  };
+
+  for (const eventNode of eventNodes) {
+    const rootActions = eventToActions.get(eventNode.id) ?? [];
+    for (const actionId of rootActions) {
+      traverse(actionId, 0, new Set());
+    }
+  }
+
+  return maxEndTime;
+};
+
+const formatDuration = (ms: number): string => {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+};
+
 const createId = (): string => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
@@ -314,6 +399,10 @@ const CueEditor: React.FC = () => {
     if (!editorDoc || !selectedCueId) return null;
     return editorDoc.file.cues.find(cue => cue.id === selectedCueId) ?? null;
   }, [editorDoc, selectedCueId]);
+
+  const chainDuration = useMemo(() => {
+    return calculateChainDuration(nodes, edges);
+  }, [nodes, edges]);
 
   const groupedFiles = useMemo(() => ({
     yarg: files.filter(file => file.mode === 'yarg'),
@@ -562,26 +651,40 @@ const CueEditor: React.FC = () => {
     setIsDirty(true);
   }, [nodes.length, setNodes]);
 
-  const isEventToActionConnection = useCallback((sourceId?: string | null, targetId?: string | null) => {
-    if (!sourceId || !targetId) {
+  const isValidNodeConnection = useCallback((sourceId?: string | null, targetId?: string | null) => {
+    if (!sourceId || !targetId || sourceId === targetId) {
       return false;
     }
     const sourceNode = nodes.find(node => node.id === sourceId);
     const targetNode = nodes.find(node => node.id === targetId);
-    return sourceNode?.data.kind === 'event' && targetNode?.data.kind === 'action';
+    if (!sourceNode || !targetNode) {
+      return false;
+    }
+
+    // Event → Action is always valid
+    if (sourceNode.data.kind === 'event' && targetNode.data.kind === 'action') {
+      return true;
+    }
+
+    // Action → Action is valid (for chaining)
+    if (sourceNode.data.kind === 'action' && targetNode.data.kind === 'action') {
+      return true;
+    }
+
+    return false;
   }, [nodes]);
 
   const onConnect = useCallback((connection: Connection) => {
-    if (!isEventToActionConnection(connection.source, connection.target)) {
+    if (!isValidNodeConnection(connection.source, connection.target)) {
       return;
     }
     setEdges(eds => addEdge({ ...connection, type: 'default' }, eds));
     setIsDirty(true);
-  }, [isEventToActionConnection, setEdges]);
+  }, [isValidNodeConnection, setEdges]);
 
   const isValidConnection = useCallback((connection: Connection) => {
-    return isEventToActionConnection(connection.source, connection.target);
-  }, [isEventToActionConnection]);
+    return isValidNodeConnection(connection.source, connection.target);
+  }, [isValidNodeConnection]);
 
   const handleNodeSelection = useCallback(({ nodes: selected }: { nodes: EditorNode[] }) => {
     setSelectedNodeId(selected[0]?.id ?? null);
@@ -624,9 +727,19 @@ const CueEditor: React.FC = () => {
     const eventNodes = nodes.filter(node => node.data.kind === 'event');
     const actionNodes = nodes.filter(node => node.data.kind === 'action');
     const validEdges = edges.filter(edge => {
-      const sourceNode = eventNodes.find(node => node.id === edge.source);
-      const targetNode = actionNodes.find(node => node.id === edge.target);
-      return Boolean(sourceNode && targetNode);
+      const sourceNode = nodes.find(node => node.id === edge.source);
+      const targetNode = nodes.find(node => node.id === edge.target);
+      if (!sourceNode || !targetNode) return false;
+
+      // Event → Action
+      if (sourceNode.data.kind === 'event' && targetNode.data.kind === 'action') {
+        return true;
+      }
+      // Action → Action (chaining)
+      if (sourceNode.data.kind === 'action' && targetNode.data.kind === 'action') {
+        return true;
+      }
+      return false;
     });
 
     const updatedCue = {
@@ -905,6 +1018,23 @@ const CueEditor: React.FC = () => {
                       ))}
                     </select>
                   </label>
+                  <label className="flex flex-col font-medium">
+                    Blend Mode
+                    <select
+                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                      value={(selectedNode.data.payload as ActionNode).color.blendMode ?? 'replace'}
+                      onChange={event => updateSelectedNode({
+                        color: {
+                          ...(selectedNode.data.payload as ActionNode).color,
+                          blendMode: event.target.value as BlendMode
+                        }
+                      } as ActionNode)}
+                    >
+                      {BLEND_MODE_OPTIONS.map(mode => (
+                        <option key={mode} value={mode}>{mode}</option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
                 <label className="flex flex-col font-medium">
                   Layer
@@ -1069,7 +1199,12 @@ const CueEditor: React.FC = () => {
               className="rounded-b-lg"
             >
               <Panel position="top-left" className="bg-white/80 dark:bg-gray-900/80 px-2 py-1 text-[11px] rounded shadow">
-                {selectedCueId ? `Cue: ${currentCueDefinition?.name}` : 'Select or add a cue'}
+                <div>{selectedCueId ? `Cue: ${currentCueDefinition?.name}` : 'Select or add a cue'}</div>
+                {chainDuration > 0 && (
+                  <div className="text-gray-600 dark:text-gray-400">
+                    Chain duration: {formatDuration(chainDuration)}
+                  </div>
+                )}
               </Panel>
               <MiniMap pannable zoomable />
               <Controls />

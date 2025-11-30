@@ -1,4 +1,4 @@
-import { WaitCondition, TrackedLight, Effect, RGBIO, LocationGroup } from '../../../types';
+import { WaitCondition, TrackedLight, Effect, EffectTransition, RGBIO, LocationGroup } from '../../../types';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import {
   getEffectSingleColor,
@@ -21,6 +21,8 @@ interface BuildEffectParams {
   action: ActionNode;
   lights: TrackedLight[];
   waitCondition?: WaitCondition;
+  /** Time in milliseconds to wait before the effect starts (for chained actions) */
+  waitTime?: number;
   intensityScale?: number;
 }
 
@@ -55,6 +57,59 @@ const ensureEnvelope = (envelope?: EnvelopeConfig): EnvelopeConfig => {
   return envelope;
 };
 
+/**
+ * Applies chained timing to an effect's first transition.
+ * - If the action was triggered by 'none', convert the first transition into a delay.
+ * - Otherwise, insert a timing-only gate that waits for the event, then delays,
+ *   before allowing the original transition to run.
+ */
+const applyChainedTiming = (effect: Effect, waitTime: number, waitCondition: WaitCondition): Effect => {
+  if (waitTime <= 0 || !effect.transitions || effect.transitions.length === 0) {
+    return effect;
+  }
+
+  const [firstTransition, ...rest] = effect.transitions;
+
+  if (waitCondition === 'none') {
+    const updatedFirst: EffectTransition = {
+      ...firstTransition,
+      waitForCondition: 'delay',
+      waitForTime: waitTime
+    };
+    return {
+      ...effect,
+      transitions: [updatedFirst, ...rest]
+    };
+  }
+
+  const timingGate: EffectTransition = {
+    ...firstTransition,
+    timingOnly: true,
+    waitForCondition: waitCondition,
+    waitForTime: 0,
+    waitForConditionCount: firstTransition.waitForConditionCount,
+    transform: {
+      ...firstTransition.transform,
+      duration: 0
+    },
+    waitUntilCondition: 'delay',
+    waitUntilTime: waitTime,
+    waitUntilConditionCount: undefined
+  };
+
+  const chainedFirst: EffectTransition = {
+    ...firstTransition,
+    waitForCondition: 'none',
+    waitForTime: 0,
+    waitForConditionCount: undefined
+  };
+
+  return {
+    ...effect,
+    transitions: [timingGate, chainedFirst, ...rest]
+  };
+};
+
 export class ActionEffectFactory {
   public static resolveLights(lightManager: DmxLightManager, target: NodeActionTarget): TrackedLight[] {
     const groups: LocationGroup[] = target.groups.length > 0 ? target.groups : ['front'];
@@ -70,6 +125,8 @@ export class ActionEffectFactory {
     const envelope = ensureEnvelope(action.envelope);
     const envelopeScale = clamp(envelope.sustainLevel ?? 1, 0, 1);
     const intensityScale = clamp((params.intensityScale ?? 1) * envelopeScale, 0, 1);
+    const waitTime = params.waitTime ?? 0;
+    // Preserve the original wait condition - applyDelayToEffect will handle combining event + delay
     const waitFor: WaitCondition = params.waitCondition ?? 'none';
     const layer = action.layer ?? 0;
 
@@ -83,10 +140,12 @@ export class ActionEffectFactory {
     const sustain = safeDuration(envelope.sustainTime, 0, 0);
     const release = safeDuration(envelope.release, 100, 0);
 
+    let effect: Effect | null = null;
+
     switch (action.effectType) {
       case 'single-color': {
         const duration = Math.max(50, attack + sustain + release + decay);
-        return getEffectSingleColor({
+        effect = getEffectSingleColor({
           lights,
           layer,
           color: baseColor,
@@ -95,9 +154,10 @@ export class ActionEffectFactory {
           waitUntil: 'delay',
           untilTime: sustain || 0
         });
+        break;
       }
       case 'cross-fade': {
-        return getEffectCrossFadeColors({
+        effect = getEffectCrossFadeColors({
           lights,
           layer,
           startColor: baseColor,
@@ -108,9 +168,10 @@ export class ActionEffectFactory {
           afterStartWait: decay,
           afterEndColorWait: release
         });
+        break;
       }
       case 'flash': {
-        return getEffectFlashColor({
+        effect = getEffectFlashColor({
           lights,
           layer,
           color: baseColor,
@@ -122,6 +183,7 @@ export class ActionEffectFactory {
           endTrigger: 'delay',
           endWait: decay
         });
+        break;
       }
       case 'fade-in-out': {
         const transparent = resolveColor(
@@ -129,7 +191,7 @@ export class ActionEffectFactory {
           0
         );
 
-        return getEffectFadeInColorFadeOut({
+        effect = getEffectFadeInColorFadeOut({
           lights,
           layer,
           startColor: transparent,
@@ -141,6 +203,7 @@ export class ActionEffectFactory {
           fadeOutDuration: Math.max(10, release || 100),
           waitAfterFadeOut: decay
         });
+        break;
       }
       case 'sweep': {
         const sweepConfig = action.config?.sweep;
@@ -152,7 +215,7 @@ export class ActionEffectFactory {
         const lowColorSetting = sweepConfig?.lowColor || action.secondaryColor || { name: 'transparent', brightness: 'low' };
         const lowColor = resolveColor(lowColorSetting, intensityScale || 0.01);
 
-        return getSweepEffect({
+        effect = getSweepEffect({
           lights,
           layer,
           waitFor,
@@ -164,6 +227,7 @@ export class ActionEffectFactory {
           high: baseColor,
           low: lowColor
         });
+        break;
       }
       case 'cycle': {
         const cycleConfig = action.config?.cycle;
@@ -172,7 +236,7 @@ export class ActionEffectFactory {
           intensityScale || 0.01
         );
 
-        return getEffectCycleLights({
+        effect = getEffectCycleLights({
           lights,
           layer,
           activeColor: baseColor,
@@ -180,9 +244,10 @@ export class ActionEffectFactory {
           transitionDuration: safeDuration(cycleConfig?.transitionDuration, attack || 150, 10),
           waitFor: cycleConfig?.trigger || waitFor
         });
+        break;
       }
       case 'blackout': {
-        const effect = getEffectBlackout({
+        effect = getEffectBlackout({
           lights,
           layer,
           duration: safeDuration(action.config?.blackout?.duration, release || 200, 10)
@@ -190,11 +255,17 @@ export class ActionEffectFactory {
         effect.transitions.forEach(transition => {
           transition.waitForCondition = waitFor;
         });
-        return effect;
+        break;
       }
       default:
         return null;
     }
+
+    if (effect && waitTime > 0) {
+      effect = applyChainedTiming(effect, waitTime, waitFor);
+    }
+
+    return effect;
   }
 }
 

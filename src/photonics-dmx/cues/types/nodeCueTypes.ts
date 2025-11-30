@@ -160,6 +160,7 @@ export interface ActionNode {
   layer?: number;
   label?: string;
   inputs?: string[];
+  outputs?: string[];
   config?: NodeActionConfig;
 }
 

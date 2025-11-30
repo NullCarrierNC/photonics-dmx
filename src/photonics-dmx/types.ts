@@ -117,6 +117,11 @@ export interface EffectTransition {
   waitForCondition: WaitCondition;
   waitForTime: number; // in milliseconds
   waitForConditionCount?: number;
+  /**
+   * When true, this transition is used purely for timing (no light changes).
+   * TransitionEngine skips applying any light transforms for timing-only steps.
+   */
+  timingOnly?: boolean;
   transform: {
     color: RGBIO;
     easing: string;

@@ -2,8 +2,10 @@ import { INetCue, CueStyle } from '../../interfaces/INetCue';
 import { CueData, CueType } from '../../types/cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { CompiledYargCue } from '../compiler/NodeCueCompiler';
+import { CompiledActionChain, CompiledYargCue } from '../compiler/NodeCueCompiler';
 import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
+import { YargEventNode } from '../../types/nodeCueTypes';
+import { Effect } from '../../../types';
 
 export class YargNodeCue implements INetCue {
   public readonly cueId: CueType;
@@ -20,27 +22,59 @@ export class YargNodeCue implements INetCue {
   }
 
   async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    for (const plan of this.compiledCue.actions) {
-      const lights = ActionEffectFactory.resolveLights(lightManager, plan.action.target);
-      if (!lights.length) {
+    for (const chain of this.compiledCue.chains) {
+      const effect = this.buildChainEffect(chain, lightManager);
+      if (!effect) {
         continue;
       }
 
-      const effect = ActionEffectFactory.buildEffect({
-        action: plan.action,
-        lights,
-        waitCondition: plan.event.eventType
-      });
-
-      if (effect) {
-        const effectName = `${this.id}:${plan.action.id}:${plan.event.id}`;
-        sequencer.addEffect(effectName, effect);
-      }
+      const effectName = `${this.id}:${chain.chainId}`;
+      sequencer.addEffect(effectName, effect);
     }
   }
 
   onStop(): void {
     // No persistent state to clear
+  }
+
+  private buildChainEffect(chain: CompiledActionChain<YargEventNode>, lightManager: DmxLightManager): Effect | null {
+    let combinedEffect: Effect | null = null;
+    let lastScheduledDelay = 0;
+
+    for (const step of chain.actions) {
+      const lights = ActionEffectFactory.resolveLights(lightManager, step.action.target);
+      if (!lights.length) {
+        continue;
+      }
+
+      const isFirstEffect = combinedEffect === null;
+      const waitCondition = isFirstEffect ? chain.event.eventType : 'delay';
+      const waitTime = isFirstEffect ? step.delayMs : Math.max(0, step.delayMs - lastScheduledDelay);
+
+      const effect = ActionEffectFactory.buildEffect({
+        action: step.action,
+        lights,
+        waitCondition,
+        waitTime
+      });
+
+      if (!effect) {
+        continue;
+      }
+
+      if (!combinedEffect) {
+        combinedEffect = {
+          ...effect,
+          transitions: [...effect.transitions]
+        };
+      } else {
+        combinedEffect.transitions.push(...effect.transitions);
+      }
+
+      lastScheduledDelay = step.delayMs;
+    }
+
+    return combinedEffect;
   }
 }
 
