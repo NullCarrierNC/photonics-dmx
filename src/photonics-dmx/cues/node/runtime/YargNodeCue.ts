@@ -39,7 +39,7 @@ export class YargNodeCue implements INetCue {
 
   private buildChainEffect(chain: CompiledActionChain<YargEventNode>, lightManager: DmxLightManager): Effect | null {
     let combinedEffect: Effect | null = null;
-    let lastScheduledDelay = 0;
+    const chainEventCondition = chain.event.eventType;
 
     for (const step of chain.actions) {
       const lights = ActionEffectFactory.resolveLights(lightManager, step.action.target);
@@ -47,15 +47,13 @@ export class YargNodeCue implements INetCue {
         continue;
       }
 
-      const isFirstEffect = combinedEffect === null;
-      const waitCondition = isFirstEffect ? chain.event.eventType : 'delay';
-      const waitTime = isFirstEffect ? step.delayMs : Math.max(0, step.delayMs - lastScheduledDelay);
-
       const effect = ActionEffectFactory.buildEffect({
         action: step.action,
         lights,
-        waitCondition,
-        waitTime
+        // All chained steps stay anchored to the triggering event; delayMs is absolute
+        // from the event timeline so every target light respects the same schedule.
+        waitCondition: chainEventCondition,
+        waitTime: step.delayMs
       });
 
       if (!effect) {
@@ -70,8 +68,6 @@ export class YargNodeCue implements INetCue {
       } else {
         combinedEffect.transitions.push(...effect.transitions);
       }
-
-      lastScheduledDelay = step.delayMs;
     }
 
     return combinedEffect;
