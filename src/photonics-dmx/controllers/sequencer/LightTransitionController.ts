@@ -8,7 +8,7 @@ import {
 } from '../../easing';
 
 import { LightStateManager } from './LightStateManager';
-import { Clock } from './Clock';
+import type { FrameContext } from './interfaces';
 
 /**
  * Holds data for each layer's transition on a specific light.
@@ -41,13 +41,9 @@ export class LightTransitionController {
   private _currentLayerStates: Map<string, Map<number, RGBIO>>;
 
   /**
-   * The final merged color per light, after layering. 
+   * Guards against state mutations while a global clear is running.
    */
-  private _finalColors: Map<string, RGBIO>;
-
-  private _clearingTransitions = false; // Flag to prevent new transitions during cleanup
-  private clock: Clock | null = null;
-  private updateCallback: (deltaTime: number) => void;
+  private _clearingTransitions = false;
 
   // Monitoring fields
   private lastStateValidation: number = 0;
@@ -57,29 +53,11 @@ export class LightTransitionController {
     this._lightStateManager = lightStateManager;
     this._transitionsByLight = new Map();
     this._currentLayerStates = new Map();
-    this._finalColors = new Map();
-    
-    // Create the update callback bound to this instance
-    this.updateCallback = this.updateTransitions.bind(this);
+    this._clearingTransitions = false;
   }
 
-  /**
-   * Register this component with the clock
-   * @param clock The clock instance
-   */
-  public registerWithClock(clock: Clock): void {
-    this.clock = clock;
-    clock.onTick(this.updateCallback);
-  }
-
-  /**
-   * Unregister from the clock
-   */
-  public unregisterFromClock(): void {
-    if (this.clock) {
-      this.clock.offTick(this.updateCallback);
-      this.clock = null;
-    }
+  public advanceFrame(frame: FrameContext): void {
+    this.updateTransitions(frame);
   }
 
   /**
@@ -209,13 +187,11 @@ export class LightTransitionController {
       // From transitions controller internal maps
       this._transitionsByLight.forEach((_v, id) => idSet.add(id));
       this._currentLayerStates.forEach((_v, id) => idSet.add(id));
-      this._finalColors.forEach((_v, id) => idSet.add(id));
       const allLightIds = Array.from(idSet);
       
       // Clear all transitions
       this._transitionsByLight.clear();
       this._currentLayerStates.clear();
-      this._finalColors.clear();
       
       // Reset all lights to black
       const blackState: RGBIO = {
@@ -228,8 +204,6 @@ export class LightTransitionController {
       };
       
       allLightIds.forEach(lightId => {
-        // Set in final colors map directly to avoid state inconsistency
-        this._finalColors.set(lightId, blackState);
         this._lightStateManager.setLightState(lightId, blackState);
       });
       
@@ -237,7 +211,6 @@ export class LightTransitionController {
 
       // Publish the black states immediately
       this._lightStateManager.publishLightStates();
-      this._lightStateManager.syncFrame();
     } finally {
       // Release the clearing flag
       this._clearingTransitions = false;
@@ -284,7 +257,6 @@ export class LightTransitionController {
     lightIds.forEach((id) => {
       this._transitionsByLight.delete(id);
       this._currentLayerStates.delete(id);
-      this._finalColors.delete(id);
     });
   }
 
@@ -317,7 +289,6 @@ export class LightTransitionController {
   public immediateBlackout(): void {
     this._transitionsByLight.clear();
     this._currentLayerStates.clear();
-    this._finalColors.clear();
 
     // Immediately push black to all known lights
     const allLightIds = this._lightStateManager.getTrackedLightIds();
@@ -347,9 +318,9 @@ export class LightTransitionController {
         }
       }
       
-      this._finalColors.set(lightId, blackState);
+      this._lightStateManager.setLightState(lightId, blackState);
     });
-    this.setFinalColors();
+    this._lightStateManager.publishLightStates();
   }
 
   /**
@@ -377,27 +348,16 @@ export class LightTransitionController {
   }
 
   /**
-   * Update method called by the clock with frame synchronization
-   *
-   * All lights and all layers are calculated using a SINGLE timestamp captured once per frame.
-   *
-   * Process:
-   *   1) Capture single timestamp for the entire frame
-   *   2) Interpolate ALL layer states for ALL lights using this timestamp
-   *   3) Blend ALL layers for ALL lights
-   *   4) Publish all states atomically
-   *
-   * @param deltaTime The time elapsed since last update in milliseconds (unused)
+   * Processes a single animation frame using the provided timing context.
    */
-  private updateTransitions(_deltaTime: number): void {
+  private updateTransitions(frame?: FrameContext): void {
     // Skip processing if a global clear is in progress
     if (this._clearingTransitions) {
       return;
     }
 
     try {
-      // CRITICAL: Single timestamp for all calculations in this frame
-      const now = performance.now();
+      const now = frame?.frameStartTime ?? performance.now();
       
       // Periodic state validation and cleanup
       if (now - this.lastStateValidation > this.VALIDATION_INTERVAL) {
@@ -533,7 +493,7 @@ export class LightTransitionController {
     }
     
     // Phase 5: Publish all buffered light state updates atomically
-    this._lightStateManager.syncFrame();
+    this._lightStateManager.publishLightStates();
   }
 
   /**
@@ -554,7 +514,6 @@ export class LightTransitionController {
     
     // If no layers, force hard black output
     if (layerStates.size === 0) {
-      this._finalColors.set(lightId, blackColor);
       this._lightStateManager.setLightState(lightId, blackColor);
       return;
     }
@@ -569,9 +528,6 @@ export class LightTransitionController {
       finalColor = this.blendWithOpacity(finalColor, layerColor);
     }
 
-    // Store the final color
-    this._finalColors.set(lightId, finalColor);
-
     // Update the light state manager (will be batched)
     this._lightStateManager.setLightState(lightId, finalColor);
   }
@@ -583,16 +539,6 @@ export class LightTransitionController {
     // Use the centralized getEasingFunction helper
     const easingFn = getEasingFunction(easingName);
     return easingFn(progress);
-  }
-
-  /**
-   * Publishes _finalColors to LightStateManager.
-   */
-  private setFinalColors(): void {
-    this._finalColors.forEach((color, lightId) => {
-      this._lightStateManager.setLightState(lightId, color);
-    });
-  //  this._lightStateManager.publishLightStates();
   }
 
   /**
@@ -745,7 +691,6 @@ export class LightTransitionController {
     // Then clear all internal state
     this._transitionsByLight.clear();
     this._currentLayerStates.clear();
-    this._finalColors.clear();
     
     // Ensure the black state is published
     //this._lightStateManager.publishLightStates();
@@ -755,10 +700,8 @@ export class LightTransitionController {
    * Shuts down the LTC, stopping intervals and clearing data.
    */
   public shutdown(): void {
-    this.unregisterFromClock();
     this._transitionsByLight.clear();
     this._currentLayerStates.clear();
-    this._finalColors.clear();
     console.log('LightTransitionController has been shut down.');
   }
 
@@ -800,8 +743,6 @@ export class LightTransitionController {
     };
     
     if (!this._currentLayerStates.has(lightId)) {
-      // With no layers, force hard black output to avoid residual hardware colour
-      this._finalColors.set(lightId, blackColor);
       this._lightStateManager.setLightState(lightId, blackColor);
       return blackColor;
     }
@@ -810,7 +751,6 @@ export class LightTransitionController {
     
     // If no layers remain for this light, force hard black output
     if (layerStates.size === 0) {
-      this._finalColors.set(lightId, blackColor);
       this._lightStateManager.setLightState(lightId, blackColor);
       return blackColor;
     }
@@ -824,9 +764,6 @@ export class LightTransitionController {
     for (const [_, layerColor] of sortedLayers) {
       finalColor = this.blendWithOpacity(finalColor, layerColor);
     }
-
-    // Store the final color
-    this._finalColors.set(lightId, finalColor);
 
     // Update the light state manager
     this._lightStateManager.setLightState(lightId, finalColor);
@@ -950,7 +887,6 @@ export class LightTransitionController {
     // Clear all internal state
     this._transitionsByLight.clear();
     this._currentLayerStates.clear();
-    this._finalColors.clear();
 
     // Ensure the black state is published
    // this._lightStateManager.publishLightStates();

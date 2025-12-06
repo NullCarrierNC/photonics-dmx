@@ -14,7 +14,7 @@ If you see the term `light` this is the virtual representation used within the l
 1. `Listeners`: listen for game data over the network. Specific implementations for YARG and RB3E. When a lighting cue is received the matching processor is called.
 2. `Processors`: handle game events and convert them to lighting effects. YARG uses cue-based processing while RB3E uses a Processor Manager to select between direct DMX control and cue-based processing. Currently only direct is active.
 3. `Sequencer`: the central coordinator of the lighting system that manages the lifecycle of effects and transitions. It oversees the EffectManager and other components.
-4. `EffectManager`: receives effect data and orchestrates the creation and management of transitions. Handles effect queueing and scheduling.
+4. `EffectManager`: receives effect data and orchestrates the creation and management of transitions. Handles effect queueing and scheduling, assigns persistent runs, and restarts them only after every light in the run completes.
 5. `LightTransitionController`: processes transitions and interpolates colour states over time, applying easing functions and handling transform timing.
 6. `LayerManager`: tracks each light's state on a per-light-per-layer basis and is responsible for calculating the final results when layers are flattened.
 7. `DmxLightManager`: manages the virtual representation of the physical DMX fixtures. 
@@ -58,18 +58,18 @@ The system automatically selects the appropriate processor:
 
 The sequencing system contains several other components, though these are mainly used internally as part of the sequencer:
 
-- `TransitionEngine`: Handles the animation and timing of transitions between light states.
+- `TransitionEngine`: Handles the animation and timing of transitions between light states using the shared frame context captured by the Sequencer.
 - `SongEventHandler`: Processes beat, measure, and other musical events.
 - `SystemEffectsController`: Manages system-level effects blackout, which don't act like normal cue/effects.
 - `EventScheduler`: Handles scheduling and management of timed events within the system using the centralized clock.
-- `Clock`: Provides centralized timing control with configurable precision (default 5ms) for all system components. Components register for tick events to synchronize updates.
+- `Clock`: Provides centralized timing control with configurable precision (default 5ms) for all system components. Each tick yields a `FrameContext` that is passed to TransitionEngine and LightTransitionController.
 - `EffectTransformer`: Transforms generic effect definitions into concrete transition specifications.
-- `LightStateManager`: Manages the final merged RGBIO state for each light and publishes frame-synchronized updates to external listeners.
+- `LightStateManager`: Manages the final merged RGBIO state for each light and publishes the output of each atomic frame calculation to external listeners.
 - `DebugMonitor`: Provides real-time monitoring and debugging capabilities (when enabled).
 
 #### Centralized Timing
 
-The `Clock` provides a single source of truth for all timing operations in the sequencer. Components register callbacks that fire on each clock tick, ensuring synchronized frame updates across the system. The default interval is 5ms, providing smooth interpolation for lighting transitions. Components such as `LightTransitionController`, `TransitionEngine`, and `LightStateManager` use the clock to maintain consistent timing and prevent desynchronization.
+The `Clock` provides a single source of truth for all timing operations in the sequencer. On each tick the Sequencer captures a `FrameContext` containing the shared timestamp, delta, and frame index. TransitionEngine advances every effect state machine using that context, LightTransitionController interpolates/blends all lights using the same timestamp, and LightStateManager publishes the merged results immediately. The default interval is 5 ms, providing smooth interpolation while keeping every light in phase.
 
 ### Processing Components
 
@@ -248,6 +248,7 @@ Layer 0 will transition into the new effect.
 top of running ones without clearing them inadvertently. 
 `EffectManager.addEffectUnblockedName`: Adds an effect only if no effect with the same name is already running. Prevents queue breaking timing issues.
 `EffectManager.setEffectUnblockedName`: Sets an effect only if no effect with the same name is already running. Otherwise discards the new effect.
+Persistent effects register a run that tracks every light in the effect. The run only restarts when all lights report completion, keeping effects like sweeps synchronized even when the cue fires continuously.
 `EffectManager.getActiveEffectsForLight(lightId)`: Returns all active effects for a specific light across all layers
 `EffectManager.isLayerFreeForLight(layer, lightId)`: Checks if a specific layer is free for a specific light
 

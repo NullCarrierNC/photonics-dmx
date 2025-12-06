@@ -110,7 +110,7 @@ export class ControllerManager {
     const clock = new Clock(clockRate);
     
     // Create the sequencer components with the Clock
-    this.lightStateManager = new LightStateManager(clock);
+    this.lightStateManager = new LightStateManager();
     this.lightTransitionController = new LightTransitionController(this.lightStateManager);
     
     // Create the sequencer with all components

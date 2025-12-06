@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom, senderSacnEnabledAtom, senderArtNetEnabledAtom, senderEnttecProEnabledAtom, senderIpcEnabledAtom, LightingPreferences } from './atoms';
+import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom, senderSacnEnabledAtom, senderArtNetEnabledAtom, senderEnttecProEnabledAtom, senderIpcEnabledAtom, LightingPreferences, senderOpenDmxEnabledAtom, openDmxComPortAtom } from './atoms';
 import { Pages } from './types';
 import squareLogo from './assets/images/photonics-icon.png';
 import LeftMenu from './components/LeftMenu';
@@ -44,9 +44,11 @@ export const App = (): JSX.Element => {
   const setSenderError = useSetAtom(senderErrorAtom);
   const setCueState = useSetAtom(currentCueStateAtom);
   const setEnttecProComPort = useSetAtom(enttecProComPortAtom);
+  const setOpenDmxComPort = useSetAtom(openDmxComPortAtom);
   const setSacnEnabled = useSetAtom(senderSacnEnabledAtom);
   const setArtNetEnabled = useSetAtom(senderArtNetEnabledAtom);
   const setEnttecProEnabled = useSetAtom(senderEnttecProEnabledAtom);
+  const setOpenDmxEnabled = useSetAtom(senderOpenDmxEnabledAtom);
   const setIpcEnabled = useSetAtom(senderIpcEnabledAtom);
   const [appVer, setAppVer] = useState('');
 
@@ -92,6 +94,9 @@ export const App = (): JSX.Element => {
         break;
       case 'enttecpro':
         setEnttecProEnabled(false);
+        break;
+      case 'opendmx':
+        setOpenDmxEnabled(false);
         break;
       case 'ipc':
         setIpcEnabled(false);
@@ -266,26 +271,36 @@ export const App = (): JSX.Element => {
       const updatedPrefs = { ...prefs };
       
       // Initialize DMX output preferences from saved preferences or default values
+      const defaultDmxOutputConfig = {
+        sacnEnabled: false,
+        artNetEnabled: false,
+        enttecProEnabled: false,
+        openDmxEnabled: false
+      };
       if (!prefs.dmxOutputConfig) {
-        // If no saved preferences, initialize with default values (all disabled)
-        const defaultConfig = {
-          sacnEnabled: false,
-          artNetEnabled: false,
-          enttecProEnabled: false
-        };
-        console.log('No saved DMX output config, using defaults:', defaultConfig);
-        updatedPrefs.dmxOutputConfig = defaultConfig;
+        console.log('No saved DMX output config, using defaults:', defaultDmxOutputConfig);
+        updatedPrefs.dmxOutputConfig = defaultDmxOutputConfig;
+      } else {
+        updatedPrefs.dmxOutputConfig = { ...defaultDmxOutputConfig, ...prefs.dmxOutputConfig };
       }
 
-      // Initialize Enttec Pro COM port from saved preferences or default values
-      if (prefs.enttecProPort) {
-        console.log('Initializing Enttec Pro COM port from saved config:', prefs.enttecProPort);
-        setEnttecProComPort(prefs.enttecProPort);
+      const defaultEnttecProConfig = { port: '' };
+      if (!prefs.enttecProConfig) {
+        console.log('No saved Enttec Pro config, using defaults:', defaultEnttecProConfig);
+        updatedPrefs.enttecProConfig = defaultEnttecProConfig;
       } else {
-        // If no saved preferences, initialize with default value (empty string)
-        console.log('No saved Enttec Pro COM port, using default (empty string)');
-        setEnttecProComPort('');
+        updatedPrefs.enttecProConfig = { ...defaultEnttecProConfig, ...prefs.enttecProConfig };
       }
+      setEnttecProComPort(updatedPrefs.enttecProConfig?.port ?? '');
+
+      const defaultOpenDmxConfig = { port: '', dmxSpeed: 40 };
+      if (!prefs.openDmxConfig) {
+        console.log('No saved OpenDMX config, using defaults:', defaultOpenDmxConfig);
+        updatedPrefs.openDmxConfig = defaultOpenDmxConfig;
+      } else {
+        updatedPrefs.openDmxConfig = { ...defaultOpenDmxConfig, ...prefs.openDmxConfig };
+      }
+      setOpenDmxComPort(updatedPrefs.openDmxConfig?.port ?? '');
       
       // Initialize Stage Kit preferences if not present
       if (!prefs.stageKitPrefs) {
@@ -297,16 +312,20 @@ export const App = (): JSX.Element => {
       }
       
       // Initialize DMX settings preferences if not present
+      const defaultDmxSettingsPrefs = {
+        artNetExpanded: false,
+        enttecProExpanded: false,
+        sacnExpanded: false,
+        openDmxExpanded: false
+      };
       if (!prefs.dmxSettingsPrefs) {
-        const defaultDmxSettingsPrefs = {
-          artNetExpanded: false,
-          enttecProExpanded: false
-        };
         console.log('No saved DMX settings preferences, using defaults:', defaultDmxSettingsPrefs);
         updatedPrefs.dmxSettingsPrefs = defaultDmxSettingsPrefs;
+      } else {
+        updatedPrefs.dmxSettingsPrefs = { ...defaultDmxSettingsPrefs, ...prefs.dmxSettingsPrefs };
       }
       
-      // Set all preferences at once to avoid race conditions
+
       setPrefs(updatedPrefs);
       
     }

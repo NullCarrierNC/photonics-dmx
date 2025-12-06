@@ -3,7 +3,7 @@ import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
-import { RGBIO } from '../../../../types';
+import {  RGBIO,  } from '../../../../types';
 import { getSweepEffect } from '../../../../effects';
 
 /**
@@ -13,15 +13,13 @@ import { getSweepEffect } from '../../../../effects';
 export class StageKitMenuCue implements INetCue {
   id = 'stagekit-menu';
   cueId = CueType.Menu;
-  description = 'StageKit menu pattern - blue lights rotating in sequence';
+  description = 'StageKit menu pattern - solid blue lights, no motion in this implementation.';
   style = CueStyle.Primary;
-
+  private isFirstExecution: boolean = true;
+  
   async execute(_cueData: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const frontLights = lightManager.getLights(['front'], 'all');
-    const backLights = lightManager.getLights(['back'], 'all');
-
-    // Merge the sorted arrays into allLights
-    const allLights = [...frontLights, ...backLights];
+    const allLights = lightManager.getLights(['front', 'back'], ['all']);
+    
    
     const blue: RGBIO = getColor('blue', 'low');
     const brightBlue: RGBIO = getColor('blue', 'high');
@@ -37,12 +35,18 @@ export class StageKitMenuCue implements INetCue {
       betweenSweepDelay: 0,
       layer: 0,
     });
-    // Use unblocked to avoid breaking the sweep timing.
-    sequencer.setEffectUnblockedName('menu', sweep, true);
+    // Use unblocked to avoid breaking the sweep timing and keep the sweep atomic.
+    if (this.isFirstExecution) {
+      sequencer.setEffectUnblockedName('menu', sweep, true);
+      this.isFirstExecution = false;
+    } else {
+      sequencer.addEffectUnblockedName('menu', sweep, true);
+    }
+    
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {

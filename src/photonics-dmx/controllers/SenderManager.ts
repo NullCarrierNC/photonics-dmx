@@ -5,6 +5,7 @@ import { IpcSender } from '../senders/IpcSender';
 import { ArtNetSender } from '../senders/ArtNetSender';
 import { SacnSender } from '../senders/SacnSender';
 import { EnttecProSender } from '../senders/EnttecProSender';
+import { OpenDmxSender } from '../senders/OpenDmxSender';
 
 
 /**
@@ -33,7 +34,7 @@ export class SenderManager {
    */
   public async enableSender(
     id: string,
-    senderType: 'artnet' | 'sacn' | 'enttecpro' | 'ipc',
+    senderType: 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc',
     config: any
   ): Promise<void> {
     // Check if sender is already enabled or currently initializing
@@ -97,6 +98,13 @@ export class SenderManager {
               throw new Error('Device path (port) is required for EnttecPro sender');
             }
             sender = new EnttecProSender(devicePath, { dmxSpeed: 20 }, 'uni1');
+            break;
+          case 'opendmx':
+            const openDevicePath = config.devicePath;
+            if (!openDevicePath) {
+              throw new Error('Device path (port) is required for OpenDMX sender');
+            }
+            sender = new OpenDmxSender(openDevicePath, { dmxSpeed: config.dmxSpeed ?? 40 }, 'uni1');
             break;
 
           default:
