@@ -206,6 +206,7 @@ const ActionNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
   const waitFor = getConditionLabel(action.timing?.waitForCondition ?? 'none', action.timing?.waitForTime);
   const waitUntil = getConditionLabel(action.timing?.waitUntilCondition ?? 'none', action.timing?.waitUntilTime);
   const targetText = `${(action.target.groups ?? []).join(', ')} | ${action.target.filter}`;
+  const durationText = `(${action.timing?.duration ?? 0}ms)`;
 
   return (
     <div
@@ -219,7 +220,7 @@ const ActionNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
       <Handle type="target" position={Position.Top} />
       <div className="text-[11px] opacity-90">Wait for: {waitFor}</div>
       <div className="font-semibold text-sm text-center">{data.label}</div>
-      <div className="text-[11px] opacity-90 text-center">{targetText}</div>
+      <div className="text-[11px] opacity-90 text-center">{targetText} {durationText}</div>
       <div className="text-[11px] opacity-90">Wait until: {waitUntil}</div>
       <Handle type="source" position={Position.Bottom} />
     </div>
@@ -482,6 +483,17 @@ const CueEditor: React.FC = () => {
     if (!selectedNodeId) return null;
     return nodes.find(node => node.id === selectedNodeId) ?? null;
   }, [nodes, selectedNodeId]);
+
+  const selectedActionHasEventParent = useMemo(() => {
+    if (!selectedNode || selectedNode.data.kind !== 'action') return false;
+    return edges.some(edge => edge.target === selectedNode.id && nodes.find(n => n.id === edge.source)?.data.kind === 'event');
+  }, [edges, nodes, selectedNode]);
+
+  const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    setEdges(prev => prev.filter(e => e.id !== edge.id));
+    setIsDirty(true);
+  }, [setEdges]);
 
   const nodeTypes = useMemo(() => ({
     event: EventNodeComponent,
@@ -775,9 +787,49 @@ const CueEditor: React.FC = () => {
     if (!isValidNodeConnection(connection.source, connection.target)) {
       return;
     }
+
+    setNodes(prevNodes => {
+      const sourceNode = prevNodes.find(n => n.id === connection.source);
+      const targetNode = prevNodes.find(n => n.id === connection.target);
+      if (!sourceNode || !targetNode) return prevNodes;
+
+      // Only mutate action targets
+      if (targetNode.data.kind !== 'action') return prevNodes;
+
+      const targetAction = { ...(targetNode.data.payload as ActionNode) };
+
+      if (sourceNode.data.kind === 'event') {
+        const sourceEvent = sourceNode.data.payload as YargEventNode | AudioEventNode;
+        targetAction.timing = {
+          ...createDefaultActionTiming(),
+          ...(targetAction.timing ?? {}),
+          waitForCondition: sourceEvent.eventType as any,
+          waitForTime: 0
+        };
+      } else if (sourceNode.data.kind === 'action') {
+        const sourceAction = sourceNode.data.payload as ActionNode;
+        targetAction.color = { ...sourceAction.color };
+        targetAction.secondaryColor = sourceAction.secondaryColor ? { ...sourceAction.secondaryColor } : undefined;
+        targetAction.target = { ...sourceAction.target };
+        targetAction.layer = sourceAction.layer;
+      }
+
+      return prevNodes.map(node =>
+        node.id === targetNode.id
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                payload: targetAction
+              }
+            }
+          : node
+      );
+    });
+
     setEdges(eds => addEdge({ ...connection, type: 'default' }, eds));
     setIsDirty(true);
-  }, [isValidNodeConnection, setEdges]);
+  }, [isValidNodeConnection, setEdges, setNodes]);
 
   const isValidConnection = useCallback((connection: Connection) => {
     return isValidNodeConnection(connection.source, connection.target);
@@ -1131,10 +1183,12 @@ const CueEditor: React.FC = () => {
               onInit={setReactFlowInstance}
               isValidConnection={isValidConnection}
               onNodeContextMenu={handleNodeContextMenu}
+              onEdgeContextMenu={onEdgeContextMenu}
               onPaneClick={() => setContextMenu(null)}
               nodeTypes={nodeTypes}
               fitView
               className="rounded-b-lg"
+              proOptions={{ hideAttribution: true }}
             >
               <Panel position="top-left" className="bg-white/80 dark:bg-gray-900/80 px-2 py-1 text-[11px] rounded shadow">
                 <div>{selectedCueId ? `Cue: ${currentCueDefinition?.name}` : 'Select or add a cue'}</div>
@@ -1144,7 +1198,14 @@ const CueEditor: React.FC = () => {
                   </div>
                 )}
               </Panel>
-              <MiniMap pannable zoomable />
+              <MiniMap
+                pannable
+                zoomable
+                maskColor="rgba(31,41,55,0.6)"
+                nodeColor="#93c5fd"
+                nodeStrokeColor="#60a5fa"
+                backgroundColor="#ffffff"
+              />
               <Controls />
               <Background gap={16} size={0.5} />
             </ReactFlow>
@@ -1416,19 +1477,26 @@ const CueEditor: React.FC = () => {
                             className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                             value={currentTiming.waitForCondition}
                             onChange={event => updateTiming({ waitForCondition: event.target.value as WaitCondition })}
+                            disabled={selectedActionHasEventParent}
                           >
                             {getActionWaitOptions(activeMode).map(option => (
                               <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
+                          {selectedActionHasEventParent && (
+                            <span className="text-[10px] text-gray-500">Inherited from event parent</span>
+                          )}
                         </label>
-                        <label className="flex flex-col font-medium">
+                        <label className={`flex flex-col font-medium ${currentTiming.waitForCondition !== 'delay' ? 'opacity-60 cursor-not-allowed' : ''}`}>
                           Wait For Time (ms)
                           <input
                             type="number"
                             min={0}
-                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            className={`mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 ${
+                              currentTiming.waitForCondition !== 'delay' ? 'opacity-60 cursor-not-allowed' : ''
+                            }`}
                             value={currentTiming.waitForTime}
+                            disabled={currentTiming.waitForCondition !== 'delay'}
                             onChange={event => updateTiming({ waitForTime: Number(event.target.value) })}
                           />
                         </label>
@@ -1466,13 +1534,16 @@ const CueEditor: React.FC = () => {
                             ))}
                           </select>
                         </label>
-                        <label className="flex flex-col font-medium">
+                        <label className={`flex flex-col font-medium ${currentTiming.waitUntilCondition !== 'delay' ? 'opacity-60 cursor-not-allowed' : ''}`}>
                           Wait Until Time (ms)
                           <input
                             type="number"
                             min={0}
-                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            className={`mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 ${
+                              currentTiming.waitUntilCondition !== 'delay' ? 'opacity-60 cursor-not-allowed' : ''
+                            }`}
                             value={currentTiming.waitUntilTime}
+                            disabled={currentTiming.waitUntilCondition !== 'delay'}
                             onChange={event => updateTiming({ waitUntilTime: Number(event.target.value) })}
                           />
                         </label>
