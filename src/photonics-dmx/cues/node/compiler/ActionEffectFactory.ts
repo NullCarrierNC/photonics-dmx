@@ -1,8 +1,6 @@
 import { WaitCondition, TrackedLight, Effect, EffectTransition, RGBIO, LocationGroup } from '../../../types';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import {
-  getEffectCrossFadeColors,
-  getEffectFlashColor,
   getSweepEffect,
   getEffectCycleLights,
   getEffectBlackout
@@ -43,12 +41,6 @@ const resolveColor = (color: NodeColorSetting, scale: number): RGBIO => {
   rgb.opacity = clamp(rgb.opacity * clampedScale, 0, 1);
   return rgb;
 };
-
-const transparentVariant = (color: RGBIO): RGBIO => ({
-  ...color,
-  intensity: 0,
-  opacity: 0
-});
 
 const ensureTiming = (action: ActionNode): ActionTimingConfig => ({
   ...createDefaultActionTiming(),
@@ -135,51 +127,6 @@ export class ActionEffectFactory {
             ...timing,
             waitForTime
           },
-          easing
-        });
-        break;
-      }
-      case 'cross-fade': {
-        const duration = safeDuration(timing.duration, 150, 10);
-        const afterStartWait = safeDuration(timing.waitUntilTime, 0, 0);
-        const afterEndWait = 0;
-        effect = getEffectCrossFadeColors({
-          lights,
-          layer,
-          startColor: baseColor,
-          endColor: secondaryColor,
-          duration,
-          waitFor,
-          crossFadeTrigger: 'delay',
-          afterStartWait,
-          afterEndColorWait: afterEndWait,
-          easing
-        });
-        break;
-      }
-      case 'flash': {
-        effect = getEffectFlashColor({
-          lights,
-          layer,
-          color: baseColor,
-          startTrigger: waitFor,
-          startWait: waitForTime,
-          holdTime: safeDuration(timing.waitUntilTime, 0, 0),
-          durationIn: safeDuration(timing.duration, 50, 10),
-          durationOut: 0,
-          endTrigger: 'delay',
-          endWait: 0,
-          easing
-        });
-        break;
-      }
-      case 'fade-in-out': {
-        effect = createSingleColorEffect({
-          lights,
-          layer,
-          waitFor,
-          color: baseColor,
-          timing,
           easing
         });
         break;

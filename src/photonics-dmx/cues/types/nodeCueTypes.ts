@@ -99,9 +99,6 @@ export interface AudioEventNode extends BaseEventNode {
 
 export type NodeEffectType =
   | 'single-color'
-  | 'cross-fade'
-  | 'flash'
-  | 'fade-in-out'
   | 'sweep'
   | 'cycle'
   | 'blackout';

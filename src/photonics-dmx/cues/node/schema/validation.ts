@@ -65,7 +65,7 @@ const AUDIO_EVENT_TYPES: AudioEventType[] = [
 ] as const;
 
 const NODE_EFFECT_TYPES: NodeEffectType[] = [
-  'single-color', 'cross-fade', 'flash', 'fade-in-out', 'sweep', 'cycle', 'blackout'
+  'single-color', 'sweep', 'cycle', 'blackout'
 ] as const;
 
 const ajv = new Ajv({

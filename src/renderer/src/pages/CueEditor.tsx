@@ -143,7 +143,7 @@ const LIGHT_TARGETS: LightTarget[] = [
 ];
 
 const ACTION_OPTIONS: NodeEffectType[] = [
-  'single-color', 'cross-fade', 'flash', 'fade-in-out', 'sweep', 'cycle', 'blackout'
+  'single-color', 'sweep', 'cycle', 'blackout'
 ];
 
 const YARG_WAIT_CONDITIONS: WaitCondition[] = [
@@ -187,6 +187,9 @@ const getAudioEventLabel = (eventType: AudioEventNode['eventType']): string =>
 
 const getActionWaitOptions = (mode: NodeCueMode): EventOption<string>[] =>
   mode === 'yarg' ? ACTION_WAIT_OPTIONS_YARG : ACTION_WAIT_OPTIONS_AUDIO;
+
+const getDefaultEventOption = (mode: NodeCueMode): EventOption<WaitCondition | AudioEventNode['eventType']> =>
+  mode === 'yarg' ? YARG_EVENT_OPTIONS[0] : AUDIO_EVENT_OPTIONS[0];
 
 const buildDefaultAction = (): ActionNode => ({
   id: `action-${createId()}`,
@@ -940,6 +943,220 @@ const CueEditor: React.FC = () => {
             ))}
           </div>
           <div className="mt-4 border-t border-gray-200 dark:border-gray-800 pt-4">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-semibold text-sm">Cue List</h3>
+              <button
+                className="text-blue-500 text-xs hover:underline"
+                onClick={handleAddCue}
+              >
+                + Add Cue
+              </button>
+            </div>
+            <div className="space-y-1 text-xs">
+              {editorDoc?.file.cues.map(cue => (
+                <div key={cue.id} className="flex items-center gap-2">
+                  <button
+                    className={`flex-1 text-left px-2 py-1 rounded border ${selectedCueId === cue.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400' : 'border-gray-200 dark:border-gray-700'}`}
+                    onClick={() => {
+                      setSelectedCueId(cue.id);
+                      loadCueIntoFlow(cue as any);
+                    }}
+                  >
+                    {cue.name}
+                  </button>
+                  <button
+                    className="text-[11px] text-red-500 hover:underline disabled:text-gray-400"
+                    onClick={() => removeCue(cue.id)}
+                    disabled={(editorDoc?.file.cues.length ?? 0) <= 1}
+                    title={(editorDoc?.file.cues.length ?? 0) <= 1 ? 'At least one cue is required' : 'Remove cue'}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <section className="flex flex-col bg-white dark:bg-gray-900 rounded-lg shadow-inner">
+          <div className="p-3 border-b border-gray-200 dark:border-gray-800 space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col text-xs font-medium">
+                Filename
+                <input
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={filename}
+                  onChange={event => {
+                    setFilename(event.target.value);
+                    setIsDirty(true);
+                  }}
+                />
+              </label>
+              <label className="flex flex-col text-xs font-medium">
+                Group ID
+                <input
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={editorDoc?.file.group.id ?? ''}
+                  onChange={event => updateGroupMeta({ id: event.target.value })}
+                />
+              </label>
+              <label className="flex flex-col text-xs font-medium">
+                Group Name
+                <input
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={editorDoc?.file.group.name ?? ''}
+                  onChange={event => updateGroupMeta({ name: event.target.value })}
+                />
+              </label>
+              <label className="flex flex-col text-xs font-medium">
+                Group Description
+                <input
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={editorDoc?.file.group.description ?? ''}
+                  onChange={event => updateGroupMeta({ description: event.target.value })}
+                />
+              </label>
+            </div>
+
+            {currentCueDefinition && (
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <label className="flex flex-col font-medium">
+                  Cue Name
+                  <input
+                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                    value={currentCueDefinition.name}
+                    onChange={event => updateCueMetadata({ name: event.target.value })}
+                  />
+                </label>
+                <label className="flex flex-col font-medium">
+                  Cue Description
+                  <input
+                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                    value={currentCueDefinition.description ?? ''}
+                    onChange={event => updateCueMetadata({ description: event.target.value })}
+                  />
+                </label>
+                {activeMode === 'yarg' ? (
+                  <>
+                    <label className="flex flex-col font-medium">
+                      Cue Type
+                      <select
+                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                        value={(currentCueDefinition as YargNodeCueDefinition).cueType}
+                        onChange={event => updateCueMetadata({ cueType: event.target.value as CueType })}
+                      >
+                        {availableCueTypes.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col font-medium">
+                      Cue Style
+                      <select
+                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                        value={(currentCueDefinition as YargNodeCueDefinition).style}
+                        onChange={event => updateCueMetadata({ style: event.target.value as 'primary' | 'secondary' })}
+                      >
+                        <option value="primary">Primary</option>
+                        <option value="secondary">Secondary</option>
+                      </select>
+                    </label>
+                  </>
+                ) : (
+                  <label className="flex flex-col font-medium">
+                    Cue Identifier
+                    <input
+                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                      value={(currentCueDefinition as AudioNodeCueDefinition).cueTypeId}
+                      onChange={event => updateCueMetadata({ cueTypeId: event.target.value })}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 relative" ref={flowWrapperRef}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onSelectionChange={handleNodeSelection}
+              onInit={setReactFlowInstance}
+              isValidConnection={isValidConnection}
+              onNodeContextMenu={handleNodeContextMenu}
+              onPaneClick={() => setContextMenu(null)}
+              fitView
+              className="rounded-b-lg"
+            >
+              <Panel position="top-left" className="bg-white/80 dark:bg-gray-900/80 px-2 py-1 text-[11px] rounded shadow">
+                <div>{selectedCueId ? `Cue: ${currentCueDefinition?.name}` : 'Select or add a cue'}</div>
+                {chainDuration > 0 && (
+                  <div className="text-gray-600 dark:text-gray-400">
+                    Chain duration: {formatDuration(chainDuration)}
+                  </div>
+                )}
+              </Panel>
+              <MiniMap pannable zoomable />
+              <Controls />
+              <Background gap={16} size={0.5} />
+            </ReactFlow>
+            {contextMenu && (
+              <div
+                className="absolute bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow text-xs"
+                style={{ top: contextMenu.y, left: contextMenu.x, zIndex: 20 }}
+              >
+                <button
+                  className="block w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => handleRemoveNode(contextMenu.nodeId)}
+                >
+                  Remove node
+                </button>
+               
+              </div>
+            )}
+          </div>
+          {validationErrors.length > 0 && (
+            <div className="p-3 text-xs text-red-600 dark:text-red-300 border-t border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40">
+              <p className="font-semibold mb-1">Validation errors</p>
+              <ul className="list-disc list-inside space-y-1">
+                {validationErrors.map(error => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+
+        <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-y-auto space-y-4">
+          <div>
+            <h3 className="font-semibold text-sm mb-2">Event Nodes</h3>
+            <button
+              className="border rounded px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+              onClick={() => addEventNode(getDefaultEventOption(activeMode))}
+            >
+              Add Event Node
+            </button>
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {ACTION_OPTIONS.map(effect => (
+                <button
+                  key={effect}
+                  className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => addActionNode(effect)}
+                >
+                  {effect}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
             <h3 className="font-semibold text-sm mb-2">Selected Node</h3>
             {!selectedNode ? (
               <p className="text-xs text-gray-500">Select a node on the canvas to edit its properties.</p>
@@ -1069,6 +1286,26 @@ const CueEditor: React.FC = () => {
                       ))}
                     </select>
                   </label>
+                  {(((selectedNode.data.payload as ActionNode).effectType === 'sweep') ||
+                    (selectedNode.data.payload as ActionNode).effectType === 'cycle') && (
+                    <label className="flex flex-col font-medium">
+                      Secondary Colour
+                      <select
+                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                        value={(selectedNode.data.payload as ActionNode).secondaryColor?.name ?? 'transparent'}
+                        onChange={event => updateSelectedNode({
+                          secondaryColor: {
+                            ...(selectedNode.data.payload as ActionNode).secondaryColor ?? { brightness: 'medium', blendMode: 'replace' },
+                            name: event.target.value as Color
+                          }
+                        } as ActionNode)}
+                      >
+                        {COLOR_OPTIONS.map(color => (
+                          <option key={color} value={color}>{color}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <label className="flex flex-col font-medium">
                     Brightness
                     <select
@@ -1234,227 +1471,171 @@ const CueEditor: React.FC = () => {
                     );
                   })()}
                 </div>
+
+                {(() => {
+                  const actionPayload = selectedNode.data.payload as ActionNode;
+                  const updateConfig = (partial: Partial<NonNullable<ActionNode['config']>>) =>
+                    updateSelectedNode<ActionNode>({
+                      config: {
+                        ...(actionPayload.config ?? {}),
+                        ...partial
+                      }
+                    });
+
+                  if (actionPayload.effectType === 'sweep') {
+                    const cfg = actionPayload.config?.sweep ?? {};
+                    return (
+                      <div className="mt-3 border-t pt-3 space-y-2">
+                        <div className="font-semibold text-xs">Sweep Settings</div>
+                        <label className="flex flex-col font-medium text-xs">
+                          Duration (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.duration ?? ''}
+                            onChange={e => updateConfig({ sweep: { ...cfg, duration: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium text-xs">
+                          Fade In (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.fadeIn ?? ''}
+                            onChange={e => updateConfig({ sweep: { ...cfg, fadeIn: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium text-xs">
+                          Fade Out (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.fadeOut ?? ''}
+                            onChange={e => updateConfig({ sweep: { ...cfg, fadeOut: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium text-xs">
+                          Overlap (%)
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.overlap ?? ''}
+                            onChange={e => updateConfig({ sweep: { ...cfg, overlap: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium text-xs">
+                          Between Delay (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.betweenDelay ?? ''}
+                            onChange={e => updateConfig({ sweep: { ...cfg, betweenDelay: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium text-xs">
+                          Low Colour
+                          <select
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.lowColor?.name ?? 'transparent'}
+                            onChange={event => updateConfig({
+                              sweep: {
+                                ...cfg,
+                                lowColor: {
+                                  ...(cfg.lowColor ?? { brightness: 'medium', blendMode: 'replace' }),
+                                  name: event.target.value as Color
+                                }
+                              }
+                            })}
+                          >
+                            {COLOR_OPTIONS.map(color => (
+                              <option key={color} value={color}>{color}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    );
+                  }
+
+                  if (actionPayload.effectType === 'cycle') {
+                    const cfg = actionPayload.config?.cycle ?? {};
+                    return (
+                      <div className="mt-3 border-t pt-3 space-y-2">
+                        <div className="font-semibold text-xs">Cycle Settings</div>
+                        <label className="flex flex-col font-medium text-xs">
+                          Base Colour
+                          <select
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.baseColor?.name ?? 'transparent'}
+                            onChange={event => updateConfig({
+                              cycle: {
+                                ...cfg,
+                                baseColor: {
+                                  ...(cfg.baseColor ?? { brightness: 'medium', blendMode: 'replace' }),
+                                  name: event.target.value as Color
+                                }
+                              }
+                            })}
+                          >
+                            {COLOR_OPTIONS.map(color => (
+                              <option key={color} value={color}>{color}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex flex-col font-medium text-xs">
+                          Transition Duration (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.transitionDuration ?? ''}
+                            onChange={e => updateConfig({ cycle: { ...cfg, transitionDuration: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium text-xs">
+                          Trigger
+                          <select
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.trigger ?? 'none'}
+                            onChange={event => updateConfig({ cycle: { ...cfg, trigger: event.target.value as WaitCondition } })}
+                          >
+                            {ACTION_WAIT_OPTIONS_YARG.map(option => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    );
+                  }
+
+                  if (actionPayload.effectType === 'blackout') {
+                    const cfg = actionPayload.config?.blackout ?? {};
+                    return (
+                      <div className="mt-3 border-t pt-3 space-y-2">
+                        <div className="font-semibold text-xs">Blackout Settings</div>
+                        <label className="flex flex-col font-medium text-xs">
+                          Duration (ms)
+                          <input
+                            type="number"
+                            min={10}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={cfg.duration ?? ''}
+                            onChange={e => updateConfig({ blackout: { ...cfg, duration: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                          />
+                        </label>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
               </div>
             )}
-          </div>
-        </aside>
-
-        <section className="flex flex-col bg-white dark:bg-gray-900 rounded-lg shadow-inner">
-          <div className="p-3 border-b border-gray-200 dark:border-gray-800 space-y-2">
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col text-xs font-medium">
-                Filename
-                <input
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={filename}
-                  onChange={event => {
-                    setFilename(event.target.value);
-                    setIsDirty(true);
-                  }}
-                />
-              </label>
-              <label className="flex flex-col text-xs font-medium">
-                Group ID
-                <input
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={editorDoc?.file.group.id ?? ''}
-                  onChange={event => updateGroupMeta({ id: event.target.value })}
-                />
-              </label>
-              <label className="flex flex-col text-xs font-medium">
-                Group Name
-                <input
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={editorDoc?.file.group.name ?? ''}
-                  onChange={event => updateGroupMeta({ name: event.target.value })}
-                />
-              </label>
-              <label className="flex flex-col text-xs font-medium">
-                Group Description
-                <input
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={editorDoc?.file.group.description ?? ''}
-                  onChange={event => updateGroupMeta({ description: event.target.value })}
-                />
-              </label>
-            </div>
-
-            {currentCueDefinition && (
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <label className="flex flex-col font-medium">
-                  Cue Name
-                  <input
-                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                    value={currentCueDefinition.name}
-                    onChange={event => updateCueMetadata({ name: event.target.value })}
-                  />
-                </label>
-                <label className="flex flex-col font-medium">
-                  Cue Description
-                  <input
-                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                    value={currentCueDefinition.description ?? ''}
-                    onChange={event => updateCueMetadata({ description: event.target.value })}
-                  />
-                </label>
-                {activeMode === 'yarg' ? (
-                  <>
-                    <label className="flex flex-col font-medium">
-                      Cue Type
-                      <select
-                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={(currentCueDefinition as YargNodeCueDefinition).cueType}
-                        onChange={event => updateCueMetadata({ cueType: event.target.value as CueType })}
-                      >
-                        {availableCueTypes.map(type => (
-                          <option key={type} value={type}>{type}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="flex flex-col font-medium">
-                      Cue Style
-                      <select
-                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={(currentCueDefinition as YargNodeCueDefinition).style}
-                        onChange={event => updateCueMetadata({ style: event.target.value as 'primary' | 'secondary' })}
-                      >
-                        <option value="primary">Primary</option>
-                        <option value="secondary">Secondary</option>
-                      </select>
-                    </label>
-                  </>
-                ) : (
-                  <label className="flex flex-col font-medium">
-                    Cue Identifier
-                    <input
-                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                      value={(currentCueDefinition as AudioNodeCueDefinition).cueTypeId}
-                      onChange={event => updateCueMetadata({ cueTypeId: event.target.value })}
-                    />
-                  </label>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 relative" ref={flowWrapperRef}>
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onSelectionChange={handleNodeSelection}
-              onInit={setReactFlowInstance}
-              isValidConnection={isValidConnection}
-              onNodeContextMenu={handleNodeContextMenu}
-              onPaneClick={() => setContextMenu(null)}
-              fitView
-              className="rounded-b-lg"
-            >
-              <Panel position="top-left" className="bg-white/80 dark:bg-gray-900/80 px-2 py-1 text-[11px] rounded shadow">
-                <div>{selectedCueId ? `Cue: ${currentCueDefinition?.name}` : 'Select or add a cue'}</div>
-                {chainDuration > 0 && (
-                  <div className="text-gray-600 dark:text-gray-400">
-                    Chain duration: {formatDuration(chainDuration)}
-                  </div>
-                )}
-              </Panel>
-              <MiniMap pannable zoomable />
-              <Controls />
-              <Background gap={16} size={0.5} />
-            </ReactFlow>
-            {contextMenu && (
-              <div
-                className="absolute bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow text-xs"
-                style={{ top: contextMenu.y, left: contextMenu.x, zIndex: 20 }}
-              >
-                <button
-                  className="block w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  onClick={() => handleRemoveNode(contextMenu.nodeId)}
-                >
-                  Remove node
-                </button>
-               
-              </div>
-            )}
-          </div>
-          {validationErrors.length > 0 && (
-            <div className="p-3 text-xs text-red-600 dark:text-red-300 border-t border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40">
-              <p className="font-semibold mb-1">Validation errors</p>
-              <ul className="list-disc list-inside space-y-1">
-                {validationErrors.map(error => (
-                  <li key={error}>{error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
-
-        <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-y-auto space-y-4">
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-semibold text-sm">Cue List</h3>
-              <button
-                className="text-blue-500 text-xs hover:underline"
-                onClick={handleAddCue}
-              >
-                + Add Cue
-              </button>
-            </div>
-            <div className="space-y-1 text-xs">
-              {editorDoc?.file.cues.map(cue => (
-                <div key={cue.id} className="flex items-center gap-2">
-                  <button
-                    className={`flex-1 text-left px-2 py-1 rounded border ${selectedCueId === cue.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400' : 'border-gray-200 dark:border-gray-700'}`}
-                    onClick={() => {
-                      setSelectedCueId(cue.id);
-                      loadCueIntoFlow(cue as any);
-                    }}
-                  >
-                    {cue.name}
-                  </button>
-                  <button
-                    className="text-[11px] text-red-500 hover:underline disabled:text-gray-400"
-                    onClick={() => removeCue(cue.id)}
-                    disabled={(editorDoc?.file.cues.length ?? 0) <= 1}
-                    title={(editorDoc?.file.cues.length ?? 0) <= 1 ? 'At least one cue is required' : 'Remove cue'}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-sm mb-2">Event Nodes</h3>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {(activeMode === 'yarg' ? YARG_EVENT_OPTIONS : AUDIO_EVENT_OPTIONS).map(option => (
-                <button
-                  key={option.value}
-                  className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => addEventNode(option)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {ACTION_OPTIONS.map(effect => (
-                <button
-                  key={effect}
-                  className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => addActionNode(effect)}
-                >
-                  {effect}
-                </button>
-              ))}
-            </div>
           </div>
         </aside>
       </div>
