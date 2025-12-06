@@ -9,8 +9,11 @@ import ReactFlow, {
   Connection,
   Edge,
   Node,
+  NodeProps,
   Panel,
-  ReactFlowInstance
+  ReactFlowInstance,
+  Handle,
+  Position
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { NodeCueFileSummary } from '../../../photonics-dmx/cues/node/loader/NodeCueLoader';
@@ -190,6 +193,60 @@ const getActionWaitOptions = (mode: NodeCueMode): EventOption<string>[] =>
 
 const getDefaultEventOption = (mode: NodeCueMode): EventOption<WaitCondition | AudioEventNode['eventType']> =>
   mode === 'yarg' ? YARG_EVENT_OPTIONS[0] : AUDIO_EVENT_OPTIONS[0];
+
+
+const getConditionLabel = (condition: string, time?: number): string => {
+  if (!condition) return 'none';
+  if (condition === 'delay' && (time ?? 0) > 0) {
+    return `delay (${Math.round(time ?? 0)}ms)`;
+  }
+  return condition;
+};
+
+const getTextColorForBg = (name: string): string => {
+  const lightish = ['white', 'yellow', 'amber', 'chartreuse', 'cyan', 'transparent'];
+  return lightish.includes(name) ? '#111827' : '#f9fafb';
+};
+
+const EventNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
+  const eventType = (data.payload as YargEventNode | AudioEventNode).eventType;
+  return (
+    <div className="px-3 py-2 rounded-lg border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-xs shadow-sm min-w-[140px]">
+      <div className="flex items-center gap-1 font-semibold text-blue-800 dark:text-blue-100">
+        <span role="img" aria-label="event">⚡</span>
+        <span>{`Event · ${eventType}`}</span>
+      </div>
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+};
+
+const ActionNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
+  const action = data.payload as ActionNode;
+  const colorName = action.color?.name ?? 'gray';
+  const textColor = getTextColorForBg(colorName);
+  const waitFor = getConditionLabel(action.timing?.waitForCondition ?? 'none', action.timing?.waitForTime);
+  const waitUntil = getConditionLabel(action.timing?.waitUntilCondition ?? 'none', action.timing?.waitUntilTime);
+  const targetText = `${(action.target.groups ?? []).join(', ')} | ${action.target.filter}`;
+
+  return (
+    <div
+      className="px-3 py-2 rounded-lg border text-xs shadow-sm min-w-[160px]"
+      style={{
+        backgroundColor: colorName,
+        borderColor: 'rgba(0,0,0,0.15)',
+        color: textColor
+      }}
+    >
+      <Handle type="target" position={Position.Top} />
+      <div className="text-[11px] opacity-90">Wait for: {waitFor}</div>
+      <div className="font-semibold text-sm text-center">{data.label}</div>
+      <div className="text-[11px] opacity-90 text-center">{targetText}</div>
+      <div className="text-[11px] opacity-90">Wait until: {waitUntil}</div>
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+};
 
 const buildDefaultAction = (): ActionNode => ({
   id: `action-${createId()}`,
@@ -448,6 +505,11 @@ const CueEditor: React.FC = () => {
     return nodes.find(node => node.id === selectedNodeId) ?? null;
   }, [nodes, selectedNodeId]);
 
+  const nodeTypes = useMemo(() => ({
+    event: EventNodeComponent,
+    action: ActionNodeComponent
+  }), []);
+
   const currentCueDefinition = useMemo(() => {
     if (!editorDoc || !selectedCueId) return null;
     return editorDoc.file.cues.find(cue => cue.id === selectedCueId) ?? null;
@@ -496,6 +558,7 @@ const CueEditor: React.FC = () => {
     const flowNodes: EditorNode[] = [
       ...cue.nodes.events.map(event => ({
         id: event.id,
+        type: 'event',
         position: nodePositions[event.id] ?? { x: 100, y: 100 },
         data: {
           kind: 'event' as const,
@@ -507,6 +570,7 @@ const CueEditor: React.FC = () => {
       })),
       ...cue.nodes.actions.map(action => ({
         id: action.id,
+        type: 'action',
         position: nodePositions[action.id] ?? { x: 400, y: 100 },
         data: {
           kind: 'action' as const,
@@ -670,6 +734,7 @@ const CueEditor: React.FC = () => {
     const newEventId = `event-${createId()}`;
     const newNode: EditorNode = {
       id: newEventId,
+      type: 'event',
       position: {
         x: 120,
         y: 80 + nodes.length * 40
@@ -690,6 +755,7 @@ const CueEditor: React.FC = () => {
     const action = { ...buildDefaultAction(), id: `action-${createId()}`, effectType };
     const newNode: EditorNode = {
       id: action.id,
+      type: 'action',
       position: {
         x: 480,
         y: 160 + nodes.length * 40
@@ -1088,6 +1154,7 @@ const CueEditor: React.FC = () => {
               isValidConnection={isValidConnection}
               onNodeContextMenu={handleNodeContextMenu}
               onPaneClick={() => setContextMenu(null)}
+              nodeTypes={nodeTypes}
               fitView
               className="rounded-b-lg"
             >
