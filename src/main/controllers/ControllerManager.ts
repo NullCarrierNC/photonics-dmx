@@ -821,9 +821,9 @@ export class ControllerManager {
 
       // Restore previously active listeners
       if (wasYargEnabled) {
-        this.enableYarg();
+        await this.enableYarg();
       } else if (wasRb3Enabled) {
-        this.enableRb3();
+        await this.enableRb3();
       }
 
       console.log("Controllers restarted successfully");
@@ -840,12 +840,7 @@ export class ControllerManager {
     // Check if the system is initialized, initialize if needed
     if (!this.isInitialized) {
       console.log("Initializing system before enabling Audio");
-      this.init().then(() => {
-        this.enableAudioInternal();
-      }).catch(error => {
-        console.error("Error during initialization:", error);
-      });
-      return;
+      await this.init();
     }
     
     await this.enableAudioInternal();
