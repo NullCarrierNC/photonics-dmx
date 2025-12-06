@@ -2,7 +2,7 @@ import Ajv, { DefinedError, JSONSchemaType } from 'ajv';
 import addFormats from 'ajv-formats';
 import {
   ActionNode,
-  ActionTiming,
+  ActionTimingConfig,
   AudioEventNode,
   AudioNodeCueDefinition,
   AudioNodeCueFile,
@@ -57,6 +57,8 @@ const WAIT_CONDITIONS: WaitCondition[] = [
 ] as const;
 
 const AUDIO_EVENT_TYPES: AudioEventType[] = [
+  'none',
+  'delay',
   'audio-beat',
   'audio-range1', 'audio-range2', 'audio-range3', 'audio-range4', 'audio-range5',
   'audio-energy'
@@ -94,17 +96,19 @@ const colorSchema: JSONSchemaType<{
   }
 };
 
-const timingSchema: JSONSchemaType<ActionTiming> = {
+const timingSchema: JSONSchemaType<ActionTimingConfig> = {
   type: 'object',
-  required: ['fadeIn', 'hold', 'fadeOut', 'postDelay'],
+  required: ['waitForCondition', 'waitForTime', 'duration', 'waitUntilCondition', 'waitUntilTime'],
   additionalProperties: false,
   properties: {
-    fadeIn: { type: 'number', minimum: 0 },
-    hold: { type: 'number', minimum: 0 },
-    fadeOut: { type: 'number', minimum: 0 },
-    postDelay: { type: 'number', minimum: 0 },
-    easeIn: { type: 'string', nullable: true },
-    easeOut: { type: 'string', nullable: true },
+    waitForCondition: { type: 'string', enum: WAIT_CONDITIONS },
+    waitForTime: { type: 'number', minimum: 0 },
+    waitForConditionCount: { type: 'number', nullable: true, minimum: 0 },
+    duration: { type: 'number', minimum: 0 },
+    waitUntilCondition: { type: 'string', enum: WAIT_CONDITIONS },
+    waitUntilTime: { type: 'number', minimum: 0 },
+    waitUntilConditionCount: { type: 'number', nullable: true, minimum: 0 },
+    easing: { type: 'string', nullable: true },
     level: { type: 'number', nullable: true, minimum: 0, maximum: 1 }
   }
 };

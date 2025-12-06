@@ -29,7 +29,15 @@ describe('Node cue chaining', () => {
             effectType: 'single-color',
             target: { groups: ['front'], filter: 'all' },
             color: { name: 'red', brightness: 'medium', blendMode: 'replace' },
-            timing: { fadeIn: 100, hold: 0, fadeOut: 0, postDelay: 0, easeIn: 'linear', easeOut: 'linear', level: 1 },
+            timing: {
+              waitForCondition: 'none',
+              waitForTime: 0,
+              duration: 100,
+              waitUntilCondition: 'delay',
+              waitUntilTime: 0,
+              easing: 'linear',
+              level: 1
+            },
             layer: 10
           },
           {
@@ -38,7 +46,15 @@ describe('Node cue chaining', () => {
             effectType: 'single-color',
             target: { groups: ['back'], filter: 'all' },
             color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
-            timing: { fadeIn: 50, hold: 0, fadeOut: 0, postDelay: 0, easeIn: 'linear', easeOut: 'linear', level: 1 },
+            timing: {
+              waitForCondition: 'none',
+              waitForTime: 0,
+              duration: 50,
+              waitUntilCondition: 'delay',
+              waitUntilTime: 0,
+              easing: 'linear',
+              level: 1
+            },
             layer: 10
           }
         ]

@@ -25,8 +25,7 @@ import type {
   NodeEffectType,
   YargEventNode,
   YargNodeCueDefinition,
-  YargNodeCueFile,
-  ActionTiming
+  YargNodeCueFile
 } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { ActionNode } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 import { createDefaultActionTiming } from '../../../photonics-dmx/cues/types/nodeCueTypes';
@@ -156,22 +155,38 @@ const YARG_WAIT_CONDITIONS: WaitCondition[] = [
   'drum-yellow-cymbal', 'drum-blue-cymbal', 'drum-green-cymbal'
 ] as WaitCondition[];
 
-const YARG_EVENT_OPTIONS: EventOption<WaitCondition>[] = [
-  { value: 'none', label: 'Cue Start' },
-  ...withDefaultLabels(YARG_WAIT_CONDITIONS)
-];
-
+// Event palette options (nodes the user can add) — no synthetic "none"/"delay"
+const YARG_EVENT_OPTIONS: EventOption<WaitCondition>[] = withDefaultLabels(YARG_WAIT_CONDITIONS);
 const AUDIO_EVENT_OPTIONS: EventOption<AudioEventNode['eventType']>[] = withDefaultLabels([
   'audio-beat',
   'audio-range1', 'audio-range2', 'audio-range3', 'audio-range4', 'audio-range5',
   'audio-energy'
 ]);
 
+// Action timing wait options (allow none/delay)
+const ACTION_WAIT_OPTIONS_YARG: EventOption<WaitCondition>[] = [
+  { value: 'none', label: 'None' },
+  { value: 'delay', label: 'Delay' },
+  ...withDefaultLabels(YARG_WAIT_CONDITIONS)
+];
+const ACTION_WAIT_OPTIONS_AUDIO: EventOption<AudioEventNode['eventType'] | 'none' | 'delay'>[] = [
+  { value: 'none', label: 'None' },
+  { value: 'delay', label: 'Delay' },
+  ...withDefaultLabels([
+    'audio-beat',
+    'audio-range1', 'audio-range2', 'audio-range3', 'audio-range4', 'audio-range5',
+    'audio-energy'
+  ])
+];
+
 const getYargEventLabel = (eventType: WaitCondition): string =>
   YARG_EVENT_OPTIONS.find(option => option.value === eventType)?.label ?? eventType;
 
 const getAudioEventLabel = (eventType: AudioEventNode['eventType']): string =>
   AUDIO_EVENT_OPTIONS.find(option => option.value === eventType)?.label ?? eventType;
+
+const getActionWaitOptions = (mode: NodeCueMode): EventOption<string>[] =>
+  mode === 'yarg' ? ACTION_WAIT_OPTIONS_YARG : ACTION_WAIT_OPTIONS_AUDIO;
 
 const buildDefaultAction = (): ActionNode => ({
   id: `action-${createId()}`,
@@ -242,6 +257,35 @@ const createDefaultCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeC
   } as AudioNodeCueDefinition;
 };
 
+const createBlankCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeCueDefinition => {
+  const base = {
+    id: `cue-${createId()}`,
+    name: 'New Cue',
+    description: '',
+    nodes: {
+      events: [],
+      actions: []
+    },
+    connections: [],
+    layout: {
+      nodePositions: {}
+    }
+  };
+
+  if (mode === 'yarg') {
+    return {
+      ...base,
+      cueType: 'Chorus',
+      style: 'primary'
+    } as YargNodeCueDefinition;
+  }
+
+  return {
+    ...base,
+    cueTypeId: 'custom-audio-cue'
+  } as AudioNodeCueDefinition;
+};
+
 const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
   const group: NodeCueGroupMeta = {
     id: `node-group-${Date.now()}`,
@@ -277,10 +321,9 @@ const getBasename = (value: string): string => {
 const calculateActionDuration = (action: ActionNode): number => {
   const timing = action.timing ?? createDefaultActionTiming();
   return (
-    Math.max(0, timing.fadeIn) +
-    Math.max(0, timing.hold) +
-    Math.max(0, timing.fadeOut) +
-    Math.max(0, timing.postDelay)
+    Math.max(0, timing.waitForTime) +
+    Math.max(0, timing.duration) +
+    Math.max(0, timing.waitUntilTime)
   );
 };
 
@@ -365,6 +408,7 @@ const CueEditor: React.FC = () => {
     initialDocRef.current = { file, path: null };
   }
 
+  const flowWrapperRef = useRef<HTMLDivElement | null>(null);
   const [files, setFiles] = useState<NodeCueFileSummary[]>([]);
   const [mode, setMode] = useState<NodeCueMode>('yarg');
   const [editorDoc, setEditorDoc] = useState<EditorDocument | null>(initialDocRef.current);
@@ -379,6 +423,7 @@ const CueEditor: React.FC = () => {
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const restoredLastFileRef = useRef<boolean>(false);
   const lastStoredFilePathRef = useRef<string | null>(getStoredLastFilePath());
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
 
   const activeMode: NodeCueMode = editorDoc?.file.mode ?? mode;
 
@@ -577,7 +622,7 @@ const CueEditor: React.FC = () => {
   }, [editorDoc, selectedCueId]);
 
   const handleAddCue = useCallback(() => {
-    const newCue = createDefaultCue(mode);
+    const newCue = createBlankCue(mode);
     const baseDoc = editorDoc ?? { file: createDefaultFile(mode), path: null };
     const updatedCues = [...baseDoc.file.cues, newCue];
     const updatedFile = mode === 'yarg'
@@ -693,7 +738,25 @@ const CueEditor: React.FC = () => {
 
   const handleNodeSelection = useCallback(({ nodes: selected }: { nodes: EditorNode[] }) => {
     setSelectedNodeId(selected[0]?.id ?? null);
+    setContextMenu(null);
   }, []);
+
+  const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: EditorNode) => {
+    event.preventDefault();
+    const rect = flowWrapperRef.current?.getBoundingClientRect();
+    const x = rect ? event.clientX - rect.left : event.clientX;
+    const y = rect ? event.clientY - rect.top : event.clientY;
+    setSelectedNodeId(node.id);
+    setContextMenu({ x, y, nodeId: node.id });
+  }, []);
+
+  const handleRemoveNode = useCallback((nodeId: string) => {
+    setNodes(nds => nds.filter(node => node.id !== nodeId));
+    setEdges(eds => eds.filter(edge => edge.source !== nodeId && edge.target !== nodeId));
+    setSelectedNodeId(prev => (prev === nodeId ? null : prev));
+    setIsDirty(true);
+    setContextMenu(null);
+  }, [setEdges, setNodes]);
 
   const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode>(updates: Partial<T>) => {
     if (!selectedNodeId) return;
@@ -1055,7 +1118,7 @@ const CueEditor: React.FC = () => {
                   {(() => {
                     const actionPayload = selectedNode.data.payload as ActionNode;
                     const currentTiming = actionPayload.timing ?? createDefaultActionTiming();
-                    const updateTiming = (partial: Partial<ActionTiming>) =>
+                    const updateTiming = (partial: Partial<ActionNode['timing']>) =>
                       updateSelectedNode({
                         timing: {
                           ...currentTiming,
@@ -1066,75 +1129,101 @@ const CueEditor: React.FC = () => {
                     return (
                       <>
                         <label className="flex flex-col font-medium">
-                          Fade In (ms)
-                      <input
-                        type="number"
-                        min={0}
-                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                            value={currentTiming.fadeIn}
-                            onChange={event => updateTiming({ fadeIn: Number(event.target.value) })}
-                      />
-                    </label>
-                  <label className="flex flex-col font-medium">
-                          Hold (ms)
-                          <input
-                            type="number"
-                            min={0}
-                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                            value={currentTiming.hold}
-                            onChange={event => updateTiming({ hold: Number(event.target.value) })}
-                          />
-                        </label>
-                        <label className="flex flex-col font-medium">
-                          Fade Out (ms)
-                          <input
-                            type="number"
-                            min={0}
-                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                            value={currentTiming.fadeOut}
-                            onChange={event => updateTiming({ fadeOut: Number(event.target.value) })}
-                          />
-                        </label>
-                        <label className="flex flex-col font-medium">
-                          Post Delay (ms)
-                          <input
-                            type="number"
-                            min={0}
-                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                            value={currentTiming.postDelay}
-                            onChange={event => updateTiming({ postDelay: Number(event.target.value) })}
-                          />
-                        </label>
-                        <label className="flex flex-col font-medium">
-                          Level
-                    <input
-                      type="number"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                            value={currentTiming.level ?? 1}
-                            onChange={event => updateTiming({ level: Number(event.target.value) })}
-                    />
-                  </label>
-                        <label className="flex flex-col font-medium">
-                          Ease In
+                          Wait For Condition
                           <select
                             className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                            value={currentTiming.easeIn ?? 'sinInOut'}
-                            onChange={event => updateTiming({ easeIn: event.target.value })}
+                            value={currentTiming.waitForCondition}
+                            onChange={event => updateTiming({ waitForCondition: event.target.value as WaitCondition })}
                           >
-                            {EASING_OPTIONS.map(ease => (
-                              <option key={ease} value={ease}>{ease}</option>
+                            {getActionWaitOptions(activeMode).map(option => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
                         </label>
                         <label className="flex flex-col font-medium">
-                          Ease Out
+                          Wait For Time (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.waitForTime}
+                            onChange={event => updateTiming({ waitForTime: Number(event.target.value) })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Wait For Count
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.waitForConditionCount ?? ''}
+                            onChange={event => updateTiming({
+                              waitForConditionCount: event.target.value === '' ? undefined : Number(event.target.value)
+                            })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Duration (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.duration}
+                            onChange={event => updateTiming({ duration: Number(event.target.value) })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Wait Until Condition
                           <select
                             className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                            value={currentTiming.easeOut ?? currentTiming.easeIn ?? 'sinInOut'}
-                            onChange={event => updateTiming({ easeOut: event.target.value })}
+                            value={currentTiming.waitUntilCondition}
+                            onChange={event => updateTiming({ waitUntilCondition: event.target.value as WaitCondition })}
+                          >
+                            {getActionWaitOptions(activeMode).map(option => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Wait Until Time (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.waitUntilTime}
+                            onChange={event => updateTiming({ waitUntilTime: Number(event.target.value) })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Wait Until Count
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.waitUntilConditionCount ?? ''}
+                            onChange={event => updateTiming({
+                              waitUntilConditionCount: event.target.value === '' ? undefined : Number(event.target.value)
+                            })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Level
+                          <input
+                            type="number"
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.level ?? 1}
+                            onChange={event => updateTiming({ level: Number(event.target.value) })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Easing
+                          <select
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.easing ?? 'sinInOut'}
+                            onChange={event => updateTiming({ easing: event.target.value })}
                           >
                             {EASING_OPTIONS.map(ease => (
                               <option key={ease} value={ease}>{ease}</option>
@@ -1248,7 +1337,7 @@ const CueEditor: React.FC = () => {
             )}
           </div>
 
-          <div className="flex-1 relative">
+          <div className="flex-1 relative" ref={flowWrapperRef}>
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -1258,6 +1347,8 @@ const CueEditor: React.FC = () => {
               onSelectionChange={handleNodeSelection}
               onInit={setReactFlowInstance}
               isValidConnection={isValidConnection}
+              onNodeContextMenu={handleNodeContextMenu}
+              onPaneClick={() => setContextMenu(null)}
               fitView
               className="rounded-b-lg"
             >
@@ -1273,6 +1364,20 @@ const CueEditor: React.FC = () => {
               <Controls />
               <Background gap={16} size={0.5} />
             </ReactFlow>
+            {contextMenu && (
+              <div
+                className="absolute bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow text-xs"
+                style={{ top: contextMenu.y, left: contextMenu.x, zIndex: 20 }}
+              >
+                <button
+                  className="block w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => handleRemoveNode(contextMenu.nodeId)}
+                >
+                  Remove node
+                </button>
+               
+              </div>
+            )}
           </div>
           {validationErrors.length > 0 && (
             <div className="p-3 text-xs text-red-600 dark:text-red-300 border-t border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40">

@@ -10,7 +10,7 @@ import {
 import { getColor } from '../../../helpers/dmxHelpers';
 import {
   ActionNode,
-  ActionTiming,
+  ActionTimingConfig,
   createDefaultActionTiming,
   NodeActionTarget,
   NodeColorSetting
@@ -50,7 +50,7 @@ const transparentVariant = (color: RGBIO): RGBIO => ({
   opacity: 0
 });
 
-const ensureTiming = (action: ActionNode): ActionTiming => ({
+const ensureTiming = (action: ActionNode): ActionTimingConfig => ({
   ...createDefaultActionTiming(),
   ...(action.timing ?? {})
 });
@@ -63,123 +63,16 @@ const resolveEasing = (value?: string, fallback: EasingType = EasingType.SIN_IN_
   return valid ? (value as EasingType) : fallback;
 };
 
-/**
- * Applies chained timing to an effect's first transition.
- * - If the action was triggered by 'none', convert the first transition into a delay.
- * - Otherwise, insert a timing-only gate that waits for the event, then delays,
- *   before allowing the original transition to run.
- */
-const applyChainedTiming = (effect: Effect, waitTime: number, waitCondition: WaitCondition): Effect => {
-  if (waitTime <= 0 || !effect.transitions || effect.transitions.length === 0) {
-    return effect;
-  }
-
-  const [firstTransition, ...rest] = effect.transitions;
-
-  if (waitCondition === 'none') {
-    const updatedFirst: EffectTransition = {
-      ...firstTransition,
-      waitForCondition: 'delay',
-      waitForTime: waitTime
-    };
-    return {
-      ...effect,
-      transitions: [updatedFirst, ...rest]
-    };
-  }
-
-  const timingGate: EffectTransition = {
-    ...firstTransition,
-    timingOnly: true,
-    waitForCondition: waitCondition,
-    waitForTime: 0,
-    waitForConditionCount: firstTransition.waitForConditionCount,
-    transform: {
-      ...firstTransition.transform,
-      duration: 0
-    },
-    waitUntilCondition: 'delay',
-    waitUntilTime: waitTime,
-    waitUntilConditionCount: undefined
-  };
-
-  const chainedFirst: EffectTransition = {
-    ...firstTransition,
-    waitForCondition: 'none',
-    waitForTime: 0,
-    waitForConditionCount: undefined
-  };
-
-  return {
-    ...effect,
-    transitions: [timingGate, chainedFirst, ...rest]
-  };
-};
-
-const createTimedColorEffect = (params: {
-  lights: TrackedLight[];
-  layer: number;
-  waitFor: WaitCondition;
-  color: RGBIO;
-  timing: ActionTiming;
-  easingIn: EasingType;
-  easingOut: EasingType;
-  returnColor?: RGBIO;
-}): Effect => {
-  const { lights, layer, waitFor, color, timing, easingIn, easingOut } = params;
-  const fadeInDuration = safeDuration(timing.fadeIn, 0, 0);
-  const holdDuration = safeDuration(timing.hold, 0, 0);
-  const fadeOutDuration = safeDuration(timing.fadeOut, 0, 0);
-  const postDelay = safeDuration(timing.postDelay, 0, 0);
-  const returnColor = params.returnColor ?? transparentVariant(color);
-
-  const transitions: EffectTransition[] = [
-    {
-      lights,
-      layer,
-      waitForCondition: waitFor,
-      waitForTime: 0,
-      transform: {
-        color,
-        easing: easingIn,
-        duration: fadeInDuration
-      },
-      waitUntilCondition: 'delay',
-      waitUntilTime: holdDuration
-    },
-    {
-      lights,
-      layer,
-      waitForCondition: 'none',
-      waitForTime: 0,
-      transform: {
-        color: returnColor,
-        easing: easingOut,
-        duration: fadeOutDuration
-      },
-      waitUntilCondition: 'delay',
-      waitUntilTime: postDelay
-    }
-  ];
-
-  return {
-    id: 'timed-color',
-    description: 'Timed color effect',
-    transitions
-  };
-};
-
 const createSingleColorEffect = (params: {
   lights: TrackedLight[];
   layer: number;
   waitFor: WaitCondition;
   color: RGBIO;
-  timing: ActionTiming;
-  easingIn: EasingType;
+  timing: ActionTimingConfig;
+  easing: EasingType;
 }): Effect => {
-  const { lights, layer, waitFor, color, timing, easingIn } = params;
-  const fadeInDuration = safeDuration(timing.fadeIn, 0, 0);
-  const holdPlusDelay = safeDuration(timing.hold, 0, 0) + safeDuration(timing.postDelay, 0, 0);
+  const { lights, layer, waitFor, color, timing, easing } = params;
+  const duration = safeDuration(timing.duration, 0, 0);
 
   return {
     id: 'single-color',
@@ -189,14 +82,16 @@ const createSingleColorEffect = (params: {
         lights,
         layer,
         waitForCondition: waitFor,
-        waitForTime: 0,
+        waitForTime: safeDuration(timing.waitForTime, 0, 0),
+        waitForConditionCount: timing.waitForConditionCount,
         transform: {
           color,
-          easing: easingIn,
-          duration: fadeInDuration
+          easing,
+          duration
         },
-        waitUntilCondition: 'delay',
-        waitUntilTime: holdPlusDelay
+        waitUntilCondition: timing.waitUntilCondition,
+        waitUntilTime: safeDuration(timing.waitUntilTime, 0, 0),
+        waitUntilConditionCount: timing.waitUntilConditionCount
       }
     ]
   };
@@ -217,11 +112,10 @@ export class ActionEffectFactory {
     const timing = ensureTiming(action);
     const timingLevel = clamp(timing.level ?? 1, 0, 1);
     const intensityScale = clamp((params.intensityScale ?? 1) * timingLevel, 0, 1);
-    const waitTime = params.waitTime ?? 0;
-    const waitFor: WaitCondition = params.waitCondition ?? 'none';
+    const waitFor: WaitCondition = params.waitCondition ?? timing.waitForCondition ?? 'none';
+    const waitForTime = safeDuration((params.waitTime ?? 0) + (timing.waitForTime ?? 0), 0, 0);
     const layer = action.layer ?? 0;
-    const easingIn = resolveEasing(timing.easeIn);
-    const easingOut = resolveEasing(timing.easeOut ?? timing.easeIn);
+    const easing = resolveEasing(timing.easing);
 
     const baseColor = resolveColor(action.color, intensityScale || 0.01);
     const secondaryColor = action.secondaryColor
@@ -237,15 +131,18 @@ export class ActionEffectFactory {
           layer,
           waitFor,
           color: baseColor,
-          timing,
-          easingIn
+          timing: {
+            ...timing,
+            waitForTime
+          },
+          easing
         });
         break;
       }
       case 'cross-fade': {
-        const duration = safeDuration(timing.fadeIn, 150, 10);
-        const afterStartWait = safeDuration(timing.hold, 0, 0);
-        const afterEndWait = safeDuration(timing.postDelay, 0, 0);
+        const duration = safeDuration(timing.duration, 150, 10);
+        const afterStartWait = safeDuration(timing.waitUntilTime, 0, 0);
+        const afterEndWait = 0;
         effect = getEffectCrossFadeColors({
           lights,
           layer,
@@ -256,7 +153,7 @@ export class ActionEffectFactory {
           crossFadeTrigger: 'delay',
           afterStartWait,
           afterEndColorWait: afterEndWait,
-          easing: easingIn
+          easing
         });
         break;
       }
@@ -266,26 +163,24 @@ export class ActionEffectFactory {
           layer,
           color: baseColor,
           startTrigger: waitFor,
-          startWait: 0,
-          holdTime: safeDuration(timing.hold, 0, 0),
-          durationIn: safeDuration(timing.fadeIn, 50, 10),
-          durationOut: safeDuration(timing.fadeOut, 100, 10),
+          startWait: waitForTime,
+          holdTime: safeDuration(timing.waitUntilTime, 0, 0),
+          durationIn: safeDuration(timing.duration, 50, 10),
+          durationOut: 0,
           endTrigger: 'delay',
-          endWait: safeDuration(timing.postDelay, 0, 0),
-          easing: easingIn
+          endWait: 0,
+          easing
         });
         break;
       }
       case 'fade-in-out': {
-        effect = createTimedColorEffect({
+        effect = createSingleColorEffect({
           lights,
           layer,
           waitFor,
           color: baseColor,
           timing,
-          easingIn,
-          easingOut,
-          returnColor: action.secondaryColor ? secondaryColor : undefined
+          easing
         });
         break;
       }
@@ -293,13 +188,13 @@ export class ActionEffectFactory {
         const sweepConfig = action.config?.sweep;
         const sweepDuration = safeDuration(
           sweepConfig?.duration,
-          timing.fadeIn + timing.hold + timing.fadeOut || 600,
+          timing.duration || 600,
           100
         );
-        const fadeIn = safeDuration(sweepConfig?.fadeIn, timing.fadeIn || 80, 10);
-        const fadeOut = safeDuration(sweepConfig?.fadeOut, timing.fadeOut || 120, 10);
+        const fadeIn = safeDuration(sweepConfig?.fadeIn, timing.duration || 80, 10);
+        const fadeOut = safeDuration(sweepConfig?.fadeOut, 120, 10);
         const overlap = clamp(sweepConfig?.overlap ?? 0, 0, 100);
-        const betweenDelay = safeDuration(sweepConfig?.betweenDelay, timing.postDelay, 0);
+        const betweenDelay = safeDuration(sweepConfig?.betweenDelay, timing.waitUntilTime, 0);
         const lowColorSetting = sweepConfig?.lowColor || action.secondaryColor || { name: 'transparent', brightness: 'low' };
         const lowColor = resolveColor(lowColorSetting, intensityScale || 0.01);
 
@@ -314,7 +209,7 @@ export class ActionEffectFactory {
           betweenSweepDelay: betweenDelay,
           high: baseColor,
           low: lowColor,
-          easing: easingIn
+          easing
         });
         break;
       }
@@ -330,7 +225,7 @@ export class ActionEffectFactory {
           layer,
           activeColor: baseColor,
           baseColor: base,
-          transitionDuration: safeDuration(cycleConfig?.transitionDuration, timing.fadeIn || 150, 10),
+          transitionDuration: safeDuration(cycleConfig?.transitionDuration, timing.duration || 150, 10),
           waitFor: cycleConfig?.trigger || waitFor
         });
         break;
@@ -341,7 +236,7 @@ export class ActionEffectFactory {
           layer,
           duration: safeDuration(
             action.config?.blackout?.duration,
-            timing.fadeOut || timing.fadeIn || 200,
+            timing.duration || 200,
             10
           )
         });
@@ -352,10 +247,6 @@ export class ActionEffectFactory {
       }
       default:
         return null;
-    }
-
-    if (effect && waitTime > 0) {
-      effect = applyChainedTiming(effect, waitTime, waitFor);
     }
 
     return effect;

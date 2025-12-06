@@ -1,6 +1,6 @@
 import {
   ActionNode,
-  ActionTiming,
+  ActionTimingConfig,
   AudioEventNode,
   AudioNodeCueDefinition,
   Connection,
@@ -41,7 +41,7 @@ export interface CompiledAudioCue {
   chains: CompiledActionChain<AudioEventNode>[];
 }
 
-const getActionTiming = (action: ActionNode): ActionTiming => ({
+const getActionTiming = (action: ActionNode): ActionTimingConfig => ({
   ...createDefaultActionTiming(),
   ...(action.timing ?? {})
 });
@@ -51,10 +51,9 @@ const getActionTiming = (action: ActionNode): ActionTiming => ({
  */
 const calculateActionDuration = (action: ActionNode): number => {
   const timing = getActionTiming(action);
-  return Math.max(0, timing.fadeIn) +
-    Math.max(0, timing.hold) +
-    Math.max(0, timing.fadeOut) +
-    Math.max(0, timing.postDelay);
+  return Math.max(0, timing.waitForTime) +
+    Math.max(0, timing.duration) +
+    Math.max(0, timing.waitUntilTime);
 };
 
 export class NodeCueCompiler {

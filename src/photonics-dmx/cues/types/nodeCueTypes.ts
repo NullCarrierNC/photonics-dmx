@@ -81,6 +81,8 @@ export interface YargEventNode extends BaseEventNode {
 }
 
 export type AudioEventType =
+  | 'none'
+  | 'delay'
   | 'audio-beat'
   | 'audio-range1'
   | 'audio-range2'
@@ -115,13 +117,15 @@ export interface NodeColorSetting {
   blendMode?: BlendMode;
 }
 
-export interface ActionTiming {
-  fadeIn: number;
-  hold: number;
-  fadeOut: number;
-  postDelay: number;
-  easeIn?: string;
-  easeOut?: string;
+export interface ActionTimingConfig {
+  waitForCondition: WaitCondition;
+  waitForTime: number;
+  waitForConditionCount?: number;
+  duration: number;
+  waitUntilCondition: WaitCondition;
+  waitUntilTime: number;
+  waitUntilConditionCount?: number;
+  easing?: string;
   level?: number;
 }
 
@@ -151,13 +155,13 @@ export interface NodeActionConfig {
   custom?: Record<string, unknown>;
 }
 
-export const createDefaultActionTiming = (): ActionTiming => ({
-  fadeIn: 100,
-  hold: 0,
-  fadeOut: 0,
-  postDelay: 0,
-  easeIn: 'sinInOut',
-  easeOut: 'sinInOut',
+export const createDefaultActionTiming = (): ActionTimingConfig => ({
+  waitForCondition: 'none',
+  waitForTime: 0,
+  duration: 200,
+  waitUntilCondition: 'none',
+  waitUntilTime: 0,
+  easing: 'sinInOut',
   level: 1
 });
 
@@ -168,7 +172,7 @@ export interface ActionNode {
   target: NodeActionTarget;
   color: NodeColorSetting;
   secondaryColor?: NodeColorSetting;
-  timing: ActionTiming;
+  timing: ActionTimingConfig;
   layer?: number;
   label?: string;
   inputs?: string[];
