@@ -41,7 +41,7 @@ const SacnToggle = ({ disabled = false }: SacnToggleProps) => {
   }
 
   return (
-    <div className="flex items-center mb-4  w-[220px] justify-between">
+    <div className="flex items-center mb-4  w-[190px] justify-between">
       <label className={`mr-4 text-lg font-semibold ${
         disabled ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
       }`}>

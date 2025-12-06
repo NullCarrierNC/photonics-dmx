@@ -29,7 +29,7 @@ const OpenDmxToggle = ({ disabled = false }: OpenDmxToggleProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-2 mb-4 w-[220px] justify-between">
+    <div className="flex flex-col gap-2 mb-4 w-[190px] justify-between">
       <div className="flex items-center gap-4 justify-between">
         <label
           className={`text-lg font-semibold ${
