@@ -1204,7 +1204,6 @@ const CueEditor: React.FC = () => {
                 maskColor="rgba(31,41,55,0.6)"
                 nodeColor="#93c5fd"
                 nodeStrokeColor="#60a5fa"
-                backgroundColor="#ffffff"
               />
               <Controls />
               <Background gap={16} size={0.5} />
