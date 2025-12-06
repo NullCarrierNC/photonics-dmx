@@ -27,42 +27,25 @@ import {
   LocationGroup,
   WaitCondition
 } from '../../../types';
+import {
+  COLOR_OPTIONS,
+  BRIGHTNESS_OPTIONS,
+  BLEND_MODE_OPTIONS,
+  LOCATION_OPTIONS,
+  LIGHT_TARGET_OPTIONS,
+  WAIT_CONDITIONS_WITH_NONE_DELAY,
+  AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY
+} from '../../../constants/options';
 
-const COLOR_VALUES: Color[] = [
-  'red', 'blue', 'yellow', 'green', 'cyan', 'orange', 'purple',
-  'chartreuse', 'teal', 'violet', 'magenta', 'vermilion', 'amber',
-  'white', 'black', 'transparent'
-] as const;
+const COLOR_VALUES: Color[] = [...COLOR_OPTIONS];
+const BRIGHTNESS_VALUES: Brightness[] = [...BRIGHTNESS_OPTIONS];
+const BLEND_MODES: BlendMode[] = [...BLEND_MODE_OPTIONS];
+const LOCATION_GROUPS: LocationGroup[] = [...LOCATION_OPTIONS];
+const LIGHT_TARGETS: LightTarget[] = [...LIGHT_TARGET_OPTIONS];
 
-const BRIGHTNESS_VALUES: Brightness[] = ['low', 'medium', 'high', 'max'] as const;
-const BLEND_MODES: BlendMode[] = ['replace', 'add', 'multiply', 'overlay'] as const;
-const LOCATION_GROUPS: LocationGroup[] = ['front', 'back', 'strobe'] as const;
-const LIGHT_TARGETS: LightTarget[] = [
-  'all', 'even', 'odd', 'half-1', 'half-2',
-  'outter-half-major', 'outter-half-minor',
-  'inner-half-major', 'inner-half-minor',
-  'third-1', 'third-2', 'third-3',
-  'quarter-1', 'quarter-2', 'quarter-3', 'quarter-4',
-  'linear', 'inverse-linear',
-  'random-1', 'random-2', 'random-3', 'random-4'
-] as const;
+const WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY];
 
-const WAIT_CONDITIONS: WaitCondition[] = [
-  'none', 'delay', 'beat', 'measure', 'half-beat', 'keyframe',
-  'guitar-open', 'guitar-green', 'guitar-red', 'guitar-yellow', 'guitar-blue', 'guitar-orange',
-  'bass-open', 'bass-green', 'bass-red', 'bass-yellow', 'bass-blue', 'bass-orange',
-  'keys-open', 'keys-green', 'keys-red', 'keys-yellow', 'keys-blue', 'keys-orange',
-  'drum-kick', 'drum-red', 'drum-yellow', 'drum-blue', 'drum-green',
-  'drum-yellow-cymbal', 'drum-blue-cymbal', 'drum-green-cymbal'
-] as const;
-
-const AUDIO_EVENT_TYPES: AudioEventType[] = [
-  'none',
-  'delay',
-  'audio-beat',
-  'audio-range1', 'audio-range2', 'audio-range3', 'audio-range4', 'audio-range5',
-  'audio-energy'
-] as const;
+const AUDIO_EVENT_TYPES: AudioEventType[] = [...AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY];
 
 const NODE_EFFECT_TYPES: NodeEffectType[] = [
   'single-color', 'sweep', 'cycle', 'blackout'

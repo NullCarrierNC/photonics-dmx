@@ -204,11 +204,7 @@ export class NodeCueCompiler {
       throw new NodeCueCompilationError(`Action '${action.label ?? action.id}' must target at least one group.`);
     }
 
-    if (action.effectType === 'cross-fade' && !action.secondaryColor) {
-      throw new NodeCueCompilationError(
-        `Action '${action.label ?? action.id}' requires a secondary colour for the cross-fade effect.`
-      );
-    }
+    
   }
 
   /**

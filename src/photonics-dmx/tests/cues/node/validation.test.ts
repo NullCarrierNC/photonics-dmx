@@ -1,7 +1,6 @@
-import { validateYargNodeCueFile, validateAudioNodeCueFile } from '../../node/schema/validation';
-import { NodeCueCompiler } from '../../node/compiler/NodeCueCompiler';
-import { YargNodeCueDefinition, AudioNodeCueDefinition, createDefaultActionTiming } from '../../types/nodeCueTypes';
-import { CueType } from '../../types/cueTypes';
+import { validateYargNodeCueFile, validateAudioNodeCueFile } from '../../../cues/node/schema/validation';
+import { YargNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes';
+import { CueType } from '../../../cues/types/cueTypes';
 
 describe('Node cue validation', () => {
   it('validates a simple YARG node cue', () => {
@@ -23,12 +22,12 @@ describe('Node cue validation', () => {
             target: { groups: ['front'], filter: 'all' },
             color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
             timing: {
-              fadeIn: 100,
-              hold: 200,
-              fadeOut: 200,
-              postDelay: 0,
-              easeIn: 'sinInOut',
-              easeOut: 'sinInOut',
+              waitForCondition: 'none',
+              waitForTime: 0,
+              duration: 200,
+              waitUntilCondition: 'none',
+              waitUntilTime: 0,
+              easing: 'sinInOut',
               level: 1
             }
           }
@@ -68,16 +67,16 @@ describe('Node cue validation', () => {
           {
             id: 'action-1',
             type: 'action',
-            effectType: 'flash',
+            effectType: 'single-color',
             target: { groups: ['front'], filter: 'all' },
             color: { name: 'red', brightness: 'high', blendMode: 'add' },
             timing: {
-              fadeIn: 50,
-              hold: 100,
-              fadeOut: 120,
-              postDelay: 0,
-              easeIn: 'sinInOut',
-              easeOut: 'sinInOut',
+              waitForCondition: 'none',
+              waitForTime: 0,
+              duration: 150,
+              waitUntilCondition: 'delay',
+              waitUntilTime: 100,
+              easing: 'sinInOut',
               level: 1
             }
           }
@@ -96,31 +95,4 @@ describe('Node cue validation', () => {
 
     expect(result.valid).toBe(true);
   });
-
-  it('throws when action lacks target or secondary color when required', () => {
-    const definition: YargNodeCueDefinition = {
-      id: 'test-cue',
-      name: 'Test Cue',
-      cueType: CueType.Chorus,
-      style: 'primary',
-      nodes: {
-        events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
-        actions: [
-          {
-            id: 'action-1',
-            type: 'action',
-            effectType: 'cross-fade',
-            target: { groups: ['front'], filter: 'all' },
-            color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
-            timing: createDefaultActionTiming()
-          }
-        ]
-      },
-      connections: [{ from: 'event-1', to: 'action-1' }],
-      layout: { nodePositions: {} }
-    };
-
-    expect(() => NodeCueCompiler.compileYargCue(definition)).toThrow();
-  });
 });
-

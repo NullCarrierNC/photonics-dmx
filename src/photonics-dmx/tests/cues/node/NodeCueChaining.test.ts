@@ -87,21 +87,16 @@ describe('Node cue chaining', () => {
     const [effect] = Object.values(addedEffects);
     expect(effect).toBeDefined();
 
-    // First step waits on the beat directly
+    // First step uses its own waitFor (none) with no offset
     const firstStep = effect.transitions.find(t => t.lights[0].id === frontLight.id && !t.timingOnly);
-    expect(firstStep?.waitForCondition).toBe('beat');
+    expect(firstStep?.waitForCondition).toBe('none');
 
-    // Second step receives a timing gate anchored to the same beat with the full chain offset (100ms)
     const backTransitions = effect.transitions.filter(t => t.lights[0].id === backLight.id);
-    const timingGate = backTransitions.find(t => t.timingOnly);
-    const actualStep = backTransitions.find(t => !t.timingOnly);
+    const backStep = backTransitions.find(t => !t.timingOnly);
 
-    expect(timingGate?.waitForCondition).toBe('beat');
-    expect(timingGate?.waitUntilCondition).toBe('delay');
-    expect(timingGate?.waitUntilTime).toBe(100);
-
-    expect(actualStep?.waitForCondition).toBe('none');
-    // The action should not start before the gate completes
-    expect(actualStep?.transform.duration).toBe(50);
+    expect(backStep?.waitForCondition).toBe('delay');
+    expect(backStep?.waitForTime).toBe(100);
+    expect(backStep?.waitUntilCondition).toBe('delay');
+    expect(backStep?.transform.duration).toBe(50);
   });
 });

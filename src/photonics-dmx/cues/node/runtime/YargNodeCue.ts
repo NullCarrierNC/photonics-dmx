@@ -39,8 +39,7 @@ export class YargNodeCue implements INetCue {
 
   private buildChainEffect(chain: CompiledActionChain<YargEventNode>, lightManager: DmxLightManager): Effect | null {
     let combinedEffect: Effect | null = null;
-    const chainEventCondition = chain.event.eventType;
-
+   
     for (const step of chain.actions) {
       const lights = ActionEffectFactory.resolveLights(lightManager, step.action.target);
       if (!lights.length) {
@@ -50,9 +49,8 @@ export class YargNodeCue implements INetCue {
       const effect = ActionEffectFactory.buildEffect({
         action: step.action,
         lights,
-        // All chained steps stay anchored to the triggering event; delayMs is absolute
-        // from the event timeline so every target light respects the same schedule.
-        waitCondition: chainEventCondition,
+        // Let actions use their own waitFor; delayMs carries the chain offset.
+        waitCondition: undefined,
         waitTime: step.delayMs
       });
 

@@ -1,4 +1,4 @@
-import { WaitCondition, TrackedLight, Effect, EffectTransition, RGBIO, LocationGroup } from '../../../types';
+import { WaitCondition, TrackedLight, Effect, RGBIO, LocationGroup } from '../../../types';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import {
   getSweepEffect,
@@ -104,15 +104,23 @@ export class ActionEffectFactory {
     const timing = ensureTiming(action);
     const timingLevel = clamp(timing.level ?? 1, 0, 1);
     const intensityScale = clamp((params.intensityScale ?? 1) * timingLevel, 0, 1);
-    const waitFor: WaitCondition = params.waitCondition ?? timing.waitForCondition ?? 'none';
-    const waitForTime = safeDuration((params.waitTime ?? 0) + (timing.waitForTime ?? 0), 0, 0);
+    let waitFor: WaitCondition = timing.waitForCondition ?? 'none';
+    let waitForTime = safeDuration((params.waitTime ?? 0) + (timing.waitForTime ?? 0), 0, 0);
+
+    // If caller passed an explicit waitCondition (e.g., chain-level override) and it's not 'none', respect it
+    if (params.waitCondition && params.waitCondition !== 'none') {
+      waitFor = params.waitCondition;
+      waitForTime = safeDuration((params.waitTime ?? 0) + (timing.waitForTime ?? 0), 0, 0);
+    }
+
+    // If action wants to start immediately but has a chain offset, convert to delay gate
+    if (waitFor === 'none' && waitForTime > 0) {
+      waitFor = 'delay';
+    }
     const layer = action.layer ?? 0;
     const easing = resolveEasing(timing.easing);
 
     const baseColor = resolveColor(action.color, intensityScale || 0.01);
-    const secondaryColor = action.secondaryColor
-      ? resolveColor(action.secondaryColor, intensityScale || 0.01)
-      : resolveColor({ name: 'transparent', brightness: 'low' }, 0);
 
     let effect: Effect | null = null;
 

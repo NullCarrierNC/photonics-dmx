@@ -33,6 +33,15 @@ import type {
 import type { ActionNode } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 import { createDefaultActionTiming } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { Color, Brightness, BlendMode, LightTarget, LocationGroup, WaitCondition } from '../../../photonics-dmx/types';
+import {
+  COLOR_OPTIONS,
+  BRIGHTNESS_OPTIONS,
+  BLEND_MODE_OPTIONS,
+  LOCATION_OPTIONS,
+  LIGHT_TARGET_OPTIONS,
+  YARG_EVENT_OPTIONS as YARG_EVENTS_BASE,
+  AUDIO_EVENT_OPTIONS as AUDIO_EVENTS_BASE,
+} from '../../../photonics-dmx/constants/options';
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes';
 import {
   deleteNodeCueFile,
@@ -113,13 +122,6 @@ const clearStoredLastFilePath = (): void => {
 const withDefaultLabels = <T extends string>(values: T[]): EventOption<T>[] =>
   values.map(value => ({ value, label: value }));
 
-const COLOR_OPTIONS: Color[] = [
-  'red', 'blue', 'yellow', 'green', 'cyan', 'orange', 'purple',
-  'chartreuse', 'teal', 'violet', 'magenta', 'vermilion', 'amber',
-  'white', 'black', 'transparent'
-];
-
-const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max'];
 const EASING_OPTIONS = [
   'linear',
   'ease',
@@ -136,35 +138,15 @@ const EASING_OPTIONS = [
   'cubicOut',
   'cubicInOut'
 ] as const;
-const BLEND_MODE_OPTIONS: BlendMode[] = ['replace', 'add', 'multiply', 'overlay'];
-const LOCATION_OPTIONS: LocationGroup[] = ['front', 'back', 'strobe'];
-const LIGHT_TARGETS: LightTarget[] = [
-  'all', 'even', 'odd', 'half-1', 'half-2', 'outter-half-major', 'outter-half-minor',
-  'inner-half-major', 'inner-half-minor', 'third-1', 'third-2', 'third-3',
-  'quarter-1', 'quarter-2', 'quarter-3', 'quarter-4',
-  'linear', 'inverse-linear', 'random-1', 'random-2', 'random-3', 'random-4'
-];
-
 const ACTION_OPTIONS: NodeEffectType[] = [
   'single-color', 'sweep', 'cycle', 'blackout'
 ];
 
-const YARG_WAIT_CONDITIONS: WaitCondition[] = [
-  'beat', 'measure', 'half-beat', 'keyframe',
-  'guitar-open', 'guitar-green', 'guitar-red', 'guitar-yellow', 'guitar-blue', 'guitar-orange',
-  'bass-open', 'bass-green', 'bass-red', 'bass-yellow', 'bass-blue', 'bass-orange',
-  'keys-open', 'keys-green', 'keys-red', 'keys-yellow', 'keys-blue', 'keys-orange',
-  'drum-kick', 'drum-red', 'drum-yellow', 'drum-blue', 'drum-green',
-  'drum-yellow-cymbal', 'drum-blue-cymbal', 'drum-green-cymbal'
-] as WaitCondition[];
+const YARG_WAIT_CONDITIONS: WaitCondition[] = [...YARG_EVENTS_BASE];
 
 // Event palette options (nodes the user can add) — no synthetic "none"/"delay"
 const YARG_EVENT_OPTIONS: EventOption<WaitCondition>[] = withDefaultLabels(YARG_WAIT_CONDITIONS);
-const AUDIO_EVENT_OPTIONS: EventOption<AudioEventNode['eventType']>[] = withDefaultLabels([
-  'audio-beat',
-  'audio-range1', 'audio-range2', 'audio-range3', 'audio-range4', 'audio-range5',
-  'audio-energy'
-]);
+const AUDIO_EVENT_OPTIONS: EventOption<AudioEventNode['eventType']>[] = withDefaultLabels(AUDIO_EVENTS_BASE);
 
 // Action timing wait options (allow none/delay)
 const ACTION_WAIT_OPTIONS_YARG: EventOption<WaitCondition>[] = [
@@ -175,11 +157,7 @@ const ACTION_WAIT_OPTIONS_YARG: EventOption<WaitCondition>[] = [
 const ACTION_WAIT_OPTIONS_AUDIO: EventOption<AudioEventNode['eventType'] | 'none' | 'delay'>[] = [
   { value: 'none', label: 'None' },
   { value: 'delay', label: 'Delay' },
-  ...withDefaultLabels([
-    'audio-beat',
-    'audio-range1', 'audio-range2', 'audio-range3', 'audio-range4', 'audio-range5',
-    'audio-energy'
-  ])
+  ...withDefaultLabels(AUDIO_EVENTS_BASE)
 ];
 
 const getYargEventLabel = (eventType: WaitCondition): string =>
@@ -1329,7 +1307,7 @@ const CueEditor: React.FC = () => {
                         }
                       } as ActionNode)}
                     >
-                      {LIGHT_TARGETS.map(target => (
+                      {LIGHT_TARGET_OPTIONS.map(target => (
                         <option key={target} value={target}>{target}</option>
                       ))}
                     </select>
