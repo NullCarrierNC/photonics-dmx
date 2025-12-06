@@ -1,10 +1,11 @@
-import { AudioLightingData, AudioConfig } from '../listeners/Audio/audioTypes';
+import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes';
 
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { AudioCueType, BuiltInAudioCues } from '../cues/types/audioCueTypes';
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry';
+import { getIntensityScale } from '../cues/audio/utils/bandUtils';
 
 /**
  * AudioCueProcessor - Processes audio data using cue-based system
@@ -73,11 +74,21 @@ export class AudioCueProcessor {
    * Process audio data received from renderer via IPC
    * This is called by ControllerManager when it receives audio:data from renderer
    */
+  private lastBeatTimestamp = 0;
+
   public processAudioData(data: AudioLightingData): void {
     if (!this.isActive) return;
 
+    const now = Date.now();
+    if (data.beatDetected && now - this.lastBeatTimestamp >= 100) {
+      this.lastBeatTimestamp = now;
+      this.sequencer.onBeat();
+    }
+
     const bandCount = this.getEnabledBandCount();
-    this.cueHandler.handleAudioData(data, this.config, this.currentCueType, bandCount);
+    const processedData =
+      this.config.linearResponse === false ? this.applyDiscreteResponse(data) : data;
+    this.cueHandler.handleAudioData(processedData, this.config, this.currentCueType, bandCount);
   }
 
   /**
@@ -118,6 +129,7 @@ export class AudioCueProcessor {
     }
 
     if (this.currentCueType !== cueType) {
+      this.cueHandler.clearCurrentCue();
       console.log(`AudioCueProcessor: Active cue set to ${cueType}`);
       this.currentCueType = cueType;
     }
@@ -159,6 +171,22 @@ export class AudioCueProcessor {
 
   private getEnabledBandCount(): number {
     return this.config.frequencyBands?.bandCount ?? 4;
+  }
+
+  private applyDiscreteResponse(audioData: AudioLightingData): AudioLightingData {
+    const mapValue = (value: number) => getIntensityScale(value, false);
+    return {
+      ...audioData,
+      overallLevel: mapValue(audioData.overallLevel),
+      energy: mapValue(audioData.energy),
+      frequencyBands: {
+        range1: mapValue(audioData.frequencyBands.range1),
+        range2: mapValue(audioData.frequencyBands.range2),
+        range3: mapValue(audioData.frequencyBands.range3),
+        range4: mapValue(audioData.frequencyBands.range4),
+        range5: mapValue(audioData.frequencyBands.range5)
+      }
+    };
   }
 }
 

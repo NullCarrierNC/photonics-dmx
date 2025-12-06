@@ -22,7 +22,7 @@ import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
 import { AudioCaptureManager } from './services/AudioCaptureManager';
-import { AudioConfig } from '../../photonics-dmx/listeners/Audio/audioTypes';
+import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 
 /**
  * Main application component
@@ -183,6 +183,7 @@ export const App = (): JSX.Element => {
         smoothing: config.smoothing,
         frequencyBands: config.frequencyBands,
         enabled: config.enabled,
+        linearResponse: config.linearResponse,
         // Preserve fields that exist in frontend but not in backend config
         sampleRate: prev.audioConfig?.sampleRate,
         updateIntervalMs: prev.audioConfig?.updateIntervalMs,

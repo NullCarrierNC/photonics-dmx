@@ -9,7 +9,7 @@ import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
 import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor';
-import { AudioConfig } from '../../photonics-dmx/listeners/Audio/audioTypes';
+import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
 import { BrowserWindow, ipcMain, app } from 'electron';
 import * as path from 'path';
@@ -1043,6 +1043,7 @@ export class ControllerManager {
     description: string;
     groupId: string;
     groupName: string;
+    groupDescription: string;
   }> {
     const registry = AudioCueRegistry.getInstance();
     const enabledGroupIds = registry.getEnabledGroups();
@@ -1053,6 +1054,7 @@ export class ControllerManager {
       description: string;
       groupId: string;
       groupName: string;
+      groupDescription: string;
     }>();
 
     for (const groupId of targetGroups) {
@@ -1065,7 +1067,8 @@ export class ControllerManager {
           label: cue.id,
           description: cue.description,
           groupId: group.id,
-          groupName: group.name
+          groupName: group.name,
+          groupDescription: group.description
         });
       });
     }

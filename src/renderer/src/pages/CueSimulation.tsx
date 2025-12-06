@@ -6,6 +6,7 @@ import { InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/ty
 import EffectsDropdown from '../components/EffectSelector';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 import CuePreviewYarg from '@renderer/components/CuePreviewYarg';
+import CuePreviewAudio from '@renderer/components/CuePreviewAudio';
 import LightsDmxPreview from '@renderer/components/LightsDmxPreview';
 import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview';
 import { useTimeoutEffect } from '../utils/useTimeout';
@@ -554,16 +555,20 @@ const CueSimulation: React.FC = () => {
   
       <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
-      <CuePreviewYarg 
-        className="mb-0"
-        showBeatIndicator={showBeatIndicator}
-        showMeasureIndicator={showMeasureIndicator}
-        showKeyframeIndicator={showKeyframeIndicator}
-        manualBeatType="Manual Beat"
-        manualMeasureType="Manual Measure"
-        manualKeyframeType="Manual Keyframe"
-        simulationMode={true}
-      />
+      {isAudioReactiveEnabled ? (
+        <CuePreviewAudio className="mb-0" />
+      ) : (
+        <CuePreviewYarg 
+          className="mb-0"
+          showBeatIndicator={showBeatIndicator}
+          showMeasureIndicator={showMeasureIndicator}
+          showKeyframeIndicator={showKeyframeIndicator}
+          manualBeatType="Manual Beat"
+          manualMeasureType="Manual Measure"
+          manualKeyframeType="Manual Keyframe"
+          simulationMode={true}
+        />
+      )}
 
       <hr className="my-6 border-gray-200 dark:border-gray-600" />
 

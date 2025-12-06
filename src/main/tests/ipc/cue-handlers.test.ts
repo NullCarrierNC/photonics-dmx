@@ -1,6 +1,6 @@
-import { CueRegistry } from '../../../photonics-dmx/cues/CueRegistry';
-import { ICue, CueStyle } from '../../../photonics-dmx/cues/interfaces/ICue';
-import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/ICueGroup';
+import { YargCueRegistry as CueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry';
+import { INetCue, CueStyle } from '../../../photonics-dmx/cues/interfaces/INetCue';
+import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/INetCueGroup';
 import { CueData, CueType } from '../../../photonics-dmx/cues/types/cueTypes';
 import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager';
@@ -28,7 +28,7 @@ const mockControllerManager = {
 };
 
 // Mock implementation with descriptions
-class MockCueImplementation implements ICue {
+class MockCueImplementation implements INetCue {
   private _id: string;
   constructor(public cueId: string, public description?: string) {
     this._id = `mock-${this.cueId}-${Math.random().toString(36).substring(2, 11)}`;

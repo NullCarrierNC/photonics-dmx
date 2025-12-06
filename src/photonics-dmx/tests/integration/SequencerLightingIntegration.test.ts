@@ -10,7 +10,7 @@ import { StageKitMenuCue } from '../../cues/yarg/handlers/stagekit/StageKitMenuC
 import { StageKitCoolManualCue } from '../../cues/yarg/handlers/stagekit/StageKitCoolManualCue';
 import { Effect, RGBIO } from '../../types';
 import { Clock } from '../../controllers/sequencer/Clock';
-import { CueData, CueType, DrumNoteType, defaultCueData } from 'src/photonics-dmx/cues';
+import { CueData, CueType, DrumNoteType, defaultCueData } from '../../cues';
 
 class ManualTestClock {
   private callbacks = new Set<(deltaTime: number) => void>();

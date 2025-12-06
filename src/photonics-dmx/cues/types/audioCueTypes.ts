@@ -1,19 +1,43 @@
-import { AudioLightingData, AudioConfig } from '../../listeners/Audio/audioTypes';
+import { AudioLightingData, AudioConfig } from '../../listeners/Audio/AudioTypes';
 
 /**
- * Audio cue types for audio-reactive lighting
- * Built-in cues are expressed as constants, while user-defined cues can provide any string identifier.
+ * Audio cue types for audio-reactive lighting.
+ * Built-in cues are enumerated constants while user-defined cues can use any string identifier.
+ */
+export enum BuiltInAudioCues {
+  BasicLayered = 'BasicLayered',
+  SpectrumCue = 'SpectrumCue',
+  PulseChaser = 'PulseChaser',
+  BeatSplitPulse = 'BeatSplitPulse',
+  BassSnareRipple = 'BassSnareRipple',
+  EnergyStrobePulse = 'EnergyStrobePulse',
+  MirrorBandBounce = 'MirrorBandBounce',
+  BandShell = 'BandShell',
+  PrismSweep = 'PrismSweep',
+  TrebleSpark = 'TrebleSpark',
+  SubHarmonicWave = 'SubHarmonicWave',
+  SpectrumStepper = 'SpectrumStepper',
+  BeatSpectrumMorph = 'BeatSpectrumMorph',
+  TriadCascade = 'TriadCascade',
+  AuroraDrift = 'AuroraDrift',
+  TempoFlutter = 'TempoFlutter',
+  DynamicSurge = 'DynamicSurge',
+  LinearLightOrgan = 'LinearLightOrgan',
+  SplitLightOrgan = 'SplitLightOrgan',
+  StackedLightOrgan = 'StackedLightOrgan',
+  DiagonalLightOrgan = 'DiagonalLightOrgan',
+  GatedLightOrgan = 'GatedLightOrgan'
+}
+
+/**
+ * AudioCueType is a free-form string so user-authored cues can
+ * register arbitrary identifiers from the node editor.
  */
 export type AudioCueType = string;
 
-export const BuiltInAudioCues = {
-  BasicLayered: 'BasicLayered',
-  SpectrumCue: 'SpectrumCue',
-} as const;
+export type BuiltInAudioCueType = `${BuiltInAudioCues}`;
 
-export type BuiltInAudioCueType = typeof BuiltInAudioCues[keyof typeof BuiltInAudioCues];
-
-export const builtInAudioCueList: BuiltInAudioCueType[] = Object.values(BuiltInAudioCues);
+export const builtInAudioCueList: BuiltInAudioCueType[] = Object.values(BuiltInAudioCues) as BuiltInAudioCueType[];
 
 /**
  * Audio cue data structure passed to cue implementations

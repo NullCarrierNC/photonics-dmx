@@ -1,5 +1,5 @@
 import { IAudioCue } from '../../interfaces/IAudioCue';
-import { AudioCueData } from '../../types/audioCueTypes';
+import { AudioCueData, AudioCueType } from '../../types/audioCueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { CompiledActionChain, CompiledAudioCue } from '../compiler/NodeCueCompiler';
@@ -31,7 +31,7 @@ const clamp = (value: number, min: number, max: number): number =>
 
 export class AudioNodeCue implements IAudioCue {
   public readonly id: string;
-  public readonly cueType: string;
+  public readonly cueType: AudioCueType;
   public readonly description: string;
 
   private readonly eventStates = new Map<string, AudioEventState>();

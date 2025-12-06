@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 import { DmxFixture, LightingConfiguration,  } from '../../photonics-dmx/types';
-import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/audioTypes';
+import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 import { Pages } from './types';
 
@@ -201,6 +201,7 @@ export interface LightingPreferences {
       }>;
     };
     enabled: boolean;
+    linearResponse?: boolean;
   };
 }
 

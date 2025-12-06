@@ -9,7 +9,7 @@
  * - Send processed data to main process via IPC for DMX control
  */
 
-import { AudioLightingData, AudioConfig } from '../../../photonics-dmx/listeners/Audio/audioTypes';
+import { AudioLightingData, AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes';
 import { getDefaultStore } from 'jotai';
 import { audioDataAtom } from '../atoms';
 

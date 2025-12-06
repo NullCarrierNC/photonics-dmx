@@ -441,8 +441,8 @@ const DmxOutputSettings: React.FC = () => {
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           Each sender can be configured individually below.
         </p>
-        <div className="flex flex-wrap gap-6">
-          <label className="flex items-center space-x-2 w-[180px]">
+        <div className="flex items-center space-x-6 flex-wrap">
+          <label className="flex items-center space-x-2">
             <input
               type="checkbox"
               checked={prefs.dmxOutputConfig?.sacnEnabled || false}
@@ -451,8 +451,8 @@ const DmxOutputSettings: React.FC = () => {
             />
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">sACN</span>
           </label>
-          
-          <label className="flex items-center space-x-2 w-[180px]">
+
+          <label className="flex items-center space-x-2">
             <input
               type="checkbox"
               checked={prefs.dmxOutputConfig?.artNetEnabled || false}
@@ -461,8 +461,8 @@ const DmxOutputSettings: React.FC = () => {
             />
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ArtNet</span>
           </label>
-          
-          <label className="flex items-center space-x-2 w-[180px]">
+
+          <label className="flex items-center space-x-2">
             <input
               type="checkbox"
               checked={prefs.dmxOutputConfig?.enttecProEnabled || false}

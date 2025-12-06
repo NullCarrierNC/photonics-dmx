@@ -19,6 +19,7 @@ import { YargNodeCue } from '../runtime/YargNodeCue';
 import { AudioNodeCue } from '../runtime/AudioNodeCue';
 import { CueType } from '../../types/cueTypes';
 import { AudioCueType, BuiltInAudioCues } from '../../types/audioCueTypes';
+import { IAudioCue } from '../../interfaces/IAudioCue';
 
 export interface NodeCueFileSummary {
   path: string;
@@ -320,7 +321,7 @@ export class NodeCueLoader extends EventEmitter {
   }
 
   private buildAudioGroup(file: AudioNodeCueFile): AudioCueGroup {
-    const cueMap = new Map<AudioCueType, AudioNodeCue>();
+    const cueMap = new Map<AudioCueType, IAudioCue>();
 
     file.cues.forEach((cue: AudioNodeCueDefinition) => {
       if (cueMap.has(cue.cueTypeId)) {

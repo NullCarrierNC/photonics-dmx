@@ -1,8 +1,9 @@
 import { ConfigFile } from './ConfigFile';
 import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes } from '../../photonics-dmx/types';
-import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio/audioConfig';
-import type { AudioConfig } from '../../photonics-dmx/listeners/Audio/audioTypes';
+
+import type { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes';
+import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio';
 
 /**
  * Application preferences interface

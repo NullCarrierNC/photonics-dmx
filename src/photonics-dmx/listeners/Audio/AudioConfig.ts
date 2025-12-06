@@ -1,4 +1,4 @@
-import { AudioConfig } from './audioTypes';
+import { AudioConfig } from './AudioTypes';
 
 /**
  * Default audio configuration for Web Audio API
@@ -30,6 +30,7 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
     ],
   },
   enabled: false,
+  linearResponse: true,
 };
 
 export default DEFAULT_AUDIO_CONFIG;

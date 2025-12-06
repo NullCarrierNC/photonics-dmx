@@ -92,5 +92,8 @@ export interface AudioConfig {
   
   /** Enable audio-reactive lighting */
   enabled: boolean;       // Default: false
+
+  /** Whether to treat cue brightness as linear (true) or discrete DMX steps (false) */
+  linearResponse?: boolean;
 }
 

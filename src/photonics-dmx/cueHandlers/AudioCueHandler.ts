@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { AudioLightingData, AudioConfig } from '../listeners/Audio/audioTypes';
+import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes';
 import { AudioCueData, AudioCueType } from '../cues/types/audioCueTypes';
 import { IAudioCue } from '../cues/interfaces/IAudioCue';
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry';
@@ -68,6 +68,10 @@ export class AudioCueHandler extends EventEmitter {
    * Stop the current cue
    */
   public stop(): void {
+    this.clearCurrentCue();
+  }
+
+  public clearCurrentCue(): void {
     if (this.currentCue?.onStop) {
       this.currentCue.onStop();
     }

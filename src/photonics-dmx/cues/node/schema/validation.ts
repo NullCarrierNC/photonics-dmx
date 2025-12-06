@@ -28,6 +28,8 @@ import {
   WaitCondition
 } from '../../../types';
 
+type SchemaFor<T> = JSONSchemaType<T> extends string ? Record<string, unknown> : JSONSchemaType<T>;
+
 const COLOR_VALUES: Color[] = [
   'red', 'blue', 'yellow', 'green', 'cyan', 'orange', 'purple',
   'chartreuse', 'teal', 'violet', 'magenta', 'vermilion', 'amber',
@@ -73,13 +75,13 @@ const ajv = new Ajv({
 });
 addFormats(ajv);
 
-const stringIdSchema: JSONSchemaType<string> = {
+const stringIdSchema: SchemaFor<string> = {
   type: 'string',
   minLength: 1,
   maxLength: 128
 };
 
-const colorSchema: JSONSchemaType<{
+const colorSchema: SchemaFor<{
   name: Color;
   brightness: Brightness;
   blendMode?: BlendMode;
@@ -94,7 +96,7 @@ const colorSchema: JSONSchemaType<{
   }
 };
 
-const timingSchema: JSONSchemaType<ActionTiming> = {
+const timingSchema: SchemaFor<ActionTiming> = {
   type: 'object',
   required: ['fadeIn', 'hold', 'fadeOut', 'postDelay'],
   additionalProperties: false,
@@ -109,7 +111,7 @@ const timingSchema: JSONSchemaType<ActionTiming> = {
   }
 };
 
-const sweepConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['sweep']>> = {
+const sweepConfigSchema: SchemaFor<NonNullable<NodeActionConfig['sweep']>> = {
   type: 'object',
   additionalProperties: false,
   required: [],
@@ -123,7 +125,7 @@ const sweepConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['sweep']>> 
   }
 };
 
-const cycleConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['cycle']>> = {
+const cycleConfigSchema: SchemaFor<NonNullable<NodeActionConfig['cycle']>> = {
   type: 'object',
   additionalProperties: false,
   required: [],
@@ -134,7 +136,7 @@ const cycleConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['cycle']>> 
   }
 };
 
-const blackoutConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['blackout']>> = {
+const blackoutConfigSchema: SchemaFor<NonNullable<NodeActionConfig['blackout']>> = {
   type: 'object',
   additionalProperties: false,
   required: [],
@@ -143,7 +145,7 @@ const blackoutConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['blackou
   }
 };
 
-const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
+const actionConfigSchema: SchemaFor<NodeActionConfig> = {
   type: 'object',
   additionalProperties: false,
   required: [],
@@ -155,7 +157,7 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
   }
 };
 
-const targetSchema: JSONSchemaType<NodeActionTarget> = {
+const targetSchema: SchemaFor<NodeActionTarget> = {
   type: 'object',
   required: ['groups', 'filter'],
   additionalProperties: false,
@@ -169,7 +171,7 @@ const targetSchema: JSONSchemaType<NodeActionTarget> = {
   }
 };
 
-const actionSchema: JSONSchemaType<ActionNode> = {
+const actionSchema: SchemaFor<ActionNode> = {
   type: 'object',
   required: ['id', 'type', 'effectType', 'target', 'color', 'timing'],
   additionalProperties: false,
@@ -209,7 +211,7 @@ const actionSchema: JSONSchemaType<ActionNode> = {
   ]
 } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-const yargEventSchema: JSONSchemaType<YargEventNode> = {
+const yargEventSchema: SchemaFor<YargEventNode> = {
   type: 'object',
   required: ['id', 'type', 'eventType'],
   additionalProperties: false,
@@ -226,7 +228,7 @@ const yargEventSchema: JSONSchemaType<YargEventNode> = {
   }
 };
 
-const audioEventSchema: JSONSchemaType<AudioEventNode> = {
+const audioEventSchema: SchemaFor<AudioEventNode> = {
   type: 'object',
   required: ['id', 'type', 'eventType', 'triggerMode'],
   additionalProperties: false,
@@ -245,7 +247,7 @@ const audioEventSchema: JSONSchemaType<AudioEventNode> = {
   }
 };
 
-const connectionSchema: JSONSchemaType<{
+const connectionSchema: SchemaFor<{
   from: string;
   to: string;
   fromPort?: string;
@@ -262,7 +264,7 @@ const connectionSchema: JSONSchemaType<{
   }
 };
 
-const layoutSchema: JSONSchemaType<NodeLayoutMetadata> = {
+const layoutSchema: SchemaFor<NodeLayoutMetadata> = {
   type: 'object',
   additionalProperties: false,
   required: ['nodePositions'],
@@ -294,7 +296,7 @@ const layoutSchema: JSONSchemaType<NodeLayoutMetadata> = {
   }
 };
 
-const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
+const yargCueSchema: SchemaFor<YargNodeCueDefinition> = {
   type: 'object',
   required: ['id', 'name', 'nodes', 'connections', 'cueType', 'style'],
   additionalProperties: false,
@@ -329,7 +331,7 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
   }
 };
 
-const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
+const audioCueSchema: SchemaFor<AudioNodeCueDefinition> = {
   type: 'object',
   required: ['id', 'name', 'nodes', 'connections', 'cueTypeId'],
   additionalProperties: false,
@@ -363,7 +365,7 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
   }
 };
 
-const groupSchema: JSONSchemaType<NodeCueGroupMeta> = {
+const groupSchema: SchemaFor<NodeCueGroupMeta> = {
   type: 'object',
   required: ['id', 'name'],
   additionalProperties: false,
@@ -374,7 +376,7 @@ const groupSchema: JSONSchemaType<NodeCueGroupMeta> = {
   }
 };
 
-const yargFileSchema: JSONSchemaType<YargNodeCueFile> = {
+const yargFileSchema: SchemaFor<YargNodeCueFile> = {
   type: 'object',
   required: ['version', 'mode', 'group', 'cues'],
   additionalProperties: false,
@@ -390,7 +392,7 @@ const yargFileSchema: JSONSchemaType<YargNodeCueFile> = {
   }
 };
 
-const audioFileSchema: JSONSchemaType<AudioNodeCueFile> = {
+const audioFileSchema: SchemaFor<AudioNodeCueFile> = {
   type: 'object',
   required: ['version', 'mode', 'group', 'cues'],
   additionalProperties: false,

@@ -151,7 +151,7 @@
         "./src/photonics-dmx/helpers/index.ts",
         "./src/photonics-dmx/helpers/utils.ts",
         "./src/photonics-dmx/listeners/Audio/audioConfig.ts",
-        "./src/photonics-dmx/listeners/Audio/audioTypes.ts",
+        "./src/photonics-dmx/listeners/Audio/AudioTypes.ts",
         "./src/photonics-dmx/listeners/Audio/index.ts",
         "./src/photonics-dmx/listeners/RB3/Rb3eNetworkListener.ts",
         "./src/photonics-dmx/listeners/RB3/StageKitLedMapper.ts",
