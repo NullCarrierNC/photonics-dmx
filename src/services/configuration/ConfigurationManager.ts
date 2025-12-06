@@ -1,6 +1,10 @@
 import { ConfigFile } from './ConfigFile';
 import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes } from '../../photonics-dmx/types';
 
+import type { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
+import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes';
+import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio';
+
 /**
  * Application preferences interface
  */
@@ -35,6 +39,7 @@ export interface AppPreferences {
     max: number;
   };
   enabledCueGroups: string[];
+  enabledAudioCueGroups?: string[];
   cueConsistencyWindow: number;
   clockRate: number;
   
@@ -54,6 +59,8 @@ export interface AppPreferences {
     sacnExpanded: boolean;
     openDmxExpanded: boolean;
   };
+  audioConfig?: AudioConfig;
+  activeAudioCueType?: AudioCueType;
 }
 
 /**
@@ -70,8 +77,10 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
   enabledCueGroups: ['stagekit'],
+  enabledAudioCueGroups: ['audio-spectrum'],
   cueConsistencyWindow: 60000,
   clockRate: 5, // 5ms interval for smooth animations
+  activeAudioCueType: BuiltInAudioCues.BasicLayered,
 
   // Brightness configuration defaults
   brightness: {
@@ -108,7 +117,8 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     enttecProExpanded: false,
     sacnExpanded: false,
     openDmxExpanded: false
-  }
+  },
+  audioConfig: DEFAULT_AUDIO_CONFIG
 };
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {
@@ -259,6 +269,34 @@ export class ConfigurationManager {
   }
 
   /**
+   * Gets the enabled audio cue groups preference
+   */
+  getEnabledAudioCueGroups(): string[] | undefined {
+    return this.preferences.get().enabledAudioCueGroups;
+  }
+
+  /**
+   * Sets the enabled audio cue groups by their IDs
+   */
+  setEnabledAudioCueGroups(groupIds: string[]): void {
+    this.setPreference('enabledAudioCueGroups', groupIds);
+  }
+
+  /**
+   * Gets the preferred audio cue type
+   */
+  getActiveAudioCueType(): AudioCueType | undefined {
+    return this.preferences.get().activeAudioCueType;
+  }
+
+  /**
+   * Persists the preferred audio cue type
+   */
+  setActiveAudioCueType(cueType: AudioCueType): void {
+    this.setPreference('activeAudioCueType', cueType);
+  }
+
+  /**
    * Gets the cue consistency window preference
    */
   getCueConsistencyWindow(): number {
@@ -356,5 +394,38 @@ export class ConfigurationManager {
    */
   resetLayoutToDefaults(): void {
     this.lightingLayout.update(DEFAULT_LIGHTING_LAYOUT);
+  }
+
+  // Audio Configuration Methods
+
+  /**
+   * Gets audio configuration
+   */
+  getAudioConfig(): AudioConfig {
+    const savedConfig = this.getPreference('audioConfig');
+
+    const config = savedConfig ? { ...DEFAULT_AUDIO_CONFIG, ...savedConfig } : DEFAULT_AUDIO_CONFIG;
+
+    return { ...config, enabled: false };
+  }
+
+  /**
+   * Sets audio configuration
+   */
+  setAudioConfig(config: AppPreferences['audioConfig']): void {
+    this.setPreference('audioConfig', config);
+  }
+
+  /**
+   * Updates audio configuration (partial update)
+   * Note: The 'enabled' field is never persisted (runtime-only state)
+   */
+  updateAudioConfig(updates: Partial<AppPreferences['audioConfig']>): void {
+    const current = this.getPreference('audioConfig') || {};
+    const updated = { ...current, ...updates };
+
+    const { enabled, ...configToSave } = updated;
+
+    this.setPreference('audioConfig', configToSave as any);
   }
 } 

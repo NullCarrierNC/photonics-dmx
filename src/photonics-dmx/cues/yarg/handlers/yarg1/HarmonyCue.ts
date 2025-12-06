@@ -1,14 +1,14 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
 import { randomBetween } from '../../../../helpers/utils';
 import { TimingPresets } from '../../../../helpers/bpmUtils';
 import { EasingType } from '../../../../easing';
 
-export class HarmonyCue implements ICue {
+export class HarmonyCue implements INetCue {
   id = 'default-harmony';
   cueId = CueType.Harmony;
   description = 'Interactive color cross-fade effect where colors are determined by drum hits (starting color) and guitar notes (ending color)';

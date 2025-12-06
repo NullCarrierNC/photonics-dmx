@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -9,7 +9,7 @@ import { getEffectFlashColor } from '../../../../effects';
 /**
  * StageKit Dischord Cue
  */
-export class StageKitDischordCue implements ICue {
+export class StageKitDischordCue implements INetCue {
   id = 'stagekit-dischord';
   cueId = CueType.Dischord;
   description = 'Yellow clockwise on beat, green dual-mode (spinning/solid) on measure, blue alternating patterns on keyframe, red flash on red drum.';

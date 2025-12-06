@@ -14,7 +14,7 @@ import { ILightingController } from '../../controllers/sequencer/interfaces';
 
 import { createMockLightingConfig } from '../helpers/testFixtures';
 import { afterEach, beforeEach, describe, jest ,it, expect } from '@jest/globals';
-import { CueData, CueType, InstrumentNoteType, DrumNoteType } from '../../cues/cueTypes';
+import { CueData, CueType, InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes';
 
 class TestCueHandler extends BaseCueHandler {
   // Implement abstract methods for testing

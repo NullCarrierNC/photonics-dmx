@@ -1,13 +1,13 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { randomBetween } from '../../../../helpers/utils';
 import { TimingPresets } from '../../../../helpers/bpmUtils';
 
-export class VerseCue implements ICue {
+export class VerseCue implements INetCue {
   id = 'default-verse';
   cueId = CueType.Verse;
   description = 'Randomized blue or yellow colors at varying intensities on all lights with timing based on song BPM';

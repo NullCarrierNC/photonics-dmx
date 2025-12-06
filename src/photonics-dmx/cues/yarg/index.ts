@@ -8,4 +8,4 @@ import './yarg1';
 // import './commonAlt1';
 
 // Export the registry for use by other modules
-export { CueRegistry } from '../CueRegistry'; 
+export { YargCueRegistry as CueRegistry } from '../registries/YargCueRegistry'; 

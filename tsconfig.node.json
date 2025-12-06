@@ -4,6 +4,7 @@
   "exclude": ["**/*.test.ts", "**/*.spec.ts", "src/photonics-dmx/tests/**/*"],
   "compilerOptions": {
     "composite": true,
-    "types": ["electron-vite/node"]
+    "types": ["electron-vite/node"],
+    "strictNullChecks": true
   }
 }

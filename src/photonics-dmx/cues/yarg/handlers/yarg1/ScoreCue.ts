@@ -1,13 +1,13 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { getEffectFlashColor } from '../../../../effects/effectFlashColor';
 import { EasingType } from '../../../../easing';
 
-export class ScoreCue implements ICue {
+export class ScoreCue implements INetCue {
   id = 'default-score';
   cueId = CueType.Score;
   description = 'Solid medium-blue colour on front with yellow flash';

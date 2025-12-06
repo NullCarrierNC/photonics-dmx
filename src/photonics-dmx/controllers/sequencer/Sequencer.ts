@@ -1,5 +1,5 @@
 import { Effect, RGBIO, TrackedLight } from '../../types';
-import { InstrumentNoteType, DrumNoteType } from '../../cues/cueTypes';
+import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes';
 import { LightTransitionController } from './LightTransitionController';
 import { DebugMonitor } from './DebugMonitor';
 import { EffectManager } from './EffectManager';
@@ -103,7 +103,7 @@ export class Sequencer implements ILightingController {
    * @param isPersistent If true, the effect re-queues itself after completing
    */
   public async setEffect(name: string, effect: Effect, isPersistent: boolean = false): Promise<void> {
-    await this.effectManager.setEffect(name, effect, isPersistent);
+    this.effectManager.setEffect(name, effect, isPersistent);
   }
 
   /**

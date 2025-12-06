@@ -14,7 +14,7 @@ interface GroupCueDetails extends CueGroup {
   isExpanded: boolean;
 }
 
-const PrefCueGroups: React.FC = () => {
+const YargEnabledCueGroups: React.FC = () => {
   const [allGroups, setAllGroups] = useState<GroupCueDetails[]>([]);
   const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,7 +103,7 @@ const PrefCueGroups: React.FC = () => {
   if (loading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4 border-b pb-2">Enabled Cue Groups</h2>
+        <h2 className="text-xl font-semibold mb-4 border-b pb-2">YARG Cue Groups</h2>
         <p>Loading cue groups...</p>
       </div>
     );
@@ -111,7 +111,7 @@ const PrefCueGroups: React.FC = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">Enabled Cue Groups</h2>
+      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">YARG Cue Groups</h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
         Cue groups contain different implementations of the same cue triggered by YARG. Having multiple groups enabled allows for a wider range of visual 
         effects during gameplay. The Stage Kit group is used as a fallback if no other group contains the necessary cue. 
@@ -177,4 +177,4 @@ const PrefCueGroups: React.FC = () => {
   );
 };
 
-export default PrefCueGroups;
+export default YargEnabledCueGroups;

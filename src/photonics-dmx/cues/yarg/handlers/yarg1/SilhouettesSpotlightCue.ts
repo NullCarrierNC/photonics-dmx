@@ -1,12 +1,12 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { getEffectFlashColor } from '../../../../effects';
 
-export class SilhouettesSpotlightCue implements ICue {
+export class SilhouettesSpotlightCue implements INetCue {
   id = 'default-silhouettes-spotlight';
   cueId = CueType.Silhouettes_Spotlight;
   description = 'Flash blue on back lights (or front if no back lights) triggered by drum-red';

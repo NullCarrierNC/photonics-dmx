@@ -1,8 +1,8 @@
-import { CueData, CueType } from '../cues/cueTypes';
+import { CueData, CueType } from '../cues/types/cueTypes';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../controllers/DmxLightManager';
 import { BaseCueHandler } from './BaseCueHandler';
-import { ICue } from '../cues/interfaces/ICue';
+import { INetCue } from '../cues/interfaces/INetCue';
 
 /**
  * YargCueHandler handles the cues called by the YARG network listener.
@@ -18,7 +18,7 @@ import { ICue } from '../cues/interfaces/ICue';
  * addEffect will not clear other effects unless it's on the same layer.
  */
 class YargCueHandler extends BaseCueHandler {
-  private currentExecutingCue: ICue | null = null;
+  private currentExecutingCue: INetCue | null = null;
   private currentExecutingCueType: CueType | null = null;
 
   constructor(

@@ -13,8 +13,9 @@ import { ILightingController } from '../controllers/sequencer/interfaces';
 import { StageKitLightMapper } from './StageKitLightMapper';
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes';
 import { getColor } from '../helpers/dmxHelpers';
-import { CueData } from '../cues/cueTypes';
-import { RGBIO, TrackedLight, Color } from '../types';
+import { CueData } from '../cues/types/cueTypes';
+import { Color, RGBIO, TrackedLight } from '../types';
+
 
 /**
  * StageKit data structure

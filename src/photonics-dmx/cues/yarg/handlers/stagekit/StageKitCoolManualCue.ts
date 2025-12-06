@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -9,7 +9,7 @@ import { getEffectClockwiseRotation, getEffectCounterClockwiseRotation } from '.
  * StageKit Cool Manual Cue 
  * 2x blue, 1x green. Blue animating clockwise, green animating counter-clockwise.
  */
-export class StageKitCoolManualCue implements ICue {
+export class StageKitCoolManualCue implements INetCue {
   id = 'stagekit-coolManual';
   cueId = CueType.Cool_Manual;
   description = 'Cool Manual - 2x blue, 1x green. Blue animating clockwise, green animating counter-clockwise, on keyframe.';

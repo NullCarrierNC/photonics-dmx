@@ -8,15 +8,21 @@ import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetwo
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
+import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor';
+import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, ipcMain, app } from 'electron';
+import * as path from 'path';
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces';
 import { SenderError } from '../../photonics-dmx/senders/BaseSender';
 import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager';
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController';
-import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/cueTypes';
-import { CueRegistry } from '../../photonics-dmx/cues/CueRegistry';
+import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
+import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
+import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
+import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes';
+import { NodeCueLoader, NodeCueListSummary } from '../../photonics-dmx/cues/node/loader/NodeCueLoader';
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues';
 
@@ -33,7 +39,9 @@ export class ControllerManager {
   private cueHandler: YargCueHandler | Rb3CueHandler | null = null;
   private yargListener: YargNetworkListener | null = null;
   private rb3eListener: Rb3eNetworkListener | null = null;
+  private audioProcessor: AudioCueProcessor | null = null;
   private processorManager: ProcessorManager | null = null;
+  private nodeCueLoader: NodeCueLoader | null = null;
 
   private testEffectInterval: NodeJS.Timeout | null = null;
   private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large';
@@ -42,6 +50,7 @@ export class ControllerManager {
   private isInitialized = false;
   private isYargEnabled = false;
   private isRb3Enabled = false;
+  private isAudioEnabled = false;
 
   constructor() {
     this.config = new ConfigurationManager();
@@ -67,6 +76,8 @@ export class ControllerManager {
     await this.initializeDmxManager();
     await this.initializeSequencer();
     await this.initializeCueRegistry();
+    await this.initializeAudioCueRegistry();
+    await this.initializeNodeCueLoader();
     await this.initializeListeners();
 
     this.isInitialized = true;
@@ -124,7 +135,7 @@ export class ControllerManager {
    * Initialize the CueRegistry with enabled groups from configuration
    */
   private async initializeCueRegistry(): Promise<void> {
-    const registry = CueRegistry.getInstance();
+    const registry = YargCueRegistry.getInstance();
     
     // Get enabled groups from configuration
     const enabledGroupIds = this.config.getEnabledCueGroups();
@@ -142,6 +153,48 @@ export class ControllerManager {
     const consistencyWindow = this.config.getCueConsistencyWindow();
     registry.setCueConsistencyWindow(consistencyWindow);
     console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms');
+  }
+
+  /**
+   * Initialize the AudioCueRegistry with enabled groups from configuration
+   */
+  private async initializeAudioCueRegistry(): Promise<void> {
+    const registry = AudioCueRegistry.getInstance();
+
+    const enabledGroupIds = this.config.getEnabledAudioCueGroups();
+    if (enabledGroupIds && enabledGroupIds.length > 0) {
+      registry.setEnabledGroups(enabledGroupIds);
+      console.log('AudioCueRegistry initialized with enabled groups:', enabledGroupIds);
+    } else {
+      const allGroups = registry.getRegisteredGroups();
+      registry.setEnabledGroups(allGroups);
+      if (allGroups.length > 0) {
+        this.config.setEnabledAudioCueGroups(allGroups);
+      }
+      console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups);
+    }
+  }
+
+  private async initializeNodeCueLoader(): Promise<void> {
+    if (this.nodeCueLoader) {
+      return;
+    }
+
+    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks');
+    this.nodeCueLoader = new NodeCueLoader({
+      baseDir,
+      yargRegistry: YargCueRegistry.getInstance(),
+      audioRegistry: AudioCueRegistry.getInstance()
+    });
+
+    const summary = await this.nodeCueLoader.loadAll();
+    console.log(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`);
+    await this.nodeCueLoader.startWatching();
+
+    this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window?.webContents.send('node-cues:changed', payload);
+    });
   }
   
 
@@ -582,6 +635,24 @@ export class ControllerManager {
         console.error("Error disabling RB3:", err);
       }
       
+      try {
+        await this.disableAudio();
+        console.log("ControllerManager shutdown: Audio disabled");
+      } catch (err) {
+        console.error("Error disabling Audio:", err);
+      }
+
+      if (this.nodeCueLoader) {
+        try {
+          await this.nodeCueLoader.dispose();
+          this.nodeCueLoader.removeAllListeners();
+          this.nodeCueLoader = null;
+          console.log("ControllerManager shutdown: node cue loader stopped");
+        } catch (err) {
+          console.error("Error shutting down node cue loader:", err);
+        }
+      }
+      
       // Ensure cue handler is shut down if it still exists
       if (this.cueHandler) {
         try {
@@ -650,6 +721,10 @@ export class ControllerManager {
 
   public getCueHandler(): YargCueHandler | Rb3CueHandler | null {
     return this.cueHandler;
+  }
+
+  public getNodeCueLoader(): NodeCueLoader | null {
+    return this.nodeCueLoader;
   }
 
   public getProcessorManager(): any | null {
@@ -756,5 +831,256 @@ export class ControllerManager {
       console.error("Error reinitializing controllers:", error);
       throw error;
     }
+  }
+
+  /**
+   * Enable audio listener and processor
+   */
+  public async enableAudio(): Promise<void> {
+    // Check if the system is initialized, initialize if needed
+    if (!this.isInitialized) {
+      console.log("Initializing system before enabling Audio");
+      this.init().then(() => {
+        this.enableAudioInternal();
+      }).catch(error => {
+        console.error("Error during initialization:", error);
+      });
+      return;
+    }
+    
+    await this.enableAudioInternal();
+  }
+
+  /**
+   * Internal method to enable Audio without initialization checks
+   * Uses Web Audio API in renderer process
+   */
+  private async enableAudioInternal(): Promise<void> {
+    if (this.isAudioEnabled || !this.effectsController || !this.dmxLightManager) {
+      console.log("Cannot enable Audio: already enabled or missing required components");
+      return;
+    }
+    
+    const audioConfig = this.config.getAudioConfig();
+    
+    try {
+      console.log('Enabling audio with Web Audio API...');
+      
+      // Create audio processor in main process using cue-based system
+      // getAudioConfig() always returns a valid config (merges with defaults)
+      const preferredCueType = this.config.getActiveAudioCueType();
+      this.audioProcessor = new AudioCueProcessor(
+        this.dmxLightManager,
+        this.effectsController,
+        audioConfig,
+        preferredCueType
+      );
+      this.config.setActiveAudioCueType(this.audioProcessor.getCurrentCueType());
+      
+      // Start the processor
+      this.audioProcessor.start();
+      
+      // Set up IPC handler to receive audio data from renderer
+      // Remove existing listener first to prevent duplicates
+      ipcMain.removeAllListeners('audio:data');
+      
+      const audioDataHandler = (_, data) => {
+        if (this.audioProcessor && this.isAudioEnabled) {
+          this.audioProcessor.processAudioData(data);
+        }
+      };
+      
+      ipcMain.on('audio:data', audioDataHandler);
+      
+      // Tell renderer to start capturing audio
+      const mainWindow = BrowserWindow.getFocusedWindow();
+      if (mainWindow) {
+        mainWindow.webContents.send('audio:enable', audioConfig);
+        console.log('Sent audio:enable to renderer');
+      } else {
+        console.warn('No focused window to send audio:enable command');
+      }
+      
+      this.isAudioEnabled = true;
+      console.log("Audio enabled successfully");
+    } catch (error) {
+      console.error('Failed to enable audio:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Disable audio processing
+   */
+  public async disableAudio(): Promise<void> {
+    if (!this.isAudioEnabled) {
+      return;
+    }
+    
+    console.log('Disabling audio...');
+    
+    // Clear all running effects before shutting down
+    if (this.effectsController) {
+      try {
+        this.effectsController.removeAllEffects();
+        await this.effectsController.blackout(0);
+        console.log('ControllerManager: Cleared all running effects and initiated blackout when disabling Audio');
+      } catch (error) {
+        console.error('Error clearing effects when disabling Audio:', error);
+      }
+    }
+    
+    // Tell renderer to stop capturing audio
+    const mainWindow = BrowserWindow.getFocusedWindow();
+    if (mainWindow) {
+      mainWindow.webContents.send('audio:disable');
+      console.log('Sent audio:disable to renderer');
+    }
+    
+    // Remove IPC handler
+    ipcMain.removeAllListeners('audio:data');
+    
+    // Shutdown processor
+    if (this.audioProcessor) {
+      this.audioProcessor.shutdown();
+      this.audioProcessor = null;
+    }
+    
+    this.isAudioEnabled = false;
+    console.log("Audio disabled successfully");
+  }
+  
+  /**
+   * Update audio configuration while audio is running
+   * This is called when config changes while audio is enabled
+   */
+  public updateAudioConfig(config: AudioConfig): void {
+    if (!this.isAudioEnabled || !this.audioProcessor) {
+      return;
+    }
+    
+    // Update config - merge with existing config to preserve fields not in partial update
+    const currentConfig = this.config.getAudioConfig();
+    const mergedConfig = { ...currentConfig, ...config };
+    this.config.setAudioConfig(mergedConfig);
+    this.audioProcessor.updateConfig(mergedConfig);
+    
+    console.log('AudioCueProcessor configuration updated');
+  }
+
+  /**
+   * Refresh active audio cue selection when enabled groups change
+   */
+  public refreshAudioCueSelection(): void {
+    if (this.audioProcessor) {
+      this.audioProcessor.refreshCueSelection();
+      this.config.setActiveAudioCueType(this.audioProcessor.getCurrentCueType());
+    }
+  }
+
+  /**
+   * Get the current audio cue selection, preferring the processor state
+   */
+  public getActiveAudioCueType(): AudioCueType {
+    if (this.audioProcessor) {
+      return this.audioProcessor.getCurrentCueType();
+    }
+
+    const saved = this.config.getActiveAudioCueType();
+    if (saved) {
+      return saved;
+    }
+
+    const registry = AudioCueRegistry.getInstance();
+    const enabled = registry.getAvailableCueTypes();
+    if (enabled.length > 0) {
+      return enabled[0];
+    }
+
+    const fallback = registry.getAvailableCueTypes(true);
+    if (fallback.length > 0) {
+      return fallback[0];
+    }
+
+    return BuiltInAudioCues.BasicLayered;
+  }
+
+  /**
+   * Persist and apply a new audio cue selection
+   */
+  public setActiveAudioCueType(cueType: AudioCueType): { success: boolean; error?: string } {
+    const registry = AudioCueRegistry.getInstance();
+    const available = registry.getAvailableCueTypes();
+
+    if (!available.includes(cueType)) {
+      return {
+        success: false,
+        error: `Cue ${cueType} is not available in enabled groups`
+      };
+    }
+
+    this.config.setActiveAudioCueType(cueType);
+
+    if (this.audioProcessor) {
+      const applied = this.audioProcessor.setActiveCueType(cueType);
+      if (!applied) {
+        return {
+          success: false,
+          error: `Cue ${cueType} could not be activated`
+        };
+      }
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Return cue options sourced from enabled audio cue groups
+   */
+  public getAudioCueOptions(): Array<{
+    id: AudioCueType;
+    label: string;
+    description: string;
+    groupId: string;
+    groupName: string;
+    groupDescription: string;
+  }> {
+    const registry = AudioCueRegistry.getInstance();
+    const enabledGroupIds = registry.getEnabledGroups();
+    const targetGroups = enabledGroupIds.length > 0 ? enabledGroupIds : registry.getRegisteredGroups();
+    const cueMap = new Map<AudioCueType, {
+      id: AudioCueType;
+      label: string;
+      description: string;
+      groupId: string;
+      groupName: string;
+      groupDescription: string;
+    }>();
+
+    for (const groupId of targetGroups) {
+      const group = registry.getGroup(groupId);
+      if (!group) continue;
+
+      group.cues.forEach((cue) => {
+        cueMap.set(cue.cueType, {
+          id: cue.cueType,
+          label: cue.id,
+          description: cue.description,
+          groupId: group.id,
+          groupName: group.name,
+          groupDescription: group.description
+        });
+      });
+    }
+
+    return Array.from(cueMap.values());
+  }
+
+
+  /**
+   * Get audio enabled state
+   */
+  public getIsAudioEnabled(): boolean {
+    return this.isAudioEnabled;
   }
 } 

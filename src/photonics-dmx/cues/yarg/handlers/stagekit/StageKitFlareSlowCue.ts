@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getEffectSingleColor } from '../../../../effects';
@@ -9,7 +9,7 @@ import { getColor } from '../../../../helpers';
 /**
  * StageKit Flare Slow Cue
  */
-export class StageKitFlareSlowCue implements ICue {
+export class StageKitFlareSlowCue implements INetCue {
   id = 'stagekit-flare-slow';
   cueId = CueType.Flare_Slow;
   description = 'All to white, high.';

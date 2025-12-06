@@ -1,7 +1,7 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import {  getEffectFlashColor } from '../../../../effects';
 import { randomBetween } from '../../../../helpers/utils';
@@ -11,7 +11,7 @@ import { Effect, EffectTransition } from '../../../../types';
 let lightStates: { [lightId: string]: 'green' | 'blue' } = {};
 let isNewSession = true; // Flag to track if this is we should reset the light states
 
-export class CoolAutomaticCue implements ICue {
+export class CoolAutomaticCue implements INetCue {
   id = 'alt-cool-auto-2';
   cueId = CueType.Cool_Automatic;
   description = 'Lights get set green or blue, then flash one light in the opposite color.';

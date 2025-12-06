@@ -1,7 +1,7 @@
-import { CueRegistry } from '../CueRegistry';
-import { CueType } from '../cueTypes';
-import { ICueGroup } from '../interfaces/ICueGroup';
-import { ICue } from '../interfaces/ICue';
+import { YargCueRegistry } from '../registries/YargCueRegistry';
+import { CueType } from '../types/cueTypes';
+import { ICueGroup } from '../interfaces/INetCueGroup';
+import { INetCue } from '../interfaces/INetCue';
 
 // Import StageKit group cues
 import { StageKitMenuCue } from './handlers/stagekit/StageKitMenuCue';
@@ -38,7 +38,7 @@ const stagekitGroup: ICueGroup = {
   id: 'stagekit',
   name: 'Stage Kit',
   description: 'Stage Kit cues that mimic the original Stage Kit visual effects. There is some variation to account for mapping to a smaller number of lights.',
-  cues: new Map<CueType, ICue>([
+  cues: new Map<CueType, INetCue>([
     [CueType.Menu, new StageKitMenuCue()],
     [CueType.Score, new StageKitScoreCue()],
     [CueType.Warm_Manual, new StageKitWarmManualCue()],
@@ -68,7 +68,7 @@ const stagekitGroup: ICueGroup = {
 };
 
 // Get the registry instance and register the StageKit group
-const registry = CueRegistry.getInstance();
+const registry = YargCueRegistry.getInstance();
 registry.registerGroup(stagekitGroup); 
 registry.setStageKitGroup(stagekitGroup.id);
 registry.setDefaultGroup(stagekitGroup.id);

@@ -25,7 +25,7 @@ export enum DrumNoteType {
 }
 
 // Import RB3E types
-import { Rb3Difficulty, Rb3TrackType } from '../listeners/RB3/rb3eTypes';
+import { Rb3Difficulty, Rb3TrackType } from '../../listeners/RB3/rb3eTypes';
 
 
 export type SongSection = "None" | "Chorus" | "Verse" | "Unknown";

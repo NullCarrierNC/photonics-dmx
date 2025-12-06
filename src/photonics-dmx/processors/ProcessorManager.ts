@@ -11,7 +11,7 @@ import { DmxLightManager } from '../controllers/DmxLightManager';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { AbstractCueHandler } from '../cueHandlers/AbstractCueHandler';
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes';
-import { CueData } from '../cues/cueTypes';
+import { CueData } from '../cues/types/cueTypes';
 
 /**
  * Available processing modes

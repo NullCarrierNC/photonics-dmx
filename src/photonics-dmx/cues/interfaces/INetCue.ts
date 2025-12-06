@@ -1,4 +1,4 @@
-import { CueData } from '../cueTypes';
+import { CueData } from '../types/cueTypes';
 import { ILightingController } from '../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../controllers/DmxLightManager';
 
@@ -7,7 +7,7 @@ export enum CueStyle {
   Secondary = "secondary"
 }
 
-export interface ICue {
+export interface INetCue {
   /**
    * The YARG ID of the cue
    */

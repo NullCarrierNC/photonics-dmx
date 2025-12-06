@@ -1,11 +1,11 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { Effect } from '../../../../types';
 
-export class StompCue implements ICue {
+export class StompCue implements INetCue {
   id = 'default-stomp';
   cueId = CueType.Stomp;
   description = 'White flash effect on front lights triggered by keyframe';

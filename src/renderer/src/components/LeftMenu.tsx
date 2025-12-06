@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { FaMoon, FaSun, FaLightbulb, FaPlay, FaInfinity } from 'react-icons/fa';
-import { FiActivity, FiLayout, FiCpu, FiInfo, FiSliders } from 'react-icons/fi';
+import { FiActivity, FiLayout, FiCpu, FiInfo, FiSliders, FiVolume2, FiPenTool } from 'react-icons/fi';
 import { useAtom, useSetAtom } from 'jotai';
 import { Pages } from './../types';
 import { currentPageAtom } from './../atoms';
@@ -75,6 +75,15 @@ const LeftMenu: React.FC<LeftMenuProps> = ({ isDarkMode, toggleDarkMode }) => {
           <span className="text-[12pt]">Cue Simulation</span>
         </button>
 
+        {/* Cue Editor Button */}
+        <button
+          onClick={() => handleMenuClick(Pages.CueEditor)}
+          className={buttonClasses(Pages.CueEditor)}
+        >
+          <FiPenTool className="text-xl" />
+          <span className="text-[12pt]">Cue Editor</span>
+        </button>
+
         {/* Network Debug Button */}
         <button
           onClick={() => handleMenuClick(Pages.NetworkDebug)}
@@ -91,6 +100,15 @@ const LeftMenu: React.FC<LeftMenuProps> = ({ isDarkMode, toggleDarkMode }) => {
         >
           <FiSliders className="text-xl" />
           <span className="text-[12pt]">Preferences</span>
+        </button>
+
+         {/* Audio Settings */}
+         <button
+          onClick={() => handleMenuClick(Pages.AudioSettings)}
+          className={buttonClasses(Pages.AudioSettings)}
+        >
+          <FiVolume2 className="text-xl" />
+          <span className="text-[12pt]">Audio Settings</span>
         </button>
 
          {/* About */}

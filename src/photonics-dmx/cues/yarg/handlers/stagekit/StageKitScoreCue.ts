@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -8,7 +8,7 @@ import { getSweepEffect } from '../../../../effects/sweepEffect';
 /**
  * StageKit Score Cue - Yellow clockwise rotation + Blue counter-clockwise rotation
  */
-export class StageKitScoreCue implements ICue {
+export class StageKitScoreCue implements INetCue {
   id = 'stagekit-score';
   cueId = CueType.Score;
   description = 'Sweep-based: Yellow clockwise rotation (1000ms) + Blue counter-clockwise rotation (200ms)';

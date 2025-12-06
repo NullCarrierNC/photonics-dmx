@@ -1,9 +1,9 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 
-export class StrobeOffCue implements ICue {
+export class StrobeOffCue implements INetCue {
   id = 'default-strobe-off';
   cueId = CueType.Strobe_Off;
   description = 'Here for completeness, but YARG disables strobes by simply not turning them on.';

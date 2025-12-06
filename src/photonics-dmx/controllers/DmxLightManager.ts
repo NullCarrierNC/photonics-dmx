@@ -244,7 +244,7 @@ export class DmxLightManager {
   /**
   * Divides the lights array into three parts and returns the specified third.
   * - If `thirdNumber = 2` and the number of lights is odd, returns the exact middle light.
-  * - Otherwise, ensures that at least two lights are returned by including an adjacent light if necessary.
+  * - Remainder 1 goes to third-2 (middle), remainder 2 goes to third-1 and third-2.
   *
   * @param lights - Array of TrackedLight objects.
   * @param thirdNumber - The third to retrieve (1, 2, or 3).
@@ -278,31 +278,15 @@ export class DmxLightManager {
     let start = 0;
     let end = 0;
 
+    // Distribute remainders: remainder 1 goes to third-2 (middle), remainder 2 goes to third-1 and third-2
     if (thirdNumber === 1) {
-      end = base + (remainder > 0 ? 1 : 0);
+      end = base + (remainder >= 2 ? 1 : 0);
     } else if (thirdNumber === 2) {
-      start = base + (remainder > 0 ? 1 : 0);
-      end = start + base + (remainder > 1 ? 1 : 0);
+      start = base + (remainder >= 2 ? 1 : 0);
+      end = start + base + (remainder >= 1 ? 1 : 0);
     } else if (thirdNumber === 3) {
-      start = 2 * base + (remainder > 0 ? 1 : 0) + (remainder > 1 ? 1 : 0);
+      start = 2 * base + (remainder >= 1 ? 1 : 0) + (remainder >= 2 ? 1 : 0);
       end = len;
-    }
-
-    // Ensure that at least two lights are returned by including an adjacent light if necessary
-    if (!(thirdNumber === 2 && len % 2 === 1)) {
-      if (end - start < 2) {
-        if (thirdNumber > 1 && start > 0) {
-          // Include the previous light
-          start = start - 1;
-          end = start + 2;
-        } else if (thirdNumber < 3 && end < len) {
-          // Include the next light
-          end = end + 1;
-        }
-        // Handle boundary conditions
-        start = Math.max(0, start);
-        end = Math.min(len, end);
-      }
     }
 
     return lights.slice(start, end);

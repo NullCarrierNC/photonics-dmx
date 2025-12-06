@@ -301,15 +301,8 @@ export class LayerManager implements ILayerManager {
         if (currentState) {
           stateMap.set(light.id, { ...currentState });
         } else {
-          // Default black state if no current state exists
-          stateMap.set(light.id, {
-            red: 0,
-            green: 0,
-            blue: 0,
-            intensity: 0,
-            opacity: 1.0,
-            blendMode: 'replace'
-          });
+          // Default to transparent if no current state exists
+          stateMap.set(light.id, this.transparentState());
         }
       }
     });
@@ -344,6 +337,8 @@ export class LayerManager implements ILayerManager {
         if (currentState) {
           // Store deep copy of state
           layerStates.set(light.id, { ...currentState });
+        } else {
+          layerStates.set(light.id, this.transparentState());
         }
       }
     });
@@ -371,6 +366,17 @@ export class LayerManager implements ILayerManager {
    */
   public clearLayerStates(layer: number): void {
     this._layerStates.delete(layer);
+  }
+
+  private transparentState(): RGBIO {
+    return {
+      red: 0,
+      green: 0,
+      blue: 0,
+      intensity: 0,
+      opacity: 0,
+      blendMode: 'replace'
+    };
   }
 
   /**

@@ -1,5 +1,5 @@
 import { DefaultCue } from '../../../cues/yarg/handlers/yarg1/DefaultCue';
-import { CueData } from '../../../cues/cueTypes';
+import { CueData } from '../../../cues/types/cueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { beforeEach, describe, jest, it, expect } from '@jest/globals';

@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -10,7 +10,7 @@ import { getSweepEffect } from '../../../../effects';
  * StageKit Menu Cue - Blue lights rotating in sequence
  * 2-second cycle, blue lights rotating around ring layout
  */
-export class StageKitMenuCue implements ICue {
+export class StageKitMenuCue implements INetCue {
   id = 'stagekit-menu';
   cueId = CueType.Menu;
   description = 'StageKit menu pattern - solid blue lights, no motion in this implementation.';

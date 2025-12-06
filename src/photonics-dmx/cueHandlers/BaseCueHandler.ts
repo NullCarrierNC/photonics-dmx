@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
-import { CueData, CueType, InstrumentNoteType, DrumNoteType } from '../cues/cueTypes';
+import { CueData, CueType, InstrumentNoteType, DrumNoteType } from '../cues/types/cueTypes';
 import { ILightingController } from '../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../controllers/DmxLightManager';
-import { CueRegistry } from '../cues/CueRegistry';
+import { YargCueRegistry } from '../cues/registries/YargCueRegistry';
 import { LightTarget, LocationGroup, TrackedLight, CueGroup } from '../types';
 
 /**
@@ -15,7 +15,7 @@ export abstract class BaseCueHandler extends EventEmitter {
   protected _sequencer: ILightingController;
   protected debouncePeriod: number;
   protected lastDebouncedCueTime: number = 0;
-  protected registry: CueRegistry;
+  protected registry: YargCueRegistry;
   
   // Cue history tracking
   private cueHistory: CueType[] = [];
@@ -34,7 +34,7 @@ export abstract class BaseCueHandler extends EventEmitter {
     this._lightManager = lightManager;
     this._sequencer = photonicsSequencer;
     this.debouncePeriod = debouncePeriod;
-    this.registry = CueRegistry.getInstance();
+    this.registry = YargCueRegistry.getInstance();
   }
 
   /**

@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom, openDmxComPortAtom, senderSacnEnabledAtom, senderArtNetEnabledAtom, senderEnttecProEnabledAtom, senderOpenDmxEnabledAtom, senderIpcEnabledAtom } from './atoms';
+import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom, senderSacnEnabledAtom, senderArtNetEnabledAtom, senderEnttecProEnabledAtom, senderIpcEnabledAtom, LightingPreferences, senderOpenDmxEnabledAtom, openDmxComPortAtom } from './atoms';
 import { Pages } from './types';
 import squareLogo from './assets/images/photonics-icon.png';
 import LeftMenu from './components/LeftMenu';
@@ -16,9 +16,13 @@ import { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types';
 import { IpcRendererEvent } from 'electron';
 import About from './pages/About';
 import Preferences from './pages/Preferences';
+import AudioSettings from './pages/AudioSettings';
+import CueEditor from './pages/CueEditor';
 import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
+import { AudioCaptureManager } from './services/AudioCaptureManager';
+import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 
 /**
  * Main application component
@@ -47,6 +51,9 @@ export const App = (): JSX.Element => {
   const setOpenDmxEnabled = useSetAtom(senderOpenDmxEnabledAtom);
   const setIpcEnabled = useSetAtom(senderIpcEnabledAtom);
   const [appVer, setAppVer] = useState('');
+
+  // Audio capture manager ref (created once, persists for app lifetime)
+  const audioCaptureManagerRef = useRef<AudioCaptureManager | null>(null);
 
   // Create a clearErrorTimeout callback that will be used to reset error state
   const clearErrorState = useCallback((): void => {
@@ -103,6 +110,89 @@ export const App = (): JSX.Element => {
     setSenderError(`Failed to start ${data.sender} sender: ${data.error}`);
     resetErrorTimeout();
   }, [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setIpcEnabled, setIsSenderError, setSenderError, resetErrorTimeout]);
+
+  // Handler for audio:enable from main process
+  const handleAudioEnable = useCallback(async (_evt: IpcRendererEvent, config: AudioConfig): Promise<void> => {
+    console.log('Received audio:enable from main process', config);
+    
+    try {
+      // Create AudioCaptureManager if it doesn't exist
+      if (!audioCaptureManagerRef.current) {
+        audioCaptureManagerRef.current = new AudioCaptureManager(config);
+        console.log('Created AudioCaptureManager');
+      } else {
+        // Update config if manager already exists
+        audioCaptureManagerRef.current.updateConfig(config);
+      }
+      
+      // Start capturing audio
+      await audioCaptureManagerRef.current.start(config.deviceId);
+      console.log('Audio capture started');
+    } catch (error) {
+      console.error('Failed to start audio capture:', error);
+      setIsSenderError(true);
+      // Show full error message - extract message from Error objects or convert to string
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : error instanceof DOMException
+        ? `${error.name}: ${error.message}`
+        : String(error);
+      setSenderError(`Failed to start audio capture: ${errorMessage}`);
+      resetErrorTimeout();
+      
+      // Automatically disable audio in main process since it failed to start
+      try {
+        await window.electron.ipcRenderer.invoke('set-audio-enabled', false);
+        console.log('Audio automatically disabled due to capture failure');
+      } catch (disableError) {
+        console.error('Failed to disable audio after capture failure:', disableError);
+      }
+    }
+  }, [setIsSenderError, setSenderError, resetErrorTimeout]);
+
+  // Handler for audio:disable from main process
+  const handleAudioDisable = useCallback((): void => {
+    console.log('Received audio:disable from main process');
+    
+    if (audioCaptureManagerRef.current) {
+      audioCaptureManagerRef.current.stop();
+      console.log('Audio capture stopped');
+    }
+  }, []);
+
+  // Handler for audio:config-update from main process
+  const handleAudioConfigUpdate = useCallback((_evt: IpcRendererEvent, config: AudioConfig): void => {
+    console.log('Received audio:config-update from main process', config);
+    
+    // Update AudioCaptureManager if it exists
+    if (audioCaptureManagerRef.current) {
+      audioCaptureManagerRef.current.updateConfig(config);
+      console.log('AudioCaptureManager configuration updated');
+    }
+    
+    // Update lightingPrefsAtom so preview components can react to color changes
+    // Merge with existing audioConfig to preserve fields like sampleRate and updateIntervalMs
+    setPrefs(prev => ({
+      ...prev,
+      audioConfig: {
+        ...prev.audioConfig,
+        // Update all compatible fields from config (exclude deviceId which has type mismatch)
+        fftSize: config.fftSize,
+        sensitivity: config.sensitivity,
+        beatDetection: config.beatDetection,
+        smoothing: config.smoothing,
+        frequencyBands: config.frequencyBands,
+        enabled: config.enabled,
+        linearResponse: config.linearResponse,
+        // Preserve fields that exist in frontend but not in backend config
+        sampleRate: prev.audioConfig?.sampleRate,
+        updateIntervalMs: prev.audioConfig?.updateIntervalMs,
+        // Preserve deviceId from frontend (number) rather than backend (string)
+        deviceId: prev.audioConfig?.deviceId
+      } as LightingPreferences['audioConfig']
+    }));
+    console.log('Lighting preferences updated with new audio config');
+  }, [setPrefs]);
 
   const toggleDarkMode = (): void => {
     setIsDarkMode((prevMode) => !prevMode);
@@ -253,6 +343,11 @@ export const App = (): JSX.Element => {
     // Set up event listener for sender start failures
     addIpcListener('sender-start-failed', handleSenderStartFailure);
 
+    // Set up event listeners for audio control
+    addIpcListener('audio:enable', handleAudioEnable);
+    addIpcListener('audio:disable', handleAudioDisable);
+    addIpcListener('audio:config-update', handleAudioConfigUpdate);
+
     const saveLightLayout = async () => {
       if (activeConfig) {
         try {
@@ -270,8 +365,16 @@ export const App = (): JSX.Element => {
       removeIpcListener('sender-error', handleSenderError);
       removeIpcListener('cue-state-update', handleCueStateUpdate);
       removeIpcListener('sender-start-failed', handleSenderStartFailure);
+      removeIpcListener('audio:enable', handleAudioEnable);
+      removeIpcListener('audio:disable', handleAudioDisable);
+      removeIpcListener('audio:config-update', handleAudioConfigUpdate);
+      
+      // Cleanup audio capture manager on unmount
+      if (audioCaptureManagerRef.current) {
+        audioCaptureManagerRef.current.stop();
+      }
     };
-  }, [activeConfig, handleSenderError, handleCueStateUpdate, handleSenderStartFailure]);
+  }, [activeConfig, handleSenderError, handleCueStateUpdate, handleSenderStartFailure, handleAudioEnable, handleAudioDisable]);
 
   const renderContent = () => {
     switch (currentPage) {
@@ -287,10 +390,14 @@ export const App = (): JSX.Element => {
         return <CueSimulation />;
       case Pages.CueSequencer:
       //  return <CueSequencer />;
+      case Pages.CueEditor:
+        return <CueEditor />;
       case Pages.NetworkDebug:
         return <NetworkDebug />;
       case Pages.Preferences:
         return <Preferences />;
+      case Pages.AudioSettings:
+        return <AudioSettings />;
       case Pages.About:
         return <About />;
       default:

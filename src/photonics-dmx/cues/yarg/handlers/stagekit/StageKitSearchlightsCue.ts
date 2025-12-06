@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -12,7 +12,7 @@ import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
  * Small venue: Yellow and red rotate together in same direction
  * Fast rotation: Entire sequence completes within one beat
  */
-export class StageKitSearchlightsCue implements ICue {
+export class StageKitSearchlightsCue implements INetCue {
   id = 'stagekit-searchlights';
   cueId = CueType.Searchlights;
   description = 'Dual counter-clockwise patterns: Yellow (0→7→6→5→4→3→2→1) and Red offset by 1 position. 0.5 cycles per beat timing. For <8 lights: Yellow only.';

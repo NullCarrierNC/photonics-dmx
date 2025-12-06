@@ -1,6 +1,6 @@
 import { useAtom } from 'jotai';
 import { useEffect } from 'react';
-import { rb3eListenerEnabledAtom, yargListenerEnabledAtom } from '../atoms';
+import { rb3eListenerEnabledAtom, yargListenerEnabledAtom, audioListenerEnabledAtom } from '../atoms';
 import { useIpcListener } from '../utils/ipcHelpers';
 
 interface Rb3ToggleProps {
@@ -10,6 +10,7 @@ interface Rb3ToggleProps {
 const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
   const [isRb3Enabled, setIsRb3Enabled] = useAtom(rb3eListenerEnabledAtom);
   const [isYargEnabled] = useAtom(yargListenerEnabledAtom);
+  const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom);
 
   useEffect(() => {
     // Initialize toggle state from system status
@@ -46,6 +47,11 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
     if (newState) {
       window.electron.ipcRenderer.send('rb3e-listener-enabled');
       console.log('RB3E Listener enabled');
+      // Disable Audio when RB3E is enabled (mutual exclusion)
+      if (isAudioEnabled) {
+        setIsAudioEnabled(false);
+        window.electron.ipcRenderer.invoke('set-audio-enabled', false);
+      }
     } else {
       window.electron.ipcRenderer.send('rb3e-listener-disabled');
       console.log('rb3e Listener disabled');
@@ -53,19 +59,19 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
   };
 
   return (
-    <div className="flex items-center mb-4  w-[220px] justify-between">
+    <div className="flex items-center mb-4  w-[190px] justify-between">
       <label className={`mr-4 text-lg font-semibold ${
-        (isYargEnabled || disabled) ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
+        (isYargEnabled || isAudioEnabled || disabled) ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
       }`}>
         Enable RB3E
       </label>
       <button
         onClick={handleToggle}
-        disabled={isYargEnabled || disabled}
+        disabled={isYargEnabled || isAudioEnabled || disabled}
         className={`w-12 h-6 rounded-full ${
           isRb3Enabled ? 'bg-green-500' : 'bg-gray-400'
         } relative focus:outline-none ${
-          (isYargEnabled || disabled) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+          (isYargEnabled || isAudioEnabled || disabled) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
         }`}
       >
         <div

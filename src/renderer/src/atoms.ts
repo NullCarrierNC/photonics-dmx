@@ -1,5 +1,7 @@
 import { atom } from 'jotai';
 import { DmxFixture, LightingConfiguration,  } from '../../photonics-dmx/types';
+import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes';
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 import { Pages } from './types';
 
 /**
@@ -71,6 +73,14 @@ export const senderIpcEnabledAtom = atom<boolean>(false);
 export const yargListenerEnabledAtom = atom<boolean>(false);
 
 export const rb3eListenerEnabledAtom = atom<boolean>(false);
+
+export const audioListenerEnabledAtom = atom<boolean>(false);
+
+/**
+ * Atom for storing live audio analysis data
+ * Updated by AudioCaptureManager, consumed by CuePreviewAudio
+ */
+export const audioDataAtom = atom<AudioLightingData | null>(null);
 
 export const isSenderErrorAtom = atom<boolean>(false);
 export const senderErrorAtom = atom<any>("");
@@ -144,6 +154,7 @@ export interface LightingPreferences {
     max: number;
   };
   enabledCueGroups?: string[];
+  activeAudioCueType?: AudioCueType;
   cueConsistencyWindow?: number;
   
   // Frontend-specific preferences
@@ -162,10 +173,53 @@ export interface LightingPreferences {
     sacnExpanded: boolean;
     openDmxExpanded: boolean;
   };
+  audioConfig?: {
+    deviceId?: number;
+    sampleRate: number;
+    fftSize: number;
+    updateIntervalMs: number;
+    sensitivity: number;
+    beatDetection: {
+      threshold: number;
+      decayRate: number;
+      minInterval: number;
+    };
+    smoothing: {
+      enabled: boolean;
+      alpha: number;
+    };
+    frequencyBands: {
+      bandCount:number,
+      ranges: Array<{
+        id: string;
+        name: string;
+        minHz: number;
+        maxHz: number;
+        color: string;
+        brightness: 'low' | 'medium' | 'high' | 'max';
+        sensitivity: number;
+      }>;
+    };
+    enabled: boolean;
+    linearResponse?: boolean;
+  };
 }
 
 export const lightingPrefsAtom = atom<LightingPreferences>({});
 export const useComplexCuesAtom = atom<boolean>(false);
+
+// Audio configuration atoms
+export const audioConfigAtom = atom((get) => {
+  const prefs = get(lightingPrefsAtom);
+  return prefs.audioConfig;
+});
+
+export const audioDevicesAtom = atom<Array<{ deviceId: number; label: string }>>([]);
+
+export const audioEnabledAtom = atom((get) => {
+  const config = get(audioConfigAtom);
+  return config?.enabled || false;
+});
 
 
 

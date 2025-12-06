@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers';
@@ -8,7 +8,7 @@ import { getEffectSingleColor } from '../../../../effects';
 /**
  * StageKit Flare Fast Cue - Blue lights (with green if previous was cool)
  */
-export class StageKitFlareFastCue implements ICue {
+export class StageKitFlareFastCue implements INetCue {
   id = 'stagekit-flare-fast';
   cueId = CueType.Flare_Fast;
   description = 'Solid blue on all. Does not yet support green if previous was cool.';

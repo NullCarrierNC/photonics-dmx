@@ -6,11 +6,11 @@ import { LightStateManager } from '../../controllers/sequencer/LightStateManager
 import { DmxLightManager } from '../../controllers/DmxLightManager';
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures';
 import { getColor } from '../../helpers/dmxHelpers';
-import { CueData, CueType, DrumNoteType, defaultCueData } from '../../cues/cueTypes';
 import { StageKitMenuCue } from '../../cues/yarg/handlers/stagekit/StageKitMenuCue';
 import { StageKitCoolManualCue } from '../../cues/yarg/handlers/stagekit/StageKitCoolManualCue';
 import { Effect, RGBIO } from '../../types';
 import { Clock } from '../../controllers/sequencer/Clock';
+import { CueData, CueType, DrumNoteType, defaultCueData } from '../../cues';
 
 class ManualTestClock {
   private callbacks = new Set<(deltaTime: number) => void>();

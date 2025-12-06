@@ -1,6 +1,6 @@
-import { CueRegistry } from '../CueRegistry';
-import { CueType } from '../cueTypes';
-import { ICueGroup } from '../interfaces/ICueGroup';
+import { YargCueRegistry } from '../registries/YargCueRegistry';
+import { CueType } from '../types/cueTypes';
+import { ICueGroup } from '../interfaces/INetCueGroup';
 
 // Import default group cues
 import { DefaultCue } from './handlers/yarg1/DefaultCue';
@@ -66,5 +66,5 @@ const defaultGroup: ICueGroup = {
 };
 
 // Get the registry instance and register the default group
-const registry = CueRegistry.getInstance();
+const registry = YargCueRegistry.getInstance();
 registry.registerGroup(defaultGroup); 

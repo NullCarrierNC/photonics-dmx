@@ -1,12 +1,12 @@
-import { CueData, CueType } from '../../../cueTypes';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
 import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
 
-export class CoolManualCue implements ICue {
+export class CoolManualCue implements INetCue {
   id = 'default-cool-manual';
   cueId = CueType.Cool_Manual;
   description = 'Alternates between blue and green on even/odd front lights triggered by beat events';

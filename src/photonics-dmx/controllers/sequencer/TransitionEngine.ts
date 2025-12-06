@@ -210,6 +210,17 @@ export class TransitionEngine implements ITransitionEngine {
    * @param currentTime The current timestamp (shared across all calculations)
    */
   public startTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
+    if (transition.timingOnly) {
+      activeEffect.state = 'waitingUntil';
+      activeEffect.transitionStartTime = currentTime;
+      if (transition.waitUntilCondition === 'delay') {
+        activeEffect.waitEndTime = currentTime + transition.waitUntilTime;
+      } else {
+        activeEffect.waitEndTime = currentTime;
+      }
+      return;
+    }
+
     this.ensureLastEndState(activeEffect);
     
     // Since this is a per-light effect, we work with the single light in the transition
@@ -233,14 +244,14 @@ export class TransitionEngine implements ITransitionEngine {
       startState = this.lightTransitionController.getLightState(light.id, transition.layer);
     }
     
-    // If all else fails, use a default black state
+    // If all else fails, use a transparent state so new effects fade in cleanly
     if (!startState) {
       startState = { 
         red: 0,
         green: 0,
         blue: 0,
         intensity: 0,
-        opacity: 1.0,
+        opacity: 0,
         blendMode: 'replace'
       };
     }

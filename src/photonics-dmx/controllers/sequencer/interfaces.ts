@@ -1,5 +1,5 @@
 import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types';
-import { InstrumentNoteType, DrumNoteType } from '../../cues/cueTypes';
+import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes';
 import { LightTransitionController } from './LightTransitionController';
 
 export interface FrameContext {

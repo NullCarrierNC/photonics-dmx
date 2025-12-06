@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -9,7 +9,7 @@ import { Effect, EffectTransition } from '../../../../types';
  * StageKit Warm Auto Cue 
  * 2x red, 1x yellow. Red animating clockwise, yellow animating counter-clockwise.
  */
-export class StageKitWarmAutoCue implements ICue {
+export class StageKitWarmAutoCue implements INetCue {
   id = 'stagekit-warmAuto';
   cueId = CueType.Warm_Automatic;
   description = '2x red, 1x yellow. Red animating clockwise, yellow animating counter-clockwise, on beat.';

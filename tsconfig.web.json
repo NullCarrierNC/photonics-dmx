@@ -5,8 +5,9 @@
     "src/renderer/src/**/*",
     "src/renderer/src/**/*.tsx",
     "src/preload/*.d.ts",
-     "src/photonics-dmx/**/*"
-, "src/mocks"  ],
+    "src/photonics-dmx/**/*",
+    "src/mocks/**/*"
+  ],
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
@@ -15,6 +16,7 @@
       "@renderer/*": [
         "src/renderer/src/*"
       ]
-    }
+    },
+    "strictNullChecks": true
   }
 }

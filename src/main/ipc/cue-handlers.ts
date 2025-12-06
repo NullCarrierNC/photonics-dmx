@@ -1,6 +1,6 @@
 import { IpcMain } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
-import { CueData } from '../../photonics-dmx/cues/cueTypes';
+import { CueData } from '../../photonics-dmx/cues/types/cueTypes';
 import { BrowserWindow } from 'electron';
 
 /**

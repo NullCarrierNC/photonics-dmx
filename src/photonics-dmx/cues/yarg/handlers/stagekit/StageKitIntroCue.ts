@@ -1,5 +1,5 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
@@ -9,7 +9,7 @@ import { Effect, EffectTransition } from '../../../../types';
  * StageKit Intro Cue - All green lights on
  * Simple green lighting for intro sequences
  */
-export class StageKitIntroCue implements ICue {
+export class StageKitIntroCue implements INetCue {
   id = 'stagekit-intro';
   cueId = CueType.Intro;
   description = 'All green lights';

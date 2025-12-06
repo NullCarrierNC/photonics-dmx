@@ -1,5 +1,6 @@
 import React from 'react';
-import PrefCueGroups from '../components/PrefCueGroups';
+import YargEnabledCueGroups from '../components/YargEnabledCueGroups';
+import AudioEnabledCueGroups from '../components/AudioEnabledCueGroups';
 import CueConsistencySettings from '../components/CueConsistencySettings';
 import DmxOutputSettings from '../components/DmxOutputSettings';
 import StageKitModeSettings from '../components/StageKitModeSettings';
@@ -13,7 +14,8 @@ const Preferences: React.FC = () => {
       <DmxOutputSettings />
       <BrightnessSettings />
      
-      <PrefCueGroups />
+      <YargEnabledCueGroups/>
+      <AudioEnabledCueGroups/>
       <StageKitModeSettings />
       <CueConsistencySettings />
       <ClockRateSettings />
