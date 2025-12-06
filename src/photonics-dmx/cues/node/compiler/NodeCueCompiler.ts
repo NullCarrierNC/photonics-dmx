@@ -1,9 +1,10 @@
 import {
   ActionNode,
+  ActionTiming,
   AudioEventNode,
   AudioNodeCueDefinition,
   Connection,
-  EnvelopeConfig,
+  createDefaultActionTiming,
   YargEventNode,
   YargNodeCueDefinition
 } from '../../types/nodeCueTypes';
@@ -40,21 +41,20 @@ export interface CompiledAudioCue {
   chains: CompiledActionChain<AudioEventNode>[];
 }
 
+const getActionTiming = (action: ActionNode): ActionTiming => ({
+  ...createDefaultActionTiming(),
+  ...(action.timing ?? {})
+});
+
 /**
- * Calculates the total duration of an action based on its envelope settings.
+ * Calculates the total duration of an action based on its timing settings.
  */
 const calculateActionDuration = (action: ActionNode): number => {
-  const env: EnvelopeConfig = action.envelope ?? {
-    attack: 0,
-    decay: 0,
-    sustainLevel: 1,
-    sustainTime: 100,
-    release: 150
-  };
-  return Math.max(0, env.attack) +
-         Math.max(0, env.decay) +
-         Math.max(0, env.sustainTime) +
-         Math.max(0, env.release);
+  const timing = getActionTiming(action);
+  return Math.max(0, timing.fadeIn) +
+    Math.max(0, timing.hold) +
+    Math.max(0, timing.fadeOut) +
+    Math.max(0, timing.postDelay);
 };
 
 export class NodeCueCompiler {

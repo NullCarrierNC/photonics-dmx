@@ -1,9 +1,7 @@
 import { WaitCondition, TrackedLight, Effect, EffectTransition, RGBIO, LocationGroup } from '../../../types';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import {
-  getEffectSingleColor,
   getEffectCrossFadeColors,
-  getEffectFadeInColorFadeOut,
   getEffectFlashColor,
   getSweepEffect,
   getEffectCycleLights,
@@ -12,10 +10,12 @@ import {
 import { getColor } from '../../../helpers/dmxHelpers';
 import {
   ActionNode,
-  EnvelopeConfig,
+  ActionTiming,
+  createDefaultActionTiming,
   NodeActionTarget,
   NodeColorSetting
 } from '../../types/nodeCueTypes';
+import { EasingType } from '../../../easing';
 
 interface BuildEffectParams {
   action: ActionNode;
@@ -44,17 +44,23 @@ const resolveColor = (color: NodeColorSetting, scale: number): RGBIO => {
   return rgb;
 };
 
-const ensureEnvelope = (envelope?: EnvelopeConfig): EnvelopeConfig => {
-  if (!envelope) {
-    return {
-      attack: 0,
-      decay: 0,
-      sustainLevel: 1,
-      sustainTime: 100,
-      release: 150
-    };
+const transparentVariant = (color: RGBIO): RGBIO => ({
+  ...color,
+  intensity: 0,
+  opacity: 0
+});
+
+const ensureTiming = (action: ActionNode): ActionTiming => ({
+  ...createDefaultActionTiming(),
+  ...(action.timing ?? {})
+});
+
+const resolveEasing = (value?: string, fallback: EasingType = EasingType.SIN_IN_OUT): EasingType => {
+  if (!value) {
+    return fallback;
   }
-  return envelope;
+  const valid = Object.values(EasingType).includes(value as EasingType);
+  return valid ? (value as EasingType) : fallback;
 };
 
 /**
@@ -110,6 +116,92 @@ const applyChainedTiming = (effect: Effect, waitTime: number, waitCondition: Wai
   };
 };
 
+const createTimedColorEffect = (params: {
+  lights: TrackedLight[];
+  layer: number;
+  waitFor: WaitCondition;
+  color: RGBIO;
+  timing: ActionTiming;
+  easingIn: EasingType;
+  easingOut: EasingType;
+  returnColor?: RGBIO;
+}): Effect => {
+  const { lights, layer, waitFor, color, timing, easingIn, easingOut } = params;
+  const fadeInDuration = safeDuration(timing.fadeIn, 0, 0);
+  const holdDuration = safeDuration(timing.hold, 0, 0);
+  const fadeOutDuration = safeDuration(timing.fadeOut, 0, 0);
+  const postDelay = safeDuration(timing.postDelay, 0, 0);
+  const returnColor = params.returnColor ?? transparentVariant(color);
+
+  const transitions: EffectTransition[] = [
+    {
+      lights,
+      layer,
+      waitForCondition: waitFor,
+      waitForTime: 0,
+      transform: {
+        color,
+        easing: easingIn,
+        duration: fadeInDuration
+      },
+      waitUntilCondition: 'delay',
+      waitUntilTime: holdDuration
+    },
+    {
+      lights,
+      layer,
+      waitForCondition: 'none',
+      waitForTime: 0,
+      transform: {
+        color: returnColor,
+        easing: easingOut,
+        duration: fadeOutDuration
+      },
+      waitUntilCondition: 'delay',
+      waitUntilTime: postDelay
+    }
+  ];
+
+  return {
+    id: 'timed-color',
+    description: 'Timed color effect',
+    transitions
+  };
+};
+
+const createSingleColorEffect = (params: {
+  lights: TrackedLight[];
+  layer: number;
+  waitFor: WaitCondition;
+  color: RGBIO;
+  timing: ActionTiming;
+  easingIn: EasingType;
+}): Effect => {
+  const { lights, layer, waitFor, color, timing, easingIn } = params;
+  const fadeInDuration = safeDuration(timing.fadeIn, 0, 0);
+  const holdPlusDelay = safeDuration(timing.hold, 0, 0) + safeDuration(timing.postDelay, 0, 0);
+
+  return {
+    id: 'single-color',
+    description: 'Single color effect',
+    transitions: [
+      {
+        lights,
+        layer,
+        waitForCondition: waitFor,
+        waitForTime: 0,
+        transform: {
+          color,
+          easing: easingIn,
+          duration: fadeInDuration
+        },
+        waitUntilCondition: 'delay',
+        waitUntilTime: holdPlusDelay
+      }
+    ]
+  };
+};
+
 export class ActionEffectFactory {
   public static resolveLights(lightManager: DmxLightManager, target: NodeActionTarget): TrackedLight[] {
     const groups: LocationGroup[] = target.groups.length > 0 ? target.groups : ['front'];
@@ -122,51 +214,49 @@ export class ActionEffectFactory {
       return null;
     }
 
-    const envelope = ensureEnvelope(action.envelope);
-    const envelopeScale = clamp(envelope.sustainLevel ?? 1, 0, 1);
-    const intensityScale = clamp((params.intensityScale ?? 1) * envelopeScale, 0, 1);
+    const timing = ensureTiming(action);
+    const timingLevel = clamp(timing.level ?? 1, 0, 1);
+    const intensityScale = clamp((params.intensityScale ?? 1) * timingLevel, 0, 1);
     const waitTime = params.waitTime ?? 0;
-    // Preserve the original wait condition - applyDelayToEffect will handle combining event + delay
     const waitFor: WaitCondition = params.waitCondition ?? 'none';
     const layer = action.layer ?? 0;
+    const easingIn = resolveEasing(timing.easeIn);
+    const easingOut = resolveEasing(timing.easeOut ?? timing.easeIn);
 
     const baseColor = resolveColor(action.color, intensityScale || 0.01);
     const secondaryColor = action.secondaryColor
       ? resolveColor(action.secondaryColor, intensityScale || 0.01)
       : resolveColor({ name: 'transparent', brightness: 'low' }, 0);
 
-    const attack = safeDuration(envelope.attack, 100, 0);
-    const decay = safeDuration(envelope.decay, 0, 0);
-    const sustain = safeDuration(envelope.sustainTime, 0, 0);
-    const release = safeDuration(envelope.release, 100, 0);
-
     let effect: Effect | null = null;
 
     switch (action.effectType) {
       case 'single-color': {
-        const duration = Math.max(50, attack + sustain + release + decay);
-        effect = getEffectSingleColor({
+        effect = createSingleColorEffect({
           lights,
           layer,
-          color: baseColor,
-          duration,
           waitFor,
-          waitUntil: 'delay',
-          untilTime: sustain || 0
+          color: baseColor,
+          timing,
+          easingIn
         });
         break;
       }
       case 'cross-fade': {
+        const duration = safeDuration(timing.fadeIn, 150, 10);
+        const afterStartWait = safeDuration(timing.hold, 0, 0);
+        const afterEndWait = safeDuration(timing.postDelay, 0, 0);
         effect = getEffectCrossFadeColors({
           lights,
           layer,
           startColor: baseColor,
           endColor: secondaryColor,
-          duration: Math.max(50, attack || 150),
+          duration,
           waitFor,
           crossFadeTrigger: 'delay',
-          afterStartWait: decay,
-          afterEndColorWait: release
+          afterStartWait,
+          afterEndColorWait: afterEndWait,
+          easing: easingIn
         });
         break;
       }
@@ -177,41 +267,39 @@ export class ActionEffectFactory {
           color: baseColor,
           startTrigger: waitFor,
           startWait: 0,
-          holdTime: sustain,
-          durationIn: Math.max(10, attack || 50),
-          durationOut: Math.max(10, release || 100),
+          holdTime: safeDuration(timing.hold, 0, 0),
+          durationIn: safeDuration(timing.fadeIn, 50, 10),
+          durationOut: safeDuration(timing.fadeOut, 100, 10),
           endTrigger: 'delay',
-          endWait: decay
+          endWait: safeDuration(timing.postDelay, 0, 0),
+          easing: easingIn
         });
         break;
       }
       case 'fade-in-out': {
-        const transparent = resolveColor(
-          { name: action.color.name, brightness: action.color.brightness, blendMode: action.color.blendMode ?? 'replace' },
-          0
-        );
-
-        effect = getEffectFadeInColorFadeOut({
+        effect = createTimedColorEffect({
           lights,
           layer,
-          startColor: transparent,
-          endColor: baseColor,
           waitFor,
-          waitBeforeFadeIn: decay,
-          fadeInDuration: Math.max(10, attack || 50),
-          holdDuration: sustain,
-          fadeOutDuration: Math.max(10, release || 100),
-          waitAfterFadeOut: decay
+          color: baseColor,
+          timing,
+          easingIn,
+          easingOut,
+          returnColor: action.secondaryColor ? secondaryColor : undefined
         });
         break;
       }
       case 'sweep': {
         const sweepConfig = action.config?.sweep;
-        const sweepDuration = safeDuration(sweepConfig?.duration, attack + sustain + release || 600, 100);
-        const fadeIn = safeDuration(sweepConfig?.fadeIn, attack || 80, 10);
-        const fadeOut = safeDuration(sweepConfig?.fadeOut, release || 120, 10);
+        const sweepDuration = safeDuration(
+          sweepConfig?.duration,
+          timing.fadeIn + timing.hold + timing.fadeOut || 600,
+          100
+        );
+        const fadeIn = safeDuration(sweepConfig?.fadeIn, timing.fadeIn || 80, 10);
+        const fadeOut = safeDuration(sweepConfig?.fadeOut, timing.fadeOut || 120, 10);
         const overlap = clamp(sweepConfig?.overlap ?? 0, 0, 100);
-        const betweenDelay = safeDuration(sweepConfig?.betweenDelay, decay, 0);
+        const betweenDelay = safeDuration(sweepConfig?.betweenDelay, timing.postDelay, 0);
         const lowColorSetting = sweepConfig?.lowColor || action.secondaryColor || { name: 'transparent', brightness: 'low' };
         const lowColor = resolveColor(lowColorSetting, intensityScale || 0.01);
 
@@ -225,7 +313,8 @@ export class ActionEffectFactory {
           lightOverlap: overlap,
           betweenSweepDelay: betweenDelay,
           high: baseColor,
-          low: lowColor
+          low: lowColor,
+          easing: easingIn
         });
         break;
       }
@@ -241,7 +330,7 @@ export class ActionEffectFactory {
           layer,
           activeColor: baseColor,
           baseColor: base,
-          transitionDuration: safeDuration(cycleConfig?.transitionDuration, attack || 150, 10),
+          transitionDuration: safeDuration(cycleConfig?.transitionDuration, timing.fadeIn || 150, 10),
           waitFor: cycleConfig?.trigger || waitFor
         });
         break;
@@ -250,7 +339,11 @@ export class ActionEffectFactory {
         effect = getEffectBlackout({
           lights,
           layer,
-          duration: safeDuration(action.config?.blackout?.duration, release || 200, 10)
+          duration: safeDuration(
+            action.config?.blackout?.duration,
+            timing.fadeOut || timing.fadeIn || 200,
+            10
+          )
         });
         effect.transitions.forEach(transition => {
           transition.waitForCondition = waitFor;

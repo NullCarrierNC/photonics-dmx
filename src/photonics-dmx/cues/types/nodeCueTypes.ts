@@ -115,12 +115,14 @@ export interface NodeColorSetting {
   blendMode?: BlendMode;
 }
 
-export interface EnvelopeConfig {
-  attack: number;
-  decay: number;
-  sustainLevel: number;
-  sustainTime: number;
-  release: number;
+export interface ActionTiming {
+  fadeIn: number;
+  hold: number;
+  fadeOut: number;
+  postDelay: number;
+  easeIn?: string;
+  easeOut?: string;
+  level?: number;
 }
 
 export interface SweepActionConfig {
@@ -149,6 +151,16 @@ export interface NodeActionConfig {
   custom?: Record<string, unknown>;
 }
 
+export const createDefaultActionTiming = (): ActionTiming => ({
+  fadeIn: 100,
+  hold: 0,
+  fadeOut: 0,
+  postDelay: 0,
+  easeIn: 'sinInOut',
+  easeOut: 'sinInOut',
+  level: 1
+});
+
 export interface ActionNode {
   id: string;
   type: 'action';
@@ -156,7 +168,7 @@ export interface ActionNode {
   target: NodeActionTarget;
   color: NodeColorSetting;
   secondaryColor?: NodeColorSetting;
-  envelope: EnvelopeConfig;
+  timing: ActionTiming;
   layer?: number;
   label?: string;
   inputs?: string[];

@@ -1,6 +1,6 @@
 import { validateYargNodeCueFile, validateAudioNodeCueFile } from '../../node/schema/validation';
 import { NodeCueCompiler } from '../../node/compiler/NodeCueCompiler';
-import { YargNodeCueDefinition, AudioNodeCueDefinition } from '../../types/nodeCueTypes';
+import { YargNodeCueDefinition, AudioNodeCueDefinition, createDefaultActionTiming } from '../../types/nodeCueTypes';
 import { CueType } from '../../types/cueTypes';
 
 describe('Node cue validation', () => {
@@ -22,7 +22,15 @@ describe('Node cue validation', () => {
             effectType: 'single-color',
             target: { groups: ['front'], filter: 'all' },
             color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
-            envelope: { attack: 100, decay: 0, sustainLevel: 1, sustainTime: 200, release: 200 }
+            timing: {
+              fadeIn: 100,
+              hold: 200,
+              fadeOut: 200,
+              postDelay: 0,
+              easeIn: 'sinInOut',
+              easeOut: 'sinInOut',
+              level: 1
+            }
           }
         ]
       },
@@ -63,7 +71,15 @@ describe('Node cue validation', () => {
             effectType: 'flash',
             target: { groups: ['front'], filter: 'all' },
             color: { name: 'red', brightness: 'high', blendMode: 'add' },
-            envelope: { attack: 50, decay: 0, sustainLevel: 1, sustainTime: 100, release: 120 }
+            timing: {
+              fadeIn: 50,
+              hold: 100,
+              fadeOut: 120,
+              postDelay: 0,
+              easeIn: 'sinInOut',
+              easeOut: 'sinInOut',
+              level: 1
+            }
           }
         ]
       },
@@ -96,7 +112,7 @@ describe('Node cue validation', () => {
             effectType: 'cross-fade',
             target: { groups: ['front'], filter: 'all' },
             color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
-            envelope: { attack: 100, decay: 0, sustainLevel: 1, sustainTime: 200, release: 200 }
+            timing: createDefaultActionTiming()
           }
         ]
       },

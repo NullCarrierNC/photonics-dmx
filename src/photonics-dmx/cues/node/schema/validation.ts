@@ -2,12 +2,12 @@ import Ajv, { DefinedError, JSONSchemaType } from 'ajv';
 import addFormats from 'ajv-formats';
 import {
   ActionNode,
+  ActionTiming,
   AudioEventNode,
   AudioNodeCueDefinition,
   AudioNodeCueFile,
   AudioEventType,
   Connection,
-  EnvelopeConfig,
   NodeActionConfig,
   NodeActionTarget,
   NodeCueGroupMeta,
@@ -94,16 +94,18 @@ const colorSchema: JSONSchemaType<{
   }
 };
 
-const envelopeSchema: JSONSchemaType<EnvelopeConfig> = {
+const timingSchema: JSONSchemaType<ActionTiming> = {
   type: 'object',
-  required: ['attack', 'decay', 'sustainLevel', 'sustainTime', 'release'],
+  required: ['fadeIn', 'hold', 'fadeOut', 'postDelay'],
   additionalProperties: false,
   properties: {
-    attack: { type: 'number', minimum: 0 },
-    decay: { type: 'number', minimum: 0 },
-    sustainLevel: { type: 'number', minimum: 0, maximum: 1 },
-    sustainTime: { type: 'number', minimum: 0 },
-    release: { type: 'number', minimum: 0 }
+    fadeIn: { type: 'number', minimum: 0 },
+    hold: { type: 'number', minimum: 0 },
+    fadeOut: { type: 'number', minimum: 0 },
+    postDelay: { type: 'number', minimum: 0 },
+    easeIn: { type: 'string', nullable: true },
+    easeOut: { type: 'string', nullable: true },
+    level: { type: 'number', nullable: true, minimum: 0, maximum: 1 }
   }
 };
 
@@ -169,7 +171,7 @@ const targetSchema: JSONSchemaType<NodeActionTarget> = {
 
 const actionSchema: JSONSchemaType<ActionNode> = {
   type: 'object',
-  required: ['id', 'type', 'effectType', 'target', 'color', 'envelope'],
+  required: ['id', 'type', 'effectType', 'target', 'color', 'timing'],
   additionalProperties: false,
   properties: {
     id: stringIdSchema,
@@ -178,7 +180,7 @@ const actionSchema: JSONSchemaType<ActionNode> = {
     target: targetSchema,
     color: colorSchema,
     secondaryColor: { ...colorSchema, nullable: true },
-    envelope: envelopeSchema,
+    timing: timingSchema,
     layer: { type: 'integer', nullable: true, minimum: 0 },
     label: { type: 'string', nullable: true },
     inputs: {

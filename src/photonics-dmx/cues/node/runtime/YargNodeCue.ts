@@ -29,7 +29,7 @@ export class YargNodeCue implements INetCue {
       }
 
       const effectName = `${this.id}:${chain.chainId}`;
-      sequencer.addEffect(effectName, effect);
+        sequencer.addEffect(effectName, effect);
     }
   }
 

@@ -19,16 +19,17 @@ import type {
   AudioEventType,
   AudioNodeCueDefinition,
   AudioNodeCueFile,
-  EnvelopeConfig,
   NodeCueFile,
   NodeCueGroupMeta,
   NodeCueMode,
   NodeEffectType,
   YargEventNode,
   YargNodeCueDefinition,
-  YargNodeCueFile
+  YargNodeCueFile,
+  ActionTiming
 } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { ActionNode } from '../../../photonics-dmx/cues/types/nodeCueTypes';
+import { createDefaultActionTiming } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { Color, Brightness, BlendMode, LightTarget, LocationGroup, WaitCondition } from '../../../photonics-dmx/types';
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes';
 import {
@@ -117,6 +118,22 @@ const COLOR_OPTIONS: Color[] = [
 ];
 
 const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max'];
+const EASING_OPTIONS = [
+  'linear',
+  'ease',
+  'easeIn',
+  'easeOut',
+  'easeInOut',
+  'sinIn',
+  'sinOut',
+  'sinInOut',
+  'quadraticIn',
+  'quadraticOut',
+  'quadraticInOut',
+  'cubicIn',
+  'cubicOut',
+  'cubicInOut'
+] as const;
 const BLEND_MODE_OPTIONS: BlendMode[] = ['replace', 'add', 'multiply', 'overlay'];
 const LOCATION_OPTIONS: LocationGroup[] = ['front', 'back', 'strobe'];
 const LIGHT_TARGETS: LightTarget[] = [
@@ -156,14 +173,6 @@ const getYargEventLabel = (eventType: WaitCondition): string =>
 const getAudioEventLabel = (eventType: AudioEventNode['eventType']): string =>
   AUDIO_EVENT_OPTIONS.find(option => option.value === eventType)?.label ?? eventType;
 
-const defaultEnvelope: EnvelopeConfig = {
-  attack: 100,
-  decay: 0,
-  sustainLevel: 1,
-  sustainTime: 200,
-  release: 200
-};
-
 const buildDefaultAction = (): ActionNode => ({
   id: `action-${createId()}`,
   type: 'action',
@@ -182,7 +191,7 @@ const buildDefaultAction = (): ActionNode => ({
     brightness: 'medium',
     blendMode: 'replace'
   },
-  envelope: { ...defaultEnvelope },
+  timing: createDefaultActionTiming(),
   layer: 0
 });
 
@@ -263,20 +272,16 @@ const getBasename = (value: string): string => {
 };
 
 /**
- * Calculates the total duration of an action based on its envelope settings.
+ * Calculates the total duration of an action based on its timing settings.
  */
 const calculateActionDuration = (action: ActionNode): number => {
-  const env = action.envelope ?? {
-    attack: 0,
-    decay: 0,
-    sustainLevel: 1,
-    sustainTime: 100,
-    release: 150
-  };
-  return Math.max(0, env.attack) +
-         Math.max(0, env.decay) +
-         Math.max(0, env.sustainTime) +
-         Math.max(0, env.release);
+  const timing = action.timing ?? createDefaultActionTiming();
+  return (
+    Math.max(0, timing.fadeIn) +
+    Math.max(0, timing.hold) +
+    Math.max(0, timing.fadeOut) +
+    Math.max(0, timing.postDelay)
+  );
 };
 
 /**
@@ -1047,40 +1052,98 @@ const CueEditor: React.FC = () => {
                   />
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['attack', 'decay', 'sustainTime', 'release'] as const).map(field => (
-                    <label key={field} className="flex flex-col font-medium">
-                      {field}
+                  {(() => {
+                    const actionPayload = selectedNode.data.payload as ActionNode;
+                    const currentTiming = actionPayload.timing ?? createDefaultActionTiming();
+                    const updateTiming = (partial: Partial<ActionTiming>) =>
+                      updateSelectedNode({
+                        timing: {
+                          ...currentTiming,
+                          ...partial
+                        }
+                      } as ActionNode);
+
+                    return (
+                      <>
+                        <label className="flex flex-col font-medium">
+                          Fade In (ms)
                       <input
                         type="number"
                         min={0}
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={(selectedNode.data.payload as ActionNode).envelope[field]}
-                        onChange={event => updateSelectedNode({
-                          envelope: {
-                            ...(selectedNode.data.payload as ActionNode).envelope,
-                            [field]: Number(event.target.value)
-                          }
-                        } as ActionNode)}
+                            value={currentTiming.fadeIn}
+                            onChange={event => updateTiming({ fadeIn: Number(event.target.value) })}
                       />
                     </label>
-                  ))}
                   <label className="flex flex-col font-medium">
-                    Sustain Level
+                          Hold (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.hold}
+                            onChange={event => updateTiming({ hold: Number(event.target.value) })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Fade Out (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.fadeOut}
+                            onChange={event => updateTiming({ fadeOut: Number(event.target.value) })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Post Delay (ms)
+                          <input
+                            type="number"
+                            min={0}
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.postDelay}
+                            onChange={event => updateTiming({ postDelay: Number(event.target.value) })}
+                          />
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Level
                     <input
                       type="number"
                       min={0}
                       max={1}
                       step={0.05}
                       className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                      value={(selectedNode.data.payload as ActionNode).envelope.sustainLevel}
-                      onChange={event => updateSelectedNode({
-                        envelope: {
-                          ...(selectedNode.data.payload as ActionNode).envelope,
-                          sustainLevel: Number(event.target.value)
-                        }
-                      } as ActionNode)}
+                            value={currentTiming.level ?? 1}
+                            onChange={event => updateTiming({ level: Number(event.target.value) })}
                     />
                   </label>
+                        <label className="flex flex-col font-medium">
+                          Ease In
+                          <select
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.easeIn ?? 'sinInOut'}
+                            onChange={event => updateTiming({ easeIn: event.target.value })}
+                          >
+                            {EASING_OPTIONS.map(ease => (
+                              <option key={ease} value={ease}>{ease}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex flex-col font-medium">
+                          Ease Out
+                          <select
+                            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                            value={currentTiming.easeOut ?? currentTiming.easeIn ?? 'sinInOut'}
+                            onChange={event => updateTiming({ easeOut: event.target.value })}
+                          >
+                            {EASING_OPTIONS.map(ease => (
+                              <option key={ease} value={ease}>{ease}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
