@@ -21,7 +21,7 @@ import {
   YARG_EVENT_OPTIONS,
   getActionWaitOptions,
   getDefaultEventOption
-} from '../lib/cueUtils';
+} from '../lib/options';
 import { createDefaultActionTiming } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorNode, EventOption } from '../lib/types';
 

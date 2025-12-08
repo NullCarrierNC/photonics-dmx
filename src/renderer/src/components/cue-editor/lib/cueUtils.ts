@@ -1,73 +1,18 @@
 import type { Edge } from 'reactflow';
-import type {
-  ActionNode,
-  AudioEventNode,
-  NodeCueMode
-} from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { ActionNode, AudioEventNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { WaitCondition } from '../../../../../photonics-dmx/types';
-import {
-  AUDIO_EVENT_OPTIONS as AUDIO_EVENTS_BASE,
-  BRIGHTNESS_OPTIONS,
-  COLOR_OPTIONS,
-  LIGHT_TARGET_OPTIONS,
-  LOCATION_OPTIONS,
-  YARG_EVENT_OPTIONS as YARG_EVENTS_BASE,
-  BLEND_MODE_OPTIONS
-} from '../../../../../photonics-dmx/constants/options';
-import type { EditorNode, EventOption } from './types';
+import type { EditorNode } from './types';
 import { createDefaultActionTiming } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-
-const withDefaultLabels = <T extends string>(values: T[]): EventOption<T>[] =>
-  values.map(value => ({ value, label: value }));
-
-const EASING_OPTIONS = [
-  'linear',
-  'ease',
-  'easeIn',
-  'easeOut',
-  'easeInOut',
-  'sinIn',
-  'sinOut',
-  'sinInOut',
-  'quadraticIn',
-  'quadraticOut',
-  'quadraticInOut',
-  'cubicIn',
-  'cubicOut',
-  'cubicInOut'
-] as const;
-
-const ACTION_OPTIONS: ActionNode['effectType'][] = [
-  'single-color', 'sweep', 'cycle', 'blackout'
-];
-
-const YARG_WAIT_CONDITIONS: WaitCondition[] = [...YARG_EVENTS_BASE];
-const YARG_EVENT_OPTIONS: EventOption<WaitCondition>[] = withDefaultLabels(YARG_WAIT_CONDITIONS);
-const AUDIO_EVENT_OPTIONS: EventOption<AudioEventNode['eventType']>[] = withDefaultLabels(AUDIO_EVENTS_BASE);
-
-const ACTION_WAIT_OPTIONS_YARG: EventOption<WaitCondition>[] = [
-  { value: 'none', label: 'None' },
-  { value: 'delay', label: 'Delay' },
-  ...withDefaultLabels(YARG_WAIT_CONDITIONS)
-];
-
-const ACTION_WAIT_OPTIONS_AUDIO: EventOption<AudioEventNode['eventType'] | 'none' | 'delay'>[] = [
-  { value: 'none', label: 'None' },
-  { value: 'delay', label: 'Delay' },
-  ...withDefaultLabels(AUDIO_EVENTS_BASE)
-];
+import {
+  AUDIO_EVENT_OPTIONS,
+  YARG_EVENT_OPTIONS
+} from './options';
 
 const getYargEventLabel = (eventType: WaitCondition): string =>
   YARG_EVENT_OPTIONS.find(option => option.value === eventType)?.label ?? eventType;
 
 const getAudioEventLabel = (eventType: AudioEventNode['eventType']): string =>
   AUDIO_EVENT_OPTIONS.find(option => option.value === eventType)?.label ?? eventType;
-
-const getActionWaitOptions = (mode: NodeCueMode): EventOption<string>[] =>
-  mode === 'yarg' ? ACTION_WAIT_OPTIONS_YARG : ACTION_WAIT_OPTIONS_AUDIO;
-
-const getDefaultEventOption = (mode: NodeCueMode): EventOption<WaitCondition | AudioEventNode['eventType']> =>
-  mode === 'yarg' ? YARG_EVENT_OPTIONS[0] : AUDIO_EVENT_OPTIONS[0];
 
 const getConditionLabel = (condition: string, time?: number): string => {
   if (!condition) return 'none';
@@ -155,25 +100,11 @@ const formatDuration = (ms: number): string => {
 };
 
 export {
-  ACTION_OPTIONS,
-  ACTION_WAIT_OPTIONS_AUDIO,
-  ACTION_WAIT_OPTIONS_YARG,
-  AUDIO_EVENT_OPTIONS,
-  BLEND_MODE_OPTIONS,
-  BRIGHTNESS_OPTIONS,
-  COLOR_OPTIONS,
-  EASING_OPTIONS,
-  LIGHT_TARGET_OPTIONS,
-  LOCATION_OPTIONS,
-  YARG_EVENT_OPTIONS,
   calculateActionDuration,
   calculateChainDuration,
   formatDuration,
-  getActionWaitOptions,
   getAudioEventLabel,
   getConditionLabel,
-  getDefaultEventOption,
   getTextColorForBg,
   getYargEventLabel,
-  withDefaultLabels
 };
