@@ -3,8 +3,10 @@ import {
   ActionTimingConfig,
   AudioEventNode,
   AudioNodeCueDefinition,
+  BaseEventNode,
   Connection,
   createDefaultActionTiming,
+  LogicNode,
   YargEventNode,
   YargNodeCueDefinition
 } from '../../types/nodeCueTypes';
@@ -16,30 +18,16 @@ export class NodeCueCompilationError extends Error {
   }
 }
 
-export interface CompiledActionStep<TEvent extends YargEventNode | AudioEventNode> {
-  action: ActionNode;
-  event: TEvent;
-  /** Cumulative delay in milliseconds from when the triggering event fires */
-  delayMs: number;
-  /** Position in chain: 0 for actions triggered directly by events, 1+ for chained actions */
-  chainPosition: number;
+export interface CompiledNodeCue<TEvent extends BaseEventNode> {
+  definition: YargNodeCueDefinition | AudioNodeCueDefinition;
+  eventMap: Map<string, TEvent>;
+  actionMap: Map<string, ActionNode>;
+  logicMap: Map<string, LogicNode>;
+  adjacency: Map<string, Connection[]>;
 }
 
-export interface CompiledActionChain<TEvent extends YargEventNode | AudioEventNode> {
-  chainId: string;
-  event: TEvent;
-  actions: CompiledActionStep<TEvent>[];
-}
-
-export interface CompiledYargCue {
-  definition: YargNodeCueDefinition;
-  chains: CompiledActionChain<YargEventNode>[];
-}
-
-export interface CompiledAudioCue {
-  definition: AudioNodeCueDefinition;
-  chains: CompiledActionChain<AudioEventNode>[];
-}
+export type CompiledYargCue = CompiledNodeCue<YargEventNode>;
+export type CompiledAudioCue = CompiledNodeCue<AudioEventNode>;
 
 const getActionTiming = (action: ActionNode): ActionTimingConfig => ({
   ...createDefaultActionTiming(),
@@ -49,7 +37,7 @@ const getActionTiming = (action: ActionNode): ActionTimingConfig => ({
 /**
  * Calculates the total duration of an action based on its timing settings.
  */
-const calculateActionDuration = (action: ActionNode): number => {
+export const calculateActionDuration = (action: ActionNode): number => {
   const timing = getActionTiming(action);
   return Math.max(0, timing.waitForTime) +
     Math.max(0, timing.duration) +
@@ -58,36 +46,20 @@ const calculateActionDuration = (action: ActionNode): number => {
 
 export class NodeCueCompiler {
   public static compileYargCue(definition: YargNodeCueDefinition): CompiledYargCue {
-    const chains = this.expandConnections(
-      definition.nodes.events,
-      definition.nodes.actions,
-      definition.connections
-    );
-
-    return {
-      definition,
-      chains
-    };
+    return this.buildCompiled(definition);
   }
 
   public static compileAudioCue(definition: AudioNodeCueDefinition): CompiledAudioCue {
-    const chains = this.expandConnections(
-      definition.nodes.events,
-      definition.nodes.actions,
-      definition.connections
-    );
-
-    return {
-      definition,
-      chains
-    };
+    return this.buildCompiled(definition);
   }
 
-  private static expandConnections<TEvent extends YargEventNode | AudioEventNode>(
-    events: TEvent[],
-    actions: ActionNode[],
-    connections: Connection[]
-  ): CompiledActionChain<TEvent>[] {
+  private static buildCompiled<TEvent extends BaseEventNode>(
+    definition: YargNodeCueDefinition | AudioNodeCueDefinition
+  ): CompiledNodeCue<TEvent> {
+    const events = definition.nodes.events as unknown as TEvent[];
+    const actions = definition.nodes.actions;
+    const logic = definition.nodes.logic ?? [];
+
     if (!events.length) {
       throw new NodeCueCompilationError('At least one event node is required.');
     }
@@ -98,97 +70,50 @@ export class NodeCueCompiler {
 
     const eventMap = new Map(events.map(event => [event.id, event]));
     const actionMap = new Map(actions.map(action => [action.id, action]));
+    const logicMap = new Map(logic.map(node => [node.id, node]));
 
-    // Build adjacency lists for the connection graph
-    const eventToActions = new Map<string, string[]>();
-    const actionToActions = new Map<string, string[]>();
-
-    for (const conn of connections) {
-      if (eventMap.has(conn.from)) {
-        // Event → Action connection
-        const list = eventToActions.get(conn.from) ?? [];
-        list.push(conn.to);
-        eventToActions.set(conn.from, list);
-      } else if (actionMap.has(conn.from) && actionMap.has(conn.to)) {
-        // Action → Action connection
-        const list = actionToActions.get(conn.from) ?? [];
-        list.push(conn.to);
-        actionToActions.set(conn.from, list);
+    // Ensure all connection endpoints exist
+    for (const conn of definition.connections) {
+      if (!eventMap.has(conn.from) && !actionMap.has(conn.from) && !logicMap.has(conn.from)) {
+        throw new NodeCueCompilationError(`Connection 'from' id '${conn.from}' does not exist.`);
+      }
+      if (!eventMap.has(conn.to) && !actionMap.has(conn.to) && !logicMap.has(conn.to)) {
+        throw new NodeCueCompilationError(`Connection 'to' id '${conn.to}' does not exist.`);
       }
     }
 
-    const chains: CompiledActionChain<TEvent>[] = [];
+    // Build adjacency for all nodes
+    const adjacency = new Map<string, Connection[]>();
+    for (const conn of definition.connections) {
+      const list = adjacency.get(conn.from) ?? [];
+      list.push(conn);
+      adjacency.set(conn.from, list);
+    }
+
+    // Validate actions and reachability
     const reachableActions = new Set<string>();
+    const visited = new Set<string>();
 
-    /**
-     * Recursively traverses action chains starting from an event-triggered action.
-     * Builds compiled plans with cumulative delays.
-     */
-    const traverseChain = (
-      actionId: string,
-      event: TEvent,
-      cumulativeDelay: number,
-      chainPosition: number,
-      visited: Set<string>,
-      currentChain: CompiledActionStep<TEvent>[]
-    ): void => {
-      if (visited.has(actionId)) {
-        return; // Prevent infinite loops (cycles should be caught by validation)
+    const traverseReachability = (nodeId: string): void => {
+      if (visited.has(nodeId)) return;
+      visited.add(nodeId);
+      if (actionMap.has(nodeId)) {
+        reachableActions.add(nodeId);
       }
-
-      const action = actionMap.get(actionId);
-      if (!action) {
-        return;
-      }
-
-      visited.add(actionId);
-      reachableActions.add(actionId);
-
-      this.validateAction(action);
-
-      const step: CompiledActionStep<TEvent> = {
-        action,
-        event,
-        delayMs: cumulativeDelay,
-        chainPosition
-      };
-
-      const nextChain = [...currentChain, step];
-
-      const actionDuration = calculateActionDuration(action);
-      const nextDelay = cumulativeDelay + actionDuration;
-
-      const chainedActions = actionToActions.get(actionId) ?? [];
-      if (chainedActions.length === 0) {
-        const pathId = nextChain.map(step => step.action.id).join('>');
-        chains.push({
-          chainId: `${event.id}:${pathId}`,
-          event,
-          actions: nextChain
-        });
-      } else {
-        for (const nextActionId of chainedActions) {
-          traverseChain(
-            nextActionId,
-            event,
-            nextDelay,
-            chainPosition + 1,
-            new Set(visited),
-            nextChain
-          );
-        }
+      const edges = adjacency.get(nodeId) ?? [];
+      for (const edge of edges) {
+        traverseReachability(edge.to);
       }
     };
 
-    // Start traversal from each event node
     for (const event of events) {
-      const rootActions = eventToActions.get(event.id) ?? [];
-      for (const actionId of rootActions) {
-        traverseChain(actionId, event, 0, 0, new Set(), []);
-      }
+      traverseReachability(event.id);
     }
 
-    // Check for orphaned actions (not reachable from any event)
+    for (const action of actions) {
+      this.validateAction(action);
+    }
+
     const unreachableActions = actions.filter(action => !reachableActions.has(action.id));
     if (unreachableActions.length > 0) {
       throw new NodeCueCompilationError(
@@ -196,7 +121,13 @@ export class NodeCueCompiler {
       );
     }
 
-    return chains;
+    return {
+      definition,
+      eventMap,
+      actionMap,
+      logicMap,
+      adjacency
+    };
   }
 
   private static validateAction(action: ActionNode): void {
@@ -207,23 +138,5 @@ export class NodeCueCompiler {
     
   }
 
-  /**
-   * Calculates the total duration of an action chain starting from an event.
-   * Useful for displaying chain duration in the UI.
-   */
-  public static calculateChainDuration(chains: CompiledActionChain<YargEventNode | AudioEventNode>[]): number {
-    if (chains.length === 0) return 0;
-
-    let maxEndTime = 0;
-    for (const chain of chains) {
-      for (const step of chain.actions) {
-        const endTime = step.delayMs + calculateActionDuration(step.action);
-        if (endTime > maxEndTime) {
-          maxEndTime = endTime;
-        }
-      }
-    }
-    return maxEndTime;
-  }
 }
 

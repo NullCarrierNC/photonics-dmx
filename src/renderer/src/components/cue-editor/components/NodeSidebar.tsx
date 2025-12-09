@@ -3,8 +3,13 @@ import type {
   ActionNode,
   AudioEventNode,
   AudioEventType,
-  NodeEffectType,
+  LogicNode,
+  LogicComparator,
+  MathOperator,
   NodeCueMode,
+  NodeEffectType,
+  ValueSource,
+  VariableLogicNode,
   YargEventNode
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { WaitCondition, Color } from '../../../../../photonics-dmx/types';
@@ -31,7 +36,8 @@ type Props = {
   selectedActionHasEventParent: boolean;
   addEventNode: (option: EventOption<WaitCondition | AudioEventNode['eventType']>) => void;
   addActionNode: (effect: NodeEffectType) => void;
-  updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode>(updates: Partial<T>) => void;
+  addLogicNode: (logicType: LogicNode['logicType']) => void;
+  updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode | LogicNode>(updates: Partial<T>) => void;
 };
 
 const NodeSidebar: React.FC<Props> = ({
@@ -40,8 +46,100 @@ const NodeSidebar: React.FC<Props> = ({
   selectedActionHasEventParent,
   addEventNode,
   addActionNode,
+  addLogicNode,
   updateSelectedNode
 }) => {
+  const isVariableSource = (src: ValueSource): src is Extract<ValueSource, { source: 'variable' }> => src.source === 'variable';
+
+  const renderValueSourceEditor = (
+    label: string,
+    value: ValueSource | undefined,
+    onChange: (next: ValueSource) => void,
+    expected: 'number' | 'boolean' | 'either' = 'either'
+  ) => {
+    const source = value ?? { source: 'literal', value: expected === 'boolean' ? false : 0 };
+    const isLiteral = source.source === 'literal';
+    const isBoolean = expected === 'boolean';
+
+    return (
+      <div className="space-y-1">
+        <label className="flex flex-col font-medium text-xs">
+          {label}
+          <select
+            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+            value={source.source}
+            onChange={event => {
+              const nextSource = event.target.value as ValueSource['source'];
+              if (nextSource === 'literal') {
+                onChange({ source: 'literal', value: isBoolean ? false : 0 });
+              } else {
+                onChange({ source: 'variable', name: isVariableSource(source) ? (source.name ?? 'var1') : 'var1', fallback: isVariableSource(source) ? source.fallback : undefined });
+              }
+            }}
+          >
+            <option value="literal">Literal</option>
+            <option value="variable">Variable</option>
+          </select>
+        </label>
+        {isLiteral ? (
+          <label className="flex flex-col font-medium text-xs">
+            Value
+            {isBoolean ? (
+              <select
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={source.value === true ? 'true' : 'false'}
+                onChange={event => onChange({ ...source, value: event.target.value === 'true' })}
+              >
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            ) : (
+              <input
+                type="number"
+                step="0.1"
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={typeof source.value === 'number' ? source.value : 0}
+                onChange={event => onChange({ ...source, value: Number(event.target.value) })}
+              />
+            )}
+          </label>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col font-medium text-xs">
+              Variable
+              <input
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+            value={isVariableSource(source) ? (source.name ?? '') : ''}
+            onChange={event => onChange({ source: 'variable', name: event.target.value || 'var1', fallback: isVariableSource(source) ? source.fallback : undefined })}
+              />
+            </label>
+            <label className="flex flex-col font-medium text-xs">
+              Fallback
+              {isBoolean ? (
+                <select
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={isVariableSource(source) && source.fallback === true ? 'true' : 'false'}
+                  onChange={event => onChange({ source: 'variable', name: isVariableSource(source) ? source.name : 'var1', fallback: event.target.value === 'true' })}
+                >
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              ) : (
+                <input
+                  type="number"
+                  step="0.1"
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={isVariableSource(source) && typeof source.fallback === 'number' ? source.fallback : 0}
+                onChange={event => onChange({ source: 'variable', name: isVariableSource(source) ? source.name : 'var1', fallback: Number(event.target.value) })}
+                />
+              )}
+            </label>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-y-auto space-y-4">
       <div>
@@ -66,6 +164,30 @@ const NodeSidebar: React.FC<Props> = ({
               {effect}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-semibold text-sm mb-2">Logic Nodes</h3>
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <button
+            className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+            onClick={() => addLogicNode('variable')}
+          >
+            Variable
+          </button>
+          <button
+            className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+            onClick={() => addLogicNode('conditional')}
+          >
+            Conditional
+          </button>
+          <button
+            className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+            onClick={() => addLogicNode('math')}
+          >
+            Math
+          </button>
         </div>
       </div>
 
@@ -127,6 +249,108 @@ const NodeSidebar: React.FC<Props> = ({
               </>
             )}
           </div>
+        ) : selectedNode.data.kind === 'logic' ? (
+          (() => {
+            const logicPayload = selectedNode.data.payload as LogicNode;
+            if (logicPayload.logicType === 'variable') {
+              const showValue = (logicPayload as VariableLogicNode).mode !== 'get';
+              return (
+                <div className="space-y-2 text-xs">
+                  <label className="flex flex-col font-medium">
+                    Mode
+                    <select
+                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                      value={(logicPayload as VariableLogicNode).mode}
+                      onChange={event => updateSelectedNode<LogicNode>({ mode: event.target.value as VariableLogicNode['mode'] })}
+                    >
+                      <option value="set">Set</option>
+                      <option value="get">Get</option>
+                      <option value="init">Init</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col font-medium">
+                    Name
+                    <input
+                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                    value={(logicPayload as VariableLogicNode).varName}
+                    onChange={event => updateSelectedNode<LogicNode>({ varName: event.target.value })}
+                    />
+                  </label>
+                  <label className="flex flex-col font-medium">
+                    Type
+                    <select
+                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                    value={(logicPayload as VariableLogicNode).valueType}
+                    onChange={event => updateSelectedNode<LogicNode>({ valueType: event.target.value as 'number' | 'boolean' })}
+                    >
+                      <option value="number">number</option>
+                      <option value="boolean">boolean</option>
+                    </select>
+                  </label>
+                  {showValue && renderValueSourceEditor(
+                    'Value',
+                    (logicPayload as VariableLogicNode).value,
+                    next => updateSelectedNode<LogicNode>({ value: next }),
+                    (logicPayload as VariableLogicNode).valueType
+                  )}
+                </div>
+              );
+            }
+
+            if (logicPayload.logicType === 'math') {
+              return (
+                <div className="space-y-2 text-xs">
+                  <label className="flex flex-col font-medium">
+                    Operator
+                    <select
+                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                      value={logicPayload.operator}
+                      onChange={event => updateSelectedNode<LogicNode>({ operator: event.target.value as MathOperator })}
+                    >
+                      <option value="add">add</option>
+                      <option value="subtract">subtract</option>
+                      <option value="multiply">multiply</option>
+                      <option value="divide">divide</option>
+                      <option value="modulus">modulus</option>
+                    </select>
+                  </label>
+                  {renderValueSourceEditor('Left', logicPayload.left, next => updateSelectedNode<LogicNode>({ left: next }), 'number')}
+                  {renderValueSourceEditor('Right', logicPayload.right, next => updateSelectedNode<LogicNode>({ right: next }), 'number')}
+                  <label className="flex flex-col font-medium">
+                    Assign To (optional)
+                    <input
+                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                      value={logicPayload.assignTo ?? ''}
+                      onChange={event => updateSelectedNode<LogicNode>({ assignTo: event.target.value || undefined })}
+                    />
+                  </label>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-2 text-xs">
+                <label className="flex flex-col font-medium">
+                  Comparator
+                  <select
+                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                    value={logicPayload.comparator}
+                    onChange={event => updateSelectedNode<LogicNode>({ comparator: event.target.value as LogicComparator })}
+                  >
+                    <option value=">">&gt;</option>
+                    <option value=">=">&gt;=</option>
+                    <option value="<">&lt;</option>
+                    <option value="<=">&lt;=</option>
+                    <option value="==">==</option>
+                    <option value="!=">!=</option>
+                  </select>
+                </label>
+                {renderValueSourceEditor('Left', logicPayload.left, next => updateSelectedNode<LogicNode>({ left: next }))}
+                {renderValueSourceEditor('Right', logicPayload.right, next => updateSelectedNode<LogicNode>({ right: next }))}
+                <p className="text-[10px] text-gray-500">First outgoing edge becomes TRUE branch, second becomes FALSE.</p>
+              </div>
+            );
+          })()
         ) : (
           <div className="space-y-3 text-xs">
             <label className="flex flex-col font-medium">

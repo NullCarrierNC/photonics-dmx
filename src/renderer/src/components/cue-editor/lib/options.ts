@@ -51,8 +51,13 @@ const ACTION_WAIT_OPTIONS_AUDIO = [
 const getActionWaitOptions = (mode: NodeCueMode) =>
   mode === 'yarg' ? ACTION_WAIT_OPTIONS_YARG : ACTION_WAIT_OPTIONS_AUDIO;
 
-const getDefaultEventOption = (mode: NodeCueMode) =>
-  mode === 'yarg' ? YARG_EVENT_OPTIONS[0] : AUDIO_EVENT_OPTIONS[0];
+const getDefaultEventOption = (mode: NodeCueMode) => {
+  if (mode === 'yarg') {
+    const beat = YARG_EVENT_OPTIONS.find(option => option.value === 'beat');
+    return beat ?? YARG_EVENT_OPTIONS[0];
+  }
+  return AUDIO_EVENT_OPTIONS[0];
+};
 
 export {
   ACTION_OPTIONS,

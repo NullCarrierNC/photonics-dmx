@@ -95,4 +95,71 @@ describe('Node cue validation', () => {
 
     expect(result.valid).toBe(true);
   });
+
+  it('validates logic nodes and detects cycles across logic/actions', () => {
+    const definition: YargNodeCueDefinition = {
+      id: 'logic-validate',
+      name: 'Logic Validate',
+      cueType: CueType.Chorus,
+      style: 'primary',
+      nodes: {
+        events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'single-color',
+            target: { groups: ['front'], filter: 'all' },
+            color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
+            timing: {
+              waitForCondition: 'none',
+              waitForTime: 0,
+              duration: 100,
+              waitUntilCondition: 'none',
+              waitUntilTime: 0,
+              easing: 'sinInOut',
+              level: 1
+            }
+          }
+        ],
+        logic: [
+          {
+            id: 'logic-1',
+            type: 'logic',
+            logicType: 'conditional',
+            comparator: '>',
+            left: { source: 'literal', value: 1 },
+            right: { source: 'literal', value: 0 }
+          }
+        ]
+      },
+      connections: [
+        { from: 'event-1', to: 'logic-1' },
+        { from: 'logic-1', to: 'action-1', fromPort: 'true' }
+      ],
+      layout: { nodePositions: {} }
+    };
+
+    const valid = validateYargNodeCueFile({
+      version: 1,
+      mode: 'yarg',
+      group: { id: 'g1', name: 'Group' },
+      cues: [definition]
+    });
+    expect(valid.valid).toBe(true);
+
+    const invalid = validateYargNodeCueFile({
+      version: 1,
+      mode: 'yarg',
+      group: { id: 'g1', name: 'Group' },
+      cues: [{
+        ...definition,
+        connections: [
+          { from: 'logic-1', to: 'action-1' },
+          { from: 'action-1', to: 'logic-1' }
+        ]
+      }]
+    });
+    expect(invalid.valid).toBe(false);
+  });
 });

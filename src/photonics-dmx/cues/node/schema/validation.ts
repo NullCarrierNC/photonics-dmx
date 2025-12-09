@@ -8,6 +8,9 @@ import {
   AudioNodeCueFile,
   AudioEventType,
   Connection,
+  LogicComparator,
+  LogicNode,
+  MathOperator,
   NodeActionConfig,
   NodeActionTarget,
   NodeCueGroupMeta,
@@ -50,6 +53,9 @@ const AUDIO_EVENT_TYPES: AudioEventType[] = [...AUDIO_EVENT_OPTIONS_WITH_NONE_DE
 const NODE_EFFECT_TYPES: NodeEffectType[] = [
   'single-color', 'sweep', 'cycle', 'blackout'
 ] as const;
+
+const LOGIC_COMPARATORS: LogicComparator[] = ['>', '>=', '<', '<=', '==', '!='];
+const MATH_OPERATORS: MathOperator[] = ['add', 'subtract', 'multiply', 'divide', 'modulus'];
 
 const ajv = new Ajv({
   allErrors: true,
@@ -141,6 +147,111 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
     custom: { type: 'object', nullable: true, additionalProperties: true }
   }
 };
+
+const valueSourceSchema: JSONSchemaType<{
+  source: 'literal' | 'variable';
+  value?: number | boolean;
+  name?: string;
+  fallback?: number | boolean;
+}> = {
+  type: 'object',
+  required: ['source'],
+  additionalProperties: false,
+  properties: {
+    source: { type: 'string', enum: ['literal', 'variable'] },
+    value: { type: ['number', 'boolean'], nullable: true },
+    name: { type: 'string', nullable: true },
+    fallback: { type: ['number', 'boolean'], nullable: true }
+  },
+  allOf: [
+    {
+      if: {
+        properties: {
+          source: { const: 'literal' }
+        }
+      },
+      then: {
+        required: ['value']
+      }
+    },
+    {
+      if: {
+        properties: {
+          source: { const: 'variable' }
+        }
+      },
+      then: {
+        required: ['name']
+      }
+    }
+  ]
+};
+
+const variableLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'mode', 'varName', 'valueType'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'variable' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    mode: { type: 'string', enum: ['set', 'get', 'init'] as const },
+    varName: { type: 'string' },
+    valueType: { type: 'string', enum: ['number', 'boolean'] as const },
+    value: { ...valueSourceSchema, nullable: true }
+  }
+} as any;
+
+const mathLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'operator', 'left', 'right'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'math' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    operator: { type: 'string', enum: MATH_OPERATORS },
+    left: valueSourceSchema,
+    right: valueSourceSchema,
+    assignTo: { type: 'string', nullable: true }
+  }
+} as any;
+
+const conditionalLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'comparator', 'left', 'right'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'conditional' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    comparator: { type: 'string', enum: LOGIC_COMPARATORS },
+    left: valueSourceSchema,
+    right: valueSourceSchema
+  }
+} as any;
+
+const logicNodeSchema: JSONSchemaType<LogicNode> = {
+  oneOf: [variableLogicSchema, mathLogicSchema, conditionalLogicSchema]
+} as any;
 
 const targetSchema: JSONSchemaType<NodeActionTarget> = {
   type: 'object',
@@ -305,6 +416,12 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
           type: 'array',
           minItems: 1,
           items: actionSchema
+        },
+        logic: {
+          type: 'array',
+          nullable: true,
+          items: logicNodeSchema,
+          default: []
         }
       }
     },
@@ -339,6 +456,12 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
           type: 'array',
           minItems: 1,
           items: actionSchema
+        },
+        logic: {
+          type: 'array',
+          nullable: true,
+          items: logicNodeSchema,
+          default: []
         }
       }
     },
@@ -433,13 +556,13 @@ const formatErrors = (errors: DefinedError[] | null | undefined): string[] => {
  */
 const detectCycles = (
   connections: Connection[],
-  actionIds: Set<string>
+  nodeIds: Set<string>
 ): string[] => {
   const errors: string[] = [];
 
   const actionToAction = new Map<string, string[]>();
   for (const conn of connections) {
-    if (actionIds.has(conn.from) && actionIds.has(conn.to)) {
+    if (nodeIds.has(conn.from) && nodeIds.has(conn.to)) {
       const existing = actionToAction.get(conn.from) ?? [];
       existing.push(conn.to);
       actionToAction.set(conn.from, existing);
@@ -472,9 +595,9 @@ const detectCycles = (
     return false;
   };
 
-  for (const actionId of actionIds) {
-    if (!visited.has(actionId)) {
-      dfs(actionId, [actionId]);
+  for (const nodeId of nodeIds) {
+    if (!visited.has(nodeId)) {
+      dfs(nodeId, [nodeId]);
     }
   }
 
@@ -491,8 +614,10 @@ export const validateYargNodeCueFile = (value: unknown): NodeCueValidationResult
 
   const semanticErrors: string[] = [];
   for (const cue of value.cues) {
+    const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
     const actionIds = new Set(cue.nodes.actions.map(a => a.id));
-    const cycleErrors = detectCycles(cue.connections, actionIds);
+    const nonEventIds = new Set<string>([...logicIds, ...actionIds]);
+    const cycleErrors = detectCycles(cue.connections, nonEventIds);
     semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
   }
 
@@ -521,8 +646,10 @@ export const validateAudioNodeCueFile = (value: unknown): NodeCueValidationResul
 
   const semanticErrors: string[] = [];
   for (const cue of value.cues) {
+    const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
     const actionIds = new Set(cue.nodes.actions.map(a => a.id));
-    const cycleErrors = detectCycles(cue.connections, actionIds);
+    const nonEventIds = new Set<string>([...logicIds, ...actionIds]);
+    const cycleErrors = detectCycles(cue.connections, nonEventIds);
     semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
   }
 

@@ -28,9 +28,51 @@ export interface Connection {
   toPort?: string;
 }
 
+export type VariableType = 'number' | 'boolean';
+
+export type ValueSource =
+  | { source: 'literal'; value: number | boolean }
+  | { source: 'variable'; name: string; fallback?: number | boolean };
+
+export type LogicComparator = '>' | '>=' | '<' | '<=' | '==' | '!=';
+export type MathOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'modulus';
+
+export interface BaseLogicNode {
+  id: string;
+  type: 'logic';
+  label?: string;
+  outputs?: string[];
+}
+
+export interface VariableLogicNode extends BaseLogicNode {
+  logicType: 'variable';
+  mode: 'set' | 'get' | 'init';
+  varName: string;
+  valueType: VariableType;
+  value?: ValueSource;
+}
+
+export interface MathLogicNode extends BaseLogicNode {
+  logicType: 'math';
+  operator: MathOperator;
+  left: ValueSource;
+  right: ValueSource;
+  assignTo?: string;
+}
+
+export interface ConditionalLogicNode extends BaseLogicNode {
+  logicType: 'conditional';
+  comparator: LogicComparator;
+  left: ValueSource;
+  right: ValueSource;
+}
+
+export type LogicNode = VariableLogicNode | MathLogicNode | ConditionalLogicNode;
+
 export interface NodeGraph<TEvent extends BaseEventNode, TAction extends ActionNode> {
   events: TEvent[];
   actions: TAction[];
+  logic?: LogicNode[];
 }
 
 export interface BaseCueDefinition {

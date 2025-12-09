@@ -2,13 +2,14 @@ import type { Node } from 'reactflow';
 import type {
   ActionNode,
   AudioEventNode,
+  LogicNode,
   NodeCueFile,
   YargEventNode
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 
 export type EditorNodeData = {
-  kind: 'event' | 'action';
-  payload: YargEventNode | AudioEventNode | ActionNode;
+  kind: 'event' | 'action' | 'logic';
+  payload: YargEventNode | AudioEventNode | ActionNode | LogicNode;
   label: string;
 };
 

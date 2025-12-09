@@ -6,6 +6,7 @@ import CueMetadataForm from '../components/cue-editor/components/CueMetadataForm
 import NodeSidebar from '../components/cue-editor/components/NodeSidebar';
 import ActionNodeComponent from '../components/cue-editor/components/flow/ActionNode';
 import EventNodeComponent from '../components/cue-editor/components/flow/EventNode';
+import LogicNodeComponent from '../components/cue-editor/components/flow/LogicNode';
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles';
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow';
 import { updateDocumentFromFlow } from '../components/cue-editor/lib/cueTransforms';
@@ -64,6 +65,7 @@ const CueEditor: React.FC = () => {
     chainDuration,
     addEventNode,
     addActionNode,
+    addLogicNode,
     updateSelectedNode,
     loadCueIntoFlow,
     setReactFlowInstance,
@@ -85,7 +87,8 @@ const CueEditor: React.FC = () => {
 
   const nodeTypes = useMemo(() => ({
     event: EventNodeComponent,
-    action: ActionNodeComponent
+    action: ActionNodeComponent,
+    logic: LogicNodeComponent
   }), []);
 
   const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio;
@@ -185,6 +188,7 @@ const CueEditor: React.FC = () => {
           selectedActionHasEventParent={selectedActionHasEventParent}
           addEventNode={addEventNode}
           addActionNode={addActionNode}
+          addLogicNode={addLogicNode}
           updateSelectedNode={updateSelectedNode}
         />
       </div>

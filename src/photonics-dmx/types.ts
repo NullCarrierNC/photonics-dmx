@@ -96,6 +96,7 @@ export interface Effect {
 export type WaitCondition =
   | 'none'
   | 'delay'
+  | 'cue-started'
   | 'beat'
   | 'measure'
   | 'half-beat'

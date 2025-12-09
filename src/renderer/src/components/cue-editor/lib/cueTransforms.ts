@@ -4,6 +4,7 @@ import type {
   AudioNodeCueDefinition,
   NodeCueFile,
   NodeCueMode,
+  LogicNode,
   YargEventNode,
   YargNodeCueDefinition
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
@@ -42,13 +43,28 @@ const cueToFlow = (cue: CueDefinition | null): { nodes: EditorNode[]; edges: Edg
         label: `${action.effectType}`,
         payload: action
       }
+    })),
+    ...(cue.nodes.logic ?? []).map((logic: LogicNode) => ({
+      id: logic.id,
+      type: 'logic' as const,
+      position: nodePositions[logic.id] ?? { x: 260, y: 120 },
+      data: {
+        kind: 'logic' as const,
+        label: logic.logicType,
+        payload: logic
+      }
     }))
   ];
 
   const edges: Edge[] = cue.connections.map(connection => ({
-    id: `${connection.from}-${connection.to}`,
+    id: `${connection.from}-${connection.to}-${connection.fromPort ?? 'any'}`,
     source: connection.from,
-    target: connection.to
+    sourceHandle: connection.fromPort ?? undefined,
+    target: connection.to,
+    data: {
+      fromPort: connection.fromPort ?? null,
+      toPort: connection.toPort ?? null
+    }
   }));
 
   return { nodes, edges };
@@ -73,15 +89,19 @@ const updateDocumentFromFlow = (
 
   const eventNodes = nodes.filter(node => node.data.kind === 'event');
   const actionNodes = nodes.filter(node => node.data.kind === 'action');
+  const logicNodes = nodes.filter(node => node.data.kind === 'logic');
   const validEdges = edges.filter(edge => {
     const sourceNode = nodes.find(node => node.id === edge.source);
     const targetNode = nodes.find(node => node.id === edge.target);
     if (!sourceNode || !targetNode) return false;
 
-    if (sourceNode.data.kind === 'event' && targetNode.data.kind === 'action') {
+    if (sourceNode.data.kind === 'event' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic')) {
       return true;
     }
-    if (sourceNode.data.kind === 'action' && targetNode.data.kind === 'action') {
+    if (sourceNode.data.kind === 'action' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic')) {
+      return true;
+    }
+    if (sourceNode.data.kind === 'logic' && (targetNode.data.kind === 'logic' || targetNode.data.kind === 'action')) {
       return true;
     }
     return false;
@@ -91,11 +111,14 @@ const updateDocumentFromFlow = (
     ...currentCueDefinition,
     nodes: {
       events: eventNodes.map(node => node.data.payload) as (YargEventNode[] | AudioEventNode[]),
-      actions: actionNodes.map(node => node.data.payload)
+      actions: actionNodes.map(node => node.data.payload),
+      logic: logicNodes.map(node => node.data.payload as LogicNode)
     },
     connections: validEdges.map(edge => ({
       from: edge.source,
-      to: edge.target
+      to: edge.target,
+      fromPort: (edge.data as any)?.fromPort ?? undefined,
+      toPort: (edge.data as any)?.toPort ?? undefined
     })),
     layout: {
       nodePositions: layoutPositions,

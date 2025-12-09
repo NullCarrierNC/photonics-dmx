@@ -2,9 +2,9 @@ import { IAudioCue } from '../../interfaces/IAudioCue';
 import { AudioCueData, AudioCueType } from '../../types/audioCueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { CompiledActionChain, CompiledAudioCue } from '../compiler/NodeCueCompiler';
+import { calculateActionDuration, CompiledAudioCue } from '../compiler/NodeCueCompiler';
 import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
-import { AudioEventNode } from '../../types/nodeCueTypes';
+import { AudioEventNode, LogicNode, ValueSource, AudioNodeCueDefinition } from '../../types/nodeCueTypes';
 import { Effect } from '../../../types';
 
 interface AudioEventState {
@@ -36,9 +36,10 @@ export class AudioNodeCue implements IAudioCue {
 
   private readonly eventStates = new Map<string, AudioEventState>();
   private readonly activeLevelEffects = new Map<string, number>();
+  private readonly variableStore = new Map<string, { type: 'number' | 'boolean'; value: number | boolean }>();
 
   constructor(groupId: string, private readonly compiledCue: CompiledAudioCue) {
-    const definition = compiledCue.definition;
+    const definition = compiledCue.definition as AudioNodeCueDefinition;
     this.id = `${groupId}:${definition.id}`;
     this.cueType = definition.cueTypeId;
     this.description = definition.description || definition.name || 'Node-based audio cue';
@@ -47,40 +48,31 @@ export class AudioNodeCue implements IAudioCue {
   async execute(data: AudioCueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const tasks: Promise<unknown>[] = [];
 
-    for (const chain of this.compiledCue.chains) {
-      const state = this.getEventState(chain.event.id);
-      const evaluation = this.evaluateEvent(chain.event, data, state);
-      const effectKey = this.effectKey(chain);
-      const rootStep = chain.actions[0];
-      const rootLayer = rootStep?.action.layer ?? 0;
+    for (const event of this.compiledCue.eventMap.values()) {
+      const state = this.getEventState(event.id);
+      const evaluation = this.evaluateEvent(event, data, state);
+      const effectKey = this.effectKey(event.id);
 
       if (evaluation.mode === 'edge') {
-        if (!evaluation.triggered) {
-          continue;
-        }
-
-        const effect = this.buildChainEffect(chain, lightManager, evaluation.intensity);
-        if (effect) {
-          sequencer.addEffect(`${effectKey}:${Date.now()}`, effect);
+        if (!evaluation.triggered) continue;
+        const effects = this.buildEdgeEffects(event.id, evaluation.intensity, lightManager);
+        for (const { name, effect } of effects) {
+          sequencer.addEffect(`${name}:${Date.now()}`, effect);
         }
       } else {
-        if (!rootStep) {
+        const actionStep = this.findFirstAction(event.id);
+        if (!actionStep) {
           continue;
         }
 
-        // Level-triggered events ignore chained steps beyond the first
-        if (chain.actions.some(step => step.chainPosition > 0)) {
-          continue;
-        }
-
-        const lights = ActionEffectFactory.resolveLights(lightManager, rootStep.action.target);
-        if (!lights.length) {
-          continue;
-        }
+        const action = this.compiledCue.actionMap.get(actionStep.actionId);
+        if (!action) continue;
+        const lights = ActionEffectFactory.resolveLights(lightManager, action.target);
+        if (!lights.length) continue;
 
         if (evaluation.active) {
           const effect = ActionEffectFactory.buildEffect({
-            action: rootStep.action,
+            action,
             lights,
             waitCondition: 'none',
             intensityScale: evaluation.intensity
@@ -88,10 +80,10 @@ export class AudioNodeCue implements IAudioCue {
 
           if (effect) {
             tasks.push(sequencer.setEffect(effectKey, effect));
-            this.activeLevelEffects.set(effectKey, rootLayer);
+            this.activeLevelEffects.set(effectKey, action.layer ?? 0);
           }
         } else if (this.activeLevelEffects.has(effectKey)) {
-          sequencer.removeEffect(effectKey, rootLayer);
+          sequencer.removeEffect(effectKey, action.layer ?? 0);
           this.activeLevelEffects.delete(effectKey);
         }
       }
@@ -105,11 +97,13 @@ export class AudioNodeCue implements IAudioCue {
   onStop(): void {
     this.eventStates.clear();
     this.activeLevelEffects.clear();
+    this.variableStore.clear();
   }
 
   onDestroy(): void {
     this.eventStates.clear();
     this.activeLevelEffects.clear();
+    this.variableStore.clear();
   }
 
   private getEventState(eventId: string): AudioEventState {
@@ -169,35 +163,196 @@ export class AudioNodeCue implements IAudioCue {
     }
   }
 
-  private buildChainEffect(
-    chain: CompiledActionChain<AudioEventNode>,
+  private buildEdgeEffects(eventId: string, intensity: number, lightManager: DmxLightManager): { name: string; effect: Effect }[] {
+    const results: { name: string; effect: Effect }[] = [];
+    const outgoing = this.compiledCue.adjacency.get(eventId) ?? [];
+
+    for (const conn of outgoing) {
+      const steps: { actionId: string; delay: number }[] = [];
+      this.traverse(conn.to, 0, new Set(), steps, intensity);
+      if (!steps.length) continue;
+
+      const effect = this.composeEffect(steps, lightManager, intensity);
+      if (effect) {
+        const chainId = steps.map(step => step.actionId).join('>');
+        results.push({ name: `${this.id}:${eventId}:${chainId}`, effect });
+      }
+    }
+
+    return results;
+  }
+
+  private traverse(
+    nodeId: string,
+    delayMs: number,
+    visited: Set<string>,
+    steps: { actionId: string; delay: number }[],
+    intensityScale: number
+  ): void {
+    if (visited.has(nodeId)) return;
+    visited.add(nodeId);
+
+    const { actionMap, logicMap, adjacency } = this.compiledCue;
+
+    if (actionMap.has(nodeId)) {
+      steps.push({ actionId: nodeId, delay: delayMs });
+      const nextDelay = delayMs + calculateActionDuration(actionMap.get(nodeId)!);
+      const edges = adjacency.get(nodeId) ?? [];
+      for (const edge of edges) {
+        this.traverse(edge.to, nextDelay, new Set(visited), steps, intensityScale);
+      }
+      return;
+    }
+
+    const logicNode = logicMap.get(nodeId);
+    if (logicNode) {
+      const nextNodes = this.evaluateLogicNode(logicNode, nodeId);
+      for (const targetId of nextNodes) {
+        this.traverse(targetId, delayMs, new Set(visited), steps, intensityScale);
+      }
+    }
+  }
+
+  private evaluateLogicNode(logicNode: LogicNode, nodeId: string): string[] {
+    const { adjacency } = this.compiledCue;
+    const edges = adjacency.get(nodeId) ?? [];
+
+    switch (logicNode.logicType) {
+      case 'variable': {
+        if (logicNode.mode !== 'get') {
+          const value = this.resolveValue(logicNode.valueType, logicNode.value);
+          if (logicNode.mode === 'init') {
+            if (!this.variableStore.has(logicNode.varName)) {
+              this.variableStore.set(logicNode.varName, { type: logicNode.valueType, value });
+            }
+          } else {
+            this.variableStore.set(logicNode.varName, { type: logicNode.valueType, value });
+          }
+        }
+        return edges.map(edge => edge.to);
+      }
+      case 'math': {
+        const left = Number(this.resolveValue('number', logicNode.left));
+        const right = Number(this.resolveValue('number', logicNode.right));
+        let result = 0;
+        switch (logicNode.operator) {
+          case 'add':
+            result = left + right;
+            break;
+          case 'subtract':
+            result = left - right;
+            break;
+          case 'multiply':
+            result = left * right;
+            break;
+          case 'divide':
+            result = right === 0 ? 0 : left / right;
+            break;
+          case 'modulus':
+            result = right === 0 ? 0 : left % right;
+            break;
+        }
+        if (logicNode.assignTo) {
+          this.variableStore.set(logicNode.assignTo, { type: 'number', value: result });
+        }
+        return edges.map(edge => edge.to);
+      }
+      case 'conditional': {
+        const left = Number(this.resolveValue('number', logicNode.left));
+        const right = Number(this.resolveValue('number', logicNode.right));
+        let outcome = false;
+        switch (logicNode.comparator) {
+          case '>':
+            outcome = left > right;
+            break;
+          case '>=':
+            outcome = left >= right;
+            break;
+          case '<':
+            outcome = left < right;
+            break;
+          case '<=':
+            outcome = left <= right;
+            break;
+          case '==':
+            outcome = left === right;
+            break;
+          case '!=':
+            outcome = left !== right;
+            break;
+        }
+        const branch = outcome ? 'true' : 'false';
+        const targeted = edges.filter(edge => edge.fromPort === branch);
+        if (targeted.length > 0) {
+          return targeted.map(edge => edge.to);
+        }
+        return edges.map(edge => edge.to);
+      }
+    }
+
+    return edges.map(edge => edge.to);
+  }
+
+  private resolveValue(expectedType: 'number' | 'boolean', source?: ValueSource): number | boolean {
+    if (!source) {
+      return expectedType === 'number' ? 0 : false;
+    }
+
+    if (source.source === 'literal') {
+      if (expectedType === 'number') {
+        if (typeof source.value === 'boolean') {
+          return source.value ? 1 : 0;
+        }
+        return typeof source.value === 'number' ? source.value : 0;
+      }
+      return source.value === true;
+    }
+
+    const existing = this.variableStore.get(source.name);
+    if (existing) {
+      if (expectedType === 'number') {
+        return typeof existing.value === 'number' ? existing.value : (existing.value ? 1 : 0);
+      }
+      return existing.value === true;
+    }
+
+    if (expectedType === 'number') {
+      if (typeof source.fallback === 'number') return source.fallback;
+      if (typeof source.fallback === 'boolean') return source.fallback ? 1 : 0;
+      return 0;
+    }
+
+    return source.fallback === true;
+  }
+
+  private composeEffect(
+    steps: { actionId: string; delay: number }[],
     lightManager: DmxLightManager,
     intensityScale: number
   ): Effect | null {
+    const { actionMap } = this.compiledCue;
     let combinedEffect: Effect | null = null;
     let lastScheduledDelay = 0;
 
-    for (const step of chain.actions) {
-      const lights = ActionEffectFactory.resolveLights(lightManager, step.action.target);
-      if (!lights.length) {
-        continue;
-      }
+    for (const step of steps) {
+      const action = actionMap.get(step.actionId);
+      if (!action) continue;
+      const lights = ActionEffectFactory.resolveLights(lightManager, action.target);
+      if (!lights.length) continue;
 
       const isFirstEffect = combinedEffect === null;
       const waitCondition = isFirstEffect ? 'none' : 'delay';
-      const waitTime = isFirstEffect ? step.delayMs : Math.max(0, step.delayMs - lastScheduledDelay);
+      const waitTime = isFirstEffect ? step.delay : Math.max(0, step.delay - lastScheduledDelay);
 
       const effect = ActionEffectFactory.buildEffect({
-        action: step.action,
+        action,
         lights,
         waitCondition,
         waitTime,
         intensityScale
       });
 
-      if (!effect) {
-        continue;
-      }
+      if (!effect) continue;
 
       if (!combinedEffect) {
         combinedEffect = {
@@ -208,14 +363,47 @@ export class AudioNodeCue implements IAudioCue {
         combinedEffect.transitions.push(...effect.transitions);
       }
 
-      lastScheduledDelay = step.delayMs;
+      lastScheduledDelay = step.delay;
     }
 
     return combinedEffect;
   }
 
-  private effectKey(chain: CompiledActionChain<AudioEventNode>): string {
-    return `${this.id}:${chain.chainId}`;
+  private findFirstAction(eventId: string): { actionId: string; delay: number } | null {
+    const visited = new Set<string>();
+    const queue: Array<{ nodeId: string; delay: number }> = [];
+    const outgoing = this.compiledCue.adjacency.get(eventId) ?? [];
+    outgoing.forEach(conn => queue.push({ nodeId: conn.to, delay: 0 }));
+
+    while (queue.length) {
+      const { nodeId, delay } = queue.shift()!;
+      if (visited.has(nodeId)) continue;
+      visited.add(nodeId);
+
+      if (this.compiledCue.actionMap.has(nodeId)) {
+        return { actionId: nodeId, delay };
+      }
+
+      const logicNode = this.compiledCue.logicMap.get(nodeId);
+      if (logicNode) {
+        const nextTargets = this.evaluateLogicNode(logicNode, nodeId);
+        const nextDelay = delay; // logic does not add delay
+        nextTargets.forEach(nextId => queue.push({ nodeId: nextId, delay: nextDelay }));
+        continue;
+      }
+
+      const nextEdges = this.compiledCue.adjacency.get(nodeId) ?? [];
+      nextEdges.forEach(edge => queue.push({
+        nodeId: edge.to,
+        delay: delay + (this.compiledCue.actionMap.has(nodeId) ? calculateActionDuration(this.compiledCue.actionMap.get(nodeId)!) : 0)
+      }));
+    }
+
+    return null;
+  }
+
+  private effectKey(eventId: string): string {
+    return `${this.id}:${eventId}`;
   }
 }
 

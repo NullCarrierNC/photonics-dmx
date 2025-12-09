@@ -42,52 +42,50 @@ const calculateChainDuration = (
 ): number => {
   const eventNodes = nodes.filter(n => n.data.kind === 'event');
   const actionNodes = nodes.filter(n => n.data.kind === 'action');
+  const logicNodes = nodes.filter(n => n.data.kind === 'logic');
 
   if (eventNodes.length === 0 || actionNodes.length === 0) return 0;
 
   const actionMap = new Map(actionNodes.map(n => [n.id, n.data.payload as ActionNode]));
-  const eventToActions = new Map<string, string[]>();
-  const actionToActions = new Map<string, string[]>();
-
-  for (const edge of edges) {
-    const sourceNode = nodes.find(n => n.id === edge.source);
-    const targetNode = nodes.find(n => n.id === edge.target);
-    if (!sourceNode || !targetNode) continue;
-
-    if (sourceNode.data.kind === 'event' && targetNode.data.kind === 'action') {
-      const list = eventToActions.get(edge.source) ?? [];
-      list.push(edge.target);
-      eventToActions.set(edge.source, list);
-    } else if (sourceNode.data.kind === 'action' && targetNode.data.kind === 'action') {
-      const list = actionToActions.get(edge.source) ?? [];
-      list.push(edge.target);
-      actionToActions.set(edge.source, list);
-    }
-  }
+  const logicSet = new Set(logicNodes.map(n => n.id));
+  const adjacency = new Map<string, string[]>();
+  edges.forEach(edge => {
+    const list = adjacency.get(edge.source) ?? [];
+    list.push(edge.target);
+    adjacency.set(edge.source, list);
+  });
 
   let maxEndTime = 0;
 
-  const traverse = (actionId: string, cumulativeDelay: number, visited: Set<string>): void => {
-    if (visited.has(actionId)) return;
-    visited.add(actionId);
+  const traverse = (nodeId: string, cumulativeDelay: number, visited: Set<string>): void => {
+    if (visited.has(nodeId)) return;
+    visited.add(nodeId);
 
-    const action = actionMap.get(actionId);
-    if (!action) return;
+    if (actionMap.has(nodeId)) {
+      const action = actionMap.get(nodeId)!;
+      const duration = calculateActionDuration(action);
+      const endTime = cumulativeDelay + duration;
+      if (endTime > maxEndTime) maxEndTime = endTime;
 
-    const duration = calculateActionDuration(action);
-    const endTime = cumulativeDelay + duration;
-    if (endTime > maxEndTime) maxEndTime = endTime;
+      const nextNodes = adjacency.get(nodeId) ?? [];
+      for (const nextId of nextNodes) {
+        traverse(nextId, endTime, new Set(visited));
+      }
+      return;
+    }
 
-    const chainedActions = actionToActions.get(actionId) ?? [];
-    for (const nextId of chainedActions) {
-      traverse(nextId, endTime, visited);
+    if (logicSet.has(nodeId)) {
+      const nextNodes = adjacency.get(nodeId) ?? [];
+      for (const nextId of nextNodes) {
+        traverse(nextId, cumulativeDelay, new Set(visited));
+      }
     }
   };
 
   for (const eventNode of eventNodes) {
-    const rootActions = eventToActions.get(eventNode.id) ?? [];
-    for (const actionId of rootActions) {
-      traverse(actionId, 0, new Set());
+    const roots = adjacency.get(eventNode.id) ?? [];
+    for (const nodeId of roots) {
+      traverse(nodeId, 0, new Set());
     }
   }
 

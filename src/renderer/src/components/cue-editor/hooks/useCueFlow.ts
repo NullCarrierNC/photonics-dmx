@@ -4,8 +4,12 @@ import {
   createDefaultActionTiming,
   type ActionNode,
   type AudioEventNode,
+  type LogicNode,
+  type MathLogicNode,
   type NodeCueMode,
   type NodeEffectType,
+  type VariableLogicNode,
+  type ConditionalLogicNode,
   type YargEventNode
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { createId, buildDefaultAction } from '../lib/cueDefaults';
@@ -93,6 +97,63 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     setIsDirty(true);
   }, [nodes.length, setIsDirty, setNodes]);
 
+  const addLogicNode = useCallback((logicType: LogicNode['logicType']) => {
+    const id = `logic-${createId()}`;
+
+    const payload: LogicNode =
+      logicType === 'variable'
+        ? ({
+            id,
+            type: 'logic',
+            logicType: 'variable',
+            label: 'variable',
+            outputs: [],
+            mode: 'set',
+            varName: 'var1',
+            valueType: 'number',
+            value: { source: 'literal', value: 0 }
+          } satisfies VariableLogicNode)
+        : logicType === 'math'
+          ? ({
+              id,
+              type: 'logic',
+              logicType: 'math',
+              label: 'math',
+              outputs: [],
+              operator: 'add',
+              left: { source: 'literal', value: 0 },
+              right: { source: 'literal', value: 0 },
+              assignTo: 'result'
+            } satisfies MathLogicNode)
+          : ({
+              id,
+              type: 'logic',
+              logicType: 'conditional',
+              label: 'conditional',
+              outputs: [],
+              comparator: '>',
+              left: { source: 'literal', value: 0 },
+              right: { source: 'literal', value: 0 }
+            } satisfies ConditionalLogicNode);
+
+    const newNode: EditorNode = {
+      id,
+      type: 'logic',
+      position: {
+        x: 320,
+        y: 120 + nodes.length * 40
+      },
+      data: {
+        kind: 'logic',
+        label: logicType,
+        payload
+      }
+    };
+
+    setNodes(nds => [...nds, newNode]);
+    setIsDirty(true);
+  }, [nodes.length, setIsDirty, setNodes]);
+
   const isValidNodeConnection = useCallback((sourceId?: string | null, targetId?: string | null) => {
     if (!sourceId || !targetId || sourceId === targetId) {
       return false;
@@ -102,10 +163,13 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     if (!sourceNode || !targetNode) {
       return false;
     }
-    if (sourceNode.data.kind === 'event' && targetNode.data.kind === 'action') {
+    if (sourceNode.data.kind === 'event' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic')) {
       return true;
     }
-    if (sourceNode.data.kind === 'action' && targetNode.data.kind === 'action') {
+    if (sourceNode.data.kind === 'logic' && (targetNode.data.kind === 'logic' || targetNode.data.kind === 'action')) {
+      return true;
+    }
+    if (sourceNode.data.kind === 'action' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic')) {
       return true;
     }
     return false;
@@ -120,42 +184,61 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       const sourceNode = prevNodes.find(n => n.id === connection.source);
       const targetNode = prevNodes.find(n => n.id === connection.target);
       if (!sourceNode || !targetNode) return prevNodes;
-      if (targetNode.data.kind !== 'action') return prevNodes;
 
-      const targetAction = { ...(targetNode.data.payload as ActionNode) };
+      if (targetNode.data.kind === 'action') {
+        const targetAction = { ...(targetNode.data.payload as ActionNode) };
 
-      if (sourceNode.data.kind === 'event') {
-        const sourceEvent = sourceNode.data.payload as YargEventNode | AudioEventNode;
-        targetAction.timing = {
-          ...createDefaultActionTiming(),
-          ...(targetAction.timing ?? {}),
-          waitForCondition: sourceEvent.eventType as any,
-          waitForTime: 0
-        };
-      } else if (sourceNode.data.kind === 'action') {
-        const sourceAction = sourceNode.data.payload as ActionNode;
-        targetAction.color = { ...sourceAction.color };
-        targetAction.secondaryColor = sourceAction.secondaryColor ? { ...sourceAction.secondaryColor } : undefined;
-        targetAction.target = { ...sourceAction.target };
-        targetAction.layer = sourceAction.layer;
+        if (sourceNode.data.kind === 'event') {
+          const sourceEvent = sourceNode.data.payload as YargEventNode | AudioEventNode;
+          targetAction.timing = {
+            ...createDefaultActionTiming(),
+            ...(targetAction.timing ?? {}),
+            waitForCondition: sourceEvent.eventType as any,
+            waitForTime: 0
+          };
+        } else if (sourceNode.data.kind === 'action') {
+          const sourceAction = sourceNode.data.payload as ActionNode;
+          targetAction.color = { ...sourceAction.color };
+          targetAction.secondaryColor = sourceAction.secondaryColor ? { ...sourceAction.secondaryColor } : undefined;
+          targetAction.target = { ...sourceAction.target };
+          targetAction.layer = sourceAction.layer;
+        }
+
+        return prevNodes.map(node =>
+          node.id === targetNode.id
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  payload: targetAction
+                }
+              }
+            : node
+        );
       }
 
-      return prevNodes.map(node =>
-        node.id === targetNode.id
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                payload: targetAction
-              }
-            }
-          : node
-      );
+      return prevNodes;
     });
 
-    setEdges(eds => addEdge({ ...connection, type: 'default' }, eds));
+    const sourceNode = nodes.find(n => n.id === connection.source);
+    let fromPort: string | null = null;
+    if (connection.sourceHandle) {
+      fromPort = connection.sourceHandle;
+    } else if (sourceNode?.data.kind === 'logic') {
+      const logicPayload = sourceNode.data.payload as LogicNode;
+      if (logicPayload.logicType === 'conditional') {
+        const existingEdges = edges.filter(e => e.source === sourceNode.id);
+        if (existingEdges.length === 0) {
+          fromPort = 'true';
+        } else if (existingEdges.length === 1) {
+          fromPort = 'false';
+        }
+      }
+    }
+
+    setEdges(eds => addEdge({ ...connection, type: 'default', data: { fromPort } }, eds));
     setIsDirty(true);
-  }, [isValidNodeConnection, setEdges, setIsDirty, setNodes]);
+  }, [edges, isValidNodeConnection, nodes, setEdges, setIsDirty, setNodes]);
 
   const isValidConnection = useCallback((connection: Connection) => {
     return isValidNodeConnection(connection.source, connection.target);
@@ -185,7 +268,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
-  const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode>(updates: Partial<T>) => {
+  const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode>(updates: Partial<T>) => {
     if (!selectedNodeId) return;
     const nodeMode = activeMode;
     setNodes(nds => nds.map(node => {
@@ -202,7 +285,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
               : (nextPayload as AudioEventNode).eventType
             : node.data.kind === 'action'
               ? (nextPayload as ActionNode).effectType
-              : node.data.label
+              : (nextPayload as LogicNode).logicType
         }
       };
     }));
@@ -226,6 +309,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     chainDuration,
     addEventNode,
     addActionNode,
+    addLogicNode,
     updateSelectedNode,
     loadCueIntoFlow,
     setReactFlowInstance,

@@ -24,7 +24,7 @@ export const LIGHT_TARGET_OPTIONS: LightTarget[] = [
 ];
 
 export const YARG_EVENT_OPTIONS: WaitCondition[] = [
-  'beat', 'measure', 'half-beat', 'keyframe',
+  'cue-started', 'beat', 'measure', 'half-beat', 'keyframe',
   'guitar-open', 'guitar-green', 'guitar-red', 'guitar-yellow', 'guitar-blue', 'guitar-orange',
   'bass-open', 'bass-green', 'bass-red', 'bass-yellow', 'bass-blue', 'bass-orange',
   'keys-open', 'keys-green', 'keys-red', 'keys-yellow', 'keys-blue', 'keys-orange',
