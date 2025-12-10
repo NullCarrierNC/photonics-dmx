@@ -305,6 +305,8 @@ export class NodeCueLoader extends EventEmitter {
       }
 
       const compiled = NodeCueCompiler.compileYargCue(cue);
+      // Attach group variables to compiled cue for runtime initialization
+      (compiled as any).groupVariables = file.group.variables ?? [];
       cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled));
     });
 
@@ -329,6 +331,8 @@ export class NodeCueLoader extends EventEmitter {
       }
 
       const compiled = NodeCueCompiler.compileAudioCue(cue);
+      // Attach group variables to compiled cue for runtime initialization
+      (compiled as any).groupVariables = file.group.variables ?? [];
       cueMap.set(cue.cueTypeId, new AudioNodeCue(file.group.id, compiled));
     });
 

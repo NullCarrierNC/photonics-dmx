@@ -34,6 +34,7 @@ type Props = {
   activeMode: NodeCueMode;
   selectedNode: EditorNode | null;
   selectedActionHasEventParent: boolean;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
   addEventNode: (option: EventOption<WaitCondition | AudioEventNode['eventType']>) => void;
   addActionNode: (effect: NodeEffectType) => void;
   addLogicNode: (logicType: LogicNode['logicType']) => void;
@@ -44,6 +45,7 @@ const NodeSidebar: React.FC<Props> = ({
   activeMode,
   selectedNode,
   selectedActionHasEventParent,
+  availableVariables,
   addEventNode,
   addActionNode,
   addLogicNode,
@@ -55,11 +57,12 @@ const NodeSidebar: React.FC<Props> = ({
     label: string,
     value: ValueSource | undefined,
     onChange: (next: ValueSource) => void,
-    expected: 'number' | 'boolean' | 'either' = 'either'
+    expected: 'number' | 'boolean' | 'string' | 'either' = 'either'
   ) => {
-    const source = value ?? { source: 'literal', value: expected === 'boolean' ? false : 0 };
+    const source = value ?? { source: 'literal', value: expected === 'boolean' ? false : expected === 'string' ? '' : 0 };
     const isLiteral = source.source === 'literal';
     const isBoolean = expected === 'boolean';
+    const isString = expected === 'string';
 
     return (
       <div className="space-y-1">
@@ -71,7 +74,8 @@ const NodeSidebar: React.FC<Props> = ({
             onChange={event => {
               const nextSource = event.target.value as ValueSource['source'];
               if (nextSource === 'literal') {
-                onChange({ source: 'literal', value: isBoolean ? false : 0 });
+                const defaultValue = isBoolean ? false : isString ? '' : 0;
+                onChange({ source: 'literal', value: defaultValue });
               } else {
                 onChange({ source: 'variable', name: isVariableSource(source) ? (source.name ?? 'var1') : 'var1', fallback: isVariableSource(source) ? source.fallback : undefined });
               }
@@ -107,11 +111,18 @@ const NodeSidebar: React.FC<Props> = ({
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col font-medium text-xs">
               Variable
-              <input
+              <select
                 className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-            value={isVariableSource(source) ? (source.name ?? '') : ''}
-            onChange={event => onChange({ source: 'variable', name: event.target.value || 'var1', fallback: isVariableSource(source) ? source.fallback : undefined })}
-              />
+                value={isVariableSource(source) ? (source.name ?? '') : ''}
+                onChange={event => onChange({ source: 'variable', name: event.target.value || 'var1', fallback: isVariableSource(source) ? source.fallback : undefined })}
+              >
+                <option value="">-- Select --</option>
+                {availableVariables.map(v => (
+                  <option key={v.name} value={v.name}>
+                    {v.name} ({v.type})
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="flex flex-col font-medium text-xs">
               Fallback
@@ -129,8 +140,8 @@ const NodeSidebar: React.FC<Props> = ({
                   type="number"
                   step="0.1"
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={isVariableSource(source) && typeof source.fallback === 'number' ? source.fallback : 0}
-                onChange={event => onChange({ source: 'variable', name: isVariableSource(source) ? source.name : 'var1', fallback: Number(event.target.value) })}
+                  value={isVariableSource(source) && typeof source.fallback === 'number' ? source.fallback : 0}
+                  onChange={event => onChange({ source: 'variable', name: isVariableSource(source) ? source.name : 'var1', fallback: Number(event.target.value) })}
                 />
               )}
             </label>
@@ -269,22 +280,30 @@ const NodeSidebar: React.FC<Props> = ({
                     </select>
                   </label>
                   <label className="flex flex-col font-medium">
-                    Name
-                    <input
+                    Variable Name
+                    <select
                       className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                    value={(logicPayload as VariableLogicNode).varName}
-                    onChange={event => updateSelectedNode<LogicNode>({ varName: event.target.value })}
-                    />
+                      value={(logicPayload as VariableLogicNode).varName}
+                      onChange={event => updateSelectedNode<LogicNode>({ varName: event.target.value })}
+                    >
+                      <option value="">-- Select Variable --</option>
+                      {availableVariables.map(v => (
+                        <option key={v.name} value={v.name}>
+                          {v.name} ({v.type}, {v.scope})
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label className="flex flex-col font-medium">
                     Type
                     <select
                       className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                    value={(logicPayload as VariableLogicNode).valueType}
-                    onChange={event => updateSelectedNode<LogicNode>({ valueType: event.target.value as 'number' | 'boolean' })}
+                      value={(logicPayload as VariableLogicNode).valueType}
+                      onChange={event => updateSelectedNode<LogicNode>({ valueType: event.target.value as 'number' | 'boolean' | 'string' })}
                     >
                       <option value="number">number</option>
                       <option value="boolean">boolean</option>
+                      <option value="string">string</option>
                     </select>
                   </label>
                   {showValue && renderValueSourceEditor(
@@ -318,11 +337,18 @@ const NodeSidebar: React.FC<Props> = ({
                   {renderValueSourceEditor('Right', logicPayload.right, next => updateSelectedNode<LogicNode>({ right: next }), 'number')}
                   <label className="flex flex-col font-medium">
                     Assign To (optional)
-                    <input
+                    <select
                       className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                       value={logicPayload.assignTo ?? ''}
                       onChange={event => updateSelectedNode<LogicNode>({ assignTo: event.target.value || undefined })}
-                    />
+                    >
+                      <option value="">-- None --</option>
+                      {availableVariables.map(v => (
+                        <option key={v.name} value={v.name}>
+                          {v.name} ({v.type}, {v.scope})
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 </div>
               );

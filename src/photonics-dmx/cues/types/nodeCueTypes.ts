@@ -14,6 +14,7 @@ export interface NodeCueGroupMeta {
   id: string;
   name: string;
   description?: string;
+  variables?: VariableDefinition[];
 }
 
 export interface NodeLayoutMetadata {
@@ -28,11 +29,19 @@ export interface Connection {
   toPort?: string;
 }
 
-export type VariableType = 'number' | 'boolean';
+export type VariableType = 'number' | 'boolean' | 'string';
 
 export type ValueSource =
-  | { source: 'literal'; value: number | boolean }
-  | { source: 'variable'; name: string; fallback?: number | boolean };
+  | { source: 'literal'; value: number | boolean | string }
+  | { source: 'variable'; name: string; fallback?: number | boolean | string };
+
+export interface VariableDefinition {
+  name: string;
+  type: VariableType;
+  scope: 'cue' | 'cue-group';
+  initialValue: number | boolean | string;
+  description?: string;
+}
 
 export type LogicComparator = '>' | '>=' | '<' | '<=' | '==' | '!=';
 export type MathOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'modulus';
@@ -82,6 +91,7 @@ export interface BaseCueDefinition {
   nodes: NodeGraph<BaseEventNode, ActionNode>;
   connections: Connection[];
   layout?: NodeLayoutMetadata;
+  variables?: VariableDefinition[];
 }
 
 export interface YargNodeCueDefinition extends BaseCueDefinition {

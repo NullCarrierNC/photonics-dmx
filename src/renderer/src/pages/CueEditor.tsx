@@ -4,13 +4,14 @@ import CueFlowCanvas from '../components/cue-editor/components/CueFlowCanvas';
 import CueFileSidebar from '../components/cue-editor/components/CueFileSidebar';
 import CueMetadataForm from '../components/cue-editor/components/CueMetadataForm';
 import NodeSidebar from '../components/cue-editor/components/NodeSidebar';
+import VariableRegistry from '../components/cue-editor/components/VariableRegistry';
 import ActionNodeComponent from '../components/cue-editor/components/flow/ActionNode';
 import EventNodeComponent from '../components/cue-editor/components/flow/EventNode';
 import LogicNodeComponent from '../components/cue-editor/components/flow/LogicNode';
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles';
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow';
 import { updateDocumentFromFlow } from '../components/cue-editor/lib/cueTransforms';
-import type { NodeCueFile } from '../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { NodeCueFile, VariableDefinition } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 
 const CueEditor: React.FC = () => {
   const loadCueIntoFlowRef = useRef<(cue: any) => void>(() => {});
@@ -91,6 +92,78 @@ const CueEditor: React.FC = () => {
     logic: LogicNodeComponent
   }), []);
 
+  const handleVariablesChange = useCallback((groupVars: VariableDefinition[], cueVars: VariableDefinition[]) => {
+    if (!editorDoc) return;
+    
+    // Update group variables
+    updateGroupMeta({ variables: groupVars });
+    
+    // Update cue variables
+    if (selectedCueId) {
+      updateCueMetadata({ variables: cueVars });
+    }
+  }, [editorDoc, selectedCueId, updateGroupMeta, updateCueMetadata]);
+
+  const getVariableReferences = useCallback((varName: string, scope: 'cue' | 'cue-group'): string[] => {
+    if (!editorDoc) return [];
+    
+    const references: string[] = [];
+    const cuesToCheck = scope === 'cue' && selectedCueId 
+      ? editorDoc.file.cues.filter(c => c.id === selectedCueId)
+      : editorDoc.file.cues;
+
+    for (const cue of cuesToCheck) {
+      // Check logic nodes
+      const logicNodes = cue.nodes.logic ?? [];
+      for (const logicNode of logicNodes) {
+        if (logicNode.logicType === 'variable' && logicNode.varName === varName) {
+          references.push(`${cue.name}: Logic Node ${logicNode.id}`);
+        }
+        if (logicNode.logicType === 'math') {
+          if (logicNode.left.source === 'variable' && logicNode.left.name === varName) {
+            references.push(`${cue.name}: Math Node ${logicNode.id} (left)`);
+          }
+          if (logicNode.right.source === 'variable' && logicNode.right.name === varName) {
+            references.push(`${cue.name}: Math Node ${logicNode.id} (right)`);
+          }
+          if (logicNode.assignTo === varName) {
+            references.push(`${cue.name}: Math Node ${logicNode.id} (assignTo)`);
+          }
+        }
+        if (logicNode.logicType === 'conditional') {
+          if (logicNode.left.source === 'variable' && logicNode.left.name === varName) {
+            references.push(`${cue.name}: Conditional Node ${logicNode.id} (left)`);
+          }
+          if (logicNode.right.source === 'variable' && logicNode.right.name === varName) {
+            references.push(`${cue.name}: Conditional Node ${logicNode.id} (right)`);
+          }
+        }
+      }
+    }
+
+    return references;
+  }, [editorDoc, selectedCueId]);
+
+  const availableVariables = useMemo(() => {
+    if (!editorDoc) return [];
+    
+    const groupVars = (editorDoc.file.group.variables ?? []).map(v => ({
+      name: v.name,
+      type: v.type,
+      scope: 'cue-group' as const
+    }));
+    
+    const cueVars = selectedCueId
+      ? (editorDoc.file.cues.find(c => c.id === selectedCueId)?.variables ?? []).map(v => ({
+          name: v.name,
+          type: v.type,
+          scope: 'cue' as const
+        }))
+      : [];
+    
+    return [...groupVars, ...cueVars];
+  }, [editorDoc, selectedCueId]);
+
   const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio;
   const primaryButton = 'px-3 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-500';
   const secondaryButton = 'px-3 py-1 text-xs rounded bg-gray-200 dark:bg-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-700';
@@ -120,21 +193,30 @@ const CueEditor: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-[260px_1fr_320px] gap-4 h-[calc(100vh-220px)]">
-        <CueFileSidebar
-          mode={mode}
-          fileList={fileList}
-          editorDoc={editorDoc}
-          selectedCueId={selectedCueId}
-          onSelectFile={selectFile}
-          onReload={refreshFiles}
-          onNewFile={handleNewFile}
-          onAddCue={handleAddCue}
-          onRemoveCue={removeCue}
-          onSelectCue={cue => {
-            setSelectedCueId(cue?.id ?? null);
-            loadCueIntoFlow(cue as any);
-          }}
-        />
+        <div className="flex flex-col gap-4 overflow-hidden">
+          <CueFileSidebar
+            mode={mode}
+            fileList={fileList}
+            editorDoc={editorDoc}
+            selectedCueId={selectedCueId}
+            onSelectFile={selectFile}
+            onReload={refreshFiles}
+            onNewFile={handleNewFile}
+            onAddCue={handleAddCue}
+            onRemoveCue={removeCue}
+            onSelectCue={cue => {
+              setSelectedCueId(cue?.id ?? null);
+              loadCueIntoFlow(cue as any);
+            }}
+          />
+          
+          <VariableRegistry
+            editorDoc={editorDoc}
+            selectedCueId={selectedCueId}
+            onVariablesChange={handleVariablesChange}
+            getVariableReferences={getVariableReferences}
+          />
+        </div>
 
         <section className="flex flex-col bg-white dark:bg-gray-900 rounded-lg shadow-inner">
           <CueMetadataForm
@@ -186,6 +268,7 @@ const CueEditor: React.FC = () => {
           activeMode={activeMode}
           selectedNode={selectedNode}
           selectedActionHasEventParent={selectedActionHasEventParent}
+          availableVariables={availableVariables}
           addEventNode={addEventNode}
           addActionNode={addActionNode}
           addLogicNode={addLogicNode}

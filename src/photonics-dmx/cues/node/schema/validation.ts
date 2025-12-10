@@ -18,6 +18,7 @@ import {
   NodeCueMode,
   NodeEffectType,
   NodeLayoutMetadata,
+  VariableDefinition,
   YargEventNode,
   YargNodeCueDefinition,
   YargNodeCueFile
@@ -150,18 +151,18 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
 
 const valueSourceSchema: JSONSchemaType<{
   source: 'literal' | 'variable';
-  value?: number | boolean;
+  value?: number | boolean | string;
   name?: string;
-  fallback?: number | boolean;
+  fallback?: number | boolean | string;
 }> = {
   type: 'object',
   required: ['source'],
   additionalProperties: false,
   properties: {
     source: { type: 'string', enum: ['literal', 'variable'] },
-    value: { type: ['number', 'boolean'], nullable: true },
+    value: { type: ['number', 'boolean', 'string'], nullable: true },
     name: { type: 'string', nullable: true },
-    fallback: { type: ['number', 'boolean'], nullable: true }
+    fallback: { type: ['number', 'boolean', 'string'], nullable: true }
   },
   allOf: [
     {
@@ -187,6 +188,19 @@ const valueSourceSchema: JSONSchemaType<{
   ]
 };
 
+const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
+  type: 'object',
+  required: ['name', 'type', 'scope', 'initialValue'],
+  additionalProperties: false,
+  properties: {
+    name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
+    type: { type: 'string', enum: ['number', 'boolean', 'string'] },
+    scope: { type: 'string', enum: ['cue', 'cue-group'] },
+    initialValue: { type: ['number', 'boolean', 'string'] },
+    description: { type: 'string', nullable: true }
+  }
+};
+
 const variableLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'mode', 'varName', 'valueType'],
@@ -203,7 +217,7 @@ const variableLogicSchema: JSONSchemaType<LogicNode> = {
     },
     mode: { type: 'string', enum: ['set', 'get', 'init'] as const },
     varName: { type: 'string' },
-    valueType: { type: 'string', enum: ['number', 'boolean'] as const },
+    valueType: { type: 'string', enum: ['number', 'boolean', 'string'] as const },
     value: { ...valueSourceSchema, nullable: true }
   }
 } as any;
@@ -429,7 +443,13 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
       type: 'array',
       items: connectionSchema
     },
-    layout: { ...layoutSchema, nullable: true }
+    layout: { ...layoutSchema, nullable: true },
+    variables: {
+      type: 'array',
+      nullable: true,
+      items: variableDefinitionSchema,
+      default: []
+    }
   }
 };
 
@@ -469,7 +489,13 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
       type: 'array',
       items: connectionSchema
     },
-    layout: { ...layoutSchema, nullable: true }
+    layout: { ...layoutSchema, nullable: true },
+    variables: {
+      type: 'array',
+      nullable: true,
+      items: variableDefinitionSchema,
+      default: []
+    }
   }
 };
 
@@ -480,7 +506,13 @@ const groupSchema: JSONSchemaType<NodeCueGroupMeta> = {
   properties: {
     id: stringIdSchema,
     name: { type: 'string', minLength: 1 },
-    description: { type: 'string', nullable: true }
+    description: { type: 'string', nullable: true },
+    variables: {
+      type: 'array',
+      nullable: true,
+      items: variableDefinitionSchema,
+      default: []
+    }
   }
 };
 
@@ -613,7 +645,29 @@ export const validateYargNodeCueFile = (value: unknown): NodeCueValidationResult
   }
 
   const semanticErrors: string[] = [];
+  
+  // Check for duplicate group-level variable names
+  const groupVariables = value.group.variables ?? [];
+  const groupVarNames = new Set<string>();
+  for (const varDef of groupVariables) {
+    if (groupVarNames.has(varDef.name)) {
+      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`);
+    }
+    groupVarNames.add(varDef.name);
+  }
+  
   for (const cue of value.cues) {
+    // Check for duplicate cue-level variable names
+    const cueVariables = cue.variables ?? [];
+    const cueVarNames = new Set<string>();
+    for (const varDef of cueVariables) {
+      if (cueVarNames.has(varDef.name)) {
+        semanticErrors.push(`cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`);
+      }
+      cueVarNames.add(varDef.name);
+    }
+    
+    // Check for circular dependencies
     const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
     const actionIds = new Set(cue.nodes.actions.map(a => a.id));
     const nonEventIds = new Set<string>([...logicIds, ...actionIds]);
@@ -645,7 +699,29 @@ export const validateAudioNodeCueFile = (value: unknown): NodeCueValidationResul
   }
 
   const semanticErrors: string[] = [];
+  
+  // Check for duplicate group-level variable names
+  const groupVariables = value.group.variables ?? [];
+  const groupVarNames = new Set<string>();
+  for (const varDef of groupVariables) {
+    if (groupVarNames.has(varDef.name)) {
+      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`);
+    }
+    groupVarNames.add(varDef.name);
+  }
+  
   for (const cue of value.cues) {
+    // Check for duplicate cue-level variable names
+    const cueVariables = cue.variables ?? [];
+    const cueVarNames = new Set<string>();
+    for (const varDef of cueVariables) {
+      if (cueVarNames.has(varDef.name)) {
+        semanticErrors.push(`cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`);
+      }
+      cueVarNames.add(varDef.name);
+    }
+    
+    // Check for circular dependencies
     const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
     const actionIds = new Set(cue.nodes.actions.map(a => a.id));
     const nonEventIds = new Set<string>([...logicIds, ...actionIds]);

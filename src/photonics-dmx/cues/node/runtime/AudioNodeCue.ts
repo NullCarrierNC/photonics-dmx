@@ -36,13 +36,37 @@ export class AudioNodeCue implements IAudioCue {
 
   private readonly eventStates = new Map<string, AudioEventState>();
   private readonly activeLevelEffects = new Map<string, number>();
-  private readonly variableStore = new Map<string, { type: 'number' | 'boolean'; value: number | boolean }>();
+  private static cueLevelVarStores = new Map<string, Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }>>();
+  private static groupLevelVarStores = new Map<string, Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }>>();
+  private cueLevelVarStore: Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }>;
+  private groupLevelVarStore: Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }>;
 
   constructor(groupId: string, private readonly compiledCue: CompiledAudioCue) {
     const definition = compiledCue.definition as AudioNodeCueDefinition;
     this.id = `${groupId}:${definition.id}`;
     this.cueType = definition.cueTypeId;
     this.description = definition.description || definition.name || 'Node-based audio cue';
+
+    // Initialize cue-level variable store
+    const existingCueStore = AudioNodeCue.cueLevelVarStores.get(this.id);
+    if (existingCueStore) {
+      this.cueLevelVarStore = existingCueStore;
+    } else {
+      this.cueLevelVarStore = new Map();
+      AudioNodeCue.cueLevelVarStores.set(this.id, this.cueLevelVarStore);
+    }
+
+    // Initialize group-level variable store
+    const existingGroupStore = AudioNodeCue.groupLevelVarStores.get(groupId);
+    if (existingGroupStore) {
+      this.groupLevelVarStore = existingGroupStore;
+    } else {
+      this.groupLevelVarStore = new Map();
+      AudioNodeCue.groupLevelVarStores.set(groupId, this.groupLevelVarStore);
+    }
+
+    // Initialize variables from registry definitions
+    this.initializeVariables();
   }
 
   async execute(data: AudioCueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
@@ -97,13 +121,41 @@ export class AudioNodeCue implements IAudioCue {
   onStop(): void {
     this.eventStates.clear();
     this.activeLevelEffects.clear();
-    this.variableStore.clear();
+    this.cueLevelVarStore.clear();
+    AudioNodeCue.cueLevelVarStores.delete(this.id);
   }
 
   onDestroy(): void {
     this.eventStates.clear();
     this.activeLevelEffects.clear();
-    this.variableStore.clear();
+    this.cueLevelVarStore.clear();
+    AudioNodeCue.cueLevelVarStores.delete(this.id);
+  }
+
+  private initializeVariables(): void {
+    const definition = this.compiledCue.definition as AudioNodeCueDefinition;
+    
+    // Initialize cue-level variables
+    const cueVariables = definition.variables ?? [];
+    for (const varDef of cueVariables) {
+      if (!this.cueLevelVarStore.has(varDef.name)) {
+        this.cueLevelVarStore.set(varDef.name, {
+          type: varDef.type,
+          value: varDef.initialValue
+        });
+      }
+    }
+
+    // Initialize group-level variables
+    const groupVariables = (this.compiledCue as any).groupVariables ?? [];
+    for (const varDef of groupVariables) {
+      if (!this.groupLevelVarStore.has(varDef.name)) {
+        this.groupLevelVarStore.set(varDef.name, {
+          type: varDef.type,
+          value: varDef.initialValue
+        });
+      }
+    }
   }
 
   private getEventState(eventId: string): AudioEventState {
@@ -221,12 +273,14 @@ export class AudioNodeCue implements IAudioCue {
       case 'variable': {
         if (logicNode.mode !== 'get') {
           const value = this.resolveValue(logicNode.valueType, logicNode.value);
+          const varStore = this.getVariableStore(logicNode.varName);
+          
           if (logicNode.mode === 'init') {
-            if (!this.variableStore.has(logicNode.varName)) {
-              this.variableStore.set(logicNode.varName, { type: logicNode.valueType, value });
+            if (!varStore.has(logicNode.varName)) {
+              varStore.set(logicNode.varName, { type: logicNode.valueType, value });
             }
           } else {
-            this.variableStore.set(logicNode.varName, { type: logicNode.valueType, value });
+            varStore.set(logicNode.varName, { type: logicNode.valueType, value });
           }
         }
         return edges.map(edge => edge.to);
@@ -253,7 +307,8 @@ export class AudioNodeCue implements IAudioCue {
             break;
         }
         if (logicNode.assignTo) {
-          this.variableStore.set(logicNode.assignTo, { type: 'number', value: result });
+          const varStore = this.getVariableStore(logicNode.assignTo);
+          varStore.set(logicNode.assignTo, { type: 'number', value: result });
         }
         return edges.map(edge => edge.to);
       }
@@ -293,36 +348,70 @@ export class AudioNodeCue implements IAudioCue {
     return edges.map(edge => edge.to);
   }
 
-  private resolveValue(expectedType: 'number' | 'boolean', source?: ValueSource): number | boolean {
+  private getVariableStore(varName: string): Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }> {
+    const definition = this.compiledCue.definition as AudioNodeCueDefinition;
+    const cueVariables = definition.variables ?? [];
+    const isCueLevel = cueVariables.some(v => v.name === varName);
+    
+    return isCueLevel ? this.cueLevelVarStore : this.groupLevelVarStore;
+  }
+
+  private resolveValue(expectedType: 'number' | 'boolean' | 'string', source?: ValueSource): number | boolean | string {
     if (!source) {
-      return expectedType === 'number' ? 0 : false;
+      return expectedType === 'number' ? 0 : expectedType === 'boolean' ? false : '';
     }
 
     if (source.source === 'literal') {
+      if (expectedType === 'string') {
+        return String(source.value);
+      }
       if (expectedType === 'number') {
         if (typeof source.value === 'boolean') {
           return source.value ? 1 : 0;
         }
+        if (typeof source.value === 'string') {
+          const parsed = parseFloat(source.value);
+          return isNaN(parsed) ? 0 : parsed;
+        }
         return typeof source.value === 'number' ? source.value : 0;
       }
-      return source.value === true;
+      return source.value === true || source.value === 'true';
     }
 
-    const existing = this.variableStore.get(source.name);
+    // Check cue-level store first, then group-level
+    const cueVar = this.cueLevelVarStore.get(source.name);
+    const groupVar = this.groupLevelVarStore.get(source.name);
+    const existing = cueVar ?? groupVar;
+    
     if (existing) {
+      if (expectedType === 'string') {
+        return String(existing.value);
+      }
       if (expectedType === 'number') {
+        if (typeof existing.value === 'string') {
+          const parsed = parseFloat(existing.value);
+          return isNaN(parsed) ? 0 : parsed;
+        }
         return typeof existing.value === 'number' ? existing.value : (existing.value ? 1 : 0);
       }
-      return existing.value === true;
+      return existing.value === true || existing.value === 'true';
     }
 
+    // Use fallback
+    if (expectedType === 'string') {
+      return source.fallback !== undefined ? String(source.fallback) : '';
+    }
     if (expectedType === 'number') {
       if (typeof source.fallback === 'number') return source.fallback;
       if (typeof source.fallback === 'boolean') return source.fallback ? 1 : 0;
+      if (typeof source.fallback === 'string') {
+        const parsed = parseFloat(source.fallback);
+        return isNaN(parsed) ? 0 : parsed;
+      }
       return 0;
     }
 
-    return source.fallback === true;
+    return source.fallback === true || source.fallback === 'true';
   }
 
   private composeEffect(
@@ -333,6 +422,7 @@ export class AudioNodeCue implements IAudioCue {
     const { actionMap } = this.compiledCue;
     let combinedEffect: Effect | null = null;
     let lastScheduledDelay = 0;
+    const seenLightIds = new Set<string>();
 
     for (const step of steps) {
       const action = actionMap.get(step.actionId);
@@ -359,8 +449,29 @@ export class AudioNodeCue implements IAudioCue {
           ...effect,
           transitions: [...effect.transitions]
         };
+        // Track which lights were in the first action
+        lights.forEach(light => seenLightIds.add(light.id));
       } else {
-        combinedEffect.transitions.push(...effect.transitions);
+        // For subsequent actions, we need to adjust waitForTime for lights that
+        // were already targeted by previous actions, but keep the absolute wait
+        // time for lights that are NEW in this action.
+        const adjustedTransitions = effect.transitions.map(t => {
+          const lightId = t.lights[0]?.id;
+          if (lightId && seenLightIds.has(lightId)) {
+            // This light was in a previous action, so reset wait time to make
+            // this transition start immediately after the previous one completes
+            return {
+              ...t,
+              waitForCondition: 'none' as const,
+              waitForTime: 0
+            };
+          } else {
+            // This is a new light not seen before, keep its absolute wait time
+            if (lightId) seenLightIds.add(lightId);
+            return t;
+          }
+        });
+        combinedEffect.transitions.push(...adjustedTransitions);
       }
 
       lastScheduledDelay = step.delay;
