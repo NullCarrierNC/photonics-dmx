@@ -79,8 +79,8 @@ export class ControllerManager {
     await this.initializeSequencer();
     await this.initializeCueRegistry();
     await this.initializeAudioCueRegistry();
+    await this.initializeEffectLoader(); // Initialize effects BEFORE node cues
     await this.initializeNodeCueLoader();
-    await this.initializeEffectLoader();
     await this.initializeListeners();
 
     this.isInitialized = true;
@@ -183,11 +183,15 @@ export class ControllerManager {
       return;
     }
 
+    // Ensure effect loader is initialized first
+    await this.initializeEffectLoader();
+
     const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks');
     this.nodeCueLoader = new NodeCueLoader({
       baseDir,
       yargRegistry: YargCueRegistry.getInstance(),
-      audioRegistry: AudioCueRegistry.getInstance()
+      audioRegistry: AudioCueRegistry.getInstance(),
+      effectLoader: this.effectLoader ?? undefined
     });
 
     const summary = await this.nodeCueLoader.loadAll();

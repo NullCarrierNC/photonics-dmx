@@ -136,7 +136,7 @@ const EffectRegistry: React.FC<Props> = ({
     if (effect) {
       setFormData({
         ...formData,
-        effectId: effect.name, // Use effect name as the effect ID by default
+        effectId: effect.id, // Use the actual effect ID
         name: effect.name
       });
     }

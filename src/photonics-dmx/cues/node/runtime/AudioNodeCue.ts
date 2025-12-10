@@ -43,12 +43,14 @@ export class AudioNodeCue implements IAudioCue {
   private cueLevelVarStore: Map<string, VariableValue>;
   private groupLevelVarStore: Map<string, VariableValue>;
   private executionEngine?: NodeExecutionEngine;
+  private effectRegistry: EffectRegistry;
 
-  constructor(groupId: string, private readonly compiledCue: CompiledAudioCue) {
+  constructor(groupId: string, private readonly compiledCue: CompiledAudioCue, effectRegistry?: EffectRegistry) {
     const definition = compiledCue.definition as AudioNodeCueDefinition;
     this.id = `${groupId}:${definition.id}`;
     this.cueType = definition.cueTypeId;
     this.description = definition.description || definition.name || 'Node-based audio cue';
+    this.effectRegistry = effectRegistry ?? new EffectRegistry();
 
     // Initialize cue-level variable store
     const existingCueStore = AudioNodeCue.cueLevelVarStores.get(this.id);
@@ -80,10 +82,6 @@ export class AudioNodeCue implements IAudioCue {
       const definition = this.compiledCue.definition as AudioNodeCueDefinition;
       const variableDefinitions = definition.variables ?? [];
       
-      // TODO: Load effect registry based on cue's effect references
-      // For now, use empty registry - effects will be gracefully skipped
-      const effectRegistry = new EffectRegistry();
-      
       this.executionEngine = new NodeExecutionEngine(
         this.compiledCue,
         this.id,
@@ -91,7 +89,7 @@ export class AudioNodeCue implements IAudioCue {
         lightManager,
         this.cueLevelVarStore,
         this.groupLevelVarStore,
-        effectRegistry,
+        this.effectRegistry,
         variableDefinitions
       );
     }

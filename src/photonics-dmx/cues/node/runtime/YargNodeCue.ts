@@ -20,13 +20,15 @@ export class YargNodeCue implements INetCue {
   private groupLevelVarStore: Map<string, VariableValue>;
   private cueStartedFired = false;
   private executionEngine?: NodeExecutionEngine;
+  private effectRegistry: EffectRegistry;
 
-  constructor(groupId: string, private readonly compiledCue: CompiledYargCue) {
+  constructor(groupId: string, private readonly compiledCue: CompiledYargCue, effectRegistry?: EffectRegistry) {
     const definition = compiledCue.definition as YargNodeCueDefinition;
     this.cueId = definition.cueType;
     this.id = `${groupId}:${definition.id}`;
     this.description = definition.description;
     this.style = definition.style === 'secondary' ? CueStyle.Secondary : CueStyle.Primary;
+    this.effectRegistry = effectRegistry ?? new EffectRegistry();
 
     // Initialize cue-level variable store
     const existingCueStore = YargNodeCue.cueLevelVarStores.get(this.id);
@@ -56,10 +58,6 @@ export class YargNodeCue implements INetCue {
       const definition = this.compiledCue.definition as YargNodeCueDefinition;
       const variableDefinitions = definition.variables ?? [];
       
-      // TODO: Load effect registry based on cue's effect references
-      // For now, use empty registry - effects will be gracefully skipped
-      const effectRegistry = new EffectRegistry();
-      
       this.executionEngine = new NodeExecutionEngine(
         this.compiledCue,
         this.id,
@@ -67,7 +65,7 @@ export class YargNodeCue implements INetCue {
         lightManager,
         this.cueLevelVarStore,
         this.groupLevelVarStore,
-        effectRegistry,
+        this.effectRegistry,
         variableDefinitions
       );
     }
