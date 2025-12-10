@@ -137,6 +137,9 @@ describe('NodeExecutionEngine', () => {
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'action1' }]]
         ])
@@ -221,6 +224,9 @@ describe('NodeExecutionEngine', () => {
           ['action2', action2]
         ]),
         logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'action1' }]],
           ['action1', [{ from: 'action1', to: 'action2' }]]
@@ -324,6 +330,9 @@ describe('NodeExecutionEngine', () => {
           ['action-false', actionFalse]
         ]),
         logicMap: new Map([['logic1', conditionalNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'logic1' }]],
           [
@@ -429,6 +438,9 @@ describe('NodeExecutionEngine', () => {
           ['logic1', setVarNode],
           ['logic2', readVarNode]
         ]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'logic1' }]],
           ['logic1', [{ from: 'logic1', to: 'logic2' }]],
@@ -574,6 +586,9 @@ describe('NodeExecutionEngine', () => {
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map(),
         logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'nonexistent-action' }]]
         ])
@@ -635,6 +650,9 @@ describe('NodeExecutionEngine', () => {
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        eventDefinitions: [],
         adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]])
       };
 

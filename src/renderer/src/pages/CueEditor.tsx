@@ -1,19 +1,23 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import 'reactflow/dist/style.css';
 import CueFlowCanvas from '../components/cue-editor/components/CueFlowCanvas';
 import CueFileSidebar from '../components/cue-editor/components/CueFileSidebar';
 import CueMetadataForm from '../components/cue-editor/components/CueMetadataForm';
 import NodeSidebar from '../components/cue-editor/components/NodeSidebar';
 import VariableRegistry from '../components/cue-editor/components/VariableRegistry';
+import EventRegistry from '../components/cue-editor/components/EventRegistry';
 import ActionNodeComponent from '../components/cue-editor/components/flow/ActionNode';
 import EventNodeComponent from '../components/cue-editor/components/flow/EventNode';
 import LogicNodeComponent from '../components/cue-editor/components/flow/LogicNode';
+import EventRaiserNodeComponent from '../components/cue-editor/components/flow/EventRaiserNode';
+import EventListenerNodeComponent from '../components/cue-editor/components/flow/EventListenerNode';
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles';
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow';
 import { updateDocumentFromFlow } from '../components/cue-editor/lib/cueTransforms';
-import type { NodeCueFile, VariableDefinition } from '../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { NodeCueFile, VariableDefinition, EventDefinition } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 
 const CueEditor: React.FC = () => {
+  const [registryTab, setRegistryTab] = useState<'variables' | 'events'>('variables');
   const loadCueIntoFlowRef = useRef<(cue: any) => void>(() => {});
   const getUpdatedDocumentRef = useRef<() => NodeCueFile | null>(() => null);
   const flowWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -67,6 +71,8 @@ const CueEditor: React.FC = () => {
     addEventNode,
     addActionNode,
     addLogicNode,
+    addEventRaiserNode,
+    addEventListenerNode,
     updateSelectedNode,
     loadCueIntoFlow,
     setReactFlowInstance,
@@ -89,7 +95,9 @@ const CueEditor: React.FC = () => {
   const nodeTypes = useMemo(() => ({
     event: EventNodeComponent,
     action: ActionNodeComponent,
-    logic: LogicNodeComponent
+    logic: LogicNodeComponent,
+    'event-raiser': EventRaiserNodeComponent,
+    'event-listener': EventListenerNodeComponent
   }), []);
 
   const handleVariablesChange = useCallback((groupVars: VariableDefinition[], cueVars: VariableDefinition[]) => {
@@ -103,6 +111,13 @@ const CueEditor: React.FC = () => {
       updateCueMetadata({ variables: cueVars });
     }
   }, [editorDoc, selectedCueId, updateGroupMeta, updateCueMetadata]);
+
+  const handleEventsChange = useCallback((events: EventDefinition[]) => {
+    if (!editorDoc || !selectedCueId) return;
+    
+    // Update cue events
+    updateCueMetadata({ events });
+  }, [editorDoc, selectedCueId, updateCueMetadata]);
 
   const getVariableReferences = useCallback((varName: string, scope: 'cue' | 'cue-group'): string[] => {
     if (!editorDoc) return [];
@@ -144,6 +159,32 @@ const CueEditor: React.FC = () => {
     return references;
   }, [editorDoc, selectedCueId]);
 
+  const getEventReferences = useCallback((eventName: string): string[] => {
+    if (!editorDoc || !selectedCueId) return [];
+    
+    const references: string[] = [];
+    const currentCue = editorDoc.file.cues.find(c => c.id === selectedCueId);
+    if (!currentCue) return [];
+
+    // Check event raiser nodes
+    const eventRaisers = currentCue.nodes.eventRaisers ?? [];
+    for (const raiser of eventRaisers) {
+      if (raiser.eventName === eventName) {
+        references.push(`Event Raiser: ${raiser.label ?? raiser.id}`);
+      }
+    }
+
+    // Check event listener nodes
+    const eventListeners = currentCue.nodes.eventListeners ?? [];
+    for (const listener of eventListeners) {
+      if (listener.eventName === eventName) {
+        references.push(`Event Listener: ${listener.label ?? listener.id}`);
+      }
+    }
+
+    return references;
+  }, [editorDoc, selectedCueId]);
+
   const availableVariables = useMemo(() => {
     if (!editorDoc) return [];
     
@@ -162,6 +203,13 @@ const CueEditor: React.FC = () => {
       : [];
     
     return [...groupVars, ...cueVars];
+  }, [editorDoc, selectedCueId]);
+
+  const availableEvents = useMemo(() => {
+    if (!editorDoc || !selectedCueId) return [];
+    
+    const currentCue = editorDoc.file.cues.find(c => c.id === selectedCueId);
+    return (currentCue?.events ?? []).map(e => e.name);
   }, [editorDoc, selectedCueId]);
 
   const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio;
@@ -210,12 +258,48 @@ const CueEditor: React.FC = () => {
             }}
           />
           
-          <VariableRegistry
-            editorDoc={editorDoc}
-            selectedCueId={selectedCueId}
-            onVariablesChange={handleVariablesChange}
-            getVariableReferences={getVariableReferences}
-          />
+          {/* Tabbed Registry Interface */}
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-inner overflow-hidden flex flex-col">
+            <div className="flex border-b border-gray-200 dark:border-gray-700">
+              <button
+                className={`flex-1 px-3 py-2 text-xs font-medium ${
+                  registryTab === 'variables'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 border-b-2 border-blue-600'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+                onClick={() => setRegistryTab('variables')}
+              >
+                Variables
+              </button>
+              <button
+                className={`flex-1 px-3 py-2 text-xs font-medium ${
+                  registryTab === 'events'
+                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 border-b-2 border-purple-600'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+                onClick={() => setRegistryTab('events')}
+              >
+                Events
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {registryTab === 'variables' ? (
+                <VariableRegistry
+                  editorDoc={editorDoc}
+                  selectedCueId={selectedCueId}
+                  onVariablesChange={handleVariablesChange}
+                  getVariableReferences={getVariableReferences}
+                />
+              ) : (
+                <EventRegistry
+                  editorDoc={editorDoc}
+                  selectedCueId={selectedCueId}
+                  onEventsChange={handleEventsChange}
+                  getEventReferences={getEventReferences}
+                />
+              )}
+            </div>
+          </div>
         </div>
 
         <section className="flex flex-col bg-white dark:bg-gray-900 rounded-lg shadow-inner">
@@ -269,9 +353,12 @@ const CueEditor: React.FC = () => {
           selectedNode={selectedNode}
           selectedActionHasEventParent={selectedActionHasEventParent}
           availableVariables={availableVariables}
+          availableEvents={availableEvents}
           addEventNode={addEventNode}
           addActionNode={addActionNode}
           addLogicNode={addLogicNode}
+          addEventRaiserNode={addEventRaiserNode}
+          addEventListenerNode={addEventListenerNode}
           updateSelectedNode={updateSelectedNode}
         />
       </div>

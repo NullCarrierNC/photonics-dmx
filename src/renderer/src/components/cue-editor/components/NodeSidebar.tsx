@@ -3,6 +3,8 @@ import type {
   ActionNode,
   AudioEventNode,
   AudioEventType,
+  EventRaiserNode,
+  EventListenerNode,
   LogicNode,
   LogicComparator,
   MathOperator,
@@ -35,10 +37,13 @@ type Props = {
   selectedNode: EditorNode | null;
   selectedActionHasEventParent: boolean;
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  availableEvents?: string[];
   addEventNode: (option: EventOption<WaitCondition | AudioEventNode['eventType']>) => void;
   addActionNode: (effect: NodeEffectType) => void;
   addLogicNode: (logicType: LogicNode['logicType']) => void;
-  updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode | LogicNode>(updates: Partial<T>) => void;
+  addEventRaiserNode?: () => void;
+  addEventListenerNode?: () => void;
+  updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode>(updates: Partial<T>) => void;
 };
 
 const NodeSidebar: React.FC<Props> = ({
@@ -46,9 +51,12 @@ const NodeSidebar: React.FC<Props> = ({
   selectedNode,
   selectedActionHasEventParent,
   availableVariables,
+  availableEvents = [],
   addEventNode,
   addActionNode,
   addLogicNode,
+  addEventRaiserNode,
+  addEventListenerNode,
   updateSelectedNode
 }) => {
   const isVariableSource = (src: ValueSource): src is Extract<ValueSource, { source: 'variable' }> => src.source === 'variable';
@@ -159,7 +167,7 @@ const NodeSidebar: React.FC<Props> = ({
           className="border rounded px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
           onClick={() => addEventNode(getDefaultEventOption(activeMode))}
         >
-          Add Event Node
+          System Event
         </button>
       </div>
 
@@ -202,10 +210,68 @@ const NodeSidebar: React.FC<Props> = ({
         </div>
       </div>
 
+      {addEventRaiserNode && addEventListenerNode && (
+        <div>
+          <h3 className="font-semibold text-sm mb-2">Runtime Events</h3>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <button
+              className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+              onClick={() => addEventRaiserNode()}
+            >
+              Event Raiser
+            </button>
+            <button
+              className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+              onClick={() => addEventListenerNode()}
+            >
+              Event Listener
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
         <h3 className="font-semibold text-sm mb-2">Selected Node</h3>
         {!selectedNode ? (
           <p className="text-xs text-gray-500">Select a node on the canvas to edit its properties.</p>
+        ) : selectedNode.data.kind === 'event-raiser' ? (
+          <div className="space-y-2 text-xs">
+            <label className="flex flex-col font-medium">
+              Event Name
+              <select
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={(selectedNode.data.payload as EventRaiserNode).eventName}
+                onChange={event => updateSelectedNode<EventRaiserNode>({ eventName: event.target.value })}
+              >
+                <option value="">-- Select Event --</option>
+                {availableEvents.map(eventName => (
+                  <option key={eventName} value={eventName}>{eventName}</option>
+                ))}
+              </select>
+            </label>
+            <p className="text-[10px] text-gray-500">
+              Raises the selected event when this node is triggered. Execution continues immediately to the next node while listeners run in parallel.
+            </p>
+          </div>
+        ) : selectedNode.data.kind === 'event-listener' ? (
+          <div className="space-y-2 text-xs">
+            <label className="flex flex-col font-medium">
+              Event Name
+              <select
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={(selectedNode.data.payload as EventListenerNode).eventName}
+                onChange={event => updateSelectedNode<EventListenerNode>({ eventName: event.target.value })}
+              >
+                <option value="">-- Select Event --</option>
+                {availableEvents.map(eventName => (
+                  <option key={eventName} value={eventName}>{eventName}</option>
+                ))}
+              </select>
+            </label>
+            <p className="text-[10px] text-gray-500">
+              Listens for the selected event. When the event is raised, this listener executes its child node chain.
+            </p>
+          </div>
         ) : selectedNode.data.kind === 'event' ? (
           <div className="space-y-2 text-xs">
             <label className="flex flex-col font-medium">

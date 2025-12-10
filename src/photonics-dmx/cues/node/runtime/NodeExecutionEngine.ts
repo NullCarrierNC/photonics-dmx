@@ -11,6 +11,8 @@ import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
 import {
   ActionNode,
   BaseEventNode,
+  EventRaiserNode,
+  EventListenerNode,
   LogicNode,
   ValueSource,
   VariableType,
@@ -28,6 +30,7 @@ export class NodeExecutionEngine {
   private cueLevelVarStore: Map<string, VariableValue>;
   private groupLevelVarStore: Map<string, VariableValue>;
   private variableDefinitions: VariableDefinition[];
+  private eventListeners: Map<string, EventListenerNode[]> = new Map();
 
   constructor(
     compiledCue: CompiledYargCue | CompiledAudioCue,
@@ -45,6 +48,25 @@ export class NodeExecutionEngine {
     this.cueLevelVarStore = cueLevelVarStore;
     this.groupLevelVarStore = groupLevelVarStore;
     this.variableDefinitions = variableDefinitions;
+    
+    // Register all event listeners during initialization
+    this.registerEventListeners();
+  }
+
+  /**
+   * Register all event listeners from the compiled cue.
+   */
+  private registerEventListeners(): void {
+    const { eventListenerMap } = this.compiledCue;
+    for (const listener of eventListenerMap.values()) {
+      // Skip listeners with no event selected
+      if (!listener.eventName) {
+        continue;
+      }
+      const listeners = this.eventListeners.get(listener.eventName) ?? [];
+      listeners.push(listener);
+      this.eventListeners.set(listener.eventName, listeners);
+    }
   }
 
   /**
@@ -99,7 +121,7 @@ export class NodeExecutionEngine {
 
     context.markVisited(nodeId);
 
-    const { actionMap, logicMap } = this.compiledCue;
+    const { actionMap, logicMap, eventRaiserMap } = this.compiledCue;
 
     // Check if it's an action node
     const actionNode = actionMap.get(nodeId);
@@ -112,6 +134,13 @@ export class NodeExecutionEngine {
     const logicNode = logicMap.get(nodeId);
     if (logicNode) {
       this.executeLogicNode(logicNode, nodeId, context);
+      return;
+    }
+
+    // Check if it's an event raiser node
+    const eventRaiserNode = eventRaiserMap.get(nodeId);
+    if (eventRaiserNode) {
+      this.executeEventRaiserNode(eventRaiserNode, context);
       return;
     }
 
@@ -192,6 +221,77 @@ export class NodeExecutionEngine {
       console.error(`Error executing logic node ${nodeId}:`, error);
       // Continue to all outgoing edges despite error
       this.continueToNextNodes(nodeId, context);
+    }
+  }
+
+  /**
+   * Execute an event raiser node: raise the event and continue immediately (non-blocking).
+   */
+  private executeEventRaiserNode(raiserNode: EventRaiserNode, context: ExecutionContext): void {
+    try {
+      const { eventName } = raiserNode;
+      
+      // Skip if no event selected
+      if (!eventName) {
+        console.warn(`Event raiser ${raiserNode.id} has no event selected, skipping`);
+        this.continueToNextNodes(raiserNode.id, context);
+        return;
+      }
+      
+      // Fire all registered listeners for this event
+      const listeners = this.eventListeners.get(eventName) ?? [];
+      for (const listener of listeners) {
+        // Create new execution context for each listener
+        this.startListenerExecution(listener);
+      }
+      
+      // Continue immediately to raiser's child (non-blocking)
+      this.continueToNextNodes(raiserNode.id, context);
+    } catch (error) {
+      console.error(`Error executing event raiser node ${raiserNode.id}:`, error);
+      // Continue execution despite error
+      this.continueToNextNodes(raiserNode.id, context);
+    }
+  }
+
+  /**
+   * Start execution from a listener node.
+   * Creates a new execution context for the listener chain.
+   */
+  private startListenerExecution(listenerNode: EventListenerNode): void {
+    try {
+      // Create new context for listener chain (treat listener as event-like node)
+      const context = new ExecutionContext(
+        listenerNode as any, // Treat as event-like node
+        this.cueLevelVarStore,
+        this.groupLevelVarStore
+      );
+      
+      // Set up callbacks
+      context.setOnNodeComplete((nodeId: string) => {
+        this.onActionComplete(context.id, nodeId);
+      });
+      
+      context.setOnContextComplete(() => {
+        this.activeContexts.delete(context.id);
+      });
+      
+      this.activeContexts.set(context.id, context);
+      
+      // Get listener's outgoing edges and start execution
+      const { adjacency } = this.compiledCue;
+      const outgoing = adjacency.get(listenerNode.id) ?? [];
+      const nextNodes = outgoing.map(conn => conn.to);
+      
+      if (nextNodes.length > 0) {
+        this.continueExecution(nextNodes, context);
+      } else {
+        // No child nodes, context completes immediately
+        context.dispose();
+        this.activeContexts.delete(context.id);
+      }
+    } catch (error) {
+      console.error(`Error starting listener execution for ${listenerNode.id}:`, error);
     }
   }
 

@@ -4,6 +4,8 @@ import {
   createDefaultActionTiming,
   type ActionNode,
   type AudioEventNode,
+  type EventRaiserNode,
+  type EventListenerNode,
   type LogicNode,
   type MathLogicNode,
   type NodeCueMode,
@@ -154,6 +156,63 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     setIsDirty(true);
   }, [nodes.length, setIsDirty, setNodes]);
 
+  const addEventRaiserNode = useCallback(() => {
+    const id = `event-raiser-${createId()}`;
+    const payload: EventRaiserNode = {
+      id,
+      type: 'event-raiser',
+      eventName: '', // Empty by default, user selects in property inspector
+      label: 'Raise Event',
+      inputs: [],
+      outputs: []
+    };
+
+    const newNode: EditorNode = {
+      id,
+      type: 'event-raiser',
+      position: {
+        x: 320,
+        y: 200 + nodes.length * 40
+      },
+      data: {
+        kind: 'event-raiser',
+        label: 'Raise Event',
+        payload
+      }
+    };
+
+    setNodes(nds => [...nds, newNode]);
+    setIsDirty(true);
+  }, [nodes.length, setIsDirty, setNodes]);
+
+  const addEventListenerNode = useCallback(() => {
+    const id = `event-listener-${createId()}`;
+    const payload: EventListenerNode = {
+      id,
+      type: 'event-listener',
+      eventName: '', // Empty by default, user selects in property inspector
+      label: 'Listen Event',
+      outputs: []
+    };
+
+    const newNode: EditorNode = {
+      id,
+      type: 'event-listener',
+      position: {
+        x: 120,
+        y: 280 + nodes.length * 40
+      },
+      data: {
+        kind: 'event-listener',
+        label: 'Listen Event',
+        payload
+      }
+    };
+
+    setNodes(nds => [...nds, newNode]);
+    setIsDirty(true);
+  }, [nodes.length, setIsDirty, setNodes]);
+
   const isValidNodeConnection = useCallback((sourceId?: string | null, targetId?: string | null) => {
     if (!sourceId || !targetId || sourceId === targetId) {
       return false;
@@ -163,13 +222,26 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     if (!sourceNode || !targetNode) {
       return false;
     }
-    if (sourceNode.data.kind === 'event' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic')) {
+    
+    // Event listeners can only be sources (no inputs allowed)
+    if (targetNode.data.kind === 'event-listener') {
+      return false;
+    }
+
+    // Valid connections
+    if (sourceNode.data.kind === 'event' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic' || targetNode.data.kind === 'event-raiser')) {
       return true;
     }
-    if (sourceNode.data.kind === 'logic' && (targetNode.data.kind === 'logic' || targetNode.data.kind === 'action')) {
+    if (sourceNode.data.kind === 'logic' && (targetNode.data.kind === 'logic' || targetNode.data.kind === 'action' || targetNode.data.kind === 'event-raiser')) {
       return true;
     }
-    if (sourceNode.data.kind === 'action' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic')) {
+    if (sourceNode.data.kind === 'action' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic' || targetNode.data.kind === 'event-raiser')) {
+      return true;
+    }
+    if (sourceNode.data.kind === 'event-raiser' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic' || targetNode.data.kind === 'event-raiser')) {
+      return true;
+    }
+    if (sourceNode.data.kind === 'event-listener' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic' || targetNode.data.kind === 'event-raiser')) {
       return true;
     }
     return false;
@@ -268,7 +340,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
-  const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode>(updates: Partial<T>) => {
+  const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode>(updates: Partial<T>) => {
     if (!selectedNodeId) return;
     const nodeMode = activeMode;
     setNodes(nds => nds.map(node => {
@@ -285,7 +357,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
               : (nextPayload as AudioEventNode).eventType
             : node.data.kind === 'action'
               ? (nextPayload as ActionNode).effectType
-              : (nextPayload as LogicNode).logicType
+              : node.data.kind === 'logic'
+                ? (nextPayload as LogicNode).logicType
+                : node.data.kind === 'event-raiser'
+                  ? (nextPayload as EventRaiserNode).eventName ? `Raise: ${(nextPayload as EventRaiserNode).eventName}` : 'Raise Event'
+                  : (nextPayload as EventListenerNode).eventName ? `Listen: ${(nextPayload as EventListenerNode).eventName}` : 'Listen Event'
         }
       };
     }));
@@ -310,6 +386,8 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     addEventNode,
     addActionNode,
     addLogicNode,
+    addEventRaiserNode,
+    addEventListenerNode,
     updateSelectedNode,
     loadCueIntoFlow,
     setReactFlowInstance,

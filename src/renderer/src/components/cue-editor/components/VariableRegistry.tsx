@@ -164,18 +164,15 @@ const VariableRegistry: React.FC<Props> = ({
 
   if (!editorDoc) {
     return (
-      <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3">
-        <h3 className="font-semibold text-sm mb-2">Variable Registry</h3>
+      <div className="p-3">
         <p className="text-xs text-gray-500">No file selected</p>
-      </aside>
+      </div>
     );
   }
 
   return (
     <>
-      <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-y-auto">
-        <h3 className="font-semibold text-sm mb-3">Variable Registry</h3>
-
+      <div className="p-3 overflow-y-auto">
         {/* Group Variables */}
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
@@ -266,7 +263,7 @@ const VariableRegistry: React.FC<Props> = ({
             )}
           </div>
         </div>
-      </aside>
+      </div>
 
       {/* Add/Edit Dialog */}
       {showDialog && (

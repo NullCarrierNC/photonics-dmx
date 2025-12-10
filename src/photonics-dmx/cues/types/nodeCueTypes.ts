@@ -43,6 +43,11 @@ export interface VariableDefinition {
   description?: string;
 }
 
+export interface EventDefinition {
+  name: string;
+  description?: string;
+}
+
 export type LogicComparator = '>' | '>=' | '<' | '<=' | '==' | '!=';
 export type MathOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'modulus';
 
@@ -78,10 +83,29 @@ export interface ConditionalLogicNode extends BaseLogicNode {
 
 export type LogicNode = VariableLogicNode | MathLogicNode | ConditionalLogicNode;
 
+export interface EventRaiserNode {
+  id: string;
+  type: 'event-raiser';
+  eventName: string;
+  label?: string;
+  inputs?: string[];
+  outputs?: string[];
+}
+
+export interface EventListenerNode {
+  id: string;
+  type: 'event-listener';
+  eventName: string;
+  label?: string;
+  outputs?: string[];
+}
+
 export interface NodeGraph<TEvent extends BaseEventNode, TAction extends ActionNode> {
   events: TEvent[];
   actions: TAction[];
   logic?: LogicNode[];
+  eventRaisers?: EventRaiserNode[];
+  eventListeners?: EventListenerNode[];
 }
 
 export interface BaseCueDefinition {
@@ -92,6 +116,7 @@ export interface BaseCueDefinition {
   connections: Connection[];
   layout?: NodeLayoutMetadata;
   variables?: VariableDefinition[];
+  events?: EventDefinition[];
 }
 
 export interface YargNodeCueDefinition extends BaseCueDefinition {

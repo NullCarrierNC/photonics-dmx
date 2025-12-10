@@ -2,6 +2,8 @@ import type { Edge, ReactFlowInstance } from 'reactflow';
 import type {
   AudioEventNode,
   AudioNodeCueDefinition,
+  EventRaiserNode,
+  EventListenerNode,
   NodeCueFile,
   NodeCueMode,
   LogicNode,
@@ -53,6 +55,26 @@ const cueToFlow = (cue: CueDefinition | null): { nodes: EditorNode[]; edges: Edg
         label: logic.logicType,
         payload: logic
       }
+    })),
+    ...(cue.nodes.eventRaisers ?? []).map((raiser: EventRaiserNode) => ({
+      id: raiser.id,
+      type: 'event-raiser' as const,
+      position: nodePositions[raiser.id] ?? { x: 260, y: 200 },
+      data: {
+        kind: 'event-raiser' as const,
+        label: `Raise: ${raiser.eventName}`,
+        payload: raiser
+      }
+    })),
+    ...(cue.nodes.eventListeners ?? []).map((listener: EventListenerNode) => ({
+      id: listener.id,
+      type: 'event-listener' as const,
+      position: nodePositions[listener.id] ?? { x: 260, y: 280 },
+      data: {
+        kind: 'event-listener' as const,
+        label: `Listen: ${listener.eventName}`,
+        payload: listener
+      }
     }))
   ];
 
@@ -90,18 +112,23 @@ const updateDocumentFromFlow = (
   const eventNodes = nodes.filter(node => node.data.kind === 'event');
   const actionNodes = nodes.filter(node => node.data.kind === 'action');
   const logicNodes = nodes.filter(node => node.data.kind === 'logic');
+  const eventRaiserNodes = nodes.filter(node => node.data.kind === 'event-raiser');
+  const eventListenerNodes = nodes.filter(node => node.data.kind === 'event-listener');
   const validEdges = edges.filter(edge => {
     const sourceNode = nodes.find(node => node.id === edge.source);
     const targetNode = nodes.find(node => node.id === edge.target);
     if (!sourceNode || !targetNode) return false;
 
-    if (sourceNode.data.kind === 'event' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic')) {
-      return true;
+    const validSourceKinds = ['event', 'action', 'logic', 'event-raiser', 'event-listener'];
+    const validTargetKinds = ['action', 'logic', 'event-raiser'];
+
+    // Event raiser can have children, event listener cannot have inputs
+    if (sourceNode.data.kind === 'event-listener') {
+      return validTargetKinds.includes(targetNode.data.kind);
     }
-    if (sourceNode.data.kind === 'action' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic')) {
-      return true;
-    }
-    if (sourceNode.data.kind === 'logic' && (targetNode.data.kind === 'logic' || targetNode.data.kind === 'action')) {
+    
+    // All other nodes can connect to actions, logic, or event-raisers
+    if (validSourceKinds.includes(sourceNode.data.kind) && validTargetKinds.includes(targetNode.data.kind)) {
       return true;
     }
     return false;
@@ -112,7 +139,9 @@ const updateDocumentFromFlow = (
     nodes: {
       events: eventNodes.map(node => node.data.payload) as (YargEventNode[] | AudioEventNode[]),
       actions: actionNodes.map(node => node.data.payload),
-      logic: logicNodes.map(node => node.data.payload as LogicNode)
+      logic: logicNodes.map(node => node.data.payload as LogicNode),
+      eventRaisers: eventRaiserNodes.map(node => node.data.payload as EventRaiserNode),
+      eventListeners: eventListenerNodes.map(node => node.data.payload as EventListenerNode)
     },
     connections: validEdges.map(edge => ({
       from: edge.source,

@@ -8,6 +8,9 @@ import {
   AudioNodeCueFile,
   AudioEventType,
   Connection,
+  EventDefinition,
+  EventRaiserNode,
+  EventListenerNode,
   LogicComparator,
   LogicNode,
   MathOperator,
@@ -198,6 +201,55 @@ const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
     scope: { type: 'string', enum: ['cue', 'cue-group'] },
     initialValue: { type: ['number', 'boolean', 'string'] },
     description: { type: 'string', nullable: true }
+  }
+};
+
+const eventDefinitionSchema: JSONSchemaType<EventDefinition> = {
+  type: 'object',
+  required: ['name'],
+  additionalProperties: false,
+  properties: {
+    name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
+    description: { type: 'string', nullable: true }
+  }
+};
+
+const eventRaiserNodeSchema: JSONSchemaType<EventRaiserNode> = {
+  type: 'object',
+  required: ['id', 'type', 'eventName'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'event-raiser' },
+    eventName: { type: 'string' },
+    label: { type: 'string', nullable: true },
+    inputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    }
+  }
+};
+
+const eventListenerNodeSchema: JSONSchemaType<EventListenerNode> = {
+  type: 'object',
+  required: ['id', 'type', 'eventName'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'event-listener' },
+    eventName: { type: 'string' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    }
   }
 };
 
@@ -436,6 +488,18 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
           nullable: true,
           items: logicNodeSchema,
           default: []
+        },
+        eventRaisers: {
+          type: 'array',
+          nullable: true,
+          items: eventRaiserNodeSchema,
+          default: []
+        },
+        eventListeners: {
+          type: 'array',
+          nullable: true,
+          items: eventListenerNodeSchema,
+          default: []
         }
       }
     },
@@ -448,6 +512,12 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
       type: 'array',
       nullable: true,
       items: variableDefinitionSchema,
+      default: []
+    },
+    events: {
+      type: 'array',
+      nullable: true,
+      items: eventDefinitionSchema,
       default: []
     }
   }
@@ -482,6 +552,18 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
           nullable: true,
           items: logicNodeSchema,
           default: []
+        },
+        eventRaisers: {
+          type: 'array',
+          nullable: true,
+          items: eventRaiserNodeSchema,
+          default: []
+        },
+        eventListeners: {
+          type: 'array',
+          nullable: true,
+          items: eventListenerNodeSchema,
+          default: []
         }
       }
     },
@@ -494,6 +576,12 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
       type: 'array',
       nullable: true,
       items: variableDefinitionSchema,
+      default: []
+    },
+    events: {
+      type: 'array',
+      nullable: true,
+      items: eventDefinitionSchema,
       default: []
     }
   }
