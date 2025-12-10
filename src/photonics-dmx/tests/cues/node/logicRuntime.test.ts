@@ -85,8 +85,15 @@ describe('Node cue logic runtime', () => {
     const compiled = NodeCueCompiler.compileYargCue(definition);
     const cue = new YargNodeCue('group-1', compiled);
 
-    const addEffect = jest.fn();
-    const sequencer = { addEffect } as any;
+    const addEffectWithCallback = jest.fn((_name: string, _effect: any, onComplete: () => void) => {
+      // Call callback immediately to simulate completion
+      onComplete();
+    });
+    
+    const sequencer = { 
+      addEffectWithCallback
+    } as any;
+    
     const lightManager = { getLights: jest.fn().mockReturnValue([{ id: 'l1', position: 0 }]) } as any;
 
     jest.spyOn(ActionEffectFactory, 'resolveLights').mockReturnValue([{ id: 'l1', position: 0 } as any]);
@@ -112,8 +119,9 @@ describe('Node cue logic runtime', () => {
 
     await cue.execute({ beat: 'Strong' } as any, sequencer, lightManager);
 
+    // Verify the conditional logic evaluated correctly (10/0 = 0, 0 == 0 is true)
     expect(buildEffectSpy).toHaveBeenCalledWith(expect.objectContaining({ action: expect.objectContaining({ id: 'action-true' }) }));
     expect(buildEffectSpy).not.toHaveBeenCalledWith(expect.objectContaining({ action: expect.objectContaining({ id: 'action-false' }) }));
-    expect(addEffect).toHaveBeenCalledTimes(1);
+    expect(addEffectWithCallback).toHaveBeenCalledTimes(1);
   });
 });

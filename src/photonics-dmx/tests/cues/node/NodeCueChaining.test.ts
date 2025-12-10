@@ -11,7 +11,7 @@ describe('Node cue chaining', () => {
     jest.restoreAllMocks();
   });
 
-  it('anchors chained steps to the triggering event across different lights', async () => {
+  it('executes actions sequentially with execution engine', async () => {
     const definition: YargNodeCueDefinition = {
       id: 'test-cue',
       name: 'Chained Beat',
@@ -75,28 +75,20 @@ describe('Node cue chaining', () => {
       return target.groups.includes('front') ? [frontLight] : [backLight];
     });
 
-    const addedEffects: Record<string, Effect> = {};
+    const callOrder: string[] = [];
     const sequencerMock: Partial<ILightingController> = {
-      addEffect: (name: string, effect: Effect) => {
-        addedEffects[name] = effect;
+      addEffectWithCallback: (name: string, _effect: Effect, onComplete: () => void) => {
+        callOrder.push(name);
+        // Call callback immediately to simulate completion
+        onComplete();
       }
     };
 
-    await cue.execute({} as any, sequencerMock as ILightingController, null as any);
+    await cue.execute({ beat: 'Strong' } as any, sequencerMock as ILightingController, null as any);
 
-    const [effect] = Object.values(addedEffects);
-    expect(effect).toBeDefined();
-
-    // First step uses its own waitFor (none) with no offset
-    const firstStep = effect.transitions.find(t => t.lights[0].id === frontLight.id && !t.timingOnly);
-    expect(firstStep?.waitForCondition).toBe('none');
-
-    const backTransitions = effect.transitions.filter(t => t.lights[0].id === backLight.id);
-    const backStep = backTransitions.find(t => !t.timingOnly);
-
-    expect(backStep?.waitForCondition).toBe('delay');
-    expect(backStep?.waitForTime).toBe(100);
-    expect(backStep?.waitUntilCondition).toBe('delay');
-    expect(backStep?.transform.duration).toBe(50);
+    // Verify both actions were executed in order
+    expect(callOrder.length).toBe(2);
+    expect(callOrder[0]).toContain('a1');
+    expect(callOrder[1]).toContain('a2');
   });
 });

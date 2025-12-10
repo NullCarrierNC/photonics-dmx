@@ -52,6 +52,8 @@ export class EffectManager implements IEffectManager {
   private _lastCalled0LayerEffect: string = ""; // Tracks the last effect name that targeted layer 0
   /** Active effect-level persistence runs keyed by run id */
   private persistentRuns: Map<string, PersistentEffectRun> = new Map();
+  /** Callbacks for effect completion, keyed by effect name */
+  private effectCallbacks: Map<string, () => void> = new Map();
 
   // Reusable default state template
   private defaultStateTemplate: RGBIO = {
@@ -93,6 +95,51 @@ export class EffectManager implements IEffectManager {
       this._lastCalled0LayerEffect = "";
       //  console.debug("EffectManager: Reset _lastCalled0LayerEffect after blackout");
     });
+  }
+
+  /**
+   * Adds a new effect with a completion callback.
+   * The callback will be fired when all lights in the effect complete their transitions.
+   * 
+   * @param name The name of the effect
+   * @param effect The effect configuration
+   * @param onComplete Callback to fire when effect completes
+   * @param isPersistent If true, the effect re-queues itself after completing
+   */
+  public addEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent: boolean = false
+  ): void {
+    // Register the callback
+    this.effectCallbacks.set(name, onComplete);
+    
+    // Add the effect normally
+    this.addEffect(name, effect, isPersistent);
+  }
+
+  /**
+   * Remove a completion callback for an effect.
+   * 
+   * @param name The name of the effect
+   */
+  public removeEffectCallback(name: string): void {
+    this.effectCallbacks.delete(name);
+  }
+
+  /**
+   * Fire the completion callback for an effect, if one exists.
+   * Called internally when an effect completes.
+   * 
+   * @param effectName The name of the effect that completed
+   */
+  private fireEffectCallback(effectName: string): void {
+    const callback = this.effectCallbacks.get(effectName);
+    if (callback) {
+      callback();
+      this.effectCallbacks.delete(effectName);
+    }
   }
 
   /**
@@ -571,8 +618,23 @@ export class EffectManager implements IEffectManager {
   /**
    * Called when a light finishes its active effect so effect-level persistence
    * can determine whether the overall run should restart.
+   * Also fires completion callbacks if all lights in an effect have completed.
    */
   public onLightEffectComplete(effectState: LightEffectState): void {
+    // Fire the completion callback for this effect (if no other lights are still running it)
+    // Check if any other lights are still running this effect
+    const effectStillActive = Array.from(this.layerManager.getActiveEffects().values()).some(
+      (layerMap) => Array.from(layerMap.values()).some(
+        (activeEffect) => activeEffect.name === effectState.name && activeEffect.lightId !== effectState.lightId
+      )
+    );
+    
+    if (!effectStillActive) {
+      // This was the last light for this effect - fire the callback
+      this.fireEffectCallback(effectState.name);
+    }
+
+    // Handle persistence
     if (!effectState.effectRunId) {
       return;
     }

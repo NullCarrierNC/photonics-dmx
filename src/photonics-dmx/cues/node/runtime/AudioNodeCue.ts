@@ -5,7 +5,8 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { calculateActionDuration, CompiledAudioCue } from '../compiler/NodeCueCompiler';
 import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
 import { AudioEventNode, LogicNode, ValueSource, AudioNodeCueDefinition } from '../../types/nodeCueTypes';
-import { Effect } from '../../../types';
+import { NodeExecutionEngine } from './NodeExecutionEngine';
+import { VariableValue } from './executionTypes';
 
 interface AudioEventState {
   previousValue: number;
@@ -36,10 +37,11 @@ export class AudioNodeCue implements IAudioCue {
 
   private readonly eventStates = new Map<string, AudioEventState>();
   private readonly activeLevelEffects = new Map<string, number>();
-  private static cueLevelVarStores = new Map<string, Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }>>();
-  private static groupLevelVarStores = new Map<string, Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }>>();
-  private cueLevelVarStore: Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }>;
-  private groupLevelVarStore: Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }>;
+  private static cueLevelVarStores = new Map<string, Map<string, VariableValue>>();
+  private static groupLevelVarStores = new Map<string, Map<string, VariableValue>>();
+  private cueLevelVarStore: Map<string, VariableValue>;
+  private groupLevelVarStore: Map<string, VariableValue>;
+  private executionEngine?: NodeExecutionEngine;
 
   constructor(groupId: string, private readonly compiledCue: CompiledAudioCue) {
     const definition = compiledCue.definition as AudioNodeCueDefinition;
@@ -72,6 +74,22 @@ export class AudioNodeCue implements IAudioCue {
   async execute(data: AudioCueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const tasks: Promise<unknown>[] = [];
 
+    // Initialize execution engine if not already created
+    if (!this.executionEngine) {
+      const definition = this.compiledCue.definition as AudioNodeCueDefinition;
+      const variableDefinitions = definition.variables ?? [];
+      
+      this.executionEngine = new NodeExecutionEngine(
+        this.compiledCue,
+        this.id,
+        sequencer,
+        lightManager,
+        this.cueLevelVarStore,
+        this.groupLevelVarStore,
+        variableDefinitions
+      );
+    }
+
     for (const event of this.compiledCue.eventMap.values()) {
       const state = this.getEventState(event.id);
       const evaluation = this.evaluateEvent(event, data, state);
@@ -79,11 +97,12 @@ export class AudioNodeCue implements IAudioCue {
 
       if (evaluation.mode === 'edge') {
         if (!evaluation.triggered) continue;
-        const effects = this.buildEdgeEffects(event.id, evaluation.intensity, lightManager);
-        for (const { name, effect } of effects) {
-          sequencer.addEffect(`${name}:${Date.now()}`, effect);
-        }
+        
+        // Use execution engine for edge-triggered events
+        const cueData = { ...data } as any;
+        this.executionEngine.startExecution(event, cueData);
       } else {
+        // Level-triggered events use continuous state management
         const actionStep = this.findFirstAction(event.id);
         if (!actionStep) {
           continue;
@@ -119,6 +138,10 @@ export class AudioNodeCue implements IAudioCue {
   }
 
   onStop(): void {
+    if (this.executionEngine) {
+      this.executionEngine.cancelAll();
+    }
+
     this.eventStates.clear();
     this.activeLevelEffects.clear();
     this.cueLevelVarStore.clear();
@@ -126,6 +149,10 @@ export class AudioNodeCue implements IAudioCue {
   }
 
   onDestroy(): void {
+    if (this.executionEngine) {
+      this.executionEngine.cancelAll();
+    }
+
     this.eventStates.clear();
     this.activeLevelEffects.clear();
     this.cueLevelVarStore.clear();
@@ -146,7 +173,7 @@ export class AudioNodeCue implements IAudioCue {
       }
     }
 
-    // Initialize group-level variables
+    // Initialize group-level variables from compiled cue metadata
     const groupVariables = (this.compiledCue as any).groupVariables ?? [];
     for (const varDef of groupVariables) {
       if (!this.groupLevelVarStore.has(varDef.name)) {
@@ -212,56 +239,6 @@ export class AudioNodeCue implements IAudioCue {
         return clamp(audioData.frequencyBands.range5 ?? 0, 0, 1);
       default:
         return 0;
-    }
-  }
-
-  private buildEdgeEffects(eventId: string, intensity: number, lightManager: DmxLightManager): { name: string; effect: Effect }[] {
-    const results: { name: string; effect: Effect }[] = [];
-    const outgoing = this.compiledCue.adjacency.get(eventId) ?? [];
-
-    for (const conn of outgoing) {
-      const steps: { actionId: string; delay: number }[] = [];
-      this.traverse(conn.to, 0, new Set(), steps, intensity);
-      if (!steps.length) continue;
-
-      const effect = this.composeEffect(steps, lightManager, intensity);
-      if (effect) {
-        const chainId = steps.map(step => step.actionId).join('>');
-        results.push({ name: `${this.id}:${eventId}:${chainId}`, effect });
-      }
-    }
-
-    return results;
-  }
-
-  private traverse(
-    nodeId: string,
-    delayMs: number,
-    visited: Set<string>,
-    steps: { actionId: string; delay: number }[],
-    intensityScale: number
-  ): void {
-    if (visited.has(nodeId)) return;
-    visited.add(nodeId);
-
-    const { actionMap, logicMap, adjacency } = this.compiledCue;
-
-    if (actionMap.has(nodeId)) {
-      steps.push({ actionId: nodeId, delay: delayMs });
-      const nextDelay = delayMs + calculateActionDuration(actionMap.get(nodeId)!);
-      const edges = adjacency.get(nodeId) ?? [];
-      for (const edge of edges) {
-        this.traverse(edge.to, nextDelay, new Set(visited), steps, intensityScale);
-      }
-      return;
-    }
-
-    const logicNode = logicMap.get(nodeId);
-    if (logicNode) {
-      const nextNodes = this.evaluateLogicNode(logicNode, nodeId);
-      for (const targetId of nextNodes) {
-        this.traverse(targetId, delayMs, new Set(visited), steps, intensityScale);
-      }
     }
   }
 
@@ -348,7 +325,7 @@ export class AudioNodeCue implements IAudioCue {
     return edges.map(edge => edge.to);
   }
 
-  private getVariableStore(varName: string): Map<string, { type: 'number' | 'boolean' | 'string'; value: number | boolean | string }> {
+  private getVariableStore(varName: string): Map<string, VariableValue> {
     const definition = this.compiledCue.definition as AudioNodeCueDefinition;
     const cueVariables = definition.variables ?? [];
     const isCueLevel = cueVariables.some(v => v.name === varName);
@@ -412,72 +389,6 @@ export class AudioNodeCue implements IAudioCue {
     }
 
     return source.fallback === true || source.fallback === 'true';
-  }
-
-  private composeEffect(
-    steps: { actionId: string; delay: number }[],
-    lightManager: DmxLightManager,
-    intensityScale: number
-  ): Effect | null {
-    const { actionMap } = this.compiledCue;
-    let combinedEffect: Effect | null = null;
-    let lastScheduledDelay = 0;
-    const seenLightIds = new Set<string>();
-
-    for (const step of steps) {
-      const action = actionMap.get(step.actionId);
-      if (!action) continue;
-      const lights = ActionEffectFactory.resolveLights(lightManager, action.target);
-      if (!lights.length) continue;
-
-      const isFirstEffect = combinedEffect === null;
-      const waitCondition = isFirstEffect ? 'none' : 'delay';
-      const waitTime = isFirstEffect ? step.delay : Math.max(0, step.delay - lastScheduledDelay);
-
-      const effect = ActionEffectFactory.buildEffect({
-        action,
-        lights,
-        waitCondition,
-        waitTime,
-        intensityScale
-      });
-
-      if (!effect) continue;
-
-      if (!combinedEffect) {
-        combinedEffect = {
-          ...effect,
-          transitions: [...effect.transitions]
-        };
-        // Track which lights were in the first action
-        lights.forEach(light => seenLightIds.add(light.id));
-      } else {
-        // For subsequent actions, we need to adjust waitForTime for lights that
-        // were already targeted by previous actions, but keep the absolute wait
-        // time for lights that are NEW in this action.
-        const adjustedTransitions = effect.transitions.map(t => {
-          const lightId = t.lights[0]?.id;
-          if (lightId && seenLightIds.has(lightId)) {
-            // This light was in a previous action, so reset wait time to make
-            // this transition start immediately after the previous one completes
-            return {
-              ...t,
-              waitForCondition: 'none' as const,
-              waitForTime: 0
-            };
-          } else {
-            // This is a new light not seen before, keep its absolute wait time
-            if (lightId) seenLightIds.add(lightId);
-            return t;
-          }
-        });
-        combinedEffect.transitions.push(...adjustedTransitions);
-      }
-
-      lastScheduledDelay = step.delay;
-    }
-
-    return combinedEffect;
   }
 
   private findFirstAction(eventId: string): { actionId: string; delay: number } | null {

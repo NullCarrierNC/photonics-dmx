@@ -217,6 +217,22 @@ export interface ILightingController {
   isLayerFreeForLight(layer: number, lightId: string): boolean;
   setState(lights: TrackedLight[], color: RGBIO, time: number): void;
   
+  /**
+   * Add an effect with a completion callback.
+   * Callback is fired when the effect fully completes (including waitUntilTime).
+   */
+  addEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean
+  ): void;
+
+  /**
+   * Remove a completion callback for an effect.
+   */
+  removeEffectCallback(name: string): void;
+  
   // Song event handling methods
   onBeat(): void;
   onMeasure(): void;
