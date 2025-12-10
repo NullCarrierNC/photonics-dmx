@@ -4,6 +4,8 @@ import {
   createDefaultActionTiming,
   type ActionNode,
   type AudioEventNode,
+  type AudioNodeCueDefinition,
+  type AudioEffectDefinition,
   type EventRaiserNode,
   type EventListenerNode,
   type LogicNode,
@@ -12,11 +14,13 @@ import {
   type NodeEffectType,
   type VariableLogicNode,
   type ConditionalLogicNode,
-  type YargEventNode
+  type YargEventNode,
+  type YargNodeCueDefinition,
+  type YargEffectDefinition
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { createId, buildDefaultAction } from '../lib/cueDefaults';
 import { calculateChainDuration } from '../lib/cueUtils';
-import { cueToFlow } from '../lib/cueTransforms';
+import { cueToFlow, effectToFlow } from '../lib/cueTransforms';
 import type { EditorNode, EditorNodeData, EventOption } from '../lib/types';
 import { getDefaultEventOption } from '../lib/options';
 
@@ -51,7 +55,13 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
   const chainDuration = useMemo(() => calculateChainDuration(nodes, edges), [nodes, edges]);
 
   const loadCueIntoFlow = useCallback((cue: any) => {
-    const { nodes: flowNodes, edges: flowEdges } = cueToFlow(cue);
+    // Check if this is an effect or a cue by looking for the 'parameters' property
+    const isEffect = cue && 'parameters' in cue;
+    
+    const { nodes: flowNodes, edges: flowEdges } = isEffect 
+      ? effectToFlow(cue as YargEffectDefinition | AudioEffectDefinition)
+      : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null);
+    
     setNodes(flowNodes);
     setEdges(flowEdges);
     setSelectedNodeId(null);
@@ -213,6 +223,62 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     setIsDirty(true);
   }, [nodes.length, setIsDirty, setNodes]);
 
+  const addEffectRaiserNode = useCallback(() => {
+    const id = `effect-raiser-${createId()}`;
+    const payload: import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode = {
+      id,
+      type: 'effect-raiser',
+      effectId: '',
+      label: 'Raise Effect',
+      outputs: []
+    };
+
+    const newNode: EditorNode = {
+      id,
+      type: 'effect-raiser',
+      position: {
+        x: 120,
+        y: 280 + nodes.length * 40
+      },
+      data: {
+        kind: 'effect-raiser',
+        label: 'Raise Effect',
+        payload
+      }
+    };
+
+    setNodes(nds => [...nds, newNode]);
+    setIsDirty(true);
+  }, [nodes.length, setIsDirty, setNodes]);
+
+  const addEffectListenerNode = useCallback(() => {
+    const id = `effect-listener-${createId()}`;
+    const payload: import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectEventListenerNode = {
+      id,
+      type: 'effect-listener',
+      label: 'Effect Entry',
+      parameterMappings: [],
+      outputs: []
+    };
+
+    const newNode: EditorNode = {
+      id,
+      type: 'effect-listener',
+      position: {
+        x: 120,
+        y: 80
+      },
+      data: {
+        kind: 'effect-listener',
+        label: 'Effect Entry',
+        payload
+      }
+    };
+
+    setNodes(nds => [...nds, newNode]);
+    setIsDirty(true);
+  }, [nodes.length, setIsDirty, setNodes]);
+
   const isValidNodeConnection = useCallback((sourceId?: string | null, targetId?: string | null) => {
     if (!sourceId || !targetId || sourceId === targetId) {
       return false;
@@ -222,28 +288,50 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     if (!sourceNode || !targetNode) {
       return false;
     }
-    
-    // Event listeners can only be sources (no inputs allowed)
-    if (targetNode.data.kind === 'event-listener') {
+
+    // Event listeners and Effect listeners can only be sources (no inputs allowed)
+    if (targetNode.data.kind === 'event-listener' || targetNode.data.kind === 'effect-listener') {
       return false;
     }
 
-    // Valid connections
-    if (sourceNode.data.kind === 'event' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic' || targetNode.data.kind === 'event-raiser')) {
+    // Valid target types for all nodes
+    const validTargets = ['action', 'logic', 'event-raiser', 'effect-raiser'];
+    
+    // Event nodes can connect to actions, logic, event raisers, and effect raisers
+    if (sourceNode.data.kind === 'event' && validTargets.includes(targetNode.data.kind)) {
       return true;
     }
-    if (sourceNode.data.kind === 'logic' && (targetNode.data.kind === 'logic' || targetNode.data.kind === 'action' || targetNode.data.kind === 'event-raiser')) {
+    
+    // Logic nodes can connect to actions, logic, event raisers, and effect raisers
+    if (sourceNode.data.kind === 'logic' && validTargets.includes(targetNode.data.kind)) {
       return true;
     }
-    if (sourceNode.data.kind === 'action' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic' || targetNode.data.kind === 'event-raiser')) {
+    
+    // Action nodes can connect to actions, logic, event raisers, and effect raisers
+    if (sourceNode.data.kind === 'action' && validTargets.includes(targetNode.data.kind)) {
       return true;
     }
-    if (sourceNode.data.kind === 'event-raiser' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic' || targetNode.data.kind === 'event-raiser')) {
+    
+    // Event raiser nodes can connect to actions, logic, event raisers, and effect raisers
+    if (sourceNode.data.kind === 'event-raiser' && validTargets.includes(targetNode.data.kind)) {
       return true;
     }
-    if (sourceNode.data.kind === 'event-listener' && (targetNode.data.kind === 'action' || targetNode.data.kind === 'logic' || targetNode.data.kind === 'event-raiser')) {
+    
+    // Effect raiser nodes can connect to actions, logic, event raisers, and effect raisers
+    if (sourceNode.data.kind === 'effect-raiser' && validTargets.includes(targetNode.data.kind)) {
       return true;
     }
+    
+    // Event listener nodes can connect to actions, logic, event raisers, and effect raisers
+    if (sourceNode.data.kind === 'event-listener' && validTargets.includes(targetNode.data.kind)) {
+      return true;
+    }
+    
+    // Effect listener nodes can connect to actions, logic, event raisers, and effect raisers (for internal effect communication)
+    if (sourceNode.data.kind === 'effect-listener' && validTargets.includes(targetNode.data.kind)) {
+      return true;
+    }
+    
     return false;
   }, [nodes]);
 
@@ -340,7 +428,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
-  const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode>(updates: Partial<T>) => {
+  const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectEventListenerNode>(updates: Partial<T>) => {
     if (!selectedNodeId) return;
     const nodeMode = activeMode;
     setNodes(nds => nds.map(node => {
@@ -388,6 +476,8 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     addLogicNode,
     addEventRaiserNode,
     addEventListenerNode,
+    addEffectRaiserNode,
+    addEffectListenerNode,
     updateSelectedNode,
     loadCueIntoFlow,
     setReactFlowInstance,

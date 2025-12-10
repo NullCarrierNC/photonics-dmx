@@ -5,6 +5,8 @@ import type {
   AudioEventType,
   EventRaiserNode,
   EventListenerNode,
+  EffectRaiserNode,
+  EffectEventListenerNode,
   LogicNode,
   LogicComparator,
   MathOperator,
@@ -15,6 +17,7 @@ import type {
   YargEventNode
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { WaitCondition, Color } from '../../../../../photonics-dmx/types';
+import type { EditorMode } from '../lib/types';
 import {
   ACTION_OPTIONS,
   ACTION_WAIT_OPTIONS_YARG,
@@ -34,29 +37,37 @@ import type { EditorNode, EventOption } from '../lib/types';
 
 type Props = {
   activeMode: NodeCueMode;
+  editorMode: EditorMode;
   selectedNode: EditorNode | null;
   selectedActionHasEventParent: boolean;
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
   availableEvents?: string[];
+  availableEffects?: { id: string; name: string }[];
   addEventNode: (option: EventOption<WaitCondition | AudioEventNode['eventType']>) => void;
   addActionNode: (effect: NodeEffectType) => void;
   addLogicNode: (logicType: LogicNode['logicType']) => void;
   addEventRaiserNode?: () => void;
   addEventListenerNode?: () => void;
-  updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode>(updates: Partial<T>) => void;
+  addEffectRaiserNode?: () => void;
+  addEffectListenerNode?: () => void;
+  updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | EffectRaiserNode | EffectEventListenerNode>(updates: Partial<T>) => void;
 };
 
 const NodeSidebar: React.FC<Props> = ({
   activeMode,
+  editorMode,
   selectedNode,
   selectedActionHasEventParent,
   availableVariables,
   availableEvents = [],
+  availableEffects = [],
   addEventNode,
   addActionNode,
   addLogicNode,
   addEventRaiserNode,
   addEventListenerNode,
+  addEffectRaiserNode,
+  addEffectListenerNode,
   updateSelectedNode
 }) => {
   const isVariableSource = (src: ValueSource): src is Extract<ValueSource, { source: 'variable' }> => src.source === 'variable';
@@ -161,15 +172,29 @@ const NodeSidebar: React.FC<Props> = ({
 
   return (
     <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-y-auto space-y-4">
-      <div>
-        <h3 className="font-semibold text-sm mb-2">Event Nodes</h3>
-        <button
-          className="border rounded px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
-          onClick={() => addEventNode(getDefaultEventOption(activeMode))}
-        >
-          System Event
-        </button>
-      </div>
+      {editorMode === 'cue' && (
+        <div>
+          <h3 className="font-semibold text-sm mb-2">Event Nodes</h3>
+          <button
+            className="border rounded px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+            onClick={() => addEventNode(getDefaultEventOption(activeMode))}
+          >
+            System Event
+          </button>
+        </div>
+      )}
+
+      {editorMode === 'effect' && addEffectListenerNode && (
+        <div>
+          <h3 className="font-semibold text-sm mb-2">Effect Entry</h3>
+          <button
+            className="border rounded px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+            onClick={() => addEffectListenerNode()}
+          >
+            Effect Listener
+          </button>
+        </div>
+      )}
 
       <div>
         <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
@@ -230,10 +255,57 @@ const NodeSidebar: React.FC<Props> = ({
         </div>
       )}
 
+      {editorMode === 'cue' && addEffectRaiserNode && (
+        <div>
+          <h3 className="font-semibold text-sm mb-2">Effect Nodes</h3>
+          <button
+            className="border rounded px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+            onClick={() => addEffectRaiserNode()}
+          >
+            Effect Raiser
+          </button>
+        </div>
+      )}
+
       <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
         <h3 className="font-semibold text-sm mb-2">Selected Node</h3>
         {!selectedNode ? (
           <p className="text-xs text-gray-500">Select a node on the canvas to edit its properties.</p>
+        ) : selectedNode.data.kind === 'effect-raiser' ? (
+          <div className="space-y-2 text-xs">
+            <label className="flex flex-col font-medium">
+              Select Effect
+              <select
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={(selectedNode.data.payload as EffectRaiserNode).effectId || ''}
+                onChange={event => updateSelectedNode<EffectRaiserNode>({ effectId: event.target.value })}
+              >
+                <option value="">-- Choose an effect --</option>
+                {availableEffects.map(effect => (
+                  <option key={effect.id} value={effect.id}>
+                    {effect.name} ({effect.id})
+                  </option>
+                ))}
+              </select>
+            </label>
+            {availableEffects.length === 0 && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                No effects imported. Go to the Effects tab to import effects.
+              </p>
+            )}
+            <p className="text-[10px] text-gray-500">
+              Triggers the selected effect. Effect parameters can be configured in the Effects tab.
+            </p>
+          </div>
+        ) : selectedNode.data.kind === 'effect-listener' ? (
+          <div className="space-y-2 text-xs">
+            <p className="text-gray-700 dark:text-gray-300">
+              This is the entry point for the effect. Configure parameters in the Effects tab.
+            </p>
+            <p className="text-[10px] text-gray-500">
+              Effect parameters will be mapped to local effect variables at runtime.
+            </p>
+          </div>
         ) : selectedNode.data.kind === 'event-raiser' ? (
           <div className="space-y-2 text-xs">
             <label className="flex flex-col font-medium">

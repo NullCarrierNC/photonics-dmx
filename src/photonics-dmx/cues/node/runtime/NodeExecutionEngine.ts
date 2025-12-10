@@ -13,6 +13,7 @@ import {
   BaseEventNode,
   EventRaiserNode,
   EventListenerNode,
+  EffectRaiserNode,
   LogicNode,
   ValueSource,
   VariableType,
@@ -20,6 +21,8 @@ import {
 } from '../../types/nodeCueTypes';
 import { ExecutionContext } from './ExecutionContext';
 import { ExecutionState, VariableValue } from './executionTypes';
+import { EffectRegistry } from './EffectRegistry';
+import { EffectExecutionEngine } from './EffectExecutionEngine';
 
 export class NodeExecutionEngine {
   private compiledCue: CompiledYargCue | CompiledAudioCue;
@@ -31,6 +34,7 @@ export class NodeExecutionEngine {
   private groupLevelVarStore: Map<string, VariableValue>;
   private variableDefinitions: VariableDefinition[];
   private eventListeners: Map<string, EventListenerNode[]> = new Map();
+  private effectRegistry: EffectRegistry;
 
   constructor(
     compiledCue: CompiledYargCue | CompiledAudioCue,
@@ -39,6 +43,7 @@ export class NodeExecutionEngine {
     lightManager: DmxLightManager,
     cueLevelVarStore: Map<string, VariableValue>,
     groupLevelVarStore: Map<string, VariableValue>,
+    effectRegistry: EffectRegistry,
     variableDefinitions: VariableDefinition[] = []
   ) {
     this.compiledCue = compiledCue;
@@ -47,6 +52,7 @@ export class NodeExecutionEngine {
     this.lightManager = lightManager;
     this.cueLevelVarStore = cueLevelVarStore;
     this.groupLevelVarStore = groupLevelVarStore;
+    this.effectRegistry = effectRegistry;
     this.variableDefinitions = variableDefinitions;
     
     // Register all event listeners during initialization
@@ -121,7 +127,7 @@ export class NodeExecutionEngine {
 
     context.markVisited(nodeId);
 
-    const { actionMap, logicMap, eventRaiserMap } = this.compiledCue;
+    const { actionMap, logicMap, eventRaiserMap, effectRaiserMap } = this.compiledCue;
 
     // Check if it's an action node
     const actionNode = actionMap.get(nodeId);
@@ -141,6 +147,13 @@ export class NodeExecutionEngine {
     const eventRaiserNode = eventRaiserMap.get(nodeId);
     if (eventRaiserNode) {
       this.executeEventRaiserNode(eventRaiserNode, context);
+      return;
+    }
+
+    // Check if it's an effect raiser node
+    const effectRaiserNode = effectRaiserMap?.get(nodeId);
+    if (effectRaiserNode) {
+      this.executeEffectRaiserNode(effectRaiserNode, context);
       return;
     }
 
@@ -249,6 +262,59 @@ export class NodeExecutionEngine {
       this.continueToNextNodes(raiserNode.id, context);
     } catch (error) {
       console.error(`Error executing event raiser node ${raiserNode.id}:`, error);
+      // Continue execution despite error
+      this.continueToNextNodes(raiserNode.id, context);
+    }
+  }
+
+  /**
+   * Execute an effect raiser node: trigger effect and continue immediately (non-blocking).
+   */
+  private executeEffectRaiserNode(raiserNode: EffectRaiserNode, context: ExecutionContext): void {
+    try {
+      const { effectId } = raiserNode;
+
+      // Skip if no effect selected
+      if (!effectId) {
+        console.warn(`Effect raiser ${raiserNode.id} has no effect selected, skipping`);
+        this.continueToNextNodes(raiserNode.id, context);
+        return;
+      }
+
+      // Look up effect from registry
+      const compiledEffect = this.effectRegistry.getEffect(effectId);
+      
+      if (!compiledEffect) {
+        // Gracefully handle missing effect (may have been deleted)
+        console.warn(`Effect ${effectId} not found (missing dependency), skipping effect raiser ${raiserNode.id}`);
+        this.continueToNextNodes(raiserNode.id, context);
+        return;
+      }
+
+      // Resolve parameter values
+      const paramValues: Record<string, any> = {};
+      for (const [paramName, valueSource] of Object.entries(raiserNode.parameterValues ?? {})) {
+        // Get parameter type from effect definition
+        const paramDef = compiledEffect.parameters.get(paramName);
+        const expectedType = paramDef?.type ?? 'number'; // Default to number if not found
+        paramValues[paramName] = this.resolveValue(expectedType, valueSource, context);
+      }
+
+      // Create effect execution engine
+      const effectEngine = new EffectExecutionEngine(
+        compiledEffect,
+        this.sequencer,
+        this.lightManager,
+        paramValues
+      );
+
+      // Trigger effect (non-blocking, runs in parallel)
+      effectEngine.triggerEffect({} as CueData);  // CueData not needed for effects
+
+      // Continue immediately (non-blocking like EventRaiserNode)
+      this.continueToNextNodes(raiserNode.id, context);
+    } catch (error) {
+      console.error(`Error executing effect raiser node ${raiserNode.id}:`, error);
       // Continue execution despite error
       this.continueToNextNodes(raiserNode.id, context);
     }

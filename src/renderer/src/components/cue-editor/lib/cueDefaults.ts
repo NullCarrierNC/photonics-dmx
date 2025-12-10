@@ -9,7 +9,14 @@ import {
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargNodeCueFile,
-  type AudioEventNode
+  type AudioEventNode,
+  type EffectFile,
+  type EffectMode,
+  type EffectGroupMeta,
+  type YargEffectDefinition,
+  type AudioEffectDefinition,
+  type YargEffectFile,
+  type AudioEffectFile
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 
 const createId = (): string => {
@@ -141,6 +148,54 @@ const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
   } as AudioNodeCueFile;
 };
 
+const createDefaultEffect = (mode: EffectMode): YargEffectDefinition | AudioEffectDefinition => {
+  const base = {
+    id: `effect-${createId()}`,
+    mode,
+    name: 'New Effect',
+    description: '',
+    parameters: [],
+    nodes: {
+      events: [],
+      actions: []
+    },
+    connections: [],
+    layout: {
+      nodePositions: {}
+    }
+  };
+
+  if (mode === 'yarg') {
+    return base as YargEffectDefinition;
+  }
+
+  return base as AudioEffectDefinition;
+};
+
+const createDefaultEffectFile = (mode: EffectMode): EffectFile => {
+  const group: EffectGroupMeta = {
+    id: `effect-group-${Date.now()}`,
+    name: mode === 'yarg' ? 'New YARG Effects' : 'New Audio Effects',
+    description: ''
+  };
+
+  if (mode === 'yarg') {
+    return {
+      version: 1,
+      mode,
+      group,
+      effects: [createDefaultEffect('yarg') as YargEffectDefinition]
+    } as YargEffectFile;
+  }
+
+  return {
+    version: 1,
+    mode,
+    group,
+    effects: [createDefaultEffect('audio') as AudioEffectDefinition]
+  } as AudioEffectFile;
+};
+
 export {
   buildDefaultAction,
   buildDefaultAudioEvent,
@@ -148,5 +203,7 @@ export {
   createBlankCue,
   createDefaultCue,
   createDefaultFile,
+  createDefaultEffect,
+  createDefaultEffectFile,
   createId
 };

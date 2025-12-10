@@ -10,6 +10,9 @@ import {
 
 export type NodeCueMode = 'yarg' | 'audio';
 
+// Effect mode - typed like cues
+export type EffectMode = 'yarg' | 'audio';
+
 export interface NodeCueGroupMeta {
   id: string;
   name: string;
@@ -46,6 +49,14 @@ export interface VariableDefinition {
 export interface EventDefinition {
   name: string;
   description?: string;
+}
+
+// Effect parameter definition
+export interface EffectParameterDefinition {
+  name: string;
+  type: VariableType;
+  description?: string;
+  defaultValue?: number | boolean | string;
 }
 
 export type LogicComparator = '>' | '>=' | '<' | '<=' | '==' | '!=';
@@ -100,12 +111,37 @@ export interface EventListenerNode {
   outputs?: string[];
 }
 
+// Effect Event Listener node
+export interface EffectEventListenerNode {
+  id: string;
+  type: 'effect-listener';
+  label?: string;
+  outputs?: string[];
+  parameterMappings?: Array<{
+    parameterName: string;
+    targetVariable: string;
+  }>;
+}
+
+// Effect Raiser node
+export interface EffectRaiserNode {
+  id: string;
+  type: 'effect-raiser';
+  effectId: string;  // References effect definition
+  label?: string;
+  inputs?: string[];
+  outputs?: string[];
+  parameterValues?: Record<string, ValueSource>;  // Parameter name -> value
+}
+
 export interface NodeGraph<TEvent extends BaseEventNode, TAction extends ActionNode> {
   events: TEvent[];
   actions: TAction[];
   logic?: LogicNode[];
   eventRaisers?: EventRaiserNode[];
   eventListeners?: EventListenerNode[];
+  effectRaisers?: EffectRaiserNode[];
+  effectListeners?: EffectEventListenerNode[];
 }
 
 export interface BaseCueDefinition {
@@ -117,6 +153,14 @@ export interface BaseCueDefinition {
   layout?: NodeLayoutMetadata;
   variables?: VariableDefinition[];
   events?: EventDefinition[];
+  effects?: EffectReference[];  // NEW: registered effects
+}
+
+// Effect reference in cue
+export interface EffectReference {
+  effectId: string;  // ID of the effect
+  effectFileId: string;  // ID of the effect file/group
+  name: string;  // Display name (cached for UI)
 }
 
 export interface YargNodeCueDefinition extends BaseCueDefinition {
@@ -253,4 +297,56 @@ export interface ActionNode {
   outputs?: string[];
   config?: NodeActionConfig;
 }
+
+// ============================================================================
+// Effect Definitions
+// ============================================================================
+
+// Effect definition (like CueDefinition but for effects)
+export interface BaseEffectDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  nodes: NodeGraph<BaseEventNode, ActionNode>;
+  connections: Connection[];
+  layout?: NodeLayoutMetadata;
+  variables?: VariableDefinition[];  // Effect-local variables
+  parameters?: EffectParameterDefinition[];  // Exposed parameters
+  events?: EventDefinition[];  // Effect-scoped runtime events
+}
+
+export interface YargEffectDefinition extends BaseEffectDefinition {
+  mode: 'yarg';
+  nodes: NodeGraph<YargEventNode, ActionNode>;
+}
+
+export interface AudioEffectDefinition extends BaseEffectDefinition {
+  mode: 'audio';
+  nodes: NodeGraph<AudioEventNode, ActionNode>;
+}
+
+export type EffectDefinition = YargEffectDefinition | AudioEffectDefinition;
+
+// Effect file structure (parallel to NodeCueFile)
+export interface EffectGroupMeta {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface YargEffectFile {
+  version: 1;
+  mode: 'yarg';
+  group: EffectGroupMeta;
+  effects: YargEffectDefinition[];
+}
+
+export interface AudioEffectFile {
+  version: 1;
+  mode: 'audio';
+  group: EffectGroupMeta;
+  effects: AudioEffectDefinition[];
+}
+
+export type EffectFile = YargEffectFile | AudioEffectFile;
 

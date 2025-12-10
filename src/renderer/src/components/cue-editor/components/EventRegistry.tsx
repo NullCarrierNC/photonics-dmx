@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { EventDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { EventDefinition, NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorDocument } from '../lib/types';
 
 type Props = {
@@ -22,7 +22,9 @@ const EventRegistry: React.FC<Props> = ({
     description: ''
   });
 
-  const currentCue = editorDoc?.file.cues.find(c => c.id === selectedCueId);
+  const currentCue = editorDoc?.mode === 'cue' 
+    ? (editorDoc.file as NodeCueFile).cues.find(c => c.id === selectedCueId)
+    : null;
   const cueEvents = currentCue?.events ?? [];
 
   const openDialog = (existing?: EventDefinition) => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { VariableDefinition, VariableType } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { VariableDefinition, VariableType, NodeCueFile, NodeCueGroupMeta } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorDocument } from '../lib/types';
 
 type Props = {
@@ -25,8 +25,12 @@ const VariableRegistry: React.FC<Props> = ({
     description: ''
   });
 
-  const groupVariables = editorDoc?.file.group.variables ?? [];
-  const currentCue = editorDoc?.file.cues.find(c => c.id === selectedCueId);
+  const groupVariables = editorDoc?.mode === 'cue' 
+    ? (editorDoc.file.group as NodeCueGroupMeta).variables ?? []
+    : [];
+  const currentCue = editorDoc?.mode === 'cue'
+    ? (editorDoc.file as NodeCueFile).cues.find(c => c.id === selectedCueId)
+    : null;
   const cueVariables = currentCue?.variables ?? [];
 
   const openDialog = (scope: 'cue' | 'cue-group', existing?: VariableDefinition) => {

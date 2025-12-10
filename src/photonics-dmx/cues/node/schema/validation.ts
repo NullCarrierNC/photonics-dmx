@@ -11,6 +11,17 @@ import {
   EventDefinition,
   EventRaiserNode,
   EventListenerNode,
+  // Effect types - imported for future schema expansion
+  EffectRaiserNode as _EffectRaiserNode,
+  EffectEventListenerNode as _EffectEventListenerNode,
+  EffectParameterDefinition as _EffectParameterDefinition,
+  EffectReference,
+  YargEffectDefinition as _YargEffectDefinition,
+  AudioEffectDefinition as _AudioEffectDefinition,
+  YargEffectFile,
+  AudioEffectFile,
+  EffectFile,
+  EffectMode,
   LogicComparator,
   LogicNode,
   MathOperator,
@@ -211,6 +222,17 @@ const eventDefinitionSchema: JSONSchemaType<EventDefinition> = {
   properties: {
     name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
     description: { type: 'string', nullable: true }
+  }
+};
+
+const effectReferenceSchema: JSONSchemaType<EffectReference> = {
+  type: 'object',
+  required: ['effectId', 'effectFileId', 'name'],
+  additionalProperties: false,
+  properties: {
+    effectId: { type: 'string', minLength: 1 },
+    effectFileId: { type: 'string', minLength: 1 },
+    name: { type: 'string', minLength: 1 }
   }
 };
 
@@ -500,6 +522,18 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
           nullable: true,
           items: eventListenerNodeSchema,
           default: []
+        },
+        effectRaisers: {
+          type: 'array',
+          nullable: true,
+          items: { type: 'object' } as any, // Simplified schema for now
+          default: []
+        },
+        effectListeners: {
+          type: 'array',
+          nullable: true,
+          items: { type: 'object' } as any, // Not used in cues, only in effects
+          default: []
         }
       }
     },
@@ -518,6 +552,12 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
       type: 'array',
       nullable: true,
       items: eventDefinitionSchema,
+      default: []
+    },
+    effects: {
+      type: 'array',
+      nullable: true,
+      items: effectReferenceSchema,
       default: []
     }
   }
@@ -564,6 +604,18 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
           nullable: true,
           items: eventListenerNodeSchema,
           default: []
+        },
+        effectRaisers: {
+          type: 'array',
+          nullable: true,
+          items: { type: 'object' } as any, // Simplified schema for now
+          default: []
+        },
+        effectListeners: {
+          type: 'array',
+          nullable: true,
+          items: { type: 'object' } as any, // Not used in cues, only in effects
+          default: []
         }
       }
     },
@@ -582,6 +634,12 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
       type: 'array',
       nullable: true,
       items: eventDefinitionSchema,
+      default: []
+    },
+    effects: {
+      type: 'array',
+      nullable: true,
+      items: effectReferenceSchema,
       default: []
     }
   }
@@ -847,6 +905,181 @@ export const validateNodeCueFile = (value: unknown): NodeCueValidationResult => 
 
   if (mode === 'yarg') {
     return validateYargNodeCueFile(value);
+  }
+
+  return {
+    valid: false,
+    errors: ['mode must be either "yarg" or "audio"']
+  };
+};
+
+// ============================================================================
+// Effect File Validation
+// ============================================================================
+
+export interface EffectValidationResult<T = EffectFile> {
+  valid: boolean;
+  data?: T;
+  errors: string[];
+  mode?: EffectMode;
+}
+
+/**
+ * Validate YARG Effect File
+ * Note: Simplified validation - expand schemas as needed
+ */
+export const validateYargEffectFile = (value: unknown): EffectValidationResult<YargEffectFile> => {
+  // Basic validation
+  if (!value || typeof value !== 'object') {
+    return {
+      valid: false,
+      errors: ['Effect file must be a JSON object']
+    };
+  }
+
+  const file = value as any;
+  
+  // Check required fields
+  if (file.version !== 1) {
+    return {
+      valid: false,
+      errors: ['version must be 1']
+    };
+  }
+
+  if (file.mode !== 'yarg') {
+    return {
+      valid: false,
+      errors: ['mode must be "yarg"']
+    };
+  }
+
+  if (!file.group || !file.group.id || !file.group.name) {
+    return {
+      valid: false,
+      errors: ['group must have id and name']
+    };
+  }
+
+  if (!Array.isArray(file.effects)) {
+    return {
+      valid: false,
+      errors: ['effects must be an array']
+    };
+  }
+
+  // Basic effect validation
+  for (const effect of file.effects) {
+    if (!effect.id || !effect.name || !effect.mode) {
+      return {
+        valid: false,
+        errors: ['Each effect must have id, name, and mode']
+      };
+    }
+    
+    if (effect.mode !== 'yarg') {
+      return {
+        valid: false,
+        errors: [`Effect ${effect.name} mode must be "yarg"`]
+      };
+    }
+  }
+
+  return {
+    valid: true,
+    data: file as YargEffectFile,
+    errors: [],
+    mode: 'yarg'
+  };
+};
+
+/**
+ * Validate Audio Effect File
+ * Note: Simplified validation - expand schemas as needed
+ */
+export const validateAudioEffectFile = (value: unknown): EffectValidationResult<AudioEffectFile> => {
+  // Basic validation
+  if (!value || typeof value !== 'object') {
+    return {
+      valid: false,
+      errors: ['Effect file must be a JSON object']
+    };
+  }
+
+  const file = value as any;
+  
+  // Check required fields
+  if (file.version !== 1) {
+    return {
+      valid: false,
+      errors: ['version must be 1']
+    };
+  }
+
+  if (file.mode !== 'audio') {
+    return {
+      valid: false,
+      errors: ['mode must be "audio"']
+    };
+  }
+
+  if (!file.group || !file.group.id || !file.group.name) {
+    return {
+      valid: false,
+      errors: ['group must have id and name']
+    };
+  }
+
+  if (!Array.isArray(file.effects)) {
+    return {
+      valid: false,
+      errors: ['effects must be an array']
+    };
+  }
+
+  // Basic effect validation
+  for (const effect of file.effects) {
+    if (!effect.id || !effect.name || !effect.mode) {
+      return {
+        valid: false,
+        errors: ['Each effect must have id, name, and mode']
+      };
+    }
+    
+    if (effect.mode !== 'audio') {
+      return {
+        valid: false,
+        errors: [`Effect ${effect.name} mode must be "audio"`]
+      };
+    }
+  }
+
+  return {
+    valid: true,
+    data: file as AudioEffectFile,
+    errors: [],
+    mode: 'audio'
+  };
+};
+
+/**
+ * Validate Effect File (auto-detects mode)
+ */
+export const validateEffectFile = (value: unknown): EffectValidationResult => {
+  if (!value || typeof value !== 'object') {
+    return {
+      valid: false,
+      errors: ['File must be a JSON object']
+    };
+  }
+
+  const mode = (value as Partial<EffectFile>).mode;
+  if (mode === 'audio') {
+    return validateAudioEffectFile(value);
+  }
+
+  if (mode === 'yarg') {
+    return validateYargEffectFile(value);
   }
 
   return {

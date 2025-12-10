@@ -6,20 +6,29 @@ import CueMetadataForm from '../components/cue-editor/components/CueMetadataForm
 import NodeSidebar from '../components/cue-editor/components/NodeSidebar';
 import VariableRegistry from '../components/cue-editor/components/VariableRegistry';
 import EventRegistry from '../components/cue-editor/components/EventRegistry';
+import EffectRegistry from '../components/cue-editor/components/EffectRegistry';
+import ParameterRegistry from '../components/cue-editor/components/ParameterRegistry';
 import ActionNodeComponent from '../components/cue-editor/components/flow/ActionNode';
 import EventNodeComponent from '../components/cue-editor/components/flow/EventNode';
 import LogicNodeComponent from '../components/cue-editor/components/flow/LogicNode';
 import EventRaiserNodeComponent from '../components/cue-editor/components/flow/EventRaiserNode';
 import EventListenerNodeComponent from '../components/cue-editor/components/flow/EventListenerNode';
+import EffectRaiserNodeComponent from '../components/cue-editor/components/flow/EffectRaiserNode';
+import EffectListenerNodeComponent from '../components/cue-editor/components/flow/EffectListenerNode';
+import NewFileModal from '../components/cue-editor/components/NewFileModal';
+import ToastContainer from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles';
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow';
-import { updateDocumentFromFlow } from '../components/cue-editor/lib/cueTransforms';
-import type { NodeCueFile, VariableDefinition, EventDefinition } from '../../../photonics-dmx/cues/types/nodeCueTypes';
+import { updateDocumentFromFlow, updateEffectDocumentFromFlow } from '../components/cue-editor/lib/cueTransforms';
+import type { NodeCueFile, EffectFile, VariableDefinition, EventDefinition, EffectReference, EffectParameterDefinition, YargEffectDefinition, AudioEffectDefinition } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 
 const CueEditor: React.FC = () => {
-  const [registryTab, setRegistryTab] = useState<'variables' | 'events'>('variables');
+  const [registryTab, setRegistryTab] = useState<'variables' | 'events' | 'effects' | 'parameters'>('variables');
+  const [showNewFileModal, setShowNewFileModal] = useState(false);
+  const { toasts, showToast, hideToast } = useToast();
   const loadCueIntoFlowRef = useRef<(cue: any) => void>(() => {});
-  const getUpdatedDocumentRef = useRef<() => NodeCueFile | null>(() => null);
+  const getUpdatedDocumentRef = useRef<() => NodeCueFile | EffectFile | null>(() => null);
   const flowWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const loadCueIntoFlowProxy = useCallback((cue: any) => loadCueIntoFlowRef.current(cue), []);
@@ -29,6 +38,7 @@ const CueEditor: React.FC = () => {
     mode,
     activeMode,
     groupedFiles,
+    groupedEffectFiles,
     editorDoc,
     selectedCueId,
     filename,
@@ -36,22 +46,34 @@ const CueEditor: React.FC = () => {
     validationErrors,
     isDirty,
     currentCueDefinition,
-    setFilename,
+    currentEffectDefinition,
     setSelectedCueId,
     setIsDirty,
     handleModeChange,
     handleNewFile,
+    handleCreateNewFile,
     updateGroupMeta,
     updateCueMetadata,
+    updateEffectMetadata,
     handleAddCue,
     removeCue,
     selectFile,
+    selectEffectFile,
     handleSave,
     handleDelete,
     handleImport,
     handleExport,
     refreshFiles
-  } = useCueFiles({ loadCueIntoFlow: loadCueIntoFlowProxy, getUpdatedDocument: getUpdatedDocumentProxy });
+  } = useCueFiles({ 
+    loadCueIntoFlow: loadCueIntoFlowProxy, 
+    getUpdatedDocument: getUpdatedDocumentProxy,
+    onSaveSuccess: (message) => showToast(message, 'success')
+  });
+
+  // Compute the current dropdown value based on editor mode
+  const dropdownValue = editorDoc?.mode === 'effect' 
+    ? (activeMode === 'yarg' ? 'yarg-effect' : 'audio-effect')
+    : activeMode;
 
   const {
     nodes,
@@ -73,6 +95,8 @@ const CueEditor: React.FC = () => {
     addLogicNode,
     addEventRaiserNode,
     addEventListenerNode,
+    addEffectRaiserNode,
+    addEffectListenerNode,
     updateSelectedNode,
     loadCueIntoFlow,
     setReactFlowInstance,
@@ -82,13 +106,25 @@ const CueEditor: React.FC = () => {
 
   loadCueIntoFlowRef.current = loadCueIntoFlow;
 
-  const getUpdatedDocument = useCallback(() => updateDocumentFromFlow(
-    editorDoc,
-    currentCueDefinition,
-    nodes,
-    edges,
-    reactFlowInstance
-  ), [editorDoc, currentCueDefinition, nodes, edges, reactFlowInstance]);
+  const getUpdatedDocument = useCallback((): NodeCueFile | EffectFile | null => {
+    if (editorDoc?.mode === 'effect') {
+      return updateEffectDocumentFromFlow(
+        editorDoc,
+        currentEffectDefinition as YargEffectDefinition | AudioEffectDefinition | null,
+        nodes,
+        edges,
+        reactFlowInstance
+      );
+    } else {
+      return updateDocumentFromFlow(
+        editorDoc,
+        currentCueDefinition,
+        nodes,
+        edges,
+        reactFlowInstance
+      );
+    }
+  }, [editorDoc, currentCueDefinition, currentEffectDefinition, nodes, edges, reactFlowInstance]);
 
   getUpdatedDocumentRef.current = getUpdatedDocument;
 
@@ -97,7 +133,9 @@ const CueEditor: React.FC = () => {
     action: ActionNodeComponent,
     logic: LogicNodeComponent,
     'event-raiser': EventRaiserNodeComponent,
-    'event-listener': EventListenerNodeComponent
+    'event-listener': EventListenerNodeComponent,
+    'effect-raiser': EffectRaiserNodeComponent,
+    'effect-listener': EffectListenerNodeComponent
   }), []);
 
   const handleVariablesChange = useCallback((groupVars: VariableDefinition[], cueVars: VariableDefinition[]) => {
@@ -114,18 +152,33 @@ const CueEditor: React.FC = () => {
 
   const handleEventsChange = useCallback((events: EventDefinition[]) => {
     if (!editorDoc || !selectedCueId) return;
-    
+
     // Update cue events
     updateCueMetadata({ events });
   }, [editorDoc, selectedCueId, updateCueMetadata]);
 
+  const handleEffectsChange = useCallback((effects: EffectReference[]) => {
+    if (!editorDoc || !selectedCueId) return;
+
+    // Update cue effects
+    updateCueMetadata({ effects });
+  }, [editorDoc, selectedCueId, updateCueMetadata]);
+
+  const handleParametersChange = useCallback((_parameters: EffectParameterDefinition[]) => {
+    // TODO: Implement effect parameter persistence
+    // For now, parameters are view-only. Full implementation requires
+    // updateEffectMetadata function similar to updateCueMetadata
+    console.warn('Effect parameter persistence not yet implemented');
+  }, []);
+
   const getVariableReferences = useCallback((varName: string, scope: 'cue' | 'cue-group'): string[] => {
-    if (!editorDoc) return [];
+    if (!editorDoc || editorDoc.mode !== 'cue') return [];
     
     const references: string[] = [];
+    const cueFile = editorDoc.file as NodeCueFile;
     const cuesToCheck = scope === 'cue' && selectedCueId 
-      ? editorDoc.file.cues.filter(c => c.id === selectedCueId)
-      : editorDoc.file.cues;
+      ? cueFile.cues.filter(c => c.id === selectedCueId)
+      : cueFile.cues;
 
     for (const cue of cuesToCheck) {
       // Check logic nodes
@@ -160,10 +213,11 @@ const CueEditor: React.FC = () => {
   }, [editorDoc, selectedCueId]);
 
   const getEventReferences = useCallback((eventName: string): string[] => {
-    if (!editorDoc || !selectedCueId) return [];
+    if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return [];
     
     const references: string[] = [];
-    const currentCue = editorDoc.file.cues.find(c => c.id === selectedCueId);
+    const cueFile = editorDoc.file as NodeCueFile;
+    const currentCue = cueFile.cues.find(c => c.id === selectedCueId);
     if (!currentCue) return [];
 
     // Check event raiser nodes
@@ -186,16 +240,17 @@ const CueEditor: React.FC = () => {
   }, [editorDoc, selectedCueId]);
 
   const availableVariables = useMemo(() => {
-    if (!editorDoc) return [];
+    if (!editorDoc || editorDoc.mode !== 'cue') return [];
     
-    const groupVars = (editorDoc.file.group.variables ?? []).map(v => ({
+    const cueFile = editorDoc.file as NodeCueFile;
+    const groupVars = (cueFile.group.variables ?? []).map(v => ({
       name: v.name,
       type: v.type,
       scope: 'cue-group' as const
     }));
     
     const cueVars = selectedCueId
-      ? (editorDoc.file.cues.find(c => c.id === selectedCueId)?.variables ?? []).map(v => ({
+      ? (cueFile.cues.find(c => c.id === selectedCueId)?.variables ?? []).map(v => ({
           name: v.name,
           type: v.type,
           scope: 'cue' as const
@@ -206,13 +261,34 @@ const CueEditor: React.FC = () => {
   }, [editorDoc, selectedCueId]);
 
   const availableEvents = useMemo(() => {
-    if (!editorDoc || !selectedCueId) return [];
+    if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return [];
     
-    const currentCue = editorDoc.file.cues.find(c => c.id === selectedCueId);
+    const cueFile = editorDoc.file as NodeCueFile;
+    const currentCue = cueFile.cues.find(c => c.id === selectedCueId);
     return (currentCue?.events ?? []).map(e => e.name);
   }, [editorDoc, selectedCueId]);
 
+  const availableEffects = useMemo(() => {
+    if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return [];
+    
+    const cueFile = editorDoc.file as NodeCueFile;
+    const currentCue = cueFile.cues.find(c => c.id === selectedCueId);
+    return (currentCue?.effects ?? []).map(e => ({ id: e.effectId, name: e.name }));
+  }, [editorDoc, selectedCueId]);
+
   const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio;
+  const effectFiles = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio;
+  
+  // Determine if we're in effect mode
+  const isEffectMode = editorDoc?.mode === 'effect';
+  const hasFile = !!editorDoc?.path;
+  
+  // Dynamic labels based on mode
+  const newFileLabel = isEffectMode ? 'New Effect File' : 'New Cue File';
+  const importLabel = isEffectMode ? 'Import Effect' : 'Import Cue';
+  const exportLabel = isEffectMode ? 'Export Effect' : 'Export Cue';
+  const deleteLabel = isEffectMode ? 'Delete Effect' : 'Delete Cue';
+  
   const primaryButton = 'px-3 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-500';
   const secondaryButton = 'px-3 py-1 text-xs rounded bg-gray-200 dark:bg-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-700';
   const dangerButton = 'px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-500';
@@ -223,20 +299,26 @@ const CueEditor: React.FC = () => {
         <div className="flex items-center gap-2">
           <label className="font-semibold text-base">Mode</label>
           <select
-            value={mode}
+            value={dropdownValue}
             onChange={event => handleModeChange(event.target.value as any)}
             className="rounded border border-gray-300 px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-600"
           >
-            <option value="yarg">YARG Node Cues</option>
-            <option value="audio">Audio Node Cues</option>
+            <optgroup label="Cues">
+              <option value="yarg">YARG Node Cues</option>
+              <option value="audio">Audio Node Cues</option>
+            </optgroup>
+            <optgroup label="Effects">
+              <option value="yarg-effect">YARG Effects</option>
+              <option value="audio-effect">Audio Effects</option>
+            </optgroup>
           </select>
         </div>
         <div className="flex gap-2">
-          <button className={secondaryButton} onClick={handleNewFile}>New File</button>
+          <button className={secondaryButton} onClick={() => setShowNewFileModal(true)}>{newFileLabel}</button>
           <button className={`${primaryButton} ${!editorDoc ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={handleSave} disabled={!editorDoc}>Save</button>
-          <button className={secondaryButton} onClick={handleImport}>Import</button>
-          <button className={`${secondaryButton} ${!editorDoc?.path ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={handleExport} disabled={!editorDoc?.path}>Export</button>
-          <button className={`${dangerButton} ${!editorDoc?.path ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={handleDelete} disabled={!editorDoc?.path}>Delete</button>
+          <button className={secondaryButton} onClick={handleImport}>{importLabel}</button>
+          <button className={`${secondaryButton} ${!hasFile ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={handleExport} disabled={!hasFile}>{exportLabel}</button>
+          <button className={`${dangerButton} ${!hasFile ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={handleDelete} disabled={!hasFile}>{deleteLabel}</button>
         </div>
       </div>
 
@@ -245,9 +327,11 @@ const CueEditor: React.FC = () => {
           <CueFileSidebar
             mode={mode}
             fileList={fileList}
+            effectFileList={effectFiles}
             editorDoc={editorDoc}
             selectedCueId={selectedCueId}
             onSelectFile={selectFile}
+            onSelectEffectFile={selectEffectFile}
             onReload={refreshFiles}
             onNewFile={handleNewFile}
             onAddCue={handleAddCue}
@@ -259,7 +343,7 @@ const CueEditor: React.FC = () => {
           />
           
           {/* Tabbed Registry Interface */}
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-inner overflow-hidden flex flex-col">
+          <div className={`bg-white dark:bg-gray-900 rounded-lg shadow-inner overflow-hidden flex flex-col ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex border-b border-gray-200 dark:border-gray-700">
               <button
                 className={`flex-1 px-3 py-2 text-xs font-medium ${
@@ -281,6 +365,26 @@ const CueEditor: React.FC = () => {
               >
                 Events
               </button>
+              <button
+                className={`flex-1 px-3 py-2 text-xs font-medium ${
+                  registryTab === 'effects'
+                    ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-300 border-b-2 border-cyan-600'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+                onClick={() => setRegistryTab('effects')}
+              >
+                Effects
+              </button>
+              <button
+                className={`flex-1 px-3 py-2 text-xs font-medium ${
+                  registryTab === 'parameters'
+                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 border-b-2 border-purple-600'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+                onClick={() => setRegistryTab('parameters')}
+              >
+                Parameters
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto">
               {registryTab === 'variables' ? (
@@ -290,31 +394,42 @@ const CueEditor: React.FC = () => {
                   onVariablesChange={handleVariablesChange}
                   getVariableReferences={getVariableReferences}
                 />
-              ) : (
+              ) : registryTab === 'events' ? (
                 <EventRegistry
                   editorDoc={editorDoc}
                   selectedCueId={selectedCueId}
                   onEventsChange={handleEventsChange}
                   getEventReferences={getEventReferences}
                 />
+              ) : registryTab === 'effects' ? (
+                <EffectRegistry
+                  editorDoc={editorDoc}
+                  selectedCueId={selectedCueId}
+                  onEffectsChange={handleEffectsChange}
+                />
+              ) : (
+                <ParameterRegistry
+                  editorDoc={editorDoc}
+                  selectedEffectId={selectedCueId}
+                  onParametersChange={handleParametersChange}
+                />
               )}
             </div>
           </div>
         </div>
 
-        <section className="flex flex-col bg-white dark:bg-gray-900 rounded-lg shadow-inner">
+        <section className={`flex flex-col bg-white dark:bg-gray-900 rounded-lg shadow-inner ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
           <CueMetadataForm
             filename={filename}
             group={editorDoc?.file.group ?? null}
             currentCue={currentCueDefinition}
+            currentEffect={currentEffectDefinition}
             availableCueTypes={availableCueTypes}
             activeMode={activeMode}
-            onFilenameChange={value => {
-              setFilename(value);
-              setIsDirty(true);
-            }}
+            editorMode={editorDoc?.mode ?? 'cue'}
             onGroupChange={updateGroupMeta}
             onCueMetadataChange={updateCueMetadata}
+            onEffectMetadataChange={updateEffectMetadata}
           />
 
           <CueFlowCanvas
@@ -348,24 +463,43 @@ const CueEditor: React.FC = () => {
           )}
         </section>
 
-        <NodeSidebar
-          activeMode={activeMode}
-          selectedNode={selectedNode}
-          selectedActionHasEventParent={selectedActionHasEventParent}
-          availableVariables={availableVariables}
-          availableEvents={availableEvents}
-          addEventNode={addEventNode}
-          addActionNode={addActionNode}
-          addLogicNode={addLogicNode}
-          addEventRaiserNode={addEventRaiserNode}
-          addEventListenerNode={addEventListenerNode}
-          updateSelectedNode={updateSelectedNode}
-        />
+        <div className={!hasFile ? 'opacity-50 pointer-events-none' : ''}>
+          <NodeSidebar
+            activeMode={activeMode}
+            editorMode={editorDoc?.mode ?? 'cue'}
+            selectedNode={selectedNode}
+            selectedActionHasEventParent={selectedActionHasEventParent}
+            availableVariables={availableVariables}
+            availableEvents={availableEvents}
+            availableEffects={availableEffects}
+            addEventNode={addEventNode}
+            addActionNode={addActionNode}
+            addLogicNode={addLogicNode}
+            addEventRaiserNode={addEventRaiserNode}
+            addEventListenerNode={addEventListenerNode}
+            addEffectRaiserNode={addEffectRaiserNode}
+            addEffectListenerNode={addEffectListenerNode}
+            updateSelectedNode={updateSelectedNode}
+          />
+        </div>
       </div>
       <div className="text-xs text-gray-500 flex justify-between">
         <span>{editorDoc?.path ?? 'Unsaved file'}</span>
         <span>{isDirty ? 'Unsaved changes' : 'All changes saved'}</span>
       </div>
+
+      <NewFileModal
+        isOpen={showNewFileModal}
+        isEffectMode={isEffectMode}
+        mode={mode}
+        onCancel={() => setShowNewFileModal(false)}
+        onSave={(metadata) => {
+          handleCreateNewFile(metadata);
+          setShowNewFileModal(false);
+        }}
+      />
+
+      <ToastContainer toasts={toasts} onDismiss={hideToast} />
     </div>
   );
 };

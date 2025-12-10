@@ -1,5 +1,6 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine';
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler';
+import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry';
 import {
   YargNodeCueDefinition,
   YargEventNode,
@@ -156,7 +157,7 @@ describe('Runtime Event System', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        []
+        new EffectRegistry()
       );
 
       engine.startExecution(systemEvent, createCueData());
@@ -245,7 +246,7 @@ describe('Runtime Event System', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        []
+        new EffectRegistry()
       );
 
       engine.startExecution(systemEvent, createCueData());
@@ -342,7 +343,7 @@ describe('Runtime Event System', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        []
+        new EffectRegistry()
       );
 
       engine.startExecution(systemEvent, createCueData());
@@ -438,7 +439,7 @@ describe('Runtime Event System', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        []
+        new EffectRegistry()
       );
 
       engine.startExecution(systemEvent, createCueData());

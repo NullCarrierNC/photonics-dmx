@@ -13,6 +13,7 @@ import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
 import { BrowserWindow, ipcMain, app } from 'electron';
 import * as path from 'path';
+import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader';
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces';
 import { SenderError } from '../../photonics-dmx/senders/BaseSender';
@@ -42,6 +43,7 @@ export class ControllerManager {
   private audioProcessor: AudioCueProcessor | null = null;
   private processorManager: ProcessorManager | null = null;
   private nodeCueLoader: NodeCueLoader | null = null;
+  private effectLoader: EffectLoader | null = null;
 
   private testEffectInterval: NodeJS.Timeout | null = null;
   private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large';
@@ -78,6 +80,7 @@ export class ControllerManager {
     await this.initializeCueRegistry();
     await this.initializeAudioCueRegistry();
     await this.initializeNodeCueLoader();
+    await this.initializeEffectLoader();
     await this.initializeListeners();
 
     this.isInitialized = true;
@@ -194,6 +197,24 @@ export class ControllerManager {
     this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {
       const window = BrowserWindow.getAllWindows()[0];
       window?.webContents.send('node-cues:changed', payload);
+    });
+  }
+
+  private async initializeEffectLoader(): Promise<void> {
+    if (this.effectLoader) {
+      return;
+    }
+
+    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks');
+    this.effectLoader = new EffectLoader({ baseDir });
+
+    const summary = await this.effectLoader.loadAll();
+    console.log(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`);
+    await this.effectLoader.startWatching();
+
+    this.effectLoader.on('changed', (payload: EffectListSummary) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window?.webContents.send('effects:changed', payload);
     });
   }
   
@@ -652,6 +673,17 @@ export class ControllerManager {
           console.error("Error shutting down node cue loader:", err);
         }
       }
+
+      if (this.effectLoader) {
+        try {
+          await this.effectLoader.dispose();
+          this.effectLoader.removeAllListeners();
+          this.effectLoader = null;
+          console.log("ControllerManager shutdown: effect loader stopped");
+        } catch (err) {
+          console.error("Error shutting down effect loader:", err);
+        }
+      }
       
       // Ensure cue handler is shut down if it still exists
       if (this.cueHandler) {
@@ -725,6 +757,10 @@ export class ControllerManager {
 
   public getNodeCueLoader(): NodeCueLoader | null {
     return this.nodeCueLoader;
+  }
+
+  public getEffectLoader(): EffectLoader | null {
+    return this.effectLoader;
   }
 
   public getProcessorManager(): any | null {

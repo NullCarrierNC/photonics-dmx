@@ -1,6 +1,7 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine';
 import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext';
 import { CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler';
+import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry';
 import {
   YargNodeCueDefinition,
   YargEventNode,
@@ -137,8 +138,9 @@ describe('NodeExecutionEngine', () => {
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
+      eventRaiserMap: new Map(),
+      eventListenerMap: new Map(),
+      effectRaiserMap: new Map(),
         eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'action1' }]]
@@ -152,7 +154,7 @@ describe('NodeExecutionEngine', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        []
+        new EffectRegistry()
       );
 
       const parameters = createCueData('Strong');
@@ -224,8 +226,9 @@ describe('NodeExecutionEngine', () => {
           ['action2', action2]
         ]),
         logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
+      eventRaiserMap: new Map(),
+      eventListenerMap: new Map(),
+      effectRaiserMap: new Map(),
         eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'action1' }]],
@@ -240,7 +243,7 @@ describe('NodeExecutionEngine', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        []
+        new EffectRegistry()
       );
 
       engine.startExecution(eventNode, createCueData('Strong'));
@@ -330,8 +333,9 @@ describe('NodeExecutionEngine', () => {
           ['action-false', actionFalse]
         ]),
         logicMap: new Map([['logic1', conditionalNode]]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
+      eventRaiserMap: new Map(),
+      eventListenerMap: new Map(),
+      effectRaiserMap: new Map(),
         eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'logic1' }]],
@@ -352,7 +356,7 @@ describe('NodeExecutionEngine', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        []
+        new EffectRegistry()
       );
 
       engine.startExecution(eventNode, createCueData('Strong'));
@@ -438,8 +442,9 @@ describe('NodeExecutionEngine', () => {
           ['logic1', setVarNode],
           ['logic2', readVarNode]
         ]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
+      eventRaiserMap: new Map(),
+      eventListenerMap: new Map(),
+      effectRaiserMap: new Map(),
         eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'logic1' }]],
@@ -455,7 +460,7 @@ describe('NodeExecutionEngine', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        definition.variables || []
+        new EffectRegistry()
       );
 
       engine.startExecution(eventNode, createCueData('Strong'));
@@ -586,8 +591,9 @@ describe('NodeExecutionEngine', () => {
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map(),
         logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
+      eventRaiserMap: new Map(),
+      eventListenerMap: new Map(),
+      effectRaiserMap: new Map(),
         eventDefinitions: [],
         adjacency: new Map([
           ['event1', [{ from: 'event1', to: 'nonexistent-action' }]]
@@ -601,7 +607,7 @@ describe('NodeExecutionEngine', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        []
+        new EffectRegistry()
       );
 
       // Should not throw
@@ -650,8 +656,9 @@ describe('NodeExecutionEngine', () => {
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map(),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
+      eventRaiserMap: new Map(),
+      eventListenerMap: new Map(),
+      effectRaiserMap: new Map(),
         eventDefinitions: [],
         adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]])
       };
@@ -663,7 +670,7 @@ describe('NodeExecutionEngine', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        []
+        new EffectRegistry()
       );
 
       engine.startExecution(eventNode, createCueData('Strong'));

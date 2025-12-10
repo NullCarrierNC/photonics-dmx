@@ -7,6 +7,7 @@ import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
 import { AudioEventNode, LogicNode, ValueSource, AudioNodeCueDefinition } from '../../types/nodeCueTypes';
 import { NodeExecutionEngine } from './NodeExecutionEngine';
 import { VariableValue } from './executionTypes';
+import { EffectRegistry } from './EffectRegistry';
 
 interface AudioEventState {
   previousValue: number;
@@ -79,6 +80,10 @@ export class AudioNodeCue implements IAudioCue {
       const definition = this.compiledCue.definition as AudioNodeCueDefinition;
       const variableDefinitions = definition.variables ?? [];
       
+      // TODO: Load effect registry based on cue's effect references
+      // For now, use empty registry - effects will be gracefully skipped
+      const effectRegistry = new EffectRegistry();
+      
       this.executionEngine = new NodeExecutionEngine(
         this.compiledCue,
         this.id,
@@ -86,6 +91,7 @@ export class AudioNodeCue implements IAudioCue {
         lightManager,
         this.cueLevelVarStore,
         this.groupLevelVarStore,
+        effectRegistry,
         variableDefinitions
       );
     }

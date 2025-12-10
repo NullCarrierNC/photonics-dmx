@@ -6,19 +6,28 @@ import type {
   EventListenerNode,
   LogicNode,
   NodeCueFile,
-  YargEventNode
+  YargEventNode,
+  EffectRaiserNode,
+  EffectEventListenerNode,
+  EffectFile
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 
+export type EditorMode = 'cue' | 'effect';
+
 export type EditorNodeData = {
-  kind: 'event' | 'action' | 'logic' | 'event-raiser' | 'event-listener';
-  payload: YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode;
+  kind: 'event' | 'action' | 'logic' | 'event-raiser' | 'event-listener' 
+        | 'effect-raiser' | 'effect-listener';
+  payload: YargEventNode | AudioEventNode | ActionNode | LogicNode 
+           | EventRaiserNode | EventListenerNode 
+           | EffectRaiserNode | EffectEventListenerNode;
   label: string;
 };
 
 export type EditorNode = Node<EditorNodeData>;
 
 export type EditorDocument = {
-  file: NodeCueFile;
+  mode: EditorMode;
+  file: NodeCueFile | EffectFile;
   path: string | null;
 };
 

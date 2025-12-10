@@ -6,6 +6,7 @@ import { CompiledYargCue } from '../compiler/NodeCueCompiler';
 import { YargNodeCueDefinition, YargEventNode } from '../../types/nodeCueTypes';
 import { NodeExecutionEngine } from './NodeExecutionEngine';
 import { VariableValue } from './executionTypes';
+import { EffectRegistry } from './EffectRegistry';
 
 export class YargNodeCue implements INetCue {
   public readonly cueId: CueType;
@@ -55,6 +56,10 @@ export class YargNodeCue implements INetCue {
       const definition = this.compiledCue.definition as YargNodeCueDefinition;
       const variableDefinitions = definition.variables ?? [];
       
+      // TODO: Load effect registry based on cue's effect references
+      // For now, use empty registry - effects will be gracefully skipped
+      const effectRegistry = new EffectRegistry();
+      
       this.executionEngine = new NodeExecutionEngine(
         this.compiledCue,
         this.id,
@@ -62,6 +67,7 @@ export class YargNodeCue implements INetCue {
         lightManager,
         this.cueLevelVarStore,
         this.groupLevelVarStore,
+        effectRegistry,
         variableDefinitions
       );
     }

@@ -9,6 +9,7 @@ import {
   EventDefinition,
   EventRaiserNode,
   EventListenerNode,
+  EffectRaiserNode,
   LogicNode,
   YargEventNode,
   YargNodeCueDefinition
@@ -28,6 +29,7 @@ export interface CompiledNodeCue<TEvent extends BaseEventNode> {
   logicMap: Map<string, LogicNode>;
   eventRaiserMap: Map<string, EventRaiserNode>;
   eventListenerMap: Map<string, EventListenerNode>;
+  effectRaiserMap: Map<string, EffectRaiserNode>;
   eventDefinitions: EventDefinition[];
   adjacency: Map<string, Connection[]>;
 }
@@ -67,14 +69,15 @@ export class NodeCueCompiler {
     const logic = definition.nodes.logic ?? [];
     const eventRaisers = definition.nodes.eventRaisers ?? [];
     const eventListeners = definition.nodes.eventListeners ?? [];
+    const effectRaisers = definition.nodes.effectRaisers ?? [];
     const eventDefinitions = definition.events ?? [];
 
     if (!events.length) {
       throw new NodeCueCompilationError('At least one event node is required.');
     }
 
-    if (!actions.length && !eventRaisers.length && !eventListeners.length) {
-      throw new NodeCueCompilationError('At least one action, event raiser, or event listener node is required.');
+    if (!actions.length && !eventRaisers.length && !eventListeners.length && !effectRaisers.length) {
+      throw new NodeCueCompilationError('At least one action, event raiser, event listener, or effect raiser node is required.');
     }
 
     const eventMap = new Map(events.map(event => [event.id, event]));
@@ -82,6 +85,7 @@ export class NodeCueCompiler {
     const logicMap = new Map(logic.map(node => [node.id, node]));
     const eventRaiserMap = new Map(eventRaisers.map(raiser => [raiser.id, raiser]));
     const eventListenerMap = new Map(eventListeners.map(listener => [listener.id, listener]));
+    const effectRaiserMap = new Map(effectRaisers.map(raiser => [raiser.id, raiser]));
     const eventNameSet = new Set(eventDefinitions.map(e => e.name));
 
     // Validate that all event raiser/listener nodes reference valid registered events
@@ -107,10 +111,10 @@ export class NodeCueCompiler {
 
     // Ensure all connection endpoints exist
     for (const conn of definition.connections) {
-      if (!eventMap.has(conn.from) && !actionMap.has(conn.from) && !logicMap.has(conn.from) && !eventRaiserMap.has(conn.from) && !eventListenerMap.has(conn.from)) {
+      if (!eventMap.has(conn.from) && !actionMap.has(conn.from) && !logicMap.has(conn.from) && !eventRaiserMap.has(conn.from) && !eventListenerMap.has(conn.from) && !effectRaiserMap.has(conn.from)) {
         throw new NodeCueCompilationError(`Connection 'from' id '${conn.from}' does not exist.`);
       }
-      if (!eventMap.has(conn.to) && !actionMap.has(conn.to) && !logicMap.has(conn.to) && !eventRaiserMap.has(conn.to) && !eventListenerMap.has(conn.to)) {
+      if (!eventMap.has(conn.to) && !actionMap.has(conn.to) && !logicMap.has(conn.to) && !eventRaiserMap.has(conn.to) && !eventListenerMap.has(conn.to) && !effectRaiserMap.has(conn.to)) {
         throw new NodeCueCompilationError(`Connection 'to' id '${conn.to}' does not exist.`);
       }
     }
@@ -167,6 +171,7 @@ export class NodeCueCompiler {
       logicMap,
       eventRaiserMap,
       eventListenerMap,
+      effectRaiserMap,
       eventDefinitions,
       adjacency
     };

@@ -138,3 +138,29 @@ export const importNodeCueFile = (mode?: 'yarg' | 'audio') =>
 
 export const exportNodeCueFile = (filePath: string) =>
   window.electron.ipcRenderer.invoke('node-cues:export', filePath);
+
+// Effect file management
+export const listEffectFiles = () =>
+  window.electron.ipcRenderer.invoke('effects:list');
+
+export const reloadEffectFiles = () =>
+  window.electron.ipcRenderer.invoke('effects:reload');
+
+export const readEffectFile = (filePath: string) =>
+  window.electron.ipcRenderer.invoke('effects:read', filePath);
+
+export const saveEffectFile = (payload: { mode: 'yarg' | 'audio'; filename: string; content: any }) =>
+  window.electron.ipcRenderer.invoke('effects:save', payload);
+
+export const deleteEffectFile = (filePath: string) =>
+  window.electron.ipcRenderer.invoke('effects:delete', filePath);
+
+export const validateEffect = (payload: { path?: string; content?: any }) =>
+  window.electron.ipcRenderer.invoke('effects:validate', payload);
+
+export const importEffectFile = (mode?: 'yarg' | 'audio') =>
+  window.electron.ipcRenderer.invoke('effects:import', mode);
+
+export const exportEffectFile = (filePath: string) =>
+  window.electron.ipcRenderer.invoke('effects:export', filePath);
+
