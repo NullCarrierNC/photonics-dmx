@@ -7,6 +7,7 @@ import type {
   EventListenerNode,
   EffectRaiserNode,
   EffectEventListenerNode,
+  EffectDefinition,
   LogicNode,
   LogicComparator,
   MathOperator,
@@ -14,7 +15,9 @@ import type {
   NodeEffectType,
   ValueSource,
   VariableLogicNode,
-  YargEventNode
+  YargEventNode,
+  YargEffectDefinition,
+  AudioEffectDefinition
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { WaitCondition, Color } from '../../../../../photonics-dmx/types';
 import type { EditorMode } from '../lib/types';
@@ -42,7 +45,8 @@ type Props = {
   selectedActionHasEventParent: boolean;
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
   availableEvents?: string[];
-  availableEffects?: { id: string; name: string }[];
+  availableEffects?: { id: string; name: string; definition?: EffectDefinition }[];
+  currentEffect?: YargEffectDefinition | AudioEffectDefinition | null;
   addEventNode: (option: EventOption<WaitCondition | AudioEventNode['eventType']>) => void;
   addActionNode: (effect: NodeEffectType) => void;
   addLogicNode: (logicType: LogicNode['logicType']) => void;
@@ -61,6 +65,7 @@ const NodeSidebar: React.FC<Props> = ({
   availableVariables,
   availableEvents = [],
   availableEffects = [],
+  currentEffect,
   addEventNode,
   addActionNode,
   addLogicNode,
@@ -118,11 +123,14 @@ const NodeSidebar: React.FC<Props> = ({
               </select>
             ) : (
               <input
-                type="number"
-                step="0.1"
+                type={isString ? 'text' : 'number'}
+                step={isString ? undefined : "0.1"}
                 className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={typeof source.value === 'number' ? source.value : 0}
-                onChange={event => onChange({ ...source, value: Number(event.target.value) })}
+                value={isString ? String(source.value ?? '') : (typeof source.value === 'number' ? source.value : 0)}
+                onChange={event => {
+                  const newValue = isString ? event.target.value : Number(event.target.value);
+                  onChange({ ...source, value: newValue });
+                }}
               />
             )}
           </label>
@@ -294,17 +302,95 @@ const NodeSidebar: React.FC<Props> = ({
               </p>
             )}
             <p className="text-[10px] text-gray-500">
-              Triggers the selected effect. Effect parameters can be configured in the Effects tab.
+              Triggers the selected effect. Configure parameter values below.
             </p>
+
+            {/* Parameter Values Configuration */}
+            {(() => {
+              const raiser = selectedNode.data.payload as EffectRaiserNode;
+              const selectedEffect = availableEffects.find(e => e.id === raiser.effectId);
+              const parameterVars = selectedEffect?.definition?.variables?.filter(v => v.isParameter) ?? [];
+              
+              if (parameterVars.length === 0) {
+                return (
+                  <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-800 rounded text-[10px] text-gray-500">
+                    This effect has no parameters defined.
+                  </div>
+                );
+              }
+
+              return (
+                <div className="mt-3 space-y-2 border-t pt-2">
+                  <div className="font-semibold text-xs">Parameter Values</div>
+                  {parameterVars.map(param => {
+                    const currentValue = raiser.parameterValues?.[param.name];
+                    return (
+                      <div key={param.name} className="space-y-1">
+                        {renderValueSourceEditor(
+                          `${param.name} (${param.type})`,
+                          currentValue,
+                          (newValue) => {
+                            const updatedValues = { ...(raiser.parameterValues ?? {}) };
+                            updatedValues[param.name] = newValue;
+                            updateSelectedNode<EffectRaiserNode>({ parameterValues: updatedValues });
+                          },
+                          param.type
+                        )}
+                        {param.description && (
+                          <div className="text-[10px] text-gray-500 italic">{param.description}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         ) : selectedNode.data.kind === 'effect-listener' ? (
-          <div className="space-y-2 text-xs">
-            <p className="text-gray-700 dark:text-gray-300">
-              This is the entry point for the effect. Configure parameters in the Effects tab.
-            </p>
-            <p className="text-[10px] text-gray-500">
-              Effect parameters will be mapped to local effect variables at runtime.
-            </p>
+          <div className="space-y-3 text-xs">
+            <div className="font-semibold text-cyan-700 dark:text-cyan-300">
+              Effect Entry Point
+            </div>
+            
+            {currentEffect && currentEffect.variables && (() => {
+              const parameterVars = currentEffect.variables.filter(v => v.isParameter);
+              
+              if (parameterVars.length === 0) {
+                return (
+                  <div className="space-y-2">
+                    <p className="text-gray-600 dark:text-gray-400">
+                      This effect has no parameters defined.
+                    </p>
+                    <p className="text-[10px] text-gray-500">
+                      Add variables and toggle "Is Parameter" in the Variables tab to accept inputs.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-2">
+                  <div className="text-xs font-medium">Effect Parameters</div>
+                  <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded space-y-1">
+                    {parameterVars.map(param => (
+                      <div key={param.name} className="text-[10px]">
+                        <span className="font-mono font-semibold text-purple-700 dark:text-purple-300">
+                          {param.name}
+                        </span>
+                        <span className="text-gray-500"> ({param.type})</span>
+                        {param.description && (
+                          <div className="text-gray-500 italic ml-2">{param.description}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-500">
+                    These parameters are automatically mapped to effect variables when the effect is triggered.
+                    Default: {parameterVars.map(p => `${p.name}=${JSON.stringify(p.initialValue)}`).join(', ')}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         ) : selectedNode.data.kind === 'event-raiser' ? (
           <div className="space-y-2 text-xs">

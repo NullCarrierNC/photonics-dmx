@@ -8,7 +8,11 @@ import type {
   NodeCueMode,
   YargNodeCueDefinition,
   YargNodeCueFile,
-  EffectFile
+  EffectFile,
+  YargEffectDefinition,
+  AudioEffectDefinition,
+  YargEffectFile,
+  AudioEffectFile
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { 
   getNodeCueTypes, 
@@ -28,7 +32,7 @@ import {
   exportEffectFile
 } from '../../../ipcApi';
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers';
-import { createBlankCue, createDefaultFile, createDefaultEffectFile } from '../lib/cueDefaults';
+import { createBlankCue, createDefaultFile, createDefaultEffectFile, createDefaultEffect } from '../lib/cueDefaults';
 import { clearStoredLastFilePath, getStoredLastFilePath, setStoredLastFilePath } from './useLastCueFilePath';
 import type { EditorDocument } from '../lib/types';
 import type { EffectMode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
@@ -350,8 +354,15 @@ const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: Use
   }, [editorDoc, selectedCueId]);
 
   const handleAddCue = useCallback(() => {
-    const newCue = createBlankCue(mode);
     const baseDoc = editorDoc ?? { mode: 'cue' as const, file: createDefaultFile(mode), path: null };
+    
+    // Don't add cues in effect mode
+    if (baseDoc.mode === 'effect') {
+      console.warn('Cannot add cue in effect mode');
+      return;
+    }
+    
+    const newCue = createBlankCue(mode);
     const baseCueFile = baseDoc.file as NodeCueFile;
     const updatedCues = [...baseCueFile.cues, newCue];
     const updatedFile = mode === 'yarg'
@@ -361,6 +372,28 @@ const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: Use
     setEditorDoc(updatedDoc);
     setSelectedCueId(newCue.id);
     loadCueIntoFlow(newCue as YargNodeCueDefinition | AudioNodeCueDefinition);
+    setIsDirty(true);
+  }, [editorDoc, mode, loadCueIntoFlow]);
+
+  const handleAddEffect = useCallback(() => {
+    const baseDoc = editorDoc ?? { mode: 'effect' as const, file: createDefaultEffectFile(mode as EffectMode), path: null };
+    
+    // Don't add effects in cue mode
+    if (baseDoc.mode === 'cue') {
+      console.warn('Cannot add effect in cue mode');
+      return;
+    }
+    
+    const newEffect = createDefaultEffect(mode as EffectMode);
+    const baseEffectFile = baseDoc.file as EffectFile;
+    const updatedEffects = [...baseEffectFile.effects, newEffect];
+    const updatedFile = mode === 'yarg'
+      ? { ...baseDoc.file, effects: updatedEffects as YargEffectDefinition[] } as YargEffectFile
+      : { ...baseDoc.file, effects: updatedEffects as AudioEffectDefinition[] } as AudioEffectFile;
+    const updatedDoc: EditorDocument = { ...baseDoc, file: updatedFile };
+    setEditorDoc(updatedDoc);
+    setSelectedCueId(newEffect.id);
+    loadCueIntoFlow(newEffect as YargEffectDefinition | AudioEffectDefinition);
     setIsDirty(true);
   }, [editorDoc, mode, loadCueIntoFlow]);
 
@@ -385,6 +418,30 @@ const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: Use
 
     const nextCue = updatedCues.find(cue => cue.id === nextCueId) ?? updatedCues[0] ?? null;
     loadCueIntoFlow(nextCue as YargNodeCueDefinition | AudioNodeCueDefinition | null);
+    setIsDirty(true);
+  }, [editorDoc, loadCueIntoFlow, selectedCueId]);
+
+  const removeEffect = useCallback((effectId: string) => {
+    if (!editorDoc || editorDoc.mode !== 'effect') return;
+    const effectFile = editorDoc.file as EffectFile;
+    if (effectFile.effects.length <= 1) return;
+
+    const updatedEffects = effectFile.effects.filter(effect => effect.id !== effectId);
+    const updatedFile = effectFile.mode === 'yarg'
+      ? { ...effectFile, effects: updatedEffects as YargEffectDefinition[] } as YargEffectFile
+      : { ...effectFile, effects: updatedEffects as AudioEffectDefinition[] } as AudioEffectFile;
+    const updatedDoc: EditorDocument = { ...editorDoc, file: updatedFile };
+
+    setEditorDoc(updatedDoc);
+
+    let nextEffectId = selectedCueId;
+    if (effectId === selectedCueId) {
+      nextEffectId = updatedEffects[0]?.id ?? null;
+      setSelectedCueId(nextEffectId);
+    }
+
+    const nextEffect = updatedEffects.find(effect => effect.id === nextEffectId) ?? updatedEffects[0] ?? null;
+    loadCueIntoFlow(nextEffect as YargEffectDefinition | AudioEffectDefinition | null);
     setIsDirty(true);
   }, [editorDoc, loadCueIntoFlow, selectedCueId]);
 
@@ -514,7 +571,9 @@ const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: Use
     updateCueMetadata,
     updateEffectMetadata,
     handleAddCue,
+    handleAddEffect,
     removeCue,
+    removeEffect,
     selectFile,
     selectEffectFile,
     handleSave,

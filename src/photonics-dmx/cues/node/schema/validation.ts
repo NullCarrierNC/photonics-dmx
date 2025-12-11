@@ -211,7 +211,8 @@ const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
     type: { type: 'string', enum: ['number', 'boolean', 'string'] },
     scope: { type: 'string', enum: ['cue', 'cue-group'] },
     initialValue: { type: ['number', 'boolean', 'string'] },
-    description: { type: 'string', nullable: true }
+    description: { type: 'string', nullable: true },
+    isParameter: { type: 'boolean', nullable: true }
   }
 };
 

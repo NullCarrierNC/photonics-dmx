@@ -15,7 +15,9 @@ type Props = {
   onReload: () => void;
   onNewFile: () => void;
   onAddCue: () => void;
+  onAddEffect: () => void;
   onRemoveCue: (cueId: string) => void;
+  onRemoveEffect: (effectId: string) => void;
   onSelectCue: (cue: YargNodeCueDefinition | AudioNodeCueDefinition | null) => void;
 };
 
@@ -30,7 +32,9 @@ const CueFileSidebar: React.FC<Props> = ({
   onReload,
   onNewFile,
   onAddCue,
+  onAddEffect,
   onRemoveCue,
+  onRemoveEffect,
   onSelectCue
 }) => {
   const isEffectMode = editorDoc?.mode === 'effect';
@@ -75,7 +79,7 @@ const CueFileSidebar: React.FC<Props> = ({
           <h3 className="font-semibold text-sm">{listLabel}</h3>
           <button
             className="text-blue-500 text-xs hover:underline"
-            onClick={onAddCue}
+            onClick={isEffectMode ? onAddEffect : onAddCue}
           >
             {addLabel}
           </button>
@@ -91,7 +95,7 @@ const CueFileSidebar: React.FC<Props> = ({
               </button>
               <button
                 className="text-[11px] text-red-500 hover:underline disabled:text-gray-400"
-                onClick={() => onRemoveCue(item.id)}
+                onClick={() => isEffectMode ? onRemoveEffect(item.id) : onRemoveCue(item.id)}
                 disabled={items.length <= 1}
                 title={items.length <= 1 ? `At least one ${isEffectMode ? 'effect' : 'cue'} is required` : `Remove ${isEffectMode ? 'effect' : 'cue'}`}
               >

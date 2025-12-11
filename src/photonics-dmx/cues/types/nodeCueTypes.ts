@@ -44,6 +44,7 @@ export interface VariableDefinition {
   scope: 'cue' | 'cue-group';
   initialValue: number | boolean | string;
   description?: string;
+  isParameter?: boolean;  // NEW: mark as effect parameter
 }
 
 export interface EventDefinition {
@@ -51,7 +52,7 @@ export interface EventDefinition {
   description?: string;
 }
 
-// Effect parameter definition
+// Effect parameter definition (DEPRECATED - use VariableDefinition with isParameter: true)
 export interface EffectParameterDefinition {
   name: string;
   type: VariableType;
@@ -117,10 +118,7 @@ export interface EffectEventListenerNode {
   type: 'effect-listener';
   label?: string;
   outputs?: string[];
-  parameterMappings?: Array<{
-    parameterName: string;
-    targetVariable: string;
-  }>;
+  // parameterMappings removed - auto-mapped from effect variables with isParameter=true
 }
 
 // Effect Raiser node
@@ -310,8 +308,8 @@ export interface BaseEffectDefinition {
   nodes: NodeGraph<BaseEventNode, ActionNode>;
   connections: Connection[];
   layout?: NodeLayoutMetadata;
-  variables?: VariableDefinition[];  // Effect-local variables
-  parameters?: EffectParameterDefinition[];  // Exposed parameters
+  variables?: VariableDefinition[];  // Effect-local variables (some may be parameters with isParameter: true)
+  parameters?: EffectParameterDefinition[];  // DEPRECATED - use variables with isParameter: true
   events?: EventDefinition[];  // Effect-scoped runtime events
 }
 

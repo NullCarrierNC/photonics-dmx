@@ -89,8 +89,8 @@ export class EffectExecutionEngine {
       return;
     }
 
-    // Apply parameter mappings to effect variables
-    this.applyParameterMappings(effectListener);
+    // Apply parameter values to effect variables
+    this.applyParameterValues(effectListener);
 
     // Create execution context
     const context = new ExecutionContext(
@@ -126,25 +126,21 @@ export class EffectExecutionEngine {
   }
 
   /**
-   * Apply parameter mappings to effect variables.
+   * Apply parameter values to effect variables.
+   * Parameters are variables with isParameter: true in the effect definition.
    */
-  private applyParameterMappings(listener: EffectEventListenerNode): void {
-    if (!listener.parameterMappings) {
-      return;
-    }
+  private applyParameterValues(_listener: EffectEventListenerNode): void {
+    // Get all variables marked as parameters
+    const parameterVars = this.variableDefinitions.filter(v => v.isParameter);
 
-    for (const mapping of listener.parameterMappings) {
-      const paramValue = this.parameterValues[mapping.parameterName];
-      if (paramValue !== undefined) {
-        // Get the parameter definition to know the type
-        const paramDef = this.compiledEffect.parameters.get(mapping.parameterName);
-        if (paramDef) {
-          this.effectVarStore.set(mapping.targetVariable, {
-            type: paramDef.type,
-            value: paramValue
-          });
-        }
-      }
+    for (const paramVar of parameterVars) {
+      // Check if a value was provided, otherwise use the default
+      const value = this.parameterValues[paramVar.name] ?? paramVar.initialValue;
+      
+      this.effectVarStore.set(paramVar.name, {
+        type: paramVar.type,
+        value: value
+      });
     }
   }
 

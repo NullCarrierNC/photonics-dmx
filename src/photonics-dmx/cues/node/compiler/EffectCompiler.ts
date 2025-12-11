@@ -113,26 +113,7 @@ export class EffectCompiler {
       }
     }
 
-    // Validate parameter mappings in effect listeners
-    const variableNames = new Set(definition.variables?.map(v => v.name) ?? []);
-    for (const effectListener of effectListeners) {
-      if (effectListener.parameterMappings) {
-        for (const mapping of effectListener.parameterMappings) {
-          // Check parameter exists
-          if (!parameterMap.has(mapping.parameterName)) {
-            throw new EffectCompilationError(
-              `Effect Listener '${effectListener.label ?? effectListener.id}' maps undefined parameter '${mapping.parameterName}'.`
-            );
-          }
-          // Check target variable exists
-          if (!variableNames.has(mapping.targetVariable)) {
-            throw new EffectCompilationError(
-              `Effect Listener '${effectListener.label ?? effectListener.id}' maps to undefined variable '${mapping.targetVariable}'.`
-            );
-          }
-        }
-      }
-    }
+    // Validate parameter mappings removed - parameters are now auto-mapped from variables with isParameter: true
 
     // Ensure all connection endpoints exist
     for (const conn of definition.connections) {

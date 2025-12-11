@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import type { VariableDefinition, VariableType, NodeCueFile, NodeCueGroupMeta } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { VariableDefinition, VariableType, NodeCueFile, NodeCueGroupMeta, YargEffectDefinition, AudioEffectDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorDocument } from '../lib/types';
 
 type Props = {
   editorDoc: EditorDocument | null;
   selectedCueId: string | null;
+  currentEffect?: YargEffectDefinition | AudioEffectDefinition | null;
   onVariablesChange: (groupVars: VariableDefinition[], cueVars: VariableDefinition[]) => void;
   getVariableReferences: (varName: string, scope: 'cue' | 'cue-group') => string[];
 };
@@ -12,6 +13,7 @@ type Props = {
 const VariableRegistry: React.FC<Props> = ({
   editorDoc,
   selectedCueId,
+  currentEffect,
   onVariablesChange,
   getVariableReferences
 }) => {
@@ -22,7 +24,8 @@ const VariableRegistry: React.FC<Props> = ({
     type: 'number',
     scope: 'cue',
     initialValue: 0,
-    description: ''
+    description: '',
+    isParameter: false
   });
 
   const groupVariables = editorDoc?.mode === 'cue' 
@@ -32,6 +35,13 @@ const VariableRegistry: React.FC<Props> = ({
     ? (editorDoc.file as NodeCueFile).cues.find(c => c.id === selectedCueId)
     : null;
   const cueVariables = currentCue?.variables ?? [];
+
+  const isEffectMode = editorDoc?.mode === 'effect';
+  
+  // For effects, get variables from currentEffect prop
+  const effectVariables = isEffectMode && currentEffect
+    ? (currentEffect.variables ?? [])
+    : [];
 
   const openDialog = (scope: 'cue' | 'cue-group', existing?: VariableDefinition) => {
     if (existing) {
@@ -43,7 +53,8 @@ const VariableRegistry: React.FC<Props> = ({
         type: 'number',
         scope,
         initialValue: 0,
-        description: ''
+        description: '',
+        isParameter: false
       });
       setEditingVar(null);
     }
@@ -59,7 +70,8 @@ const VariableRegistry: React.FC<Props> = ({
       type: 'number',
       scope: 'cue',
       initialValue: 0,
-      description: ''
+      description: '',
+      isParameter: false
     });
   };
 
@@ -74,7 +86,8 @@ const VariableRegistry: React.FC<Props> = ({
       type: formData.type as VariableType,
       scope: formData.scope as 'cue' | 'cue-group',
       initialValue: formData.initialValue,
-      description: formData.description
+      description: formData.description,
+      isParameter: formData.isParameter
     };
 
     if (showDialog === 'group') {
@@ -91,6 +104,21 @@ const VariableRegistry: React.FC<Props> = ({
         updatedGroupVars.push(newVar);
       }
       onVariablesChange(updatedGroupVars, cueVariables);
+    } else if (isEffectMode) {
+      // Handle effect variables
+      let updatedEffectVars = [...effectVariables];
+      if (editingVar) {
+        const index = updatedEffectVars.findIndex(v => v.name === editingVar.name);
+        if (index >= 0) updatedEffectVars[index] = newVar;
+      } else {
+        // Check for duplicate names
+        if (updatedEffectVars.some(v => v.name === newVar.name)) {
+          alert(`An effect variable named "${newVar.name}" already exists`);
+          return;
+        }
+        updatedEffectVars.push(newVar);
+      }
+      onVariablesChange([], updatedEffectVars); // Pass as cue vars for simplicity
     } else {
       let updatedCueVars = [...cueVariables];
       if (editingVar) {
@@ -121,7 +149,10 @@ const VariableRegistry: React.FC<Props> = ({
       return;
     }
 
-    if (scope === 'cue-group') {
+    if (isEffectMode) {
+      const updatedEffectVars = effectVariables.filter(v => v.name !== varName);
+      onVariablesChange([], updatedEffectVars);
+    } else if (scope === 'cue-group') {
       const updatedGroupVars = groupVariables.filter(v => v.name !== varName);
       onVariablesChange(updatedGroupVars, cueVariables);
     } else {
@@ -177,96 +208,154 @@ const VariableRegistry: React.FC<Props> = ({
   return (
     <>
       <div className="p-3 overflow-y-auto">
-        {/* Group Variables */}
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="font-medium text-xs text-gray-700 dark:text-gray-300">Group Variables</h4>
-            <button
-              className="text-blue-500 text-[10px] hover:underline"
-              onClick={() => openDialog('cue-group')}
-            >
-              + Add
-            </button>
-          </div>
-          <div className="space-y-1">
-            {groupVariables.length === 0 ? (
-              <p className="text-[10px] text-gray-500 italic">No group variables</p>
-            ) : (
-              groupVariables.map(varDef => (
-                <div
-                  key={varDef.name}
-                  className="flex items-center gap-2 text-[11px] p-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-mono font-semibold truncate">{varDef.name}</div>
-                    <div className="text-[10px] text-gray-500">
-                      {varDef.type} = {String(varDef.initialValue)}
+        {isEffectMode ? (
+          /* Effect Variables Only */
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-medium text-xs text-gray-700 dark:text-gray-300">Effect Variables</h4>
+              <button
+                className="text-blue-500 text-[10px] hover:underline"
+                onClick={() => openDialog('cue')}
+              >
+                + Add
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-500 mb-2 italic">
+              Toggle "Is Parameter" to expose variables as effect inputs
+            </p>
+            <div className="space-y-1">
+              {effectVariables.length === 0 ? (
+                <p className="text-[10px] text-gray-500 italic">No effect variables</p>
+              ) : (
+                effectVariables.map(varDef => (
+                  <div
+                    key={varDef.name}
+                    className="flex items-center gap-2 text-[11px] p-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono font-semibold truncate">
+                        {varDef.name}
+                        {varDef.isParameter && (
+                          <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded">
+                            Parameter
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {varDef.type} = {String(varDef.initialValue)}
+                      </div>
                     </div>
+                    <button
+                      className="text-blue-500 hover:underline text-[10px]"
+                      onClick={() => openDialog('cue', varDef)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="text-red-500 hover:underline text-[10px]"
+                      onClick={() => handleDelete(varDef.name, 'cue')}
+                    >
+                      Del
+                    </button>
                   </div>
-                  <button
-                    className="text-blue-500 hover:underline text-[10px]"
-                    onClick={() => openDialog('cue-group', varDef)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="text-red-500 hover:underline text-[10px]"
-                    onClick={() => handleDelete(varDef.name, 'cue-group')}
-                  >
-                    Del
-                  </button>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Group Variables */}
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="font-medium text-xs text-gray-700 dark:text-gray-300">Group Variables</h4>
+                <button
+                  className="text-blue-500 text-[10px] hover:underline"
+                  onClick={() => openDialog('cue-group')}
+                >
+                  + Add
+                </button>
+              </div>
+              <div className="space-y-1">
+                {groupVariables.length === 0 ? (
+                  <p className="text-[10px] text-gray-500 italic">No group variables</p>
+                ) : (
+                  groupVariables.map(varDef => (
+                    <div
+                      key={varDef.name}
+                      className="flex items-center gap-2 text-[11px] p-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono font-semibold truncate">{varDef.name}</div>
+                        <div className="text-[10px] text-gray-500">
+                          {varDef.type} = {String(varDef.initialValue)}
+                        </div>
+                      </div>
+                      <button
+                        className="text-blue-500 hover:underline text-[10px]"
+                        onClick={() => openDialog('cue-group', varDef)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="text-red-500 hover:underline text-[10px]"
+                        onClick={() => handleDelete(varDef.name, 'cue-group')}
+                      >
+                        Del
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
 
-        {/* Cue Variables */}
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="font-medium text-xs text-gray-700 dark:text-gray-300">Cue Variables</h4>
-            <button
-              className="text-blue-500 text-[10px] hover:underline disabled:text-gray-400"
-              onClick={() => openDialog('cue')}
-              disabled={!selectedCueId}
-            >
-              + Add
-            </button>
-          </div>
-          <div className="space-y-1">
-            {!selectedCueId ? (
-              <p className="text-[10px] text-gray-500 italic">Select a cue</p>
-            ) : cueVariables.length === 0 ? (
-              <p className="text-[10px] text-gray-500 italic">No cue variables</p>
-            ) : (
-              cueVariables.map(varDef => (
-                <div
-                  key={varDef.name}
-                  className="flex items-center gap-2 text-[11px] p-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+            {/* Cue Variables */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="font-medium text-xs text-gray-700 dark:text-gray-300">Cue Variables</h4>
+                <button
+                  className="text-blue-500 text-[10px] hover:underline disabled:text-gray-400"
+                  onClick={() => openDialog('cue')}
+                  disabled={!selectedCueId}
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-mono font-semibold truncate">{varDef.name}</div>
-                    <div className="text-[10px] text-gray-500">
-                      {varDef.type} = {String(varDef.initialValue)}
+                  + Add
+                </button>
+              </div>
+              <div className="space-y-1">
+                {!selectedCueId ? (
+                  <p className="text-[10px] text-gray-500 italic">Select a cue</p>
+                ) : cueVariables.length === 0 ? (
+                  <p className="text-[10px] text-gray-500 italic">No cue variables</p>
+                ) : (
+                  cueVariables.map(varDef => (
+                    <div
+                      key={varDef.name}
+                      className="flex items-center gap-2 text-[11px] p-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono font-semibold truncate">{varDef.name}</div>
+                        <div className="text-[10px] text-gray-500">
+                          {varDef.type} = {String(varDef.initialValue)}
+                        </div>
+                      </div>
+                      <button
+                        className="text-blue-500 hover:underline text-[10px]"
+                        onClick={() => openDialog('cue', varDef)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="text-red-500 hover:underline text-[10px]"
+                        onClick={() => handleDelete(varDef.name, 'cue')}
+                      >
+                        Del
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    className="text-blue-500 hover:underline text-[10px]"
-                    onClick={() => openDialog('cue', varDef)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="text-red-500 hover:underline text-[10px]"
-                    onClick={() => handleDelete(varDef.name, 'cue')}
-                  >
-                    Del
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Add/Edit Dialog */}
@@ -274,7 +363,7 @@ const VariableRegistry: React.FC<Props> = ({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-96 max-w-full">
             <h3 className="font-semibold text-lg mb-4">
-              {editingVar ? 'Edit' : 'Add'} {showDialog === 'group' ? 'Group' : 'Cue'} Variable
+              {editingVar ? 'Edit' : 'Add'} {isEffectMode ? 'Effect' : (showDialog === 'group' ? 'Group' : 'Cue')} Variable
             </h3>
             <div className="space-y-3">
               <label className="flex flex-col font-medium text-sm">
@@ -331,6 +420,21 @@ const VariableRegistry: React.FC<Props> = ({
                   placeholder="What this variable is for"
                 />
               </label>
+
+              {isEffectMode && (
+                <label className="flex items-center gap-2 font-medium text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.isParameter ?? false}
+                    onChange={e => setFormData({ ...formData, isParameter: e.target.checked })}
+                    className="rounded"
+                  />
+                  <span>Is Parameter</span>
+                  <span className="text-[10px] text-gray-500 font-normal">
+                    (Expose as effect input)
+                  </span>
+                </label>
+              )}
             </div>
 
             <div className="flex gap-2 mt-6">

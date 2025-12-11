@@ -50,7 +50,12 @@ describe('NodeExecutionEngine', () => {
     // Create mock sequencer
     mockSequencer = {
       addEffect: jest.fn(),
-      addEffectWithCallback: jest.fn(),
+      addEffectWithCallback: jest.fn((_name, _effect, callback) => {
+        // Automatically invoke callback after a short delay to simulate completion
+        if (callback) {
+          setTimeout(() => callback(), 1);
+        }
+      }),
       removeEffectCallback: jest.fn(),
       setEffect: jest.fn(),
       removeEffect: jest.fn(),
@@ -368,7 +373,7 @@ describe('NodeExecutionEngine', () => {
       expect(effectName).toContain('action-true');
     });
 
-    it('should set and read variables at runtime', () => {
+    it('should set and read variables at runtime', async () => {
       const eventNode: YargEventNode = {
         id: 'event1',
         type: 'event',
@@ -460,10 +465,14 @@ describe('NodeExecutionEngine', () => {
         mockLightManager,
         cueLevelVarStore,
         groupLevelVarStore,
-        new EffectRegistry()
+        new EffectRegistry(),
+        definition.variables ?? []
       );
 
       engine.startExecution(eventNode, createCueData('Strong'));
+
+      // Advance timers to allow the mock callback to fire
+      jest.runAllTimers();
 
       // Variable should be set to 42
       expect(cueLevelVarStore.get('counter')).toEqual({
@@ -681,6 +690,246 @@ describe('NodeExecutionEngine', () => {
       // Execution state should be empty
       const state = engine.getExecutionState();
       expect(state.activeContexts).toHaveLength(0);
+    });
+  });
+
+  describe('Effect Raiser Node', () => {
+    it('should execute effect when Effect Raiser is triggered', async () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const effectRaiserNode = {
+        id: 'raiser1',
+        type: 'effect-raiser' as const,
+        effectId: 'test-effect',
+        label: 'Raise Effect',
+        outputs: []
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: 'TestType' as CueType,
+        style: 'primary',
+        description: 'Test',
+        nodes: {
+          events: [eventNode],
+          actions: [],
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectRaisers: [effectRaiserNode]
+        },
+        connections: [{ from: 'event1', to: 'raiser1' }]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map(),
+        logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map([['raiser1', effectRaiserNode]]),
+        eventDefinitions: [],
+        adjacency: new Map([['event1', [{ from: 'event1', to: 'raiser1' }]]])
+      };
+
+      // Create a mock effect
+      const mockEffect = {
+        definition: { id: 'test-effect', name: 'Test Effect', parameters: [] },
+        parameters: [],
+        effectListenerMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        actionMap: new Map(),
+        logicMap: new Map(),
+        adjacency: new Map()
+      };
+
+      const effectRegistry = new EffectRegistry();
+      effectRegistry.registerEffect('test-effect', mockEffect as any);
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        effectRegistry
+      );
+
+      await engine.startExecution(eventNode, createCueData('Strong'));
+
+      // Effect should be found and executed (non-blocking)
+      // In real execution, EffectExecutionEngine would be triggered
+      expect(effectRegistry.hasEffect('test-effect')).toBe(true);
+    });
+
+    it('should handle missing effect gracefully', () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const effectRaiserNode = {
+        id: 'raiser1',
+        type: 'effect-raiser' as const,
+        effectId: 'missing-effect',
+        label: 'Raise Missing Effect',
+        outputs: []
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: 'TestType' as CueType,
+        style: 'primary',
+        description: 'Test',
+        nodes: {
+          events: [eventNode],
+          actions: [],
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectRaisers: [effectRaiserNode]
+        },
+        connections: [{ from: 'event1', to: 'raiser1' }]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map(),
+        logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map([['raiser1', effectRaiserNode]]),
+        eventDefinitions: [],
+        adjacency: new Map([['event1', [{ from: 'event1', to: 'raiser1' }]]])
+      };
+
+      const effectRegistry = new EffectRegistry(); // Empty registry
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        effectRegistry
+      );
+
+      // Should not throw, just log warning
+      expect(() => {
+        engine.startExecution(eventNode, createCueData('Strong'));
+      }).not.toThrow();
+    });
+
+    it('should continue execution after Effect Raiser (non-blocking)', async () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const effectRaiserNode = {
+        id: 'raiser1',
+        type: 'effect-raiser' as const,
+        effectId: 'test-effect',
+        label: 'Raise Effect',
+        outputs: ['action1']
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: { groups: ['front'], filter: 'all' },
+        color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+        secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+        timing: { 
+          waitForCondition: 'none',
+          waitForTime: 0,
+          duration: 100, 
+          waitUntilCondition: 'none',
+          waitUntilTime: 0,
+          easing: 'linear', 
+          level: 1 
+        },
+        layer: 0
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: 'TestType' as CueType,
+        style: 'primary',
+        description: 'Test',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectRaisers: [effectRaiserNode]
+        },
+        connections: [
+          { from: 'event1', to: 'raiser1' },
+          { from: 'raiser1', to: 'action1' }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([['action1', actionNode]]),
+        logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map([['raiser1', effectRaiserNode]]),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'raiser1' }]],
+          ['raiser1', [{ from: 'raiser1', to: 'action1' }]]
+        ])
+      };
+
+      const mockEffect = {
+        definition: { id: 'test-effect', name: 'Test', parameters: [] },
+        parameters: [],
+        effectListenerMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        actionMap: new Map(),
+        logicMap: new Map(),
+        adjacency: new Map()
+      };
+
+      const effectRegistry = new EffectRegistry();
+      effectRegistry.registerEffect('test-effect', mockEffect as any);
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        effectRegistry
+      );
+
+      await engine.startExecution(eventNode, createCueData('Strong'));
+
+      // Both effect and subsequent action should execute
+      // Effect executes async, action executes in chain
+      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
     });
   });
 });

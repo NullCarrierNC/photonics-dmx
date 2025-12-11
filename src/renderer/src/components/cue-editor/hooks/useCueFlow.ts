@@ -257,7 +257,6 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       id,
       type: 'effect-listener',
       label: 'Effect Entry',
-      parameterMappings: [],
       outputs: []
     };
 
