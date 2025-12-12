@@ -25,7 +25,14 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
       return valueText ? `${base} = ${valueText}` : base;
     }
     if (logicType === 'math') {
-      return `${(logic.operator as string).toUpperCase()}`;
+      const left = formatValueSource(logic.left);
+      const right = formatValueSource(logic.right);
+      const operatorSymbol = logic.operator === 'add' ? '+' : 
+                            logic.operator === 'subtract' ? '-' : 
+                            logic.operator === 'multiply' ? '*' : 
+                            logic.operator === 'divide' ? '/' : 
+                            logic.operator === 'modulus' ? '%' : logic.operator;
+      return `${logic.operator.toUpperCase()}: ${left} ${operatorSymbol} ${right}`;
     }
     if (logicType === 'conditional') {
       const left = formatValueSource(logic.left);
