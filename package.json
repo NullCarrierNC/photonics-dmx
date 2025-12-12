@@ -57,7 +57,7 @@
     "electron-vite": "3.0.0",
     "eslint": "8.57.1",
     "eslint-plugin-react": "7.34.3",
-    "glob": "10.3.10",
+    "glob": "10.5.0",
     "jest": "^30.2.0",
     "postcss-loader": "8.1.1",
     "prettier": "3.3.2",
@@ -71,7 +71,7 @@
     "vite": "^5.4.19"
   },
   "overrides": {
-    "glob": "10.3.10",
+    "glob": "10.5.0",
     "rimraf": "5.0.5",
     "boolean": "4.0.0",
     "inflight": "2.0.0",
