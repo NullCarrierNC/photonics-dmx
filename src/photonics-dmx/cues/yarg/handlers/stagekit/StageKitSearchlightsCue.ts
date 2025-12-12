@@ -73,7 +73,7 @@ export class StageKitSearchlightsCue implements ICue {
     allLights: any[],
     lightDuration: number
   ): Effect {
-    const yellowColor = getColor('yellow', 'medium', 'add');
+    const yellowColor = getColor('yellow', 'medium', 'replace');
     const transparentColor = getColor('transparent', 'medium', 'add');
     const yellowTransitions: EffectTransition[] = [];
     
@@ -134,7 +134,7 @@ export class StageKitSearchlightsCue implements ICue {
     allLights: any[],
     lightDuration: number
   ): Effect {
-    const redColor = getColor('red', 'medium', 'add');
+    const redColor = getColor('red', 'medium', 'replace');
     const transparentColor = getColor('transparent', 'medium', 'add');
     const redTransitions: EffectTransition[] = [];
     

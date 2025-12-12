@@ -3,8 +3,8 @@ import { CueData, CueType } from '../../../cueTypes';
 import { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../../controllers/DmxLightManager';
 import { getColor } from '../../../../helpers/dmxHelpers';
-import { RGBIO } from '../../../../types';
-import { getSweepEffect } from '../../../../effects';
+import {  RGBIO,  } from '../../../../types';
+import { getEffectSingleColor, getSweepEffect } from '../../../../effects';
 
 /**
  * StageKit Menu Cue - Blue lights rotating in sequence
@@ -13,18 +13,23 @@ import { getSweepEffect } from '../../../../effects';
 export class StageKitMenuCue implements ICue {
   id = 'stagekit-menu';
   cueId = CueType.Menu;
-  description = 'StageKit menu pattern - blue lights rotating in sequence';
+  description = 'StageKit menu pattern - solid blue lights, no motion in this implementation.';
   style = CueStyle.Primary;
-
+  private isFirstExecution: boolean = true;
+  
   async execute(_cueData: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const frontLights = lightManager.getLights(['front'], 'all');
-    const backLights = lightManager.getLights(['back'], 'all');
-
-    // Merge the sorted arrays into allLights
-    const allLights = [...frontLights, ...backLights];
+    const allLights = lightManager.getLights(['front', 'back'], ['all']);
+    
    
     const blue: RGBIO = getColor('blue', 'low');
     const brightBlue: RGBIO = getColor('blue', 'high');
+
+    const singleColor = getEffectSingleColor({
+      color: blue,
+      duration: 100,
+      lights: allLights,
+      layer: 0,
+    });
 
     const sweep = getSweepEffect({
       lights: allLights,
@@ -35,14 +40,22 @@ export class StageKitMenuCue implements ICue {
       fadeOutDuration: 0,
       lightOverlap: 0,
       betweenSweepDelay: 0,
-      layer: 0,
+      layer: 1,
     });
-    // Use unblocked to avoid breaking the sweep timing.
-    sequencer.setEffectUnblockedName('menu', sweep, true);
+    // Use unblocked to avoid breaking the sweep timing and keep the sweep atomic.
+    if (this.isFirstExecution) {
+      sequencer.setEffectUnblockedName('menu', singleColor, true);
+      sequencer.addEffectUnblockedName('menu-sweep', sweep, true);
+      this.isFirstExecution = false;
+    } else {
+      sequencer.addEffectUnblockedName('menu', singleColor, true);
+      sequencer.addEffectUnblockedName('menu-sweep', sweep, true);
+    }
+    
   }
 
   onStop(): void {
-    // Cleanup handled by effect system
+    this.isFirstExecution = true;
   }
 
   onPause(): void {

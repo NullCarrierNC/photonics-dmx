@@ -60,7 +60,11 @@ describe('ConfigurationManager', () => {
 
     test('should get all preferences', () => {
       const prefs = configManager.getAllPreferences();
-      expect(prefs).toEqual({ effectDebounce: 0, complex: true });
+      expect(prefs).toMatchObject({
+        effectDebounce: 0,
+        complex: true,
+        enttecProConfig: { port: '' }
+      });
     });
 
     test('should update multiple preferences', () => {
@@ -181,7 +185,7 @@ describe('ConfigurationManager', () => {
       const writeCall = calls[calls.length - 1];
       const savedData = JSON.parse(writeCall[1]);
       
-      expect(savedData).toHaveProperty('version', 2);
+      expect(savedData).toHaveProperty('version', 3);
       expect(savedData).toHaveProperty('data');
       expect(savedData.data).toHaveProperty('effectDebounce', 100);
     });

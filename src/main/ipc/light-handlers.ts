@@ -2,7 +2,7 @@ import { IpcMain, BrowserWindow } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { SenderConfig } from '../../photonics-dmx/types';
 import { CueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/CueRegistry';
-import { CueType } from '../../photonics-dmx/cues/cueTypes';
+import { CueType, InstrumentNoteType, DrumNoteType } from '../../photonics-dmx/cues/cueTypes';
 
 /**
  * Set up light-related IPC handlers
@@ -85,6 +85,13 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           return;
         }
         config = { devicePath: port };
+      } else if (sender === 'opendmx') {
+        if (!port) {
+          console.error('Port is required for OpenDMX sender');
+          return;
+        }
+        const dmxSpeed = typeof data.dmxSpeed === 'number' && data.dmxSpeed > 0 ? data.dmxSpeed : undefined;
+        config = { devicePath: port, dmxSpeed };
       } else if (sender === 'artnet') {
         config = {
           host: host || '127.0.0.1',
@@ -102,7 +109,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       // Use the new sender API (supports both worker-based and IPC senders)
       console.log(`Enabling ${sender} sender with config:`, config);
       try {
-        await senderManager.enableSender(sender, sender as 'artnet' | 'sacn' | 'enttecpro' | 'ipc', config);
+        await senderManager.enableSender(sender, sender as 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc', config);
         console.log(`Successfully enabled ${sender} sender`);
       } catch (error) {
         console.error(`Failed to enable ${sender} sender:`, error);
@@ -486,30 +493,38 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
 
         // Update the mock cue data with the simulated note
         switch (instrument) {
-          case 'guitar':
-            mockCueData.guitarNotes = [noteType];
-            if ('handleGuitarNote' in cueHandler) {
-              cueHandler.handleGuitarNote(noteType as any, mockCueData);
+          case 'guitar': {
+            const normalizedNote = String(noteType) as InstrumentNoteType;
+            mockCueData.guitarNotes = [normalizedNote];
+            if ('handleGuitarNote' in cueHandler && typeof cueHandler.handleGuitarNote === 'function') {
+              cueHandler.handleGuitarNote(normalizedNote, mockCueData);
             }
             break;
-          case 'bass':
-            mockCueData.bassNotes = [noteType];
-            if ('handleBassNote' in cueHandler) {
-              cueHandler.handleBassNote(noteType as any, mockCueData);
+          }
+          case 'bass': {
+            const normalizedNote = String(noteType) as InstrumentNoteType;
+            mockCueData.bassNotes = [normalizedNote];
+            if ('handleBassNote' in cueHandler && typeof cueHandler.handleBassNote === 'function') {
+              cueHandler.handleBassNote(normalizedNote, mockCueData);
             }
             break;
-          case 'keys':
-            mockCueData.keysNotes = [noteType];
-            if ('handleKeysNote' in cueHandler) {
-              cueHandler.handleKeysNote(noteType as any, mockCueData);
+          }
+          case 'keys': {
+            const normalizedNote = String(noteType) as InstrumentNoteType;
+            mockCueData.keysNotes = [normalizedNote];
+            if ('handleKeysNote' in cueHandler && typeof cueHandler.handleKeysNote === 'function') {
+              cueHandler.handleKeysNote(normalizedNote, mockCueData);
             }
             break;
-          case 'drums':
-            mockCueData.drumNotes = [noteType];
-            if ('handleDrumNote' in cueHandler) {
-              cueHandler.handleDrumNote(noteType as any, mockCueData);
+          }
+          case 'drums': {
+            const normalizedNote = String(noteType) as DrumNoteType;
+            mockCueData.drumNotes = [normalizedNote];
+            if ('handleDrumNote' in cueHandler && typeof cueHandler.handleDrumNote === 'function') {
+              cueHandler.handleDrumNote(normalizedNote, mockCueData);
             }
             break;
+          }
           default:
             console.warn(`Unknown instrument: ${instrument}`);
             return { success: false, error: `Unknown instrument: ${instrument}` };
@@ -900,7 +915,8 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       const interfaces: Array<{name: string, value: string, family: string}> = [];
 
       for (const [name, ifaceArray] of Object.entries(networkInterfaces)) {
-        for (const iface of ifaceArray as any[]) {
+        const interfaceList = Array.isArray(ifaceArray) ? ifaceArray : [];
+        for (const iface of interfaceList) {
           // Skip internal and loopback interfaces
           if (!iface.internal && !iface.address.startsWith('127.')) {
             interfaces.push({

@@ -158,6 +158,22 @@ export const getEffectClockwiseRotation = ({
         waitUntilTime: waitUntilTime,
         waitUntilConditionCount: (stepsAfterActive * beatsPerCycle) + waitUntilConditionCount
       });
+    } else {
+      transitions.push({
+        lights: [light],
+        layer: layer,
+        waitForCondition: waitForCondition,
+        waitForTime: waitForTime,
+        waitForConditionCount: waitForConditionCount,
+        transform: {
+          color: baseColor,
+          easing: 'linear',
+          duration: 0,
+        },
+        waitUntilCondition: 'none',
+        waitUntilTime: 0,
+        waitUntilConditionCount: 0
+      });
     }
   }
 
@@ -248,6 +264,22 @@ export const getEffectCounterClockwiseRotation = ({
         waitUntilCondition: waitUntilCondition,
         waitUntilTime: waitUntilTime,
         waitUntilConditionCount: (stepsAfterActive * beatsPerCycle) + waitUntilConditionCount
+      });
+    } else {
+      transitions.push({
+        lights: [light],
+        layer: layer,
+        waitForCondition: waitForCondition,
+        waitForTime: waitForTime,
+        waitForConditionCount: waitForConditionCount,
+        transform: {
+          color: baseColor,
+          easing: 'linear',
+          duration: 0,
+        },
+        waitUntilCondition: 'none',
+        waitUntilTime: 0,
+        waitUntilConditionCount: 0
       });
     }
   }

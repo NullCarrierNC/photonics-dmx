@@ -99,7 +99,7 @@ export class ControllerManager {
     const clock = new Clock(clockRate);
     
     // Create the sequencer components with the Clock
-    this.lightStateManager = new LightStateManager(clock);
+    this.lightStateManager = new LightStateManager();
     this.lightTransitionController = new LightTransitionController(this.lightStateManager);
     
     // Create the sequencer with all components
@@ -678,12 +678,11 @@ export class ControllerManager {
    */
   public getSenderStatus(): { sacn: boolean; artnet: boolean; enttecpro: boolean; ipc: boolean } {
     this.ensureSenderManager();
-    const enabledSenders = this.senderManager!.getEnabledSenders();
     return {
-      sacn: enabledSenders.includes('sacn'),
-      artnet: enabledSenders.includes('artnet'),
-      enttecpro: enabledSenders.includes('enttecpro'),
-      ipc: this.senderManager!.isIpcSenderEnabled()
+      sacn: this.senderManager!.isSenderEnabled('sacn'),
+      artnet: this.senderManager!.isSenderEnabled('artnet'),
+      enttecpro: this.senderManager!.isSenderEnabled('enttecpro'),
+      ipc: this.senderManager!.isSenderEnabled('ipc')
     };
   }
 

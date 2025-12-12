@@ -7,7 +7,13 @@ import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes } from 
 export interface AppPreferences {
   effectDebounce: number;
   complex: boolean;
-  enttecProPort?: string;
+  enttecProConfig?: {
+    port: string;
+  };
+  openDmxConfig?: {
+    port: string;
+    dmxSpeed: number;
+  };
   artNetConfig?: {
     host: string;
     universe: number;
@@ -37,6 +43,7 @@ export interface AppPreferences {
     sacnEnabled: boolean;
     artNetEnabled: boolean;
     enttecProEnabled: boolean;
+    openDmxEnabled: boolean;
   };
   stageKitPrefs?: {
     yargPriority: 'prefer-for-tracked' | 'random' | 'never';
@@ -45,6 +52,7 @@ export interface AppPreferences {
     artNetExpanded: boolean;
     enttecProExpanded: boolean;
     sacnExpanded: boolean;
+    openDmxExpanded: boolean;
   };
 }
 
@@ -77,7 +85,15 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   dmxOutputConfig: {
     sacnEnabled: true,
     artNetEnabled: false,
-    enttecProEnabled: false
+    enttecProEnabled: false,
+    openDmxEnabled: false
+  },
+  enttecProConfig: {
+    port: ''
+  },
+  openDmxConfig: {
+    port: '',
+    dmxSpeed: 20
   },
   sacnConfig: {
     universe: 1,
@@ -90,7 +106,8 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   dmxSettingsPrefs: {
     artNetExpanded: false,
     enttecProExpanded: false,
-    sacnExpanded: false
+    sacnExpanded: false,
+    openDmxExpanded: false
   }
 };
 
@@ -120,12 +137,13 @@ export class ConfigurationManager {
 
   constructor() {
     // Initialize config files with version numbers
-    this.preferences = new ConfigFile('prefs.json', DEFAULT_PREFERENCES, 2);
+    this.preferences = new ConfigFile('prefs.json', DEFAULT_PREFERENCES, 3);
     this.userLights = new ConfigFile('lights.json', DEFAULT_USER_LIGHTS, 1);
     this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1);
     
     // Handle legacy lights format migration
     this.migrateLegacyLightsFormat();
+    this.migrateLegacyPreferences();
   }
 
   /**
@@ -144,6 +162,42 @@ export class ConfigurationManager {
       const migratedData: UserLightsConfig = { lights: currentData };
       this.userLights.update(migratedData);
       console.log(`[Photonics Config] Migrated legacy lights format to new format`);
+    }
+  }
+
+  /**
+   * Migrates legacy preference structures to the latest schema.
+   * Currently handles the v2 -> v3 transition, where USB sender settings
+   * move from flat fields (enttecProPort/openDmxPort/openDmxSpeed) into
+   * dedicated top-level config objects (enttecProConfig/openDmxConfig).
+   */
+  private migrateLegacyPreferences(): void {
+    const currentPrefs = { ...this.preferences.get() } as any;
+    let updated = false;
+
+    const defaultEnttecConfig = { port: '' };
+
+    // v2 -> v3: migrate legacy enttecProPort into enttecProConfig
+    if (!currentPrefs.enttecProConfig) {
+      const legacyPort = typeof currentPrefs.enttecProPort === 'string' ? currentPrefs.enttecProPort : '';
+      currentPrefs.enttecProConfig = { ...defaultEnttecConfig, port: legacyPort };
+      updated = true;
+    } else if (typeof currentPrefs.enttecProConfig.port !== 'string') {
+        currentPrefs.enttecProConfig = {
+          ...defaultEnttecConfig,
+          ...currentPrefs.enttecProConfig,
+          port: typeof currentPrefs.enttecProConfig.port === 'string' ? currentPrefs.enttecProConfig.port : ''
+        };
+      updated = true;
+    }
+
+    if (currentPrefs.enttecProPort !== undefined) {
+      delete currentPrefs.enttecProPort;
+      updated = true;
+    }
+
+    if (updated) {
+      this.preferences.update(currentPrefs);
     }
   }
 

@@ -43,8 +43,7 @@ describe('Sequencer', () => {
       removeTransitionsByLayer: jest.fn(),
       removeLightLayer: jest.fn(),
       getFinalLightState: jest.fn(),
-      registerWithClock: jest.fn(),
-      unregisterFromClock: jest.fn()
+      advanceFrame: jest.fn()
     } as unknown as jest.Mocked<LightTransitionController>;
 
     // Create mock for Clock

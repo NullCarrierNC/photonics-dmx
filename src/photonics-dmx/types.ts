@@ -491,10 +491,12 @@ export const easingFunctions: { [key: string]: EasingFunction } = {
   'cubic.inout': cubicInOut,
 };
 
-export type Senders = 'sacn' | 'ipc' | 'enttecpro' | 'artnet';
+export type Senders = 'sacn' | 'ipc' | 'enttecpro' | 'artnet' | 'opendmx';
 export interface SenderConfig {
   sender: Senders
   port?: string
+  devicePath?: string
+  dmxSpeed?: number
   host?: string
   universe?: number
   net?: number

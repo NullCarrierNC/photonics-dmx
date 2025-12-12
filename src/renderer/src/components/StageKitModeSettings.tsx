@@ -98,7 +98,7 @@ const StageKitModeSettings: React.FC = () => {
         <div className=" ">
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Due to how the RB3E networking works, Photonics doesn't use the cue system like it does with YARG. Instead it uses the 
-            provided LED lighting data diirectly to re-create the original Stage Kit lighting effects. This is essentially the same as using 
+            provided LED lighting data directly to re-create the original Stage Kit lighting effects. This is essentially the same as using 
             YARG in Stage Kit mode.
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">

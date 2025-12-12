@@ -5,6 +5,7 @@ import Rb3Toggle from './Rb3Toggle';
 import EnttecProToggle from './EnttecProToggle';
 import SacnToggle from './SacnToggle';
 import ArtNetToggle from './ArtNetToggle';
+import OpenDmxToggle from './OpenDmxToggle';
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa';
 import { myValidDmxLightsAtom } from '../atoms';
 
@@ -44,7 +45,7 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps ) => {
             <SacnToggle disabled={hasInvalidConfig} /> <EnttecProToggle disabled={hasInvalidConfig} />
           </div>
           <div className="flex flex-row gap-16 items-start ">
-            <ArtNetToggle disabled={hasInvalidConfig} />
+            <ArtNetToggle disabled={hasInvalidConfig} /> <OpenDmxToggle disabled={hasInvalidConfig} />
           </div>
           
           {hasInvalidConfig && (

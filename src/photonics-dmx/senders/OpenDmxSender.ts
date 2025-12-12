@@ -1,22 +1,16 @@
-import { DMX, ArtnetDriver, IUniverseDriver } from "dmx-ts";
+import { DMX, EnttecOpenUSBDMXDriver, IUniverseDriver } from "dmx-ts";
 import { EventEmitter } from "events";
 import { BaseSender, SenderError } from "./BaseSender";
 
-export class ArtNetSender extends BaseSender {
+export class OpenDmxSender extends BaseSender {
   private dmx: DMX = new DMX();
   private universe?: IUniverseDriver;
   private eventEmitter: EventEmitter;
 
   constructor(
-    private host: string = "127.0.0.1",
-    private options = {
-      universe: 1,
-      net: 0,
-      subnet: 0,
-      subuni: 0,
-      port: 6454,
-      base_refresh_interval: 1000  // 1 second refresh interval for unchanged frames
-    }
+    private port: string,
+    private options: { dmxSpeed?: number } = { dmxSpeed: 20 },
+    private universeName: string = "uni1"
   ) {
     super();
     this.eventEmitter = new EventEmitter();
@@ -25,8 +19,8 @@ export class ArtNetSender extends BaseSender {
   public async start(): Promise<void> {
     try {
       this.universe = await this.dmx.addUniverse(
-        "artnet-universe",
-        new ArtnetDriver(this.host, this.options)
+        this.universeName,
+        new EnttecOpenUSBDMXDriver(this.port, this.options)
       );
     } catch (err) {
       const errorEvent = new SenderError(err);
@@ -38,30 +32,26 @@ export class ArtNetSender extends BaseSender {
     if (!this.universe) {
       return;
     }
-    
-    console.log(`Stopping ArtNet sender on host ${this.host}...`);
-    
+
+    console.log(`Stopping OpenDMX sender on port ${this.port}...`);
+
     try {
-      // First set all channels to zero (blackout)
       const zeroPayload: Record<number, number> = {};
       for (let channel = 1; channel <= 255; channel++) {
         zeroPayload[channel] = 0;
       }
-      
-      // Try to update one last time
+
       try {
         if (this.universe) {
           this.universe.update(zeroPayload);
-          console.log("Sent zero values to all ArtNet channels");
+          console.log("Sent zero values to all DMX channels");
         }
       } catch (err) {
         console.error("Failed to send zero values before stopping:", err);
       }
-      
-      // Give a small delay to ensure commands are sent
+
       await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Clean up all event listeners first
+
       try {
         this.eventEmitter.removeAllListeners();
         if (this.dmx) {
@@ -71,17 +61,14 @@ export class ArtNetSender extends BaseSender {
       } catch (err) {
         console.error("Error removing event listeners:", err);
       }
-      
-      // Close the DMX connection
+
       try {
         if (this.dmx) {
           await this.dmx.close();
-          console.log("ArtNet connection closed");
+          console.log("DMX connection closed");
         }
       } catch (err) {
-        console.error("Error during ArtNet close:", err);
-        
-        // If close fails, we'll try forcibly clearing references
+        console.error("Error during DMX close:", err);
         try {
           this.universe = undefined;
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -90,28 +77,19 @@ export class ArtNetSender extends BaseSender {
         }
       }
     } catch (outerErr) {
-      console.error("Unhandled error during ArtNetSender stop:", outerErr);
+      console.error("Unhandled error during OpenDmxSender stop:", outerErr);
     } finally {
-      // Final cleanup, clear all references
       this.universe = undefined;
-      console.log("ArtNetSender cleanup completed");
+      console.log("OpenDmxSender cleanup completed");
     }
   }
 
   public async send(universeBuffer: Record<number, number>): Promise<void> {
     try {
       this.verifySenderStarted();
-      
-      // Convert from 1-based DMX indexing to 0-based ArtNet indexing
-      const convertedBuffer: Record<number, number> = {};
-      for (const channelStr in universeBuffer) {
-        const channel = parseInt(channelStr, 10);
-        convertedBuffer[channel - 1] = universeBuffer[channel];
-      }
-      
-      this.universe!.update(convertedBuffer);
+      this.universe!.update(universeBuffer);
     } catch (err) {
-      console.error("ArtNetSender error:", err);
+      console.error("OpenDmxSender error:", err);
       const errorEvent = new SenderError(err);
       this.eventEmitter.emit("SenderError", errorEvent);
     }
@@ -119,7 +97,7 @@ export class ArtNetSender extends BaseSender {
 
   protected verifySenderStarted(): void {
     if (!this.universe) {
-      throw new Error("ArtNetSender isn't started.");
+      throw new Error("OpenDmxSender isn't started.");
     }
   }
 
@@ -130,4 +108,5 @@ export class ArtNetSender extends BaseSender {
   public removeSendError(listener: (error: SenderError) => void): void {
     this.eventEmitter.off("SenderError", listener);
   }
-} 
+}
+
