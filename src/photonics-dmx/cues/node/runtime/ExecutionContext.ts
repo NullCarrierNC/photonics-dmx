@@ -4,6 +4,8 @@
  */
 
 import { ActionNode, BaseEventNode } from '../../types/nodeCueTypes';
+import { CueData } from '../../types/cueTypes';
+import { AudioCueData } from '../../types/audioCueTypes';
 import { VariableValue, NodeCompletionCallback, ContextCompletionCallback } from './executionTypes';
 
 export class ExecutionContext {
@@ -18,6 +20,9 @@ export class ExecutionContext {
   // Variable store references (shared with cue)
   public readonly cueLevelVarStore: Map<string, VariableValue>;
   public readonly groupLevelVarStore: Map<string, VariableValue>;
+  
+  // Cue data reference for data nodes
+  public readonly cueData: CueData | AudioCueData;
 
   // Callbacks
   private onNodeCompleteCallback?: NodeCompletionCallback;
@@ -25,12 +30,14 @@ export class ExecutionContext {
 
   constructor(
     eventNode: BaseEventNode,
+    cueData: CueData | AudioCueData,
     cueLevelVarStore: Map<string, VariableValue>,
     groupLevelVarStore: Map<string, VariableValue>
   ) {
     this.id = `${eventNode.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     this.eventNode = eventNode;
     this.startTime = Date.now();
+    this.cueData = cueData;
     this.cueLevelVarStore = cueLevelVarStore;
     this.groupLevelVarStore = groupLevelVarStore;
   }

@@ -6,6 +6,7 @@
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { CueData } from '../../types/cueTypes';
+import { AudioCueData } from '../../types/audioCueTypes';
 import {  CompiledYargCue, CompiledAudioCue } from '../compiler/NodeCueCompiler';
 import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
 import {
@@ -17,7 +18,11 @@ import {
   LogicNode,
   ValueSource,
   VariableType,
-  VariableDefinition
+  VariableDefinition,
+  CueDataLogicNode,
+  ConfigDataLogicNode,
+  YargCueDataProperty,
+  AudioCueDataProperty
 } from '../../types/nodeCueTypes';
 import { ExecutionContext } from './ExecutionContext';
 import { ExecutionState, VariableValue } from './executionTypes';
@@ -79,10 +84,11 @@ export class NodeExecutionEngine {
    * Start executing a node graph from an event node.
    * Creates a new ExecutionContext and begins execution.
    */
-  public startExecution(eventNode: BaseEventNode, _parameters: CueData): void {
+  public startExecution(eventNode: BaseEventNode, parameters: CueData): void {
     try {
       const context = new ExecutionContext(
         eventNode,
+        parameters,
         this.cueLevelVarStore,
         this.groupLevelVarStore
       );
@@ -254,8 +260,8 @@ export class NodeExecutionEngine {
       // Fire all registered listeners for this event
       const listeners = this.eventListeners.get(eventName) ?? [];
       for (const listener of listeners) {
-        // Create new execution context for each listener
-        this.startListenerExecution(listener);
+        // Create new execution context for each listener, passing cue data
+        this.startListenerExecution(listener, context.cueData as CueData);
       }
       
       // Continue immediately to raiser's child (non-blocking)
@@ -305,11 +311,12 @@ export class NodeExecutionEngine {
         compiledEffect,
         this.sequencer,
         this.lightManager,
-        paramValues
+        paramValues,
+        context.cueData  // Pass caller's cue data
       );
 
       // Trigger effect (non-blocking, runs in parallel)
-      effectEngine.triggerEffect({} as CueData);  // CueData not needed for effects
+      effectEngine.triggerEffect(context.cueData);
 
       // Continue immediately (non-blocking like EventRaiserNode)
       this.continueToNextNodes(raiserNode.id, context);
@@ -324,11 +331,12 @@ export class NodeExecutionEngine {
    * Start execution from a listener node.
    * Creates a new execution context for the listener chain.
    */
-  private startListenerExecution(listenerNode: EventListenerNode): void {
+  private startListenerExecution(listenerNode: EventListenerNode, cueData: CueData): void {
     try {
       // Create new context for listener chain (treat listener as event-like node)
       const context = new ExecutionContext(
         listenerNode as any, // Treat as event-like node
+        cueData,
         this.cueLevelVarStore,
         this.groupLevelVarStore
       );
@@ -452,9 +460,123 @@ export class NodeExecutionEngine {
         
         return edges.map(edge => edge.to);
       }
+
+      case 'cue-data': {
+        const value = this.extractCueDataValue(logicNode.dataProperty, context.cueData);
+        
+        if (logicNode.assignTo) {
+          const varStore = this.getVariableStore(logicNode.assignTo);
+          const type = this.inferType(value);
+          varStore.set(logicNode.assignTo, { type, value });
+        }
+        
+        return edges.map(edge => edge.to);
+      }
+
+      case 'config-data': {
+        const value = this.extractConfigDataValue(logicNode.dataProperty);
+        
+        if (logicNode.assignTo) {
+          const varStore = this.getVariableStore(logicNode.assignTo);
+          varStore.set(logicNode.assignTo, { type: 'number', value });
+        }
+        
+        return edges.map(edge => edge.to);
+      }
     }
 
     return edges.map(edge => edge.to);
+  }
+
+  /**
+   * Infer variable type from value.
+   */
+  private inferType(value: number | string | boolean): VariableType {
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'number') return 'number';
+    return 'string';
+  }
+
+  /**
+   * Extract cue data value based on property.
+   */
+  private extractCueDataValue(property: string, cueData: CueData | AudioCueData): number | string | boolean {
+    // Mode detection (YARG vs Audio)
+    const isYargMode = 'lightingCue' in cueData;
+    
+    if (isYargMode) {
+      return this.extractYargCueDataValue(property as YargCueDataProperty, cueData as CueData);
+    } else {
+      return this.extractAudioCueDataValue(property as AudioCueDataProperty, cueData as AudioCueData);
+    }
+  }
+
+  /**
+   * Extract YARG-specific cue data.
+   */
+  private extractYargCueDataValue(property: YargCueDataProperty, cueData: CueData): number | string | boolean {
+    switch (property) {
+      case 'cue-name': return this.cueId;
+      case 'cue-type': return cueData.lightingCue;
+      case 'execution-count': return cueData.executionCount ?? 0;
+      case 'bpm': return cueData.beatsPerMinute;
+      case 'song-section': return cueData.songSection;
+      case 'current-scene': return cueData.currentScene;
+      case 'beat-type': return cueData.beat;
+      case 'keyframe': return cueData.keyframe;
+      case 'guitar-note-count': return cueData.guitarNotes.length;
+      case 'bass-note-count': return cueData.bassNotes.length;
+      case 'drum-note-count': return cueData.drumNotes.length;
+      case 'keys-note-count': return cueData.keysNotes.length;
+      case 'total-score': return cueData.totalScore ?? 0;
+      case 'performer': return cueData.performer;
+      case 'bonus-effect': return cueData.bonusEffect;
+      case 'fog-state': return cueData.fogState;
+      case 'time-since-cue-start': return Date.now() - (cueData.cueStartTime ?? Date.now());
+      case 'time-since-last-cue': return cueData.timeSinceLastCue ?? 0;
+      default: return 0;
+    }
+  }
+
+  /**
+   * Extract Audio-specific cue data.
+   */
+  private extractAudioCueDataValue(property: AudioCueDataProperty, cueData: AudioCueData): number | string | boolean {
+    switch (property) {
+      case 'cue-name': return this.cueId;
+      case 'cue-type-id': return ''; // Audio cues have cueTypeId
+      case 'execution-count': return cueData.executionCount;
+      case 'timestamp': return cueData.timestamp;
+      case 'overall-level': return cueData.audioData.overallLevel;
+      case 'bpm': return cueData.audioData.bpm ?? 0;
+      case 'beat-detected': return cueData.audioData.beatDetected;
+      case 'energy': return cueData.audioData.energy;
+      case 'freq-range1': return cueData.audioData.frequencyBands.range1;
+      case 'freq-range2': return cueData.audioData.frequencyBands.range2;
+      case 'freq-range3': return cueData.audioData.frequencyBands.range3;
+      case 'freq-range4': return cueData.audioData.frequencyBands.range4;
+      case 'freq-range5': return cueData.audioData.frequencyBands.range5;
+      case 'enabled-band-count': return cueData.enabledBandCount;
+      default: return 0;
+    }
+  }
+
+  /**
+   * Extract config data value based on property.
+   */
+  private extractConfigDataValue(property: string): number {
+    switch (property) {
+      case 'total-lights':
+        return this.lightManager.getLightsInGroup(['front', 'back', 'strobe']).length;
+      case 'front-lights-count':
+        return this.lightManager.getLightsInGroup('front').length;
+      case 'back-lights-count':
+        return this.lightManager.getLightsInGroup('back').length;
+      case 'strobe-lights-count':
+        return this.lightManager.getLightsInGroup('strobe').length;
+      default:
+        return 0;
+    }
   }
 
   /**

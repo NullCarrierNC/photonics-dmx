@@ -39,6 +39,14 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
       const right = formatValueSource(logic.right);
       return `IF ${left} ${logic.comparator} ${right}`;
     }
+    if (logicType === 'cue-data') {
+      const assignText = logic.assignTo ? ` → ${logic.assignTo}` : '';
+      return `${logic.dataProperty}${assignText}`;
+    }
+    if (logicType === 'config-data') {
+      const assignText = logic.assignTo ? ` → ${logic.assignTo}` : '';
+      return `${logic.dataProperty}${assignText}`;
+    }
     return logicType;
   };
 

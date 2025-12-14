@@ -495,6 +495,7 @@ describe('NodeExecutionEngine', () => {
 
       const context = new ExecutionContext(
         eventNode,
+        createCueData('Strong'),
         cueLevelVarStore,
         groupLevelVarStore
       );
@@ -518,6 +519,7 @@ describe('NodeExecutionEngine', () => {
 
       const context = new ExecutionContext(
         eventNode,
+        createCueData('Strong'),
         cueLevelVarStore,
         groupLevelVarStore
       );
@@ -555,6 +557,7 @@ describe('NodeExecutionEngine', () => {
 
       const context = new ExecutionContext(
         eventNode,
+        createCueData('Strong'),
         cueLevelVarStore,
         groupLevelVarStore
       );
@@ -929,6 +932,503 @@ describe('NodeExecutionEngine', () => {
 
       // Both effect and subsequent action should execute
       // Effect executes async, action executes in chain
+      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+    });
+  });
+
+  describe('Data Nodes', () => {
+    it('should extract YARG cue data and assign to variable', () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const cueDataNode: LogicNode = {
+        id: 'cuedata1',
+        type: 'logic',
+        logicType: 'cue-data',
+        dataProperty: 'bpm',
+        assignTo: 'currentBpm',
+        outputs: []
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: { groups: ['front'], filter: 'all' },
+        color: { name: 'red', brightness: 'high' },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: 0,
+          duration: 200,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Default,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [cueDataNode]
+        },
+        connections: [
+          { from: 'event1', to: 'cuedata1' },
+          { from: 'cuedata1', to: 'action1' }
+        ],
+        variables: [
+          { name: 'currentBpm', type: 'number', scope: 'cue', initialValue: 0 }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([['action1', actionNode]]),
+        logicMap: new Map([['cuedata1', cueDataNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'cuedata1' }]],
+          ['cuedata1', [{ from: 'cuedata1', to: 'action1' }]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      const parameters = createCueData('Strong');
+      parameters.beatsPerMinute = 140;
+      engine.startExecution(eventNode, parameters);
+
+      // Verify variable was set
+      const storedVar = cueLevelVarStore.get('currentBpm');
+      expect(storedVar).toBeDefined();
+      expect(storedVar?.value).toBe(140);
+      expect(storedVar?.type).toBe('number');
+
+      // Action should still execute
+      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+    });
+
+    it('should extract config data and assign to variable', () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const configDataNode: LogicNode = {
+        id: 'configdata1',
+        type: 'logic',
+        logicType: 'config-data',
+        dataProperty: 'front-lights-count',
+        assignTo: 'numFrontLights',
+        outputs: []
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: { groups: ['front'], filter: 'all' },
+        color: { name: 'red', brightness: 'high' },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: 0,
+          duration: 200,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Default,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [configDataNode]
+        },
+        connections: [
+          { from: 'event1', to: 'configdata1' },
+          { from: 'configdata1', to: 'action1' }
+        ],
+        variables: [
+          { name: 'numFrontLights', type: 'number', scope: 'cue', initialValue: 0 }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([['action1', actionNode]]),
+        logicMap: new Map([['configdata1', configDataNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'configdata1' }]],
+          ['configdata1', [{ from: 'configdata1', to: 'action1' }]]
+        ])
+      };
+
+      // Mock getLightsInGroup to return 8 front lights
+      mockLightManager.getLightsInGroup = jest.fn().mockReturnValue([
+        { id: 'f1' }, { id: 'f2' }, { id: 'f3' }, { id: 'f4' },
+        { id: 'f5' }, { id: 'f6' }, { id: 'f7' }, { id: 'f8' }
+      ]);
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      // Verify variable was set
+      const storedVar = cueLevelVarStore.get('numFrontLights');
+      expect(storedVar).toBeDefined();
+      expect(storedVar?.value).toBe(8);
+      expect(storedVar?.type).toBe('number');
+
+      // Action should still execute
+      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+    });
+
+    it('should handle cue data node without assignTo', () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const cueDataNode: LogicNode = {
+        id: 'cuedata1',
+        type: 'logic',
+        logicType: 'cue-data',
+        dataProperty: 'execution-count',
+        // No assignTo - value should be ignored
+        outputs: []
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: { groups: ['front'], filter: 'all' },
+        color: { name: 'red', brightness: 'high' },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: 0,
+          duration: 200,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Default,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [cueDataNode]
+        },
+        connections: [
+          { from: 'event1', to: 'cuedata1' },
+          { from: 'cuedata1', to: 'action1' }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([['action1', actionNode]]),
+        logicMap: new Map([['cuedata1', cueDataNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'cuedata1' }]],
+          ['cuedata1', [{ from: 'cuedata1', to: 'action1' }]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry()
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      // No variable should be set
+      expect(cueLevelVarStore.size).toBe(0);
+
+      // Action should still execute
+      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+    });
+
+    it('should use cue data in conditional branching', () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const cueDataNode: LogicNode = {
+        id: 'cuedata1',
+        type: 'logic',
+        logicType: 'cue-data',
+        dataProperty: 'guitar-note-count',
+        assignTo: 'noteCount',
+        outputs: []
+      };
+
+      const conditionalNode: LogicNode = {
+        id: 'conditional1',
+        type: 'logic',
+        logicType: 'conditional',
+        comparator: '>=',
+        left: { source: 'variable', name: 'noteCount' },
+        right: { source: 'literal', value: 2 },
+        outputs: []
+      };
+
+      const actionHigh: ActionNode = {
+        id: 'action-high',
+        type: 'action',
+        effectType: 'single-color',
+        target: { groups: ['front'], filter: 'all' },
+        color: { name: 'red', brightness: 'high' },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: 0,
+          duration: 200,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }
+      };
+
+      const actionLow: ActionNode = {
+        id: 'action-low',
+        type: 'action',
+        effectType: 'single-color',
+        target: { groups: ['front'], filter: 'all' },
+        color: { name: 'blue', brightness: 'low' },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: 0,
+          duration: 200,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Default,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionHigh, actionLow],
+          logic: [cueDataNode, conditionalNode]
+        },
+        connections: [
+          { from: 'event1', to: 'cuedata1' },
+          { from: 'cuedata1', to: 'conditional1' },
+          { from: 'conditional1', to: 'action-high', fromPort: 'true' },
+          { from: 'conditional1', to: 'action-low', fromPort: 'false' }
+        ],
+        variables: [
+          { name: 'noteCount', type: 'number', scope: 'cue', initialValue: 0 }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([
+          ['action-high', actionHigh],
+          ['action-low', actionLow]
+        ]),
+        logicMap: new Map<string, LogicNode>([
+          ['cuedata1', cueDataNode],
+          ['conditional1', conditionalNode]
+        ]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'cuedata1' }]],
+          ['cuedata1', [{ from: 'cuedata1', to: 'conditional1' }]],
+          ['conditional1', [
+            { from: 'conditional1', to: 'action-high', fromPort: 'true' },
+            { from: 'conditional1', to: 'action-low', fromPort: 'false' }
+          ]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      // Test with 3 guitar notes (should trigger high action)
+      const parameters = createCueData('Strong');
+      parameters.guitarNotes = ['Green', 'Red', 'Yellow'] as any;
+      engine.startExecution(eventNode, parameters);
+
+      // Verify variable was set correctly
+      const storedVar = cueLevelVarStore.get('noteCount');
+      expect(storedVar?.value).toBe(3);
+
+      // Should execute high action (3 >= 2)
+      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledWith(
+        expect.stringContaining('action-high'),
+        expect.anything(),
+        expect.anything(),
+        false
+      );
+    });
+
+    it('should extract config data for total lights', () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const configDataNode: LogicNode = {
+        id: 'configdata1',
+        type: 'logic',
+        logicType: 'config-data',
+        dataProperty: 'total-lights',
+        assignTo: 'totalCount',
+        outputs: []
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: { groups: ['front'], filter: 'all' },
+        color: { name: 'red', brightness: 'high' },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: 0,
+          duration: 200,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Default,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [configDataNode]
+        },
+        connections: [
+          { from: 'event1', to: 'configdata1' },
+          { from: 'configdata1', to: 'action1' }
+        ],
+        variables: [
+          { name: 'totalCount', type: 'number', scope: 'cue', initialValue: 0 }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([['action1', actionNode]]),
+        logicMap: new Map([['configdata1', configDataNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'configdata1' }]],
+          ['configdata1', [{ from: 'configdata1', to: 'action1' }]]
+        ])
+      };
+
+      // Mock total lights count
+      mockLightManager.getLightsInGroup = jest.fn((groups) => {
+        if (Array.isArray(groups)) {
+          return [
+            { id: 'f1', position: 0 }, { id: 'f2', position: 1 }, { id: 'f3', position: 2 }, { id: 'f4', position: 3 },
+            { id: 'b1', position: 0 }, { id: 'b2', position: 1 }, { id: 's1', position: 0 }
+          ];
+        }
+        return [];
+      }) as any;
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      // Verify variable was set
+      const storedVar = cueLevelVarStore.get('totalCount');
+      expect(storedVar).toBeDefined();
+      expect(storedVar?.value).toBe(7);
+      expect(storedVar?.type).toBe('number');
+
+      // Action should still execute
       expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
     });
   });

@@ -338,8 +338,72 @@ const conditionalLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
+// Cue data property enums (deduplicated for schema validation)
+const YARG_CUE_DATA_PROPERTIES = [
+  'cue-name', 'cue-type', 'execution-count', 'bpm', 'song-section',
+  'current-scene', 'beat-type', 'keyframe', 'guitar-note-count',
+  'bass-note-count', 'drum-note-count', 'keys-note-count',
+  'total-score', 'performer', 'bonus-effect', 'fog-state',
+  'time-since-cue-start', 'time-since-last-cue'
+] as const;
+
+const AUDIO_CUE_DATA_PROPERTIES = [
+  'cue-type-id', 'timestamp',
+  'overall-level', 'beat-detected', 'energy',
+  'freq-range1', 'freq-range2', 'freq-range3', 'freq-range4', 'freq-range5',
+  'enabled-band-count'
+] as const;
+
+// Combine without duplicates (cue-name, execution-count, bpm are in both but only listed once)
+const CUE_DATA_PROPERTIES = [
+  ...YARG_CUE_DATA_PROPERTIES,
+  ...AUDIO_CUE_DATA_PROPERTIES
+];
+
+const CONFIG_DATA_PROPERTIES = [
+  'total-lights', 'front-lights-count', 'back-lights-count', 'strobe-lights-count'
+] as const;
+
+const cueDataLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'dataProperty'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'cue-data' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    dataProperty: { type: 'string', enum: CUE_DATA_PROPERTIES },
+    assignTo: { type: 'string', nullable: true }
+  }
+} as any;
+
+const configDataLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'dataProperty'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'config-data' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    dataProperty: { type: 'string', enum: CONFIG_DATA_PROPERTIES },
+    assignTo: { type: 'string', nullable: true }
+  }
+} as any;
+
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
-  oneOf: [variableLogicSchema, mathLogicSchema, conditionalLogicSchema]
+  oneOf: [variableLogicSchema, mathLogicSchema, conditionalLogicSchema, cueDataLogicSchema, configDataLogicSchema]
 } as any;
 
 const targetSchema: JSONSchemaType<NodeActionTarget> = {

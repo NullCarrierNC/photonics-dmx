@@ -93,7 +93,71 @@ export interface ConditionalLogicNode extends BaseLogicNode {
   right: ValueSource;
 }
 
-export type LogicNode = VariableLogicNode | MathLogicNode | ConditionalLogicNode;
+// YARG Cue Data Properties
+export type YargCueDataProperty = 
+  | 'cue-name'              // Current cue name (string)
+  | 'cue-type'              // Current CueType (string)
+  | 'execution-count'       // How many times this cue has executed (number)
+  | 'bpm'                   // Beats per minute (number)
+  | 'song-section'          // Chorus/Verse/etc (string)
+  | 'current-scene'         // Menu/Gameplay/Score (string)
+  | 'beat-type'             // Measure/Strong/Weak (string)
+  | 'keyframe'              // Current keyframe value (string)
+  | 'guitar-note-count'     // Number of guitar notes pressed (number)
+  | 'bass-note-count'       // Number of bass notes pressed (number)
+  | 'drum-note-count'       // Number of drum notes pressed (number)
+  | 'keys-note-count'       // Number of keys notes pressed (number)
+  | 'total-score'           // Total band score (number)
+  | 'performer'             // Performer index (number)
+  | 'bonus-effect'          // Whether bonus effect active (boolean)
+  | 'fog-state'             // Fog on/off (boolean)
+  | 'time-since-cue-start'  // Milliseconds since cue started (number)
+  | 'time-since-last-cue';  // Milliseconds since previous cue (number)
+
+// Audio Cue Data Properties
+export type AudioCueDataProperty =
+  | 'cue-name'              // Current cue name (string)
+  | 'cue-type-id'           // Current cue type ID (string)
+  | 'execution-count'       // Execution count (number)
+  | 'timestamp'             // Current timestamp (number)
+  | 'overall-level'         // Audio level 0.0-1.0 (number)
+  | 'bpm'                   // Detected BPM or null (number)
+  | 'beat-detected'         // Beat detected this frame (boolean)
+  | 'energy'                // Audio energy 0.0-1.0 (number)
+  | 'freq-range1'           // Bass frequencies 0.0-1.0 (number)
+  | 'freq-range2'           // Low-mids 0.0-1.0 (number)
+  | 'freq-range3'           // Mids 0.0-1.0 (number)
+  | 'freq-range4'           // Upper-mids 0.0-1.0 (number)
+  | 'freq-range5'           // Highs 0.0-1.0 (number)
+  | 'enabled-band-count';   // Number of enabled bands (number)
+
+export type CueDataProperty = YargCueDataProperty | AudioCueDataProperty;
+
+// Config Data Properties
+export type ConfigDataProperty =
+  | 'total-lights'          // Total number of all lights (number)
+  | 'front-lights-count'    // Number of front lights (number)
+  | 'back-lights-count'     // Number of back lights (number)
+  | 'strobe-lights-count';  // Number of strobe lights (number)
+
+export interface CueDataLogicNode extends BaseLogicNode {
+  logicType: 'cue-data';
+  dataProperty: CueDataProperty;
+  assignTo?: string;
+}
+
+export interface ConfigDataLogicNode extends BaseLogicNode {
+  logicType: 'config-data';
+  dataProperty: ConfigDataProperty;
+  assignTo?: string;
+}
+
+export type LogicNode = 
+  | VariableLogicNode 
+  | MathLogicNode 
+  | ConditionalLogicNode
+  | CueDataLogicNode
+  | ConfigDataLogicNode;
 
 export interface EventRaiserNode {
   id: string;

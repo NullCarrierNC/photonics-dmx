@@ -6,6 +6,7 @@
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { CueData } from '../../types/cueTypes';
+import { AudioCueData } from '../../types/audioCueTypes';
 import { CompiledEffect } from '../compiler/EffectCompiler';
 import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
 import {
@@ -30,17 +31,20 @@ export class EffectExecutionEngine {
   private activeContexts: Map<string, ExecutionContext> = new Map();
   private variableDefinitions: VariableDefinition[];
   private eventListeners: Map<string, EventListenerNode[]> = new Map();
+  private callerCueData: CueData | AudioCueData;  // Cue data from caller
 
   constructor(
     compiledEffect: CompiledEffect<BaseEventNode>,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
-    parameterValues: Record<string, any>
+    parameterValues: Record<string, any>,
+    callerCueData: CueData | AudioCueData
   ) {
     this.compiledEffect = compiledEffect;
     this.sequencer = sequencer;
     this.lightManager = lightManager;
     this.parameterValues = parameterValues;
+    this.callerCueData = callerCueData;
     this.variableDefinitions = compiledEffect.definition.variables ?? [];
     
     // Initialize effect-local variable store
@@ -81,7 +85,7 @@ export class EffectExecutionEngine {
   /**
    * Trigger the effect by starting execution from the effect listener.
    */
-  public triggerEffect(_cueData: CueData): void {
+  public triggerEffect(cueData: CueData | AudioCueData): void {
     // Get the effect listener (entry point)
     const effectListener = Array.from(this.compiledEffect.effectListenerMap.values())[0];
     if (!effectListener) {
@@ -92,9 +96,10 @@ export class EffectExecutionEngine {
     // Apply parameter values to effect variables
     this.applyParameterValues(effectListener);
 
-    // Create execution context
+    // Create execution context with caller's cue data
     const context = new ExecutionContext(
       { id: effectListener.id, type: 'event', outputs: effectListener.outputs } as any,
+      cueData,  // Pass caller's cue data
       this.effectVarStore,  // Use effect-local variables as "cue-level"
       new Map()  // No group-level variables for effects
     );
@@ -374,6 +379,7 @@ export class EffectExecutionEngine {
   private startListenerExecution(listener: EventListenerNode): void {
     const context = new ExecutionContext(
       { id: listener.id, type: 'event', outputs: listener.outputs } as any,
+      this.callerCueData,
       this.effectVarStore,
       new Map()
     );
