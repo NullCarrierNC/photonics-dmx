@@ -44,68 +44,57 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
 
   return (
     <div className="space-y-1">
-      <label className="flex flex-col font-medium text-xs">
-        {label}
+      <label className="flex items-center justify-between font-medium text-xs">
+        <span>{label}</span>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Use Variable</span>
+          <input
+            type="checkbox"
+            checked={!isLiteral}
+            onChange={(e) => handleToggleVar(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-600 dark:bg-gray-700"
+          />
+        </label>
       </label>
       {isLiteral ? (
-        // Literal mode: switch and value on same line
-        <div className="flex items-center gap-2 mt-1">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-600 dark:text-gray-400">Variable</span>
+        // Literal mode: just the input
+        <div className="mt-1">
+          {isBoolean ? (
+            <select
+              className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={source.value === true ? 'true' : 'false'}
+              onChange={event => onChange({ ...source, value: event.target.value === 'true' })}
+            >
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          ) : validLiterals ? (
+            // Show dropdown for constrained literals (e.g., colours, brightness levels)
+            <select
+              className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={String(source.value)}
+              onChange={event => onChange({ ...source, value: event.target.value })}
+            >
+              {validLiterals.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          ) : (
             <input
-              type="checkbox"
-              checked={!isLiteral}
-              onChange={(e) => handleToggleVar(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-600 dark:bg-gray-700"
+              type={isString ? 'text' : 'number'}
+              step={isString ? undefined : "0.1"}
+              className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={isString ? String(source.value ?? '') : (typeof source.value === 'number' ? source.value : 0)}
+              onChange={event => {
+                const newValue = isString ? event.target.value : Number(event.target.value);
+                onChange({ ...source, value: newValue });
+              }}
             />
-          </label>
-          <div className="flex-1">
-            {isBoolean ? (
-              <select
-                className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={source.value === true ? 'true' : 'false'}
-                onChange={event => onChange({ ...source, value: event.target.value === 'true' })}
-              >
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </select>
-            ) : validLiterals ? (
-              // Show dropdown for constrained literals (e.g., colours, brightness levels)
-              <select
-                className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={String(source.value)}
-                onChange={event => onChange({ ...source, value: event.target.value })}
-              >
-                {validLiterals.map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type={isString ? 'text' : 'number'}
-                step={isString ? undefined : "0.1"}
-                className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={isString ? String(source.value ?? '') : (typeof source.value === 'number' ? source.value : 0)}
-                onChange={event => {
-                  const newValue = isString ? event.target.value : Number(event.target.value);
-                  onChange({ ...source, value: newValue });
-                }}
-              />
-            )}
-          </div>
+          )}
         </div>
       ) : (
-        // Variable mode: switch on top, variable dropdown and fallback below
+        // Variable mode: variable dropdown and fallback below
         <div className="space-y-2 mt-1">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-600 dark:text-gray-400">Variable</span>
-            <input
-              type="checkbox"
-              checked={!isLiteral}
-              onChange={(e) => handleToggleVar(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-600 dark:bg-gray-700"
-            />
-          </label>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col font-medium text-xs">
               Variable
