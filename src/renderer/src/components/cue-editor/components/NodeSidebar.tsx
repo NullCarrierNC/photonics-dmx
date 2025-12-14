@@ -3,6 +3,7 @@ import type {
   ActionNode,
   AudioEventNode,
   AudioEventType,
+  ConfigDataProperty,
   EventRaiserNode,
   EventListenerNode,
   EffectRaiserNode,
@@ -30,7 +31,6 @@ import {
   COLOR_OPTIONS,
   EASING_OPTIONS,
   LIGHT_TARGET_OPTIONS,
-  LOCATION_OPTIONS,
   YARG_EVENT_OPTIONS,
   getActionWaitOptions,
   getDefaultEventOption
@@ -77,11 +77,19 @@ const NodeSidebar: React.FC<Props> = ({
 }) => {
   const isVariableSource = (src: ValueSource): src is Extract<ValueSource, { source: 'variable' }> => src.source === 'variable';
 
+  const extractLiteralValue = (valueSource: ValueSource | undefined, defaultValue: string | number = ''): string | number => {
+    if (!valueSource || valueSource.source !== 'literal') {
+      return defaultValue;
+    }
+    return typeof valueSource.value === 'number' ? valueSource.value : String(valueSource.value ?? defaultValue);
+  };
+
   const renderValueSourceEditor = (
     label: string,
     value: ValueSource | undefined,
     onChange: (next: ValueSource) => void,
-    expected: 'number' | 'boolean' | 'string' | 'either' = 'either'
+    expected: 'number' | 'boolean' | 'string' | 'either' = 'either',
+    validLiterals?: string[]  // NEW: optional constraint for literal values
   ) => {
     const source = value ?? { source: 'literal', value: expected === 'boolean' ? false : expected === 'string' ? '' : 0 };
     const isLiteral = source.source === 'literal';
@@ -98,7 +106,7 @@ const NodeSidebar: React.FC<Props> = ({
             onChange={event => {
               const nextSource = event.target.value as ValueSource['source'];
               if (nextSource === 'literal') {
-                const defaultValue = isBoolean ? false : isString ? '' : 0;
+                const defaultValue = isBoolean ? false : isString ? (validLiterals?.[0] ?? '') : 0;
                 onChange({ source: 'literal', value: defaultValue });
               } else {
                 onChange({ source: 'variable', name: isVariableSource(source) ? (source.name ?? 'var1') : 'var1', fallback: isVariableSource(source) ? source.fallback : undefined });
@@ -120,6 +128,17 @@ const NodeSidebar: React.FC<Props> = ({
               >
                 <option value="true">true</option>
                 <option value="false">false</option>
+              </select>
+            ) : validLiterals ? (
+              // Show dropdown for constrained literals (e.g., colors, brightness levels)
+              <select
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={String(source.value)}
+                onChange={event => onChange({ ...source, value: event.target.value })}
+              >
+                {validLiterals.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
               </select>
             ) : (
               <input
@@ -162,6 +181,18 @@ const NodeSidebar: React.FC<Props> = ({
                   <option value="true">true</option>
                   <option value="false">false</option>
                 </select>
+              ) : validLiterals ? (
+                // Show dropdown for constrained fallback values
+                <select
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={String(isVariableSource(source) ? source.fallback ?? '' : '')}
+                  onChange={event => onChange({ source: 'variable', name: isVariableSource(source) ? source.name : 'var1', fallback: event.target.value })}
+                >
+                  <option value="">-- None --</option>
+                  {validLiterals.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
               ) : (
                 <input
                   type="number"
@@ -179,7 +210,8 @@ const NodeSidebar: React.FC<Props> = ({
   };
 
   return (
-    <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-y-auto space-y-4">
+    <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner h-full flex flex-col overflow-hidden">
+      <div className="p-3 flex-1 overflow-y-auto space-y-4">
       {editorMode === 'cue' && (
         <div>
           <h3 className="font-semibold text-sm mb-2">Event Nodes</h3>
@@ -634,7 +666,7 @@ const NodeSidebar: React.FC<Props> = ({
                     <select
                       className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                       value={logicPayload.dataProperty ?? ''}
-                      onChange={event => updateSelectedNode<LogicNode>({ dataProperty: event.target.value })}
+                      onChange={event => updateSelectedNode<LogicNode>({ dataProperty: event.target.value as ConfigDataProperty || undefined })}
                     >
                       <option value="">-- Select Property --</option>
                       {cueDataProperties.map(prop => (
@@ -678,7 +710,7 @@ const NodeSidebar: React.FC<Props> = ({
                     <select
                       className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                       value={logicPayload.dataProperty ?? ''}
-                      onChange={event => updateSelectedNode<LogicNode>({ dataProperty: event.target.value })}
+                      onChange={event => updateSelectedNode<LogicNode>({ dataProperty: event.target.value as ConfigDataProperty || undefined })}
                     >
                       <option value="">-- Select Property --</option>
                       {configDataProperties.map(prop => (
@@ -748,129 +780,98 @@ const NodeSidebar: React.FC<Props> = ({
                 ))}
               </select>
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col font-medium">
-                Target Groups
-                <select
-                  multiple
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(selectedNode.data.payload as ActionNode).target.groups}
-                  onChange={event => {
-                    const selected = Array.from(event.target.selectedOptions).map(option => option.value);
-                    updateSelectedNode({
-                      target: {
-                        ...(selectedNode.data.payload as ActionNode).target,
-                        groups: selected
-                      }
-                    } as ActionNode);
-                  }}
-                >
-                  {LOCATION_OPTIONS.map(loc => (
-                    <option key={loc} value={loc}>{loc}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col font-medium">
-                Target Filter
-                <select
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(selectedNode.data.payload as ActionNode).target.filter}
-                  onChange={event => updateSelectedNode({
-                    target: {
-                      ...(selectedNode.data.payload as ActionNode).target,
-                      filter: event.target.value
-                    }
-                  } as ActionNode)}
-                >
-                  {LIGHT_TARGET_OPTIONS.map(target => (
-                    <option key={target} value={target}>{target}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col font-medium">
-                Primary Colour
-                <select
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(selectedNode.data.payload as ActionNode).color.name}
-                  onChange={event => updateSelectedNode({
-                    color: {
-                      ...(selectedNode.data.payload as ActionNode).color,
-                      name: event.target.value as Color
-                    }
-                  } as ActionNode)}
-                >
-                  {COLOR_OPTIONS.map(color => (
-                    <option key={color} value={color}>{color}</option>
-                  ))}
-                </select>
-              </label>
-              {(((selectedNode.data.payload as ActionNode).effectType === 'sweep') ||
-                (selectedNode.data.payload as ActionNode).effectType === 'cycle') && (
-                <label className="flex flex-col font-medium">
-                  Secondary Colour
-                  <select
-                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                    value={(selectedNode.data.payload as ActionNode).secondaryColor?.name ?? 'transparent'}
-                    onChange={event => updateSelectedNode({
-                      secondaryColor: {
-                        ...(selectedNode.data.payload as ActionNode).secondaryColor ?? { brightness: 'medium', blendMode: 'replace' },
-                      name: event.target.value as Color
-                      }
-                    } as ActionNode)}
-                  >
-                    {COLOR_OPTIONS.map(color => (
-                      <option key={color} value={color}>{color}</option>
-                    ))}
-                  </select>
-                </label>
+            {renderValueSourceEditor(
+              'Target Groups (comma-separated: front,back,strobe)',
+              (selectedNode.data.payload as ActionNode).target.groups,
+              next => updateSelectedNode<ActionNode>({
+                target: {
+                  ...(selectedNode.data.payload as ActionNode).target,
+                  groups: next
+                }
+              }),
+              'string'
+            )}
+            {renderValueSourceEditor(
+              'Target Filter',
+              (selectedNode.data.payload as ActionNode).target.filter,
+              next => updateSelectedNode<ActionNode>({
+                target: {
+                  ...(selectedNode.data.payload as ActionNode).target,
+                  filter: next
+                }
+              }),
+              'string',
+              LIGHT_TARGET_OPTIONS
+            )}
+            {renderValueSourceEditor(
+              'Primary Color',
+              (selectedNode.data.payload as ActionNode).color.name,
+              next => updateSelectedNode<ActionNode>({
+                color: {
+                  ...(selectedNode.data.payload as ActionNode).color,
+                  name: next
+                }
+              }),
+              'string',
+              COLOR_OPTIONS
+            )}
+            {renderValueSourceEditor(
+              'Primary Brightness',
+              (selectedNode.data.payload as ActionNode).color.brightness,
+              next => updateSelectedNode<ActionNode>({
+                color: {
+                  ...(selectedNode.data.payload as ActionNode).color,
+                  brightness: next
+                }
+              }),
+              'string',
+              BRIGHTNESS_OPTIONS
+            )}
+            {renderValueSourceEditor(
+              'Primary Blend Mode',
+              (selectedNode.data.payload as ActionNode).color.blendMode,
+              next => updateSelectedNode<ActionNode>({
+                color: {
+                  ...(selectedNode.data.payload as ActionNode).color,
+                  blendMode: next
+                }
+              }),
+              'string',
+              BLEND_MODE_OPTIONS
+            )}
+            {(((selectedNode.data.payload as ActionNode).effectType === 'sweep') ||
+              (selectedNode.data.payload as ActionNode).effectType === 'cycle') && (<>
+              {renderValueSourceEditor(
+                'Secondary Color',
+                (selectedNode.data.payload as ActionNode).secondaryColor?.name,
+                next => updateSelectedNode<ActionNode>({
+                  secondaryColor: {
+                    ...(selectedNode.data.payload as ActionNode).secondaryColor ?? { brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } },
+                    name: next
+                  }
+                }),
+                'string',
+                COLOR_OPTIONS
               )}
-              <label className="flex flex-col font-medium">
-                Brightness
-                <select
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(selectedNode.data.payload as ActionNode).color.brightness}
-                  onChange={event => updateSelectedNode({
-                    color: {
-                      ...(selectedNode.data.payload as ActionNode).color,
-                      brightness: event.target.value
-                    }
-                  } as ActionNode)}
-                >
-                  {BRIGHTNESS_OPTIONS.map(brightness => (
-                    <option key={brightness} value={brightness}>{brightness}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col font-medium">
-                Blend Mode
-                <select
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(selectedNode.data.payload as ActionNode).color.blendMode ?? 'replace'}
-                  onChange={event => updateSelectedNode({
-                    color: {
-                      ...(selectedNode.data.payload as ActionNode).color,
-                      blendMode: event.target.value
-                    }
-                  } as ActionNode)}
-                >
-                  {BLEND_MODE_OPTIONS.map(mode => (
-                    <option key={mode} value={mode}>{mode}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="flex flex-col font-medium">
-              Layer
-              <input
-                type="number"
-                min={0}
-                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={(selectedNode.data.payload as ActionNode).layer ?? 0}
-                onChange={event => updateSelectedNode({ layer: Number(event.target.value) })}
-              />
-            </label>
+              {renderValueSourceEditor(
+                'Secondary Brightness',
+                (selectedNode.data.payload as ActionNode).secondaryColor?.brightness,
+                next => updateSelectedNode<ActionNode>({
+                  secondaryColor: {
+                    ...(selectedNode.data.payload as ActionNode).secondaryColor ?? { name: { source: 'literal', value: 'blue' }, blendMode: { source: 'literal', value: 'replace' } },
+                    brightness: next
+                  }
+                }),
+                'string',
+                BRIGHTNESS_OPTIONS
+              )}
+            </>)}
+            {renderValueSourceEditor(
+              'Layer',
+              (selectedNode.data.payload as ActionNode).layer,
+              next => updateSelectedNode<ActionNode>({ layer: next }),
+              'number'
+            )}
             <div className="grid grid-cols-2 gap-2">
               {(() => {
                 const actionPayload = selectedNode.data.payload as ActionNode;
@@ -901,41 +902,24 @@ const NodeSidebar: React.FC<Props> = ({
                         <span className="text-[10px] text-gray-500">Inherited from event parent</span>
                       )}
                     </label>
-                    <label className={`flex flex-col font-medium ${currentTiming.waitForCondition !== 'delay' ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                      Wait For Time (ms)
-                      <input
-                        type="number"
-                        min={0}
-                        className={`mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 ${
-                          currentTiming.waitForCondition !== 'delay' ? 'opacity-60 cursor-not-allowed' : ''
-                        }`}
-                        value={currentTiming.waitForTime}
-                        disabled={currentTiming.waitForCondition !== 'delay'}
-                        onChange={event => updateTiming({ waitForTime: Number(event.target.value) })}
-                      />
-                    </label>
-                    <label className="flex flex-col font-medium">
-                      Wait For Count
-                      <input
-                        type="number"
-                        min={0}
-                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={currentTiming.waitForConditionCount ?? ''}
-                        onChange={event => updateTiming({
-                          waitForConditionCount: event.target.value === '' ? undefined : Number(event.target.value)
-                        })}
-                      />
-                    </label>
-                    <label className="flex flex-col font-medium">
-                      Duration (ms)
-                      <input
-                        type="number"
-                        min={0}
-                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={currentTiming.duration}
-                        onChange={event => updateTiming({ duration: Number(event.target.value) })}
-                      />
-                    </label>
+                    {renderValueSourceEditor(
+                      'Wait For Time (ms)',
+                      currentTiming.waitForTime,
+                      next => updateTiming({ waitForTime: next }),
+                      'number'
+                    )}
+                    {renderValueSourceEditor(
+                      'Wait For Count',
+                      currentTiming.waitForConditionCount,
+                      next => updateTiming({ waitForConditionCount: next }),
+                      'number'
+                    )}
+                    {renderValueSourceEditor(
+                      'Duration (ms)',
+                      currentTiming.duration,
+                      next => updateTiming({ duration: next }),
+                      'number'
+                    )}
                     <label className="flex flex-col font-medium">
                       Wait Until Condition
                       <select
@@ -948,43 +932,24 @@ const NodeSidebar: React.FC<Props> = ({
                         ))}
                       </select>
                     </label>
-                    <label className={`flex flex-col font-medium ${currentTiming.waitUntilCondition !== 'delay' ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                      Wait Until Time (ms)
-                      <input
-                        type="number"
-                        min={0}
-                        className={`mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 ${
-                          currentTiming.waitUntilCondition !== 'delay' ? 'opacity-60 cursor-not-allowed' : ''
-                        }`}
-                        value={currentTiming.waitUntilTime}
-                        disabled={currentTiming.waitUntilCondition !== 'delay'}
-                        onChange={event => updateTiming({ waitUntilTime: Number(event.target.value) })}
-                      />
-                    </label>
-                    <label className="flex flex-col font-medium">
-                      Wait Until Count
-                      <input
-                        type="number"
-                        min={0}
-                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={currentTiming.waitUntilConditionCount ?? ''}
-                        onChange={event => updateTiming({
-                          waitUntilConditionCount: event.target.value === '' ? undefined : Number(event.target.value)
-                        })}
-                      />
-                    </label>
-                    <label className="flex flex-col font-medium">
-                      Level
-                      <input
-                        type="number"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={currentTiming.level ?? 1}
-                        onChange={event => updateTiming({ level: Number(event.target.value) })}
-                      />
-                    </label>
+                    {renderValueSourceEditor(
+                      'Wait Until Time (ms)',
+                      currentTiming.waitUntilTime,
+                      next => updateTiming({ waitUntilTime: next }),
+                      'number'
+                    )}
+                    {renderValueSourceEditor(
+                      'Wait Until Count',
+                      currentTiming.waitUntilConditionCount,
+                      next => updateTiming({ waitUntilConditionCount: next }),
+                      'number'
+                    )}
+                    {renderValueSourceEditor(
+                      'Level (0.0 - 1.0)',
+                      currentTiming.level,
+                      next => updateTiming({ level: next }),
+                      'number'
+                    )}
                     <label className="flex flex-col font-medium">
                       Easing
                       <select
@@ -1023,8 +988,8 @@ const NodeSidebar: React.FC<Props> = ({
                         type="number"
                         min={0}
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={cfg.duration ?? ''}
-                        onChange={e => updateConfig({ sweep: { ...cfg, duration: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                        value={extractLiteralValue(cfg.duration, '')}
+                        onChange={e => updateConfig({ sweep: { ...cfg, duration: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } } })}
                       />
                     </label>
                     <label className="flex flex-col font-medium text-xs">
@@ -1033,8 +998,8 @@ const NodeSidebar: React.FC<Props> = ({
                         type="number"
                         min={0}
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={cfg.fadeIn ?? ''}
-                        onChange={e => updateConfig({ sweep: { ...cfg, fadeIn: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                        value={extractLiteralValue(cfg.fadeIn, '')}
+                        onChange={e => updateConfig({ sweep: { ...cfg, fadeIn: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } } })}
                       />
                     </label>
                     <label className="flex flex-col font-medium text-xs">
@@ -1043,8 +1008,8 @@ const NodeSidebar: React.FC<Props> = ({
                         type="number"
                         min={0}
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={cfg.fadeOut ?? ''}
-                        onChange={e => updateConfig({ sweep: { ...cfg, fadeOut: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                        value={extractLiteralValue(cfg.fadeOut, '')}
+                        onChange={e => updateConfig({ sweep: { ...cfg, fadeOut: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } } })}
                       />
                     </label>
                     <label className="flex flex-col font-medium text-xs">
@@ -1054,8 +1019,8 @@ const NodeSidebar: React.FC<Props> = ({
                         min={0}
                         max={100}
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={cfg.overlap ?? ''}
-                        onChange={e => updateConfig({ sweep: { ...cfg, overlap: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                        value={extractLiteralValue(cfg.overlap, '')}
+                        onChange={e => updateConfig({ sweep: { ...cfg, overlap: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } } })}
                       />
                     </label>
                     <label className="flex flex-col font-medium text-xs">
@@ -1064,21 +1029,21 @@ const NodeSidebar: React.FC<Props> = ({
                         type="number"
                         min={0}
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={cfg.betweenDelay ?? ''}
-                        onChange={e => updateConfig({ sweep: { ...cfg, betweenDelay: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                        value={extractLiteralValue(cfg.betweenDelay, '')}
+                        onChange={e => updateConfig({ sweep: { ...cfg, betweenDelay: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } } })}
                       />
                     </label>
                     <label className="flex flex-col font-medium text-xs">
                       Low Colour
                       <select
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={cfg.lowColor?.name ?? 'transparent'}
+                        value={cfg.lowColor?.name?.source === 'literal' ? cfg.lowColor.name.value as string : 'transparent'}
                         onChange={event => updateConfig({
                           sweep: {
                             ...cfg,
                             lowColor: {
-                              ...(cfg.lowColor ?? { brightness: 'medium', blendMode: 'replace' }),
-                              name: event.target.value as Color
+                              ...(cfg.lowColor ?? { brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } }),
+                              name: { source: 'literal', value: event.target.value as Color }
                             }
                           }
                         })}
@@ -1101,13 +1066,13 @@ const NodeSidebar: React.FC<Props> = ({
                       Base Colour
                       <select
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={cfg.baseColor?.name ?? 'transparent'}
+                        value={cfg.baseColor?.name?.source === 'literal' ? cfg.baseColor.name.value as string : 'transparent'}
                         onChange={event => updateConfig({
                           cycle: {
                             ...cfg,
                             baseColor: {
-                              ...(cfg.baseColor ?? { brightness: 'medium', blendMode: 'replace' }),
-                                  name: event.target.value as Color
+                              ...(cfg.baseColor ?? { brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } }),
+                              name: { source: 'literal', value: event.target.value as Color }
                             }
                           }
                         })}
@@ -1123,8 +1088,8 @@ const NodeSidebar: React.FC<Props> = ({
                         type="number"
                         min={0}
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={cfg.transitionDuration ?? ''}
-                        onChange={e => updateConfig({ cycle: { ...cfg, transitionDuration: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                        value={extractLiteralValue(cfg.transitionDuration, '')}
+                        onChange={e => updateConfig({ cycle: { ...cfg, transitionDuration: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } } })}
                       />
                     </label>
                     <label className="flex flex-col font-medium text-xs">
@@ -1154,8 +1119,8 @@ const NodeSidebar: React.FC<Props> = ({
                         type="number"
                         min={10}
                         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                        value={cfg.duration ?? ''}
-                        onChange={e => updateConfig({ blackout: { ...cfg, duration: e.target.value === '' ? undefined : Number(e.target.value) } })}
+                        value={extractLiteralValue(cfg.duration, '')}
+                        onChange={e => updateConfig({ blackout: { ...cfg, duration: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } } })}
                       />
                     </label>
                   </div>
@@ -1166,6 +1131,7 @@ const NodeSidebar: React.FC<Props> = ({
             })()}
           </div>
         )}
+      </div>
       </div>
     </aside>
   );

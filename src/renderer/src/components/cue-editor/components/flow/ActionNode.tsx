@@ -2,16 +2,41 @@ import React from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import type { EditorNodeData } from '../../lib/types';
 import { getConditionLabel, getTextColorForBg } from '../../lib/cueUtils';
-import type { ActionNode as ActionPayload } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { ActionNode as ActionPayload, ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+
+// Helper to display ValueSource as text
+const displayValueSource = (vs: ValueSource | undefined, defaultValue: string = ''): string => {
+  if (!vs) return defaultValue;
+  if (vs.source === 'literal') {
+    return String(vs.value ?? defaultValue);
+  }
+  return `$${vs.name}`;
+};
 
 const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
   const action = data.payload as ActionPayload;
-  const colorName = action.color?.name ?? 'gray';
+  
+  // Handle color which is now ValueSource
+  const colorValue = action.color?.name;
+  const colorName = colorValue?.source === 'literal' ? String(colorValue.value) : 'gray';
   const textColor = getTextColorForBg(colorName);
-  const waitFor = getConditionLabel(action.timing?.waitForCondition ?? 'none', action.timing?.waitForTime);
-  const waitUntil = getConditionLabel(action.timing?.waitUntilCondition ?? 'none', action.timing?.waitUntilTime);
-  const targetText = `${(action.target.groups ?? []).join(', ')} | ${action.target.filter}`;
-  const durationText = `(${action.timing?.duration ?? 0}ms)`;
+  
+  // Handle timing values which are now ValueSource
+  const waitForTime = action.timing?.waitForTime;
+  const waitForTimeValue = waitForTime?.source === 'literal' ? Number(waitForTime.value) : 0;
+  const waitUntilTime = action.timing?.waitUntilTime;
+  const waitUntilTimeValue = waitUntilTime?.source === 'literal' ? Number(waitUntilTime.value) : 0;
+  const duration = action.timing?.duration;
+  const durationValue = duration?.source === 'literal' ? Number(duration.value) : 0;
+  
+  const waitFor = getConditionLabel(action.timing?.waitForCondition ?? 'none', waitForTimeValue);
+  const waitUntil = getConditionLabel(action.timing?.waitUntilCondition ?? 'none', waitUntilTimeValue);
+  
+  // Handle target groups and filter which are now ValueSource
+  const groupsText = displayValueSource(action.target.groups, 'front');
+  const filterText = displayValueSource(action.target.filter, 'all');
+  const targetText = `${groupsText} | ${filterText}`;
+  const durationText = `(${durationValue}ms)`;
 
   return (
     <div

@@ -1,11 +1,7 @@
 import { CueType } from './cueTypes';
-import {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import type {
   WaitCondition,
-  LocationGroup,
-  LightTarget,
-  Color,
-  Brightness,
-  BlendMode
 } from '../../types';
 
 export type NodeCueMode = 'yarg' | 'audio';
@@ -44,20 +40,12 @@ export interface VariableDefinition {
   scope: 'cue' | 'cue-group';
   initialValue: number | boolean | string;
   description?: string;
-  isParameter?: boolean;  // NEW: mark as effect parameter
+  isParameter?: boolean; 
 }
 
 export interface EventDefinition {
   name: string;
   description?: string;
-}
-
-// Effect parameter definition (DEPRECATED - use VariableDefinition with isParameter: true)
-export interface EffectParameterDefinition {
-  name: string;
-  type: VariableType;
-  description?: string;
-  defaultValue?: number | boolean | string;
 }
 
 export type LogicComparator = '>' | '>=' | '<' | '<=' | '==' | '!=';
@@ -287,45 +275,45 @@ export type NodeEffectType =
   | 'blackout';
 
 export interface NodeActionTarget {
-  groups: LocationGroup[];
-  filter: LightTarget;
+  groups: ValueSource;  // Can reference a string variable containing comma-separated groups
+  filter: ValueSource;  // Can reference a string variable with filter name
 }
 
 export interface NodeColorSetting {
-  name: Color;
-  brightness: Brightness;
-  blendMode?: BlendMode;
+  name: ValueSource;        // Can reference a string variable with color name
+  brightness: ValueSource;  // Can reference a string variable with brightness level
+  blendMode?: ValueSource;  // Can reference a string variable with blend mode
 }
 
 export interface ActionTimingConfig {
   waitForCondition: WaitCondition;
-  waitForTime: number;
-  waitForConditionCount?: number;
-  duration: number;
+  waitForTime: ValueSource;
+  waitForConditionCount?: ValueSource;
+  duration: ValueSource;
   waitUntilCondition: WaitCondition;
-  waitUntilTime: number;
-  waitUntilConditionCount?: number;
+  waitUntilTime: ValueSource;
+  waitUntilConditionCount?: ValueSource;
   easing?: string;
-  level?: number;
+  level?: ValueSource;
 }
 
 export interface SweepActionConfig {
-  duration?: number;
-  fadeIn?: number;
-  fadeOut?: number;
-  overlap?: number;
-  betweenDelay?: number;
+  duration?: ValueSource;
+  fadeIn?: ValueSource;
+  fadeOut?: ValueSource;
+  overlap?: ValueSource;
+  betweenDelay?: ValueSource;
   lowColor?: NodeColorSetting;
 }
 
 export interface CycleActionConfig {
   baseColor?: NodeColorSetting;
-  transitionDuration?: number;
+  transitionDuration?: ValueSource;
   trigger?: WaitCondition;
 }
 
 export interface BlackoutActionConfig {
-  duration?: number;
+  duration?: ValueSource;
 }
 
 export interface NodeActionConfig {
@@ -337,12 +325,12 @@ export interface NodeActionConfig {
 
 export const createDefaultActionTiming = (): ActionTimingConfig => ({
   waitForCondition: 'none',
-  waitForTime: 0,
-  duration: 200,
+  waitForTime: { source: 'literal', value: 0 },
+  duration: { source: 'literal', value: 200 },
   waitUntilCondition: 'none',
-  waitUntilTime: 0,
+  waitUntilTime: { source: 'literal', value: 0 },
   easing: 'sinInOut',
-  level: 1
+  level: { source: 'literal', value: 1 }
 });
 
 export interface ActionNode {
@@ -353,7 +341,7 @@ export interface ActionNode {
   color: NodeColorSetting;
   secondaryColor?: NodeColorSetting;
   timing: ActionTimingConfig;
-  layer?: number;
+  layer?: ValueSource;
   label?: string;
   inputs?: string[];
   outputs?: string[];
@@ -373,7 +361,6 @@ export interface BaseEffectDefinition {
   connections: Connection[];
   layout?: NodeLayoutMetadata;
   variables?: VariableDefinition[];  // Effect-local variables (some may be parameters with isParameter: true)
-  parameters?: EffectParameterDefinition[];  // DEPRECATED - use variables with isParameter: true
   events?: EventDefinition[];  // Effect-scoped runtime events
 }
 

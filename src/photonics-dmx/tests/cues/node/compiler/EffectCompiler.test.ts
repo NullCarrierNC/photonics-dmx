@@ -9,7 +9,6 @@ describe('EffectCompiler', () => {
         mode: 'yarg',
         name: 'Test Effect',
         description: 'A test effect',
-        parameters: [],
         nodes: {
           events: [],
           actions: [
@@ -17,19 +16,30 @@ describe('EffectCompiler', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
-              secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 100, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [],
@@ -64,7 +74,6 @@ describe('EffectCompiler', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        parameters: [],
         nodes: {
           events: [],
           actions: [
@@ -72,19 +81,30 @@ describe('EffectCompiler', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
-              secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 100, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [],
@@ -106,7 +126,6 @@ describe('EffectCompiler', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        parameters: [],
         nodes: {
           events: [],
           actions: [],
@@ -145,9 +164,6 @@ describe('EffectCompiler', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        parameters: [
-          { name: 'speed', type: 'number', description: '' } // DEPRECATED - will be migrated
-        ],
         variables: [
           { name: 'speedParam', type: 'number', scope: 'cue', initialValue: 100, isParameter: true }
         ],
@@ -158,19 +174,30 @@ describe('EffectCompiler', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
-              secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 100, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [],
@@ -204,7 +231,6 @@ describe('EffectCompiler', () => {
         mode: 'audio',
         name: 'Audio Test',
         description: '',
-        parameters: [],
         nodes: {
           events: [],
           actions: [
@@ -212,19 +238,30 @@ describe('EffectCompiler', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'blue', brightness: 'high', blendMode: 'replace' },
-              secondaryColor: { name: 'blue', brightness: 'high', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'blue' }, 
+                brightness: { source: 'literal', value: 'high' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'blue' }, 
+                brightness: { source: 'literal', value: 'high' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 200, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 200 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [],
@@ -260,7 +297,6 @@ describe('EffectCompiler', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        parameters: [],
         nodes: {
           events: [],
           actions: [
@@ -268,19 +304,30 @@ describe('EffectCompiler', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
-              secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 100, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [],
@@ -317,7 +364,6 @@ describe('EffectCompiler', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        parameters: [],
         nodes: {
           events: [],
           actions: [
@@ -325,19 +371,30 @@ describe('EffectCompiler', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
-              secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 100, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [],

@@ -375,7 +375,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
             ...createDefaultActionTiming(),
             ...(targetAction.timing ?? {}),
             waitForCondition: sourceEvent.eventType as any,
-            waitForTime: 0
+            waitForTime: { source: 'literal', value: 0 }
           };
         } else if (sourceNode.data.kind === 'action') {
           const sourceAction = sourceNode.data.payload as ActionNode;

@@ -24,32 +24,46 @@ describe('Node cue logic runtime', () => {
             id: 'action-true',
             type: 'action',
             effectType: 'single-color',
-            target: { groups: ['front'], filter: 'all' },
-            color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
+            target: { 
+              groups: { source: 'literal', value: 'front' }, 
+              filter: { source: 'literal', value: 'all' } 
+            },
+            color: { 
+              name: { source: 'literal', value: 'blue' }, 
+              brightness: { source: 'literal', value: 'medium' }, 
+              blendMode: { source: 'literal', value: 'replace' } 
+            },
             timing: {
               waitForCondition: 'none',
-              waitForTime: 0,
-              duration: 100,
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 100 },
               waitUntilCondition: 'none',
-              waitUntilTime: 0,
+              waitUntilTime: { source: 'literal', value: 0 },
               easing: 'sinInOut',
-              level: 1
+              level: { source: 'literal', value: 1 }
             }
           },
           {
             id: 'action-false',
             type: 'action',
             effectType: 'single-color',
-            target: { groups: ['front'], filter: 'all' },
-            color: { name: 'red', brightness: 'medium', blendMode: 'replace' },
+            target: { 
+              groups: { source: 'literal', value: 'front' }, 
+              filter: { source: 'literal', value: 'all' } 
+            },
+            color: { 
+              name: { source: 'literal', value: 'red' }, 
+              brightness: { source: 'literal', value: 'medium' }, 
+              blendMode: { source: 'literal', value: 'replace' } 
+            },
             timing: {
               waitForCondition: 'none',
-              waitForTime: 0,
-              duration: 100,
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 100 },
               waitUntilCondition: 'none',
-              waitUntilTime: 0,
+              waitUntilTime: { source: 'literal', value: 0 },
               easing: 'sinInOut',
-              level: 1
+              level: { source: 'literal', value: 1 }
             }
           }
         ],

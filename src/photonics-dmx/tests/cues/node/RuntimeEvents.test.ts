@@ -119,14 +119,20 @@ describe('Runtime Event System', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'medium' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'medium' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -187,14 +193,20 @@ describe('Runtime Event System', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'medium' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'medium' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -202,14 +214,20 @@ describe('Runtime Event System', () => {
         id: 'action2',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['back'], filter: 'all' },
-        color: { name: 'blue', brightness: 'medium' },
+        target: { 
+          groups: { source: 'literal', value: 'back' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'blue' }, 
+          brightness: { source: 'literal', value: 'medium' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -290,14 +308,20 @@ describe('Runtime Event System', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'medium' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'medium' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -305,14 +329,20 @@ describe('Runtime Event System', () => {
         id: 'action2',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['back'], filter: 'all' },
-        color: { name: 'blue', brightness: 'medium' },
+        target: { 
+          groups: { source: 'literal', value: 'back' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'blue' }, 
+          brightness: { source: 'literal', value: 'medium' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -386,14 +416,20 @@ describe('Runtime Event System', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'medium' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'medium' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -401,14 +437,20 @@ describe('Runtime Event System', () => {
         id: 'action2',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['back'], filter: 'all' },
-        color: { name: 'blue', brightness: 'medium' },
+        target: { 
+          groups: { source: 'literal', value: 'back' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'blue' }, 
+          brightness: { source: 'literal', value: 'medium' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -468,14 +510,20 @@ describe('Runtime Event System', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'medium' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'medium' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -518,14 +566,20 @@ describe('Runtime Event System', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'medium' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'medium' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 

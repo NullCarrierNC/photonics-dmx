@@ -27,35 +27,49 @@ describe('Node cue chaining', () => {
             id: 'a1',
             type: 'action',
             effectType: 'single-color',
-            target: { groups: ['front'], filter: 'all' },
-            color: { name: 'red', brightness: 'medium', blendMode: 'replace' },
+            target: { 
+              groups: { source: 'literal', value: 'front' }, 
+              filter: { source: 'literal', value: 'all' } 
+            },
+            color: { 
+              name: { source: 'literal', value: 'red' }, 
+              brightness: { source: 'literal', value: 'medium' }, 
+              blendMode: { source: 'literal', value: 'replace' } 
+            },
             timing: {
               waitForCondition: 'none',
-              waitForTime: 0,
-              duration: 100,
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 100 },
               waitUntilCondition: 'delay',
-              waitUntilTime: 0,
+              waitUntilTime: { source: 'literal', value: 0 },
               easing: 'linear',
-              level: 1
+              level: { source: 'literal', value: 1 }
             },
-            layer: 10
+            layer: { source: 'literal', value: 10 }
           },
           {
             id: 'a2',
             type: 'action',
             effectType: 'single-color',
-            target: { groups: ['back'], filter: 'all' },
-            color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
+            target: { 
+              groups: { source: 'literal', value: 'back' }, 
+              filter: { source: 'literal', value: 'all' } 
+            },
+            color: { 
+              name: { source: 'literal', value: 'blue' }, 
+              brightness: { source: 'literal', value: 'medium' }, 
+              blendMode: { source: 'literal', value: 'replace' } 
+            },
             timing: {
               waitForCondition: 'none',
-              waitForTime: 0,
-              duration: 50,
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 50 },
               waitUntilCondition: 'delay',
-              waitUntilTime: 0,
+              waitUntilTime: { source: 'literal', value: 0 },
               easing: 'linear',
-              level: 1
+              level: { source: 'literal', value: 1 }
             },
-            layer: 10
+            layer: { source: 'literal', value: 10 }
           }
         ]
       },

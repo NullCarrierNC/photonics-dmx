@@ -491,26 +491,7 @@ const CueEditor: React.FC = () => {
           )}
         </section>
 
-        {/* Validation Errors */}
-        {validationErrors.length > 0 && (
-          <section className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg p-3">
-            <div className="flex items-start gap-2">
-              <span className="text-red-600 dark:text-red-400 text-lg">⚠️</span>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">
-                  Validation Errors
-                </h3>
-                <ul className="list-disc list-inside space-y-1 text-xs text-red-700 dark:text-red-400">
-                  {validationErrors.map((error, index) => (
-                    <li key={index}>{error}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-        )}
-
-        <div className={!hasFile ? 'opacity-50 pointer-events-none' : ''}>
+        <div className={`overflow-hidden ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
           <NodeSidebar
             activeMode={activeMode}
             editorMode={editorDoc?.mode ?? 'cue'}

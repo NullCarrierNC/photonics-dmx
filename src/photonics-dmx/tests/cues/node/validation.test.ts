@@ -19,16 +19,23 @@ describe('Node cue validation', () => {
             id: 'action-1',
             type: 'action',
             effectType: 'single-color',
-            target: { groups: ['front'], filter: 'all' },
-            color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
+            target: { 
+              groups: { source: 'literal', value: 'front' }, 
+              filter: { source: 'literal', value: 'all' } 
+            },
+            color: { 
+              name: { source: 'literal', value: 'blue' }, 
+              brightness: { source: 'literal', value: 'medium' }, 
+              blendMode: { source: 'literal', value: 'replace' } 
+            },
             timing: {
               waitForCondition: 'none',
-              waitForTime: 0,
-              duration: 200,
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 200 },
               waitUntilCondition: 'none',
-              waitUntilTime: 0,
+              waitUntilTime: { source: 'literal', value: 0 },
               easing: 'sinInOut',
-              level: 1
+              level: { source: 'literal', value: 1 }
             }
           }
         ]
@@ -68,16 +75,23 @@ describe('Node cue validation', () => {
             id: 'action-1',
             type: 'action',
             effectType: 'single-color',
-            target: { groups: ['front'], filter: 'all' },
-            color: { name: 'red', brightness: 'high', blendMode: 'add' },
+            target: { 
+              groups: { source: 'literal', value: 'front' }, 
+              filter: { source: 'literal', value: 'all' } 
+            },
+            color: { 
+              name: { source: 'literal', value: 'red' }, 
+              brightness: { source: 'literal', value: 'high' }, 
+              blendMode: { source: 'literal', value: 'add' } 
+            },
             timing: {
               waitForCondition: 'none',
-              waitForTime: 0,
-              duration: 150,
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 150 },
               waitUntilCondition: 'delay',
-              waitUntilTime: 100,
+              waitUntilTime: { source: 'literal', value: 100 },
               easing: 'sinInOut',
-              level: 1
+              level: { source: 'literal', value: 1 }
             }
           }
         ]
@@ -109,16 +123,23 @@ describe('Node cue validation', () => {
             id: 'action-1',
             type: 'action',
             effectType: 'single-color',
-            target: { groups: ['front'], filter: 'all' },
-            color: { name: 'blue', brightness: 'medium', blendMode: 'replace' },
+            target: { 
+              groups: { source: 'literal', value: 'front' }, 
+              filter: { source: 'literal', value: 'all' } 
+            },
+            color: { 
+              name: { source: 'literal', value: 'blue' }, 
+              brightness: { source: 'literal', value: 'medium' }, 
+              blendMode: { source: 'literal', value: 'replace' } 
+            },
             timing: {
               waitForCondition: 'none',
-              waitForTime: 0,
-              duration: 100,
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 100 },
               waitUntilCondition: 'none',
-              waitUntilTime: 0,
+              waitUntilTime: { source: 'literal', value: 0 },
               easing: 'sinInOut',
-              level: 1
+              level: { source: 'literal', value: 1 }
             }
           }
         ],

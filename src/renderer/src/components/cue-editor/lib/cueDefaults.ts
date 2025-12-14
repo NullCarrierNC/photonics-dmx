@@ -31,21 +31,21 @@ const buildDefaultAction = (): ActionNode => ({
   type: 'action',
   effectType: 'single-color',
   target: {
-    groups: ['front'],
-    filter: 'all'
+    groups: { source: 'literal', value: 'front' },
+    filter: { source: 'literal', value: 'all' }
   },
   color: {
-    name: 'blue',
-    brightness: 'medium',
-    blendMode: 'replace'
+    name: { source: 'literal', value: 'blue' },
+    brightness: { source: 'literal', value: 'medium' },
+    blendMode: { source: 'literal', value: 'replace' }
   },
   secondaryColor: {
-    name: 'green',
-    brightness: 'medium',
-    blendMode: 'replace'
+    name: { source: 'literal', value: 'green' },
+    brightness: { source: 'literal', value: 'medium' },
+    blendMode: { source: 'literal', value: 'replace' }
   },
   timing: createDefaultActionTiming(),
-  layer: 0
+  layer: { source: 'literal', value: 0 }
 });
 
 const buildDefaultYargEvent = (): YargEventNode => ({

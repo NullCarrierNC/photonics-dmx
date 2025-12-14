@@ -29,10 +29,16 @@ const getTextColorForBg = (name: string): string => {
 
 const calculateActionDuration = (action: ActionNode): number => {
   const timing = action.timing ?? createDefaultActionTiming();
+  const getValue = (valueSource: { source: 'literal' | 'variable'; value?: number | boolean | string; name?: string }): number => {
+    if (valueSource.source === 'literal' && typeof valueSource.value === 'number') {
+      return valueSource.value;
+    }
+    return 0; // Default for variable sources or non-number literals
+  };
   return (
-    Math.max(0, timing.waitForTime) +
-    Math.max(0, timing.duration) +
-    Math.max(0, timing.waitUntilTime)
+    Math.max(0, getValue(timing.waitForTime)) +
+    Math.max(0, getValue(timing.duration)) +
+    Math.max(0, getValue(timing.waitUntilTime))
   );
 };
 

@@ -14,7 +14,6 @@ import {
   // Effect types - imported for future schema expansion
   EffectRaiserNode as _EffectRaiserNode,
   EffectEventListenerNode as _EffectEventListenerNode,
-  EffectParameterDefinition as _EffectParameterDefinition,
   EffectReference,
   YargEffectDefinition as _YargEffectDefinition,
   AudioEffectDefinition as _AudioEffectDefinition,
@@ -32,34 +31,19 @@ import {
   NodeCueMode,
   NodeEffectType,
   NodeLayoutMetadata,
+  ValueSource,
   VariableDefinition,
   YargEventNode,
   YargNodeCueDefinition,
   YargNodeCueFile
 } from '../../types/nodeCueTypes';
 import {
-  BlendMode,
-  Brightness,
-  Color,
-  LightTarget,
-  LocationGroup,
   WaitCondition
 } from '../../../types';
 import {
-  COLOR_OPTIONS,
-  BRIGHTNESS_OPTIONS,
-  BLEND_MODE_OPTIONS,
-  LOCATION_OPTIONS,
-  LIGHT_TARGET_OPTIONS,
   WAIT_CONDITIONS_WITH_NONE_DELAY,
   AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY
 } from '../../../constants/options';
-
-const COLOR_VALUES: Color[] = [...COLOR_OPTIONS];
-const BRIGHTNESS_VALUES: Brightness[] = [...BRIGHTNESS_OPTIONS];
-const BLEND_MODES: BlendMode[] = [...BLEND_MODE_OPTIONS];
-const LOCATION_GROUPS: LocationGroup[] = [...LOCATION_OPTIONS];
-const LIGHT_TARGETS: LightTarget[] = [...LIGHT_TARGET_OPTIONS];
 
 const WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY];
 
@@ -85,90 +69,8 @@ const stringIdSchema: JSONSchemaType<string> = {
   maxLength: 128
 };
 
-const colorSchema: JSONSchemaType<{
-  name: Color;
-  brightness: Brightness;
-  blendMode?: BlendMode;
-}> = {
-  type: 'object',
-  required: ['name', 'brightness'],
-  additionalProperties: false,
-  properties: {
-    name: { type: 'string', enum: COLOR_VALUES },
-    brightness: { type: 'string', enum: BRIGHTNESS_VALUES },
-    blendMode: { type: 'string', enum: BLEND_MODES, nullable: true }
-  }
-};
-
-const timingSchema: JSONSchemaType<ActionTimingConfig> = {
-  type: 'object',
-  required: ['waitForCondition', 'waitForTime', 'duration', 'waitUntilCondition', 'waitUntilTime'],
-  additionalProperties: false,
-  properties: {
-    waitForCondition: { type: 'string', enum: WAIT_CONDITIONS },
-    waitForTime: { type: 'number', minimum: 0 },
-    waitForConditionCount: { type: 'number', nullable: true, minimum: 0 },
-    duration: { type: 'number', minimum: 0 },
-    waitUntilCondition: { type: 'string', enum: WAIT_CONDITIONS },
-    waitUntilTime: { type: 'number', minimum: 0 },
-    waitUntilConditionCount: { type: 'number', nullable: true, minimum: 0 },
-    easing: { type: 'string', nullable: true },
-    level: { type: 'number', nullable: true, minimum: 0, maximum: 1 }
-  }
-};
-
-const sweepConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['sweep']>> = {
-  type: 'object',
-  additionalProperties: false,
-  required: [],
-  properties: {
-    duration: { type: 'number', minimum: 50, nullable: true },
-    fadeIn: { type: 'number', minimum: 0, nullable: true },
-    fadeOut: { type: 'number', minimum: 0, nullable: true },
-    overlap: { type: 'number', minimum: 0, maximum: 100, nullable: true },
-    betweenDelay: { type: 'number', minimum: 0, nullable: true },
-    lowColor: { ...colorSchema, nullable: true }
-  }
-};
-
-const cycleConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['cycle']>> = {
-  type: 'object',
-  additionalProperties: false,
-  required: [],
-  properties: {
-    baseColor: { ...colorSchema, nullable: true },
-    transitionDuration: { type: 'number', minimum: 10, nullable: true },
-    trigger: { type: 'string', enum: WAIT_CONDITIONS, nullable: true }
-  }
-};
-
-const blackoutConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['blackout']>> = {
-  type: 'object',
-  additionalProperties: false,
-  required: [],
-  properties: {
-    duration: { type: 'number', minimum: 10, nullable: true }
-  }
-};
-
-const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
-  type: 'object',
-  additionalProperties: false,
-  required: [],
-  properties: {
-    sweep: { ...sweepConfigSchema, nullable: true },
-    cycle: { ...cycleConfigSchema, nullable: true },
-    blackout: { ...blackoutConfigSchema, nullable: true },
-    custom: { type: 'object', nullable: true, additionalProperties: true }
-  }
-};
-
-const valueSourceSchema: JSONSchemaType<{
-  source: 'literal' | 'variable';
-  value?: number | boolean | string;
-  name?: string;
-  fallback?: number | boolean | string;
-}> = {
+// Define ValueSource schema first so it can be reused
+const valueSourceSchema: JSONSchemaType<ValueSource> = {
   type: 'object',
   required: ['source'],
   additionalProperties: false,
@@ -200,6 +102,84 @@ const valueSourceSchema: JSONSchemaType<{
       }
     }
   ]
+} as any;
+
+const colorSchema: JSONSchemaType<{
+  name: ValueSource;
+  brightness: ValueSource;
+  blendMode?: ValueSource;
+}> = {
+  type: 'object',
+  required: ['name', 'brightness'],
+  additionalProperties: false,
+  properties: {
+    name: valueSourceSchema,
+    brightness: valueSourceSchema,
+    blendMode: { ...valueSourceSchema, nullable: true }
+  }
+} as any;
+
+const timingSchema: JSONSchemaType<ActionTimingConfig> = {
+  type: 'object',
+  required: ['waitForCondition', 'waitForTime', 'duration', 'waitUntilCondition', 'waitUntilTime'],
+  additionalProperties: false,
+  properties: {
+    waitForCondition: { type: 'string', enum: WAIT_CONDITIONS },
+    waitForTime: valueSourceSchema,
+    waitForConditionCount: { ...valueSourceSchema, nullable: true },
+    duration: valueSourceSchema,
+    waitUntilCondition: { type: 'string', enum: WAIT_CONDITIONS },
+    waitUntilTime: valueSourceSchema,
+    waitUntilConditionCount: { ...valueSourceSchema, nullable: true },
+    easing: { type: 'string', nullable: true },
+    level: { ...valueSourceSchema, nullable: true }
+  }
+} as any;
+
+const sweepConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['sweep']>> = {
+  type: 'object',
+  additionalProperties: false,
+  required: [],
+  properties: {
+    duration: { ...valueSourceSchema, nullable: true },
+    fadeIn: { ...valueSourceSchema, nullable: true },
+    fadeOut: { ...valueSourceSchema, nullable: true },
+    overlap: { ...valueSourceSchema, nullable: true },
+    betweenDelay: { ...valueSourceSchema, nullable: true },
+    lowColor: { ...colorSchema, nullable: true }
+  }
+} as any;
+
+const cycleConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['cycle']>> = {
+  type: 'object',
+  additionalProperties: false,
+  required: [],
+  properties: {
+    baseColor: { ...colorSchema, nullable: true },
+    transitionDuration: { ...valueSourceSchema, nullable: true },
+    trigger: { type: 'string', enum: WAIT_CONDITIONS, nullable: true }
+  }
+} as any;
+
+const blackoutConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['blackout']>> = {
+  type: 'object',
+  additionalProperties: false,
+  required: [],
+  properties: {
+    duration: { ...valueSourceSchema, nullable: true }
+  }
+} as any;
+
+const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
+  type: 'object',
+  additionalProperties: false,
+  required: [],
+  properties: {
+    sweep: { ...sweepConfigSchema, nullable: true },
+    cycle: { ...cycleConfigSchema, nullable: true },
+    blackout: { ...blackoutConfigSchema, nullable: true },
+    custom: { type: 'object', nullable: true, additionalProperties: true }
+  }
 };
 
 const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
@@ -411,14 +391,10 @@ const targetSchema: JSONSchemaType<NodeActionTarget> = {
   required: ['groups', 'filter'],
   additionalProperties: false,
   properties: {
-    groups: {
-      type: 'array',
-      items: { type: 'string', enum: LOCATION_GROUPS },
-      minItems: 1
-    },
-    filter: { type: 'string', enum: LIGHT_TARGETS }
+    groups: valueSourceSchema,
+    filter: valueSourceSchema
   }
-};
+} as any;
 
 const actionSchema: JSONSchemaType<ActionNode> = {
   type: 'object',
@@ -432,7 +408,7 @@ const actionSchema: JSONSchemaType<ActionNode> = {
     color: colorSchema,
     secondaryColor: { ...colorSchema, nullable: true },
     timing: timingSchema,
-    layer: { type: 'integer', nullable: true, minimum: 0 },
+    layer: { ...valueSourceSchema, nullable: true },
     label: { type: 'string', nullable: true },
     inputs: {
       type: 'array',

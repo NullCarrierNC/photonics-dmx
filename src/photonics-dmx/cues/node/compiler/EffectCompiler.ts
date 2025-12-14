@@ -5,14 +5,14 @@ import {
   BaseEventNode,
   BaseEffectDefinition,
   Connection,
-  EffectParameterDefinition,
   EffectEventListenerNode,
   EventDefinition,
   EventRaiserNode,
   EventListenerNode,
   LogicNode,
   YargEventNode,
-  YargEffectDefinition
+  YargEffectDefinition,
+  VariableDefinition
 } from '../../types/nodeCueTypes';
 
 export class EffectCompilationError extends Error {
@@ -32,7 +32,7 @@ export interface CompiledEffect<TEvent extends BaseEventNode> {
   eventListenerMap: Map<string, EventListenerNode>;  // Runtime events within effect
   eventDefinitions: EventDefinition[];
   adjacency: Map<string, Connection[]>;
-  parameters: Map<string, EffectParameterDefinition>;
+  parameters: Map<string, VariableDefinition>;
 }
 
 export type CompiledYargEffect = CompiledEffect<YargEventNode>;
@@ -65,7 +65,8 @@ export class EffectCompiler {
     const eventListeners = definition.nodes.eventListeners ?? [];
     const effectListeners = definition.nodes.effectListeners ?? [];
     const eventDefinitions = definition.events ?? [];
-    const parameters = definition.parameters ?? [];
+    // Derive parameters from variables with isParameter: true
+    const parameters = definition.variables?.filter(v => v.isParameter) ?? [];
 
     // Effects must have at least one effect listener (entry point)
     if (effectListeners.length === 0) {
@@ -89,7 +90,7 @@ export class EffectCompiler {
     const effectListenerMap = new Map(effectListeners.map(listener => [listener.id, listener]));
     const eventRaiserMap = new Map(eventRaisers.map(raiser => [raiser.id, raiser]));
     const eventListenerMap = new Map(eventListeners.map(listener => [listener.id, listener]));
-    const parameterMap = new Map(parameters.map(param => [param.name, param]));
+    const parameterMap = new Map(parameters.map(variable => [variable.name, variable]));
     const eventNameSet = new Set(eventDefinitions.map(e => e.name));
 
     // Validate runtime event raiser/listener nodes reference valid registered events
@@ -205,7 +206,12 @@ export class EffectCompiler {
   }
 
   private static validateAction(action: ActionNode): void {
-    if (!action.target.groups || action.target.groups.length === 0) {
+    // Check if groups is defined (ValueSource should always have a value)
+    if (!action.target.groups) {
+      throw new EffectCompilationError(`Action '${action.label ?? action.id}' must target at least one group.`);
+    }
+    // If it's a literal source, check the value isn't empty
+    if (action.target.groups.source === 'literal' && !action.target.groups.value) {
       throw new EffectCompilationError(`Action '${action.label ?? action.id}' must target at least one group.`);
     }
   }

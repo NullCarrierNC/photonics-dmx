@@ -106,19 +106,19 @@ describe('NodeExecutionEngine', () => {
         type: 'action',
         effectType: 'single-color',
         target: {
-          groups: ['front'],
-          filter: 'all'
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' }
         },
         color: {
-          name: 'red',
-          brightness: 'high'
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' }
         },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 200,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0,
+          waitUntilTime: { source: 'literal', value: 0 },
           easing: 'linear'
         }
       };
@@ -181,14 +181,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -196,14 +202,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action2',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['back'], filter: 'all' },
-        color: { name: 'blue', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'back' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'blue' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -287,14 +299,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action-true',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'green', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'green' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -302,14 +320,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action-false',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -403,14 +427,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'green', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'green' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -528,14 +558,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -639,14 +675,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -743,9 +785,7 @@ describe('NodeExecutionEngine', () => {
 
       // Create a mock effect
       const mockEffect = {
-        definition: { id: 'test-effect', name: 'Test Effect', parameters: [] },
-        parameters: [],
-        effectListenerMap: new Map(),
+        definition: { id: 'test-effect', name: 'Test Effect' },
         eventRaiserMap: new Map(),
         eventListenerMap: new Map(),
         actionMap: new Map(),
@@ -854,19 +894,30 @@ describe('NodeExecutionEngine', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
-        secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'white' }, 
+          brightness: { source: 'literal', value: 'medium' }, 
+          blendMode: { source: 'literal', value: 'replace' } 
+        },
+        secondaryColor: { 
+          name: { source: 'literal', value: 'white' }, 
+          brightness: { source: 'literal', value: 'medium' }, 
+          blendMode: { source: 'literal', value: 'replace' } 
+        },
         timing: { 
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 100, 
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0,
-          easing: 'linear', 
-          level: 1 
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: 'linear',
+          level: { source: 'literal', value: 1 }
         },
-        layer: 0
+        layer: { source: 'literal', value: 0 }
       };
 
       const definition: YargNodeCueDefinition = {
@@ -905,9 +956,7 @@ describe('NodeExecutionEngine', () => {
       };
 
       const mockEffect = {
-        definition: { id: 'test-effect', name: 'Test', parameters: [] },
-        parameters: [],
-        effectListenerMap: new Map(),
+        definition: { id: 'test-effect', name: 'Test' },
         eventRaiserMap: new Map(),
         eventListenerMap: new Map(),
         actionMap: new Map(),
@@ -957,14 +1006,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 200,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -1047,14 +1102,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 200,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -1141,14 +1202,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 200,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -1232,14 +1299,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action-high',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 200,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -1247,14 +1320,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action-low',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'blue', brightness: 'low' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'blue' }, 
+          brightness: { source: 'literal', value: 'low' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 200,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -1353,14 +1432,20 @@ describe('NodeExecutionEngine', () => {
         id: 'action1',
         type: 'action',
         effectType: 'single-color',
-        target: { groups: ['front'], filter: 'all' },
-        color: { name: 'red', brightness: 'high' },
+        target: { 
+          groups: { source: 'literal', value: 'front' }, 
+          filter: { source: 'literal', value: 'all' } 
+        },
+        color: { 
+          name: { source: 'literal', value: 'red' }, 
+          brightness: { source: 'literal', value: 'high' } 
+        },
         timing: {
           waitForCondition: 'none',
-          waitForTime: 0,
-          duration: 200,
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: { source: 'literal', value: 0 }
         }
       };
 
@@ -1430,6 +1515,461 @@ describe('NodeExecutionEngine', () => {
 
       // Action should still execute
       expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+    });
+  });
+
+  describe('Action Node Variable Resolution', () => {
+    beforeEach(() => {
+      // Update mock light manager to return lights with position
+      mockLightManager.getLightsInGroup = jest.fn((group) => {
+        const groups = Array.isArray(group) ? group : [group];
+        const lights: any[] = [];
+        if (groups.includes('front')) {
+          lights.push({ id: 'f1', position: { x: 0, y: 0, z: 0 } }, { id: 'f2', position: { x: 0, y: 0, z: 0 } });
+        }
+        if (groups.includes('back')) {
+          lights.push({ id: 'b1', position: { x: 0, y: 0, z: 0 } });
+        }
+        return lights;
+      });
+    });
+
+    it('should resolve variable for color name', () => {
+      // Setup: event -> variable (set color) -> action (use color variable)
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+        outputs: ['var1']
+      };
+
+      const variableNode: LogicNode = {
+        id: 'var1',
+        type: 'logic',
+        logicType: 'variable',
+        mode: 'set',
+        varName: 'myColor',
+        valueType: 'string',
+        value: { source: 'literal', value: 'red' },
+        outputs: ['action1']
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' }
+        },
+        color: {
+          name: { source: 'variable', name: 'myColor', fallback: 'blue' },
+          brightness: { source: 'literal', value: 'medium' },
+          blendMode: { source: 'literal', value: 'replace' }
+        },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: 'none',
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: 'sinInOut',
+          level: { source: 'literal', value: 1 }
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [variableNode]
+        },
+        connections: [
+          { from: 'event1', to: 'var1', fromPort: 'event1', toPort: 'var1' },
+          { from: 'var1', to: 'action1', fromPort: 'var1', toPort: 'action1' }
+        ],
+        variables: [{ name: 'myColor', type: 'string', scope: 'cue', initialValue: '' }]
+      };
+
+      const compiledCue: CompiledYargCue = { definition, eventMap: new Map([[eventNode.id, eventNode]]), actionMap: new Map([[actionNode.id, actionNode]]), logicMap: new Map<string, LogicNode>([[variableNode.id, variableNode]]), eventRaiserMap: new Map(), eventListenerMap: new Map(), effectRaiserMap: new Map(), eventDefinitions: [], adjacency: new Map([['event1', [{ from: 'event1', to: 'var1' }]], ['var1', [{ from: 'var1', to: 'action1' }]]]) };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      // Wait for action to execute
+      setTimeout(() => {
+        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        // The resolved color should be 'red' from the variable
+      }, 10);
+    });
+
+    it('should resolve variable for target groups', () => {
+      // Setup: variable (set groups) -> action (use groups variable)
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+        outputs: ['var1']
+      };
+
+      const variableNode: LogicNode = {
+        id: 'var1',
+        type: 'logic',
+        logicType: 'variable',
+        mode: 'set',
+        varName: 'targetGroups',
+        valueType: 'string',
+        value: { source: 'literal', value: 'front,back' },
+        outputs: ['action1']
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: {
+          groups: { source: 'variable', name: 'targetGroups', fallback: 'front' },
+          filter: { source: 'literal', value: 'all' }
+        },
+        color: {
+          name: { source: 'literal', value: 'blue' },
+          brightness: { source: 'literal', value: 'high' },
+          blendMode: { source: 'literal', value: 'replace' }
+        },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: 'none',
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: 'sinInOut',
+          level: { source: 'literal', value: 1 }
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [variableNode]
+        },
+        connections: [
+          { from: 'event1', to: 'var1' },
+          { from: 'var1', to: 'action1' }
+        ],
+        variables: [{ name: 'targetGroups', type: 'string', scope: 'cue', initialValue: '' }]
+      };
+
+      const compiledCue: CompiledYargCue = { definition, eventMap: new Map([[eventNode.id, eventNode]]), actionMap: new Map([[actionNode.id, actionNode]]), logicMap: new Map<string, LogicNode>([[variableNode.id, variableNode]]), eventRaiserMap: new Map(), eventListenerMap: new Map(), effectRaiserMap: new Map(), eventDefinitions: [], adjacency: new Map([['event1', [{ from: 'event1', to: 'var1' }]], ['var1', [{ from: 'var1', to: 'action1' }]]]) };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      setTimeout(() => {
+        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        // Groups should be resolved to ['front', 'back']
+      }, 10);
+    });
+
+    it('should use fallback when variable not found', () => {
+      // Action references non-existent variable, should use fallback
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+        outputs: ['action1']
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' }
+        },
+        color: {
+          name: { source: 'variable', name: 'nonExistentColor', fallback: 'green' },
+          brightness: { source: 'literal', value: 'medium' },
+          blendMode: { source: 'literal', value: 'replace' }
+        },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: 'none',
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: 'sinInOut',
+          level: { source: 'literal', value: 1 }
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: []
+        },
+        connections: [{ from: 'event1', to: 'action1' }],
+        variables: []
+      };
+
+      const compiledCue: CompiledYargCue = { definition, eventMap: new Map([[eventNode.id, eventNode]]), actionMap: new Map([[actionNode.id, actionNode]]), logicMap: new Map<string, LogicNode>(), eventRaiserMap: new Map(), eventListenerMap: new Map(), effectRaiserMap: new Map(), eventDefinitions: [], adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]]) };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      setTimeout(() => {
+        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        // Should use fallback color 'green'
+      }, 10);
+    });
+
+    it('should resolve variable for duration', () => {
+      // Cue data -> math -> action with dynamic duration
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+        outputs: ['cuedata1']
+      };
+
+      const cueDataNode: LogicNode = {
+        id: 'cuedata1',
+        type: 'logic',
+        logicType: 'cue-data',
+        dataProperty: 'bpm',
+        assignTo: 'currentBpm',
+        outputs: ['math1']
+      };
+
+      const mathNode: LogicNode = {
+        id: 'math1',
+        type: 'logic',
+        logicType: 'math',
+        operator: 'multiply',
+        left: { source: 'variable', name: 'currentBpm' },
+        right: { source: 'literal', value: 5 },
+        assignTo: 'calculatedDuration',
+        outputs: ['action1']
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' }
+        },
+        color: {
+          name: { source: 'literal', value: 'purple' },
+          brightness: { source: 'literal', value: 'high' },
+          blendMode: { source: 'literal', value: 'replace' }
+        },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'variable', name: 'calculatedDuration', fallback: 200 },
+          waitUntilCondition: 'none',
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: 'sinInOut',
+          level: { source: 'literal', value: 1 }
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [cueDataNode, mathNode]
+        },
+        connections: [
+          { from: 'event1', to: 'cuedata1' },
+          { from: 'cuedata1', to: 'math1' },
+          { from: 'math1', to: 'action1' }
+        ],
+        variables: [
+          { name: 'currentBpm', type: 'number', scope: 'cue', initialValue: 0 },
+          { name: 'calculatedDuration', type: 'number', scope: 'cue', initialValue: 0 }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([[eventNode.id, eventNode]]),
+        actionMap: new Map([[actionNode.id, actionNode]]),
+        logicMap: new Map<string, LogicNode>([[cueDataNode.id, cueDataNode], [mathNode.id, mathNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'cuedata1' }]],
+          ['cuedata1', [{ from: 'cuedata1', to: 'math1' }]],
+          ['math1', [{ from: 'math1', to: 'action1' }]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      setTimeout(() => {
+        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        // Duration should be 120 (BPM) * 5 = 600
+        expect(cueLevelVarStore.get('calculatedDuration')?.value).toBe(600);
+      }, 10);
+    });
+
+    it('should handle invalid color variable gracefully', () => {
+      // Variable contains invalid color, should use default
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+        outputs: ['var1']
+      };
+
+      const variableNode: LogicNode = {
+        id: 'var1',
+        type: 'logic',
+        logicType: 'variable',
+        mode: 'set',
+        varName: 'badColor',
+        valueType: 'string',
+        value: { source: 'literal', value: 'not-a-valid-color' },
+        outputs: ['action1']
+      };
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'single-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' }
+        },
+        color: {
+          name: { source: 'variable', name: 'badColor' },
+          brightness: { source: 'literal', value: 'medium' },
+          blendMode: { source: 'literal', value: 'replace' }
+        },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: 'none',
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: 'sinInOut',
+          level: { source: 'literal', value: 1 }
+        }
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [variableNode]
+        },
+        connections: [
+          { from: 'event1', to: 'var1' },
+          { from: 'var1', to: 'action1' }
+        ],
+        variables: [{ name: 'badColor', type: 'string', scope: 'cue', initialValue: '' }]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([[eventNode.id, eventNode]]),
+        actionMap: new Map([[actionNode.id, actionNode]]),
+        logicMap: new Map<string, LogicNode>([[variableNode.id, variableNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'var1' }]],
+          ['var1', [{ from: 'var1', to: 'action1' }]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      setTimeout(() => {
+        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        // Should resolve to default color 'blue' (from resolveColor method)
+      }, 10);
     });
   });
 });

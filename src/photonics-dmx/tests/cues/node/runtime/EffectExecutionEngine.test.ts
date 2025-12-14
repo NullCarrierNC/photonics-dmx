@@ -59,7 +59,6 @@ describe('EffectExecutionEngine', () => {
         mode: 'yarg',
         name: 'Test Effect',
         description: '',
-        parameters: [],
         variables: [
           { name: 'speed', type: 'number', scope: 'cue', initialValue: 100, isParameter: true },
           { name: 'color', type: 'string', scope: 'cue', initialValue: 'white', isParameter: true }
@@ -71,19 +70,30 @@ describe('EffectExecutionEngine', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
-              secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 100, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [],
@@ -114,7 +124,8 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
-        parameterValues
+        parameterValues,
+        createCueData()
       );
 
       await engine.triggerEffect(createCueData());
@@ -131,7 +142,6 @@ describe('EffectExecutionEngine', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        parameters: [{ name: 'speed', type: 'number' }],
         variables: [
           { name: 'localSpeed', type: 'number', scope: 'cue', initialValue: 100, isParameter: true }
         ],
@@ -175,7 +185,8 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
-        parameterValues
+        parameterValues,
+        createCueData()
       );
 
       // Should not throw
@@ -190,7 +201,6 @@ describe('EffectExecutionEngine', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        parameters: [],
         nodes: {
           events: [],
           actions: [
@@ -198,19 +208,30 @@ describe('EffectExecutionEngine', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
-              secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 100, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [
@@ -250,7 +271,8 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
-        {}
+        {},
+        createCueData()
       );
 
       await engine.triggerEffect(createCueData());
@@ -270,7 +292,6 @@ describe('EffectExecutionEngine', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        parameters: [],
         events: [
           {
             name: 'internal-event',
@@ -284,19 +305,30 @@ describe('EffectExecutionEngine', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'red', brightness: 'high', blendMode: 'replace' },
-              secondaryColor: { name: 'red', brightness: 'high', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'red' }, 
+                brightness: { source: 'literal', value: 'high' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'red' }, 
+                brightness: { source: 'literal', value: 'high' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 100, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [],
@@ -341,7 +373,8 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
-        {}
+        {},
+        createCueData()
       );
 
       await engine.triggerEffect(createCueData());
@@ -358,7 +391,6 @@ describe('EffectExecutionEngine', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        parameters: [],
         nodes: {
           events: [],
           actions: [
@@ -366,19 +398,30 @@ describe('EffectExecutionEngine', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'single-color',
-              target: { groups: ['front'], filter: 'all' },
-              color: { name: 'white', brightness: 'medium', blendMode: 'replace' },
-              secondaryColor: { name: 'white', brightness: 'medium', blendMode: 'replace' },
+              target: { 
+                groups: { source: 'literal', value: 'front' }, 
+                filter: { source: 'literal', value: 'all' } 
+              },
+              color: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
+              secondaryColor: { 
+                name: { source: 'literal', value: 'white' }, 
+                brightness: { source: 'literal', value: 'medium' }, 
+                blendMode: { source: 'literal', value: 'replace' } 
+              },
               timing: { 
                 waitForCondition: 'none',
-                waitForTime: 0,
-                duration: 1000, 
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 1000 }, 
                 waitUntilCondition: 'none',
-                waitUntilTime: 0,
+                waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear', 
-                level: 1 
+                level: { source: 'literal', value: 1 } 
               },
-              layer: 0
+              layer: { source: 'literal', value: 0 }
             }
           ],
           logic: [],
@@ -405,7 +448,8 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
-        {}
+        {},
+        createCueData()
       );
 
       const startTime = Date.now();

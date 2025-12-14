@@ -8,7 +8,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { CueData } from '../../types/cueTypes';
 import { AudioCueData } from '../../types/audioCueTypes';
 import {  CompiledYargCue, CompiledAudioCue } from '../compiler/NodeCueCompiler';
-import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
+import { ActionEffectFactory, ResolvedActionTarget, ResolvedColorSetting, ResolvedActionTiming } from '../compiler/ActionEffectFactory';
 import {
   ActionNode,
   BaseEventNode,
@@ -19,11 +19,10 @@ import {
   ValueSource,
   VariableType,
   VariableDefinition,
-  CueDataLogicNode,
-  ConfigDataLogicNode,
   YargCueDataProperty,
   AudioCueDataProperty
 } from '../../types/nodeCueTypes';
+import { Color, Brightness, BlendMode, LocationGroup, LightTarget } from '../../../types';
 import { ExecutionContext } from './ExecutionContext';
 import { ExecutionState, VariableValue } from './executionTypes';
 import { EffectRegistry } from './EffectRegistry';
@@ -174,7 +173,59 @@ export class NodeExecutionEngine {
    */
   private executeActionNode(actionNode: ActionNode, context: ExecutionContext): void {
     try {
-      const lights = ActionEffectFactory.resolveLights(this.lightManager, actionNode.target);
+      // Resolve target
+      const resolvedTarget: ResolvedActionTarget = {
+        groups: this.resolveLocationGroups(actionNode.target.groups, context),
+        filter: this.resolveLightTarget(actionNode.target.filter, context)
+      };
+      
+      // Resolve color
+      const resolvedColor: ResolvedColorSetting = {
+        name: this.resolveColor(actionNode.color.name, context),
+        brightness: this.resolveBrightness(actionNode.color.brightness, context),
+        blendMode: this.resolveBlendMode(actionNode.color.blendMode, context)
+      };
+      
+      // Resolve secondary color if present
+      const resolvedSecondaryColor: ResolvedColorSetting | undefined = actionNode.secondaryColor ? {
+        name: this.resolveColor(actionNode.secondaryColor.name, context),
+        brightness: this.resolveBrightness(actionNode.secondaryColor.brightness, context),
+        blendMode: this.resolveBlendMode(actionNode.secondaryColor.blendMode, context)
+      } : undefined;
+      
+      // Resolve timing
+      const resolvedTiming: ResolvedActionTiming = {
+        ...actionNode.timing,
+        waitForTime: Number(this.resolveValue('number', actionNode.timing.waitForTime, context)),
+        waitForConditionCount: actionNode.timing.waitForConditionCount 
+          ? Number(this.resolveValue('number', actionNode.timing.waitForConditionCount, context))
+          : undefined,
+        duration: Number(this.resolveValue('number', actionNode.timing.duration, context)),
+        waitUntilTime: Number(this.resolveValue('number', actionNode.timing.waitUntilTime, context)),
+        waitUntilConditionCount: actionNode.timing.waitUntilConditionCount
+          ? Number(this.resolveValue('number', actionNode.timing.waitUntilConditionCount, context))
+          : undefined,
+        level: actionNode.timing.level
+          ? Number(this.resolveValue('number', actionNode.timing.level, context))
+          : 1
+      };
+      
+      // Resolve layer
+      const resolvedLayer = actionNode.layer
+        ? Number(this.resolveValue('number', actionNode.layer, context))
+        : 0;
+      
+      // Create resolved action node for effect building (keep config as-is, not used by factory)
+      const resolvedAction: any = {
+        ...actionNode,
+        target: resolvedTarget,
+        color: resolvedColor,
+        secondaryColor: resolvedSecondaryColor,
+        timing: resolvedTiming,
+        layer: resolvedLayer
+      };
+      
+      const lights = ActionEffectFactory.resolveLights(this.lightManager, resolvedTarget);
       if (!lights || lights.length === 0) {
         // No lights to target, continue immediately
         this.continueToNextNodes(actionNode.id, context);
@@ -182,10 +233,15 @@ export class NodeExecutionEngine {
       }
 
       const effect = ActionEffectFactory.buildEffect({
-        action: actionNode,
+        action: resolvedAction,
         lights,
         waitCondition: undefined,
-        waitTime: 0
+        waitTime: 0,
+        resolvedTarget,
+        resolvedColor,
+        resolvedSecondaryColor,
+        resolvedTiming,
+        resolvedLayer
       });
 
       if (!effect) {
@@ -577,6 +633,60 @@ export class NodeExecutionEngine {
       default:
         return 0;
     }
+  }
+
+  /**
+   * Resolve location groups from ValueSource (comma-separated string to array).
+   */
+  private resolveLocationGroups(source: ValueSource, context: ExecutionContext): LocationGroup[] {
+    const value = this.resolveValue('string', source, context);
+    if (typeof value !== 'string') return ['front'];
+    
+    // Parse comma-separated groups: "front,back" → ['front', 'back']
+    const validGroups: LocationGroup[] = ['front', 'back', 'strobe'];
+    return value.split(',')
+      .map(g => g.trim())
+      .filter(g => validGroups.includes(g as LocationGroup)) as LocationGroup[];
+  }
+
+  /**
+   * Resolve light target filter from ValueSource.
+   */
+  private resolveLightTarget(source: ValueSource, context: ExecutionContext): LightTarget {
+    const value = this.resolveValue('string', source, context);
+    const valid: LightTarget[] = ['all', 'even', 'odd', 'random-1', 'random-2', 'random-3'];
+    return valid.includes(value as LightTarget) ? (value as LightTarget) : 'all';
+  }
+
+  /**
+   * Resolve color name from ValueSource.
+   */
+  private resolveColor(source: ValueSource, context: ExecutionContext): Color {
+    const value = this.resolveValue('string', source, context);
+    // Import COLOR_OPTIONS to validate
+    const validColors: Color[] = [
+      'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'white', 'transparent'
+    ];
+    return validColors.includes(value as Color) ? (value as Color) : 'blue';
+  }
+
+  /**
+   * Resolve brightness level from ValueSource.
+   */
+  private resolveBrightness(source: ValueSource, context: ExecutionContext): Brightness {
+    const value = this.resolveValue('string', source, context);
+    const valid: Brightness[] = ['low', 'medium', 'high', 'max'];
+    return valid.includes(value as Brightness) ? (value as Brightness) : 'medium';
+  }
+
+  /**
+   * Resolve blend mode from ValueSource.
+   */
+  private resolveBlendMode(source: ValueSource | undefined, context: ExecutionContext): BlendMode | undefined {
+    if (!source) return undefined;
+    const value = this.resolveValue('string', source, context);
+    const valid: BlendMode[] = ['replace', 'add', 'multiply', 'overlay'];
+    return valid.includes(value as BlendMode) ? (value as BlendMode) : 'replace';
   }
 
   /**
