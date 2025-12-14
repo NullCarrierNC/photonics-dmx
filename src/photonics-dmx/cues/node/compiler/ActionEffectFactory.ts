@@ -1,10 +1,5 @@
 import { WaitCondition, TrackedLight, Effect, RGBIO, LocationGroup, Color, Brightness, BlendMode, LightTarget } from '../../../types';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import {
-  getSweepEffect,
-  getEffectCycleLights,
-  getEffectBlackout
-} from '../../../effects';
 import { getColor } from '../../../helpers/dmxHelpers';
 import {
   ActionNode,
@@ -186,12 +181,10 @@ export class ActionEffectFactory {
     // Use provided resolved values or resolve from action
     const timing = params.resolvedTiming ?? this.resolveTiming(action.timing);
     const primaryColor = params.resolvedColor ?? this.resolveColorSetting(action.color);
-    const secondaryColor = params.resolvedSecondaryColor ?? (action.secondaryColor ? this.resolveColorSetting(action.secondaryColor) : undefined);
     const layer = params.resolvedLayer ?? (action.layer?.source === 'literal' ? Number(action.layer.value) : 0);
 
-    // For single-color, don't use level (original cues don't use it)
-    // For other effects, level can be used for intensity scaling
-    const timingLevel = action.effectType === 'single-color' ? 1 : clamp(timing.level ?? 1, 0, 1);
+    // For set-color, don't use level (original cues don't use it)
+    const timingLevel = 1;
     const intensityScale = clamp((params.intensityScale ?? 1) * timingLevel, 0, 1);
     let waitFor: WaitCondition = timing.waitForCondition ?? 'none';
     let waitForTime = safeDuration((params.waitTime ?? 0) + (timing.waitForTime ?? 0), 0, 0);
@@ -213,7 +206,7 @@ export class ActionEffectFactory {
     let effect: Effect | null = null;
 
     switch (action.effectType) {
-      case 'single-color': {
+      case 'set-color': {
         effect = createSingleColorEffect({
           lights,
           layer,
@@ -224,51 +217,10 @@ export class ActionEffectFactory {
         });
         break;
       }
-      case 'sweep': {
-        // Use resolved secondary color or fall back to transparent
-        const lowColorSetting = secondaryColor || { name: 'transparent' as Color, brightness: 'low' as Brightness };
-        const lowColor = resolveColor(lowColorSetting, intensityScale || 0.01);
-
-        effect = getSweepEffect({
-          lights,
-          layer,
-          waitFor,
-          sweepTime: timing.duration || 600,
-          fadeInDuration: timing.duration || 80,
-          fadeOutDuration: 120,
-          lightOverlap: 0,
-          betweenSweepDelay: timing.waitUntilTime || 0,
-          high: baseColor,
-          low: lowColor,
-          easing
-        });
-        break;
-      }
-      case 'cycle': {
-        // Use resolved secondary color or fall back to transparent
-        const baseCycleSetting = secondaryColor || { name: 'transparent' as Color, brightness: 'low' as Brightness };
-        const base = resolveColor(baseCycleSetting, intensityScale || 0.01);
-
-        effect = getEffectCycleLights({
-          lights,
-          layer,
-          activeColor: baseColor,
-          baseColor: base,
-          transitionDuration: timing.duration || 150,
-          waitFor: waitFor
-        });
-        break;
-      }
       case 'blackout': {
-        effect = getEffectBlackout({
-          lights,
-          layer,
-          duration: timing.duration || 200
-        });
-        effect.transitions.forEach(transition => {
-          transition.waitForCondition = waitFor;
-        });
-        break;
+        // Blackout is handled directly by sequencer, not as an effect
+        // Return null to indicate this should be handled specially
+        return null;
       }
       default:
         return null;

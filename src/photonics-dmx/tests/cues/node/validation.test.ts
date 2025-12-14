@@ -18,7 +18,7 @@ describe('Node cue validation', () => {
           {
             id: 'action-1',
             type: 'action',
-            effectType: 'single-color',
+            effectType: 'set-color',
             target: { 
               groups: { source: 'literal', value: 'front' }, 
               filter: { source: 'literal', value: 'all' } 
@@ -74,7 +74,7 @@ describe('Node cue validation', () => {
           {
             id: 'action-1',
             type: 'action',
-            effectType: 'single-color',
+            effectType: 'set-color',
             target: { 
               groups: { source: 'literal', value: 'front' }, 
               filter: { source: 'literal', value: 'all' } 
@@ -122,7 +122,7 @@ describe('Node cue validation', () => {
           {
             id: 'action-1',
             type: 'action',
-            effectType: 'single-color',
+            effectType: 'set-color',
             target: { 
               groups: { source: 'literal', value: 'front' }, 
               filter: { source: 'literal', value: 'all' } 

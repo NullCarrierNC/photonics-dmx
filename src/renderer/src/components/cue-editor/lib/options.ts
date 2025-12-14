@@ -2,11 +2,6 @@ import type { NodeCueMode } from '../../../../../photonics-dmx/cues/types/nodeCu
 import type { WaitCondition } from '../../../../../photonics-dmx/types';
 import {
   AUDIO_EVENT_OPTIONS as AUDIO_EVENTS_BASE,
-  BLEND_MODE_OPTIONS,
-  BRIGHTNESS_OPTIONS,
-  COLOR_OPTIONS,
-  LIGHT_TARGET_OPTIONS,
-  LOCATION_OPTIONS,
   YARG_EVENT_OPTIONS as YARG_EVENTS_BASE
 } from '../../../../../photonics-dmx/constants/options';
 
@@ -29,8 +24,6 @@ const EASING_OPTIONS = [
   'cubicOut',
   'cubicInOut'
 ] as const;
-
-const ACTION_OPTIONS = ['single-color', 'sweep', 'cycle', 'blackout'] as const;
 
 const YARG_WAIT_CONDITIONS: WaitCondition[] = [...YARG_EVENTS_BASE];
 const YARG_EVENT_OPTIONS = withDefaultLabels(YARG_WAIT_CONDITIONS);
@@ -60,16 +53,10 @@ const getDefaultEventOption = (mode: NodeCueMode) => {
 };
 
 export {
-  ACTION_OPTIONS,
   ACTION_WAIT_OPTIONS_AUDIO,
   ACTION_WAIT_OPTIONS_YARG,
   AUDIO_EVENT_OPTIONS,
-  BLEND_MODE_OPTIONS,
-  BRIGHTNESS_OPTIONS,
-  COLOR_OPTIONS,
   EASING_OPTIONS,
-  LIGHT_TARGET_OPTIONS,
-  LOCATION_OPTIONS,
   YARG_EVENT_OPTIONS,
   getActionWaitOptions,
   getDefaultEventOption,

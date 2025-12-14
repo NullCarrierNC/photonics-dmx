@@ -268,11 +268,10 @@ export interface AudioEventNode extends BaseEventNode {
   triggerMode: 'edge' | 'level';
 }
 
-export type NodeEffectType =
-  | 'single-color'
-  | 'sweep'
-  | 'cycle'
-  | 'blackout';
+
+export const NODE_EFFECT_TYPES = ['set-color', 'blackout'] as const;
+
+export type NodeEffectType = typeof NODE_EFFECT_TYPES[number];
 
 export interface NodeActionTarget {
   groups: ValueSource;  // Can reference a string variable containing comma-separated groups
@@ -298,29 +297,7 @@ export interface ActionTimingConfig {
   level?: ValueSource;
 }
 
-export interface SweepActionConfig {
-  duration?: ValueSource;
-  fadeIn?: ValueSource;
-  fadeOut?: ValueSource;
-  overlap?: ValueSource;
-  betweenDelay?: ValueSource;
-  lowColor?: NodeColorSetting;
-}
-
-export interface CycleActionConfig {
-  baseColor?: NodeColorSetting;
-  transitionDuration?: ValueSource;
-  trigger?: WaitCondition;
-}
-
-export interface BlackoutActionConfig {
-  duration?: ValueSource;
-}
-
 export interface NodeActionConfig {
-  sweep?: SweepActionConfig;
-  cycle?: CycleActionConfig;
-  blackout?: BlackoutActionConfig;
   custom?: Record<string, unknown>;
 }
 

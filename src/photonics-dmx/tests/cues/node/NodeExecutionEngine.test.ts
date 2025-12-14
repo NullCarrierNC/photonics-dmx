@@ -104,7 +104,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: {
           groups: { source: 'literal', value: 'front' },
           filter: { source: 'literal', value: 'all' }
@@ -180,7 +180,7 @@ describe('NodeExecutionEngine', () => {
       const action1: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -201,7 +201,7 @@ describe('NodeExecutionEngine', () => {
       const action2: ActionNode = {
         id: 'action2',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'back' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -298,7 +298,7 @@ describe('NodeExecutionEngine', () => {
       const actionTrue: ActionNode = {
         id: 'action-true',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -319,7 +319,7 @@ describe('NodeExecutionEngine', () => {
       const actionFalse: ActionNode = {
         id: 'action-false',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -426,7 +426,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -557,7 +557,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -674,7 +674,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -893,7 +893,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -1005,7 +1005,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -1101,7 +1101,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -1201,7 +1201,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -1298,7 +1298,7 @@ describe('NodeExecutionEngine', () => {
       const actionHigh: ActionNode = {
         id: 'action-high',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -1319,7 +1319,7 @@ describe('NodeExecutionEngine', () => {
       const actionLow: ActionNode = {
         id: 'action-low',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -1431,7 +1431,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -1557,7 +1557,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: {
           groups: { source: 'literal', value: 'front' },
           filter: { source: 'literal', value: 'all' }
@@ -1640,7 +1640,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: {
           groups: { source: 'variable', name: 'targetGroups', fallback: 'front' },
           filter: { source: 'literal', value: 'all' }
@@ -1711,7 +1711,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: {
           groups: { source: 'literal', value: 'front' },
           filter: { source: 'literal', value: 'all' }
@@ -1799,7 +1799,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: {
           groups: { source: 'literal', value: 'front' },
           filter: { source: 'literal', value: 'all' }
@@ -1900,7 +1900,7 @@ describe('NodeExecutionEngine', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: {
           groups: { source: 'literal', value: 'front' },
           filter: { source: 'literal', value: 'all' }

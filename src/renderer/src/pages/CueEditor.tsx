@@ -50,7 +50,6 @@ const CueEditor: React.FC = () => {
     setSelectedCueId,
     setIsDirty,
     handleModeChange,
-    handleNewFile,
     handleCreateNewFile,
     updateGroupMeta,
     updateCueMetadata,

@@ -23,7 +23,7 @@ describe('Node cue logic runtime', () => {
           {
             id: 'action-true',
             type: 'action',
-            effectType: 'single-color',
+            effectType: 'set-color',
             target: { 
               groups: { source: 'literal', value: 'front' }, 
               filter: { source: 'literal', value: 'all' } 
@@ -46,7 +46,7 @@ describe('Node cue logic runtime', () => {
           {
             id: 'action-false',
             type: 'action',
-            effectType: 'single-color',
+            effectType: 'set-color',
             target: { 
               groups: { source: 'literal', value: 'front' }, 
               filter: { source: 'literal', value: 'all' } 

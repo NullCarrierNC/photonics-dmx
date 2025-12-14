@@ -26,7 +26,7 @@ describe('Node cue chaining', () => {
           {
             id: 'a1',
             type: 'action',
-            effectType: 'single-color',
+            effectType: 'set-color',
             target: { 
               groups: { source: 'literal', value: 'front' }, 
               filter: { source: 'literal', value: 'all' } 
@@ -50,7 +50,7 @@ describe('Node cue chaining', () => {
           {
             id: 'a2',
             type: 'action',
-            effectType: 'single-color',
+            effectType: 'set-color',
             target: { 
               groups: { source: 'literal', value: 'back' }, 
               filter: { source: 'literal', value: 'all' } 

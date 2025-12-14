@@ -29,7 +29,7 @@ const createId = (): string => {
 const buildDefaultAction = (): ActionNode => ({
   id: `action-${createId()}`,
   type: 'action',
-  effectType: 'single-color',
+  effectType: 'set-color',
   target: {
     groups: { source: 'literal', value: 'front' },
     filter: { source: 'literal', value: 'all' }

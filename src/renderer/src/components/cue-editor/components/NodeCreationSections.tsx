@@ -1,7 +1,8 @@
 import React from 'react';
 import type { NodeCueMode, LogicNode, NodeEffectType } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorMode } from '../lib/types';
-import { ACTION_OPTIONS, getDefaultEventOption } from '../lib/options';
+import { NODE_EFFECT_TYPES } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import { getDefaultEventOption } from '../lib/options';
 import type { EventOption } from '../lib/types';
 import type { AudioEventNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { WaitCondition } from '../../../../../photonics-dmx/types';
@@ -53,7 +54,7 @@ const ActionNodesSection: React.FC<{
   <div>
     <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
     <div className="grid grid-cols-2 gap-2 text-xs">
-      {ACTION_OPTIONS.map(effect => (
+      {NODE_EFFECT_TYPES.map(effect => (
         <button
           key={effect}
           className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"

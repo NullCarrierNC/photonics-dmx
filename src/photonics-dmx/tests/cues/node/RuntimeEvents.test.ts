@@ -118,7 +118,7 @@ describe('Runtime Event System', () => {
       const actionNode: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -192,7 +192,7 @@ describe('Runtime Event System', () => {
       const action1: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -213,7 +213,7 @@ describe('Runtime Event System', () => {
       const action2: ActionNode = {
         id: 'action2',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'back' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -307,7 +307,7 @@ describe('Runtime Event System', () => {
       const action1: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -328,7 +328,7 @@ describe('Runtime Event System', () => {
       const action2: ActionNode = {
         id: 'action2',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'back' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -415,7 +415,7 @@ describe('Runtime Event System', () => {
       const action1: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -436,7 +436,7 @@ describe('Runtime Event System', () => {
       const action2: ActionNode = {
         id: 'action2',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'back' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -509,7 +509,7 @@ describe('Runtime Event System', () => {
       const action: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 
@@ -565,7 +565,7 @@ describe('Runtime Event System', () => {
       const action: ActionNode = {
         id: 'action1',
         type: 'action',
-        effectType: 'single-color',
+        effectType: 'set-color',
         target: { 
           groups: { source: 'literal', value: 'front' }, 
           filter: { source: 'literal', value: 'all' } 

@@ -29,7 +29,7 @@ import {
   NodeCueGroupMeta,
   NodeCueFile,
   NodeCueMode,
-  NodeEffectType,
+  NODE_EFFECT_TYPES,
   NodeLayoutMetadata,
   ValueSource,
   VariableDefinition,
@@ -48,10 +48,6 @@ import {
 const WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY];
 
 const AUDIO_EVENT_TYPES: AudioEventType[] = [...AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY];
-
-const NODE_EFFECT_TYPES: NodeEffectType[] = [
-  'single-color', 'sweep', 'cycle', 'blackout'
-] as const;
 
 const LOGIC_COMPARATORS: LogicComparator[] = ['>', '>=', '<', '<=', '==', '!='];
 const MATH_OPERATORS: MathOperator[] = ['add', 'subtract', 'multiply', 'divide', 'modulus'];
@@ -138,48 +134,11 @@ const timingSchema: JSONSchemaType<ActionTimingConfig> = {
   }
 } as any;
 
-const sweepConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['sweep']>> = {
-  type: 'object',
-  additionalProperties: false,
-  required: [],
-  properties: {
-    duration: { ...valueSourceSchema, nullable: true },
-    fadeIn: { ...valueSourceSchema, nullable: true },
-    fadeOut: { ...valueSourceSchema, nullable: true },
-    overlap: { ...valueSourceSchema, nullable: true },
-    betweenDelay: { ...valueSourceSchema, nullable: true },
-    lowColor: { ...colorSchema, nullable: true }
-  }
-} as any;
-
-const cycleConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['cycle']>> = {
-  type: 'object',
-  additionalProperties: false,
-  required: [],
-  properties: {
-    baseColor: { ...colorSchema, nullable: true },
-    transitionDuration: { ...valueSourceSchema, nullable: true },
-    trigger: { type: 'string', enum: WAIT_CONDITIONS, nullable: true }
-  }
-} as any;
-
-const blackoutConfigSchema: JSONSchemaType<NonNullable<NodeActionConfig['blackout']>> = {
-  type: 'object',
-  additionalProperties: false,
-  required: [],
-  properties: {
-    duration: { ...valueSourceSchema, nullable: true }
-  }
-} as any;
-
 const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
   type: 'object',
   additionalProperties: false,
   required: [],
   properties: {
-    sweep: { ...sweepConfigSchema, nullable: true },
-    cycle: { ...cycleConfigSchema, nullable: true },
-    blackout: { ...blackoutConfigSchema, nullable: true },
     custom: { type: 'object', nullable: true, additionalProperties: true }
   }
 };

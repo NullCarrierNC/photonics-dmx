@@ -173,6 +173,44 @@ export class NodeExecutionEngine {
    */
   private executeActionNode(actionNode: ActionNode, context: ExecutionContext): void {
     try {
+      // Handle blackout specially - it uses sequencer.blackout() directly
+      if (actionNode.effectType === 'blackout') {
+        // Resolve timing to get duration
+        const resolvedTiming: ResolvedActionTiming = {
+          ...actionNode.timing,
+          waitForTime: Number(this.resolveValue('number', actionNode.timing.waitForTime, context)),
+          waitForConditionCount: actionNode.timing.waitForConditionCount 
+            ? Number(this.resolveValue('number', actionNode.timing.waitForConditionCount, context))
+            : undefined,
+          duration: Number(this.resolveValue('number', actionNode.timing.duration, context)),
+          waitUntilTime: Number(this.resolveValue('number', actionNode.timing.waitUntilTime, context)),
+          waitUntilConditionCount: actionNode.timing.waitUntilConditionCount
+            ? Number(this.resolveValue('number', actionNode.timing.waitUntilConditionCount, context))
+            : undefined,
+          level: actionNode.timing.level
+            ? Number(this.resolveValue('number', actionNode.timing.level, context))
+            : 1
+        };
+
+        // Register this action as active (waiting for completion)
+        context.registerActiveAction(actionNode.id, actionNode);
+
+        // Call sequencer.blackout() which returns a Promise<void>
+        this.sequencer.blackout(resolvedTiming.duration).then(() => {
+          // Blackout completed
+          if (context.hasVisited(actionNode.id)) {
+            context.completeAction(actionNode.id);
+          }
+        }).catch((error) => {
+          console.error(`Error during blackout for action node ${actionNode.id}:`, error);
+          // Continue execution despite error
+          if (context.hasVisited(actionNode.id)) {
+            context.completeAction(actionNode.id);
+          }
+        });
+        return;
+      }
+
       // Resolve target
       const resolvedTarget: ResolvedActionTarget = {
         groups: this.resolveLocationGroups(actionNode.target.groups, context),

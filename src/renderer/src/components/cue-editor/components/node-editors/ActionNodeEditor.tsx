@@ -1,20 +1,20 @@
 import React from 'react';
 import type { ActionNode, NodeEffectType, NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { Color, WaitCondition } from '../../../../../../photonics-dmx/types';
+import { NODE_EFFECT_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { WaitCondition } from '../../../../../../photonics-dmx/types';
+import {
+  BLEND_MODE_OPTIONS,
+  BRIGHTNESS_OPTIONS,
+  COLOR_OPTIONS,
+  LIGHT_TARGET_OPTIONS
+} from '../../../../../../photonics-dmx/constants/options';
 import { 
-  ACTION_OPTIONS, 
-  BLEND_MODE_OPTIONS, 
-  BRIGHTNESS_OPTIONS, 
-  COLOR_OPTIONS, 
   EASING_OPTIONS, 
-  LIGHT_TARGET_OPTIONS,
-  ACTION_WAIT_OPTIONS_YARG,
   getActionWaitOptions
 } from '../../lib/options';
 import { createDefaultActionTiming } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import ValueSourceEditor from '../shared/ValueSourceEditor';
 import TargetGroupsMultiSelectEditor from '../shared/TargetGroupsMultiSelectEditor';
-import { extractLiteralValue } from '../shared/nodeEditorUtils';
 
 interface ActionNodeEditorProps {
   node: ActionNode;
@@ -24,207 +24,6 @@ interface ActionNodeEditorProps {
   updateNode: (updates: Partial<ActionNode>) => void;
 }
 
-const SweepConfigEditor: React.FC<{
-  config: NonNullable<ActionNode['config']>['sweep'];
-  updateConfig: (partial: Partial<NonNullable<ActionNode['config']>>) => void;
-}> = ({ config, updateConfig }) => {
-  const cfg = config ?? {};
-
-  return (
-    <div className="mt-3 border-t pt-3 space-y-2">
-      <div className="font-semibold text-xs">Sweep Settings</div>
-      <label className="flex flex-col font-medium text-xs">
-        Duration (ms)
-        <input
-          type="number"
-          min={0}
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={extractLiteralValue(cfg.duration, '')}
-          onChange={e => updateConfig({ 
-            sweep: { 
-              ...cfg, 
-              duration: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } 
-            } 
-          })}
-        />
-      </label>
-      <label className="flex flex-col font-medium text-xs">
-        Fade In (ms)
-        <input
-          type="number"
-          min={0}
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={extractLiteralValue(cfg.fadeIn, '')}
-          onChange={e => updateConfig({ 
-            sweep: { 
-              ...cfg, 
-              fadeIn: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } 
-            } 
-          })}
-        />
-      </label>
-      <label className="flex flex-col font-medium text-xs">
-        Fade Out (ms)
-        <input
-          type="number"
-          min={0}
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={extractLiteralValue(cfg.fadeOut, '')}
-          onChange={e => updateConfig({ 
-            sweep: { 
-              ...cfg, 
-              fadeOut: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } 
-            } 
-          })}
-        />
-      </label>
-      <label className="flex flex-col font-medium text-xs">
-        Overlap (%)
-        <input
-          type="number"
-          min={0}
-          max={100}
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={extractLiteralValue(cfg.overlap, '')}
-          onChange={e => updateConfig({ 
-            sweep: { 
-              ...cfg, 
-              overlap: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } 
-            } 
-          })}
-        />
-      </label>
-      <label className="flex flex-col font-medium text-xs">
-        Between Delay (ms)
-        <input
-          type="number"
-          min={0}
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={extractLiteralValue(cfg.betweenDelay, '')}
-          onChange={e => updateConfig({ 
-            sweep: { 
-              ...cfg, 
-              betweenDelay: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } 
-            } 
-          })}
-        />
-      </label>
-      <label className="flex flex-col font-medium text-xs">
-        Low Colour
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={cfg.lowColor?.name?.source === 'literal' ? cfg.lowColor.name.value as string : 'transparent'}
-          onChange={event => updateConfig({
-            sweep: {
-              ...cfg,
-              lowColor: {
-                ...(cfg.lowColor ?? { brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } }),
-                name: { source: 'literal', value: event.target.value as Color }
-              }
-            }
-          })}
-        >
-          {COLOR_OPTIONS.map(color => (
-            <option key={color} value={color}>{color}</option>
-          ))}
-        </select>
-      </label>
-    </div>
-  );
-};
-
-const CycleConfigEditor: React.FC<{
-  config: NonNullable<ActionNode['config']>['cycle'];
-  updateConfig: (partial: Partial<NonNullable<ActionNode['config']>>) => void;
-}> = ({ config, updateConfig }) => {
-  const cfg = config ?? {};
-
-  return (
-    <div className="mt-3 border-t pt-3 space-y-2">
-      <div className="font-semibold text-xs">Cycle Settings</div>
-      <label className="flex flex-col font-medium text-xs">
-        Base Colour
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={cfg.baseColor?.name?.source === 'literal' ? cfg.baseColor.name.value as string : 'transparent'}
-          onChange={event => updateConfig({
-            cycle: {
-              ...cfg,
-              baseColor: {
-                ...(cfg.baseColor ?? { brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } }),
-                name: { source: 'literal', value: event.target.value as Color }
-              }
-            }
-          })}
-        >
-          {COLOR_OPTIONS.map(color => (
-            <option key={color} value={color}>{color}</option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col font-medium text-xs">
-        Transition Duration (ms)
-        <input
-          type="number"
-          min={0}
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={extractLiteralValue(cfg.transitionDuration, '')}
-          onChange={e => updateConfig({ 
-            cycle: { 
-              ...cfg, 
-              transitionDuration: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } 
-            } 
-          })}
-        />
-      </label>
-      <label className="flex flex-col font-medium text-xs">
-        Trigger
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={cfg.trigger ?? 'none'}
-          onChange={event => updateConfig({ 
-            cycle: { 
-              ...cfg, 
-              trigger: event.target.value as WaitCondition 
-            } 
-          })}
-        >
-          {ACTION_WAIT_OPTIONS_YARG.map(option => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </label>
-    </div>
-  );
-};
-
-const BlackoutConfigEditor: React.FC<{
-  config: NonNullable<ActionNode['config']>['blackout'];
-  updateConfig: (partial: Partial<NonNullable<ActionNode['config']>>) => void;
-}> = ({ config, updateConfig }) => {
-  const cfg = config ?? {};
-
-  return (
-    <div className="mt-3 border-t pt-3 space-y-2">
-      <div className="font-semibold text-xs">Blackout Settings</div>
-      <label className="flex flex-col font-medium text-xs">
-        Duration (ms)
-        <input
-          type="number"
-          min={10}
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={extractLiteralValue(cfg.duration, '')}
-          onChange={e => updateConfig({ 
-            blackout: { 
-              ...cfg, 
-              duration: e.target.value === '' ? undefined : { source: 'literal', value: Number(e.target.value) } 
-            } 
-          })}
-        />
-      </label>
-    </div>
-  );
-};
 
 const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
   node,
@@ -242,14 +41,6 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
       }
     });
 
-  const updateConfig = (partial: Partial<NonNullable<ActionNode['config']>>) =>
-    updateNode({
-      config: {
-        ...(node.config ?? {}),
-        ...partial
-      }
-    });
-
   return (
     <div className="space-y-3 text-xs">
       <label className="flex flex-col font-medium">
@@ -259,94 +50,47 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           value={node.effectType}
           onChange={event => updateNode({ effectType: event.target.value as NodeEffectType })}
         >
-          {ACTION_OPTIONS.map(effect => (
+          {NODE_EFFECT_TYPES.map(effect => (
             <option key={effect} value={effect}>{effect}</option>
           ))}
         </select>
       </label>
-      <TargetGroupsMultiSelectEditor
-        label="Target Groups"
-        value={node.target.groups}
-        onChange={next => updateNode({
-          target: {
-            ...node.target,
-            groups: next
-          }
-        })}
-        availableVariables={availableVariables}
-      />
-      <ValueSourceEditor
-        label="Target Filter"
-        value={node.target.filter}
-        onChange={next => updateNode({
-          target: {
-            ...node.target,
-            filter: next
-          }
-        })}
-        expected="string"
-        validLiterals={LIGHT_TARGET_OPTIONS}
-        availableVariables={availableVariables}
-      />
-      <ValueSourceEditor
-        label="Color"
-        value={node.color.name}
-        onChange={next => updateNode({
-          color: {
-            ...node.color,
-            name: next
-          }
-        })}
-        expected="string"
-        validLiterals={COLOR_OPTIONS}
-        availableVariables={availableVariables}
-      />
-      <ValueSourceEditor
-        label="Brightness"
-        value={node.color.brightness}
-        onChange={next => updateNode({
-          color: {
-            ...node.color,
-            brightness: next
-          }
-        })}
-        expected="string"
-        validLiterals={BRIGHTNESS_OPTIONS}
-        availableVariables={availableVariables}
-      />
-      <ValueSourceEditor
-        label="Blend Mode"
-        value={node.color.blendMode}
-        onChange={next => updateNode({
-          color: {
-            ...node.color,
-            blendMode: next
-          }
-        })}
-        expected="string"
-        validLiterals={BLEND_MODE_OPTIONS}
-        availableVariables={availableVariables}
-      />
-      <ValueSourceEditor
-        label="Opacity (0.0 - 1.0)"
-        value={node.color.opacity}
-        onChange={next => updateNode({
-          color: {
-            ...node.color,
-            opacity: next
-          }
-        })}
-        expected="number"
-        availableVariables={availableVariables}
-      />
-      {(node.effectType === 'sweep' || node.effectType === 'cycle') && (
+      {node.effectType !== 'blackout' && (
+        <>
+          <TargetGroupsMultiSelectEditor
+            label="Target Groups"
+            value={node.target.groups}
+            onChange={next => updateNode({
+              target: {
+                ...node.target,
+                groups: next
+              }
+            })}
+            availableVariables={availableVariables}
+          />
+          <ValueSourceEditor
+            label="Target Filter"
+            value={node.target.filter}
+            onChange={next => updateNode({
+              target: {
+                ...node.target,
+                filter: next
+              }
+            })}
+            expected="string"
+            validLiterals={LIGHT_TARGET_OPTIONS}
+            availableVariables={availableVariables}
+          />
+        </>
+      )}
+      {node.effectType === 'set-color' && (
         <>
           <ValueSourceEditor
-            label="Secondary Color"
-            value={node.secondaryColor?.name}
+            label="Color"
+            value={node.color.name}
             onChange={next => updateNode({
-              secondaryColor: {
-                ...node.secondaryColor ?? { brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } },
+              color: {
+                ...node.color,
                 name: next
               }
             })}
@@ -355,11 +99,11 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
             availableVariables={availableVariables}
           />
           <ValueSourceEditor
-            label="Secondary Brightness"
-            value={node.secondaryColor?.brightness}
+            label="Brightness"
+            value={node.color.brightness}
             onChange={next => updateNode({
-              secondaryColor: {
-                ...node.secondaryColor ?? { name: { source: 'literal', value: 'blue' }, blendMode: { source: 'literal', value: 'replace' } },
+              color: {
+                ...node.color,
                 brightness: next
               }
             })}
@@ -368,11 +112,24 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
             availableVariables={availableVariables}
           />
           <ValueSourceEditor
-            label="Secondary Opacity (0.0 - 1.0)"
-            value={node.secondaryColor?.opacity}
+            label="Blend Mode"
+            value={node.color.blendMode}
             onChange={next => updateNode({
-              secondaryColor: {
-                ...node.secondaryColor ?? { name: { source: 'literal', value: 'blue' }, brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } },
+              color: {
+                ...node.color,
+                blendMode: next
+              }
+            })}
+            expected="string"
+            validLiterals={BLEND_MODE_OPTIONS}
+            availableVariables={availableVariables}
+          />
+          <ValueSourceEditor
+            label="Opacity (0.0 - 1.0)"
+            value={node.color.opacity}
+            onChange={next => updateNode({
+              color: {
+                ...node.color,
                 opacity: next
               }
             })}
@@ -381,13 +138,15 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           />
         </>
       )}
-      <ValueSourceEditor
-        label="Layer"
-        value={node.layer}
-        onChange={next => updateNode({ layer: next })}
-        expected="number"
-        availableVariables={availableVariables}
-      />
+      {node.effectType !== 'blackout' && (
+        <ValueSourceEditor
+          label="Layer"
+          value={node.layer}
+          onChange={next => updateNode({ layer: next })}
+          expected="number"
+          availableVariables={availableVariables}
+        />
+      )}
       <div className="space-y-3">
         {/* Wait For Section */}
         <div className="space-y-2">
@@ -407,7 +166,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
               <span className="text-[10px] text-gray-500">Inherited from event parent</span>
             )}
           </label>
-          {(!(node.effectType === 'single-color' && currentTiming.waitForCondition === 'none')) && (
+          {(!(node.effectType === 'set-color' && currentTiming.waitForCondition === 'none')) && (
             <>
               <ValueSourceEditor
                 label="Wait For Time (ms)"
@@ -450,7 +209,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
               ))}
             </select>
           </label>
-          {(!(node.effectType === 'single-color' && currentTiming.waitUntilCondition === 'none')) && (
+          {(!(node.effectType === 'set-color' && currentTiming.waitUntilCondition === 'none')) && (
             <>
               <ValueSourceEditor
                 label="Wait Until Time (ms)"
@@ -470,43 +229,20 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           )}
         </div>
 
-        {/* Level and Easing */}
-        <div className={`grid gap-2 ${node.effectType === 'single-color' ? 'grid-cols-1' : 'grid-cols-2'}`}>
-          {node.effectType !== 'single-color' && (
-            <ValueSourceEditor
-              label="Level (0.0 - 1.0)"
-              value={currentTiming.level}
-              onChange={next => updateTiming({ level: next })}
-              expected="number"
-              availableVariables={availableVariables}
-            />
-          )}
-          <label className="flex flex-col font-medium">
-            Easing
-            <select
-              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={currentTiming.easing ?? 'linear'}
-              onChange={event => updateTiming({ easing: event.target.value })}
-            >
-              {EASING_OPTIONS.map(ease => (
-                <option key={ease} value={ease}>{ease}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        {/* Easing */}
+        <label className="flex flex-col font-medium">
+          Easing
+          <select
+            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+            value={currentTiming.easing ?? 'linear'}
+            onChange={event => updateTiming({ easing: event.target.value })}
+          >
+            {EASING_OPTIONS.map(ease => (
+              <option key={ease} value={ease}>{ease}</option>
+            ))}
+          </select>
+        </label>
       </div>
-
-      {node.effectType === 'sweep' && (
-        <SweepConfigEditor config={node.config?.sweep} updateConfig={updateConfig} />
-      )}
-
-      {node.effectType === 'cycle' && (
-        <CycleConfigEditor config={node.config?.cycle} updateConfig={updateConfig} />
-      )}
-
-      {node.effectType === 'blackout' && (
-        <BlackoutConfigEditor config={node.config?.blackout} updateConfig={updateConfig} />
-      )}
     </div>
   );
 };
