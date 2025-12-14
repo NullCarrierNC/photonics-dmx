@@ -13,6 +13,7 @@ import {
 } from '../../lib/options';
 import { createDefaultActionTiming } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import ValueSourceEditor from '../shared/ValueSourceEditor';
+import TargetGroupsMultiSelectEditor from '../shared/TargetGroupsMultiSelectEditor';
 import { extractLiteralValue } from '../shared/nodeEditorUtils';
 
 interface ActionNodeEditorProps {
@@ -263,8 +264,8 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           ))}
         </select>
       </label>
-      <ValueSourceEditor
-        label="Target Groups (comma-separated: front,back,strobe)"
+      <TargetGroupsMultiSelectEditor
+        label="Target Groups"
         value={node.target.groups}
         onChange={next => updateNode({
           target: {
@@ -272,7 +273,6 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
             groups: next
           }
         })}
-        expected="string"
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
@@ -289,7 +289,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
-        label="Primary Color"
+        label="Color"
         value={node.color.name}
         onChange={next => updateNode({
           color: {
@@ -302,7 +302,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
-        label="Primary Brightness"
+        label="Brightness"
         value={node.color.brightness}
         onChange={next => updateNode({
           color: {
@@ -315,7 +315,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
-        label="Primary Blend Mode"
+        label="Blend Mode"
         value={node.color.blendMode}
         onChange={next => updateNode({
           color: {
@@ -364,37 +364,46 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
         expected="number"
         availableVariables={availableVariables}
       />
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col font-medium">
-          Wait For Condition
-          <select
-            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-            value={currentTiming.waitForCondition}
-            onChange={event => updateTiming({ waitForCondition: event.target.value as WaitCondition })}
-            disabled={selectedActionHasEventParent}
-          >
-            {getActionWaitOptions(activeMode).map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          {selectedActionHasEventParent && (
-            <span className="text-[10px] text-gray-500">Inherited from event parent</span>
+      <div className="space-y-3">
+        {/* Wait For Section */}
+        <div className="space-y-2">
+          <label className="flex flex-col font-medium">
+            Wait For Condition
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={currentTiming.waitForCondition}
+              onChange={event => updateTiming({ waitForCondition: event.target.value as WaitCondition })}
+              disabled={selectedActionHasEventParent}
+            >
+              {getActionWaitOptions(activeMode).map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            {selectedActionHasEventParent && (
+              <span className="text-[10px] text-gray-500">Inherited from event parent</span>
+            )}
+          </label>
+          {(!(node.effectType === 'single-color' && currentTiming.waitForCondition === 'none')) && (
+            <>
+              <ValueSourceEditor
+                label="Wait For Time (ms)"
+                value={currentTiming.waitForTime}
+                onChange={next => updateTiming({ waitForTime: next })}
+                expected="number"
+                availableVariables={availableVariables}
+              />
+              <ValueSourceEditor
+                label="Wait For Count"
+                value={currentTiming.waitForConditionCount}
+                onChange={next => updateTiming({ waitForConditionCount: next })}
+                expected="number"
+                availableVariables={availableVariables}
+              />
+            </>
           )}
-        </label>
-        <ValueSourceEditor
-          label="Wait For Time (ms)"
-          value={currentTiming.waitForTime}
-          onChange={next => updateTiming({ waitForTime: next })}
-          expected="number"
-          availableVariables={availableVariables}
-        />
-        <ValueSourceEditor
-          label="Wait For Count"
-          value={currentTiming.waitForConditionCount}
-          onChange={next => updateTiming({ waitForConditionCount: next })}
-          expected="number"
-          availableVariables={availableVariables}
-        />
+        </div>
+
+        {/* Duration */}
         <ValueSourceEditor
           label="Duration (ms)"
           value={currentTiming.duration}
@@ -402,51 +411,63 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           expected="number"
           availableVariables={availableVariables}
         />
-        <label className="flex flex-col font-medium">
-          Wait Until Condition
-          <select
-            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-            value={currentTiming.waitUntilCondition}
-            onChange={event => updateTiming({ waitUntilCondition: event.target.value as WaitCondition })}
-          >
-            {getActionWaitOptions(activeMode).map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <ValueSourceEditor
-          label="Wait Until Time (ms)"
-          value={currentTiming.waitUntilTime}
-          onChange={next => updateTiming({ waitUntilTime: next })}
-          expected="number"
-          availableVariables={availableVariables}
-        />
-        <ValueSourceEditor
-          label="Wait Until Count"
-          value={currentTiming.waitUntilConditionCount}
-          onChange={next => updateTiming({ waitUntilConditionCount: next })}
-          expected="number"
-          availableVariables={availableVariables}
-        />
-        <ValueSourceEditor
-          label="Level (0.0 - 1.0)"
-          value={currentTiming.level}
-          onChange={next => updateTiming({ level: next })}
-          expected="number"
-          availableVariables={availableVariables}
-        />
-        <label className="flex flex-col font-medium">
-          Easing
-          <select
-            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-            value={currentTiming.easing ?? 'sinInOut'}
-            onChange={event => updateTiming({ easing: event.target.value })}
-          >
-            {EASING_OPTIONS.map(ease => (
-              <option key={ease} value={ease}>{ease}</option>
-            ))}
-          </select>
-        </label>
+
+        {/* Wait Until Section */}
+        <div className="space-y-2">
+          <label className="flex flex-col font-medium">
+            Wait Until Condition
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={currentTiming.waitUntilCondition}
+              onChange={event => updateTiming({ waitUntilCondition: event.target.value as WaitCondition })}
+            >
+              {getActionWaitOptions(activeMode).map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          {(!(node.effectType === 'single-color' && currentTiming.waitUntilCondition === 'none')) && (
+            <>
+              <ValueSourceEditor
+                label="Wait Until Time (ms)"
+                value={currentTiming.waitUntilTime}
+                onChange={next => updateTiming({ waitUntilTime: next })}
+                expected="number"
+                availableVariables={availableVariables}
+              />
+              <ValueSourceEditor
+                label="Wait Until Count"
+                value={currentTiming.waitUntilConditionCount}
+                onChange={next => updateTiming({ waitUntilConditionCount: next })}
+                expected="number"
+                availableVariables={availableVariables}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Level and Easing */}
+        <div className="grid grid-cols-2 gap-2">
+          <ValueSourceEditor
+            label="Level (0.0 - 1.0)"
+            value={currentTiming.level}
+            onChange={next => updateTiming({ level: next })}
+            expected="number"
+            availableVariables={availableVariables}
+          />
+          <label className="flex flex-col font-medium">
+            Easing
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={currentTiming.easing ?? 'sinInOut'}
+              onChange={event => updateTiming({ easing: event.target.value })}
+            >
+              {EASING_OPTIONS.map(ease => (
+                <option key={ease} value={ease}>{ease}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {node.effectType === 'sweep' && (
