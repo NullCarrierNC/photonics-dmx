@@ -6,6 +6,7 @@ import type {
   ConditionalLogicNode,
   CueDataLogicNode,
   ConfigDataLogicNode,
+  LightsFromIndexLogicNode,
   ConfigDataProperty,
   MathOperator,
   LogicComparator
@@ -73,7 +74,7 @@ const VariableLogicEditor: React.FC<{
           label="Value"
           value={node.value}
           onChange={next => updateNode({ value: next })}
-          expected={node.valueType}
+          expected={node.valueType as 'number' | 'boolean' | 'string'}
           availableVariables={availableVariables}
         />
       )}
@@ -222,7 +223,9 @@ const ConfigDataLogicEditor: React.FC<{
     { id: 'total-lights', label: 'Total Lights', type: 'number' },
     { id: 'front-lights-count', label: 'Front Lights Count', type: 'number' },
     { id: 'back-lights-count', label: 'Back Lights Count', type: 'number' },
-    { id: 'strobe-lights-count', label: 'Strobe Lights Count', type: 'number' }
+    { id: 'front-lights-array', label: 'Front Lights Array', type: 'light-array' },
+    { id: 'back-lights-array', label: 'Back Lights Array', type: 'light-array' },
+    { id: 'front-back-lights-array', label: 'Front & Back Lights Array', type: 'light-array' }
   ];
 
   return (
@@ -300,6 +303,62 @@ const ConditionalLogicEditor: React.FC<{
   );
 };
 
+const LightsFromIndexLogicEditor: React.FC<{
+  node: LightsFromIndexLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Source Variable (light-array)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.sourceVariable}
+          onChange={event => updateNode({ sourceVariable: event.target.value })}
+        >
+          <option value="">-- Select light-array --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <ValueSourceEditor
+        label="Index (with wraparound)"
+        value={node.index}
+        onChange={next => updateNode({ index: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+
+      <label className="flex flex-col font-medium">
+        Assign To
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo}
+          onChange={event => updateNode({ assignTo: event.target.value })}
+        >
+          <option value="">-- Select variable --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <p className="text-[10px] text-gray-500 italic">
+        Extracts a single light from source array. Index wraps around if out of bounds.
+      </p>
+    </div>
+  );
+};
+
 const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
   node,
   activeMode,
@@ -341,6 +400,16 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <ConfigDataLogicEditor
         node={node as ConfigDataLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'lights-from-index') {
+    return (
+      <LightsFromIndexLogicEditor
+        node={node as LightsFromIndexLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

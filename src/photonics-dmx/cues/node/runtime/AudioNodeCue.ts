@@ -257,6 +257,13 @@ export class AudioNodeCue implements IAudioCue {
     switch (logicNode.logicType) {
       case 'variable': {
         if (logicNode.mode !== 'get') {
+          // For light-array type, we can't resolve from value source (it comes from config-data)
+          if (logicNode.valueType === 'light-array') {
+            // Light arrays must come from config-data nodes, not variable nodes
+            console.warn('Cannot set light-array variable from variable node, use config-data node instead');
+            return edges.map(edge => edge.to);
+          }
+          
           const value = this.resolveValue(logicNode.valueType, logicNode.value);
           const varStore = this.getVariableStore(logicNode.varName);
           

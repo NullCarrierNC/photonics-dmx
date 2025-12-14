@@ -103,6 +103,12 @@ const LogicNodesSection: React.FC<{
       >
         Config Data
       </button>
+      <button
+        className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+        onClick={() => addLogicNode('lights-from-index')}
+      >
+        Lights From Index
+      </button>
     </div>
   </div>
 );

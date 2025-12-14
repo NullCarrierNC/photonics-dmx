@@ -6,6 +6,7 @@ import {
   createDefaultActionTiming
 } from '../../types/nodeCueTypes';
 import { EasingType } from '../../../easing';
+import { VariableValue } from '../runtime/executionTypes';
 
 // Resolved action data (after ValueSource resolution)
 export interface ResolvedActionTarget {
@@ -166,7 +167,22 @@ export class ActionEffectFactory {
     };
   }
 
-  public static resolveLights(lightManager: DmxLightManager, target: any): TrackedLight[] {
+  public static resolveLights(
+    lightManager: DmxLightManager, 
+    target: any,
+    variableResolver?: (name: string) => VariableValue | undefined
+  ): TrackedLight[] {
+    // Check if groups is a variable reference
+    if (target.groups?.source === 'variable' && variableResolver) {
+      const varValue = variableResolver(target.groups.name);
+      
+      // If it's a light-array variable, use those exact lights (ignore filter)
+      if (varValue?.type === 'light-array') {
+        return varValue.value as TrackedLight[];
+      }
+    }
+    
+    // Standard group/filter resolution
     const resolved = this.resolveTarget(target);
     const groups: LocationGroup[] = resolved.groups.length > 0 ? resolved.groups : ['front'];
     return lightManager.getLights(groups, resolved.filter);

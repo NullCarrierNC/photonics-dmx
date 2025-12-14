@@ -22,7 +22,7 @@ import {
   YargCueDataProperty,
   AudioCueDataProperty
 } from '../../types/nodeCueTypes';
-import { Color, Brightness, BlendMode, LocationGroup, LightTarget } from '../../../types';
+import { Color, Brightness, BlendMode, LocationGroup, LightTarget, TrackedLight } from '../../../types';
 import { ExecutionContext } from './ExecutionContext';
 import { ExecutionState, VariableValue } from './executionTypes';
 import { EffectRegistry } from './EffectRegistry';
@@ -269,7 +269,15 @@ export class NodeExecutionEngine {
         layer: resolvedLayer
       };
       
-      const lights = ActionEffectFactory.resolveLights(this.lightManager, resolvedTarget);
+      const lights = ActionEffectFactory.resolveLights(
+        this.lightManager,
+        actionNode.target,  // Pass the ORIGINAL target with ValueSource intact
+        (varName: string) => {
+          const cueVar = context.cueLevelVarStore.get(varName);
+          const groupVar = context.groupLevelVarStore.get(varName);
+          return cueVar ?? groupVar;
+        }
+      );
       if (!lights || lights.length === 0) {
         // No lights to target, continue immediately
         this.continueToNextNodes(actionNode.id, context);
@@ -578,8 +586,44 @@ export class NodeExecutionEngine {
         
         if (logicNode.assignTo) {
           const varStore = this.getVariableStore(logicNode.assignTo);
-          varStore.set(logicNode.assignTo, { type: 'number', value });
+          const type = Array.isArray(value) ? 'light-array' : 'number';
+          varStore.set(logicNode.assignTo, { type, value });
         }
+        
+        return edges.map(edge => edge.to);
+      }
+
+      case 'lights-from-index': {
+        // Get the source light array variable
+        const sourceVarStore = this.getVariableStore(logicNode.sourceVariable);
+        const sourceVar = sourceVarStore.get(logicNode.sourceVariable);
+        
+        if (!sourceVar || sourceVar.type !== 'light-array') {
+          console.warn(`lights-from-index node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+          return edges.map(edge => edge.to);
+        }
+        
+        const lightsArray = sourceVar.value as TrackedLight[];
+        
+        if (lightsArray.length === 0) {
+          console.warn(`lights-from-index node ${nodeId}: source array is empty`);
+          return edges.map(edge => edge.to);
+        }
+        
+        // Resolve the index
+        const indexValue = this.resolveValue('number', logicNode.index, context);
+        const index = Math.floor(Number(indexValue));
+        
+        // Apply wraparound (modulo)
+        const wrappedIndex = ((index % lightsArray.length) + lightsArray.length) % lightsArray.length;
+        const selectedLight = lightsArray[wrappedIndex];
+        
+        // Assign the single light to the target variable
+        const targetVarStore = this.getVariableStore(logicNode.assignTo);
+        targetVarStore.set(logicNode.assignTo, { 
+          type: 'light-array', 
+          value: [selectedLight] 
+        });
         
         return edges.map(edge => edge.to);
       }
@@ -663,17 +707,22 @@ export class NodeExecutionEngine {
 
   /**
    * Extract config data value based on property.
+   * Returns either a number (for counts) or TrackedLight[] (for arrays).
    */
-  private extractConfigDataValue(property: string): number {
+  private extractConfigDataValue(property: string): number | TrackedLight[] {
     switch (property) {
       case 'total-lights':
-        return this.lightManager.getLightsInGroup(['front', 'back', 'strobe']).length;
+        return this.lightManager.getLightsInGroup(['front', 'back']).length;
       case 'front-lights-count':
         return this.lightManager.getLightsInGroup('front').length;
       case 'back-lights-count':
         return this.lightManager.getLightsInGroup('back').length;
-      case 'strobe-lights-count':
-        return this.lightManager.getLightsInGroup('strobe').length;
+      case 'front-lights-array':
+        return this.lightManager.getLightsInGroup('front');
+      case 'back-lights-array':
+        return this.lightManager.getLightsInGroup('back');
+      case 'front-back-lights-array':
+        return this.lightManager.getLightsInGroup(['front', 'back']);
       default:
         return 0;
     }

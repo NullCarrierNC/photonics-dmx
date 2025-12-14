@@ -157,7 +157,7 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
               >
                 <option value="">-- Select --</option>
                 {availableVariables
-                  .filter(v => v.type === 'string')
+                  .filter(v => v.type === 'string' || v.type === 'light-array')
                   .map(v => (
                     <option key={v.name} value={v.name}>
                       {v.name} ({v.type})

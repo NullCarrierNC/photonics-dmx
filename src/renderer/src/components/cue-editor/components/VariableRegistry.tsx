@@ -183,6 +183,12 @@ const VariableRegistry: React.FC<Props> = ({
             onChange={e => onChange(e.target.value)}
           />
         );
+      case 'light-array':
+        return (
+          <div className="text-xs text-gray-500 italic py-1">
+            Empty array (populated via config-data node)
+          </div>
+        );
       case 'number':
       default:
         return (
@@ -232,19 +238,19 @@ const VariableRegistry: React.FC<Props> = ({
                     key={varDef.name}
                     className="flex items-center gap-2 text-[11px] p-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono font-semibold truncate">
-                        {varDef.name}
-                        {varDef.isParameter && (
-                          <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded">
-                            Parameter
-                          </span>
-                        )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono font-semibold truncate">
+                          {varDef.name}
+                          {varDef.isParameter && (
+                            <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded">
+                              Parameter
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-gray-500">
+                          {varDef.type} = {varDef.type === 'light-array' ? '[]' : String(varDef.initialValue)}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-gray-500">
-                        {varDef.type} = {String(varDef.initialValue)}
-                      </div>
-                    </div>
                     <button
                       className="text-blue-500 hover:underline text-[10px]"
                       onClick={() => openDialog('cue', varDef)}
@@ -287,7 +293,7 @@ const VariableRegistry: React.FC<Props> = ({
                       <div className="flex-1 min-w-0">
                         <div className="font-mono font-semibold truncate">{varDef.name}</div>
                         <div className="text-[10px] text-gray-500">
-                          {varDef.type} = {String(varDef.initialValue)}
+                          {varDef.type} = {varDef.type === 'light-array' ? '[]' : String(varDef.initialValue)}
                         </div>
                       </div>
                       <button
@@ -334,7 +340,7 @@ const VariableRegistry: React.FC<Props> = ({
                       <div className="flex-1 min-w-0">
                         <div className="font-mono font-semibold truncate">{varDef.name}</div>
                         <div className="text-[10px] text-gray-500">
-                          {varDef.type} = {String(varDef.initialValue)}
+                          {varDef.type} = {varDef.type === 'light-array' ? '[]' : String(varDef.initialValue)}
                         </div>
                       </div>
                       <button
@@ -392,12 +398,14 @@ const VariableRegistry: React.FC<Props> = ({
                     let newValue: any = 0;
                     if (newType === 'boolean') newValue = false;
                     else if (newType === 'string') newValue = '';
+                    else if (newType === 'light-array') newValue = [];
                     setFormData({ ...formData, type: newType, initialValue: newValue });
                   }}
                 >
                   <option value="number">Number</option>
                   <option value="boolean">Boolean</option>
                   <option value="string">String</option>
+                  <option value="light-array">Light Array</option>
                 </select>
               </label>
 

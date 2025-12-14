@@ -149,9 +149,9 @@ const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
   additionalProperties: false,
   properties: {
     name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
-    type: { type: 'string', enum: ['number', 'boolean', 'string'] },
+    type: { type: 'string', enum: ['number', 'boolean', 'string', 'light-array'] },
     scope: { type: 'string', enum: ['cue', 'cue-group'] },
-    initialValue: { type: ['number', 'boolean', 'string'] },
+    initialValue: { type: ['number', 'boolean', 'string', 'array'] } as any,
     description: { type: 'string', nullable: true },
     isParameter: { type: 'boolean', nullable: true }
   }
@@ -233,7 +233,7 @@ const variableLogicSchema: JSONSchemaType<LogicNode> = {
     },
     mode: { type: 'string', enum: ['set', 'get', 'init'] as const },
     varName: { type: 'string' },
-    valueType: { type: 'string', enum: ['number', 'boolean', 'string'] as const },
+    valueType: { type: 'string', enum: ['number', 'boolean', 'string', 'light-array'] as const },
     value: { ...valueSourceSchema, nullable: true }
   }
 } as any;
@@ -302,7 +302,8 @@ const CUE_DATA_PROPERTIES = [
 ];
 
 const CONFIG_DATA_PROPERTIES = [
-  'total-lights', 'front-lights-count', 'back-lights-count', 'strobe-lights-count'
+  'total-lights', 'front-lights-count', 'back-lights-count',
+  'front-lights-array', 'back-lights-array', 'front-back-lights-array'
 ] as const;
 
 const cueDataLogicSchema: JSONSchemaType<LogicNode> = {
@@ -343,8 +344,35 @@ const configDataLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
+const lightsFromIndexLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariable', 'index', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'lights-from-index' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariable: { type: 'string' },
+    index: valueSourceSchema,
+    assignTo: { type: 'string' }
+  }
+} as any;
+
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
-  oneOf: [variableLogicSchema, mathLogicSchema, conditionalLogicSchema, cueDataLogicSchema, configDataLogicSchema]
+  oneOf: [
+    variableLogicSchema, 
+    mathLogicSchema, 
+    conditionalLogicSchema, 
+    cueDataLogicSchema, 
+    configDataLogicSchema,
+    lightsFromIndexLogicSchema
+  ]
 } as any;
 
 const targetSchema: JSONSchemaType<NodeActionTarget> = {

@@ -1972,4 +1972,466 @@ describe('NodeExecutionEngine', () => {
       }, 10);
     });
   });
+
+  describe('Light Array Support', () => {
+    it('should store light array from config-data node', () => {
+      const mockLights = [
+        { id: 'front1', position: 0, config: {} },
+        { id: 'front2', position: 1, config: {} },
+        { id: 'front3', position: 2, config: {} }
+      ];
+
+      mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights);
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const configDataNode: LogicNode = {
+        id: 'config1',
+        type: 'logic',
+        logicType: 'config-data',
+        dataProperty: 'front-lights-array',
+        assignTo: 'frontLights'
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [],
+          logic: [configDataNode]
+        },
+        connections: [
+          { from: 'event1', to: 'config1' }
+        ],
+        variables: [{ name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] }]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([[eventNode.id, eventNode]]),
+        actionMap: new Map(),
+        logicMap: new Map<string, LogicNode>([[configDataNode.id, configDataNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'config1' }]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      // Check that the light array was stored in the variable store
+      const storedValue = cueLevelVarStore.get('frontLights');
+      expect(storedValue).toBeDefined();
+      expect(storedValue?.type).toBe('light-array');
+      expect(Array.isArray(storedValue?.value)).toBe(true);
+      expect(storedValue?.value).toEqual(mockLights);
+    });
+
+    it('should get all config-data array types', () => {
+      const mockFrontLights = [
+        { id: 'front1', position: 0, config: {} as any },
+        { id: 'front2', position: 1, config: {} as any }
+      ];
+      const mockBackLights = [
+        { id: 'back1', position: 0, config: {} as any }
+      ];
+      const mockAllLights = [...mockFrontLights, ...mockBackLights];
+
+      mockLightManager.getLightsInGroup = jest.fn((groups: any) => {
+        if (Array.isArray(groups)) {
+          if (groups.includes('front') && groups.includes('back')) {
+            return mockAllLights;
+          }
+        } else {
+          if (groups === 'front') return mockFrontLights;
+          if (groups === 'back') return mockBackLights;
+        }
+        return [];
+      });
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const config1: LogicNode = {
+        id: 'config1',
+        type: 'logic',
+        logicType: 'config-data',
+        dataProperty: 'front-lights-array',
+        assignTo: 'frontLights'
+      };
+
+      const config2: LogicNode = {
+        id: 'config2',
+        type: 'logic',
+        logicType: 'config-data',
+        dataProperty: 'back-lights-array',
+        assignTo: 'backLights'
+      };
+
+      const config3: LogicNode = {
+        id: 'config3',
+        type: 'logic',
+        logicType: 'config-data',
+        dataProperty: 'front-back-lights-array',
+        assignTo: 'allLights'
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [],
+          logic: [config1, config2, config3]
+        },
+        connections: [
+          { from: 'event1', to: 'config1' },
+          { from: 'event1', to: 'config2' },
+          { from: 'event1', to: 'config3' }
+        ],
+        variables: [
+          { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'backLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([[eventNode.id, eventNode]]),
+        actionMap: new Map(),
+        logicMap: new Map<string, LogicNode>([
+          [config1.id, config1],
+          [config2.id, config2],
+          [config3.id, config3]
+        ]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [
+            { from: 'event1', to: 'config1' },
+            { from: 'event1', to: 'config2' },
+            { from: 'event1', to: 'config3' }
+          ]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      expect(cueLevelVarStore.get('frontLights')?.value).toEqual(mockFrontLights);
+      expect(cueLevelVarStore.get('backLights')?.value).toEqual(mockBackLights);
+      expect(cueLevelVarStore.get('allLights')?.value).toEqual(mockAllLights);
+    });
+  });
+
+  describe('Lights From Index Node', () => {
+    it('should extract single light from array using index', () => {
+      const mockLights = [
+        { id: 'light0', position: 0, config: {} as any },
+        { id: 'light1', position: 1, config: {} as any },
+        { id: 'light2', position: 2, config: {} as any },
+        { id: 'light3', position: 3, config: {} as any }
+      ];
+
+      mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights);
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const configNode: LogicNode = {
+        id: 'config1',
+        type: 'logic',
+        logicType: 'config-data',
+        dataProperty: 'front-lights-array',
+        assignTo: 'allLights'
+      };
+
+      const indexNode: LogicNode = {
+        id: 'lights-index1',
+        type: 'logic',
+        logicType: 'lights-from-index',
+        sourceVariable: 'allLights',
+        index: { source: 'literal', value: 2 },
+        assignTo: 'selectedLight'
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [],
+          logic: [configNode, indexNode]
+        },
+        connections: [
+          { from: 'event1', to: 'config1' },
+          { from: 'config1', to: 'lights-index1' }
+        ],
+        variables: [
+          { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'selectedLight', type: 'light-array', scope: 'cue', initialValue: [] }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([[eventNode.id, eventNode]]),
+        actionMap: new Map(),
+        logicMap: new Map<string, LogicNode>([
+          [configNode.id, configNode],
+          [indexNode.id, indexNode]
+        ]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'config1' }]],
+          ['config1', [{ from: 'config1', to: 'lights-index1' }]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      const selectedLight = cueLevelVarStore.get('selectedLight');
+      expect(selectedLight).toBeDefined();
+      expect(selectedLight?.type).toBe('light-array');
+      expect(selectedLight?.value).toEqual([mockLights[2]]);
+    });
+
+    it('should handle wraparound for out-of-bounds index', () => {
+      const mockLights = [
+        { id: 'light0', position: 0, config: {} as any },
+        { id: 'light1', position: 1, config: {} as any },
+        { id: 'light2', position: 2, config: {} as any }
+      ];
+
+      mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights);
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const configNode: LogicNode = {
+        id: 'config1',
+        type: 'logic',
+        logicType: 'config-data',
+        dataProperty: 'front-lights-array',
+        assignTo: 'allLights'
+      };
+
+      const indexNode: LogicNode = {
+        id: 'lights-index1',
+        type: 'logic',
+        logicType: 'lights-from-index',
+        sourceVariable: 'allLights',
+        index: { source: 'literal', value: 5 },
+        assignTo: 'selectedLight'
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [],
+          logic: [configNode, indexNode]
+        },
+        connections: [
+          { from: 'event1', to: 'config1' },
+          { from: 'config1', to: 'lights-index1' }
+        ],
+        variables: [
+          { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'selectedLight', type: 'light-array', scope: 'cue', initialValue: [] }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([[eventNode.id, eventNode]]),
+        actionMap: new Map(),
+        logicMap: new Map<string, LogicNode>([
+          [configNode.id, configNode],
+          [indexNode.id, indexNode]
+        ]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'config1' }]],
+          ['config1', [{ from: 'config1', to: 'lights-index1' }]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      const selectedLight = cueLevelVarStore.get('selectedLight');
+      expect(selectedLight).toBeDefined();
+      expect(selectedLight?.type).toBe('light-array');
+      // Index 5 with array length 3 should wrap to index 2 (5 % 3 = 2)
+      expect(selectedLight?.value).toEqual([mockLights[2]]);
+    });
+
+    it('should handle negative index with wraparound', () => {
+      const mockLights = [
+        { id: 'light0', position: 0, config: {} as any },
+        { id: 'light1', position: 1, config: {} as any },
+        { id: 'light2', position: 2, config: {} as any }
+      ];
+
+      mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights);
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat'
+      };
+
+      const configNode: LogicNode = {
+        id: 'config1',
+        type: 'logic',
+        logicType: 'config-data',
+        dataProperty: 'front-lights-array',
+        assignTo: 'allLights'
+      };
+
+      const indexNode: LogicNode = {
+        id: 'lights-index1',
+        type: 'logic',
+        logicType: 'lights-from-index',
+        sourceVariable: 'allLights',
+        index: { source: 'literal', value: -1 },
+        assignTo: 'selectedLight'
+      };
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Intro,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [],
+          logic: [configNode, indexNode]
+        },
+        connections: [
+          { from: 'event1', to: 'config1' },
+          { from: 'config1', to: 'lights-index1' }
+        ],
+        variables: [
+          { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'selectedLight', type: 'light-array', scope: 'cue', initialValue: [] }
+        ]
+      };
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([[eventNode.id, eventNode]]),
+        actionMap: new Map(),
+        logicMap: new Map<string, LogicNode>([
+          [configNode.id, configNode],
+          [indexNode.id, indexNode]
+        ]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'config1' }]],
+          ['config1', [{ from: 'config1', to: 'lights-index1' }]]
+        ])
+      };
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables
+      );
+
+      engine.startExecution(eventNode, createCueData('Strong'));
+
+      const selectedLight = cueLevelVarStore.get('selectedLight');
+      expect(selectedLight).toBeDefined();
+      expect(selectedLight?.type).toBe('light-array');
+      // Index -1 should wrap to the last element (index 2)
+      expect(selectedLight?.value).toEqual([mockLights[2]]);
+    });
+  });
 });

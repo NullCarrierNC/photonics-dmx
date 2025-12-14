@@ -2,6 +2,7 @@ import { CueType } from './cueTypes';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type {
   WaitCondition,
+  TrackedLight,
 } from '../../types';
 
 export type NodeCueMode = 'yarg' | 'audio';
@@ -28,17 +29,17 @@ export interface Connection {
   toPort?: string;
 }
 
-export type VariableType = 'number' | 'boolean' | 'string';
+export type VariableType = 'number' | 'boolean' | 'string' | 'light-array';
 
 export type ValueSource =
-  | { source: 'literal'; value: number | boolean | string }
-  | { source: 'variable'; name: string; fallback?: number | boolean | string };
+  | { source: 'literal'; value: number | boolean | string | TrackedLight[] }
+  | { source: 'variable'; name: string; fallback?: number | boolean | string | TrackedLight[] };
 
 export interface VariableDefinition {
   name: string;
   type: VariableType;
   scope: 'cue' | 'cue-group';
-  initialValue: number | boolean | string;
+  initialValue: number | boolean | string | TrackedLight[];
   description?: string;
   isParameter?: boolean; 
 }
@@ -123,10 +124,12 @@ export type CueDataProperty = YargCueDataProperty | AudioCueDataProperty;
 
 // Config Data Properties
 export type ConfigDataProperty =
-  | 'total-lights'          // Total number of all lights (number)
-  | 'front-lights-count'    // Number of front lights (number)
-  | 'back-lights-count'     // Number of back lights (number)
-  | 'strobe-lights-count';  // Number of strobe lights (number)
+  | 'total-lights'              // Total number of all lights (number)
+  | 'front-lights-count'        // Number of front lights (number)
+  | 'back-lights-count'         // Number of back lights (number)
+  | 'front-lights-array'        // Array of front lights (TrackedLight[])
+  | 'back-lights-array'         // Array of back lights (TrackedLight[])
+  | 'front-back-lights-array';  // Array of front and back lights (TrackedLight[])
 
 export interface CueDataLogicNode extends BaseLogicNode {
   logicType: 'cue-data';
@@ -140,12 +143,20 @@ export interface ConfigDataLogicNode extends BaseLogicNode {
   assignTo?: string;
 }
 
+export interface LightsFromIndexLogicNode extends BaseLogicNode {
+  logicType: 'lights-from-index';
+  sourceVariable: string;  // Name of the light-array variable
+  index: ValueSource;      // Index to extract (with wraparound)
+  assignTo: string;        // Variable to assign the single light to
+}
+
 export type LogicNode = 
   | VariableLogicNode 
   | MathLogicNode 
   | ConditionalLogicNode
   | CueDataLogicNode
-  | ConfigDataLogicNode;
+  | ConfigDataLogicNode
+  | LightsFromIndexLogicNode;
 
 export interface EventRaiserNode {
   id: string;

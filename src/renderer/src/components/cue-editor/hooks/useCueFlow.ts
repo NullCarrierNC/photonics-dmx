@@ -16,6 +16,7 @@ import {
   type ConditionalLogicNode,
   type CueDataLogicNode,
   type ConfigDataLogicNode,
+  type LightsFromIndexLogicNode,
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargEffectDefinition
@@ -159,16 +160,27 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
                   dataProperty: 'total-lights',
                   assignTo: undefined
                 } satisfies ConfigDataLogicNode as LogicNode)
-              : ({
-                  id,
-                  type: 'logic',
-                  logicType: 'conditional',
-                  label: 'conditional',
-                  outputs: [],
-                  comparator: '>',
-                  left: { source: 'literal', value: 0 },
-                  right: { source: 'literal', value: 0 }
-                } satisfies ConditionalLogicNode);
+              : logicType === 'lights-from-index'
+                ? ({
+                    id,
+                    type: 'logic',
+                    logicType: 'lights-from-index',
+                    label: 'lights-from-index',
+                    outputs: [],
+                    sourceVariable: '',
+                    index: { source: 'literal', value: 0 },
+                    assignTo: ''
+                  } satisfies LightsFromIndexLogicNode as LogicNode)
+                : ({
+                    id,
+                    type: 'logic',
+                    logicType: 'conditional',
+                    label: 'conditional',
+                    outputs: [],
+                    comparator: '>',
+                    left: { source: 'literal', value: 0 },
+                    right: { source: 'literal', value: 0 }
+                  } satisfies ConditionalLogicNode);
 
     const newNode: EditorNode = {
       id,

@@ -19,6 +19,7 @@ import {
   ValueSource,
   VariableDefinition
 } from '../../types/nodeCueTypes';
+import { TrackedLight } from '../../../types';
 import { ExecutionContext } from './ExecutionContext';
 import { VariableValue } from './executionTypes';
 
@@ -405,7 +406,7 @@ export class EffectExecutionEngine {
   /**
    * Resolve a value source to its actual value.
    */
-  private resolveValueSource(source: ValueSource): number | boolean | string {
+  private resolveValueSource(source: ValueSource): number | boolean | string | TrackedLight[] {
     if (source.source === 'literal') {
       return source.value;
     } else {

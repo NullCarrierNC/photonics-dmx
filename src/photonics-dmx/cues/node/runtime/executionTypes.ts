@@ -1,9 +1,11 @@
+import { TrackedLight } from '../../../types';
+
 /**
  * Variable value stored in variable stores.
  */
 export interface VariableValue {
-  type: 'number' | 'boolean' | 'string';
-  value: number | boolean | string;
+  type: 'number' | 'boolean' | 'string' | 'light-array';
+  value: number | boolean | string | TrackedLight[];
 }
 
 /**

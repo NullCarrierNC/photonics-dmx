@@ -86,7 +86,9 @@ describe('Node cue chaining', () => {
     const backLight: TrackedLight = { id: 'back-1', position: 1 };
 
     jest.spyOn(ActionEffectFactory, 'resolveLights').mockImplementation((_lm, target) => {
-      return target.groups.includes('front') ? [frontLight] : [backLight];
+      // Handle ValueSource structure - target.groups is { source: 'literal', value: 'front' }
+      const groupsValue = target.groups?.source === 'literal' ? target.groups.value : '';
+      return groupsValue.includes('front') ? [frontLight] : [backLight];
     });
 
     const callOrder: string[] = [];
