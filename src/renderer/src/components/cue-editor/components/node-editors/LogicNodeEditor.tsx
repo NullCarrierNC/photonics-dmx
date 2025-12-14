@@ -1,0 +1,363 @@
+import React from 'react';
+import type { 
+  LogicNode, 
+  VariableLogicNode, 
+  MathLogicNode,
+  ConditionalLogicNode,
+  CueDataLogicNode,
+  ConfigDataLogicNode,
+  ConfigDataProperty,
+  MathOperator,
+  LogicComparator
+} from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import ValueSourceEditor from '../shared/ValueSourceEditor';
+
+interface LogicNodeEditorProps {
+  node: LogicNode;
+  activeMode: NodeCueMode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}
+
+const VariableLogicEditor: React.FC<{
+  node: VariableLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const showValue = node.mode !== 'get';
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Mode
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.mode}
+          onChange={event => updateNode({ mode: event.target.value as VariableLogicNode['mode'] })}
+        >
+          <option value="set">Set</option>
+          <option value="get">Get</option>
+          <option value="init">Init</option>
+        </select>
+      </label>
+      <label className="flex flex-col font-medium">
+        Variable Name
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.varName}
+          onChange={event => updateNode({ varName: event.target.value })}
+        >
+          <option value="">-- Select Variable --</option>
+          {availableVariables.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.type}, {v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col font-medium">
+        Type
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.valueType}
+          onChange={event => updateNode({ valueType: event.target.value as 'number' | 'boolean' | 'string' })}
+        >
+          <option value="number">number</option>
+          <option value="boolean">boolean</option>
+          <option value="string">string</option>
+        </select>
+      </label>
+      {showValue && (
+        <ValueSourceEditor
+          label="Value"
+          value={node.value}
+          onChange={next => updateNode({ value: next })}
+          expected={node.valueType}
+          availableVariables={availableVariables}
+        />
+      )}
+    </div>
+  );
+};
+
+const MathLogicEditor: React.FC<{
+  node: MathLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Operator
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.operator}
+          onChange={event => updateNode({ operator: event.target.value as MathOperator })}
+        >
+          <option value="add">add</option>
+          <option value="subtract">subtract</option>
+          <option value="multiply">multiply</option>
+          <option value="divide">divide</option>
+          <option value="modulus">modulus</option>
+        </select>
+      </label>
+      <ValueSourceEditor
+        label="Left"
+        value={node.left}
+        onChange={next => updateNode({ left: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+      <ValueSourceEditor
+        label="Right"
+        value={node.right}
+        onChange={next => updateNode({ right: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+      <label className="flex flex-col font-medium">
+        Assign To (optional)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo ?? ''}
+          onChange={event => updateNode({ assignTo: event.target.value || undefined })}
+        >
+          <option value="">-- None --</option>
+          {availableVariables.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.type}, {v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+};
+
+const CueDataLogicEditor: React.FC<{
+  node: CueDataLogicNode;
+  activeMode: NodeCueMode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, activeMode, availableVariables, updateNode }) => {
+  const cueDataProperties = activeMode === 'yarg' ? [
+    { id: 'cue-name', label: 'Cue Name', type: 'string' },
+    { id: 'cue-type', label: 'Cue Type', type: 'string' },
+    { id: 'execution-count', label: 'Execution Count', type: 'number' },
+    { id: 'bpm', label: 'BPM', type: 'number' },
+    { id: 'song-section', label: 'Song Section', type: 'string' },
+    { id: 'current-scene', label: 'Current Scene', type: 'string' },
+    { id: 'beat-type', label: 'Beat Type', type: 'string' },
+    { id: 'keyframe', label: 'Keyframe', type: 'string' },
+    { id: 'guitar-note-count', label: 'Guitar Note Count', type: 'number' },
+    { id: 'bass-note-count', label: 'Bass Note Count', type: 'number' },
+    { id: 'drum-note-count', label: 'Drum Note Count', type: 'number' },
+    { id: 'keys-note-count', label: 'Keys Note Count', type: 'number' },
+    { id: 'total-score', label: 'Total Score', type: 'number' },
+    { id: 'performer', label: 'Performer', type: 'number' },
+    { id: 'bonus-effect', label: 'Bonus Effect', type: 'boolean' },
+    { id: 'fog-state', label: 'Fog State', type: 'boolean' },
+    { id: 'time-since-cue-start', label: 'Time Since Cue Start', type: 'number' },
+    { id: 'time-since-last-cue', label: 'Time Since Last Cue', type: 'number' }
+  ] : [
+    { id: 'cue-name', label: 'Cue Name', type: 'string' },
+    { id: 'cue-type-id', label: 'Cue Type ID', type: 'string' },
+    { id: 'execution-count', label: 'Execution Count', type: 'number' },
+    { id: 'timestamp', label: 'Timestamp', type: 'number' },
+    { id: 'overall-level', label: 'Overall Audio Level', type: 'number' },
+    { id: 'bpm', label: 'BPM', type: 'number' },
+    { id: 'beat-detected', label: 'Beat Detected', type: 'boolean' },
+    { id: 'energy', label: 'Energy', type: 'number' },
+    { id: 'freq-range1', label: 'Frequency Range 1', type: 'number' },
+    { id: 'freq-range2', label: 'Frequency Range 2', type: 'number' },
+    { id: 'freq-range3', label: 'Frequency Range 3', type: 'number' },
+    { id: 'freq-range4', label: 'Frequency Range 4', type: 'number' },
+    { id: 'freq-range5', label: 'Frequency Range 5', type: 'number' },
+    { id: 'enabled-band-count', label: 'Enabled Band Count', type: 'number' }
+  ];
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Data Property
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.dataProperty ?? ''}
+          onChange={event => updateNode({ dataProperty: event.target.value as ConfigDataProperty || undefined })}
+        >
+          <option value="">-- Select Property --</option>
+          {cueDataProperties.map(prop => (
+            <option key={prop.id} value={prop.id}>
+              {prop.label} ({prop.type})
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col font-medium">
+        Assign To Variable (optional)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo ?? ''}
+          onChange={event => updateNode({ assignTo: event.target.value || undefined })}
+        >
+          <option value="">-- None --</option>
+          {availableVariables.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.type}, {v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+};
+
+const ConfigDataLogicEditor: React.FC<{
+  node: ConfigDataLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const configDataProperties = [
+    { id: 'total-lights', label: 'Total Lights', type: 'number' },
+    { id: 'front-lights-count', label: 'Front Lights Count', type: 'number' },
+    { id: 'back-lights-count', label: 'Back Lights Count', type: 'number' },
+    { id: 'strobe-lights-count', label: 'Strobe Lights Count', type: 'number' }
+  ];
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Config Property
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.dataProperty ?? ''}
+          onChange={event => updateNode({ dataProperty: event.target.value as ConfigDataProperty || undefined })}
+        >
+          <option value="">-- Select Property --</option>
+          {configDataProperties.map(prop => (
+            <option key={prop.id} value={prop.id}>
+              {prop.label} ({prop.type})
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col font-medium">
+        Assign To Variable (optional)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo ?? ''}
+          onChange={event => updateNode({ assignTo: event.target.value || undefined })}
+        >
+          <option value="">-- None --</option>
+          {availableVariables.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.type}, {v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+};
+
+const ConditionalLogicEditor: React.FC<{
+  node: ConditionalLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Comparator
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.comparator}
+          onChange={event => updateNode({ comparator: event.target.value as LogicComparator })}
+        >
+          <option value=">">&gt;</option>
+          <option value=">=">&gt;=</option>
+          <option value="<">&lt;</option>
+          <option value="<=">&lt;=</option>
+          <option value="==">==</option>
+          <option value="!=">!=</option>
+        </select>
+      </label>
+      <ValueSourceEditor
+        label="Left"
+        value={node.left}
+        onChange={next => updateNode({ left: next })}
+        availableVariables={availableVariables}
+      />
+      <ValueSourceEditor
+        label="Right"
+        value={node.right}
+        onChange={next => updateNode({ right: next })}
+        availableVariables={availableVariables}
+      />
+      <p className="text-[10px] text-gray-500">First outgoing edge becomes TRUE branch, second becomes FALSE.</p>
+    </div>
+  );
+};
+
+const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
+  node,
+  activeMode,
+  availableVariables,
+  updateNode
+}) => {
+  if (node.logicType === 'variable') {
+    return (
+      <VariableLogicEditor
+        node={node as VariableLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'math') {
+    return (
+      <MathLogicEditor
+        node={node as MathLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'cue-data') {
+    return (
+      <CueDataLogicEditor
+        node={node as CueDataLogicNode}
+        activeMode={activeMode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'config-data') {
+    return (
+      <ConfigDataLogicEditor
+        node={node as ConfigDataLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'conditional') {
+    return (
+      <ConditionalLogicEditor
+        node={node as ConditionalLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  return <div className="text-xs text-gray-500">Unknown logic node type</div>;
+};
+
+export default LogicNodeEditor;
