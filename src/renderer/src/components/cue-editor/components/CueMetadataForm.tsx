@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import type {
   AudioNodeCueDefinition,
   NodeCueMode,
@@ -39,43 +40,62 @@ const CueMetadataForm: React.FC<Props> = ({
   const isEffectMode = editorMode === 'effect';
   const itemLabel = isEffectMode ? 'Effect' : 'Cue';
   const currentItem = isEffectMode ? currentEffect : currentCue;
+  const [isGroupMetadataOpen, setIsGroupMetadataOpen] = useState(true);
   
   return (
     <div className="p-3 border-b border-gray-200 dark:border-gray-800 space-y-2">
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col text-xs font-medium">
-          Filename
-          <input
-            className="mt-1 rounded border px-2 py-1 bg-gray-100 dark:bg-gray-700 dark:border-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed"
-            value={filename}
-            readOnly
-            title="Filename is set when creating the file and cannot be changed"
-          />
-        </label>
-        <label className="flex flex-col text-xs font-medium">
-          Group ID
-          <input
-            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-            value={group?.id ?? ''}
-            onChange={event => onGroupChange({ id: event.target.value })}
-          />
-        </label>
-        <label className="flex flex-col text-xs font-medium">
-          Group Name
-          <input
-            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-            value={group?.name ?? ''}
-            onChange={event => onGroupChange({ name: event.target.value })}
-          />
-        </label>
-        <label className="flex flex-col text-xs font-medium">
-          Group Description
-          <input
-            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-            value={group?.description ?? ''}
-            onChange={event => onGroupChange({ description: event.target.value })}
-          />
-        </label>
+      {/* Group Metadata Accordion */}
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700">
+        <button
+          className="w-full flex items-center justify-between p-2 text-left font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          onClick={() => setIsGroupMetadataOpen(!isGroupMetadataOpen)}
+        >
+          <span>Group Metadata</span>
+          {isGroupMetadataOpen ? (
+            <FaChevronDown className="w-4 h-4 text-gray-500" />
+          ) : (
+            <FaChevronRight className="w-4 h-4 text-gray-500" />
+          )}
+        </button>
+        {isGroupMetadataOpen && (
+          <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col text-xs font-medium">
+                Filename
+                <input
+                  className="mt-1 rounded border px-2 py-1 bg-gray-100 dark:bg-gray-700 dark:border-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed"
+                  value={filename}
+                  readOnly
+                  title="Filename is set when creating the file and cannot be changed"
+                />
+              </label>
+              <label className="flex flex-col text-xs font-medium">
+                Group ID
+                <input
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={group?.id ?? ''}
+                  onChange={event => onGroupChange({ id: event.target.value })}
+                />
+              </label>
+              <label className="flex flex-col text-xs font-medium">
+                Group Name
+                <input
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={group?.name ?? ''}
+                  onChange={event => onGroupChange({ name: event.target.value })}
+                />
+              </label>
+              <label className="flex flex-col text-xs font-medium">
+                Group Description
+                <input
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={group?.description ?? ''}
+                  onChange={event => onGroupChange({ description: event.target.value })}
+                />
+              </label>
+            </div>
+          </div>
+        )}
       </div>
 
       {currentItem && (

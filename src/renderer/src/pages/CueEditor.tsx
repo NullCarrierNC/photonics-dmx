@@ -361,7 +361,7 @@ const CueEditor: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-[208px_1fr_256px] gap-4 h-[calc(100vh-220px)]">
+      <div className="grid grid-cols-[208px_1fr_282px] gap-4 h-[calc(100vh-220px)]">
         <div className="flex flex-col gap-4 overflow-hidden">
           <CueFileSidebar
             mode={mode}
