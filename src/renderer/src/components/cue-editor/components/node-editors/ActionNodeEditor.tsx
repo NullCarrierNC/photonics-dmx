@@ -327,6 +327,18 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
         validLiterals={BLEND_MODE_OPTIONS}
         availableVariables={availableVariables}
       />
+      <ValueSourceEditor
+        label="Opacity (0.0 - 1.0)"
+        value={node.color.opacity}
+        onChange={next => updateNode({
+          color: {
+            ...node.color,
+            opacity: next
+          }
+        })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
       {(node.effectType === 'sweep' || node.effectType === 'cycle') && (
         <>
           <ValueSourceEditor
@@ -353,6 +365,18 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
             })}
             expected="string"
             validLiterals={BRIGHTNESS_OPTIONS}
+            availableVariables={availableVariables}
+          />
+          <ValueSourceEditor
+            label="Secondary Opacity (0.0 - 1.0)"
+            value={node.secondaryColor?.opacity}
+            onChange={next => updateNode({
+              secondaryColor: {
+                ...node.secondaryColor ?? { name: { source: 'literal', value: 'blue' }, brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } },
+                opacity: next
+              }
+            })}
+            expected="number"
             availableVariables={availableVariables}
           />
         </>
@@ -447,19 +471,21 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
         </div>
 
         {/* Level and Easing */}
-        <div className="grid grid-cols-2 gap-2">
-          <ValueSourceEditor
-            label="Level (0.0 - 1.0)"
-            value={currentTiming.level}
-            onChange={next => updateTiming({ level: next })}
-            expected="number"
-            availableVariables={availableVariables}
-          />
+        <div className={`grid gap-2 ${node.effectType === 'single-color' ? 'grid-cols-1' : 'grid-cols-2'}`}>
+          {node.effectType !== 'single-color' && (
+            <ValueSourceEditor
+              label="Level (0.0 - 1.0)"
+              value={currentTiming.level}
+              onChange={next => updateTiming({ level: next })}
+              expected="number"
+              availableVariables={availableVariables}
+            />
+          )}
           <label className="flex flex-col font-medium">
             Easing
             <select
               className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={currentTiming.easing ?? 'sinInOut'}
+              value={currentTiming.easing ?? 'linear'}
               onChange={event => updateTiming({ easing: event.target.value })}
             >
               {EASING_OPTIONS.map(ease => (

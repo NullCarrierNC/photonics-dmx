@@ -183,14 +183,20 @@ export class NodeExecutionEngine {
       const resolvedColor: ResolvedColorSetting = {
         name: this.resolveColor(actionNode.color.name, context),
         brightness: this.resolveBrightness(actionNode.color.brightness, context),
-        blendMode: this.resolveBlendMode(actionNode.color.blendMode, context)
+        blendMode: this.resolveBlendMode(actionNode.color.blendMode, context),
+        opacity: actionNode.color.opacity
+          ? Number(this.resolveValue('number', actionNode.color.opacity, context))
+          : undefined
       };
       
       // Resolve secondary color if present
       const resolvedSecondaryColor: ResolvedColorSetting | undefined = actionNode.secondaryColor ? {
         name: this.resolveColor(actionNode.secondaryColor.name, context),
         brightness: this.resolveBrightness(actionNode.secondaryColor.brightness, context),
-        blendMode: this.resolveBlendMode(actionNode.secondaryColor.blendMode, context)
+        blendMode: this.resolveBlendMode(actionNode.secondaryColor.blendMode, context),
+        opacity: actionNode.secondaryColor.opacity
+          ? Number(this.resolveValue('number', actionNode.secondaryColor.opacity, context))
+          : undefined
       } : undefined;
       
       // Resolve timing

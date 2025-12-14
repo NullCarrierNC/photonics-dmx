@@ -80,7 +80,7 @@ const NodeSidebar: React.FC<Props> = ({
           />
         ) : (
           <>
-            <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+            <div>
               <h3 className="font-semibold text-sm mb-2">Selected Node</h3>
               {selectedNode.data.kind === 'effect-raiser' && (
                 <EffectRaiserEditor

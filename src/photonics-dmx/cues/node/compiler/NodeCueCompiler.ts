@@ -49,7 +49,8 @@ function migrateActionNode(action: any): ActionNode {
     return {
       name: migrateValueSource(color.name, 'blue'),
       brightness: migrateValueSource(color.brightness, 'medium'),
-      blendMode: color.blendMode ? migrateValueSource(color.blendMode, 'replace') : undefined
+      blendMode: color.blendMode ? migrateValueSource(color.blendMode, 'replace') : undefined,
+      opacity: color.opacity ? migrateValueSource(color.opacity, 1) : undefined
     };
   };
 

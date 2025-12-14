@@ -13,7 +13,6 @@ type Props = {
   onSelectFile: (file: NodeCueFileSummary) => void;
   onSelectEffectFile: (file: EffectFileSummary) => void;
   onReload: () => void;
-  onNewFile: () => void;
   onAddCue: () => void;
   onAddEffect: () => void;
   onRemoveCue: (cueId: string) => void;
@@ -30,7 +29,6 @@ const CueFileSidebar: React.FC<Props> = ({
   onSelectFile,
   onSelectEffectFile,
   onReload,
-  onNewFile,
   onAddCue,
   onAddEffect,
   onRemoveCue,
@@ -104,9 +102,6 @@ const CueFileSidebar: React.FC<Props> = ({
             </div>
           ))}
         </div>
-      </div>
-      <div className="flex gap-2 mt-4">
-        <button className="border px-2 py-1 rounded text-xs" onClick={onNewFile}>New File</button>
       </div>
     </aside>
   );

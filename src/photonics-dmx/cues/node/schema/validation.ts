@@ -108,6 +108,7 @@ const colorSchema: JSONSchemaType<{
   name: ValueSource;
   brightness: ValueSource;
   blendMode?: ValueSource;
+  opacity?: ValueSource;
 }> = {
   type: 'object',
   required: ['name', 'brightness'],
@@ -115,7 +116,8 @@ const colorSchema: JSONSchemaType<{
   properties: {
     name: valueSourceSchema,
     brightness: valueSourceSchema,
-    blendMode: { ...valueSourceSchema, nullable: true }
+    blendMode: { ...valueSourceSchema, nullable: true },
+    opacity: { ...valueSourceSchema, nullable: true }
   }
 } as any;
 

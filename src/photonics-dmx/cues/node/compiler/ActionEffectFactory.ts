@@ -22,6 +22,7 @@ export interface ResolvedColorSetting {
   name: Color;
   brightness: Brightness;
   blendMode?: BlendMode;
+  opacity?: number;  // 0.0-1.0
 }
 
 export interface ResolvedActionTiming {
@@ -61,11 +62,12 @@ const safeDuration = (value: number | undefined, fallback: number, min = 0): num
   return Math.max(min, value);
 };
 
-const resolveColor = (color: ResolvedColorSetting, scale: number): RGBIO => {
+const resolveColor = (color: ResolvedColorSetting, intensityScale: number): RGBIO => {
   const rgb = getColor(color.name, color.brightness, color.blendMode ?? 'replace');
-  const clampedScale = clamp(scale, 0, 1);
-  rgb.intensity = Math.round(rgb.intensity * clampedScale);
-  rgb.opacity = clamp(rgb.opacity * clampedScale, 0, 1);
+  const clampedIntensityScale = clamp(intensityScale, 0, 1);
+  rgb.intensity = Math.round(rgb.intensity * clampedIntensityScale);
+  // Use opacity from color setting if provided, otherwise default to 1.0
+  rgb.opacity = color.opacity !== undefined ? clamp(color.opacity, 0, 1) : 1.0;
   return rgb;
 };
 
@@ -138,11 +140,13 @@ export class ActionEffectFactory {
     const name = color.name?.source === 'literal' ? String(color.name.value) : 'blue';
     const brightness = color.brightness?.source === 'literal' ? String(color.brightness.value) : 'medium';
     const blendMode = color.blendMode?.source === 'literal' ? String(color.blendMode.value) : 'replace';
+    const opacity = color.opacity?.source === 'literal' ? Number(color.opacity.value) : undefined;
     
     return {
       name: name as Color,
       brightness: brightness as Brightness,
-      blendMode: blendMode as BlendMode
+      blendMode: blendMode as BlendMode,
+      opacity: opacity !== undefined ? clamp(opacity, 0, 1) : undefined
     };
   }
 
@@ -185,7 +189,9 @@ export class ActionEffectFactory {
     const secondaryColor = params.resolvedSecondaryColor ?? (action.secondaryColor ? this.resolveColorSetting(action.secondaryColor) : undefined);
     const layer = params.resolvedLayer ?? (action.layer?.source === 'literal' ? Number(action.layer.value) : 0);
 
-    const timingLevel = clamp(timing.level ?? 1, 0, 1);
+    // For single-color, don't use level (original cues don't use it)
+    // For other effects, level can be used for intensity scaling
+    const timingLevel = action.effectType === 'single-color' ? 1 : clamp(timing.level ?? 1, 0, 1);
     const intensityScale = clamp((params.intensityScale ?? 1) * timingLevel, 0, 1);
     let waitFor: WaitCondition = timing.waitForCondition ?? 'none';
     let waitForTime = safeDuration((params.waitTime ?? 0) + (timing.waitForTime ?? 0), 0, 0);

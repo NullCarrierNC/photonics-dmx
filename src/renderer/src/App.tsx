@@ -408,7 +408,7 @@ export const App = (): JSX.Element => {
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-black dark:text-gray-200">
       {/* Left Sidebar */}
-      <div className="fixed top-0 left-0 h-full w-[260px] shadow-lg flex flex-col bg-white dark:bg-gray-900 dark:text-white overflow-y-auto">
+      <div className="fixed top-0 left-0 h-full w-[208px] shadow-lg flex flex-col bg-white dark:bg-gray-900 dark:text-white overflow-y-auto">
         {/* Sidebar Header */}
         <div className="h-16 bg-gray-800 dark:bg-gray-950 text-white flex items-center p-2">
           <img
@@ -427,7 +427,7 @@ export const App = (): JSX.Element => {
       </div>
 
       {/* Right Content Area */}
-      <div className="flex-grow ml-[260px] flex flex-col h-screen">
+      <div className="flex-grow ml-[208px] flex flex-col h-screen">
         {/* Main Content Header */}
         <div className="h-16 bg-gray-800 dark:bg-gray-950 text-white flex items-center justify-center z-10">
           <HeaderProjects />

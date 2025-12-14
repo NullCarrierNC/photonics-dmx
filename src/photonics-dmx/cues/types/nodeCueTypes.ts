@@ -283,6 +283,7 @@ export interface NodeColorSetting {
   name: ValueSource;        // Can reference a string variable with color name
   brightness: ValueSource;  // Can reference a string variable with brightness level
   blendMode?: ValueSource;  // Can reference a string variable with blend mode
+  opacity?: ValueSource;    // Can reference a number variable with opacity (0.0-1.0)
 }
 
 export interface ActionTimingConfig {
@@ -329,7 +330,7 @@ export const createDefaultActionTiming = (): ActionTimingConfig => ({
   duration: { source: 'literal', value: 200 },
   waitUntilCondition: 'none',
   waitUntilTime: { source: 'literal', value: 0 },
-  easing: 'sinInOut',
+  easing: 'linear',
   level: { source: 'literal', value: 1 }
 });
 

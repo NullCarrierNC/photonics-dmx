@@ -361,7 +361,7 @@ const CueEditor: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-[260px_1fr_320px] gap-4 h-[calc(100vh-220px)]">
+      <div className="grid grid-cols-[208px_1fr_256px] gap-4 h-[calc(100vh-220px)]">
         <div className="flex flex-col gap-4 overflow-hidden">
           <CueFileSidebar
             mode={mode}
@@ -372,7 +372,6 @@ const CueEditor: React.FC = () => {
             onSelectFile={selectFile}
             onSelectEffectFile={selectEffectFile}
             onReload={refreshFiles}
-            onNewFile={handleNewFile}
             onAddCue={handleAddCue}
             onAddEffect={handleAddEffect}
             onRemoveCue={removeCue}

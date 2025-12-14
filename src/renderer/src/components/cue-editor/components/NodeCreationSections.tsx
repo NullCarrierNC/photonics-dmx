@@ -94,13 +94,13 @@ const LogicNodesSection: React.FC<{
         className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
         onClick={() => addLogicNode('cue-data')}
       >
-        📊 Cue Data
+        Cue Data
       </button>
       <button
         className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
         onClick={() => addLogicNode('config-data')}
       >
-        ⚙️ Config Data
+        Config Data
       </button>
     </div>
   </div>
