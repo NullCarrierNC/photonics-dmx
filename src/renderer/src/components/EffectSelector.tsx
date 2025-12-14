@@ -27,9 +27,11 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
       setLoading(false);
       return;
     }
-    
+
     try {
       setLoading(true);
+      // Clear current selection when switching groups
+      setSelectedEffect(null);
       // This retrieves cues from the specified group without changing the active group state
       const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', groupId);
       
@@ -38,19 +40,8 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
         const sortedEffects = availableEffects.sort((a, b) => a.id.localeCompare(b.id));
         setEffects(sortedEffects);
         
-        // If we have a value prop, select that effect
-        if (value) {
-          const selectedEffect = sortedEffects.find(effect => effect.id === value);
-          if (selectedEffect) {
-            setSelectedEffect(selectedEffect);
-          }
-        } 
-        // Otherwise select the first effect if there's no current selection
-        else if (!selectedEffect && sortedEffects.length > 0) {
-          const firstEffect = sortedEffects[0];
-          setSelectedEffect(firstEffect);
-          onSelect(firstEffect);
-        }
+        // Note: Auto-selection of first effect is handled by the useEffect below
+        // that watches value and effects. 
       } else {
         setEffects([]);
         setSelectedEffect(null);
@@ -62,7 +53,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [groupId, value, onSelect]); // Keep only essential dependencies
+  }, [groupId, onSelect]); // Removed 'value' dependency to avoid interference with the useEffect below
 
   // Fetch effects when group changes
   useEffect(() => {
@@ -76,12 +67,16 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
       if (matchingEffect) {
         setSelectedEffect(matchingEffect);
       }
-    } else if (!value && effects.length > 0 && !selectedEffect) {
-      // If no value is provided but we have effects, select the first one
-      setSelectedEffect(effects[0]);
-      onSelect(effects[0]);
+    } else if (!value && effects.length > 0) {
+      // If parent clears selection but we have effects, auto-select the first one
+      const firstEffect = effects[0];
+      setSelectedEffect(firstEffect);
+      onSelect(firstEffect);
+    } else if (!value) {
+      // Clear internal selection when parent clears selection and no effects available
+      setSelectedEffect(null);
     }
-  }, [value, effects, onSelect, selectedEffect]);
+  }, [value, effects, onSelect]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;

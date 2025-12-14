@@ -210,7 +210,8 @@ const CueSimulation: React.FC = () => {
     if (groupIds.length === 1) {
       const groupId = groupIds[0];
       setSelectedGroupId(groupId); // Store the actual group ID
-      // Don't clear selectedEffect here - let the EffectsDropdown handle it
+      // Clear selected effect when group changes so EffectsDropdown will select the first cue in the new group
+      setSelectedEffect(null);
       
       // Get group details to determine display name
       try {
