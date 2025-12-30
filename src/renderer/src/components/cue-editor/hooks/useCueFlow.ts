@@ -17,6 +17,8 @@ import {
   type CueDataLogicNode,
   type ConfigDataLogicNode,
   type LightsFromIndexLogicNode,
+  type ForLoopLogicNode,
+  type WhileLoopLogicNode,
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargEffectDefinition
@@ -171,16 +173,40 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
                     index: { source: 'literal', value: 0 },
                     assignTo: ''
                   } satisfies LightsFromIndexLogicNode as LogicNode)
-                : ({
-                    id,
-                    type: 'logic',
-                    logicType: 'conditional',
-                    label: 'conditional',
-                    outputs: [],
-                    comparator: '>',
-                    left: { source: 'literal', value: 0 },
-                    right: { source: 'literal', value: 0 }
-                  } satisfies ConditionalLogicNode);
+                : logicType === 'for-loop'
+                  ? ({
+                      id,
+                      type: 'logic',
+                      logicType: 'for-loop',
+                      label: 'for-loop',
+                      outputs: [],
+                      start: { source: 'literal', value: 0 },
+                      end: { source: 'literal', value: 10 },
+                      step: { source: 'literal', value: 1 },
+                      counterVariable: ''
+                    } satisfies ForLoopLogicNode as LogicNode)
+                  : logicType === 'while-loop'
+                    ? ({
+                        id,
+                        type: 'logic',
+                        logicType: 'while-loop',
+                        label: 'while-loop',
+                        outputs: [],
+                        comparator: '<',
+                        left: { source: 'literal', value: 0 },
+                        right: { source: 'literal', value: 10 },
+                        maxIterations: { source: 'literal', value: 1000 }
+                      } satisfies WhileLoopLogicNode as LogicNode)
+                    : ({
+                        id,
+                        type: 'logic',
+                        logicType: 'conditional',
+                        label: 'conditional',
+                        outputs: [],
+                        comparator: '>',
+                        left: { source: 'literal', value: 0 },
+                        right: { source: 'literal', value: 0 }
+                      } satisfies ConditionalLogicNode);
 
     const newNode: EditorNode = {
       id,

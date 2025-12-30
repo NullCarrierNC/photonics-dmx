@@ -511,7 +511,17 @@ const CueEditor: React.FC = () => {
         </div>
       </div>
       <div className="text-xs text-gray-500 flex justify-between">
-        <span>{editorDoc?.path ?? 'Unsaved file'}</span>
+        {editorDoc?.path ? (
+          <button
+            className="hover:text-blue-600 hover:underline text-left"
+            onClick={() => window.electron.ipcRenderer.invoke('shell:showItemInFolder', editorDoc.path)}
+            title="Click to reveal in file explorer"
+          >
+            {editorDoc.path}
+          </button>
+        ) : (
+          <span>Unsaved file</span>
+        )}
         <span>{isDirty ? 'Unsaved changes' : 'All changes saved'}</span>
       </div>
 

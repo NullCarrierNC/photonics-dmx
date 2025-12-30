@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { 
   LogicNode, 
   VariableLogicNode, 
@@ -12,6 +12,7 @@ import type {
   LogicComparator
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import { getConfigDataPropertiesMeta } from '../../../../../../photonics-dmx/constants/nodeConstants';
 import ValueSourceEditor from '../shared/ValueSourceEditor';
 
 interface LogicNodeEditorProps {
@@ -151,6 +152,7 @@ const CueDataLogicEditor: React.FC<{
     { id: 'current-scene', label: 'Current Scene', type: 'string' },
     { id: 'beat-type', label: 'Beat Type', type: 'string' },
     { id: 'keyframe', label: 'Keyframe', type: 'string' },
+    { id: 'venue-size', label: 'Venue Size', type: 'string' },
     { id: 'guitar-note-count', label: 'Guitar Note Count', type: 'number' },
     { id: 'bass-note-count', label: 'Bass Note Count', type: 'number' },
     { id: 'drum-note-count', label: 'Drum Note Count', type: 'number' },
@@ -219,14 +221,8 @@ const ConfigDataLogicEditor: React.FC<{
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
   updateNode: (updates: Partial<LogicNode>) => void;
 }> = ({ node, availableVariables, updateNode }) => {
-  const configDataProperties = [
-    { id: 'total-lights', label: 'Total Lights', type: 'number' },
-    { id: 'front-lights-count', label: 'Front Lights Count', type: 'number' },
-    { id: 'back-lights-count', label: 'Back Lights Count', type: 'number' },
-    { id: 'front-lights-array', label: 'Front Lights Array', type: 'light-array' },
-    { id: 'back-lights-array', label: 'Back Lights Array', type: 'light-array' },
-    { id: 'front-back-lights-array', label: 'Front & Back Lights Array', type: 'light-array' }
-  ];
+  // Use shared constants for config data properties
+  const configDataProperties = useMemo(() => getConfigDataPropertiesMeta(), []);
 
   return (
     <div className="space-y-2 text-xs">
@@ -359,6 +355,102 @@ const LightsFromIndexLogicEditor: React.FC<{
   );
 };
 
+const ForLoopLogicEditor: React.FC<{
+  node: any;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  return (
+    <div className="space-y-2 text-xs">
+      <ValueSourceEditor
+        label="Start (inclusive)"
+        value={node.start}
+        onChange={next => updateNode({ start: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+      <ValueSourceEditor
+        label="End (exclusive)"
+        value={node.end}
+        onChange={next => updateNode({ end: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+      <ValueSourceEditor
+        label="Step"
+        value={node.step}
+        onChange={next => updateNode({ step: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+      <label className="flex flex-col font-medium">
+        Counter Variable
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.counterVariable ?? ''}
+          onChange={event => updateNode({ counterVariable: event.target.value })}
+        >
+          <option value="">-- Select Variable --</option>
+          {availableVariables.filter(v => v.type === 'number').map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="text-[10px] text-gray-500">Max 1000 iterations. Loop executes downstream nodes synchronously.</p>
+    </div>
+  );
+};
+
+const WhileLoopLogicEditor: React.FC<{
+  node: any;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Comparator
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.comparator}
+          onChange={event => updateNode({ comparator: event.target.value as LogicComparator })}
+        >
+          <option value=">">&gt;</option>
+          <option value=">=">&gt;=</option>
+          <option value="<">&lt;</option>
+          <option value="<=">&lt;=</option>
+          <option value="==">==</option>
+          <option value="!=">!=</option>
+        </select>
+      </label>
+      <ValueSourceEditor
+        label="Left"
+        value={node.left}
+        onChange={next => updateNode({ left: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+      <ValueSourceEditor
+        label="Right"
+        value={node.right}
+        onChange={next => updateNode({ right: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+      <ValueSourceEditor
+        label="Max Iterations (default: 1000)"
+        value={node.maxIterations}
+        onChange={next => updateNode({ maxIterations: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+      <p className="text-[10px] text-gray-500">Hard cap at 1000 iterations. Loop executes while condition is true.</p>
+    </div>
+  );
+};
+
 const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
   node,
   activeMode,
@@ -410,6 +502,26 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <LightsFromIndexLogicEditor
         node={node as LightsFromIndexLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'for-loop') {
+    return (
+      <ForLoopLogicEditor
+        node={node}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'while-loop') {
+    return (
+      <WhileLoopLogicEditor
+        node={node}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

@@ -109,6 +109,18 @@ const LogicNodesSection: React.FC<{
       >
         Lights From Index
       </button>
+      <button
+        className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+        onClick={() => addLogicNode('for-loop')}
+      >
+        For Loop
+      </button>
+      <button
+        className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+        onClick={() => addLogicNode('while-loop')}
+      >
+        While Loop
+      </button>
     </div>
   </div>
 );

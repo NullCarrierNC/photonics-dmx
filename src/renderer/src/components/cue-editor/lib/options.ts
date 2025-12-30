@@ -4,6 +4,7 @@ import {
   AUDIO_EVENT_OPTIONS as AUDIO_EVENTS_BASE,
   YARG_EVENT_OPTIONS as YARG_EVENTS_BASE
 } from '../../../../../photonics-dmx/constants/options';
+import { getYargEventCategories } from '../../../../../photonics-dmx/constants/nodeConstants';
 
 const withDefaultLabels = <T extends string>(values: T[]) =>
   values.map(value => ({ value, label: value }));
@@ -28,6 +29,9 @@ const EASING_OPTIONS = [
 const YARG_WAIT_CONDITIONS: WaitCondition[] = [...YARG_EVENTS_BASE];
 const YARG_EVENT_OPTIONS = withDefaultLabels(YARG_WAIT_CONDITIONS);
 const AUDIO_EVENT_OPTIONS = withDefaultLabels(AUDIO_EVENTS_BASE);
+
+// Categorized YARG event options - derived from shared constants
+const YARG_EVENT_OPTIONS_CATEGORIZED = getYargEventCategories();
 
 const ACTION_WAIT_OPTIONS_YARG = [
   { value: 'none', label: 'None' },
@@ -58,6 +62,7 @@ export {
   AUDIO_EVENT_OPTIONS,
   EASING_OPTIONS,
   YARG_EVENT_OPTIONS,
+  YARG_EVENT_OPTIONS_CATEGORIZED,
   getActionWaitOptions,
   getDefaultEventOption,
   withDefaultLabels

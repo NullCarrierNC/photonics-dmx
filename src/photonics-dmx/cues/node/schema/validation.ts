@@ -279,32 +279,20 @@ const conditionalLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
-// Cue data property enums (deduplicated for schema validation)
-const YARG_CUE_DATA_PROPERTIES = [
-  'cue-name', 'cue-type', 'execution-count', 'bpm', 'song-section',
-  'current-scene', 'beat-type', 'keyframe', 'guitar-note-count',
-  'bass-note-count', 'drum-note-count', 'keys-note-count',
-  'total-score', 'performer', 'bonus-effect', 'fog-state',
-  'time-since-cue-start', 'time-since-last-cue'
-] as const;
+// Import shared constants for DRY compliance
+import {
+  YARG_CUE_DATA_PROPERTIES,
+  AUDIO_CUE_DATA_PROPERTIES,
+  ALL_CONFIG_DATA_PROPERTIES
+} from '../../../constants/nodeConstants';
 
-const AUDIO_CUE_DATA_PROPERTIES = [
-  'cue-type-id', 'timestamp',
-  'overall-level', 'beat-detected', 'energy',
-  'freq-range1', 'freq-range2', 'freq-range3', 'freq-range4', 'freq-range5',
-  'enabled-band-count'
-] as const;
-
-// Combine without duplicates (cue-name, execution-count, bpm are in both but only listed once)
+// Combine cue data properties without duplicates (dedupe overlapping properties like 'cue-name', 'bpm', 'execution-count')
 const CUE_DATA_PROPERTIES = [
-  ...YARG_CUE_DATA_PROPERTIES,
-  ...AUDIO_CUE_DATA_PROPERTIES
+  ...new Set([...YARG_CUE_DATA_PROPERTIES, ...AUDIO_CUE_DATA_PROPERTIES])
 ];
 
-const CONFIG_DATA_PROPERTIES = [
-  'total-lights', 'front-lights-count', 'back-lights-count',
-  'front-lights-array', 'back-lights-array', 'front-back-lights-array'
-] as const;
+// Use shared config data properties
+const CONFIG_DATA_PROPERTIES = ALL_CONFIG_DATA_PROPERTIES;
 
 const cueDataLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -364,6 +352,48 @@ const lightsFromIndexLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
+const forLoopLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'start', 'end', 'step', 'counterVariable'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'for-loop' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    start: valueSourceSchema,
+    end: valueSourceSchema,
+    step: valueSourceSchema,
+    counterVariable: { type: 'string' }
+  }
+} as any;
+
+const whileLoopLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'comparator', 'left', 'right', 'maxIterations'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'while-loop' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    comparator: { type: 'string', enum: LOGIC_COMPARATORS },
+    left: valueSourceSchema,
+    right: valueSourceSchema,
+    maxIterations: valueSourceSchema
+  }
+} as any;
+
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
   oneOf: [
     variableLogicSchema, 
@@ -371,7 +401,9 @@ const logicNodeSchema: JSONSchemaType<LogicNode> = {
     conditionalLogicSchema, 
     cueDataLogicSchema, 
     configDataLogicSchema,
-    lightsFromIndexLogicSchema
+    lightsFromIndexLogicSchema,
+    forLoopLogicSchema,
+    whileLoopLogicSchema
   ]
 } as any;
 

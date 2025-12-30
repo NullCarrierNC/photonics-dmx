@@ -1,12 +1,16 @@
 /**
  * Event-driven execution engine for node graphs.
  * Executes nodes sequentially, respecting blocking semantics.
+ * 
+ * This module has been refactored for maintainability:
+ * - dataExtractors.ts: CueData and config data extraction
+ * - valueResolver.ts: ValueSource resolution and type inference
+ * - logicNodeEvaluator.ts: Logic node evaluation (variable, math, conditional, loops)
  */
 
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { CueData } from '../../types/cueTypes';
-import { AudioCueData } from '../../types/audioCueTypes';
 import {  CompiledYargCue, CompiledAudioCue } from '../compiler/NodeCueCompiler';
 import { ActionEffectFactory, ResolvedActionTarget, ResolvedColorSetting, ResolvedActionTiming } from '../compiler/ActionEffectFactory';
 import {
@@ -16,17 +20,16 @@ import {
   EventListenerNode,
   EffectRaiserNode,
   LogicNode,
-  ValueSource,
-  VariableType,
-  VariableDefinition,
-  YargCueDataProperty,
-  AudioCueDataProperty
+  VariableDefinition
 } from '../../types/nodeCueTypes';
-import { Color, Brightness, BlendMode, LocationGroup, LightTarget, TrackedLight } from '../../../types';
 import { ExecutionContext } from './ExecutionContext';
 import { ExecutionState, VariableValue } from './executionTypes';
 import { EffectRegistry } from './EffectRegistry';
 import { EffectExecutionEngine } from './EffectExecutionEngine';
+
+// Import refactored modules
+import { resolveValue, resolveLocationGroups, resolveLightTarget, resolveColor, resolveBrightness, resolveBlendMode } from './valueResolver';
+import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator';
 
 export class NodeExecutionEngine {
   private compiledCue: CompiledYargCue | CompiledAudioCue;
@@ -178,17 +181,17 @@ export class NodeExecutionEngine {
         // Resolve timing to get duration
         const resolvedTiming: ResolvedActionTiming = {
           ...actionNode.timing,
-          waitForTime: Number(this.resolveValue('number', actionNode.timing.waitForTime, context)),
+          waitForTime: Number(resolveValue('number', actionNode.timing.waitForTime, context)),
           waitForConditionCount: actionNode.timing.waitForConditionCount 
-            ? Number(this.resolveValue('number', actionNode.timing.waitForConditionCount, context))
+            ? Number(resolveValue('number', actionNode.timing.waitForConditionCount, context))
             : undefined,
-          duration: Number(this.resolveValue('number', actionNode.timing.duration, context)),
-          waitUntilTime: Number(this.resolveValue('number', actionNode.timing.waitUntilTime, context)),
+          duration: Number(resolveValue('number', actionNode.timing.duration, context)),
+          waitUntilTime: Number(resolveValue('number', actionNode.timing.waitUntilTime, context)),
           waitUntilConditionCount: actionNode.timing.waitUntilConditionCount
-            ? Number(this.resolveValue('number', actionNode.timing.waitUntilConditionCount, context))
+            ? Number(resolveValue('number', actionNode.timing.waitUntilConditionCount, context))
             : undefined,
           level: actionNode.timing.level
-            ? Number(this.resolveValue('number', actionNode.timing.level, context))
+            ? Number(resolveValue('number', actionNode.timing.level, context))
             : 1
         };
 
@@ -213,50 +216,50 @@ export class NodeExecutionEngine {
 
       // Resolve target
       const resolvedTarget: ResolvedActionTarget = {
-        groups: this.resolveLocationGroups(actionNode.target.groups, context),
-        filter: this.resolveLightTarget(actionNode.target.filter, context)
+        groups: resolveLocationGroups(actionNode.target.groups, context),
+        filter: resolveLightTarget(actionNode.target.filter, context)
       };
       
       // Resolve color
       const resolvedColor: ResolvedColorSetting = {
-        name: this.resolveColor(actionNode.color.name, context),
-        brightness: this.resolveBrightness(actionNode.color.brightness, context),
-        blendMode: this.resolveBlendMode(actionNode.color.blendMode, context),
+        name: resolveColor(actionNode.color.name, context),
+        brightness: resolveBrightness(actionNode.color.brightness, context),
+        blendMode: resolveBlendMode(actionNode.color.blendMode, context),
         opacity: actionNode.color.opacity
-          ? Number(this.resolveValue('number', actionNode.color.opacity, context))
+          ? Number(resolveValue('number', actionNode.color.opacity, context))
           : undefined
       };
       
       // Resolve secondary color if present
       const resolvedSecondaryColor: ResolvedColorSetting | undefined = actionNode.secondaryColor ? {
-        name: this.resolveColor(actionNode.secondaryColor.name, context),
-        brightness: this.resolveBrightness(actionNode.secondaryColor.brightness, context),
-        blendMode: this.resolveBlendMode(actionNode.secondaryColor.blendMode, context),
+        name: resolveColor(actionNode.secondaryColor.name, context),
+        brightness: resolveBrightness(actionNode.secondaryColor.brightness, context),
+        blendMode: resolveBlendMode(actionNode.secondaryColor.blendMode, context),
         opacity: actionNode.secondaryColor.opacity
-          ? Number(this.resolveValue('number', actionNode.secondaryColor.opacity, context))
+          ? Number(resolveValue('number', actionNode.secondaryColor.opacity, context))
           : undefined
       } : undefined;
       
       // Resolve timing
       const resolvedTiming: ResolvedActionTiming = {
         ...actionNode.timing,
-        waitForTime: Number(this.resolveValue('number', actionNode.timing.waitForTime, context)),
+        waitForTime: Number(resolveValue('number', actionNode.timing.waitForTime, context)),
         waitForConditionCount: actionNode.timing.waitForConditionCount 
-          ? Number(this.resolveValue('number', actionNode.timing.waitForConditionCount, context))
+          ? Number(resolveValue('number', actionNode.timing.waitForConditionCount, context))
           : undefined,
-        duration: Number(this.resolveValue('number', actionNode.timing.duration, context)),
-        waitUntilTime: Number(this.resolveValue('number', actionNode.timing.waitUntilTime, context)),
+        duration: Number(resolveValue('number', actionNode.timing.duration, context)),
+        waitUntilTime: Number(resolveValue('number', actionNode.timing.waitUntilTime, context)),
         waitUntilConditionCount: actionNode.timing.waitUntilConditionCount
-          ? Number(this.resolveValue('number', actionNode.timing.waitUntilConditionCount, context))
+          ? Number(resolveValue('number', actionNode.timing.waitUntilConditionCount, context))
           : undefined,
         level: actionNode.timing.level
-          ? Number(this.resolveValue('number', actionNode.timing.level, context))
+          ? Number(resolveValue('number', actionNode.timing.level, context))
           : 1
       };
       
       // Resolve layer
       const resolvedLayer = actionNode.layer
-        ? Number(this.resolveValue('number', actionNode.layer, context))
+        ? Number(resolveValue('number', actionNode.layer, context))
         : 0;
       
       // Create resolved action node for effect building (keep config as-is, not used by factory)
@@ -333,7 +336,20 @@ export class NodeExecutionEngine {
    */
   private executeLogicNode(logicNode: LogicNode, nodeId: string, context: ExecutionContext): void {
     try {
-      const nextNodes = this.evaluateLogicNode(logicNode, nodeId, context);
+      const { adjacency } = this.compiledCue;
+      const edges = adjacency.get(nodeId) ?? [];
+
+      // Create evaluator context with bound executeNode
+      const evaluatorContext: LogicNodeEvaluatorContext = {
+        cueId: this.cueId,
+        lightManager: this.lightManager,
+        cueLevelVarStore: this.cueLevelVarStore,
+        groupLevelVarStore: this.groupLevelVarStore,
+        variableDefinitions: this.variableDefinitions,
+        executeNode: (nextNodeId: string, ctx: ExecutionContext) => this.executeNode(nextNodeId, ctx)
+      };
+
+      const nextNodes = evaluateLogicNode(logicNode, nodeId, edges, context, evaluatorContext);
       
       // Logic nodes execute immediately - continue to next nodes without waiting
       if (nextNodes.length > 0) {
@@ -411,7 +427,7 @@ export class NodeExecutionEngine {
         // Get parameter type from effect definition
         const paramDef = compiledEffect.parameters.get(paramName);
         const expectedType = paramDef?.type ?? 'number'; // Default to number if not found
-        paramValues[paramName] = this.resolveValue(expectedType, valueSource, context);
+        paramValues[paramName] = resolveValue(expectedType, valueSource, context);
       }
 
       // Create effect execution engine
@@ -475,385 +491,6 @@ export class NodeExecutionEngine {
     } catch (error) {
       console.error(`Error starting listener execution for ${listenerNode.id}:`, error);
     }
-  }
-
-  /**
-   * Evaluate a logic node and determine which nodes to execute next.
-   * This is where runtime variable evaluation happens.
-   */
-  private evaluateLogicNode(logicNode: LogicNode, nodeId: string, context: ExecutionContext): string[] {
-    const { adjacency } = this.compiledCue;
-    const edges = adjacency.get(nodeId) ?? [];
-
-    switch (logicNode.logicType) {
-      case 'variable': {
-        if (logicNode.mode !== 'get') {
-          const value = this.resolveValue(logicNode.valueType, logicNode.value, context);
-          const varStore = this.getVariableStore(logicNode.varName);
-          
-          if (logicNode.mode === 'init') {
-            if (!varStore.has(logicNode.varName)) {
-              varStore.set(logicNode.varName, { type: logicNode.valueType, value });
-            }
-          } else {
-            varStore.set(logicNode.varName, { type: logicNode.valueType, value });
-          }
-        }
-        return edges.map(edge => edge.to);
-      }
-
-      case 'math': {
-        const left = Number(this.resolveValue('number', logicNode.left, context));
-        const right = Number(this.resolveValue('number', logicNode.right, context));
-        let result = 0;
-        
-        switch (logicNode.operator) {
-          case 'add':
-            result = left + right;
-            break;
-          case 'subtract':
-            result = left - right;
-            break;
-          case 'multiply':
-            result = left * right;
-            break;
-          case 'divide':
-            result = right === 0 ? 0 : left / right;
-            break;
-          case 'modulus':
-            result = right === 0 ? 0 : left % right;
-            break;
-        }
-        
-        if (logicNode.assignTo) {
-          const varStore = this.getVariableStore(logicNode.assignTo);
-          varStore.set(logicNode.assignTo, { type: 'number', value: result });
-        }
-        
-        return edges.map(edge => edge.to);
-      }
-
-      case 'conditional': {
-        const left = Number(this.resolveValue('number', logicNode.left, context));
-        const right = Number(this.resolveValue('number', logicNode.right, context));
-        let outcome = false;
-        
-        switch (logicNode.comparator) {
-          case '>':
-            outcome = left > right;
-            break;
-          case '>=':
-            outcome = left >= right;
-            break;
-          case '<':
-            outcome = left < right;
-            break;
-          case '<=':
-            outcome = left <= right;
-            break;
-          case '==':
-            outcome = left === right;
-            break;
-          case '!=':
-            outcome = left !== right;
-            break;
-        }
-        
-        const branch = outcome ? 'true' : 'false';
-        const targeted = edges.filter(edge => edge.fromPort === branch);
-        
-        if (targeted.length > 0) {
-          return targeted.map(edge => edge.to);
-        }
-        
-        return edges.map(edge => edge.to);
-      }
-
-      case 'cue-data': {
-        const value = this.extractCueDataValue(logicNode.dataProperty, context.cueData);
-        
-        if (logicNode.assignTo) {
-          const varStore = this.getVariableStore(logicNode.assignTo);
-          const type = this.inferType(value);
-          varStore.set(logicNode.assignTo, { type, value });
-        }
-        
-        return edges.map(edge => edge.to);
-      }
-
-      case 'config-data': {
-        const value = this.extractConfigDataValue(logicNode.dataProperty);
-        
-        if (logicNode.assignTo) {
-          const varStore = this.getVariableStore(logicNode.assignTo);
-          const type = Array.isArray(value) ? 'light-array' : 'number';
-          varStore.set(logicNode.assignTo, { type, value });
-        }
-        
-        return edges.map(edge => edge.to);
-      }
-
-      case 'lights-from-index': {
-        // Get the source light array variable
-        const sourceVarStore = this.getVariableStore(logicNode.sourceVariable);
-        const sourceVar = sourceVarStore.get(logicNode.sourceVariable);
-        
-        if (!sourceVar || sourceVar.type !== 'light-array') {
-          console.warn(`lights-from-index node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
-          return edges.map(edge => edge.to);
-        }
-        
-        const lightsArray = sourceVar.value as TrackedLight[];
-        
-        if (lightsArray.length === 0) {
-          console.warn(`lights-from-index node ${nodeId}: source array is empty`);
-          return edges.map(edge => edge.to);
-        }
-        
-        // Resolve the index
-        const indexValue = this.resolveValue('number', logicNode.index, context);
-        const index = Math.floor(Number(indexValue));
-        
-        // Apply wraparound (modulo)
-        const wrappedIndex = ((index % lightsArray.length) + lightsArray.length) % lightsArray.length;
-        const selectedLight = lightsArray[wrappedIndex];
-        
-        // Assign the single light to the target variable
-        const targetVarStore = this.getVariableStore(logicNode.assignTo);
-        targetVarStore.set(logicNode.assignTo, { 
-          type: 'light-array', 
-          value: [selectedLight] 
-        });
-        
-        return edges.map(edge => edge.to);
-      }
-    }
-
-    return edges.map(edge => edge.to);
-  }
-
-  /**
-   * Infer variable type from value.
-   */
-  private inferType(value: number | string | boolean): VariableType {
-    if (typeof value === 'boolean') return 'boolean';
-    if (typeof value === 'number') return 'number';
-    return 'string';
-  }
-
-  /**
-   * Extract cue data value based on property.
-   */
-  private extractCueDataValue(property: string, cueData: CueData | AudioCueData): number | string | boolean {
-    // Mode detection (YARG vs Audio)
-    const isYargMode = 'lightingCue' in cueData;
-    
-    if (isYargMode) {
-      return this.extractYargCueDataValue(property as YargCueDataProperty, cueData as CueData);
-    } else {
-      return this.extractAudioCueDataValue(property as AudioCueDataProperty, cueData as AudioCueData);
-    }
-  }
-
-  /**
-   * Extract YARG-specific cue data.
-   */
-  private extractYargCueDataValue(property: YargCueDataProperty, cueData: CueData): number | string | boolean {
-    switch (property) {
-      case 'cue-name': return this.cueId;
-      case 'cue-type': return cueData.lightingCue;
-      case 'execution-count': return cueData.executionCount ?? 0;
-      case 'bpm': return cueData.beatsPerMinute;
-      case 'song-section': return cueData.songSection;
-      case 'current-scene': return cueData.currentScene;
-      case 'beat-type': return cueData.beat;
-      case 'keyframe': return cueData.keyframe;
-      case 'guitar-note-count': return cueData.guitarNotes.length;
-      case 'bass-note-count': return cueData.bassNotes.length;
-      case 'drum-note-count': return cueData.drumNotes.length;
-      case 'keys-note-count': return cueData.keysNotes.length;
-      case 'total-score': return cueData.totalScore ?? 0;
-      case 'performer': return cueData.performer;
-      case 'bonus-effect': return cueData.bonusEffect;
-      case 'fog-state': return cueData.fogState;
-      case 'time-since-cue-start': return Date.now() - (cueData.cueStartTime ?? Date.now());
-      case 'time-since-last-cue': return cueData.timeSinceLastCue ?? 0;
-      default: return 0;
-    }
-  }
-
-  /**
-   * Extract Audio-specific cue data.
-   */
-  private extractAudioCueDataValue(property: AudioCueDataProperty, cueData: AudioCueData): number | string | boolean {
-    switch (property) {
-      case 'cue-name': return this.cueId;
-      case 'cue-type-id': return ''; // Audio cues have cueTypeId
-      case 'execution-count': return cueData.executionCount;
-      case 'timestamp': return cueData.timestamp;
-      case 'overall-level': return cueData.audioData.overallLevel;
-      case 'bpm': return cueData.audioData.bpm ?? 0;
-      case 'beat-detected': return cueData.audioData.beatDetected;
-      case 'energy': return cueData.audioData.energy;
-      case 'freq-range1': return cueData.audioData.frequencyBands.range1;
-      case 'freq-range2': return cueData.audioData.frequencyBands.range2;
-      case 'freq-range3': return cueData.audioData.frequencyBands.range3;
-      case 'freq-range4': return cueData.audioData.frequencyBands.range4;
-      case 'freq-range5': return cueData.audioData.frequencyBands.range5;
-      case 'enabled-band-count': return cueData.enabledBandCount;
-      default: return 0;
-    }
-  }
-
-  /**
-   * Extract config data value based on property.
-   * Returns either a number (for counts) or TrackedLight[] (for arrays).
-   */
-  private extractConfigDataValue(property: string): number | TrackedLight[] {
-    switch (property) {
-      case 'total-lights':
-        return this.lightManager.getLightsInGroup(['front', 'back']).length;
-      case 'front-lights-count':
-        return this.lightManager.getLightsInGroup('front').length;
-      case 'back-lights-count':
-        return this.lightManager.getLightsInGroup('back').length;
-      case 'front-lights-array':
-        return this.lightManager.getLightsInGroup('front');
-      case 'back-lights-array':
-        return this.lightManager.getLightsInGroup('back');
-      case 'front-back-lights-array':
-        return this.lightManager.getLightsInGroup(['front', 'back']);
-      default:
-        return 0;
-    }
-  }
-
-  /**
-   * Resolve location groups from ValueSource (comma-separated string to array).
-   */
-  private resolveLocationGroups(source: ValueSource, context: ExecutionContext): LocationGroup[] {
-    const value = this.resolveValue('string', source, context);
-    if (typeof value !== 'string') return ['front'];
-    
-    // Parse comma-separated groups: "front,back" → ['front', 'back']
-    const validGroups: LocationGroup[] = ['front', 'back', 'strobe'];
-    return value.split(',')
-      .map(g => g.trim())
-      .filter(g => validGroups.includes(g as LocationGroup)) as LocationGroup[];
-  }
-
-  /**
-   * Resolve light target filter from ValueSource.
-   */
-  private resolveLightTarget(source: ValueSource, context: ExecutionContext): LightTarget {
-    const value = this.resolveValue('string', source, context);
-    const valid: LightTarget[] = ['all', 'even', 'odd', 'random-1', 'random-2', 'random-3'];
-    return valid.includes(value as LightTarget) ? (value as LightTarget) : 'all';
-  }
-
-  /**
-   * Resolve color name from ValueSource.
-   */
-  private resolveColor(source: ValueSource, context: ExecutionContext): Color {
-    const value = this.resolveValue('string', source, context);
-    // Import COLOR_OPTIONS to validate
-    const validColors: Color[] = [
-      'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'white', 'transparent'
-    ];
-    return validColors.includes(value as Color) ? (value as Color) : 'blue';
-  }
-
-  /**
-   * Resolve brightness level from ValueSource.
-   */
-  private resolveBrightness(source: ValueSource, context: ExecutionContext): Brightness {
-    const value = this.resolveValue('string', source, context);
-    const valid: Brightness[] = ['low', 'medium', 'high', 'max'];
-    return valid.includes(value as Brightness) ? (value as Brightness) : 'medium';
-  }
-
-  /**
-   * Resolve blend mode from ValueSource.
-   */
-  private resolveBlendMode(source: ValueSource | undefined, context: ExecutionContext): BlendMode | undefined {
-    if (!source) return undefined;
-    const value = this.resolveValue('string', source, context);
-    const valid: BlendMode[] = ['replace', 'add', 'multiply', 'overlay'];
-    return valid.includes(value as BlendMode) ? (value as BlendMode) : 'replace';
-  }
-
-  /**
-   * Get the appropriate variable store for a variable name.
-   */
-  private getVariableStore(varName: string): Map<string, VariableValue> {
-    // Check if variable is defined in cue-level registry
-    const isCueLevel = this.variableDefinitions.some(v => v.name === varName && v.scope === 'cue');
-    return isCueLevel ? this.cueLevelVarStore : this.groupLevelVarStore;
-  }
-
-  /**
-   * Resolve a value source to an actual value at runtime.
-   */
-  private resolveValue(
-    expectedType: VariableType,
-    source: ValueSource | undefined,
-    context: ExecutionContext
-  ): number | boolean | string {
-    if (!source) {
-      return expectedType === 'number' ? 0 : expectedType === 'boolean' ? false : '';
-    }
-
-    if (source.source === 'literal') {
-      if (expectedType === 'string') {
-        return String(source.value);
-      }
-      if (expectedType === 'number') {
-        if (typeof source.value === 'boolean') {
-          return source.value ? 1 : 0;
-        }
-        if (typeof source.value === 'string') {
-          const parsed = parseFloat(source.value);
-          return isNaN(parsed) ? 0 : parsed;
-        }
-        return typeof source.value === 'number' ? source.value : 0;
-      }
-      return source.value === true || source.value === 'true';
-    }
-
-    // Check cue-level store first, then group-level (use context's stores)
-    const cueVar = context.cueLevelVarStore.get(source.name);
-    const groupVar = context.groupLevelVarStore.get(source.name);
-    const existing = cueVar ?? groupVar;
-    
-    if (existing) {
-      if (expectedType === 'string') {
-        return String(existing.value);
-      }
-      if (expectedType === 'number') {
-        if (typeof existing.value === 'string') {
-          const parsed = parseFloat(existing.value);
-          return isNaN(parsed) ? 0 : parsed;
-        }
-        return typeof existing.value === 'number' ? existing.value : (existing.value ? 1 : 0);
-      }
-      return existing.value === true || existing.value === 'true';
-    }
-
-    // Use fallback
-    if (expectedType === 'string') {
-      return source.fallback !== undefined ? String(source.fallback) : '';
-    }
-    if (expectedType === 'number') {
-      if (typeof source.fallback === 'number') return source.fallback;
-      if (typeof source.fallback === 'boolean') return source.fallback ? 1 : 0;
-      if (typeof source.fallback === 'string') {
-        const parsed = parseFloat(source.fallback);
-        return isNaN(parsed) ? 0 : parsed;
-      }
-      return 0;
-    }
-
-    return source.fallback === true || source.fallback === 'true';
   }
 
   /**

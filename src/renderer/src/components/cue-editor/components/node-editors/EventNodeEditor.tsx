@@ -2,7 +2,7 @@ import React from 'react';
 import type { YargEventNode, AudioEventNode, AudioEventType } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { WaitCondition } from '../../../../../../photonics-dmx/types';
-import { YARG_EVENT_OPTIONS, AUDIO_EVENT_OPTIONS } from '../../lib/options';
+import { YARG_EVENT_OPTIONS_CATEGORIZED, AUDIO_EVENT_OPTIONS } from '../../lib/options';
 
 interface EventNodeEditorProps {
   node: YargEventNode | AudioEventNode;
@@ -17,7 +17,6 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
   updateYargNode,
   updateAudioNode
 }) => {
-  const eventOptions = activeMode === 'yarg' ? YARG_EVENT_OPTIONS : AUDIO_EVENT_OPTIONS;
   const eventType = activeMode === 'yarg' 
     ? (node as YargEventNode).eventType 
     : (node as AudioEventNode).eventType;
@@ -37,9 +36,19 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
             }
           }}
         >
-          {eventOptions.map(option => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
+          {activeMode === 'yarg' ? (
+            YARG_EVENT_OPTIONS_CATEGORIZED.map(category => (
+              <optgroup key={category.category} label={category.category}>
+                {category.events.map(event => (
+                  <option key={event.value} value={event.value}>{event.label}</option>
+                ))}
+              </optgroup>
+            ))
+          ) : (
+            AUDIO_EVENT_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))
+          )}
         </select>
       </label>
       {activeMode === 'audio' && (

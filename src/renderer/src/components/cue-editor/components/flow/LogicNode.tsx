@@ -18,7 +18,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
   const logicType = (logic as any)?.logicType as string | undefined;
   if (!logicType) return null;
 
-  const renderDetails = () => {
+  const renderDetails = (): React.ReactNode => {
     if (logicType === 'variable') {
       const valueText = formatValueSource(logic.value);
       const base = `${(logic.mode as string).toUpperCase()} ${logic.varName}`;
@@ -32,7 +32,12 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
                             logic.operator === 'multiply' ? '*' : 
                             logic.operator === 'divide' ? '/' : 
                             logic.operator === 'modulus' ? '%' : logic.operator;
-      return `${logic.operator.toUpperCase()}: ${left} ${operatorSymbol} ${right}`;
+      return (
+        <>
+          <div>{logic.operator.toUpperCase()}: {left} {operatorSymbol} {right}</div>
+          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+        </>
+      );
     }
     if (logicType === 'conditional') {
       const left = formatValueSource(logic.left);
@@ -40,34 +45,72 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
       return `IF ${left} ${logic.comparator} ${right}`;
     }
     if (logicType === 'cue-data') {
-      const assignText = logic.assignTo ? ` → ${logic.assignTo}` : '';
-      return `${logic.dataProperty}${assignText}`;
+      return (
+        <>
+          <div>{logic.dataProperty}</div>
+          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+        </>
+      );
     }
     if (logicType === 'config-data') {
-      const assignText = logic.assignTo ? ` → ${logic.assignTo}` : '';
-      return `${logic.dataProperty}${assignText}`;
+      return (
+        <>
+          <div>{logic.dataProperty}</div>
+          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+        </>
+      );
+    }
+    if (logicType === 'lights-from-index') {
+      const indexText = formatValueSource(logic.index);
+      return (
+        <>
+          <div>{logic.sourceVariable}[{indexText}]</div>
+          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+        </>
+      );
+    }
+    if (logicType === 'for-loop') {
+      const start = formatValueSource(logic.start);
+      const end = formatValueSource(logic.end);
+      const step = formatValueSource(logic.step);
+      const varName = logic.counterVariable || 'i';
+      return `FOR ${varName} = ${start} to ${end}, step ${step}`;
+    }
+    if (logicType === 'while-loop') {
+      const left = formatValueSource(logic.left);
+      const right = formatValueSource(logic.right);
+      return `WHILE ${left} ${logic.comparator} ${right}`;
     }
     return logicType;
   };
 
   const isConditional = logicType === 'conditional';
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data';
+  const isLoopNode = logicType === 'for-loop' || logicType === 'while-loop';
 
-  const nodeStyles = isDataNode
-    ? "border-orange-800 bg-orange-50 dark:bg-orange-900/30 text-xs shadow-sm min-w-[150px]"
-    : "border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-xs shadow-sm min-w-[150px]";
+  const nodeStyles = isLoopNode
+    ? "border-purple-400 bg-purple-50 dark:bg-purple-900/30 text-xs shadow-sm min-w-[150px]"
+    : isDataNode
+      ? "border-orange-800 bg-orange-50 dark:bg-orange-900/30 text-xs shadow-sm min-w-[150px]"
+      : "border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-xs shadow-sm min-w-[150px]";
 
-  const titleStyles = isDataNode
-    ? "font-semibold text-orange-200 dark:text-orange-100 text-center"
-    : "font-semibold text-amber-800 dark:text-amber-100 text-center";
+  const titleStyles = isLoopNode
+    ? "font-semibold text-purple-800 dark:text-purple-100 text-center"
+    : isDataNode
+      ? "font-semibold text-orange-200 dark:text-orange-100 text-center"
+      : "font-semibold text-amber-800 dark:text-amber-100 text-center";
 
-  const detailStyles = isDataNode
-    ? "text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center"
-    : "text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center";
+  const detailStyles = isLoopNode
+    ? "text-[11px] text-purple-900 dark:text-purple-50 opacity-90 text-center"
+    : isDataNode
+      ? "text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center"
+      : "text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center";
 
-  const handleStyles = isDataNode
-    ? "text-orange-700 dark:text-orange-100"
-    : "text-amber-700 dark:text-amber-100";
+  const handleStyles = isLoopNode
+    ? "text-purple-700 dark:text-purple-100"
+    : isDataNode
+      ? "text-orange-700 dark:text-orange-100"
+      : "text-amber-700 dark:text-amber-100";
 
   return (
     <div className={`px-3 py-2 rounded-lg border-2 ${nodeStyles}`}>

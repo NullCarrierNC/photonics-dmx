@@ -4,6 +4,7 @@ import type {
   WaitCondition,
   TrackedLight,
 } from '../../types';
+import { ALL_CONFIG_DATA_PROPERTIES } from '../../constants/nodeConstants';
 
 export type NodeCueMode = 'yarg' | 'audio';
 
@@ -92,6 +93,7 @@ export type YargCueDataProperty =
   | 'current-scene'         // Menu/Gameplay/Score (string)
   | 'beat-type'             // Measure/Strong/Weak (string)
   | 'keyframe'              // Current keyframe value (string)
+  | 'venue-size'            // Venue size: NoVenue/Small/Large (string)
   | 'guitar-note-count'     // Number of guitar notes pressed (number)
   | 'bass-note-count'       // Number of bass notes pressed (number)
   | 'drum-note-count'       // Number of drum notes pressed (number)
@@ -122,14 +124,8 @@ export type AudioCueDataProperty =
 
 export type CueDataProperty = YargCueDataProperty | AudioCueDataProperty;
 
-// Config Data Properties
-export type ConfigDataProperty =
-  | 'total-lights'              // Total number of all lights (number)
-  | 'front-lights-count'        // Number of front lights (number)
-  | 'back-lights-count'         // Number of back lights (number)
-  | 'front-lights-array'        // Array of front lights (TrackedLight[])
-  | 'back-lights-array'         // Array of back lights (TrackedLight[])
-  | 'front-back-lights-array';  // Array of front and back lights (TrackedLight[])
+// Config Data Properties - derived from shared constants
+export type ConfigDataProperty = typeof ALL_CONFIG_DATA_PROPERTIES[number];
 
 export interface CueDataLogicNode extends BaseLogicNode {
   logicType: 'cue-data';
@@ -150,13 +146,31 @@ export interface LightsFromIndexLogicNode extends BaseLogicNode {
   assignTo: string;        // Variable to assign the single light to
 }
 
+export interface ForLoopLogicNode extends BaseLogicNode {
+  logicType: 'for-loop';
+  start: ValueSource;           // Starting value (inclusive)
+  end: ValueSource;             // Ending value (exclusive)
+  step: ValueSource;            // Increment per iteration (default: 1)
+  counterVariable: string;      // Variable to store current iteration value
+}
+
+export interface WhileLoopLogicNode extends BaseLogicNode {
+  logicType: 'while-loop';
+  comparator: LogicComparator;  // Condition comparator
+  left: ValueSource;            // Left side of condition
+  right: ValueSource;           // Right side of condition
+  maxIterations: ValueSource;   // Optional max iterations (default: 1000)
+}
+
 export type LogicNode = 
   | VariableLogicNode 
   | MathLogicNode 
   | ConditionalLogicNode
   | CueDataLogicNode
   | ConfigDataLogicNode
-  | LightsFromIndexLogicNode;
+  | LightsFromIndexLogicNode
+  | ForLoopLogicNode
+  | WhileLoopLogicNode;
 
 export interface EventRaiserNode {
   id: string;
