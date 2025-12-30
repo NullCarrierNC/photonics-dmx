@@ -10,13 +10,15 @@ import type { LocationGroup } from '../types';
 // ============================================================================
 
 /**
- * Light targets used for pattern filtering
+ * Light targets used for pattern filtering (static filters only, excludes linear/random)
  */
 export const PATTERN_TARGETS = [
   'all', 'even', 'odd',
+  'half-1', 'half-2',
+  'outter-half-major', 'outter-half-minor',
+  'inner-half-major', 'inner-half-minor',
   'third-1', 'third-2', 'third-3',
-  'quarter-1', 'quarter-2', 'quarter-3', 'quarter-4',
-  'half-1', 'half-2'
+  'quarter-1', 'quarter-2', 'quarter-3', 'quarter-4'
 ] as const;
 
 export type PatternTarget = typeof PATTERN_TARGETS[number];
