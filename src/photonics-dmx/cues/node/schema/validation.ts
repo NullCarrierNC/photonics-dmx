@@ -452,6 +452,29 @@ const createPairsLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
+const concatLightsLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariables', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'concat-lights' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariables: { 
+      type: 'array',
+      items: { type: 'string' },
+      minItems: 1
+    },
+    assignTo: { type: 'string' }
+  }
+} as any;
+
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
   oneOf: [
     variableLogicSchema, 
@@ -464,7 +487,8 @@ const logicNodeSchema: JSONSchemaType<LogicNode> = {
     whileLoopLogicSchema,
     arrayLengthLogicSchema,
     reverseLightsLogicSchema,
-    createPairsLogicSchema
+    createPairsLogicSchema,
+    concatLightsLogicSchema
   ]
 } as any;
 

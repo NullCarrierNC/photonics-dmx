@@ -106,13 +106,23 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
         </>
       );
     }
+    if (logicType === 'concat-lights') {
+      const vars = logic.sourceVariables || [];
+      return (
+        <>
+          <div>CONCAT {vars.length} ARRAYS</div>
+          {vars.length > 0 && <div>{vars.join(' + ')}</div>}
+          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+        </>
+      );
+    }
     return logicType;
   };
 
   const isConditional = logicType === 'conditional';
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data';
   const isLoopNode = logicType === 'for-loop' || logicType === 'while-loop';
-  const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' || logicType === 'create-pairs';
+  const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' || logicType === 'create-pairs' || logicType === 'concat-lights';
 
   const nodeStyles = isLoopNode
     ? "border-purple-400 bg-purple-50 dark:bg-purple-900/30 text-xs shadow-sm min-w-[150px]"

@@ -139,6 +139,12 @@ const LogicNodesSection: React.FC<{
       >
         Create Pairs
       </button>
+      <button
+        className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+        onClick={() => addLogicNode('concat-lights')}
+      >
+        Concat Lights
+      </button>
     </div>
   </div>
 );

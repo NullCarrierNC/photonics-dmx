@@ -154,6 +154,12 @@ export interface CreatePairsLogicNode extends BaseLogicNode {
   assignTo: string;             // Variable to store paired lights (flattened)
 }
 
+export interface ConcatLightsLogicNode extends BaseLogicNode {
+  logicType: 'concat-lights';
+  sourceVariables: string[];    // Names of light-array variables to concatenate
+  assignTo: string;             // Variable to store concatenated array
+}
+
 export type LogicNode = 
   | VariableLogicNode 
   | MathLogicNode 
@@ -165,7 +171,8 @@ export type LogicNode =
   | WhileLoopLogicNode
   | ArrayLengthLogicNode
   | ReverseLightsLogicNode
-  | CreatePairsLogicNode;
+  | CreatePairsLogicNode
+  | ConcatLightsLogicNode;
 
 export interface EventRaiserNode {
   id: string;

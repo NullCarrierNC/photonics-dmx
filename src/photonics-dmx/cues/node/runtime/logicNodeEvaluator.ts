@@ -356,6 +356,28 @@ export function evaluateLogicNode(
       
       return edges.map(edge => edge.to);
     }
+
+    case 'concat-lights': {
+      // Concatenate multiple light arrays into one
+      const concatResult: TrackedLight[] = [];
+      
+      for (const varName of logicNode.sourceVariables) {
+        const sourceVarStore = getVarStore(varName);
+        const sourceVar = sourceVarStore.get(varName);
+        
+        if (sourceVar && sourceVar.type === 'light-array') {
+          concatResult.push(...(sourceVar.value as TrackedLight[]));
+        } else {
+          console.warn(`concat-lights node ${nodeId}: variable "${varName}" is not a light-array, skipping`);
+        }
+      }
+      
+      // Assign the concatenated array to the target variable
+      const targetVarStore = getVarStore(logicNode.assignTo);
+      targetVarStore.set(logicNode.assignTo, { type: 'light-array', value: concatResult });
+      
+      return edges.map(edge => edge.to);
+    }
   }
 
   return edges.map(edge => edge.to);

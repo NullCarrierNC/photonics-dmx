@@ -22,6 +22,7 @@ import {
   type ArrayLengthLogicNode,
   type ReverseLightsLogicNode,
   type CreatePairsLogicNode,
+  type ConcatLightsLogicNode,
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargEffectDefinition
@@ -231,16 +232,26 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
                               sourceVariable: '',
                               assignTo: ''
                             } satisfies CreatePairsLogicNode as LogicNode)
-                          : ({
-                              id,
-                              type: 'logic',
-                              logicType: 'conditional',
-                              label: 'conditional',
-                              outputs: [],
-                              comparator: '>',
-                              left: { source: 'literal', value: 0 },
-                              right: { source: 'literal', value: 0 }
-                            } satisfies ConditionalLogicNode);
+                          : logicType === 'concat-lights'
+                            ? ({
+                                id,
+                                type: 'logic',
+                                logicType: 'concat-lights',
+                                label: 'concat-lights',
+                                outputs: [],
+                                sourceVariables: [],
+                                assignTo: ''
+                              } satisfies ConcatLightsLogicNode as LogicNode)
+                            : ({
+                                id,
+                                type: 'logic',
+                                logicType: 'conditional',
+                                label: 'conditional',
+                                outputs: [],
+                                comparator: '>',
+                                left: { source: 'literal', value: 0 },
+                                right: { source: 'literal', value: 0 }
+                              } satisfies ConditionalLogicNode);
 
     const newNode: EditorNode = {
       id,
