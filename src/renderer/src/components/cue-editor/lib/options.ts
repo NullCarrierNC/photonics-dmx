@@ -4,7 +4,7 @@ import {
   AUDIO_EVENT_OPTIONS as AUDIO_EVENTS_BASE,
   YARG_EVENT_OPTIONS as YARG_EVENTS_BASE
 } from '../../../../../photonics-dmx/constants/options';
-import { getYargEventCategories } from '../../../../../photonics-dmx/constants/nodeConstants';
+import { getYargEventCategories } from '../../../../../photonics-dmx/cues/node/utils/eventUtils';
 
 const withDefaultLabels = <T extends string>(values: T[]) =>
   values.map(value => ({ value, label: value }));

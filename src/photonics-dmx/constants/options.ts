@@ -1,4 +1,4 @@
-import { Color, Brightness, BlendMode, LightTarget, LocationGroup, WaitCondition } from '../types';
+import { Color, Brightness, BlendMode, LightTarget, LocationGroup, WaitCondition, WAIT_CONDITIONS } from '../types';
 import { AudioEventType } from '../cues/types/nodeCueTypes';
 
 export const COLOR_OPTIONS: Color[] = [
@@ -23,16 +23,13 @@ export const LIGHT_TARGET_OPTIONS: LightTarget[] = [
   'random-1', 'random-2', 'random-3', 'random-4'
 ];
 
-export const YARG_EVENT_OPTIONS: WaitCondition[] = [
-  'cue-started', 'beat', 'measure', 'half-beat', 'keyframe',
-  'guitar-open', 'guitar-green', 'guitar-red', 'guitar-yellow', 'guitar-blue', 'guitar-orange',
-  'bass-open', 'bass-green', 'bass-red', 'bass-yellow', 'bass-blue', 'bass-orange',
-  'keys-open', 'keys-green', 'keys-red', 'keys-yellow', 'keys-blue', 'keys-orange',
-  'drum-kick', 'drum-red', 'drum-yellow', 'drum-blue', 'drum-green',
-  'drum-yellow-cymbal', 'drum-blue-cymbal', 'drum-green-cymbal'
-];
+// Derive from WAIT_CONDITIONS, excluding 'none' and 'delay' (those are special)
+export const YARG_EVENT_OPTIONS: WaitCondition[] = WAIT_CONDITIONS.filter(
+  (c): c is Exclude<WaitCondition, 'none' | 'delay'> => c !== 'none' && c !== 'delay'
+);
 
-export const WAIT_CONDITIONS_WITH_NONE_DELAY: WaitCondition[] = ['none', 'delay', ...YARG_EVENT_OPTIONS];
+// Full list including none and delay - use the source of truth directly
+export const WAIT_CONDITIONS_WITH_NONE_DELAY: WaitCondition[] = [...WAIT_CONDITIONS];
 
 export const AUDIO_EVENT_OPTIONS: AudioEventType[] = [
   'audio-beat',

@@ -81,36 +81,70 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
       const right = formatValueSource(logic.right);
       return `WHILE ${left} ${logic.comparator} ${right}`;
     }
+    if (logicType === 'array-length') {
+      return (
+        <>
+          <div>LENGTH OF {logic.sourceVariable || '?'}</div>
+          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+        </>
+      );
+    }
+    if (logicType === 'reverse-lights') {
+      return (
+        <>
+          <div>REVERSE {logic.sourceVariable || '?'}</div>
+          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+        </>
+      );
+    }
+    if (logicType === 'create-pairs') {
+      return (
+        <>
+          <div>{(logic.pairType || 'opposite').toUpperCase()} PAIRS</div>
+          <div>FROM: {logic.sourceVariable || '?'}</div>
+          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+        </>
+      );
+    }
     return logicType;
   };
 
   const isConditional = logicType === 'conditional';
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data';
   const isLoopNode = logicType === 'for-loop' || logicType === 'while-loop';
+  const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' || logicType === 'create-pairs';
 
   const nodeStyles = isLoopNode
     ? "border-purple-400 bg-purple-50 dark:bg-purple-900/30 text-xs shadow-sm min-w-[150px]"
-    : isDataNode
-      ? "border-orange-800 bg-orange-50 dark:bg-orange-900/30 text-xs shadow-sm min-w-[150px]"
-      : "border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-xs shadow-sm min-w-[150px]";
+    : isArrayNode
+      ? "border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-xs shadow-sm min-w-[150px]"
+      : isDataNode
+        ? "border-orange-800 bg-orange-50 dark:bg-orange-900/30 text-xs shadow-sm min-w-[150px]"
+        : "border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-xs shadow-sm min-w-[150px]";
 
   const titleStyles = isLoopNode
     ? "font-semibold text-purple-800 dark:text-purple-100 text-center"
-    : isDataNode
-      ? "font-semibold text-orange-200 dark:text-orange-100 text-center"
-      : "font-semibold text-amber-800 dark:text-amber-100 text-center";
+    : isArrayNode
+      ? "font-semibold text-teal-800 dark:text-teal-100 text-center"
+      : isDataNode
+        ? "font-semibold text-orange-200 dark:text-orange-100 text-center"
+        : "font-semibold text-amber-800 dark:text-amber-100 text-center";
 
   const detailStyles = isLoopNode
     ? "text-[11px] text-purple-900 dark:text-purple-50 opacity-90 text-center"
-    : isDataNode
-      ? "text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center"
-      : "text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center";
+    : isArrayNode
+      ? "text-[11px] text-teal-900 dark:text-teal-50 opacity-90 text-center"
+      : isDataNode
+        ? "text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center"
+        : "text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center";
 
   const handleStyles = isLoopNode
     ? "text-purple-700 dark:text-purple-100"
-    : isDataNode
-      ? "text-orange-700 dark:text-orange-100"
-      : "text-amber-700 dark:text-amber-100";
+    : isArrayNode
+      ? "text-teal-700 dark:text-teal-100"
+      : isDataNode
+        ? "text-orange-700 dark:text-orange-100"
+        : "text-amber-700 dark:text-amber-100";
 
   return (
     <div className={`px-3 py-2 rounded-lg border-2 ${nodeStyles}`}>

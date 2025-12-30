@@ -7,12 +7,16 @@ import type {
   CueDataLogicNode,
   ConfigDataLogicNode,
   LightsFromIndexLogicNode,
+  ArrayLengthLogicNode,
+  ReverseLightsLogicNode,
+  CreatePairsLogicNode,
   ConfigDataProperty,
   MathOperator,
-  LogicComparator
+  LogicComparator,
+  CreatePairsType
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import { getConfigDataPropertiesMeta } from '../../../../../../photonics-dmx/constants/nodeConstants';
+import { getConfigDataPropertiesMeta } from '../../../../../../photonics-dmx/cues/node/utils/configDataUtils';
 import ValueSourceEditor from '../shared/ValueSourceEditor';
 
 interface LogicNodeEditorProps {
@@ -148,6 +152,7 @@ const CueDataLogicEditor: React.FC<{
     { id: 'cue-type', label: 'Cue Type', type: 'string' },
     { id: 'execution-count', label: 'Execution Count', type: 'number' },
     { id: 'bpm', label: 'BPM', type: 'number' },
+    { id: 'beat-duration-ms', label: 'Beat Duration (ms)', type: 'number' },
     { id: 'song-section', label: 'Song Section', type: 'string' },
     { id: 'current-scene', label: 'Current Scene', type: 'string' },
     { id: 'beat-type', label: 'Beat Type', type: 'string' },
@@ -451,6 +456,165 @@ const WhileLoopLogicEditor: React.FC<{
   );
 };
 
+const ArrayLengthLogicEditor: React.FC<{
+  node: ArrayLengthLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
+  const numberVars = availableVariables.filter(v => v.type === 'number');
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Source Variable (light-array)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.sourceVariable}
+          onChange={event => updateNode({ sourceVariable: event.target.value })}
+        >
+          <option value="">-- Select light-array --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col font-medium">
+        Assign To (number variable)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo}
+          onChange={event => updateNode({ assignTo: event.target.value })}
+        >
+          <option value="">-- Select variable --</option>
+          {numberVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <p className="text-[10px] text-gray-500 italic">
+        Gets the number of lights in the source array.
+      </p>
+    </div>
+  );
+};
+
+const ReverseLightsLogicEditor: React.FC<{
+  node: ReverseLightsLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Source Variable (light-array)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.sourceVariable}
+          onChange={event => updateNode({ sourceVariable: event.target.value })}
+        >
+          <option value="">-- Select light-array --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col font-medium">
+        Assign To (light-array variable)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo}
+          onChange={event => updateNode({ assignTo: event.target.value })}
+        >
+          <option value="">-- Select variable --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <p className="text-[10px] text-gray-500 italic">
+        Reverses the order of lights in the array. Useful for counter-clockwise patterns.
+      </p>
+    </div>
+  );
+};
+
+const CreatePairsLogicEditor: React.FC<{
+  node: CreatePairsLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Pair Type
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.pairType}
+          onChange={event => updateNode({ pairType: event.target.value as CreatePairsType })}
+        >
+          <option value="opposite">Opposite Pairs</option>
+          <option value="diagonal">Diagonal Pairs</option>
+        </select>
+      </label>
+
+      <label className="flex flex-col font-medium">
+        Source Variable (light-array)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.sourceVariable}
+          onChange={event => updateNode({ sourceVariable: event.target.value })}
+        >
+          <option value="">-- Select light-array --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col font-medium">
+        Assign To (light-array variable)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo}
+          onChange={event => updateNode({ assignTo: event.target.value })}
+        >
+          <option value="">-- Select variable --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <p className="text-[10px] text-gray-500 italic">
+        {node.pairType === 'diagonal' 
+          ? 'Diagonal: For sweep patterns (6,2 → 5,1 → 4,0 → 3,7)'
+          : 'Opposite: Pairs lights across the ring (0,4), (1,5), (2,6), (3,7)'}
+      </p>
+    </div>
+  );
+};
+
 const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
   node,
   activeMode,
@@ -532,6 +696,36 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <ConditionalLogicEditor
         node={node as ConditionalLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'array-length') {
+    return (
+      <ArrayLengthLogicEditor
+        node={node as ArrayLengthLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'reverse-lights') {
+    return (
+      <ReverseLightsLogicEditor
+        node={node as ReverseLightsLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'create-pairs') {
+    return (
+      <CreatePairsLogicEditor
+        node={node as CreatePairsLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

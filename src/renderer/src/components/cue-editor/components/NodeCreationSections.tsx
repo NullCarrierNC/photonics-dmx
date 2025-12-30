@@ -121,6 +121,24 @@ const LogicNodesSection: React.FC<{
       >
         While Loop
       </button>
+      <button
+        className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+        onClick={() => addLogicNode('array-length')}
+      >
+        Array Length
+      </button>
+      <button
+        className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+        onClick={() => addLogicNode('reverse-lights')}
+      >
+        Reverse Lights
+      </button>
+      <button
+        className="border rounded px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+        onClick={() => addLogicNode('create-pairs')}
+      >
+        Create Pairs
+      </button>
     </div>
   </div>
 );

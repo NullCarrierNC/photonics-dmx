@@ -394,6 +394,64 @@ const whileLoopLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
+const arrayLengthLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'array-length' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariable: { type: 'string' },
+    assignTo: { type: 'string' }
+  }
+} as any;
+
+const reverseLightsLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'reverse-lights' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariable: { type: 'string' },
+    assignTo: { type: 'string' }
+  }
+} as any;
+
+const createPairsLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'pairType', 'sourceVariable', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'create-pairs' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    pairType: { type: 'string', enum: ['opposite', 'diagonal'] as const },
+    sourceVariable: { type: 'string' },
+    assignTo: { type: 'string' }
+  }
+} as any;
+
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
   oneOf: [
     variableLogicSchema, 
@@ -403,7 +461,10 @@ const logicNodeSchema: JSONSchemaType<LogicNode> = {
     configDataLogicSchema,
     lightsFromIndexLogicSchema,
     forLoopLogicSchema,
-    whileLoopLogicSchema
+    whileLoopLogicSchema,
+    arrayLengthLogicSchema,
+    reverseLightsLogicSchema,
+    createPairsLogicSchema
   ]
 } as any;
 

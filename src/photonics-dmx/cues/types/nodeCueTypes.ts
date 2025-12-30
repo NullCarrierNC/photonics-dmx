@@ -4,7 +4,11 @@ import type {
   WaitCondition,
   TrackedLight,
 } from '../../types';
-import { ALL_CONFIG_DATA_PROPERTIES } from '../../constants/nodeConstants';
+import {
+  ALL_CONFIG_DATA_PROPERTIES,
+  YARG_CUE_DATA_PROPERTIES,
+  AUDIO_CUE_DATA_PROPERTIES
+} from '../../constants/nodeConstants';
 
 export type NodeCueMode = 'yarg' | 'audio';
 
@@ -83,44 +87,11 @@ export interface ConditionalLogicNode extends BaseLogicNode {
   right: ValueSource;
 }
 
-// YARG Cue Data Properties
-export type YargCueDataProperty = 
-  | 'cue-name'              // Current cue name (string)
-  | 'cue-type'              // Current CueType (string)
-  | 'execution-count'       // How many times this cue has executed (number)
-  | 'bpm'                   // Beats per minute (number)
-  | 'song-section'          // Chorus/Verse/etc (string)
-  | 'current-scene'         // Menu/Gameplay/Score (string)
-  | 'beat-type'             // Measure/Strong/Weak (string)
-  | 'keyframe'              // Current keyframe value (string)
-  | 'venue-size'            // Venue size: NoVenue/Small/Large (string)
-  | 'guitar-note-count'     // Number of guitar notes pressed (number)
-  | 'bass-note-count'       // Number of bass notes pressed (number)
-  | 'drum-note-count'       // Number of drum notes pressed (number)
-  | 'keys-note-count'       // Number of keys notes pressed (number)
-  | 'total-score'           // Total band score (number)
-  | 'performer'             // Performer index (number)
-  | 'bonus-effect'          // Whether bonus effect active (boolean)
-  | 'fog-state'             // Fog on/off (boolean)
-  | 'time-since-cue-start'  // Milliseconds since cue started (number)
-  | 'time-since-last-cue';  // Milliseconds since previous cue (number)
+// YARG Cue Data Properties - derived from shared constants
+export type YargCueDataProperty = typeof YARG_CUE_DATA_PROPERTIES[number];
 
-// Audio Cue Data Properties
-export type AudioCueDataProperty =
-  | 'cue-name'              // Current cue name (string)
-  | 'cue-type-id'           // Current cue type ID (string)
-  | 'execution-count'       // Execution count (number)
-  | 'timestamp'             // Current timestamp (number)
-  | 'overall-level'         // Audio level 0.0-1.0 (number)
-  | 'bpm'                   // Detected BPM or null (number)
-  | 'beat-detected'         // Beat detected this frame (boolean)
-  | 'energy'                // Audio energy 0.0-1.0 (number)
-  | 'freq-range1'           // Bass frequencies 0.0-1.0 (number)
-  | 'freq-range2'           // Low-mids 0.0-1.0 (number)
-  | 'freq-range3'           // Mids 0.0-1.0 (number)
-  | 'freq-range4'           // Upper-mids 0.0-1.0 (number)
-  | 'freq-range5'           // Highs 0.0-1.0 (number)
-  | 'enabled-band-count';   // Number of enabled bands (number)
+// Audio Cue Data Properties - derived from shared constants
+export type AudioCueDataProperty = typeof AUDIO_CUE_DATA_PROPERTIES[number];
 
 export type CueDataProperty = YargCueDataProperty | AudioCueDataProperty;
 
@@ -162,6 +133,27 @@ export interface WhileLoopLogicNode extends BaseLogicNode {
   maxIterations: ValueSource;   // Optional max iterations (default: 1000)
 }
 
+export interface ArrayLengthLogicNode extends BaseLogicNode {
+  logicType: 'array-length';
+  sourceVariable: string;       // Name of light-array variable
+  assignTo: string;             // Variable to store count
+}
+
+export interface ReverseLightsLogicNode extends BaseLogicNode {
+  logicType: 'reverse-lights';
+  sourceVariable: string;       // Name of light-array variable
+  assignTo: string;             // Variable to store reversed array
+}
+
+export type CreatePairsType = 'opposite' | 'diagonal';
+
+export interface CreatePairsLogicNode extends BaseLogicNode {
+  logicType: 'create-pairs';
+  pairType: CreatePairsType;    // Type of pair grouping
+  sourceVariable: string;       // Name of light-array variable
+  assignTo: string;             // Variable to store paired lights (flattened)
+}
+
 export type LogicNode = 
   | VariableLogicNode 
   | MathLogicNode 
@@ -170,7 +162,10 @@ export type LogicNode =
   | ConfigDataLogicNode
   | LightsFromIndexLogicNode
   | ForLoopLogicNode
-  | WhileLoopLogicNode;
+  | WhileLoopLogicNode
+  | ArrayLengthLogicNode
+  | ReverseLightsLogicNode
+  | CreatePairsLogicNode;
 
 export interface EventRaiserNode {
   id: string;

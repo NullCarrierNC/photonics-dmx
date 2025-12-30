@@ -13,8 +13,8 @@ import {
 } from '../../types/nodeCueTypes';
 import {
   parsePatternPropertyId,
-  patternGroupToLocationGroups
-} from '../../../constants/nodeConstants';
+  configLightGroupToLocationGroups
+} from '../utils/patternUtils';
 
 /**
  * Extract cue data value based on property (YARG or Audio mode).
@@ -47,6 +47,7 @@ export function extractYargCueDataValue(
     case 'cue-type': return cueData.lightingCue;
     case 'execution-count': return cueData.executionCount ?? 0;
     case 'bpm': return cueData.beatsPerMinute;
+    case 'beat-duration-ms': return cueData.beatsPerMinute > 0 ? Math.round(60000 / cueData.beatsPerMinute) : 500;
     case 'song-section': return cueData.songSection;
     case 'current-scene': return cueData.currentScene;
     case 'beat-type': return cueData.beat;
@@ -114,14 +115,12 @@ export function extractConfigDataValue(
       return lightManager.getLightsInGroup('front');
     case 'back-lights-array':
       return lightManager.getLightsInGroup('back');
-    case 'front-back-lights-array':
-      return lightManager.getLightsInGroup(['front', 'back']);
   }
 
   // Try to parse as a pattern filter property (DRY approach)
   const parsed = parsePatternPropertyId(property);
   if (parsed) {
-    const locationGroups = patternGroupToLocationGroups(parsed.group);
+    const locationGroups = configLightGroupToLocationGroups(parsed.group);
     return lightManager.getLights(locationGroups, parsed.target as LightTarget);
   }
 

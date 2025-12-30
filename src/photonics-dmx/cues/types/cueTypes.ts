@@ -24,6 +24,69 @@ export enum DrumNoteType {
   GreenCymbal = "GreenCymbal"
 }
 
+/**
+ * Maps event string suffixes to InstrumentNoteType values
+ * Used to convert event names like 'guitar-open' to InstrumentNoteType.Open
+ */
+export const INSTRUMENT_NOTE_MAP: Record<string, InstrumentNoteType> = {
+  'open': InstrumentNoteType.Open,
+  'green': InstrumentNoteType.Green,
+  'red': InstrumentNoteType.Red,
+  'yellow': InstrumentNoteType.Yellow,
+  'blue': InstrumentNoteType.Blue,
+  'orange': InstrumentNoteType.Orange
+};
+
+/**
+ * Maps drum event string suffixes to DrumNoteType values
+ * Used to convert event names like 'drum-kick' to DrumNoteType.Kick
+ */
+export const DRUM_NOTE_MAP: Record<string, DrumNoteType> = {
+  'kick': DrumNoteType.Kick,
+  'red': DrumNoteType.RedDrum,
+  'yellow': DrumNoteType.YellowDrum,
+  'blue': DrumNoteType.BlueDrum,
+  'green': DrumNoteType.GreenDrum,
+  'yellow-cymbal': DrumNoteType.YellowCymbal,
+  'blue-cymbal': DrumNoteType.BlueCymbal,
+  'green-cymbal': DrumNoteType.GreenCymbal
+};
+
+/**
+ * Parse an event type string and check if a note is present in the given arrays.
+ * Returns true if the event is triggered based on the current notes.
+ */
+export function isInstrumentEventTriggered(
+  eventType: string,
+  guitarNotes: InstrumentNoteType[],
+  bassNotes: InstrumentNoteType[],
+  keysNotes: InstrumentNoteType[],
+  drumNotes: DrumNoteType[]
+): boolean | null {
+  // Guitar events
+  if (eventType.startsWith('guitar-')) {
+    const note = INSTRUMENT_NOTE_MAP[eventType.slice(7)];
+    return note ? guitarNotes.includes(note) : null;
+  }
+  // Bass events
+  if (eventType.startsWith('bass-')) {
+    const note = INSTRUMENT_NOTE_MAP[eventType.slice(5)];
+    return note ? bassNotes.includes(note) : null;
+  }
+  // Keys events
+  if (eventType.startsWith('keys-')) {
+    const note = INSTRUMENT_NOTE_MAP[eventType.slice(5)];
+    return note ? keysNotes.includes(note) : null;
+  }
+  // Drum events
+  if (eventType.startsWith('drum-')) {
+    const note = DRUM_NOTE_MAP[eventType.slice(5)];
+    return note ? drumNotes.includes(note) : null;
+  }
+  // Not an instrument event
+  return null;
+}
+
 // Import RB3E types
 import { Rb3Difficulty, Rb3TrackType } from '../../listeners/RB3/rb3eTypes';
 

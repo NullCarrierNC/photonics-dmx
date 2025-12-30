@@ -4,8 +4,6 @@
  */
 
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { CueData } from '../../types/cueTypes';
-import { AudioCueData } from '../../types/audioCueTypes';
 import { TrackedLight } from '../../../types';
 import {
   LogicNode,
@@ -290,7 +288,126 @@ export function evaluateLogicNode(
       // Don't return downstream nodes - we already executed them
       return [];
     }
+
+    case 'array-length': {
+      // Get the source light array variable
+      const sourceVarStore = getVarStore(logicNode.sourceVariable);
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable);
+      
+      let length = 0;
+      if (sourceVar && sourceVar.type === 'light-array') {
+        const lightsArray = sourceVar.value as TrackedLight[];
+        length = lightsArray.length;
+      } else {
+        console.warn(`array-length node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+      }
+      
+      // Assign the length to the target variable
+      const targetVarStore = getVarStore(logicNode.assignTo);
+      targetVarStore.set(logicNode.assignTo, { type: 'number', value: length });
+      
+      return edges.map(edge => edge.to);
+    }
+
+    case 'reverse-lights': {
+      // Get the source light array variable
+      const sourceVarStore = getVarStore(logicNode.sourceVariable);
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable);
+      
+      if (!sourceVar || sourceVar.type !== 'light-array') {
+        console.warn(`reverse-lights node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+        return edges.map(edge => edge.to);
+      }
+      
+      const lightsArray = sourceVar.value as TrackedLight[];
+      const reversedLights = [...lightsArray].reverse();
+      
+      // Assign the reversed array to the target variable
+      const targetVarStore = getVarStore(logicNode.assignTo);
+      targetVarStore.set(logicNode.assignTo, { type: 'light-array', value: reversedLights });
+      
+      return edges.map(edge => edge.to);
+    }
+
+    case 'create-pairs': {
+      // Get the source light array variable
+      const sourceVarStore = getVarStore(logicNode.sourceVariable);
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable);
+      
+      if (!sourceVar || sourceVar.type !== 'light-array') {
+        console.warn(`create-pairs node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+        return edges.map(edge => edge.to);
+      }
+      
+      const lightsArray = sourceVar.value as TrackedLight[];
+      let pairedLights: TrackedLight[];
+      
+      if (logicNode.pairType === 'opposite') {
+        // Create opposite pairs: [0,4], [1,5], [2,6], [3,7] -> flattened to [0,4,1,5,2,6,3,7]
+        pairedLights = createOppositePairs(lightsArray);
+      } else {
+        // Create diagonal pairs: [6,2], [5,1], [4,0], [3,7] -> flattened
+        pairedLights = createDiagonalPairs(lightsArray);
+      }
+      
+      // Assign the paired lights to the target variable
+      const targetVarStore = getVarStore(logicNode.assignTo);
+      targetVarStore.set(logicNode.assignTo, { type: 'light-array', value: pairedLights });
+      
+      return edges.map(edge => edge.to);
+    }
   }
 
   return edges.map(edge => edge.to);
+}
+
+/**
+ * Creates opposite pairs from a light array and flattens them.
+ * For 8 lights: [0,4], [1,5], [2,6], [3,7] -> [0,4,1,5,2,6,3,7]
+ * Pairs are interleaved so that indexing by 2 gives a pair.
+ */
+function createOppositePairs(lights: TrackedLight[]): TrackedLight[] {
+  const result: TrackedLight[] = [];
+  const halfLength = Math.floor(lights.length / 2);
+  
+  for (let i = 0; i < halfLength; i++) {
+    result.push(lights[i]);
+    result.push(lights[i + halfLength]);
+  }
+  
+  // If odd number of lights, include the middle light at the end
+  if (lights.length % 2 !== 0) {
+    result.push(lights[halfLength]);
+  }
+  
+  return result;
+}
+
+/**
+ * Creates diagonal pairs for sweep patterns and flattens them.
+ * For 8 lights: [6,2], [5,1], [4,0], [3,7] -> [6,2,5,1,4,0,3,7]
+ * For 4 lights: [2], [1], [0], [3] -> [2,1,0,3]
+ * Pairs are interleaved so that indexing by 2 gives a pair.
+ */
+function createDiagonalPairs(lights: TrackedLight[]): TrackedLight[] {
+  const result: TrackedLight[] = [];
+  
+  if (lights.length >= 8) {
+    // For 8+ lights: diagonal sweep pattern (6|2) → (5|1) → (4|0) → (3|7)
+    result.push(lights[6], lights[2]);
+    result.push(lights[5], lights[1]);
+    result.push(lights[4], lights[0]);
+    result.push(lights[3], lights[7]);
+  } else if (lights.length >= 4) {
+    // For 4-7 lights: single-light diagonal pattern
+    result.push(lights[Math.min(2, lights.length - 1)]);
+    result.push(lights[Math.min(1, lights.length - 1)]);
+    result.push(lights[0]);
+    result.push(lights[Math.min(3, lights.length - 1)]);
+  } else {
+    // For fewer lights, just return them in order
+    result.push(...lights);
+  }
+  
+  return result;
 }

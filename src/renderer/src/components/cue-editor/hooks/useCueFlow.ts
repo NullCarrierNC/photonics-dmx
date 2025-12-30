@@ -19,6 +19,9 @@ import {
   type LightsFromIndexLogicNode,
   type ForLoopLogicNode,
   type WhileLoopLogicNode,
+  type ArrayLengthLogicNode,
+  type ReverseLightsLogicNode,
+  type CreatePairsLogicNode,
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargEffectDefinition
@@ -197,16 +200,47 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
                         right: { source: 'literal', value: 10 },
                         maxIterations: { source: 'literal', value: 1000 }
                       } satisfies WhileLoopLogicNode as LogicNode)
-                    : ({
-                        id,
-                        type: 'logic',
-                        logicType: 'conditional',
-                        label: 'conditional',
-                        outputs: [],
-                        comparator: '>',
-                        left: { source: 'literal', value: 0 },
-                        right: { source: 'literal', value: 0 }
-                      } satisfies ConditionalLogicNode);
+                    : logicType === 'array-length'
+                      ? ({
+                          id,
+                          type: 'logic',
+                          logicType: 'array-length',
+                          label: 'array-length',
+                          outputs: [],
+                          sourceVariable: '',
+                          assignTo: ''
+                        } satisfies ArrayLengthLogicNode as LogicNode)
+                      : logicType === 'reverse-lights'
+                        ? ({
+                            id,
+                            type: 'logic',
+                            logicType: 'reverse-lights',
+                            label: 'reverse-lights',
+                            outputs: [],
+                            sourceVariable: '',
+                            assignTo: ''
+                          } satisfies ReverseLightsLogicNode as LogicNode)
+                        : logicType === 'create-pairs'
+                          ? ({
+                              id,
+                              type: 'logic',
+                              logicType: 'create-pairs',
+                              label: 'create-pairs',
+                              outputs: [],
+                              pairType: 'opposite',
+                              sourceVariable: '',
+                              assignTo: ''
+                            } satisfies CreatePairsLogicNode as LogicNode)
+                          : ({
+                              id,
+                              type: 'logic',
+                              logicType: 'conditional',
+                              label: 'conditional',
+                              outputs: [],
+                              comparator: '>',
+                              left: { source: 'literal', value: 0 },
+                              right: { source: 'literal', value: 0 }
+                            } satisfies ConditionalLogicNode);
 
     const newNode: EditorNode = {
       id,

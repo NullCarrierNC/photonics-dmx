@@ -91,22 +91,31 @@ export interface Effect {
 }
 
 /**
- * Represents conditions that can trigger waiting in effects
+ * All wait condition values - single source of truth
  */
-export type WaitCondition =
-  | 'none'
-  | 'delay'
-  | 'cue-started'
-  | 'beat'
-  | 'measure'
-  | 'half-beat'
-  | 'keyframe'
-  // Instrument note events (matching SongEventHandler)
-  | 'guitar-open' | 'guitar-green' | 'guitar-red' | 'guitar-yellow' | 'guitar-blue' | 'guitar-orange'
-  | 'bass-open' | 'bass-green' | 'bass-red' | 'bass-yellow' | 'bass-blue' | 'bass-orange'
-  | 'keys-open' | 'keys-green' | 'keys-red' | 'keys-yellow' | 'keys-blue' | 'keys-orange'
-  | 'drum-kick' | 'drum-red' | 'drum-yellow' | 'drum-blue' | 'drum-green'
-  | 'drum-yellow-cymbal' | 'drum-blue-cymbal' | 'drum-green-cymbal';
+export const WAIT_CONDITIONS = [
+  'none',
+  'delay',
+  'cue-started',
+  'beat',
+  'measure',
+  'half-beat',
+  'keyframe',
+  // Guitar events
+  'guitar-open', 'guitar-green', 'guitar-red', 'guitar-yellow', 'guitar-blue', 'guitar-orange',
+  // Bass events
+  'bass-open', 'bass-green', 'bass-red', 'bass-yellow', 'bass-blue', 'bass-orange',
+  // Keys events
+  'keys-open', 'keys-green', 'keys-red', 'keys-yellow', 'keys-blue', 'keys-orange',
+  // Drum events
+  'drum-kick', 'drum-red', 'drum-yellow', 'drum-blue', 'drum-green',
+  'drum-yellow-cymbal', 'drum-blue-cymbal', 'drum-green-cymbal'
+] as const;
+
+/**
+ * Represents conditions that can trigger waiting in effects - derived from WAIT_CONDITIONS
+ */
+export type WaitCondition = typeof WAIT_CONDITIONS[number];
 
 /**
  * Interface defining a transition within an effect

@@ -2056,17 +2056,10 @@ describe('NodeExecutionEngine', () => {
       const mockBackLights = [
         { id: 'back1', position: 0, config: {} as any }
       ];
-      const mockAllLights = [...mockFrontLights, ...mockBackLights];
 
       mockLightManager.getLightsInGroup = jest.fn((groups: any) => {
-        if (Array.isArray(groups)) {
-          if (groups.includes('front') && groups.includes('back')) {
-            return mockAllLights;
-          }
-        } else {
-          if (groups === 'front') return mockFrontLights;
-          if (groups === 'back') return mockBackLights;
-        }
+        if (groups === 'front') return mockFrontLights;
+        if (groups === 'back') return mockBackLights;
         return [];
       });
 
@@ -2092,14 +2085,6 @@ describe('NodeExecutionEngine', () => {
         assignTo: 'backLights'
       };
 
-      const config3: LogicNode = {
-        id: 'config3',
-        type: 'logic',
-        logicType: 'config-data',
-        dataProperty: 'front-back-lights-array',
-        assignTo: 'allLights'
-      };
-
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
@@ -2108,17 +2093,15 @@ describe('NodeExecutionEngine', () => {
         nodes: {
           events: [eventNode],
           actions: [],
-          logic: [config1, config2, config3]
+          logic: [config1, config2]
         },
         connections: [
           { from: 'event1', to: 'config1' },
-          { from: 'event1', to: 'config2' },
-          { from: 'event1', to: 'config3' }
+          { from: 'event1', to: 'config2' }
         ],
         variables: [
           { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
-          { name: 'backLights', type: 'light-array', scope: 'cue', initialValue: [] },
-          { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] }
+          { name: 'backLights', type: 'light-array', scope: 'cue', initialValue: [] }
         ]
       };
 
@@ -2128,8 +2111,7 @@ describe('NodeExecutionEngine', () => {
         actionMap: new Map(),
         logicMap: new Map<string, LogicNode>([
           [config1.id, config1],
-          [config2.id, config2],
-          [config3.id, config3]
+          [config2.id, config2]
         ]),
         eventRaiserMap: new Map(),
         eventListenerMap: new Map(),
@@ -2138,8 +2120,7 @@ describe('NodeExecutionEngine', () => {
         adjacency: new Map([
           ['event1', [
             { from: 'event1', to: 'config1' },
-            { from: 'event1', to: 'config2' },
-            { from: 'event1', to: 'config3' }
+            { from: 'event1', to: 'config2' }
           ]]
         ])
       };
@@ -2159,7 +2140,6 @@ describe('NodeExecutionEngine', () => {
 
       expect(cueLevelVarStore.get('frontLights')?.value).toEqual(mockFrontLights);
       expect(cueLevelVarStore.get('backLights')?.value).toEqual(mockBackLights);
-      expect(cueLevelVarStore.get('allLights')?.value).toEqual(mockAllLights);
     });
   });
 
