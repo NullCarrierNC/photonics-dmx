@@ -12,7 +12,7 @@ export class WindowManager {
     // Create the browser window
     this.mainWindow = new BrowserWindow({
       width: 1280,
-      height: 900,
+      height: 1000,
       show: false,
       autoHideMenuBar: false,
       webPreferences: {
