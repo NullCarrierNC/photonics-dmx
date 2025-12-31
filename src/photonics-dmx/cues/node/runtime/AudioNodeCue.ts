@@ -114,7 +114,17 @@ export class AudioNodeCue implements IAudioCue {
 
         const action = this.compiledCue.actionMap.get(actionStep.actionId);
         if (!action) continue;
-        const lights = ActionEffectFactory.resolveLights(lightManager, action.target);
+        
+        // Resolve lights with variable resolver for light-array support
+        const lights = ActionEffectFactory.resolveLights(
+          lightManager,
+          action.target,
+          (varName: string) => {
+            const cueVar = this.cueLevelVarStore.get(varName);
+            const groupVar = this.groupLevelVarStore.get(varName);
+            return cueVar ?? groupVar;
+          }
+        );
         if (!lights.length) continue;
 
         if (evaluation.active) {
@@ -348,13 +358,13 @@ export class AudioNodeCue implements IAudioCue {
     return isCueLevel ? this.cueLevelVarStore : this.groupLevelVarStore;
   }
 
-  private resolveValue(expectedType: 'number' | 'boolean' | 'string', source?: ValueSource): number | boolean | string {
+  private resolveValue(expectedType: 'number' | 'boolean' | 'string' | 'color', source?: ValueSource): number | boolean | string {
     if (!source) {
       return expectedType === 'number' ? 0 : expectedType === 'boolean' ? false : '';
     }
 
     if (source.source === 'literal') {
-      if (expectedType === 'string') {
+      if (expectedType === 'string' || expectedType === 'color') {
         return String(source.value);
       }
       if (expectedType === 'number') {
@@ -376,7 +386,7 @@ export class AudioNodeCue implements IAudioCue {
     const existing = cueVar ?? groupVar;
     
     if (existing) {
-      if (expectedType === 'string') {
+      if (expectedType === 'string' || expectedType === 'color') {
         return String(existing.value);
       }
       if (expectedType === 'number') {

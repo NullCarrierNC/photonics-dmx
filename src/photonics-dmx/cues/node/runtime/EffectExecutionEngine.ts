@@ -200,8 +200,16 @@ export class EffectExecutionEngine {
 
     const effectName = `effect_${this.compiledEffect.definition.id}_${action.id}`;
     
-    // Resolve lights for the action
-    const lights = ActionEffectFactory.resolveLights(this.lightManager, action.target);
+    // Resolve lights for the action with variable resolver for light-array support
+    const lights = ActionEffectFactory.resolveLights(
+      this.lightManager,
+      action.target,
+      (varName: string) => {
+        const cueVar = context.cueLevelVarStore.get(varName);
+        const groupVar = context.groupLevelVarStore.get(varName);
+        return cueVar ?? groupVar;
+      }
+    );
     
     // Build effect using ActionEffectFactory
     const effect = ActionEffectFactory.buildEffect({
