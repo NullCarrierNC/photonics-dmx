@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { VariableDefinition, VariableType, NodeCueFile, NodeCueGroupMeta, YargEffectDefinition, AudioEffectDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorDocument } from '../lib/types';
+import { COLOR_OPTIONS } from '../../../../../photonics-dmx/constants/options';
 
 type Props = {
   editorDoc: EditorDocument | null;
@@ -182,6 +183,18 @@ const VariableRegistry: React.FC<Props> = ({
             value={value ?? ''}
             onChange={e => onChange(e.target.value)}
           />
+        );
+      case 'color':
+        return (
+          <select
+            className="rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+            value={value ?? 'blue'}
+            onChange={e => onChange(e.target.value)}
+          >
+            {COLOR_OPTIONS.map(color => (
+              <option key={color} value={color}>{color}</option>
+            ))}
+          </select>
         );
       case 'light-array':
         return (
@@ -398,6 +411,7 @@ const VariableRegistry: React.FC<Props> = ({
                     let newValue: any = 0;
                     if (newType === 'boolean') newValue = false;
                     else if (newType === 'string') newValue = '';
+                    else if (newType === 'color') newValue = 'blue';
                     else if (newType === 'light-array') newValue = [];
                     setFormData({ ...formData, type: newType, initialValue: newValue });
                   }}
@@ -405,6 +419,7 @@ const VariableRegistry: React.FC<Props> = ({
                   <option value="number">Number</option>
                   <option value="boolean">Boolean</option>
                   <option value="string">String</option>
+                  <option value="color">Color</option>
                   <option value="light-array">Light Array</option>
                 </select>
               </label>

@@ -149,7 +149,7 @@ const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
   additionalProperties: false,
   properties: {
     name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
-    type: { type: 'string', enum: ['number', 'boolean', 'string', 'light-array'] },
+    type: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array'] },
     scope: { type: 'string', enum: ['cue', 'cue-group'] },
     initialValue: { type: ['number', 'boolean', 'string', 'array'] } as any,
     description: { type: 'string', nullable: true },
@@ -233,7 +233,7 @@ const variableLogicSchema: JSONSchemaType<LogicNode> = {
     },
     mode: { type: 'string', enum: ['set', 'get', 'init'] as const },
     varName: { type: 'string' },
-    valueType: { type: 'string', enum: ['number', 'boolean', 'string', 'light-array'] as const },
+    valueType: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array'] as const },
     value: { ...valueSourceSchema, nullable: true }
   }
 } as any;

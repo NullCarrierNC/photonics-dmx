@@ -238,8 +238,19 @@ const CueEditor: React.FC = () => {
   }, [editorDoc, selectedCueId]);
 
   const availableVariables = useMemo(() => {
-    if (!editorDoc || editorDoc.mode !== 'cue') return [];
+    if (!editorDoc) return [];
     
+    // Effect mode: use effect's variables
+    if (editorDoc.mode === 'effect') {
+      const effectVars = (currentEffectDefinition?.variables ?? []).map(v => ({
+        name: v.name,
+        type: v.type,
+        scope: 'cue' as const  // Effect variables are cue-scoped
+      }));
+      return effectVars;
+    }
+    
+    // Cue mode: combine group and cue variables
     const cueFile = editorDoc.file as NodeCueFile;
     const groupVars = (cueFile.group.variables ?? []).map(v => ({
       name: v.name,
@@ -256,7 +267,7 @@ const CueEditor: React.FC = () => {
       : [];
     
     return [...groupVars, ...cueVars];
-  }, [editorDoc, selectedCueId]);
+  }, [editorDoc, selectedCueId, currentEffectDefinition]);
 
   const availableEvents = useMemo(() => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return [];
