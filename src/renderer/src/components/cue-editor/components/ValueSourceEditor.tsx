@@ -1,10 +1,11 @@
 import React from 'react';
 import type { ValueSource } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import { COLOR_OPTIONS } from '../../../../../photonics-dmx/constants/options';
 
 interface ValueSourceEditorProps {
   value: ValueSource;
   onChange: (value: ValueSource) => void;
-  expectedType: 'number' | 'string' | 'boolean';
+  expectedType: 'number' | 'string' | 'boolean' | 'color';
   availableVariables: Array<{ name: string; type: string }>;
   label?: string;
   placeholder?: string;
@@ -25,8 +26,11 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   const isLiteral = value.source === 'literal';
   
   // Filter variables by expected type
+  // For color type, also accept string type variables since colors are strings
   const compatibleVariables = availableVariables.filter(
-    v => v.type === expectedType || v.type === 'any'
+    v => v.type === expectedType || v.type === 'any' || 
+         (expectedType === 'color' && v.type === 'string') ||
+         (expectedType === 'string' && v.type === 'color')
   );
 
   const handleSourceTypeChange = (sourceType: 'literal' | 'variable') => {
@@ -93,13 +97,30 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
 
       {/* Value Input */}
       {isLiteral ? (
-        <input
-          type={expectedType === 'number' ? 'number' : 'text'}
-          value={String(value.value ?? '')}
-          onChange={(e) => handleLiteralChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
-        />
+        expectedType === 'color' ? (
+          // Color dropdown for literal color values
+          <select
+            value={String(value.value ?? '')}
+            onChange={(e) => handleLiteralChange(e.target.value)}
+            className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+          >
+            <option value="">-- Select Color --</option>
+            {COLOR_OPTIONS.map((color) => (
+              <option key={color} value={color}>
+                {color}
+              </option>
+            ))}
+          </select>
+        ) : (
+          // Standard input for other types
+          <input
+            type={expectedType === 'number' ? 'number' : 'text'}
+            value={String(value.value ?? '')}
+            onChange={(e) => handleLiteralChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+          />
+        )
       ) : (
         <div>
           <select
@@ -125,7 +146,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   );
 };
 
-function getDefaultValueForType(type: 'number' | 'string' | 'boolean'): number | string | boolean {
+function getDefaultValueForType(type: 'number' | 'string' | 'boolean' | 'color'): number | string | boolean {
   switch (type) {
     case 'number':
       return 0;
@@ -133,12 +154,14 @@ function getDefaultValueForType(type: 'number' | 'string' | 'boolean'): number |
       return '';
     case 'boolean':
       return false;
+    case 'color':
+      return COLOR_OPTIONS[0] || 'white'; // Default to first color option
   }
 }
 
 function parseValueForType(
   value: string,
-  type: 'number' | 'string' | 'boolean'
+  type: 'number' | 'string' | 'boolean' | 'color'
 ): number | string | boolean {
   switch (type) {
     case 'number':
@@ -147,6 +170,8 @@ function parseValueForType(
       return value;
     case 'boolean':
       return value === 'true' || value === '1';
+    case 'color':
+      return value; // Colors are just string literals
   }
 }
 

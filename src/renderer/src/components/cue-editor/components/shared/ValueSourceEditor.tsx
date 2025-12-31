@@ -1,12 +1,13 @@
 import React from 'react';
 import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { isVariableSource } from './nodeEditorUtils';
+import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options';
 
 interface ValueSourceEditorProps {
   label: string;
   value: ValueSource | undefined;
   onChange: (next: ValueSource) => void;
-  expected?: 'number' | 'boolean' | 'string' | 'either';
+  expected?: 'number' | 'boolean' | 'string' | 'color' | 'either';
   validLiterals?: string[];
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
 }
@@ -19,13 +20,25 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   validLiterals,
   availableVariables
 }) => {
+  // For color type, use COLOR_OPTIONS if validLiterals not provided
+  const effectiveValidLiterals = expected === 'color' && !validLiterals ? COLOR_OPTIONS : validLiterals;
+  
   const source = value ?? { 
     source: 'literal', 
-    value: expected === 'boolean' ? false : expected === 'string' ? '' : 0 
+    value: expected === 'boolean' ? false : expected === 'string' || expected === 'color' ? '' : 0 
   };
   const isLiteral = source.source === 'literal';
   const isBoolean = expected === 'boolean';
-  const isString = expected === 'string';
+  const isString = expected === 'string' || expected === 'color';
+
+  // Filter variables by expected type (color and string are compatible)
+  const compatibleVariables = expected === 'either' 
+    ? availableVariables 
+    : availableVariables.filter(v => 
+        v.type === expected || 
+        (expected === 'color' && v.type === 'string') ||
+        (expected === 'string' && v.type === 'color')
+      );
 
   const handleToggleVar = (checked: boolean) => {
     if (checked) {
@@ -37,7 +50,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
       });
     } else {
       // Switch to literal mode
-      const defaultValue = isBoolean ? false : isString ? (validLiterals?.[0] ?? '') : 0;
+      const defaultValue = isBoolean ? false : isString ? (effectiveValidLiterals?.[0] ?? '') : 0;
       onChange({ source: 'literal', value: defaultValue });
     }
   };
@@ -68,14 +81,14 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
               <option value="true">true</option>
               <option value="false">false</option>
             </select>
-          ) : validLiterals ? (
+          ) : effectiveValidLiterals ? (
             // Show dropdown for constrained literals (e.g., colours, brightness levels)
             <select
               className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={String(source.value)}
               onChange={event => onChange({ ...source, value: event.target.value })}
             >
-              {validLiterals.map(opt => (
+              {effectiveValidLiterals.map(opt => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
@@ -108,7 +121,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
                 })}
               >
                 <option value="">-- Select --</option>
-                {availableVariables.map(v => (
+                {compatibleVariables.map(v => (
                   <option key={v.name} value={v.name}>
                     {v.name} ({v.type})
                   </option>
@@ -130,7 +143,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
                   <option value="true">true</option>
                   <option value="false">false</option>
                 </select>
-              ) : validLiterals ? (
+              ) : effectiveValidLiterals ? (
                 // Show dropdown for constrained fallback values
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
@@ -142,7 +155,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
                   })}
                 >
                   <option value="">-- None --</option>
-                  {validLiterals.map(opt => (
+                  {effectiveValidLiterals.map(opt => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
