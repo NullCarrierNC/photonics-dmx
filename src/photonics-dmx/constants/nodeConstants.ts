@@ -11,9 +11,10 @@ import type { LocationGroup } from '../types';
 
 /**
  * Light targets used for pattern filtering (static filters only, excludes linear/random)
+ * Note: 'all' is excluded since we have explicit array properties (all-lights-array, front-lights-array, back-lights-array)
  */
 export const PATTERN_TARGETS = [
-  'all', 'even', 'odd',
+  'even', 'odd',
   'half-1', 'half-2',
   'outter-half-major', 'outter-half-minor',
   'inner-half-major', 'inner-half-minor',
@@ -52,6 +53,7 @@ export const BASE_CONFIG_DATA_PROPERTIES = [
   'total-lights',
   'front-lights-count',
   'back-lights-count',
+  'all-lights-array',
   'front-lights-array',
   'back-lights-array'
 ] as const;

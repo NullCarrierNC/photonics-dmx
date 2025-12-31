@@ -111,6 +111,8 @@ export function extractConfigDataValue(
       return lightManager.getLightsInGroup('front').length;
     case 'back-lights-count':
       return lightManager.getLightsInGroup('back').length;
+    case 'all-lights-array':
+      return lightManager.getLightsInGroup(['front', 'back']);
     case 'front-lights-array':
       return lightManager.getLightsInGroup('front');
     case 'back-lights-array':

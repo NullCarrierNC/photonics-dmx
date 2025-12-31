@@ -27,6 +27,7 @@ export function getConfigDataPropertiesMeta(): ConfigDataPropertyMeta[] {
     { id: 'total-lights', label: 'Total Lights', type: 'number' },
     { id: 'front-lights-count', label: 'Front Lights Count', type: 'number' },
     { id: 'back-lights-count', label: 'Back Lights Count', type: 'number' },
+    { id: 'all-lights-array', label: 'All Lights Array', type: 'light-array' },
     { id: 'front-lights-array', label: 'Front Lights Array', type: 'light-array' },
     { id: 'back-lights-array', label: 'Back Lights Array', type: 'light-array' }
   ];

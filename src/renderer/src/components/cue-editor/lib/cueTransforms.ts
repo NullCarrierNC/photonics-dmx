@@ -82,16 +82,22 @@ const cueToFlow = (cue: CueDefinition | null): { nodes: EditorNode[]; edges: Edg
         payload: listener
       }
     })),
-    ...(cue.nodes.effectRaisers ?? []).map((raiser: EffectRaiserNode) => ({
-      id: raiser.id,
-      type: 'effect-raiser' as const,
-      position: nodePositions[raiser.id] ?? { x: 260, y: 360 },
-      data: {
-        kind: 'effect-raiser' as const,
-        label: `Effect: ${raiser.effectId || 'none'}`,
-        payload: raiser
-      }
-    }))
+    ...(cue.nodes.effectRaisers ?? []).map((raiser: EffectRaiserNode) => {
+      // Look up effect name from cue's effects array
+      const effectRef = cue.effects?.find(e => e.effectId === raiser.effectId);
+      const effectName = effectRef?.name || raiser.effectId || 'none';
+      return {
+        id: raiser.id,
+        type: 'effect-raiser' as const,
+        position: nodePositions[raiser.id] ?? { x: 260, y: 360 },
+        data: {
+          kind: 'effect-raiser' as const,
+          label: `Effect: ${effectName}`,
+          payload: raiser,
+          effectName // Pass name to node component
+        }
+      };
+    })
   ];
 
   const edges: Edge[] = cue.connections.map(connection => ({

@@ -30,7 +30,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
           <option value="">-- Choose an effect --</option>
           {availableEffects.map(effect => (
             <option key={effect.id} value={effect.id}>
-              {effect.name} ({effect.id})
+              {effect.name}
             </option>
           ))}
         </select>

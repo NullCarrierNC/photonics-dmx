@@ -649,7 +649,6 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
         },
         actions: {
           type: 'array',
-          minItems: 1,
           items: actionSchema
         },
         logic: {
@@ -731,7 +730,6 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
         },
         actions: {
           type: 'array',
-          minItems: 1,
           items: actionSchema
         },
         logic: {

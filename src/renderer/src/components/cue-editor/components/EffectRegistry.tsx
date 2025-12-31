@@ -214,7 +214,7 @@ const EffectRegistry: React.FC<Props> = ({
                   {effect.name}
                 </div>
                 <div className="text-[10px] text-gray-600 dark:text-gray-400 mt-0.5">
-                  ID: {effect.effectId} | File: {effect.effectFileId}
+                  From: {effect.effectFileId}
                 </div>
               </div>
               <div className="flex gap-1">
