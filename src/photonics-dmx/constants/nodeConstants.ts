@@ -74,7 +74,7 @@ export const ALL_CONFIG_DATA_PROPERTIES = [
  * YARG cue data properties
  */
 export const YARG_CUE_DATA_PROPERTIES = [
-  'cue-name', 'cue-type', 'execution-count', 'bpm', 'beat-duration-ms', 'song-section',
+  'cue-name', 'cue-type', 'previous-cue', 'execution-count', 'bpm', 'beat-duration-ms', 'song-section',
   'current-scene', 'beat-type', 'keyframe', 'venue-size', 'guitar-note-count',
   'bass-note-count', 'drum-note-count', 'keys-note-count',
   'total-score', 'performer', 'bonus-effect', 'fog-state',

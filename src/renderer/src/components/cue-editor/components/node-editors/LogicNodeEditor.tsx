@@ -152,6 +152,7 @@ const CueDataLogicEditor: React.FC<{
   const cueDataProperties = activeMode === 'yarg' ? [
     { id: 'cue-name', label: 'Cue Name', type: 'string' },
     { id: 'cue-type', label: 'Cue Type', type: 'string' },
+    { id: 'previous-cue', label: 'Previous Cue', type: 'cue-type' },
     { id: 'execution-count', label: 'Execution Count', type: 'number' },
     { id: 'bpm', label: 'BPM', type: 'number' },
     { id: 'beat-duration-ms', label: 'Beat Duration (ms)', type: 'number' },

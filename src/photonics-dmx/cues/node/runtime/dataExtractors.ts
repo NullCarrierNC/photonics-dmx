@@ -45,6 +45,7 @@ export function extractYargCueDataValue(
   switch (property) {
     case 'cue-name': return cueId;
     case 'cue-type': return cueData.lightingCue;
+    case 'previous-cue': return cueData.previousCue ?? '';
     case 'execution-count': return cueData.executionCount ?? 0;
     case 'bpm': return cueData.beatsPerMinute;
     case 'beat-duration-ms': return cueData.beatsPerMinute > 0 ? Math.round(60000 / cueData.beatsPerMinute) : 500;

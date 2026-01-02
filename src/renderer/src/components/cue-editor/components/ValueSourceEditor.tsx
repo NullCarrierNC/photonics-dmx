@@ -5,7 +5,7 @@ import { COLOR_OPTIONS } from '../../../../../photonics-dmx/constants/options';
 interface ValueSourceEditorProps {
   value: ValueSource;
   onChange: (value: ValueSource) => void;
-  expectedType: 'number' | 'string' | 'boolean' | 'color';
+  expectedType: 'number' | 'string' | 'boolean' | 'color' | 'cue-type';
   availableVariables: Array<{ name: string; type: string }>;
   label?: string;
   placeholder?: string;
@@ -27,10 +27,12 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   
   // Filter variables by expected type
   // For color type, also accept string type variables since colors are strings
+  // For cue-type, accept string and cue-type variables (and vice versa)
   const compatibleVariables = availableVariables.filter(
     v => v.type === expectedType || v.type === 'any' || 
          (expectedType === 'color' && v.type === 'string') ||
-         (expectedType === 'string' && v.type === 'color')
+         (expectedType === 'string' && (v.type === 'color' || v.type === 'cue-type')) ||
+         (expectedType === 'cue-type' && (v.type === 'string' || v.type === 'cue-type'))
   );
 
   const handleSourceTypeChange = (sourceType: 'literal' | 'variable') => {
@@ -146,11 +148,12 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   );
 };
 
-function getDefaultValueForType(type: 'number' | 'string' | 'boolean' | 'color'): number | string | boolean {
+function getDefaultValueForType(type: 'number' | 'string' | 'boolean' | 'color' | 'cue-type'): number | string | boolean {
   switch (type) {
     case 'number':
       return 0;
     case 'string':
+    case 'cue-type':
       return '';
     case 'boolean':
       return false;
@@ -161,12 +164,13 @@ function getDefaultValueForType(type: 'number' | 'string' | 'boolean' | 'color')
 
 function parseValueForType(
   value: string,
-  type: 'number' | 'string' | 'boolean' | 'color'
+  type: 'number' | 'string' | 'boolean' | 'color' | 'cue-type'
 ): number | string | boolean {
   switch (type) {
     case 'number':
       return parseFloat(value) || 0;
     case 'string':
+    case 'cue-type':
       return value;
     case 'boolean':
       return value === 'true' || value === '1';

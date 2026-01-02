@@ -7,7 +7,7 @@ interface ValueSourceEditorProps {
   label: string;
   value: ValueSource | undefined;
   onChange: (next: ValueSource) => void;
-  expected?: 'number' | 'boolean' | 'string' | 'color' | 'either';
+  expected?: 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'either';
   validLiterals?: string[];
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
   integerOnly?: boolean; // For number fields that should only accept integers
@@ -34,13 +34,14 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   const isString = expected === 'string' || expected === 'color';
   const allowTextInput = isString || expected === 'either';
 
-  // Filter variables by expected type (color and string are compatible)
+  // Filter variables by expected type (color and string are compatible, cue-type and string are compatible)
   const compatibleVariables = expected === 'either' 
     ? availableVariables 
     : availableVariables.filter(v => 
         v.type === expected || 
         (expected === 'color' && v.type === 'string') ||
-        (expected === 'string' && v.type === 'color')
+        (expected === 'string' && (v.type === 'color' || v.type === 'cue-type')) ||
+        (expected === 'cue-type' && (v.type === 'string' || v.type === 'cue-type'))
       );
 
   const handleToggleVar = (checked: boolean) => {

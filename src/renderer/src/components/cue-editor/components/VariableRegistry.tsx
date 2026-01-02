@@ -176,6 +176,7 @@ const VariableRegistry: React.FC<Props> = ({
           </select>
         );
       case 'string':
+      case 'cue-type':
         return (
           <input
             type="text"
@@ -410,7 +411,7 @@ const VariableRegistry: React.FC<Props> = ({
                     const newType = e.target.value as VariableType;
                     let newValue: any = 0;
                     if (newType === 'boolean') newValue = false;
-                    else if (newType === 'string') newValue = '';
+                    else if (newType === 'string' || newType === 'cue-type') newValue = '';
                     else if (newType === 'color') newValue = 'blue';
                     else if (newType === 'light-array') newValue = [];
                     setFormData({ ...formData, type: newType, initialValue: newValue });
@@ -421,6 +422,7 @@ const VariableRegistry: React.FC<Props> = ({
                   <option value="string">String</option>
                   <option value="color">Color</option>
                   <option value="light-array">Light Array</option>
+                  <option value="cue-type">Cue Type</option>
                 </select>
               </label>
 

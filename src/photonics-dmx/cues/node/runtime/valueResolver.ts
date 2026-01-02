@@ -21,7 +21,7 @@ export function resolveValue(
   }
 
   if (source.source === 'literal') {
-    if (expectedType === 'string') {
+    if (expectedType === 'string' || expectedType === 'cue-type') {
       return String(source.value);
     }
     if (expectedType === 'number') {
@@ -43,7 +43,7 @@ export function resolveValue(
   const existing = cueVar ?? groupVar;
   
   if (existing) {
-    if (expectedType === 'string') {
+    if (expectedType === 'string' || expectedType === 'cue-type') {
       return String(existing.value);
     }
     if (expectedType === 'number') {
@@ -57,7 +57,7 @@ export function resolveValue(
   }
 
   // Use fallback
-  if (expectedType === 'string') {
+  if (expectedType === 'string' || expectedType === 'cue-type') {
     return source.fallback !== undefined ? String(source.fallback) : '';
   }
   if (expectedType === 'number') {

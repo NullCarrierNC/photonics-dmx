@@ -239,7 +239,7 @@ const variableLogicSchema: JSONSchemaType<LogicNode> = {
     },
     mode: { type: 'string', enum: ['set', 'get', 'init'] as const },
     varName: { type: 'string' },
-    valueType: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array'] as const },
+    valueType: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type'] as const },
     value: { ...valueSourceSchema, nullable: true }
   }
 } as any;

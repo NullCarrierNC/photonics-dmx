@@ -35,7 +35,7 @@ export interface Connection {
   toPort?: string;
 }
 
-export type VariableType = 'number' | 'boolean' | 'string' | 'color' | 'light-array';
+export type VariableType = 'number' | 'boolean' | 'string' | 'color' | 'light-array' | 'cue-type';
 
 export type ValueSource =
   | { source: 'literal'; value: number | boolean | string | TrackedLight[] }
