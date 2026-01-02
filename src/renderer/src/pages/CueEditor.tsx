@@ -356,7 +356,7 @@ const CueEditor: React.FC = () => {
               <option value="yarg">YARG Node Cues</option>
               <option value="audio">Audio Node Cues</option>
             </optgroup>
-            <optgroup label="Effects">
+            <optgroup label="Effects" style={{ display: 'none' }}>
               <option value="yarg-effect">YARG Effects</option>
               <option value="audio-effect">Audio Effects</option>
             </optgroup>
@@ -417,7 +417,7 @@ const CueEditor: React.FC = () => {
               </button>
               {editorDoc?.mode === 'cue' && (
                 <button
-                  className={`flex-1 px-3 py-2 text-xs font-medium ${
+                  className={`flex-1 px-3 py-2 text-xs font-medium hidden ${
                     registryTab === 'effects'
                       ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-300 border-b-2 border-cyan-600'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'

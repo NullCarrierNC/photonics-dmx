@@ -331,13 +331,20 @@ const LightsFromIndexLogicEditor: React.FC<{
         </select>
       </label>
 
-      <ValueSourceEditor
-        label="Index (with wraparound)"
-        value={node.index}
-        onChange={next => updateNode({ index: next })}
-        expected="number"
-        availableVariables={availableVariables}
-      />
+      <div className="space-y-1">
+        <ValueSourceEditor
+          label="Index (single int, comma-separated list, or variable)"
+          value={node.index}
+          onChange={next => updateNode({ index: next })}
+          expected="either"
+          availableVariables={availableVariables}
+        />
+        {node.index.source === 'literal' && typeof node.index.value === 'string' && node.index.value.includes(',') && (
+          <p className="text-[10px] text-gray-500 italic">
+            Comma-separated list of integers (e.g., "0, 2, 5")
+          </p>
+        )}
+      </div>
 
       <label className="flex flex-col font-medium">
         Assign To
@@ -356,7 +363,7 @@ const LightsFromIndexLogicEditor: React.FC<{
       </label>
 
       <p className="text-[10px] text-gray-500 italic">
-        Extracts a single light from source array. Index wraps around if out of bounds.
+        Extracts lights from source array at specified indices. Supports single int, comma-separated list (e.g., "0, 2, 5"), or variable (single int or array of ints). Indices wrap around if out of bounds.
       </p>
     </div>
   );

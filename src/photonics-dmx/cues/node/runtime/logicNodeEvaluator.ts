@@ -169,19 +169,109 @@ export function evaluateLogicNode(
         return edges.map(edge => edge.to);
       }
       
-      // Resolve the index
-      const indexValue = resolveValue('number', logicNode.index, context);
-      const index = Math.floor(Number(indexValue));
+      // Resolve the index value - could be a number, string (comma-separated), or variable
+      let indices: number[] = [];
       
-      // Apply wraparound (modulo)
-      const wrappedIndex = ((index % lightsArray.length) + lightsArray.length) % lightsArray.length;
-      const selectedLight = lightsArray[wrappedIndex];
+      if (logicNode.index.source === 'literal') {
+        // Handle literal value - could be a number or comma-separated string
+        const indexValue = logicNode.index.value;
+        if (typeof indexValue === 'number') {
+          indices = [Math.floor(indexValue)];
+        } else if (typeof indexValue === 'string') {
+          // Parse comma-separated list of integers
+          indices = indexValue.split(',')
+            .map(s => s.trim())
+            .map(s => {
+              const parsed = parseInt(s, 10);
+              return isNaN(parsed) ? null : parsed;
+            })
+            .filter((idx): idx is number => idx !== null);
+        } else {
+          // Try to parse as number
+          const parsed = Number(indexValue);
+          if (!isNaN(parsed)) {
+            indices = [Math.floor(parsed)];
+          }
+        }
+      } else {
+        // Handle variable source
+        const varName = logicNode.index.name;
+        const cueVar = context.cueLevelVarStore.get(varName);
+        const groupVar = context.groupLevelVarStore.get(varName);
+        const varValue = cueVar ?? groupVar;
+        
+        if (varValue) {
+          if (varValue.type === 'number') {
+            // Single number variable
+            indices = [Math.floor(Number(varValue.value))];
+          } else if (varValue.type === 'string') {
+            // String variable - could be a single number or comma-separated list
+            const strValue = String(varValue.value);
+            if (strValue.includes(',')) {
+              // Comma-separated list
+              indices = strValue.split(',')
+                .map(s => s.trim())
+                .map(s => {
+                  const parsed = parseInt(s, 10);
+                  return isNaN(parsed) ? null : parsed;
+                })
+                .filter((idx): idx is number => idx !== null);
+            } else {
+              // Single number as string
+              const parsed = parseInt(strValue, 10);
+              if (!isNaN(parsed)) {
+                indices = [parsed];
+              }
+            }
+          } else if (Array.isArray(varValue.value)) {
+            // Array variable - assume it's an array of numbers (for future support)
+            indices = (varValue.value as any[])
+              .map(v => {
+                const num = typeof v === 'number' ? v : Number(v);
+                return isNaN(num) ? null : Math.floor(num);
+              })
+              .filter((idx): idx is number => idx !== null);
+          } else {
+            // Try to parse as number
+            const parsed = Number(varValue.value);
+            if (!isNaN(parsed)) {
+              indices = [Math.floor(parsed)];
+            }
+          }
+        } else if (logicNode.index.fallback !== undefined) {
+          // Use fallback
+          const fallback = logicNode.index.fallback;
+          if (typeof fallback === 'number') {
+            indices = [Math.floor(fallback)];
+          } else if (typeof fallback === 'string') {
+            indices = fallback.split(',')
+              .map(s => s.trim())
+              .map(s => {
+                const parsed = parseInt(s, 10);
+                return isNaN(parsed) ? null : parsed;
+              })
+              .filter((idx): idx is number => idx !== null);
+          }
+        }
+      }
       
-      // Assign the single light to the target variable
+      // If no valid indices found, return early
+      if (indices.length === 0) {
+        console.warn(`lights-from-index node ${nodeId}: no valid indices found`);
+        return edges.map(edge => edge.to);
+      }
+      
+      // Apply wraparound (modulo) and extract lights
+      const selectedLights = indices.map(index => {
+        const wrappedIndex = ((index % lightsArray.length) + lightsArray.length) % lightsArray.length;
+        return lightsArray[wrappedIndex];
+      });
+      
+      // Assign the array of lights to the target variable
       const targetVarStore = getVarStore(logicNode.assignTo);
       targetVarStore.set(logicNode.assignTo, { 
         type: 'light-array', 
-        value: [selectedLight] 
+        value: selectedLights 
       });
       
       return edges.map(edge => edge.to);

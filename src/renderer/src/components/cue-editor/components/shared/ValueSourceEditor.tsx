@@ -27,11 +27,12 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   
   const source = value ?? { 
     source: 'literal', 
-    value: expected === 'boolean' ? false : expected === 'string' || expected === 'color' ? '' : 0 
+    value: expected === 'boolean' ? false : (expected === 'string' || expected === 'color' || expected === 'either') ? '' : 0 
   };
   const isLiteral = source.source === 'literal';
   const isBoolean = expected === 'boolean';
   const isString = expected === 'string' || expected === 'color';
+  const allowTextInput = isString || expected === 'either';
 
   // Filter variables by expected type (color and string are compatible)
   const compatibleVariables = expected === 'either' 
@@ -96,17 +97,22 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
             </select>
           ) : (
             <input
-              type={isString ? 'text' : 'number'}
-              step={isString ? undefined : (integerOnly ? "1" : "0.1")}
+              type={allowTextInput ? 'text' : 'number'}
+              step={allowTextInput ? undefined : (integerOnly ? "1" : "0.1")}
               className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={isString ? String(source.value ?? '') : (typeof source.value === 'number' ? source.value : 0)}
+              value={allowTextInput ? String(source.value ?? '') : (typeof source.value === 'number' ? source.value : 0)}
               onChange={event => {
-                let newValue = isString ? event.target.value : Number(event.target.value);
-                // Round to integer if integerOnly is true
-                if (!isString && integerOnly && typeof newValue === 'number') {
-                  newValue = Math.round(newValue);
+                if (allowTextInput) {
+                  // For string or either type, store as string (allows comma-separated values)
+                  onChange({ ...source, value: event.target.value });
+                } else {
+                  let newValue = Number(event.target.value);
+                  // Round to integer if integerOnly is true
+                  if (integerOnly && typeof newValue === 'number') {
+                    newValue = Math.round(newValue);
+                  }
+                  onChange({ ...source, value: newValue });
                 }
-                onChange({ ...source, value: newValue });
               }}
             />
           )}

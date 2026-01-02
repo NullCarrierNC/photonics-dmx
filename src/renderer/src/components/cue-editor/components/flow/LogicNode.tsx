@@ -129,7 +129,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
   const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' || logicType === 'create-pairs' || logicType === 'concat-lights';
 
   const nodeStyles = isLoopNode
-    ? "border-purple-400 bg-purple-50 dark:bg-purple-900/30 text-xs shadow-sm min-w-[150px]"
+    ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 text-xs shadow-sm min-w-[150px]"
     : isArrayNode
       ? "border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-xs shadow-sm min-w-[150px]"
       : isDataNode
@@ -137,7 +137,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
         : "border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-xs shadow-sm min-w-[150px]";
 
   const titleStyles = isLoopNode
-    ? "font-semibold text-purple-800 dark:text-purple-100 text-center"
+    ? "font-semibold text-indigo-800 dark:text-indigo-100 text-center"
     : isArrayNode
       ? "font-semibold text-teal-800 dark:text-teal-100 text-center"
       : isDataNode
@@ -145,7 +145,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
         : "font-semibold text-amber-800 dark:text-amber-100 text-center";
 
   const detailStyles = isLoopNode
-    ? "text-[11px] text-purple-900 dark:text-purple-50 opacity-90 text-center"
+    ? "text-[11px] text-indigo-900 dark:text-indigo-50 opacity-90 text-center"
     : isArrayNode
       ? "text-[11px] text-teal-900 dark:text-teal-50 opacity-90 text-center"
       : isDataNode
@@ -153,7 +153,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
         : "text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center";
 
   const handleStyles = isLoopNode
-    ? "text-purple-700 dark:text-purple-100"
+    ? "text-indigo-700 dark:text-indigo-100"
     : isArrayNode
       ? "text-teal-700 dark:text-teal-100"
       : isDataNode

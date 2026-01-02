@@ -15,7 +15,7 @@ const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string =>
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data';
   
   if (isLoopNode) {
-    return `${baseClasses} border-purple-400 bg-purple-50 dark:bg-purple-900/30 text-purple-800 dark:text-purple-100`;
+    return `${baseClasses} border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-100`;
   }
   if (isArrayNode) {
     return `${baseClasses} border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-teal-800 dark:text-teal-100`;
@@ -42,15 +42,26 @@ interface NodeCreationSectionsProps {
 const EventNodesSection: React.FC<{
   activeMode: NodeCueMode;
   addEventNode: (option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>) => void;
-}> = ({ activeMode, addEventNode }) => (
+  addEventListenerNode?: () => void;
+}> = ({ activeMode, addEventNode, addEventListenerNode }) => (
   <div>
-    <h3 className="font-semibold text-sm mb-2">Event Nodes</h3>
-    <button
-      className="border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-100 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity"
-      onClick={() => addEventNode(getDefaultEventOption(activeMode))}
-    >
-      System Event
-    </button>
+    <h3 className="font-semibold text-sm mb-2">Event Listeners</h3>
+    <div className="grid grid-cols-2 gap-2 text-xs">
+      <button
+        className="border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        onClick={() => addEventNode(getDefaultEventOption(activeMode))}
+      >
+        System Event
+      </button>
+      {addEventListenerNode && (
+        <button
+          className="border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+          onClick={() => addEventListenerNode()}
+        >
+          Custom Event Listener
+        </button>
+      )}
+    </div>
   </div>
 );
 
@@ -93,17 +104,37 @@ const LogicNodesSection: React.FC<{
   <div>
     <h3 className="font-semibold text-sm mb-2">Logic Nodes</h3>
     <div className="grid grid-cols-3 gap-2 text-xs">
+      {/* Data nodes (orange) */}
       <button
-        className={getLogicNodeButtonClasses('variable')}
-        onClick={() => addLogicNode('variable')}
+        className={getLogicNodeButtonClasses('config-data')}
+        onClick={() => addLogicNode('config-data')}
       >
-        Variable
+        Config Data
       </button>
+      <button
+        className={getLogicNodeButtonClasses('cue-data')}
+        onClick={() => addLogicNode('cue-data')}
+      >
+        Cue Data
+      </button>
+      {/* Logic nodes (amber) */}
       <button
         className={getLogicNodeButtonClasses('conditional')}
         onClick={() => addLogicNode('conditional')}
       >
         Conditional
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('delay')}
+        onClick={() => addLogicNode('delay')}
+      >
+        Delay
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('lights-from-index')}
+        onClick={() => addLogicNode('lights-from-index')}
+      >
+        Lights From Index
       </button>
       <button
         className={getLogicNodeButtonClasses('math')}
@@ -112,23 +143,37 @@ const LogicNodesSection: React.FC<{
         Math
       </button>
       <button
-        className={getLogicNodeButtonClasses('cue-data')}
-        onClick={() => addLogicNode('cue-data')}
+        className={getLogicNodeButtonClasses('variable')}
+        onClick={() => addLogicNode('variable')}
       >
-        Cue Data
+        Variable
+      </button>
+      {/* Light operations (teal) */}
+      <button
+        className={getLogicNodeButtonClasses('array-length')}
+        onClick={() => addLogicNode('array-length')}
+      >
+        Array Length
       </button>
       <button
-        className={getLogicNodeButtonClasses('config-data')}
-        onClick={() => addLogicNode('config-data')}
+        className={getLogicNodeButtonClasses('concat-lights')}
+        onClick={() => addLogicNode('concat-lights')}
       >
-        Config Data
+        Concat Lights
       </button>
       <button
-        className={getLogicNodeButtonClasses('lights-from-index')}
-        onClick={() => addLogicNode('lights-from-index')}
+        className={getLogicNodeButtonClasses('create-pairs')}
+        onClick={() => addLogicNode('create-pairs')}
       >
-        Lights From Index
+        Create Pairs
       </button>
+      <button
+        className={getLogicNodeButtonClasses('reverse-lights')}
+        onClick={() => addLogicNode('reverse-lights')}
+      >
+        Reverse Lights
+      </button>
+      {/* Loop nodes (purple) */}
       <button
         className={getLogicNodeButtonClasses('for-loop')}
         onClick={() => addLogicNode('for-loop')}
@@ -141,60 +186,21 @@ const LogicNodesSection: React.FC<{
       >
         While Loop
       </button>
-      <button
-        className={getLogicNodeButtonClasses('array-length')}
-        onClick={() => addLogicNode('array-length')}
-      >
-        Array Length
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('reverse-lights')}
-        onClick={() => addLogicNode('reverse-lights')}
-      >
-        Reverse Lights
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('create-pairs')}
-        onClick={() => addLogicNode('create-pairs')}
-      >
-        Create Pairs
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('concat-lights')}
-        onClick={() => addLogicNode('concat-lights')}
-      >
-        Concat Lights
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('delay')}
-        onClick={() => addLogicNode('delay')}
-      >
-        Delay
-      </button>
     </div>
   </div>
 );
 
 const RuntimeEventsSection: React.FC<{
   addEventRaiserNode: () => void;
-  addEventListenerNode: () => void;
-}> = ({ addEventRaiserNode, addEventListenerNode }) => (
+}> = ({ addEventRaiserNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Runtime Events</h3>
-    <div className="grid grid-cols-2 gap-2 text-xs">
-      <button
-        className="border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
-        onClick={() => addEventRaiserNode()}
-      >
-        Event Raiser
-      </button>
-      <button
-        className="border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
-        onClick={() => addEventListenerNode()}
-      >
-        Event Listener
-      </button>
-    </div>
+    <button
+      className="border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity w-full"
+      onClick={() => addEventRaiserNode()}
+    >
+      Custom Event Raiser
+    </button>
   </div>
 );
 
@@ -226,7 +232,7 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
   return (
     <>
       {editorMode === 'cue' && (
-        <EventNodesSection activeMode={activeMode} addEventNode={addEventNode} />
+        <EventNodesSection activeMode={activeMode} addEventNode={addEventNode} addEventListenerNode={addEventListenerNode} />
       )}
 
       {editorMode === 'effect' && addEffectListenerNode && (
@@ -237,15 +243,16 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
 
       <LogicNodesSection addLogicNode={addLogicNode} />
 
-      {addEventRaiserNode && addEventListenerNode && (
+      {addEventRaiserNode && (
         <RuntimeEventsSection 
           addEventRaiserNode={addEventRaiserNode} 
-          addEventListenerNode={addEventListenerNode} 
         />
       )}
 
       {editorMode === 'cue' && addEffectRaiserNode && (
-        <EffectNodesSection addEffectRaiserNode={addEffectRaiserNode} />
+        <div className="hidden">
+          <EffectNodesSection addEffectRaiserNode={addEffectRaiserNode} />
+        </div>
       )}
     </>
   );
