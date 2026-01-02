@@ -35,7 +35,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
       return (
         <>
           <div>{logic.operator.toUpperCase()}: {left} {operatorSymbol} {right}</div>
-          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
         </>
       );
     }
@@ -48,15 +48,15 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
       return (
         <>
           <div>{logic.dataProperty}</div>
-          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
         </>
       );
     }
     if (logicType === 'config-data') {
       return (
         <>
-          <div>{logic.dataProperty}</div>
-          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+          <div>Assign: {logic.dataProperty}</div>
+          {logic.assignTo && <div>To Var Var: {logic.assignTo}</div>}
         </>
       );
     }
@@ -65,7 +65,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
       return (
         <>
           <div>{logic.sourceVariable}[{indexText}]</div>
-          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
         </>
       );
     }
@@ -85,7 +85,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
       return (
         <>
           <div>LENGTH OF {logic.sourceVariable || '?'}</div>
-          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
         </>
       );
     }
@@ -93,7 +93,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
       return (
         <>
           <div>REVERSE {logic.sourceVariable || '?'}</div>
-          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
         </>
       );
     }
@@ -102,7 +102,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
         <>
           <div>{(logic.pairType || 'opposite').toUpperCase()} PAIRS</div>
           <div>FROM: {logic.sourceVariable || '?'}</div>
-          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
         </>
       );
     }
@@ -112,7 +112,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
         <>
           <div>CONCAT {vars.length} ARRAYS</div>
           {vars.length > 0 && <div>{vars.join(' + ')}</div>}
-          {logic.assignTo && <div>TO: {logic.assignTo}</div>}
+          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
         </>
       );
     }
