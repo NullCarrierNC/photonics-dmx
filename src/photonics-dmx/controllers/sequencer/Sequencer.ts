@@ -94,6 +94,33 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Adds a new effect with a completion callback.
+   * The callback will be fired when all lights in the effect complete their transitions.
+   * 
+   * @param name The name of the effect
+   * @param effect The effect configuration
+   * @param onComplete Callback to fire when effect completes
+   * @param isPersistent If true, the effect re-queues itself after completing
+   */
+  public addEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent: boolean = false
+  ): void {
+    this.effectManager.addEffectWithCallback(name, effect, onComplete, isPersistent);
+  }
+
+  /**
+   * Remove a completion callback for an effect.
+   * 
+   * @param name The name of the effect
+   */
+  public removeEffectCallback(name: string): void {
+    this.effectManager.removeEffectCallback(name);
+  }
+
+  /**
    * Clears all running effects and starts a new effect.
    * If an effect with the same name is already running, it will be queued.
    * 

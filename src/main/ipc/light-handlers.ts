@@ -2,7 +2,7 @@ import { IpcMain, BrowserWindow } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { SenderConfig } from '../../photonics-dmx/types';
 import { YargCueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/registries/YargCueRegistry';
-import { CueType, DrumNoteType, InstrumentNoteType } from '../../photonics-dmx/cues/types/cueTypes';
+import { CueType, DrumNoteType, InstrumentNoteType, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
 
 
@@ -336,7 +336,16 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           }
         }
         
-        // Send the simulated cue data to the frontend
+        // Send the simulated cue data through the cue handler to process node events
+        const cueHandler = controllerManager.getCueHandler();
+        if (cueHandler && effectId) {
+          const cueType = getCueTypeFromId(effectId);
+          if (cueType) {
+            await cueHandler.handleCue(cueType, mockCueData);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend for visual indicators
         const allWindows = BrowserWindow.getAllWindows();
         const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
         if (mainWindow) {
@@ -401,7 +410,16 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           }
         }
         
-        // Send the simulated cue data to the frontend
+        // Send the simulated cue data through the cue handler to process node events
+        const cueHandler = controllerManager.getCueHandler();
+        if (cueHandler && effectId) {
+          const cueType = getCueTypeFromId(effectId);
+          if (cueType) {
+            await cueHandler.handleCue(cueType, mockCueData);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend for visual indicators
         const allWindows = BrowserWindow.getAllWindows();
         const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
         if (mainWindow) {
@@ -448,7 +466,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           strobeState: 'Strobe_Off',
           performer: 'None',
           trackMode: 'simulated',
-          beat: 'Unknown',
+          beat: 'Measure',
           keyframe: 'Unknown',
           bonusEffect: 'None',
           ledPositions: [],
@@ -466,7 +484,16 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           }
         }
         
-        // Send the simulated cue data to the frontend
+        // Send the simulated cue data through the cue handler to process node events
+        const cueHandler = controllerManager.getCueHandler();
+        if (cueHandler && effectId) {
+          const cueType = getCueTypeFromId(effectId);
+          if (cueType) {
+            await cueHandler.handleCue(cueType, mockCueData);
+          }
+        }
+        
+        // Send the simulated cue data to the frontend for visual indicators
         const mainWindow = BrowserWindow.getAllWindows()[0];
         if (mainWindow) {
           mainWindow.webContents.send('cue-handled', mockCueData);

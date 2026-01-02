@@ -6,13 +6,15 @@ interface EffectsDropdownProps {
   onSelect: (effect: EffectSelector) => void;
   value?: string;
   disabled?: boolean;
+  autoSelectFirst?: boolean;
 }
 
 export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
   groupId = 'stagekit',
   onSelect,
   value,
-  disabled = false
+  disabled = false,
+  autoSelectFirst = false
 }) => {
   const [effects, setEffects] = useState<EffectSelector[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,9 +29,11 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
       setLoading(false);
       return;
     }
-    
+
     try {
       setLoading(true);
+      // Clear current selection when switching groups
+      setSelectedEffect(null);
       // This retrieves cues from the specified group without changing the active group state
       const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', groupId);
       
@@ -38,19 +42,8 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
         const sortedEffects = availableEffects.sort((a, b) => a.id.localeCompare(b.id));
         setEffects(sortedEffects);
         
-        // If we have a value prop, select that effect
-        if (value) {
-          const selectedEffect = sortedEffects.find(effect => effect.id === value);
-          if (selectedEffect) {
-            setSelectedEffect(selectedEffect);
-          }
-        } 
-        // Otherwise select the first effect if there's no current selection
-        else if (!selectedEffect && sortedEffects.length > 0) {
-          const firstEffect = sortedEffects[0];
-          setSelectedEffect(firstEffect);
-          onSelect(firstEffect);
-        }
+        // Note: Auto-selection of first effect is handled by the useEffect below
+        // that watches value and effects. 
       } else {
         setEffects([]);
         setSelectedEffect(null);
@@ -62,7 +55,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [groupId, value, onSelect]); // Keep only essential dependencies
+  }, [groupId, onSelect]); // Removed 'value' dependency to avoid interference with the useEffect below
 
   // Fetch effects when group changes
   useEffect(() => {
@@ -76,12 +69,16 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
       if (matchingEffect) {
         setSelectedEffect(matchingEffect);
       }
-    } else if (!value && effects.length > 0 && !selectedEffect) {
-      // If no value is provided but we have effects, select the first one
-      setSelectedEffect(effects[0]);
-      onSelect(effects[0]);
+    } else if (!value && effects.length > 0 && autoSelectFirst) {
+      // Only auto-select the first one if autoSelectFirst is enabled
+      const firstEffect = effects[0];
+      setSelectedEffect(firstEffect);
+      onSelect(firstEffect);
+    } else if (!value) {
+      // Clear internal selection when parent clears selection
+      setSelectedEffect(null);
     }
-  }, [value, effects, onSelect, selectedEffect]);
+  }, [value, effects, onSelect, autoSelectFirst]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
@@ -111,11 +108,14 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
         ) : effects.length === 0 ? (
           <option value="" disabled>No effects available</option>
         ) : (
-          effects.map((effect) => (
-            <option key={effect.id} value={effect.id}>
-              {effect.id}
-            </option>
-          ))
+          <>
+            <option value="">- Select -</option>
+            {effects.map((effect) => (
+              <option key={effect.id} value={effect.id}>
+                {effect.id}
+              </option>
+            ))}
+          </>
         )}
       </select>
     </div>

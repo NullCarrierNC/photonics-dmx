@@ -1,21 +1,37 @@
-import { WaitCondition, TrackedLight, Effect, EffectTransition, RGBIO, LocationGroup } from '../../../types';
+import { WaitCondition, TrackedLight, Effect, EffectTransition, RGBIO, LocationGroup, Color, Brightness, BlendMode, LightTarget } from '../../../types';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import {
-  getEffectCrossFadeColors,
-  getEffectFlashColor,
-  getSweepEffect,
-  getEffectCycleLights,
-  getEffectBlackout
-} from '../../../effects';
 import { getColor } from '../../../helpers/dmxHelpers';
 import {
   ActionNode,
-  ActionTiming,
-  createDefaultActionTiming,
-  NodeActionTarget,
-  NodeColorSetting
+  createDefaultActionTiming
 } from '../../types/nodeCueTypes';
 import { EasingType } from '../../../easing';
+import { VariableValue } from '../runtime/executionTypes';
+
+// Resolved action data (after ValueSource resolution)
+export interface ResolvedActionTarget {
+  groups: LocationGroup[];
+  filter: LightTarget;
+}
+
+export interface ResolvedColorSetting {
+  name: Color;
+  brightness: Brightness;
+  blendMode?: BlendMode;
+  opacity?: number;  // 0.0-1.0
+}
+
+export interface ResolvedActionTiming {
+  waitForCondition: WaitCondition;
+  waitForTime: number;
+  waitForConditionCount?: number;
+  duration: number;
+  waitUntilCondition: WaitCondition;
+  waitUntilTime: number;
+  waitUntilConditionCount?: number;
+  easing?: string;
+  level?: number;
+}
 
 interface BuildEffectParams {
   action: ActionNode;
@@ -23,6 +39,21 @@ interface BuildEffectParams {
   waitCondition?: WaitCondition;
   /** Time in milliseconds to wait before the effect starts (for chained actions) */
   waitTime?: number;
+  intensityScale?: number;
+  // Add resolved values for direct use
+  resolvedTarget?: ResolvedActionTarget;
+  resolvedColor?: ResolvedColorSetting;
+  resolvedSecondaryColor?: ResolvedColorSetting;
+  resolvedTiming?: ResolvedActionTiming;
+  resolvedLayer?: number;
+}
+
+export interface BuildEffectChainStep {
+  action: ActionNode;
+  lights: TrackedLight[];
+  resolvedColor?: ResolvedColorSetting;
+  resolvedTiming?: ResolvedActionTiming;
+  resolvedLayer?: number;
   intensityScale?: number;
 }
 
@@ -36,24 +67,14 @@ const safeDuration = (value: number | undefined, fallback: number, min = 0): num
   return Math.max(min, value);
 };
 
-const resolveColor = (color: NodeColorSetting, scale: number): RGBIO => {
+const resolveColor = (color: ResolvedColorSetting, intensityScale: number): RGBIO => {
   const rgb = getColor(color.name, color.brightness, color.blendMode ?? 'replace');
-  const clampedScale = clamp(scale, 0, 1);
-  rgb.intensity = Math.round(rgb.intensity * clampedScale);
-  rgb.opacity = clamp(rgb.opacity * clampedScale, 0, 1);
+  const clampedIntensityScale = clamp(intensityScale, 0, 1);
+  rgb.intensity = Math.round(rgb.intensity * clampedIntensityScale);
+  // Use opacity from color setting if provided, otherwise default to 1.0
+  rgb.opacity = color.opacity !== undefined ? clamp(color.opacity, 0, 1) : 1.0;
   return rgb;
 };
-
-const transparentVariant = (color: RGBIO): RGBIO => ({
-  ...color,
-  intensity: 0,
-  opacity: 0
-});
-
-const ensureTiming = (action: ActionNode): ActionTiming => ({
-  ...createDefaultActionTiming(),
-  ...(action.timing ?? {})
-});
 
 const resolveEasing = (value?: string, fallback: EasingType = EasingType.SIN_IN_OUT): EasingType => {
   if (!value) {
@@ -63,109 +84,45 @@ const resolveEasing = (value?: string, fallback: EasingType = EasingType.SIN_IN_
   return valid ? (value as EasingType) : fallback;
 };
 
-/**
- * Applies chained timing to an effect's first transition.
- * - If the action was triggered by 'none', convert the first transition into a delay.
- * - Otherwise, insert a timing-only gate that waits for the event, then delays,
- *   before allowing the original transition to run.
- */
-const applyChainedTiming = (effect: Effect, waitTime: number, waitCondition: WaitCondition): Effect => {
-  if (waitTime <= 0 || !effect.transitions || effect.transitions.length === 0) {
-    return effect;
+const normalizeWaitFor = (timing: ResolvedActionTiming, waitTimeOffset = 0): { waitFor: WaitCondition; waitForTime: number } => {
+  let waitFor: WaitCondition = timing.waitForCondition ?? 'none';
+  const waitForTime = safeDuration(waitTimeOffset + (timing.waitForTime ?? 0), 0, 0);
+
+  // If the transition wants to "start immediately" but has an explicit delay time,
+  // interpret that as a delay gate (matches existing buildEffect behavior).
+  if (waitFor === 'none' && waitForTime > 0) {
+    waitFor = 'delay';
   }
 
-  const [firstTransition, ...rest] = effect.transitions;
-
-  if (waitCondition === 'none') {
-    const updatedFirst: EffectTransition = {
-      ...firstTransition,
-      waitForCondition: 'delay',
-      waitForTime: waitTime
-    };
-    return {
-      ...effect,
-      transitions: [updatedFirst, ...rest]
-    };
-  }
-
-  const timingGate: EffectTransition = {
-    ...firstTransition,
-    timingOnly: true,
-    waitForCondition: waitCondition,
-    waitForTime: 0,
-    waitForConditionCount: firstTransition.waitForConditionCount,
-    transform: {
-      ...firstTransition.transform,
-      duration: 0
-    },
-    waitUntilCondition: 'delay',
-    waitUntilTime: waitTime,
-    waitUntilConditionCount: undefined
-  };
-
-  const chainedFirst: EffectTransition = {
-    ...firstTransition,
-    waitForCondition: 'none',
-    waitForTime: 0,
-    waitForConditionCount: undefined
-  };
-
-  return {
-    ...effect,
-    transitions: [timingGate, chainedFirst, ...rest]
-  };
+  return { waitFor, waitForTime };
 };
 
-const createTimedColorEffect = (params: {
+const createSingleColorTransition = (params: {
   lights: TrackedLight[];
   layer: number;
   waitFor: WaitCondition;
+  waitForTime: number;
   color: RGBIO;
-  timing: ActionTiming;
-  easingIn: EasingType;
-  easingOut: EasingType;
-  returnColor?: RGBIO;
-}): Effect => {
-  const { lights, layer, waitFor, color, timing, easingIn, easingOut } = params;
-  const fadeInDuration = safeDuration(timing.fadeIn, 0, 0);
-  const holdDuration = safeDuration(timing.hold, 0, 0);
-  const fadeOutDuration = safeDuration(timing.fadeOut, 0, 0);
-  const postDelay = safeDuration(timing.postDelay, 0, 0);
-  const returnColor = params.returnColor ?? transparentVariant(color);
-
-  const transitions: EffectTransition[] = [
-    {
-      lights,
-      layer,
-      waitForCondition: waitFor,
-      waitForTime: 0,
-      transform: {
-        color,
-        easing: easingIn,
-        duration: fadeInDuration
-      },
-      waitUntilCondition: 'delay',
-      waitUntilTime: holdDuration
-    },
-    {
-      lights,
-      layer,
-      waitForCondition: 'none',
-      waitForTime: 0,
-      transform: {
-        color: returnColor,
-        easing: easingOut,
-        duration: fadeOutDuration
-      },
-      waitUntilCondition: 'delay',
-      waitUntilTime: postDelay
-    }
-  ];
+  timing: ResolvedActionTiming;
+  easing: EasingType;
+}): EffectTransition => {
+  const { lights, layer, waitFor, waitForTime, color, timing, easing } = params;
+  const duration = safeDuration(timing.duration, 0, 0);
 
   return {
-    id: 'timed-color',
-    description: 'Timed color effect',
-    transitions
+    lights,
+    layer,
+    waitForCondition: waitFor,
+    waitForTime: safeDuration(waitForTime, 0, 0),
+    waitForConditionCount: timing.waitForConditionCount,
+    transform: {
+      color,
+      easing,
+      duration
+    },
+    waitUntilCondition: timing.waitUntilCondition,
+    waitUntilTime: safeDuration(timing.waitUntilTime, 0, 0),
+    waitUntilConditionCount: timing.waitUntilConditionCount
   };
 };
 
@@ -174,12 +131,12 @@ const createSingleColorEffect = (params: {
   layer: number;
   waitFor: WaitCondition;
   color: RGBIO;
-  timing: ActionTiming;
-  easingIn: EasingType;
+  timing: ResolvedActionTiming;
+  easing: EasingType;
 }): Effect => {
-  const { lights, layer, waitFor, color, timing, easingIn } = params;
-  const fadeInDuration = safeDuration(timing.fadeIn, 0, 0);
-  const holdPlusDelay = safeDuration(timing.hold, 0, 0) + safeDuration(timing.postDelay, 0, 0);
+  const { lights, layer, waitFor, color, timing, easing } = params;
+  const duration = safeDuration(timing.duration, 0, 0);
+  const { waitForTime } = normalizeWaitFor(timing, 0);
 
   return {
     id: 'single-color',
@@ -189,23 +146,98 @@ const createSingleColorEffect = (params: {
         lights,
         layer,
         waitForCondition: waitFor,
-        waitForTime: 0,
+        waitForTime: safeDuration(waitForTime, 0, 0),
+        waitForConditionCount: timing.waitForConditionCount,
         transform: {
           color,
-          easing: easingIn,
-          duration: fadeInDuration
+          easing,
+          duration
         },
-        waitUntilCondition: 'delay',
-        waitUntilTime: holdPlusDelay
+        waitUntilCondition: timing.waitUntilCondition,
+        waitUntilTime: safeDuration(timing.waitUntilTime, 0, 0),
+        waitUntilConditionCount: timing.waitUntilConditionCount
       }
     ]
   };
 };
 
 export class ActionEffectFactory {
-  public static resolveLights(lightManager: DmxLightManager, target: NodeActionTarget): TrackedLight[] {
-    const groups: LocationGroup[] = target.groups.length > 0 ? target.groups : ['front'];
-    return lightManager.getLights(groups, target.filter);
+  // Helper to resolve target if needed
+  private static resolveTarget(target: any): ResolvedActionTarget {
+    // Check if already resolved (has array for groups)
+    if (Array.isArray(target.groups)) {
+      return target as ResolvedActionTarget;
+    }
+    // Otherwise treat as ValueSource - use literal value or default
+    const groupsValue = target.groups?.source === 'literal' ? String(target.groups.value) : 'front';
+    const filterValue = target.filter?.source === 'literal' ? String(target.filter.value) : 'all';
+    
+    return {
+      groups: groupsValue.split(',').map(g => g.trim()) as LocationGroup[],
+      filter: filterValue as LightTarget
+    };
+  }
+
+  // Helper to resolve color if needed
+  private static resolveColorSetting(color: any): ResolvedColorSetting {
+    // Check if already resolved
+    if (typeof color.name === 'string' && typeof color.brightness === 'string') {
+      return color as ResolvedColorSetting;
+    }
+    // Otherwise treat as ValueSource
+    const name = color.name?.source === 'literal' ? String(color.name.value) : 'blue';
+    const brightness = color.brightness?.source === 'literal' ? String(color.brightness.value) : 'medium';
+    const blendMode = color.blendMode?.source === 'literal' ? String(color.blendMode.value) : 'replace';
+    const opacity = color.opacity?.source === 'literal' ? Number(color.opacity.value) : undefined;
+    
+    return {
+      name: name as Color,
+      brightness: brightness as Brightness,
+      blendMode: blendMode as BlendMode,
+      opacity: opacity !== undefined ? clamp(opacity, 0, 1) : undefined
+    };
+  }
+
+  // Helper to resolve timing if needed
+  private static resolveTiming(timing: any): ResolvedActionTiming {
+    // Check if already resolved
+    if (typeof timing.waitForTime === 'number') {
+      return timing as ResolvedActionTiming;
+    }
+    // Otherwise treat as ValueSource
+    const defaults = createDefaultActionTiming();
+    return {
+      waitForCondition: timing.waitForCondition ?? defaults.waitForCondition,
+      waitForTime: timing.waitForTime?.source === 'literal' ? Number(timing.waitForTime.value) : 0,
+      waitForConditionCount: timing.waitForConditionCount?.source === 'literal' ? Number(timing.waitForConditionCount.value) : undefined,
+      duration: timing.duration?.source === 'literal' ? Number(timing.duration.value) : 200,
+      waitUntilCondition: timing.waitUntilCondition ?? defaults.waitUntilCondition,
+      waitUntilTime: timing.waitUntilTime?.source === 'literal' ? Number(timing.waitUntilTime.value) : 0,
+      waitUntilConditionCount: timing.waitUntilConditionCount?.source === 'literal' ? Number(timing.waitUntilConditionCount.value) : undefined,
+      easing: timing.easing,
+      level: timing.level?.source === 'literal' ? Number(timing.level.value) : 1
+    };
+  }
+
+  public static resolveLights(
+    lightManager: DmxLightManager, 
+    target: any,
+    variableResolver?: (name: string) => VariableValue | undefined
+  ): TrackedLight[] {
+    // Check if groups is a variable reference
+    if (target.groups?.source === 'variable' && variableResolver) {
+      const varValue = variableResolver(target.groups.name);
+      
+      // If it's a light-array variable, use those exact lights (ignore filter)
+      if (varValue?.type === 'light-array') {
+        return varValue.value as TrackedLight[];
+      }
+    }
+    
+    // Standard group/filter resolution
+    const resolved = this.resolveTarget(target);
+    const groups: LocationGroup[] = resolved.groups.length > 0 ? resolved.groups : ['front'];
+    return lightManager.getLights(groups, resolved.filter);
   }
 
   public static buildEffect(params: BuildEffectParams): Effect | null {
@@ -214,151 +246,116 @@ export class ActionEffectFactory {
       return null;
     }
 
-    const timing = ensureTiming(action);
-    const timingLevel = clamp(timing.level ?? 1, 0, 1);
-    const intensityScale = clamp((params.intensityScale ?? 1) * timingLevel, 0, 1);
-    const waitTime = params.waitTime ?? 0;
-    const waitFor: WaitCondition = params.waitCondition ?? 'none';
-    const layer = action.layer ?? 0;
-    const easingIn = resolveEasing(timing.easeIn);
-    const easingOut = resolveEasing(timing.easeOut ?? timing.easeIn);
+    // Use provided resolved values or resolve from action
+    const timing = params.resolvedTiming ?? this.resolveTiming(action.timing);
+    const primaryColor = params.resolvedColor ?? this.resolveColorSetting(action.color);
+    const layer = params.resolvedLayer ?? (action.layer?.source === 'literal' ? Number(action.layer.value) : 0);
 
-    const baseColor = resolveColor(action.color, intensityScale || 0.01);
-    const secondaryColor = action.secondaryColor
-      ? resolveColor(action.secondaryColor, intensityScale || 0.01)
-      : resolveColor({ name: 'transparent', brightness: 'low' }, 0);
+    // For set-color, don't use level (original cues don't use it)
+    const timingLevel = 1;
+    const intensityScale = clamp((params.intensityScale ?? 1) * timingLevel, 0, 1);
+    let waitFor: WaitCondition = timing.waitForCondition ?? 'none';
+    let waitForTime = safeDuration((params.waitTime ?? 0) + (timing.waitForTime ?? 0), 0, 0);
+
+    // If caller passed an explicit waitCondition (e.g., chain-level override) and it's not 'none', respect it
+    if (params.waitCondition && params.waitCondition !== 'none') {
+      waitFor = params.waitCondition;
+      waitForTime = safeDuration((params.waitTime ?? 0) + (timing.waitForTime ?? 0), 0, 0);
+    }
+
+    // If action wants to start immediately but has a chain offset, convert to delay gate
+    if (waitFor === 'none' && waitForTime > 0) {
+      waitFor = 'delay';
+    }
+    
+    const easing = resolveEasing(timing.easing);
+    const baseColor = resolveColor(primaryColor, intensityScale || 0.01);
 
     let effect: Effect | null = null;
 
     switch (action.effectType) {
-      case 'single-color': {
+      case 'set-color': {
         effect = createSingleColorEffect({
           lights,
           layer,
           waitFor,
           color: baseColor,
-          timing,
-          easingIn
-        });
-        break;
-      }
-      case 'cross-fade': {
-        const duration = safeDuration(timing.fadeIn, 150, 10);
-        const afterStartWait = safeDuration(timing.hold, 0, 0);
-        const afterEndWait = safeDuration(timing.postDelay, 0, 0);
-        effect = getEffectCrossFadeColors({
-          lights,
-          layer,
-          startColor: baseColor,
-          endColor: secondaryColor,
-          duration,
-          waitFor,
-          crossFadeTrigger: 'delay',
-          afterStartWait,
-          afterEndColorWait: afterEndWait,
-          easing: easingIn
-        });
-        break;
-      }
-      case 'flash': {
-        effect = getEffectFlashColor({
-          lights,
-          layer,
-          color: baseColor,
-          startTrigger: waitFor,
-          startWait: 0,
-          holdTime: safeDuration(timing.hold, 0, 0),
-          durationIn: safeDuration(timing.fadeIn, 50, 10),
-          durationOut: safeDuration(timing.fadeOut, 100, 10),
-          endTrigger: 'delay',
-          endWait: safeDuration(timing.postDelay, 0, 0),
-          easing: easingIn
-        });
-        break;
-      }
-      case 'fade-in-out': {
-        effect = createTimedColorEffect({
-          lights,
-          layer,
-          waitFor,
-          color: baseColor,
-          timing,
-          easingIn,
-          easingOut,
-          returnColor: action.secondaryColor ? secondaryColor : undefined
-        });
-        break;
-      }
-      case 'sweep': {
-        const sweepConfig = action.config?.sweep;
-        const sweepDuration = safeDuration(
-          sweepConfig?.duration,
-          timing.fadeIn + timing.hold + timing.fadeOut || 600,
-          100
-        );
-        const fadeIn = safeDuration(sweepConfig?.fadeIn, timing.fadeIn || 80, 10);
-        const fadeOut = safeDuration(sweepConfig?.fadeOut, timing.fadeOut || 120, 10);
-        const overlap = clamp(sweepConfig?.overlap ?? 0, 0, 100);
-        const betweenDelay = safeDuration(sweepConfig?.betweenDelay, timing.postDelay, 0);
-        const lowColorSetting = sweepConfig?.lowColor || action.secondaryColor || { name: 'transparent', brightness: 'low' };
-        const lowColor = resolveColor(lowColorSetting, intensityScale || 0.01);
-
-        effect = getSweepEffect({
-          lights,
-          layer,
-          waitFor,
-          sweepTime: sweepDuration,
-          fadeInDuration: fadeIn,
-          fadeOutDuration: fadeOut,
-          lightOverlap: overlap,
-          betweenSweepDelay: betweenDelay,
-          high: baseColor,
-          low: lowColor,
-          easing: easingIn
-        });
-        break;
-      }
-      case 'cycle': {
-        const cycleConfig = action.config?.cycle;
-        const base = resolveColor(
-          cycleConfig?.baseColor || action.secondaryColor || { name: 'transparent', brightness: 'low' },
-          intensityScale || 0.01
-        );
-
-        effect = getEffectCycleLights({
-          lights,
-          layer,
-          activeColor: baseColor,
-          baseColor: base,
-          transitionDuration: safeDuration(cycleConfig?.transitionDuration, timing.fadeIn || 150, 10),
-          waitFor: cycleConfig?.trigger || waitFor
+          timing: timing,
+          easing
         });
         break;
       }
       case 'blackout': {
-        effect = getEffectBlackout({
-          lights,
-          layer,
-          duration: safeDuration(
-            action.config?.blackout?.duration,
-            timing.fadeOut || timing.fadeIn || 200,
-            10
-          )
-        });
-        effect.transitions.forEach(transition => {
-          transition.waitForCondition = waitFor;
-        });
-        break;
+        // Blackout is handled directly by sequencer, not as an effect
+        // Return null to indicate this should be handled specially
+        return null;
       }
       default:
         return null;
     }
 
-    if (effect && waitTime > 0) {
-      effect = applyChainedTiming(effect, waitTime, waitFor);
+    return effect;
+  }
+
+  /**
+   * Build a single sequencer Effect with multiple sequential transitions from a chain
+   * of action nodes. This is used to ensure "red then yellow" type patterns complete
+   * as an atomic unit (no early callback after the first action) and to preserve layer
+   * continuity between steps.
+   *
+   * Important: all steps must target the same lights and the same layer.
+   */
+  public static buildEffectChain(steps: BuildEffectChainStep[]): Effect | null {
+    if (!steps || steps.length === 0) return null;
+
+    // Validate common lights + layer
+    const first = steps[0];
+    if (!first.lights || first.lights.length === 0) return null;
+    const baseLayer = first.resolvedLayer ?? (first.action.layer?.source === 'literal' ? Number(first.action.layer.value) : 0);
+    const baseLightIds = first.lights.map(l => l.id).join(',');
+
+    const transitions: EffectTransition[] = [];
+
+    for (const step of steps) {
+      if (step.action.effectType !== 'set-color') {
+        return null;
+      }
+      if (!step.lights || step.lights.length === 0) return null;
+
+      const layer = step.resolvedLayer ?? (step.action.layer?.source === 'literal' ? Number(step.action.layer.value) : 0);
+      if (layer !== baseLayer) return null;
+
+      const ids = step.lights.map(l => l.id).join(',');
+      if (ids !== baseLightIds) return null;
+
+      const timing = step.resolvedTiming ?? this.resolveTiming(step.action.timing);
+      const primaryColor = step.resolvedColor ?? this.resolveColorSetting(step.action.color);
+
+      const timingLevel = 1;
+      const intensityScale = clamp((step.intensityScale ?? 1) * timingLevel, 0, 1);
+      const easing = resolveEasing(timing.easing);
+      const color = resolveColor(primaryColor, intensityScale || 0.01);
+
+      const { waitFor, waitForTime } = normalizeWaitFor(timing, 0);
+
+      transitions.push(
+        createSingleColorTransition({
+          lights: step.lights,
+          layer,
+          waitFor,
+          waitForTime,
+          color,
+          timing,
+          easing
+        })
+      );
     }
 
-    return effect;
+    return {
+      id: 'action-chain',
+      description: 'Chained action effect',
+      transitions
+    };
   }
 }
 

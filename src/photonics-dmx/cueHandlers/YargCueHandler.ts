@@ -82,9 +82,8 @@ class YargCueHandler extends BaseCueHandler {
         this.emit('cueHandled', historicCueData);
         return;
       case CueType.Menu:
-        this.stopCurrentCue();
-        //this.registry.setActiveGroups([]);
-        break;
+  //      this.stopCurrentCue();
+   //     break;
     }
 
     // Get implementation from registry
@@ -130,6 +129,14 @@ class YargCueHandler extends BaseCueHandler {
       this.currentExecutingCue = null;
       this.currentExecutingCueType = null;
     }
+  }
+
+  /**
+   * Stop the active cue (if any) and run its onStop lifecycle.
+   * Used by Cue Simulation / test harnesses so restarting the same cue works reliably.
+   */
+  public stopActiveCue(): void {
+    this.stopCurrentCue();
   }
 
   /**

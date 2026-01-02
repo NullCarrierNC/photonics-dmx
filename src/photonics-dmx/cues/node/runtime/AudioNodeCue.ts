@@ -2,10 +2,12 @@ import { IAudioCue } from '../../interfaces/IAudioCue';
 import { AudioCueData, AudioCueType } from '../../types/audioCueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { CompiledActionChain, CompiledAudioCue } from '../compiler/NodeCueCompiler';
+import { calculateActionDuration, CompiledAudioCue } from '../compiler/NodeCueCompiler';
 import { ActionEffectFactory } from '../compiler/ActionEffectFactory';
-import { AudioEventNode } from '../../types/nodeCueTypes';
-import { Effect } from '../../../types';
+import { AudioEventNode, LogicNode, ValueSource, AudioNodeCueDefinition } from '../../types/nodeCueTypes';
+import { NodeExecutionEngine } from './NodeExecutionEngine';
+import { VariableValue } from './executionTypes';
+import { EffectRegistry } from './EffectRegistry';
 
 interface AudioEventState {
   previousValue: number;
@@ -36,51 +38,98 @@ export class AudioNodeCue implements IAudioCue {
 
   private readonly eventStates = new Map<string, AudioEventState>();
   private readonly activeLevelEffects = new Map<string, number>();
+  private static cueLevelVarStores = new Map<string, Map<string, VariableValue>>();
+  private static groupLevelVarStores = new Map<string, Map<string, VariableValue>>();
+  private cueLevelVarStore: Map<string, VariableValue>;
+  private groupLevelVarStore: Map<string, VariableValue>;
+  private executionEngine?: NodeExecutionEngine;
+  private effectRegistry: EffectRegistry;
 
-  constructor(groupId: string, private readonly compiledCue: CompiledAudioCue) {
-    const definition = compiledCue.definition;
+  constructor(groupId: string, private readonly compiledCue: CompiledAudioCue, effectRegistry?: EffectRegistry) {
+    const definition = compiledCue.definition as AudioNodeCueDefinition;
     this.id = `${groupId}:${definition.id}`;
     this.cueType = definition.cueTypeId;
     this.description = definition.description || definition.name || 'Node-based audio cue';
+    this.effectRegistry = effectRegistry ?? new EffectRegistry();
+
+    // Initialize cue-level variable store
+    const existingCueStore = AudioNodeCue.cueLevelVarStores.get(this.id);
+    if (existingCueStore) {
+      this.cueLevelVarStore = existingCueStore;
+    } else {
+      this.cueLevelVarStore = new Map();
+      AudioNodeCue.cueLevelVarStores.set(this.id, this.cueLevelVarStore);
+    }
+
+    // Initialize group-level variable store
+    const existingGroupStore = AudioNodeCue.groupLevelVarStores.get(groupId);
+    if (existingGroupStore) {
+      this.groupLevelVarStore = existingGroupStore;
+    } else {
+      this.groupLevelVarStore = new Map();
+      AudioNodeCue.groupLevelVarStores.set(groupId, this.groupLevelVarStore);
+    }
+
+    // Initialize variables from registry definitions
+    this.initializeVariables();
   }
 
   async execute(data: AudioCueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
     const tasks: Promise<unknown>[] = [];
 
-    for (const chain of this.compiledCue.chains) {
-      const state = this.getEventState(chain.event.id);
-      const evaluation = this.evaluateEvent(chain.event, data, state);
-      const effectKey = this.effectKey(chain);
-      const rootStep = chain.actions[0];
-      const rootLayer = rootStep?.action.layer ?? 0;
+    // Initialize execution engine if not already created
+    if (!this.executionEngine) {
+      const definition = this.compiledCue.definition as AudioNodeCueDefinition;
+      const variableDefinitions = definition.variables ?? [];
+      
+      this.executionEngine = new NodeExecutionEngine(
+        this.compiledCue,
+        this.id,
+        sequencer,
+        lightManager,
+        this.cueLevelVarStore,
+        this.groupLevelVarStore,
+        this.effectRegistry,
+        variableDefinitions
+      );
+    }
+
+    for (const event of this.compiledCue.eventMap.values()) {
+      const state = this.getEventState(event.id);
+      const evaluation = this.evaluateEvent(event, data, state);
+      const effectKey = this.effectKey(event.id);
 
       if (evaluation.mode === 'edge') {
-        if (!evaluation.triggered) {
-          continue;
-        }
-
-        const effect = this.buildChainEffect(chain, lightManager, evaluation.intensity);
-        if (effect) {
-          sequencer.addEffect(`${effectKey}:${Date.now()}`, effect);
-        }
+        if (!evaluation.triggered) continue;
+        
+        // Use execution engine for edge-triggered events
+        const cueData = { ...data } as any;
+        this.executionEngine.startExecution(event, cueData);
       } else {
-        if (!rootStep) {
+        // Level-triggered events use continuous state management
+        const actionStep = this.findFirstAction(event.id);
+        if (!actionStep) {
           continue;
         }
 
-        // Level-triggered events ignore chained steps beyond the first
-        if (chain.actions.some(step => step.chainPosition > 0)) {
-          continue;
-        }
-
-        const lights = ActionEffectFactory.resolveLights(lightManager, rootStep.action.target);
-        if (!lights.length) {
-          continue;
-        }
+        const action = this.compiledCue.actionMap.get(actionStep.actionId);
+        if (!action) continue;
+        
+        // Resolve lights with variable resolver for light-array support
+        const lights = ActionEffectFactory.resolveLights(
+          lightManager,
+          action.target,
+          (varName: string) => {
+            const cueVar = this.cueLevelVarStore.get(varName);
+            const groupVar = this.groupLevelVarStore.get(varName);
+            return cueVar ?? groupVar;
+          }
+        );
+        if (!lights.length) continue;
 
         if (evaluation.active) {
           const effect = ActionEffectFactory.buildEffect({
-            action: rootStep.action,
+            action,
             lights,
             waitCondition: 'none',
             intensityScale: evaluation.intensity
@@ -88,10 +137,14 @@ export class AudioNodeCue implements IAudioCue {
 
           if (effect) {
             tasks.push(sequencer.setEffect(effectKey, effect));
-            this.activeLevelEffects.set(effectKey, rootLayer);
+            // Extract layer from ValueSource or use default
+            const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0;
+            this.activeLevelEffects.set(effectKey, layer);
           }
         } else if (this.activeLevelEffects.has(effectKey)) {
-          sequencer.removeEffect(effectKey, rootLayer);
+          // Extract layer from ValueSource or use default
+          const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0;
+          sequencer.removeEffect(effectKey, layer);
           this.activeLevelEffects.delete(effectKey);
         }
       }
@@ -103,13 +156,51 @@ export class AudioNodeCue implements IAudioCue {
   }
 
   onStop(): void {
+    if (this.executionEngine) {
+      this.executionEngine.cancelAll();
+    }
+
     this.eventStates.clear();
     this.activeLevelEffects.clear();
+    this.cueLevelVarStore.clear();
+    AudioNodeCue.cueLevelVarStores.delete(this.id);
   }
 
   onDestroy(): void {
+    if (this.executionEngine) {
+      this.executionEngine.cancelAll();
+    }
+
     this.eventStates.clear();
     this.activeLevelEffects.clear();
+    this.cueLevelVarStore.clear();
+    AudioNodeCue.cueLevelVarStores.delete(this.id);
+  }
+
+  private initializeVariables(): void {
+    const definition = this.compiledCue.definition as AudioNodeCueDefinition;
+    
+    // Initialize cue-level variables
+    const cueVariables = definition.variables ?? [];
+    for (const varDef of cueVariables) {
+      if (!this.cueLevelVarStore.has(varDef.name)) {
+        this.cueLevelVarStore.set(varDef.name, {
+          type: varDef.type,
+          value: varDef.initialValue
+        });
+      }
+    }
+
+    // Initialize group-level variables from compiled cue metadata
+    const groupVariables = (this.compiledCue as any).groupVariables ?? [];
+    for (const varDef of groupVariables) {
+      if (!this.groupLevelVarStore.has(varDef.name)) {
+        this.groupLevelVarStore.set(varDef.name, {
+          type: varDef.type,
+          value: varDef.initialValue
+        });
+      }
+    }
   }
 
   private getEventState(eventId: string): AudioEventState {
@@ -169,53 +260,197 @@ export class AudioNodeCue implements IAudioCue {
     }
   }
 
-  private buildChainEffect(
-    chain: CompiledActionChain<AudioEventNode>,
-    lightManager: DmxLightManager,
-    intensityScale: number
-  ): Effect | null {
-    let combinedEffect: Effect | null = null;
-    let lastScheduledDelay = 0;
+  private evaluateLogicNode(logicNode: LogicNode, nodeId: string): string[] {
+    const { adjacency } = this.compiledCue;
+    const edges = adjacency.get(nodeId) ?? [];
 
-    for (const step of chain.actions) {
-      const lights = ActionEffectFactory.resolveLights(lightManager, step.action.target);
-      if (!lights.length) {
-        continue;
+    switch (logicNode.logicType) {
+      case 'variable': {
+        if (logicNode.mode !== 'get') {
+          // For light-array type, we can't resolve from value source (it comes from config-data)
+          if (logicNode.valueType === 'light-array') {
+            // Light arrays must come from config-data nodes, not variable nodes
+            console.warn('Cannot set light-array variable from variable node, use config-data node instead');
+            return edges.map(edge => edge.to);
+          }
+          
+          const value = this.resolveValue(logicNode.valueType, logicNode.value);
+          const varStore = this.getVariableStore(logicNode.varName);
+          
+          if (logicNode.mode === 'init') {
+            if (!varStore.has(logicNode.varName)) {
+              varStore.set(logicNode.varName, { type: logicNode.valueType, value });
+            }
+          } else {
+            varStore.set(logicNode.varName, { type: logicNode.valueType, value });
+          }
+        }
+        return edges.map(edge => edge.to);
       }
-
-      const isFirstEffect = combinedEffect === null;
-      const waitCondition = isFirstEffect ? 'none' : 'delay';
-      const waitTime = isFirstEffect ? step.delayMs : Math.max(0, step.delayMs - lastScheduledDelay);
-
-      const effect = ActionEffectFactory.buildEffect({
-        action: step.action,
-        lights,
-        waitCondition,
-        waitTime,
-        intensityScale
-      });
-
-      if (!effect) {
-        continue;
+      case 'math': {
+        const left = Number(this.resolveValue('number', logicNode.left));
+        const right = Number(this.resolveValue('number', logicNode.right));
+        let result = 0;
+        switch (logicNode.operator) {
+          case 'add':
+            result = left + right;
+            break;
+          case 'subtract':
+            result = left - right;
+            break;
+          case 'multiply':
+            result = left * right;
+            break;
+          case 'divide':
+            result = right === 0 ? 0 : left / right;
+            break;
+          case 'modulus':
+            result = right === 0 ? 0 : left % right;
+            break;
+        }
+        if (logicNode.assignTo) {
+          const varStore = this.getVariableStore(logicNode.assignTo);
+          varStore.set(logicNode.assignTo, { type: 'number', value: result });
+        }
+        return edges.map(edge => edge.to);
       }
-
-      if (!combinedEffect) {
-        combinedEffect = {
-          ...effect,
-          transitions: [...effect.transitions]
-        };
-      } else {
-        combinedEffect.transitions.push(...effect.transitions);
+      case 'conditional': {
+        const left = Number(this.resolveValue('number', logicNode.left));
+        const right = Number(this.resolveValue('number', logicNode.right));
+        let outcome = false;
+        switch (logicNode.comparator) {
+          case '>':
+            outcome = left > right;
+            break;
+          case '>=':
+            outcome = left >= right;
+            break;
+          case '<':
+            outcome = left < right;
+            break;
+          case '<=':
+            outcome = left <= right;
+            break;
+          case '==':
+            outcome = left === right;
+            break;
+          case '!=':
+            outcome = left !== right;
+            break;
+        }
+        const branch = outcome ? 'true' : 'false';
+        const targeted = edges.filter(edge => edge.fromPort === branch);
+        if (targeted.length > 0) {
+          return targeted.map(edge => edge.to);
+        }
+        return edges.map(edge => edge.to);
       }
-
-      lastScheduledDelay = step.delayMs;
     }
 
-    return combinedEffect;
+    return edges.map(edge => edge.to);
   }
 
-  private effectKey(chain: CompiledActionChain<AudioEventNode>): string {
-    return `${this.id}:${chain.chainId}`;
+  private getVariableStore(varName: string): Map<string, VariableValue> {
+    const definition = this.compiledCue.definition as AudioNodeCueDefinition;
+    const cueVariables = definition.variables ?? [];
+    const isCueLevel = cueVariables.some(v => v.name === varName);
+    
+    return isCueLevel ? this.cueLevelVarStore : this.groupLevelVarStore;
+  }
+
+  private resolveValue(expectedType: 'number' | 'boolean' | 'string' | 'color', source?: ValueSource): number | boolean | string {
+    if (!source) {
+      return expectedType === 'number' ? 0 : expectedType === 'boolean' ? false : '';
+    }
+
+    if (source.source === 'literal') {
+      if (expectedType === 'string' || expectedType === 'color') {
+        return String(source.value);
+      }
+      if (expectedType === 'number') {
+        if (typeof source.value === 'boolean') {
+          return source.value ? 1 : 0;
+        }
+        if (typeof source.value === 'string') {
+          const parsed = parseFloat(source.value);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return typeof source.value === 'number' ? source.value : 0;
+      }
+      return source.value === true || source.value === 'true';
+    }
+
+    // Check cue-level store first, then group-level
+    const cueVar = this.cueLevelVarStore.get(source.name);
+    const groupVar = this.groupLevelVarStore.get(source.name);
+    const existing = cueVar ?? groupVar;
+    
+    if (existing) {
+      if (expectedType === 'string' || expectedType === 'color') {
+        return String(existing.value);
+      }
+      if (expectedType === 'number') {
+        if (typeof existing.value === 'string') {
+          const parsed = parseFloat(existing.value);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return typeof existing.value === 'number' ? existing.value : (existing.value ? 1 : 0);
+      }
+      return existing.value === true || existing.value === 'true';
+    }
+
+    // Use fallback
+    if (expectedType === 'string') {
+      return source.fallback !== undefined ? String(source.fallback) : '';
+    }
+    if (expectedType === 'number') {
+      if (typeof source.fallback === 'number') return source.fallback;
+      if (typeof source.fallback === 'boolean') return source.fallback ? 1 : 0;
+      if (typeof source.fallback === 'string') {
+        const parsed = parseFloat(source.fallback);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
+    }
+
+    return source.fallback === true || source.fallback === 'true';
+  }
+
+  private findFirstAction(eventId: string): { actionId: string; delay: number } | null {
+    const visited = new Set<string>();
+    const queue: Array<{ nodeId: string; delay: number }> = [];
+    const outgoing = this.compiledCue.adjacency.get(eventId) ?? [];
+    outgoing.forEach(conn => queue.push({ nodeId: conn.to, delay: 0 }));
+
+    while (queue.length) {
+      const { nodeId, delay } = queue.shift()!;
+      if (visited.has(nodeId)) continue;
+      visited.add(nodeId);
+
+      if (this.compiledCue.actionMap.has(nodeId)) {
+        return { actionId: nodeId, delay };
+      }
+
+      const logicNode = this.compiledCue.logicMap.get(nodeId);
+      if (logicNode) {
+        const nextTargets = this.evaluateLogicNode(logicNode, nodeId);
+        const nextDelay = delay; // logic does not add delay
+        nextTargets.forEach(nextId => queue.push({ nodeId: nextId, delay: nextDelay }));
+        continue;
+      }
+
+      const nextEdges = this.compiledCue.adjacency.get(nodeId) ?? [];
+      nextEdges.forEach(edge => queue.push({
+        nodeId: edge.to,
+        delay: delay + (this.compiledCue.actionMap.has(nodeId) ? calculateActionDuration(this.compiledCue.actionMap.get(nodeId)!) : 0)
+      }));
+    }
+
+    return null;
+  }
+
+  private effectKey(eventId: string): string {
+    return `${this.id}:${eventId}`;
   }
 }
 

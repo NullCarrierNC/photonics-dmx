@@ -24,6 +24,9 @@ export class Application {
       setGlobalBrightnessConfig(brightnessConfig);
     }
     
+    // Set controller manager in window manager for window state persistence
+    this.windowManager.setControllerManager(this.controllerManager);
+    
     // Create main window
     this.windowManager.createMainWindow();
     

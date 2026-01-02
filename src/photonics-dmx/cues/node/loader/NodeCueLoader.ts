@@ -7,9 +7,7 @@ import {
   AudioNodeCueFile,
   NodeCueFile,
   NodeCueMode,
-  YargNodeCueFile,
-  YargNodeCueDefinition,
-  AudioNodeCueDefinition
+  YargNodeCueFile
 } from '../../types/nodeCueTypes';
 import { NodeCueCompilationError, NodeCueCompiler } from '../compiler/NodeCueCompiler';
 import { YargCueRegistry } from '../../registries/YargCueRegistry';
@@ -20,6 +18,10 @@ import { AudioNodeCue } from '../runtime/AudioNodeCue';
 import { CueType } from '../../types/cueTypes';
 import { AudioCueType, BuiltInAudioCues } from '../../types/audioCueTypes';
 import { IAudioCue } from '../../interfaces/IAudioCue';
+import { EffectRegistry } from '../runtime/EffectRegistry';
+import { EffectCompiler } from '../compiler/EffectCompiler';
+import type { EffectLoader } from './EffectLoader';
+import type { EffectReference } from '../../types/nodeCueTypes';
 
 export interface NodeCueFileSummary {
   path: string;
@@ -46,6 +48,7 @@ interface NodeCueLoaderOptions {
   baseDir: string;
   yargRegistry: YargCueRegistry;
   audioRegistry: AudioCueRegistry;
+  effectLoader?: EffectLoader;
 }
 
 interface FileRegistration {
@@ -268,10 +271,10 @@ export class NodeCueLoader extends EventEmitter {
     this.unregisterFile(filePath);
 
     if (mode === 'yarg') {
-      const group = this.buildYargGroup(file as YargNodeCueFile);
+      const group = await this.buildYargGroup(file as YargNodeCueFile);
       this.options.yargRegistry.registerGroup(group);
     } else {
-      const group = this.buildAudioGroup(file as AudioNodeCueFile);
+      const group = await this.buildAudioGroup(file as AudioNodeCueFile);
       this.options.audioRegistry.registerGroup(group);
       file.cues.forEach(cue => this.customAudioCueTypes.add(cue.cueTypeId));
     }
@@ -296,17 +299,23 @@ export class NodeCueLoader extends EventEmitter {
     this.fileRegistrations.delete(filePath);
   }
 
-  private buildYargGroup(file: YargNodeCueFile): ICueGroup {
+  private async buildYargGroup(file: YargNodeCueFile): Promise<ICueGroup> {
     const cueMap = new Map<CueType, YargNodeCue>();
 
-    file.cues.forEach((cue: YargNodeCueDefinition) => {
+    for (const cue of file.cues) {
       if (cueMap.has(cue.cueType)) {
         throw new NodeCueCompilationError(`Duplicate cueType '${cue.cueType}' in group '${file.group.name}'.`);
       }
 
       const compiled = NodeCueCompiler.compileYargCue(cue);
-      cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled));
-    });
+      // Attach group variables to compiled cue for runtime initialization
+      (compiled as any).groupVariables = file.group.variables ?? [];
+      
+      // Build effect registry for this cue
+      const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg');
+      
+      cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled, effectRegistry));
+    }
 
     if (cueMap.size === 0) {
       throw new NodeCueCompilationError('Group must contain at least one cue definition.');
@@ -320,17 +329,23 @@ export class NodeCueLoader extends EventEmitter {
     };
   }
 
-  private buildAudioGroup(file: AudioNodeCueFile): AudioCueGroup {
+  private async buildAudioGroup(file: AudioNodeCueFile): Promise<AudioCueGroup> {
     const cueMap = new Map<AudioCueType, IAudioCue>();
 
-    file.cues.forEach((cue: AudioNodeCueDefinition) => {
+    for (const cue of file.cues) {
       if (cueMap.has(cue.cueTypeId)) {
         throw new NodeCueCompilationError(`Duplicate audio cue id '${cue.cueTypeId}' in group '${file.group.name}'.`);
       }
 
       const compiled = NodeCueCompiler.compileAudioCue(cue);
-      cueMap.set(cue.cueTypeId, new AudioNodeCue(file.group.id, compiled));
-    });
+      // Attach group variables to compiled cue for runtime initialization
+      (compiled as any).groupVariables = file.group.variables ?? [];
+      
+      // Build effect registry for this cue
+      const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio');
+      
+      cueMap.set(cue.cueTypeId, new AudioNodeCue(file.group.id, compiled, effectRegistry));
+    }
 
     if (cueMap.size === 0) {
       throw new NodeCueCompilationError('Group must contain at least one audio cue definition.');
@@ -381,6 +396,46 @@ export class NodeCueLoader extends EventEmitter {
       return 'audio';
     }
     return null;
+  }
+
+  /**
+   * Builds an EffectRegistry for a cue by loading and compiling all referenced effects.
+   */
+  private async buildEffectRegistry(effectReferences: EffectReference[], mode: NodeCueMode): Promise<EffectRegistry> {
+    const registry = new EffectRegistry();
+
+    if (!this.options.effectLoader || effectReferences.length === 0) {
+      return registry;
+    }
+
+    for (const effectRef of effectReferences) {
+      try {
+        const effectFile = await this.options.effectLoader.loadEffectByReference(effectRef, mode);
+        
+        if (!effectFile) {
+          console.warn(`Effect file ${effectRef.effectFileId} not found, skipping effect ${effectRef.effectId}`);
+          continue;
+        }
+
+        // Find the effect with the matching ID
+        const effect = effectFile.effects.find(e => e.id === effectRef.effectId);
+        
+        if (!effect) {
+          console.warn(`Effect ${effectRef.effectId} not found in file ${effectRef.effectFileId}, skipping`);
+          continue;
+        }
+
+        // Compile the effect
+        const compiledEffect = EffectCompiler.compile(effect);
+        
+        // Register the effect with its ID
+        registry.registerEffect(effectRef.effectId, compiledEffect);
+      } catch (error) {
+        console.error(`Failed to load/compile effect ${effectRef.effectId}:`, error);
+      }
+    }
+
+    return registry;
   }
 }
 

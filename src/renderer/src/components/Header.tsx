@@ -15,12 +15,16 @@ const Header: React.FC = () => {
     [Pages.LightLayout]: 'Light Layout',
     [Pages.NetworkDebug]: 'Network Debug',
     [Pages.CuePreview]: 'DMX Preview',
+    [Pages.CueSimulation]: 'Cue Simulation',
+    [Pages.CueEditor]: 'Cue Editor',
+    [Pages.Preferences]: 'Preferences',
+    [Pages.AudioSettings]: 'Audio Settings',
     [Pages.About]: 'About Photonics (ALPHA VERSION)',
   };
 
   return (
     <div className="flex items-center justify-between p-4 w-full">
-      <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{pageTitles[currentPage]}</h1>
+      <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{pageTitles[currentPage] || currentPage}</h1>
       <button
         className="ml-auto flex items-center text-white font-bold hover:text-gray-300 focus:outline-none"
         aria-label="Help"

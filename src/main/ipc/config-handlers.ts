@@ -95,17 +95,27 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
   // Get enabled cue groups
   ipcMain.handle('get-enabled-cue-groups', async () => {
-    const enabled = controllerManager.getConfig().getEnabledCueGroups();
+    const registry = YargCueRegistry.getInstance();
+    const prefs = controllerManager.getConfig().getAllPreferences();
+    let enabled = prefs.enabledCueGroups;
+    const allGroups = registry.getAllGroups();
 
     // If the preference hasn't been set, default to all groups enabled
     if (enabled === undefined) {
-      const registry = YargCueRegistry.getInstance();
-      return registry.getAllGroups();
+      enabled = allGroups;
+      controllerManager.getConfig().setEnabledCueGroups(enabled);
+      registry.setEnabledGroups(enabled);
+    } else {
+      // Automatically enable any newly added cue groups so new groups are not hidden by default
+      const missingGroups = allGroups.filter(id => !enabled!.includes(id));
+      if (missingGroups.length > 0) {
+        enabled = [...enabled, ...missingGroups];
+        controllerManager.getConfig().setEnabledCueGroups(enabled);
+        registry.setEnabledGroups(enabled);
+      }
     }
 
     // Initialize stage kit priority in the registry if not already set
-    const registry = YargCueRegistry.getInstance();
-    const prefs = controllerManager.getConfig().getAllPreferences();
     const currentPriority = registry.getStageKitPriority();
     const configPriority = prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked';
     
@@ -113,7 +123,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       registry.setStageKitPriority(configPriority);
     }
 
-    return enabled;
+    return enabled!;
   });
 
   // Set enabled cue groups

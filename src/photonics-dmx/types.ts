@@ -91,21 +91,56 @@ export interface Effect {
 }
 
 /**
- * Represents conditions that can trigger waiting in effects
+ * Node system events - cue lifecycle events handled by the node cue system.
+ * These are NOT song events and should NOT be used in action timing.
  */
-export type WaitCondition =
-  | 'none'
-  | 'delay'
-  | 'beat'
-  | 'measure'
-  | 'half-beat'
-  | 'keyframe'
-  // Instrument note events (matching SongEventHandler)
-  | 'guitar-open' | 'guitar-green' | 'guitar-red' | 'guitar-yellow' | 'guitar-blue' | 'guitar-orange'
-  | 'bass-open' | 'bass-green' | 'bass-red' | 'bass-yellow' | 'bass-blue' | 'bass-orange'
-  | 'keys-open' | 'keys-green' | 'keys-red' | 'keys-yellow' | 'keys-blue' | 'keys-orange'
-  | 'drum-kick' | 'drum-red' | 'drum-yellow' | 'drum-blue' | 'drum-green'
-  | 'drum-yellow-cymbal' | 'drum-blue-cymbal' | 'drum-green-cymbal';
+export const NODE_SYSTEM_EVENTS = [
+  'cue-started',  // Fires once per cue lifecycle (first YARG call after creation)
+  'cue-called'    // Fires every YARG call (for repeated work)
+] as const;
+
+/**
+ * Represents node system lifecycle events
+ */
+export type NodeSystemEvent = typeof NODE_SYSTEM_EVENTS[number];
+
+/**
+ * Song wait conditions - events from YARG song data, handled by the sequencer.
+ * Used for action timing (waitForCondition, waitUntilCondition).
+ */
+export const WAIT_CONDITIONS = [
+  'none',
+  'delay',
+  'beat',
+  'measure',
+  'half-beat',
+  'keyframe',
+  // Guitar events
+  'guitar-open', 'guitar-green', 'guitar-red', 'guitar-yellow', 'guitar-blue', 'guitar-orange',
+  // Bass events
+  'bass-open', 'bass-green', 'bass-red', 'bass-yellow', 'bass-blue', 'bass-orange',
+  // Keys events
+  'keys-open', 'keys-green', 'keys-red', 'keys-yellow', 'keys-blue', 'keys-orange',
+  // Drum events
+  'drum-kick', 'drum-red', 'drum-yellow', 'drum-blue', 'drum-green',
+  'drum-yellow-cymbal', 'drum-blue-cymbal', 'drum-green-cymbal'
+] as const;
+
+/**
+ * Represents song-based wait conditions for action timing - derived from WAIT_CONDITIONS
+ */
+export type WaitCondition = typeof WAIT_CONDITIONS[number];
+
+/**
+ * Combined event types for YARG event nodes.
+ * Includes both system events and song events.
+ */
+export const YARG_EVENT_TYPES = [...NODE_SYSTEM_EVENTS, ...WAIT_CONDITIONS] as const;
+
+/**
+ * Represents all valid event types for YARG event nodes
+ */
+export type YargEventType = typeof YARG_EVENT_TYPES[number];
 
 /**
  * Interface defining a transition within an effect

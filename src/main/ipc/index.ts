@@ -4,6 +4,8 @@ import { setupConfigHandlers } from './config-handlers';
 import { setupLightHandlers } from './light-handlers';
 import { setupCueHandlers } from './cue-handlers';
 import { setupNodeCueHandlers } from './node-cue-handlers';
+import { setupEffectHandlers } from './effect-handlers';
+import { setupShellHandlers } from './shell-handlers';
 
 /**
  * Set up all IPC handlers
@@ -15,4 +17,6 @@ export function setupIpcHandlers(ipcMain: IpcMain, controllerManager: Controller
   setupLightHandlers(ipcMain, controllerManager);
   setupCueHandlers(ipcMain, controllerManager);
   setupNodeCueHandlers(ipcMain, controllerManager);
+  setupEffectHandlers(ipcMain, controllerManager);
+  setupShellHandlers(ipcMain);
 } 

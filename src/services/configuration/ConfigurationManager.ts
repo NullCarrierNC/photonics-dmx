@@ -61,6 +61,21 @@ export interface AppPreferences {
   };
   audioConfig?: AudioConfig;
   activeAudioCueType?: AudioCueType;
+  simulationSettings?: {
+    registryType: 'YARG' | 'RB3E';
+    groupId: string;
+    effectId: string | null;
+    venueSize: 'NoVenue' | 'Small' | 'Large';
+    bpm: number;
+    instrument: 'guitar' | 'bass' | 'keys' | 'drums';
+  };
+  leftMenuCollapsed?: boolean;
+  windowState?: {
+    width: number;
+    height: number;
+    x?: number;
+    y?: number;
+  };
 }
 
 /**
