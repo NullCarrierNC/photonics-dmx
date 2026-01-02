@@ -116,6 +116,10 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
         </>
       );
     }
+    if (logicType === 'delay') {
+      const delayTime = formatValueSource(logic.delayTime);
+      return `${delayTime}ms`;
+    }
     return logicType;
   };
 

@@ -755,9 +755,16 @@ export class NodeExecutionEngine {
   /**
    * Execute a logic node: evaluate at runtime and continue to next nodes.
    * Logic nodes don't block - they execute immediately.
+   * Exception: Delay nodes block execution for the specified delay time.
    */
   private executeLogicNode(logicNode: LogicNode, nodeId: string, context: ExecutionContext): void {
     try {
+      // Handle delay nodes specially - they block execution
+      if (logicNode.logicType === 'delay') {
+        this.executeDelayNode(logicNode, nodeId, context);
+        return;
+      }
+
       const { adjacency } = this.compiledCue;
       const edges = adjacency.get(nodeId) ?? [];
 
@@ -784,6 +791,58 @@ export class NodeExecutionEngine {
       }
     } catch (error) {
       console.error(`Error executing logic node ${nodeId}:`, error);
+      // Continue to all outgoing edges despite error
+      this.continueToNextNodes(nodeId, context);
+    }
+  }
+
+  /**
+   * Execute a delay node: wait for the specified delay time before continuing.
+   * Delay nodes block execution like action nodes.
+   */
+  private executeDelayNode(delayNode: LogicNode & { logicType: 'delay'; delayTime: any }, nodeId: string, context: ExecutionContext): void {
+    try {
+      // Resolve delay time from ValueSource
+      const delayMs = Number(resolveValue('number', delayNode.delayTime, context));
+      const actualDelay = Math.max(0, delayMs); // Ensure non-negative
+
+      this.debugLog(`exec delay nodeId=${nodeId} ctx=${context.id}`, { delayMs: actualDelay });
+
+      // Register as active to block execution
+      // We use a dummy action node structure for compatibility with ExecutionContext
+      const dummyAction: ActionNode = {
+        id: nodeId,
+        type: 'action',
+        effectType: 'set-color',
+        target: { groups: { source: 'literal', value: 'front' }, filter: { source: 'literal', value: 'all' } },
+        color: { name: { source: 'literal', value: 'blue' }, brightness: { source: 'literal', value: 'medium' } },
+        timing: { waitForCondition: 'none', waitForTime: { source: 'literal', value: 0 }, duration: { source: 'literal', value: 0 }, waitUntilCondition: 'none', waitUntilTime: { source: 'literal', value: 0 } }
+      };
+      context.registerActiveAction(nodeId, dummyAction);
+
+      // Set timeout to complete the delay
+      setTimeout(() => {
+        if (context.hasVisited(nodeId)) {
+          this.debugLog(`delay complete nodeId=${nodeId} ctx=${context.id}`);
+          context.completeAction(nodeId);
+          
+          // Continue to next nodes after delay
+          const { adjacency } = this.compiledCue;
+          const edges = adjacency.get(nodeId) ?? [];
+          const nextNodes = edges.map(edge => edge.to);
+          
+          if (nextNodes.length > 0) {
+            this.continueExecution(nextNodes, context);
+          } else {
+            // No more nodes, check if context is complete
+            if (context.isComplete()) {
+              context.dispose();
+            }
+          }
+        }
+      }, actualDelay);
+    } catch (error) {
+      console.error(`Error executing delay node ${nodeId}:`, error);
       // Continue to all outgoing edges despite error
       this.continueToNextNodes(nodeId, context);
     }

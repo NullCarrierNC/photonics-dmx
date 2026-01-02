@@ -378,6 +378,12 @@ export function evaluateLogicNode(
       
       return edges.map(edge => edge.to);
     }
+
+    case 'delay': {
+      // Delay nodes are handled specially in the execution engine (they block).
+      // This case just returns the next nodes - the actual delay happens in NodeExecutionEngine.
+      return edges.map(edge => edge.to);
+    }
   }
 
   return edges.map(edge => edge.to);

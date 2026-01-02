@@ -481,6 +481,24 @@ const concatLightsLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
+const delayLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'delayTime'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'delay' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    delayTime: valueSourceSchema
+  }
+} as any;
+
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
   oneOf: [
     variableLogicSchema, 
@@ -494,7 +512,8 @@ const logicNodeSchema: JSONSchemaType<LogicNode> = {
     arrayLengthLogicSchema,
     reverseLightsLogicSchema,
     createPairsLogicSchema,
-    concatLightsLogicSchema
+    concatLightsLogicSchema,
+    delayLogicSchema
   ]
 } as any;
 

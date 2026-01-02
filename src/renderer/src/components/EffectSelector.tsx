@@ -6,13 +6,15 @@ interface EffectsDropdownProps {
   onSelect: (effect: EffectSelector) => void;
   value?: string;
   disabled?: boolean;
+  autoSelectFirst?: boolean;
 }
 
 export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
   groupId = 'stagekit',
   onSelect,
   value,
-  disabled = false
+  disabled = false,
+  autoSelectFirst = false
 }) => {
   const [effects, setEffects] = useState<EffectSelector[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,16 +69,16 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
       if (matchingEffect) {
         setSelectedEffect(matchingEffect);
       }
-    } else if (!value && effects.length > 0) {
-      // If parent clears selection but we have effects, auto-select the first one
+    } else if (!value && effects.length > 0 && autoSelectFirst) {
+      // Only auto-select the first one if autoSelectFirst is enabled
       const firstEffect = effects[0];
       setSelectedEffect(firstEffect);
       onSelect(firstEffect);
     } else if (!value) {
-      // Clear internal selection when parent clears selection and no effects available
+      // Clear internal selection when parent clears selection
       setSelectedEffect(null);
     }
-  }, [value, effects, onSelect]);
+  }, [value, effects, onSelect, autoSelectFirst]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
@@ -106,11 +108,14 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
         ) : effects.length === 0 ? (
           <option value="" disabled>No effects available</option>
         ) : (
-          effects.map((effect) => (
-            <option key={effect.id} value={effect.id}>
-              {effect.id}
-            </option>
-          ))
+          <>
+            <option value="">- Select -</option>
+            {effects.map((effect) => (
+              <option key={effect.id} value={effect.id}>
+                {effect.id}
+              </option>
+            ))}
+          </>
         )}
       </select>
     </div>

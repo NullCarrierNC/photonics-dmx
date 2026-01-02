@@ -161,6 +161,11 @@ export interface ConcatLightsLogicNode extends BaseLogicNode {
   assignTo: string;             // Variable to store concatenated array
 }
 
+export interface DelayLogicNode extends BaseLogicNode {
+  logicType: 'delay';
+  delayTime: ValueSource;        // Delay time in milliseconds
+}
+
 export type LogicNode = 
   | VariableLogicNode 
   | MathLogicNode 
@@ -173,7 +178,8 @@ export type LogicNode =
   | ArrayLengthLogicNode
   | ReverseLightsLogicNode
   | CreatePairsLogicNode
-  | ConcatLightsLogicNode;
+  | ConcatLightsLogicNode
+  | DelayLogicNode;
 
 export interface EventRaiserNode {
   id: string;

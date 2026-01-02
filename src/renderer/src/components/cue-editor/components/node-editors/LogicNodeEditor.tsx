@@ -11,6 +11,7 @@ import type {
   ReverseLightsLogicNode,
   CreatePairsLogicNode,
   ConcatLightsLogicNode,
+  DelayLogicNode,
   ConfigDataProperty,
   MathOperator,
   LogicComparator,
@@ -695,6 +696,27 @@ const ConcatLightsLogicEditor: React.FC<{
   );
 };
 
+const DelayLogicEditor: React.FC<{
+  node: DelayLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  return (
+    <div className="space-y-2 text-xs">
+      <ValueSourceEditor
+        label="Delay Time (ms)"
+        value={node.delayTime}
+        onChange={next => updateNode({ delayTime: next })}
+        expected="number"
+        availableVariables={availableVariables}
+      />
+      <p className="text-[10px] text-gray-500 italic">
+        Delays execution for the specified time in milliseconds before continuing to the next node.
+      </p>
+    </div>
+  );
+};
+
 const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
   node,
   activeMode,
@@ -816,6 +838,16 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <ConcatLightsLogicEditor
         node={node as ConcatLightsLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'delay') {
+    return (
+      <DelayLogicEditor
+        node={node as DelayLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

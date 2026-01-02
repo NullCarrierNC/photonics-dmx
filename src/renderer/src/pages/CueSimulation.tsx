@@ -60,6 +60,15 @@ const CueSimulation: React.FC = () => {
   useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 200 : null);
 
   const activeGroupsSelectorRef = useRef<ActiveGroupsSelectorRef>(null);
+  
+  // Track initialization phases to avoid overriding active groups during startup
+  const isInitialMount = useRef(true);
+  const isFullyInitialized = useRef(false);
+  const isSettingActiveGroup = useRef(false);
+  const isLoadingFromPrefs = useRef(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasLoadedSavedEffect = useRef(false);
+  const savedEffectIdRef = useRef<string | null>(null);
 
   // Automatically enable IPC sender for preview functionality when lights are configured
   useEffect(() => {
@@ -92,17 +101,187 @@ const CueSimulation: React.FC = () => {
       window.electron.ipcRenderer.invoke('stop-test-effect').catch(error => {
         console.error('Error stopping test effect on unmount:', error);
       });
+      // Clear any pending save timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
     };
   }, []);
 
-  // Track initialization phases to avoid overriding active groups during startup
-  const isInitialMount = useRef(true);
-  const isFullyInitialized = useRef(false);
+  // Load saved simulation settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        isLoadingFromPrefs.current = true;
+        const prefs = await window.electron.ipcRenderer.invoke('get-prefs');
+        const savedSettings = prefs.simulationSettings;
+        
+        if (savedSettings) {
+          // Load all saved settings
+          if (savedSettings.registryType) {
+            setSelectedRegistryType(savedSettings.registryType);
+          }
+          if (savedSettings.venueSize) {
+            setSelectedVenueSize(savedSettings.venueSize);
+          }
+          if (savedSettings.bpm) {
+            setSelectedBpm(savedSettings.bpm);
+          }
+          if (savedSettings.instrument) {
+            setSelectedInstrument(savedSettings.instrument);
+          }
+          if (savedSettings.groupId) {
+            // Store saved effect ID for later loading
+            if (savedSettings.effectId) {
+              savedEffectIdRef.current = savedSettings.effectId;
+            }
+            // Set group ID first, which will trigger group loading
+            setSelectedGroupId(savedSettings.groupId);
+            // Get group display name
+            try {
+              const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+              const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId);
+              if (group) {
+                setSelectedGroup(group.name);
+              }
+            } catch (error) {
+              console.error('Error fetching group details during load:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading simulation settings:', error);
+      } finally {
+        isLoadingFromPrefs.current = false;
+      }
+    };
+    
+    loadSettings();
+  }, []);
+
+  // Save simulation settings when they change (debounced)
+  const saveSettings = useCallback(() => {
+    if (isLoadingFromPrefs.current) {
+      return; // Don't save during initial load
+    }
+
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Debounce the save operation
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await window.electron.ipcRenderer.invoke('save-prefs', {
+          simulationSettings: {
+            registryType: selectedRegistryType,
+            groupId: selectedGroupId,
+            effectId: selectedEffect?.id || null,
+            venueSize: selectedVenueSize,
+            bpm: selectedBpm,
+            instrument: selectedInstrument
+          }
+        });
+      } catch (error) {
+        console.error('Error saving simulation settings:', error);
+      }
+    }, 500); // 500ms debounce
+  }, [selectedRegistryType, selectedGroupId, selectedEffect?.id, selectedVenueSize, selectedBpm, selectedInstrument]);
+
+  // Save settings when they change
+  useEffect(() => {
+    if (!isLoadingFromPrefs.current) {
+      saveSettings();
+    }
+  }, [saveSettings]);
+
+  // Load saved effect after group is loaded and effects are available
+  useEffect(() => {
+    const loadSavedEffect = async () => {
+      // Only load if we have a saved effect ID and haven't loaded it yet
+      if (!selectedGroupId || !savedEffectIdRef.current || hasLoadedSavedEffect.current) {
+        return;
+      }
+      
+      // Wait for effects to be loaded by EffectsDropdown
+      const checkForEffects = async (retries = 10) => {
+        try {
+          const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', selectedGroupId);
+          if (availableEffects && availableEffects.length > 0) {
+            const savedEffect = availableEffects.find((e: EffectSelector) => e.id === savedEffectIdRef.current);
+            if (savedEffect) {
+              setSelectedEffect(savedEffect);
+              hasLoadedSavedEffect.current = true;
+              savedEffectIdRef.current = null; // Clear after loading
+            } else {
+              // Effect not found in this group, clear it
+              hasLoadedSavedEffect.current = true;
+              savedEffectIdRef.current = null;
+            }
+          } else if (retries > 0) {
+            // Effects not loaded yet, retry after a short delay
+            setTimeout(() => checkForEffects(retries - 1), 200);
+          } else {
+            hasLoadedSavedEffect.current = true;
+            savedEffectIdRef.current = null;
+          }
+        } catch (error) {
+          console.error('Error loading saved effect:', error);
+          hasLoadedSavedEffect.current = true;
+          savedEffectIdRef.current = null;
+        }
+      };
+      
+      checkForEffects();
+    };
+    
+    if (selectedGroupId && savedEffectIdRef.current) {
+      loadSavedEffect();
+    }
+  }, [selectedGroupId]);
+
+  // Reset the hasLoadedSavedEffect flag when group changes (user-initiated change)
+  useEffect(() => {
+    if (!isLoadingFromPrefs.current) {
+      hasLoadedSavedEffect.current = false;
+      savedEffectIdRef.current = null;
+    }
+  }, [selectedGroupId]);
+
+  // Single useEffect to handle set-active-cue-groups when selectedGroupId changes
+  useEffect(() => {
+    if (selectedGroupId && !isSettingActiveGroup.current) {
+      isSettingActiveGroup.current = true;
+      window.electron.ipcRenderer.invoke('set-active-cue-groups', [selectedGroupId])
+        .then(result => {
+          if (result.success) {
+            activeGroupsSelectorRef.current?.refreshActiveGroups();
+            console.log(`Set active cue groups: ${selectedGroupId}`);
+            // Mark as fully initialized after first successful group selection
+            if (isInitialMount.current) {
+              isInitialMount.current = false;
+            }
+            isFullyInitialized.current = true;
+          } else {
+            console.error('Failed to set active groups for preview:', result.error);
+          }
+        })
+        .catch(err => {
+          console.error('Error setting active groups for preview:', err);
+        })
+        .finally(() => {
+          isSettingActiveGroup.current = false;
+        });
+    }
+  }, [selectedGroupId]);
 
   // Helper function to ensure active group matches the selected group when user interacts with effects
+  // This is only needed for explicit user actions, not when group changes (handled by useEffect above)
   const ensureActiveGroupMatches = useCallback(async () => {
-    if (selectedGroupId && isFullyInitialized.current) {
+    if (selectedGroupId && isFullyInitialized.current && !isSettingActiveGroup.current) {
       try {
+        isSettingActiveGroup.current = true;
         const result = await window.electron.ipcRenderer.invoke('set-active-cue-groups', [selectedGroupId]);
         if (result.success) {
           activeGroupsSelectorRef.current?.refreshActiveGroups();
@@ -112,6 +291,8 @@ const CueSimulation: React.FC = () => {
         }
       } catch (error) {
         console.error('Error setting active group to match selection:', error);
+      } finally {
+        isSettingActiveGroup.current = false;
       }
     }
   }, [selectedGroupId]);
@@ -210,7 +391,7 @@ const CueSimulation: React.FC = () => {
     if (groupIds.length === 1) {
       const groupId = groupIds[0];
       setSelectedGroupId(groupId); // Store the actual group ID
-      // Clear selected effect when group changes so EffectsDropdown will select the first cue in the new group
+      // Clear selected effect when group changes so EffectsDropdown will show "- Select -"
       setSelectedEffect(null);
       
       // Get group details to determine display name
@@ -222,27 +403,7 @@ const CueSimulation: React.FC = () => {
         // Only update state if the selection actually changed
         setSelectedGroup(prevSelectedGroup => {
           if (prevSelectedGroup !== displayName) {
-            // Always set the selected group as active, even on initial mount
-            // This ensures that the selected group is used for simulation
-            window.electron.ipcRenderer.invoke('set-active-cue-groups', groupIds)
-              .then(result => {
-                if (result.success) {
-                  // Directly refresh the ActiveGroupsSelector to reflect the change
-                  activeGroupsSelectorRef.current?.refreshActiveGroups();
-                } else {
-                  console.error('Failed to set active groups for preview:', result.error);
-                }
-              })
-              .catch(err => {
-                console.error('Error setting active groups for preview:', err);
-              });
-            
-            // Mark as fully initialized after first group selection
-            if (isInitialMount.current) {
-              isInitialMount.current = false;
-            }
-            isFullyInitialized.current = true;
-            
+            // Note: set-active-cue-groups is now handled by the useEffect watching selectedGroupId
             return displayName;
           }
           return prevSelectedGroup;
