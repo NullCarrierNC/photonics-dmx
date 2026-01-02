@@ -400,6 +400,44 @@ export class NodeExecutionEngine {
       const resolvedLayer = actionNode.layer
         ? Number(resolveValue('number', actionNode.layer, context))
         : 0;
+
+      /**
+       * Action chaining / pre-queueing
+       * -----------------------------
+       * When we have a simple linear chain of action nodes (action -> action -> ...),
+       * we want those transitions to run back-to-back on the sequencer without the
+       * layer being cleared between actions.
+       *
+       * If we wait for action A to fully complete before submitting action B, there can
+       * be a visible "flash" of lower layers between them (e.g. base blue showing between
+       * red and yellow). By submitting action B while action A is still active, the
+       * sequencer queues it and preserves layer state, allowing smooth fades.
+       */
+      const buildActionChain = (): ActionNode[] => {
+        const { adjacency, actionMap } = this.compiledCue;
+        const chain: ActionNode[] = [actionNode];
+        const visitedInChain = new Set<string>([actionNode.id]);
+
+        let currentId = actionNode.id;
+        // Only follow the chain when there's exactly one outgoing edge
+        // and it leads to another action node.
+        while (true) {
+          const outgoing = adjacency.get(currentId) ?? [];
+          if (outgoing.length !== 1) break;
+          const nextId = outgoing[0].to;
+          const nextAction = actionMap.get(nextId);
+          if (!nextAction) break;
+          if (visitedInChain.has(nextId)) break;
+
+          chain.push(nextAction);
+          visitedInChain.add(nextId);
+          currentId = nextId;
+        }
+
+        return chain;
+      };
+
+      const actionChain = buildActionChain();
       
       // Create resolved action node for effect building (keep config as-is, not used by factory)
       const resolvedAction: any = {
@@ -443,51 +481,237 @@ export class NodeExecutionEngine {
         return;
       }
 
-      const effect = ActionEffectFactory.buildEffect({
-        action: resolvedAction,
-        lights,
-        waitCondition: undefined,
-        waitTime: 0,
-        resolvedTarget,
-        resolvedColor,
-        resolvedSecondaryColor,
-        resolvedTiming,
-        resolvedLayer
-      });
+      // If we're not actually chaining anything, fall back to single-action behavior.
+      if (actionChain.length === 1) {
+        const effect = ActionEffectFactory.buildEffect({
+          action: resolvedAction,
+          lights,
+          waitCondition: undefined,
+          waitTime: 0,
+          resolvedTarget,
+          resolvedColor,
+          resolvedSecondaryColor,
+          resolvedTiming,
+          resolvedLayer
+        });
 
-      if (!effect) {
-        // Failed to build effect, continue immediately
-        this.continueToNextNodes(actionNode.id, context);
+        if (!effect) {
+          // Failed to build effect, continue immediately
+          this.continueToNextNodes(actionNode.id, context);
+          return;
+        }
+
+        // Register this action as active (waiting for completion)
+        context.registerActiveAction(actionNode.id, actionNode);
+
+        // Generate unique effect name
+        const effectName = `${this.cueId}:${context.eventNode.id}:${context.id}:${actionNode.id}`;
+
+        this.debugLog(`submit effect nodeId=${actionNode.id} ctx=${context.id}`, {
+          effectName,
+          layer: resolvedLayer,
+          timing: resolvedTiming,
+          color: resolvedColor,
+          secondaryColor: resolvedSecondaryColor
+        });
+
+        // Submit effect to sequencer with completion callback
+        this.sequencer.addEffectWithCallback(
+          effectName,
+          effect,
+          () => {
+            // This callback is fired when the effect completes
+            if (context.hasVisited(actionNode.id)) {
+              this.debugLog(`effect complete nodeId=${actionNode.id} ctx=${context.id}`, { effectName });
+              context.completeAction(actionNode.id);
+            }
+          },
+          false // Not persistent
+        );
         return;
       }
 
-      // Register this action as active (waiting for completion)
-      context.registerActiveAction(actionNode.id, actionNode);
-
-      // Generate unique effect name
-      const effectName = `${this.cueId}:${context.eventNode.id}:${context.id}:${actionNode.id}`;
-
-      this.debugLog(`submit effect nodeId=${actionNode.id} ctx=${context.id}`, {
-        effectName,
+      // Chained actions: resolve/build/submit each action immediately so the sequencer queues them.
+      // We use a stable effect name per (context + resolvedLayer) so the sequencer queues rather than replaces,
+      // preserving the layer state between transitions.
+      const chainEffectName = `${this.cueId}:${context.eventNode.id}:${context.id}:layer-${resolvedLayer}`;
+      this.debugLog(`submit action-chain ctx=${context.id}`, {
+        effectName: chainEffectName,
         layer: resolvedLayer,
-        timing: resolvedTiming,
-        color: resolvedColor,
-        secondaryColor: resolvedSecondaryColor
+        actions: actionChain.map(a => ({ id: a.id, effectType: a.effectType }))
       });
 
-      // Submit effect to sequencer with completion callback
-      this.sequencer.addEffectWithCallback(
-        effectName,
-        effect,
-        () => {
-          // This callback is fired when the effect completes
+      // Ensure the rest of the chain nodes won't execute independently later.
+      // They will still be marked complete when the final queued effect finishes.
+      for (let i = 1; i < actionChain.length; i++) {
+        context.markVisited(actionChain[i].id);
+      }
+
+      // Register all chain actions as active so the context stays blocked until the chain completes.
+      for (const a of actionChain) {
+        context.registerActiveAction(a.id, a);
+      }
+
+      const resolveAndBuildEffectForAction = (a: ActionNode): { effect: any, resolvedLayer: number, resolvedTiming: ResolvedActionTiming, resolvedColor: ResolvedColorSetting, resolvedSecondaryColor?: ResolvedColorSetting } | null => {
+        if (a.effectType === 'blackout') {
+          // Don't chain blackout with other actions (special-cased above)
+          return null;
+        }
+
+        const layerNum = a.layer ? Number(resolveValue('number', a.layer, context)) : 0;
+        // Only chain actions on the same resolved layer to avoid unintended cross-layer queuing.
+        if (layerNum !== resolvedLayer) {
+          return null;
+        }
+
+        const rt: ResolvedActionTarget = {
+          groups: resolveLocationGroups(a.target.groups, context),
+          filter: resolveLightTarget(a.target.filter, context)
+        };
+
+        const rc: ResolvedColorSetting = {
+          name: resolveColor(a.color.name, context),
+          brightness: resolveBrightness(a.color.brightness, context),
+          blendMode: resolveBlendMode(a.color.blendMode, context),
+          opacity: a.color.opacity ? Number(resolveValue('number', a.color.opacity, context)) : undefined
+        };
+
+        const rsc: ResolvedColorSetting | undefined = a.secondaryColor ? {
+          name: resolveColor(a.secondaryColor.name, context),
+          brightness: resolveBrightness(a.secondaryColor.brightness, context),
+          blendMode: resolveBlendMode(a.secondaryColor.blendMode, context),
+          opacity: a.secondaryColor.opacity ? Number(resolveValue('number', a.secondaryColor.opacity, context)) : undefined
+        } : undefined;
+
+        const rtiming: ResolvedActionTiming = {
+          ...a.timing,
+          waitForTime: Number(resolveValue('number', a.timing.waitForTime, context)),
+          waitForConditionCount: a.timing.waitForConditionCount
+            ? Number(resolveValue('number', a.timing.waitForConditionCount, context))
+            : undefined,
+          duration: Number(resolveValue('number', a.timing.duration, context)),
+          waitUntilTime: Number(resolveValue('number', a.timing.waitUntilTime, context)),
+          waitUntilConditionCount: a.timing.waitUntilConditionCount
+            ? Number(resolveValue('number', a.timing.waitUntilConditionCount, context))
+            : undefined,
+          level: a.timing.level
+            ? Number(resolveValue('number', a.timing.level, context))
+            : 1
+        };
+
+        const chainLights = ActionEffectFactory.resolveLights(
+          this.lightManager,
+          a.target,
+          (varName: string) => {
+            const cueVar = context.cueLevelVarStore.get(varName);
+            const groupVar = context.groupLevelVarStore.get(varName);
+            return cueVar ?? groupVar;
+          }
+        );
+
+        if (!chainLights || chainLights.length === 0) {
+          return null;
+        }
+
+        const resolvedA: any = {
+          ...a,
+          target: rt,
+          color: rc,
+          secondaryColor: rsc,
+          timing: rtiming,
+          layer: layerNum
+        };
+
+        const eff = ActionEffectFactory.buildEffect({
+          action: resolvedA,
+          lights: chainLights,
+          waitCondition: undefined,
+          waitTime: 0,
+          resolvedTarget: rt,
+          resolvedColor: rc,
+          resolvedSecondaryColor: rsc,
+          resolvedTiming: rtiming,
+          resolvedLayer: layerNum
+        });
+
+        if (!eff) return null;
+        return { effect: eff, resolvedLayer: layerNum, resolvedTiming: rtiming, resolvedColor: rc, resolvedSecondaryColor: rsc };
+      };
+
+      // Build all effects in chain; if anything can't be built, fall back to submitting only the first action.
+      const built: Array<{ actionId: string, effect: any, resolvedTiming: ResolvedActionTiming, resolvedColor: ResolvedColorSetting, resolvedSecondaryColor?: ResolvedColorSetting }> = [];
+      for (const a of actionChain) {
+        const builtOne = resolveAndBuildEffectForAction(a);
+        if (!builtOne) break;
+        built.push({ actionId: a.id, effect: builtOne.effect, resolvedTiming: builtOne.resolvedTiming, resolvedColor: builtOne.resolvedColor, resolvedSecondaryColor: builtOne.resolvedSecondaryColor });
+      }
+
+      if (built.length !== actionChain.length) {
+        // Fallback: only submit the original action as before, and let the rest execute normally.
+        // Undo the "visited" marks and active registrations for chain nodes beyond the first.
+        for (let i = 1; i < actionChain.length; i++) {
+          // We can't "unvisit" cleanly with current ExecutionContext API; safest fallback is
+          // to complete all chain actions immediately and continue from the first.
+          context.completeAction(actionChain[i].id);
+        }
+        // Submit first action normally (single action behavior)
+        const effect = ActionEffectFactory.buildEffect({
+          action: resolvedAction,
+          lights,
+          waitCondition: undefined,
+          waitTime: 0,
+          resolvedTarget,
+          resolvedColor,
+          resolvedSecondaryColor,
+          resolvedTiming,
+          resolvedLayer
+        });
+        if (!effect) {
+          this.continueToNextNodes(actionNode.id, context);
+          return;
+        }
+        const effectName = `${this.cueId}:${context.eventNode.id}:${context.id}:${actionNode.id}`;
+        this.sequencer.addEffectWithCallback(effectName, effect, () => {
           if (context.hasVisited(actionNode.id)) {
-            this.debugLog(`effect complete nodeId=${actionNode.id} ctx=${context.id}`, { effectName });
             context.completeAction(actionNode.id);
           }
-        },
-        false // Not persistent
-      );
+        }, false);
+        return;
+      }
+
+      // Submit all effects; register callback on the final queued effect.
+      for (let i = 0; i < built.length; i++) {
+        const b = built[i];
+        const isLast = i === built.length - 1;
+
+        this.debugLog(`submit chained effect nodeId=${b.actionId} ctx=${context.id}`, {
+          effectName: chainEffectName,
+          layer: resolvedLayer,
+          timing: b.resolvedTiming,
+          color: b.resolvedColor,
+          secondaryColor: b.resolvedSecondaryColor
+        });
+
+        if (!isLast) {
+          this.sequencer.addEffectWithCallback(chainEffectName, b.effect, () => {}, false);
+          continue;
+        }
+
+        this.sequencer.addEffectWithCallback(
+          chainEffectName,
+          b.effect,
+          () => {
+            // Effect callback fires when the last light finishes the last queued transition for this name.
+            for (const a of actionChain) {
+              if (context.hasVisited(a.id)) {
+                this.debugLog(`effect complete (chained) nodeId=${a.id} ctx=${context.id}`, { effectName: chainEffectName });
+                context.completeAction(a.id);
+              }
+            }
+          },
+          false
+        );
+      }
     } catch (error) {
       console.error(`Error executing action node ${actionNode.id}:`, error);
       // Continue execution despite error

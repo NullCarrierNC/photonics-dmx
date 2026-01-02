@@ -454,10 +454,18 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
         if (sourceNode.data.kind === 'event') {
           const sourceEvent = sourceNode.data.payload as YargEventNode | AudioEventNode;
+          // Event nodes are graph entry points. For song-driven events (beat/keyframe/etc) we can
+          // optionally mirror the event onto the action's waitForCondition. For system events
+          // (cue-started/cue-called) we MUST NOT write them into action timing (schema/runtime),
+          // so we default to 'none'.
+          const inheritedWaitForCondition =
+            sourceEvent.eventType === 'cue-started' || sourceEvent.eventType === 'cue-called'
+              ? 'none'
+              : (sourceEvent.eventType as any);
           targetAction.timing = {
             ...createDefaultActionTiming(),
             ...(targetAction.timing ?? {}),
-            waitForCondition: sourceEvent.eventType as any,
+            waitForCondition: inheritedWaitForCondition,
             waitForTime: { source: 'literal', value: 0 }
           };
         } else if (sourceNode.data.kind === 'action') {
