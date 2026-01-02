@@ -132,6 +132,14 @@ class YargCueHandler extends BaseCueHandler {
   }
 
   /**
+   * Stop the active cue (if any) and run its onStop lifecycle.
+   * Used by Cue Simulation / test harnesses so restarting the same cue works reliably.
+   */
+  public stopActiveCue(): void {
+    this.stopCurrentCue();
+  }
+
+  /**
    * Handle keyframe navigation
    */
   public handleKeyframe(): void {

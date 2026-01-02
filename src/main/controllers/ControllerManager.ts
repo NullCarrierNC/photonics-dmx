@@ -323,6 +323,13 @@ export class ControllerManager {
       clearInterval(this.testEffectInterval);
       this.testEffectInterval = null;
     }
+
+    // Important: stopping the simulation must also stop the active cue.
+    // Otherwise node cues can remain mid-execution (waiting on callbacks),
+    // and restarting the same cue will appear to do nothing.
+    if (this.cueHandler instanceof YargCueHandler) {
+      this.cueHandler.stopActiveCue();
+    }
     
     if (this.effectsController) {
       await this.effectsController.blackout(0);
