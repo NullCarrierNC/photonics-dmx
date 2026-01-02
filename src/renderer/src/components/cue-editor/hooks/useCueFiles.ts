@@ -545,6 +545,46 @@ const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: Use
     }
   }, [editorDoc]);
 
+  const handleReload = useCallback(async () => {
+    const currentPath = editorDoc?.path;
+    
+    // Refresh the file list
+    if (editorDoc?.mode === 'effect') {
+      await refreshEffectFiles();
+    } else {
+      await refreshFiles();
+    }
+
+    // If there's a current file open, reload it directly from disk
+    if (currentPath) {
+      try {
+        if (editorDoc?.mode === 'effect') {
+          const file = await readEffectFile(currentPath);
+          setEditorDoc({ mode: 'effect', file, path: currentPath });
+          setMode(file.mode);
+          setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath);
+          const effectFile = file as EffectFile;
+          const effectId = effectFile.effects.find(e => e.id === selectedCueId)?.id ?? effectFile.effects[0]?.id ?? null;
+          setSelectedCueId(effectId);
+          setIsDirty(false);
+          loadCueIntoFlow(effectFile.effects.find(e => e.id === effectId) ?? null);
+        } else {
+          const file = await readNodeCueFile(currentPath);
+          setEditorDoc({ mode: 'cue', file, path: currentPath });
+          setMode(file.mode);
+          setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath);
+          const cueFile = file as NodeCueFile;
+          const cueId = cueFile.cues.find(c => c.id === selectedCueId)?.id ?? cueFile.cues[0]?.id ?? null;
+          setSelectedCueId(cueId);
+          setIsDirty(false);
+          loadCueIntoFlow(cueFile.cues.find(c => c.id === cueId) ?? null);
+        }
+      } catch (error) {
+        console.error('Failed to reload current file', error);
+      }
+    }
+  }, [editorDoc, selectedCueId, refreshFiles, refreshEffectFiles, loadCueIntoFlow]);
+
   return {
     mode,
     activeMode,
@@ -580,7 +620,8 @@ const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: Use
     handleDelete,
     handleImport,
     handleExport,
-    refreshFiles
+    refreshFiles,
+    handleReload
   };
 };
 

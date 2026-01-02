@@ -64,7 +64,7 @@ const CueEditor: React.FC = () => {
     handleDelete,
     handleImport,
     handleExport,
-    refreshFiles
+    handleReload
   } = useCueFiles({ 
     loadCueIntoFlow: loadCueIntoFlowProxy, 
     getUpdatedDocument: getUpdatedDocumentProxy,
@@ -371,7 +371,7 @@ const CueEditor: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-[208px_1fr_282px] gap-4 h-[calc(100vh-220px)]">
+      <div className="grid grid-cols-[minmax(208px,400px)_2fr_minmax(282px,400px)] gap-4 h-[calc(100vh-220px)]">
         <div className="flex flex-col gap-4 overflow-hidden">
           <CueFileSidebar
             mode={mode}
@@ -381,7 +381,7 @@ const CueEditor: React.FC = () => {
             selectedCueId={selectedCueId}
             onSelectFile={selectFile}
             onSelectEffectFile={selectEffectFile}
-            onReload={refreshFiles}
+            onReload={handleReload}
             onAddCue={handleAddCue}
             onAddEffect={handleAddEffect}
             onRemoveCue={removeCue}

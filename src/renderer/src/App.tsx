@@ -40,6 +40,7 @@ export const App = (): JSX.Element => {
   const [currentPage] = useAtom(currentPageAtom);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [, setPrefs] = useAtom(lightingPrefsAtom);
+  const [isLeftMenuCollapsed, setIsLeftMenuCollapsed] = useState(false);
   const setIsSenderError = useSetAtom(isSenderErrorAtom);
   const setSenderError = useSetAtom(senderErrorAtom);
   const setCueState = useSetAtom(currentCueStateAtom);
@@ -199,6 +200,16 @@ export const App = (): JSX.Element => {
     document.documentElement.classList.toggle('dark', !isDarkMode); 
   };
 
+  const handleToggleLeftMenu = async (): Promise<void> => {
+    const newCollapsed = !isLeftMenuCollapsed;
+    setIsLeftMenuCollapsed(newCollapsed);
+    try {
+      await window.electron.ipcRenderer.invoke('save-prefs', { leftMenuCollapsed: newCollapsed });
+    } catch (error) {
+      console.error('Failed to save left menu collapsed state:', error);
+    }
+  };
+
   // Load light library effect
   useEffect(() => {
     const loadLightLibrary = async (): Promise<void> => {
@@ -329,6 +340,10 @@ export const App = (): JSX.Element => {
 
       setPrefs(updatedPrefs);
       
+      // Load left menu collapsed state
+      if (prefs.leftMenuCollapsed !== undefined) {
+        setIsLeftMenuCollapsed(prefs.leftMenuCollapsed);
+      }
     }
 
     fetchAppVersion();
@@ -405,29 +420,46 @@ export const App = (): JSX.Element => {
     }
   };
 
+  const sidebarWidth = isLeftMenuCollapsed ? 80 : 208;
+
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-black dark:text-gray-200">
       {/* Left Sidebar */}
-      <div className="fixed top-0 left-0 h-full w-[208px] shadow-lg flex flex-col bg-white dark:bg-gray-900 dark:text-white overflow-y-auto">
+      <div 
+        className="fixed top-0 left-0 h-full shadow-lg flex flex-col bg-white dark:bg-gray-900 dark:text-white overflow-y-auto transition-all duration-300"
+        style={{ width: `${sidebarWidth}px` }}
+      >
         {/* Sidebar Header */}
         <div className="h-16 bg-gray-800 dark:bg-gray-950 text-white flex items-center p-2">
-          <img
-            src={squareLogo}
-            alt="Logo"
-            className="h-full"
-            style={{ width: 'auto', height: '100%', padding: '4px' }}
-          />
-          <span className="flex-grow text-left ml-2">Photonics {appVer}</span>
+          {!isLeftMenuCollapsed && (
+            <>
+              <img
+                src={squareLogo}
+                alt="Logo"
+                className="h-full"
+                style={{ width: 'auto', height: '100%', padding: '4px' }}
+              />
+              <span className="flex-grow text-left ml-2">Photonics {appVer}</span>
+            </>
+          )}
         </div>
 
         {/* Sidebar Content with LeftMenu */}
-        <div className="flex-grow p-4 overflow-y-auto">
-          <LeftMenu isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
+        <div className={`flex-grow overflow-y-auto ${isLeftMenuCollapsed ? 'p-2' : 'p-4'}`}>
+          <LeftMenu 
+            isDarkMode={isDarkMode} 
+            toggleDarkMode={toggleDarkMode}
+            isCollapsed={isLeftMenuCollapsed}
+            onToggleCollapse={handleToggleLeftMenu}
+          />
         </div>
       </div>
 
       {/* Right Content Area */}
-      <div className="flex-grow ml-[208px] flex flex-col h-screen">
+      <div 
+        className="flex-grow flex flex-col h-screen transition-all duration-300"
+        style={{ marginLeft: `${sidebarWidth}px` }}
+      >
         {/* Main Content Header */}
         <div className="h-16 bg-gray-800 dark:bg-gray-950 text-white flex items-center justify-center z-10">
           <HeaderProjects />

@@ -69,6 +69,13 @@ export interface AppPreferences {
     bpm: number;
     instrument: 'guitar' | 'bass' | 'keys' | 'drums';
   };
+  leftMenuCollapsed?: boolean;
+  windowState?: {
+    width: number;
+    height: number;
+    x?: number;
+    y?: number;
+  };
 }
 
 /**

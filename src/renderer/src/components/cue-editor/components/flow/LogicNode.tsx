@@ -12,7 +12,7 @@ const formatValueSource = (value?: ValueSource): string => {
   return `${value.name}${fallback}`;
 };
 
-const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
+const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => {
   if (data.kind !== 'logic') return null;
   const logic = data.payload as LogicNode | any;
   const logicType = (logic as any)?.logicType as string | undefined;
@@ -160,8 +160,10 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
         ? "text-orange-700 dark:text-orange-100"
         : "text-amber-700 dark:text-amber-100";
 
+  const selectedStyles = selected ? 'shadow-[0_0_24px_8px_rgba(59,130,246,0.8)] ring-4 ring-blue-400' : '';
+
   return (
-    <div className={`px-3 py-2 rounded-lg border-2 ${nodeStyles}`}>
+    <div className={`px-3 py-2 rounded-lg border-2 ${nodeStyles} ${selectedStyles}`}>
       <Handle type="target" position={Position.Top} />
       <div className={titleStyles}>{data.label}</div>
       <div className={detailStyles}>{renderDetails()}</div>

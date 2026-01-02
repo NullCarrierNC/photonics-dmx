@@ -4,7 +4,7 @@ import type { EditorNodeData } from '../../lib/types';
 import { getConditionLabel, getTextColorForBg, displayValueSource } from '../../lib/cueUtils';
 import type { ActionNode as ActionPayload } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 
-const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
+const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => {
   const action = data.payload as ActionPayload;
   
   // Handle color which is now ValueSource
@@ -32,10 +32,11 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
 
   // Build label: include variable name if color is from a variable
   const labelText = colorVarName ? `${data.label}(${colorVarName})` : data.label;
+  const selectedStyles = selected ? 'shadow-[0_0_24px_8px_rgba(59,130,246,0.8)] ring-4 ring-blue-400' : '';
 
   return (
     <div
-      className="px-3 py-2 rounded-lg border text-xs shadow-sm min-w-[160px]"
+      className={`px-3 py-2 rounded-lg border text-xs shadow-sm min-w-[160px] ${selectedStyles}`}
       style={{
         backgroundColor: colorName,
         borderColor: isColorVariable ? '#666' : 'rgba(0,0,0,0.15)',
