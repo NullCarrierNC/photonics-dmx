@@ -430,17 +430,16 @@ export const App = (): JSX.Element => {
         style={{ width: `${sidebarWidth}px` }}
       >
         {/* Sidebar Header */}
-        <div className="h-16 bg-gray-800 dark:bg-gray-950 text-white flex items-center p-2">
+        <div className={`h-16 bg-gray-800 dark:bg-gray-950 text-white flex items-center ${isLeftMenuCollapsed ? 'justify-center' : 'p-2'}`}>
+          <img
+            src={squareLogo}
+            alt="Logo"
+            className="h-full"
+            style={{ width: 'auto', height: '100%', padding: '4px' }}
+            title={isLeftMenuCollapsed ? `Photonics ${appVer}` : undefined}
+          />
           {!isLeftMenuCollapsed && (
-            <>
-              <img
-                src={squareLogo}
-                alt="Logo"
-                className="h-full"
-                style={{ width: 'auto', height: '100%', padding: '4px' }}
-              />
-              <span className="flex-grow text-left ml-2">Photonics {appVer}</span>
-            </>
+            <span className="flex-grow text-left ml-2">Photonics {appVer}</span>
           )}
         </div>
 

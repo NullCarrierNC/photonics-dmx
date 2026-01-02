@@ -642,48 +642,15 @@ const LightsLayout = () => {
                     />
 
                     {/* Light Channels Configuration */}
-                    <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="mt-8 space-y-8">
                         {/* Front Lights */}
-                        {frontLights.map((light, index) => (
-                            <div key={light.id} className="flex flex-col">
-                                <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
-                                    Front {index + 1} (Position {light.position})
-                                </div>
-                                <LightChannelsConfig
-                                    light={light}
-                                    myLights={myFixtures}
-                                    onChange={handleLightChange}
-                                    isHighlighted={highlightedLight === light.position}
-                                    onClick={() => handleLightClick(light.position)}
-                                />
-                            </div>
-                        ))}
-
-                        {/* Back Lights */}
-                        {selectedLayout === 'front-back' &&
-                            backLights.map((light, index) => (
-                                <div key={light.id} className="flex flex-col">
-                                    <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
-                                        Back {index + 1} (Position {light.position})
-                                    </div>
-                                    <LightChannelsConfig
-                                        light={light}
-                                        myLights={myFixtures}
-                                        onChange={handleLightChange}
-                                        isHighlighted={highlightedLight === light.position}
-                                        onClick={() => handleLightClick(light.position)}
-                                    />
-                                </div>
-                            ))}
-
-                        {/* Strobe Column: Only show if Dedicated Strobe is selected */}
-                        {selectedStrobe === ConfigStrobeType.Dedicated &&
-                            allPrimaryLights
-                                .filter((l) => l.group === 'strobe')
-                                .map((light, _index) => (
+                        <div>
+                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Front Lights</h2>
+                            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                                {frontLights.map((light, index) => (
                                     <div key={light.id} className="flex flex-col">
                                         <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
-                                            Dedicated Strobe (Position {light.position})
+                                            Front {index + 1} (Position {light.position})
                                         </div>
                                         <LightChannelsConfig
                                             light={light}
@@ -694,6 +661,57 @@ const LightsLayout = () => {
                                         />
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* Back Lights */}
+                        {selectedLayout === 'front-back' && backLights.length > 0 && (
+                            <div>
+                                <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Back Lights</h2>
+                                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                                    {backLights.map((light, index) => (
+                                        <div key={light.id} className="flex flex-col">
+                                            <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
+                                                Back {index + 1} (Position {light.position})
+                                            </div>
+                                            <LightChannelsConfig
+                                                light={light}
+                                                myLights={myFixtures}
+                                                onChange={handleLightChange}
+                                                isHighlighted={highlightedLight === light.position}
+                                                onClick={() => handleLightClick(light.position)}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Strobe Lights: Only show if Dedicated Strobe is selected */}
+                        {selectedStrobe === ConfigStrobeType.Dedicated &&
+                            allPrimaryLights.filter((l) => l.group === 'strobe').length > 0 && (
+                                <div>
+                                    <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Dedicated Strobe Lights</h2>
+                                    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                                        {allPrimaryLights
+                                            .filter((l) => l.group === 'strobe')
+                                            .map((light, _index) => (
+                                                <div key={light.id} className="flex flex-col">
+                                                    <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
+                                                        Dedicated Strobe (Position {light.position})
+                                                    </div>
+                                                    <LightChannelsConfig
+                                                        light={light}
+                                                        myLights={myFixtures}
+                                                        onChange={handleLightChange}
+                                                        isHighlighted={highlightedLight === light.position}
+                                                        onClick={() => handleLightClick(light.position)}
+                                                    />
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                            )}
                     </div>
 
                     {/* Success Message */}

@@ -231,7 +231,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`flex flex-col flex-grow items-center space-y-2 p-4 max-w-[240px] rounded-lg shadow cursor-pointer 
+      className={`flex flex-col flex-grow items-center space-y-2 p-4 max-w-[440px] rounded-lg shadow cursor-pointer 
                   text-gray-800 dark:text-gray-200 
                   ${
                     isHighlighted
