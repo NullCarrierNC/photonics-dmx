@@ -1,4 +1,4 @@
-import { WaitCondition, TrackedLight, Effect, RGBIO, LocationGroup, Color, Brightness, BlendMode, LightTarget } from '../../../types';
+import { WaitCondition, TrackedLight, Effect, EffectTransition, RGBIO, LocationGroup, Color, Brightness, BlendMode, LightTarget } from '../../../types';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { getColor } from '../../../helpers/dmxHelpers';
 import {
@@ -48,6 +48,15 @@ interface BuildEffectParams {
   resolvedLayer?: number;
 }
 
+export interface BuildEffectChainStep {
+  action: ActionNode;
+  lights: TrackedLight[];
+  resolvedColor?: ResolvedColorSetting;
+  resolvedTiming?: ResolvedActionTiming;
+  resolvedLayer?: number;
+  intensityScale?: number;
+}
+
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
 
@@ -75,6 +84,48 @@ const resolveEasing = (value?: string, fallback: EasingType = EasingType.SIN_IN_
   return valid ? (value as EasingType) : fallback;
 };
 
+const normalizeWaitFor = (timing: ResolvedActionTiming, waitTimeOffset = 0): { waitFor: WaitCondition; waitForTime: number } => {
+  let waitFor: WaitCondition = timing.waitForCondition ?? 'none';
+  const waitForTime = safeDuration(waitTimeOffset + (timing.waitForTime ?? 0), 0, 0);
+
+  // If the transition wants to "start immediately" but has an explicit delay time,
+  // interpret that as a delay gate (matches existing buildEffect behavior).
+  if (waitFor === 'none' && waitForTime > 0) {
+    waitFor = 'delay';
+  }
+
+  return { waitFor, waitForTime };
+};
+
+const createSingleColorTransition = (params: {
+  lights: TrackedLight[];
+  layer: number;
+  waitFor: WaitCondition;
+  waitForTime: number;
+  color: RGBIO;
+  timing: ResolvedActionTiming;
+  easing: EasingType;
+}): EffectTransition => {
+  const { lights, layer, waitFor, waitForTime, color, timing, easing } = params;
+  const duration = safeDuration(timing.duration, 0, 0);
+
+  return {
+    lights,
+    layer,
+    waitForCondition: waitFor,
+    waitForTime: safeDuration(waitForTime, 0, 0),
+    waitForConditionCount: timing.waitForConditionCount,
+    transform: {
+      color,
+      easing,
+      duration
+    },
+    waitUntilCondition: timing.waitUntilCondition,
+    waitUntilTime: safeDuration(timing.waitUntilTime, 0, 0),
+    waitUntilConditionCount: timing.waitUntilConditionCount
+  };
+};
+
 const createSingleColorEffect = (params: {
   lights: TrackedLight[];
   layer: number;
@@ -85,6 +136,7 @@ const createSingleColorEffect = (params: {
 }): Effect => {
   const { lights, layer, waitFor, color, timing, easing } = params;
   const duration = safeDuration(timing.duration, 0, 0);
+  const { waitForTime } = normalizeWaitFor(timing, 0);
 
   return {
     id: 'single-color',
@@ -94,7 +146,7 @@ const createSingleColorEffect = (params: {
         lights,
         layer,
         waitForCondition: waitFor,
-        waitForTime: safeDuration(timing.waitForTime, 0, 0),
+        waitForTime: safeDuration(waitForTime, 0, 0),
         waitForConditionCount: timing.waitForConditionCount,
         transform: {
           color,
@@ -243,6 +295,67 @@ export class ActionEffectFactory {
     }
 
     return effect;
+  }
+
+  /**
+   * Build a single sequencer Effect with multiple sequential transitions from a chain
+   * of action nodes. This is used to ensure "red then yellow" type patterns complete
+   * as an atomic unit (no early callback after the first action) and to preserve layer
+   * continuity between steps.
+   *
+   * Important: all steps must target the same lights and the same layer.
+   */
+  public static buildEffectChain(steps: BuildEffectChainStep[]): Effect | null {
+    if (!steps || steps.length === 0) return null;
+
+    // Validate common lights + layer
+    const first = steps[0];
+    if (!first.lights || first.lights.length === 0) return null;
+    const baseLayer = first.resolvedLayer ?? (first.action.layer?.source === 'literal' ? Number(first.action.layer.value) : 0);
+    const baseLightIds = first.lights.map(l => l.id).join(',');
+
+    const transitions: EffectTransition[] = [];
+
+    for (const step of steps) {
+      if (step.action.effectType !== 'set-color') {
+        return null;
+      }
+      if (!step.lights || step.lights.length === 0) return null;
+
+      const layer = step.resolvedLayer ?? (step.action.layer?.source === 'literal' ? Number(step.action.layer.value) : 0);
+      if (layer !== baseLayer) return null;
+
+      const ids = step.lights.map(l => l.id).join(',');
+      if (ids !== baseLightIds) return null;
+
+      const timing = step.resolvedTiming ?? this.resolveTiming(step.action.timing);
+      const primaryColor = step.resolvedColor ?? this.resolveColorSetting(step.action.color);
+
+      const timingLevel = 1;
+      const intensityScale = clamp((step.intensityScale ?? 1) * timingLevel, 0, 1);
+      const easing = resolveEasing(timing.easing);
+      const color = resolveColor(primaryColor, intensityScale || 0.01);
+
+      const { waitFor, waitForTime } = normalizeWaitFor(timing, 0);
+
+      transitions.push(
+        createSingleColorTransition({
+          lights: step.lights,
+          layer,
+          waitFor,
+          waitForTime,
+          color,
+          timing,
+          easing
+        })
+      );
+    }
+
+    return {
+      id: 'action-chain',
+      description: 'Chained action effect',
+      transitions
+    };
   }
 }
 

@@ -532,8 +532,9 @@ export class NodeExecutionEngine {
       }
 
       // Chained actions: resolve/build/submit each action immediately so the sequencer queues them.
-      // We use a stable effect name per (context + resolvedLayer) so the sequencer queues rather than replaces,
-      // preserving the layer state between transitions.
+      // We compile the chain into ONE effect with multiple transitions.
+      // This ensures the completion callback fires after the final transition,
+      // and preserves layer continuity between steps.
       const chainEffectName = `${this.cueId}:${context.eventNode.id}:${context.id}:layer-${resolvedLayer}`;
       this.debugLog(`submit action-chain ctx=${context.id}`, {
         effectName: chainEffectName,
@@ -638,15 +639,15 @@ export class NodeExecutionEngine {
         return { effect: eff, resolvedLayer: layerNum, resolvedTiming: rtiming, resolvedColor: rc, resolvedSecondaryColor: rsc };
       };
 
-      // Build all effects in chain; if anything can't be built, fall back to submitting only the first action.
-      const built: Array<{ actionId: string, effect: any, resolvedTiming: ResolvedActionTiming, resolvedColor: ResolvedColorSetting, resolvedSecondaryColor?: ResolvedColorSetting }> = [];
+      // Build a single multi-transition effect for the chain; if we can't, fall back to single-action behavior.
+      const builtSteps: Array<{ actionId: string, effect: any, resolvedTiming: ResolvedActionTiming, resolvedColor: ResolvedColorSetting, resolvedSecondaryColor?: ResolvedColorSetting }> = [];
       for (const a of actionChain) {
         const builtOne = resolveAndBuildEffectForAction(a);
         if (!builtOne) break;
-        built.push({ actionId: a.id, effect: builtOne.effect, resolvedTiming: builtOne.resolvedTiming, resolvedColor: builtOne.resolvedColor, resolvedSecondaryColor: builtOne.resolvedSecondaryColor });
+        builtSteps.push({ actionId: a.id, effect: builtOne.effect, resolvedTiming: builtOne.resolvedTiming, resolvedColor: builtOne.resolvedColor, resolvedSecondaryColor: builtOne.resolvedSecondaryColor });
       }
 
-      if (built.length !== actionChain.length) {
+      if (builtSteps.length !== actionChain.length) {
         // Fallback: only submit the original action as before, and let the rest execute normally.
         // Undo the "visited" marks and active registrations for chain nodes beyond the first.
         for (let i = 1; i < actionChain.length; i++) {
@@ -679,39 +680,71 @@ export class NodeExecutionEngine {
         return;
       }
 
-      // Submit all effects; register callback on the final queued effect.
-      for (let i = 0; i < built.length; i++) {
-        const b = built[i];
-        const isLast = i === built.length - 1;
+      // Extract the EffectTransition(s) from each single-transition effect and compose them.
+      // Each b.effect is an Effect with exactly one transition (from ActionEffectFactory.buildEffect).
+      const composedEffect = ActionEffectFactory.buildEffectChain(
+        builtSteps.map(step => ({
+          action: actionChain.find(a => a.id === step.actionId)!,
+          // Each step already validated as targeting the same lights; keep the shared lights reference.
+          lights,
+          resolvedColor: step.resolvedColor,
+          resolvedTiming: step.resolvedTiming,
+          resolvedLayer,
+          intensityScale: 1
+        }))
+      );
 
-        this.debugLog(`submit chained effect nodeId=${b.actionId} ctx=${context.id}`, {
-          effectName: chainEffectName,
-          layer: resolvedLayer,
-          timing: b.resolvedTiming,
-          color: b.resolvedColor,
-          secondaryColor: b.resolvedSecondaryColor
+      if (!composedEffect) {
+        // Safety fallback: behave like single-action to avoid breaking execution.
+        const effect = ActionEffectFactory.buildEffect({
+          action: resolvedAction,
+          lights,
+          waitCondition: undefined,
+          waitTime: 0,
+          resolvedTarget,
+          resolvedColor,
+          resolvedSecondaryColor,
+          resolvedTiming,
+          resolvedLayer
         });
-
-        if (!isLast) {
-          this.sequencer.addEffectWithCallback(chainEffectName, b.effect, () => {}, false);
-          continue;
+        if (!effect) {
+          this.continueToNextNodes(actionNode.id, context);
+          return;
         }
-
-        this.sequencer.addEffectWithCallback(
-          chainEffectName,
-          b.effect,
-          () => {
-            // Effect callback fires when the last light finishes the last queued transition for this name.
-            for (const a of actionChain) {
-              if (context.hasVisited(a.id)) {
-                this.debugLog(`effect complete (chained) nodeId=${a.id} ctx=${context.id}`, { effectName: chainEffectName });
-                context.completeAction(a.id);
-              }
-            }
-          },
-          false
-        );
+        const effectName = `${this.cueId}:${context.eventNode.id}:${context.id}:${actionNode.id}`;
+        this.sequencer.addEffectWithCallback(effectName, effect, () => {
+          if (context.hasVisited(actionNode.id)) {
+            context.completeAction(actionNode.id);
+          }
+        }, false);
+        return;
       }
+
+      this.debugLog(`submit composed action-chain ctx=${context.id}`, {
+        effectName: chainEffectName,
+        layer: resolvedLayer,
+        transitions: composedEffect.transitions.map(t => ({
+          waitForCondition: t.waitForCondition,
+          waitForTime: t.waitForTime,
+          duration: t.transform.duration,
+          waitUntilCondition: t.waitUntilCondition,
+          waitUntilTime: t.waitUntilTime
+        }))
+      });
+
+      this.sequencer.addEffectWithCallback(
+        chainEffectName,
+        composedEffect,
+        () => {
+          for (const a of actionChain) {
+            if (context.hasVisited(a.id)) {
+              this.debugLog(`effect complete (chained) nodeId=${a.id} ctx=${context.id}`, { effectName: chainEffectName });
+              context.completeAction(a.id);
+            }
+          }
+        },
+        false
+      );
     } catch (error) {
       console.error(`Error executing action node ${actionNode.id}:`, error);
       // Continue execution despite error
