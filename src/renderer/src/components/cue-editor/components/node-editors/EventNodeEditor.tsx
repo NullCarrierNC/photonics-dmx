@@ -1,7 +1,7 @@
 import React from 'react';
 import type { YargEventNode, AudioEventNode, AudioEventType } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { WaitCondition } from '../../../../../../photonics-dmx/types';
+import type { YargEventType } from '../../../../../../photonics-dmx/types';
 import { YARG_EVENT_OPTIONS_CATEGORIZED, AUDIO_EVENT_OPTIONS } from '../../lib/options';
 
 interface EventNodeEditorProps {
@@ -30,7 +30,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           value={eventType}
           onChange={event => {
             if (activeMode === 'yarg') {
-              updateYargNode({ eventType: event.target.value as WaitCondition });
+              updateYargNode({ eventType: event.target.value as YargEventType });
             } else {
               updateAudioNode({ eventType: event.target.value as AudioEventType });
             }

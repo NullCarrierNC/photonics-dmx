@@ -1,6 +1,6 @@
 import type { Edge } from 'reactflow';
-import type { ActionNode, AudioEventNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { WaitCondition } from '../../../../../photonics-dmx/types';
+import type { ActionNode, AudioEventNode, ValueSource } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { YargEventType } from '../../../../../photonics-dmx/types';
 import type { EditorNode } from './types';
 import { createDefaultActionTiming } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import {
@@ -8,16 +8,26 @@ import {
   YARG_EVENT_OPTIONS
 } from './options';
 
-const getYargEventLabel = (eventType: WaitCondition): string =>
+// Helper to display ValueSource as text
+const displayValueSource = (vs: ValueSource | undefined, defaultValue: string = ''): string => {
+  if (!vs) return defaultValue;
+  if (vs.source === 'literal') {
+    return String(vs.value ?? defaultValue);
+  }
+  return `$${vs.name}`;
+};
+
+const getYargEventLabel = (eventType: YargEventType): string =>
   YARG_EVENT_OPTIONS.find(option => option.value === eventType)?.label ?? eventType;
 
 const getAudioEventLabel = (eventType: AudioEventNode['eventType']): string =>
   AUDIO_EVENT_OPTIONS.find(option => option.value === eventType)?.label ?? eventType;
 
-const getConditionLabel = (condition: string, time?: number): string => {
+const getConditionLabel = (condition: string, timeSource?: ValueSource): string => {
   if (!condition) return 'none';
-  if (condition === 'delay' && (time ?? 0) > 0) {
-    return `delay (${Math.round(time ?? 0)}ms)`;
+  if (condition === 'delay') {
+    const timeText = displayValueSource(timeSource, '0');
+    return `delay [${timeText}ms]`;
   }
   return condition;
 };
@@ -106,6 +116,7 @@ const formatDuration = (ms: number): string => {
 export {
   calculateActionDuration,
   calculateChainDuration,
+  displayValueSource,
   formatDuration,
   getAudioEventLabel,
   getConditionLabel,

@@ -1,4 +1,8 @@
-import { Color, Brightness, BlendMode, LightTarget, LocationGroup, WaitCondition, WAIT_CONDITIONS } from '../types';
+import { 
+  Color, Brightness, BlendMode, LightTarget, LocationGroup, 
+  WaitCondition, WAIT_CONDITIONS,
+  YargEventType, YARG_EVENT_TYPES
+} from '../types';
 import { AudioEventType } from '../cues/types/nodeCueTypes';
 
 export const COLOR_OPTIONS: Color[] = [
@@ -23,12 +27,19 @@ export const LIGHT_TARGET_OPTIONS: LightTarget[] = [
   'random-1', 'random-2', 'random-3', 'random-4'
 ];
 
-// Derive from WAIT_CONDITIONS, excluding 'none' and 'delay' (those are special)
-export const YARG_EVENT_OPTIONS: WaitCondition[] = WAIT_CONDITIONS.filter(
-  (c): c is Exclude<WaitCondition, 'none' | 'delay'> => c !== 'none' && c !== 'delay'
+/**
+ * YARG event options for EVENT NODES - includes system events (cue-started, cue-called)
+ * and song events (beat, measure, keyframe, instruments).
+ * Excludes 'none' and 'delay' as those are only for action timing.
+ */
+export const YARG_EVENT_OPTIONS: YargEventType[] = YARG_EVENT_TYPES.filter(
+  (c): c is Exclude<YargEventType, 'none' | 'delay'> => c !== 'none' && c !== 'delay'
 );
 
-// Full list including none and delay - use the source of truth directly
+/**
+ * Wait conditions for ACTION TIMING - song-based conditions only (no system events).
+ * Includes 'none' and 'delay' for action waitFor/waitUntil configuration.
+ */
 export const WAIT_CONDITIONS_WITH_NONE_DELAY: WaitCondition[] = [...WAIT_CONDITIONS];
 
 export const AUDIO_EVENT_OPTIONS: AudioEventType[] = [

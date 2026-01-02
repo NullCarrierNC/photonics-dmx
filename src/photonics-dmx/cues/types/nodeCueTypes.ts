@@ -2,6 +2,7 @@ import { CueType } from './cueTypes';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type {
   WaitCondition,
+  YargEventType,
   TrackedLight,
 } from '../../types';
 import {
@@ -275,7 +276,7 @@ export interface BaseEventNode {
 }
 
 export interface YargEventNode extends BaseEventNode {
-  eventType: WaitCondition;
+  eventType: YargEventType;
 }
 
 export type AudioEventType =

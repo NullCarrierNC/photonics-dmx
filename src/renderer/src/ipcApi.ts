@@ -111,6 +111,9 @@ export const startTestEffect = (effectId: string, venueSize?: 'NoVenue' | 'Small
 export const stopTestEffect = () => 
   window.electron.ipcRenderer.invoke('stop-test-effect');
 
+export const setNodeCueDebug = (enabled: boolean) =>
+  window.electron.ipcRenderer.invoke('node-cues:set-debug', enabled);
+
 // Node cue management
 export const listNodeCueFiles = () =>
   window.electron.ipcRenderer.invoke('node-cues:list');

@@ -29,7 +29,8 @@ export function getYargEventCategories(): EventCategory[] {
     {
       category: 'Timing',
       events: [
-        { value: 'cue-started', label: 'Cue Started' },
+        { value: 'cue-started', label: 'Cue Started (once per lifecycle)' },
+        { value: 'cue-called', label: 'Cue Called (every call)' },
         { value: 'beat', label: 'Beat' },
         { value: 'measure', label: 'Measure' },
         { value: 'half-beat', label: 'Half Beat' },

@@ -21,6 +21,10 @@ export class YargNodeCue implements INetCue {
   private cueStartedFired = false;
   private executionEngine?: NodeExecutionEngine;
   private effectRegistry: EffectRegistry;
+  
+  // Cue queuing state
+  private isExecutingCueStarted = false;
+  private queuedParameters: CueData[] = [];
 
   constructor(groupId: string, private readonly compiledCue: CompiledYargCue, effectRegistry?: EffectRegistry) {
     const definition = compiledCue.definition as YargNodeCueDefinition;
@@ -72,8 +76,102 @@ export class YargNodeCue implements INetCue {
 
     // Get triggered events and start execution for each
     const events = this.getTriggeredEvents(parameters);
-    for (const event of events) {
+    
+    // Check if we have cue-started or cue-called events (queued events)
+    const hasCueEvent = events.some(e => e.eventType === 'cue-started' || e.eventType === 'cue-called');
+    
+    if (hasCueEvent && this.isExecutingCueStarted) {
+      // Queue this call if a cue-started/cue-called execution is already in progress
+      this.queuedParameters.push(parameters);
+      return;
+    }
+    
+    // Mark as executing if we have cue events
+    if (hasCueEvent) {
+      this.isExecutingCueStarted = true;
+    }
+
+    // Split events by type so we can guarantee initialization ordering.
+    // Important: cue-started must complete BEFORE cue-called runs, otherwise cue-called may
+    // read uninitialized variables (e.g., targetLight) and actions will silently target no lights.
+    const cueStartedEvents = events.filter(e => e.eventType === 'cue-started');
+    const cueCalledEvents = events.filter(e => e.eventType === 'cue-called');
+    const otherEvents = events.filter(e => e.eventType !== 'cue-started' && e.eventType !== 'cue-called');
+
+    // Fire non-cue events immediately; they don't participate in the cue lifecycle queue.
+    for (const event of otherEvents) {
       this.executionEngine.startExecution(event, parameters);
+    }
+
+    // If cue-started is present on this call, run it first, then run cue-called after it completes.
+    if (cueStartedEvents.length > 0) {
+      // There should typically be only one cue-started event node, but support multiple defensively.
+      // Run them sequentially (in order) before cue-called.
+      const runCueStartedAtIndex = (idx: number) => {
+        const ev = cueStartedEvents[idx];
+        this.executionEngine!.startExecutionWithCallback(ev, parameters, () => {
+          const nextIdx = idx + 1;
+          if (nextIdx < cueStartedEvents.length) {
+            runCueStartedAtIndex(nextIdx);
+            return;
+          }
+
+          // Now that initialization has completed, run cue-called events.
+          if (cueCalledEvents.length > 0) {
+            // Run cue-called events; when the LAST one completes, advance the queued cue call.
+            let remaining = cueCalledEvents.length;
+            for (const calledEv of cueCalledEvents) {
+              this.executionEngine!.startExecutionWithCallback(calledEv, parameters, () => {
+                remaining -= 1;
+                if (remaining === 0) {
+                  this.onCueEventComplete(sequencer, lightManager);
+                }
+              });
+            }
+          } else {
+            // No cue-called events; initialization completion ends this lifecycle execution.
+            this.onCueEventComplete(sequencer, lightManager);
+          }
+        });
+      };
+
+      runCueStartedAtIndex(0);
+      return;
+    }
+
+    // No cue-started on this call; run cue-called events immediately.
+    if (cueCalledEvents.length > 0) {
+      let remaining = cueCalledEvents.length;
+      for (const calledEv of cueCalledEvents) {
+        this.executionEngine.startExecutionWithCallback(calledEv, parameters, () => {
+          remaining -= 1;
+          if (remaining === 0) {
+            this.onCueEventComplete(sequencer, lightManager);
+          }
+        });
+      }
+      return;
+    }
+
+    // If we got here, there were no cue lifecycle events. Clear executing state.
+    this.isExecutingCueStarted = false;
+  }
+  
+  /**
+   * Called when a cue-started or cue-called execution completes.
+   * Processes the next item in the queue if any.
+   */
+  private onCueEventComplete(sequencer: ILightingController, lightManager: DmxLightManager): void {
+    if (this.queuedParameters.length > 0) {
+      const nextParams = this.queuedParameters.shift()!;
+      // We are no longer executing the previous cue lifecycle run, so allow the dequeued call
+      // to actually start. If we don't clear this flag here, execute() will immediately re-queue
+      // the dequeued call and we will never progress beyond the first iteration.
+      this.isExecutingCueStarted = false;
+      // Re-execute with queued parameters (will get cue-called event since cue-started already fired)
+      this.execute(nextParams, sequencer, lightManager);
+    } else {
+      this.isExecutingCueStarted = false;
     }
   }
 
@@ -104,6 +202,10 @@ export class YargNodeCue implements INetCue {
     this.cueLevelVarStore.clear();
     YargNodeCue.cueLevelVarStores.delete(this.id);
     this.cueStartedFired = false;
+    
+    // Reset queuing state
+    this.isExecutingCueStarted = false;
+    this.queuedParameters = [];
   }
 
   private initializeVariables(): void {
@@ -147,6 +249,11 @@ export class YargNodeCue implements INetCue {
           value: varDef.initialValue
         });
       }
+      return true;
+    }
+    
+    // cue-called fires every YARG call (for repeated work)
+    if (eventType === 'cue-called') {
       return true;
     }
     

@@ -32,6 +32,20 @@ import { resolveValue, resolveLocationGroups, resolveLightTarget, resolveColor, 
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator';
 
 export class NodeExecutionEngine {
+  /**
+   * Global runtime toggle for node-cue debug logging.
+   * This is useful in packaged builds where env vars are inconvenient.
+   */
+  private static globalDebugEnabled = false;
+
+  public static setDebugEnabled(enabled: boolean): void {
+    NodeExecutionEngine.globalDebugEnabled = enabled;
+  }
+
+  public static getDebugEnabled(): boolean {
+    return NodeExecutionEngine.globalDebugEnabled;
+  }
+
   private compiledCue: CompiledYargCue | CompiledAudioCue;
   private cueId: string;
   private activeContexts: Map<string, ExecutionContext> = new Map();
@@ -42,6 +56,11 @@ export class NodeExecutionEngine {
   private variableDefinitions: VariableDefinition[];
   private eventListeners: Map<string, EventListenerNode[]> = new Map();
   private effectRegistry: EffectRegistry;
+  /**
+   * Instance snapshot of env-based debug setting. Note that runtime toggles are handled via
+   * the static global flag so existing engines can start logging immediately.
+   */
+  private debugEnabled: boolean;
 
   constructor(
     compiledCue: CompiledYargCue | CompiledAudioCue,
@@ -61,9 +80,77 @@ export class NodeExecutionEngine {
     this.groupLevelVarStore = groupLevelVarStore;
     this.effectRegistry = effectRegistry;
     this.variableDefinitions = variableDefinitions;
+
+    // Debug logging is opt-in to avoid noisy logs in normal operation.
+    // Enable with either env var:
+    // - PHOTONICS_NODE_CUE_DEBUG=1
+    // - NODE_CUE_DEBUG=1
+    this.debugEnabled =
+      (process?.env?.PHOTONICS_NODE_CUE_DEBUG === '1') ||
+      (process?.env?.NODE_CUE_DEBUG === '1');
     
     // Register all event listeners during initialization
     this.registerEventListeners();
+  }
+
+  private debugLog(message: string, data?: unknown): void {
+    // Allow enabling debug at runtime via NodeExecutionEngine.setDebugEnabled(...)
+    if (!this.debugEnabled && !NodeExecutionEngine.globalDebugEnabled) return;
+    // Use console.log (not debug) so it shows up consistently in packaged builds.
+    if (data === undefined) {
+      // eslint-disable-next-line no-console
+      console.log(`[NodeCue] ${this.cueId} ${message}`);
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[NodeCue] ${this.cueId} ${message}`, this.debugPreview(data));
+  }
+
+  private debugPreview(value: unknown): unknown {
+    // Keep logs readable and avoid dumping huge arrays/objects.
+    const maxArray = 12;
+    const maxString = 300;
+
+    const previewAny = (v: any): any => {
+      if (v === null || v === undefined) return v;
+      if (typeof v === 'string') {
+        return v.length > maxString ? `${v.slice(0, maxString)}…` : v;
+      }
+      if (typeof v === 'number' || typeof v === 'boolean') return v;
+      if (Array.isArray(v)) {
+        const head = v.slice(0, maxArray).map(previewAny);
+        return v.length > maxArray ? { items: head, truncated: v.length - maxArray } : head;
+      }
+      if (v && typeof v === 'object') {
+        // Special-case TrackedLight-ish objects
+        if ('id' in v && typeof (v as any).id === 'string') {
+          const out: any = { id: (v as any).id };
+          if ('position' in v && typeof (v as any).position === 'number') out.position = (v as any).position;
+          return out;
+        }
+
+        // VariableValue preview
+        if ('type' in v && 'value' in v) {
+          const vv = v as any;
+          return { type: vv.type, value: previewAny(vv.value) };
+        }
+
+        // Generic object: shallow preview keys
+        const obj = v as Record<string, unknown>;
+        const result: Record<string, unknown> = {};
+        for (const [k, val] of Object.entries(obj)) {
+          result[k] = previewAny(val);
+        }
+        return result;
+      }
+      return v;
+    };
+
+    return previewAny(value);
+  }
+
+  private getVariableValue(name: string, context: ExecutionContext): VariableValue | undefined {
+    return context.cueLevelVarStore.get(name) ?? context.groupLevelVarStore.get(name);
   }
 
   /**
@@ -87,6 +174,17 @@ export class NodeExecutionEngine {
    * Creates a new ExecutionContext and begins execution.
    */
   public startExecution(eventNode: BaseEventNode, parameters: CueData): void {
+    this.startExecutionWithCallback(eventNode, parameters);
+  }
+  
+  /**
+   * Start executing a node graph from an event node with an optional completion callback.
+   * Creates a new ExecutionContext and begins execution.
+   * @param eventNode The event node to start execution from
+   * @param parameters The cue data parameters
+   * @param onComplete Optional callback fired when this execution context completes
+   */
+  public startExecutionWithCallback(eventNode: BaseEventNode, parameters: CueData, onComplete?: () => void): void {
     try {
       const context = new ExecutionContext(
         eventNode,
@@ -95,6 +193,8 @@ export class NodeExecutionEngine {
         this.groupLevelVarStore
       );
 
+      this.debugLog(`startExecution event=${(eventNode as any).eventType ?? 'unknown'} nodeId=${eventNode.id} ctx=${context.id}`);
+
       // Set up completion callbacks
       context.setOnNodeComplete((nodeId: string) => {
         this.onActionComplete(context.id, nodeId);
@@ -102,6 +202,10 @@ export class NodeExecutionEngine {
 
       context.setOnContextComplete(() => {
         this.activeContexts.delete(context.id);
+        // Fire external completion callback if provided
+        if (onComplete) {
+          onComplete();
+        }
       });
 
       this.activeContexts.set(context.id, context);
@@ -117,6 +221,10 @@ export class NodeExecutionEngine {
         // No nodes to execute, context completes immediately
         context.dispose();
         this.activeContexts.delete(context.id);
+        // Fire completion callback even for empty execution
+        if (onComplete) {
+          onComplete();
+        }
       }
     } catch (error) {
       console.error(`Error starting execution for event ${eventNode.id}:`, error);
@@ -130,6 +238,7 @@ export class NodeExecutionEngine {
   private executeNode(nodeId: string, context: ExecutionContext): void {
     // Prevent cycles - don't execute a node twice in the same context
     if (context.hasVisited(nodeId)) {
+      this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`);
       return;
     }
 
@@ -140,6 +249,13 @@ export class NodeExecutionEngine {
     // Check if it's an action node
     const actionNode = actionMap.get(nodeId);
     if (actionNode) {
+      this.debugLog(`exec action nodeId=${nodeId} ctx=${context.id}`, {
+        effectType: actionNode.effectType,
+        target: actionNode.target,
+        color: actionNode.color,
+        timing: actionNode.timing,
+        layer: actionNode.layer
+      });
       this.executeActionNode(actionNode, context);
       return;
     }
@@ -147,6 +263,24 @@ export class NodeExecutionEngine {
     // Check if it's a logic node
     const logicNode = logicMap.get(nodeId);
     if (logicNode) {
+      // Pre-log variable inputs if applicable
+      const logicLog: any = { logicType: (logicNode as any).logicType, nodeId, ctx: context.id };
+      if ((logicNode as any).sourceVariable) {
+        const src = (logicNode as any).sourceVariable as string;
+        logicLog.sourceVariable = src;
+        logicLog.sourceValue = this.getVariableValue(src, context);
+      }
+      if ((logicNode as any).varName) {
+        const vn = (logicNode as any).varName as string;
+        logicLog.varName = vn;
+        logicLog.varValueBefore = this.getVariableValue(vn, context);
+      }
+      if ((logicNode as any).assignTo) {
+        const at = (logicNode as any).assignTo as string;
+        logicLog.assignTo = at;
+        logicLog.assignToBefore = this.getVariableValue(at, context);
+      }
+      this.debugLog(`exec logic nodeId=${nodeId} ctx=${context.id}`, logicLog);
       this.executeLogicNode(logicNode, nodeId, context);
       return;
     }
@@ -154,6 +288,7 @@ export class NodeExecutionEngine {
     // Check if it's an event raiser node
     const eventRaiserNode = eventRaiserMap.get(nodeId);
     if (eventRaiserNode) {
+      this.debugLog(`exec event-raiser nodeId=${nodeId} ctx=${context.id}`, { eventName: eventRaiserNode.eventName });
       this.executeEventRaiserNode(eventRaiserNode, context);
       return;
     }
@@ -161,6 +296,10 @@ export class NodeExecutionEngine {
     // Check if it's an effect raiser node
     const effectRaiserNode = effectRaiserMap?.get(nodeId);
     if (effectRaiserNode) {
+      this.debugLog(`exec effect-raiser nodeId=${nodeId} ctx=${context.id}`, {
+        effectId: effectRaiserNode.effectId,
+        parameterValues: effectRaiserNode.parameterValues
+      });
       this.executeEffectRaiserNode(effectRaiserNode, context);
       return;
     }
@@ -281,8 +420,25 @@ export class NodeExecutionEngine {
           return cueVar ?? groupVar;
         }
       );
+
+      // Log resolved lights + any variable target
+      if (actionNode.target?.groups?.source === 'variable') {
+        const varName = actionNode.target.groups.name;
+        this.debugLog(`action target groups from var=$${varName} ctx=${context.id}`, {
+          varValue: this.getVariableValue(varName, context),
+          resolvedLightsCount: lights?.length ?? 0,
+          resolvedLights: (lights ?? []).map(l => ({ id: (l as any).id, position: (l as any).position }))
+        });
+      } else {
+        this.debugLog(`action resolved lights ctx=${context.id}`, {
+          resolvedLightsCount: lights?.length ?? 0,
+          resolvedLights: (lights ?? []).map(l => ({ id: (l as any).id, position: (l as any).position }))
+        });
+      }
+
       if (!lights || lights.length === 0) {
         // No lights to target, continue immediately
+        this.debugLog(`action skipped (no lights) nodeId=${actionNode.id} ctx=${context.id}`);
         this.continueToNextNodes(actionNode.id, context);
         return;
       }
@@ -311,6 +467,14 @@ export class NodeExecutionEngine {
       // Generate unique effect name
       const effectName = `${this.cueId}:${context.eventNode.id}:${context.id}:${actionNode.id}`;
 
+      this.debugLog(`submit effect nodeId=${actionNode.id} ctx=${context.id}`, {
+        effectName,
+        layer: resolvedLayer,
+        timing: resolvedTiming,
+        color: resolvedColor,
+        secondaryColor: resolvedSecondaryColor
+      });
+
       // Submit effect to sequencer with completion callback
       this.sequencer.addEffectWithCallback(
         effectName,
@@ -318,6 +482,7 @@ export class NodeExecutionEngine {
         () => {
           // This callback is fired when the effect completes
           if (context.hasVisited(actionNode.id)) {
+            this.debugLog(`effect complete nodeId=${actionNode.id} ctx=${context.id}`, { effectName });
             context.completeAction(actionNode.id);
           }
         },

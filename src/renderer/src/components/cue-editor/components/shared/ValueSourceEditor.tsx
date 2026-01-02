@@ -10,6 +10,7 @@ interface ValueSourceEditorProps {
   expected?: 'number' | 'boolean' | 'string' | 'color' | 'either';
   validLiterals?: string[];
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  integerOnly?: boolean; // For number fields that should only accept integers
 }
 
 const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
@@ -18,7 +19,8 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   onChange,
   expected = 'either',
   validLiterals,
-  availableVariables
+  availableVariables,
+  integerOnly = false
 }) => {
   // For color type, use COLOR_OPTIONS if validLiterals not provided
   const effectiveValidLiterals = expected === 'color' && !validLiterals ? COLOR_OPTIONS : validLiterals;
@@ -95,11 +97,15 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
           ) : (
             <input
               type={isString ? 'text' : 'number'}
-              step={isString ? undefined : "0.1"}
+              step={isString ? undefined : (integerOnly ? "1" : "0.1")}
               className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={isString ? String(source.value ?? '') : (typeof source.value === 'number' ? source.value : 0)}
               onChange={event => {
-                const newValue = isString ? event.target.value : Number(event.target.value);
+                let newValue = isString ? event.target.value : Number(event.target.value);
+                // Round to integer if integerOnly is true
+                if (!isString && integerOnly && typeof newValue === 'number') {
+                  newValue = Math.round(newValue);
+                }
                 onChange({ ...source, value: newValue });
               }}
             />
@@ -162,14 +168,21 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
               ) : (
                 <input
                   type="number"
-                  step="0.1"
+                  step={integerOnly ? "1" : "0.1"}
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={isVariableSource(source) && typeof source.fallback === 'number' ? source.fallback : 0}
-                  onChange={event => onChange({ 
-                    source: 'variable', 
-                    name: isVariableSource(source) ? source.name : 'var1', 
-                    fallback: Number(event.target.value) 
-                  })}
+                  onChange={event => {
+                    let fallbackValue = Number(event.target.value);
+                    // Round to integer if integerOnly is true
+                    if (integerOnly) {
+                      fallbackValue = Math.round(fallbackValue);
+                    }
+                    onChange({ 
+                      source: 'variable', 
+                      name: isVariableSource(source) ? source.name : 'var1', 
+                      fallback: fallbackValue
+                    });
+                  }}
                 />
               )}
             </label>

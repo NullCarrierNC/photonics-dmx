@@ -1,17 +1,8 @@
 import React from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import type { EditorNodeData } from '../../lib/types';
-import { getConditionLabel, getTextColorForBg } from '../../lib/cueUtils';
-import type { ActionNode as ActionPayload, ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-
-// Helper to display ValueSource as text
-const displayValueSource = (vs: ValueSource | undefined, defaultValue: string = ''): string => {
-  if (!vs) return defaultValue;
-  if (vs.source === 'literal') {
-    return String(vs.value ?? defaultValue);
-  }
-  return `$${vs.name}`;
-};
+import { getConditionLabel, getTextColorForBg, displayValueSource } from '../../lib/cueUtils';
+import type { ActionNode as ActionPayload } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 
 const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
   const action = data.payload as ActionPayload;
@@ -25,14 +16,12 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ data }) => {
   
   // Handle timing values which are now ValueSource
   const waitForTime = action.timing?.waitForTime;
-  const waitForTimeValue = waitForTime?.source === 'literal' ? Number(waitForTime.value) : 0;
   const waitUntilTime = action.timing?.waitUntilTime;
-  const waitUntilTimeValue = waitUntilTime?.source === 'literal' ? Number(waitUntilTime.value) : 0;
   const duration = action.timing?.duration;
   const durationValue = duration?.source === 'literal' ? Number(duration.value) : 0;
-  
-  const waitFor = getConditionLabel(action.timing?.waitForCondition ?? 'none', waitForTimeValue);
-  const waitUntil = getConditionLabel(action.timing?.waitUntilCondition ?? 'none', waitUntilTimeValue);
+
+  const waitFor = getConditionLabel(action.timing?.waitForCondition ?? 'none', waitForTime);
+  const waitUntil = getConditionLabel(action.timing?.waitUntilCondition ?? 'none', waitUntilTime);
   
   // Handle brightness, target groups, and filter which are now ValueSource
   const brightnessText = displayValueSource(action.color?.brightness, 'high');

@@ -16,7 +16,6 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorMode } from '../lib/types';
 import type { EditorNode, EventOption } from '../lib/types';
-import type { WaitCondition } from '../../../../../photonics-dmx/types';
 import NodeCreationSections from './NodeCreationSections';
 import EffectRaiserEditor from './node-editors/EffectRaiserEditor';
 import EffectListenerEditor from './node-editors/EffectListenerEditor';
@@ -35,7 +34,7 @@ type Props = {
   availableEvents?: string[];
   availableEffects?: { id: string; name: string; definition?: EffectDefinition }[];
   currentEffect?: YargEffectDefinition | AudioEffectDefinition | null;
-  addEventNode: (option: EventOption<WaitCondition | AudioEventNode['eventType']>) => void;
+  addEventNode: (option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>) => void;
   addActionNode: (effect: NodeEffectType) => void;
   addLogicNode: (logicType: LogicNode['logicType']) => void;
   addEventRaiserNode?: () => void;

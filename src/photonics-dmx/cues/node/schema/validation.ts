@@ -38,14 +38,20 @@ import {
   YargNodeCueFile
 } from '../../types/nodeCueTypes';
 import {
-  WaitCondition
+  WaitCondition,
+  YargEventType,
+  YARG_EVENT_TYPES as YARG_EVENT_TYPES_SOURCE
 } from '../../../types';
 import {
   WAIT_CONDITIONS_WITH_NONE_DELAY,
   AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY
 } from '../../../constants/options';
 
+// Song-based wait conditions for action timing (excludes system events)
 const WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY];
+
+// All event types for YARG event nodes (includes system events + song events)
+const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENT_TYPES_SOURCE];
 
 const AUDIO_EVENT_TYPES: AudioEventType[] = [...AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY];
 
@@ -555,7 +561,9 @@ const yargEventSchema: JSONSchemaType<YargEventNode> = {
       nullable: true,
       items: { type: 'string' }
     },
-    eventType: { type: 'string', enum: WAIT_CONDITIONS }
+    // Uses YARG_EVENT_TYPES which includes both system events (cue-started, cue-called)
+    // and song events (beat, measure, keyframe, instruments, etc.)
+    eventType: { type: 'string', enum: YARG_EVENT_TYPES }
   }
 };
 

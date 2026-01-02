@@ -144,6 +144,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           value={node.layer}
           onChange={next => updateNode({ layer: next })}
           expected="number"
+          integerOnly={true}
           availableVariables={availableVariables}
         />
       )}

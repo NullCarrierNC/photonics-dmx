@@ -4,6 +4,7 @@ import * as path from 'path';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { NodeCueMode, NodeCueFile } from '../../photonics-dmx/cues/types/nodeCueTypes';
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation';
+import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeExecutionEngine';
 
 const ensureLoader = (controllerManager: ControllerManager) => {
   const loader = controllerManager.getNodeCueLoader();
@@ -25,6 +26,11 @@ interface ValidatePayload {
 }
 
 export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
+  ipcMain.handle('node-cues:set-debug', async (_event, enabled: boolean) => {
+    NodeExecutionEngine.setDebugEnabled(Boolean(enabled));
+    return { success: true, enabled: NodeExecutionEngine.getDebugEnabled() };
+  });
+
   ipcMain.handle('node-cues:list', async () => {
     const loader = ensureLoader(controllerManager);
     return loader.getSummary();

@@ -1,16 +1,14 @@
 import React from 'react';
-import type { NodeCueMode, LogicNode, NodeEffectType } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { NodeCueMode, LogicNode, NodeEffectType, YargEventNode, AudioEventNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorMode } from '../lib/types';
 import { NODE_EFFECT_TYPES } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { getDefaultEventOption } from '../lib/options';
 import type { EventOption } from '../lib/types';
-import type { AudioEventNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { WaitCondition } from '../../../../../photonics-dmx/types';
 
 interface NodeCreationSectionsProps {
   activeMode: NodeCueMode;
   editorMode: EditorMode;
-  addEventNode: (option: EventOption<WaitCondition | AudioEventNode['eventType']>) => void;
+  addEventNode: (option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>) => void;
   addActionNode: (effect: NodeEffectType) => void;
   addLogicNode: (logicType: LogicNode['logicType']) => void;
   addEventRaiserNode?: () => void;
@@ -21,7 +19,7 @@ interface NodeCreationSectionsProps {
 
 const EventNodesSection: React.FC<{
   activeMode: NodeCueMode;
-  addEventNode: (option: EventOption<WaitCondition | AudioEventNode['eventType']>) => void;
+  addEventNode: (option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>) => void;
 }> = ({ activeMode, addEventNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Event Nodes</h3>
