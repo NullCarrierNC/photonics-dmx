@@ -12,7 +12,8 @@ import type {
   NodeEffectType,
   YargEventNode,
   YargEffectDefinition,
-  AudioEffectDefinition
+  AudioEffectDefinition,
+  NotesNode
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorMode } from '../lib/types';
 import type { EditorNode, EventOption } from '../lib/types';
@@ -24,6 +25,7 @@ import EventListenerEditor from './node-editors/EventListenerEditor';
 import EventNodeEditor from './node-editors/EventNodeEditor';
 import LogicNodeEditor from './node-editors/LogicNodeEditor';
 import ActionNodeEditor from './node-editors/ActionNodeEditor';
+import NotesNodeEditor from './node-editors/NotesNodeEditor';
 
 type Props = {
   activeMode: NodeCueMode;
@@ -41,7 +43,8 @@ type Props = {
   addEventListenerNode?: () => void;
   addEffectRaiserNode?: () => void;
   addEffectListenerNode?: () => void;
-  updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | EffectRaiserNode | EffectEventListenerNode>(updates: Partial<T>) => void;
+  addNotesNode?: () => void;
+  updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | EffectRaiserNode | EffectEventListenerNode | NotesNode>(updates: Partial<T>) => void;
 };
 
 const NodeSidebar: React.FC<Props> = ({
@@ -60,6 +63,7 @@ const NodeSidebar: React.FC<Props> = ({
   addEventListenerNode,
   addEffectRaiserNode,
   addEffectListenerNode,
+  addNotesNode,
   updateSelectedNode
 }) => {
   return (
@@ -76,6 +80,7 @@ const NodeSidebar: React.FC<Props> = ({
             addEventListenerNode={addEventListenerNode}
             addEffectRaiserNode={addEffectRaiserNode}
             addEffectListenerNode={addEffectListenerNode}
+            addNotesNode={addNotesNode}
           />
         ) : (
           <>
@@ -129,6 +134,12 @@ const NodeSidebar: React.FC<Props> = ({
                   selectedActionHasEventParent={selectedActionHasEventParent}
                   availableVariables={availableVariables}
                   updateNode={(updates) => updateSelectedNode<ActionNode>(updates)}
+                />
+              )}
+              {selectedNode.data.kind === 'notes' && (
+                <NotesNodeEditor
+                  node={selectedNode.data.payload as NotesNode}
+                  updateNode={(updates) => updateSelectedNode<NotesNode>(updates)}
                 />
               )}
             </div>

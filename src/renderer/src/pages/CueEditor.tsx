@@ -14,6 +14,7 @@ import EventRaiserNodeComponent from '../components/cue-editor/components/flow/E
 import EventListenerNodeComponent from '../components/cue-editor/components/flow/EventListenerNode';
 import EffectRaiserNodeComponent from '../components/cue-editor/components/flow/EffectRaiserNode';
 import EffectListenerNodeComponent from '../components/cue-editor/components/flow/EffectListenerNode';
+import NotesNodeComponent from '../components/cue-editor/components/flow/NotesNode';
 import NewFileModal from '../components/cue-editor/components/NewFileModal';
 import ToastContainer from '../components/Toast';
 import { useToast } from '../hooks/useToast';
@@ -99,6 +100,7 @@ const CueEditor: React.FC = () => {
     addEventListenerNode,
     addEffectRaiserNode,
     addEffectListenerNode,
+    addNotesNode,
     updateSelectedNode,
     loadCueIntoFlow,
     setReactFlowInstance,
@@ -138,7 +140,8 @@ const CueEditor: React.FC = () => {
     'event-raiser': EventRaiserNodeComponent,
     'event-listener': EventListenerNodeComponent,
     'effect-raiser': EffectRaiserNodeComponent,
-    'effect-listener': EffectListenerNodeComponent
+    'effect-listener': EffectListenerNodeComponent,
+    notes: NotesNodeComponent
   }), []);
 
   const handleVariablesChange = useCallback((groupVars: VariableDefinition[], cueVars: VariableDefinition[]) => {
@@ -500,6 +503,7 @@ const CueEditor: React.FC = () => {
             addEventListenerNode={addEventListenerNode}
             addEffectRaiserNode={addEffectRaiserNode}
             addEffectListenerNode={addEffectListenerNode}
+            addNotesNode={addNotesNode}
           />
           {validationErrors.length > 0 && (
             <div className="p-3 text-xs text-red-600 dark:text-red-300 border-t border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40">
@@ -530,6 +534,7 @@ const CueEditor: React.FC = () => {
             addEventListenerNode={addEventListenerNode}
             addEffectRaiserNode={addEffectRaiserNode}
             addEffectListenerNode={addEffectListenerNode}
+            addNotesNode={addNotesNode}
             updateSelectedNode={updateSelectedNode}
           />
         </div>

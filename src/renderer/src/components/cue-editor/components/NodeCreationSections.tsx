@@ -37,6 +37,7 @@ interface NodeCreationSectionsProps {
   addEventListenerNode?: () => void;
   addEffectRaiserNode?: () => void;
   addEffectListenerNode?: () => void;
+  addNotesNode?: () => void;
 }
 
 const EventNodesSection: React.FC<{
@@ -224,6 +225,22 @@ const EffectNodesSection: React.FC<{
   </div>
 );
 
+const NotesSection: React.FC<{
+  addNotesNode: () => void;
+}> = ({ addNotesNode }) => (
+  <div>
+    <h3 className="font-semibold text-sm mb-2">Documentation</h3>
+    <div className="grid grid-cols-2 gap-2 text-xs">
+      <button
+        className="border-2 border-yellow-500 bg-yellow-400 dark:bg-yellow-500 text-yellow-900 dark:text-yellow-950 rounded px-2 py-1 hover:opacity-80 transition-opacity font-semibold"
+        onClick={() => addNotesNode()}
+      >
+        Notes
+      </button>
+    </div>
+  </div>
+);
+
 const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
   activeMode,
   editorMode,
@@ -233,7 +250,8 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
   addEventRaiserNode,
   addEventListenerNode,
   addEffectRaiserNode,
-  addEffectListenerNode
+  addEffectListenerNode,
+  addNotesNode
 }) => {
   return (
     <>
@@ -259,6 +277,10 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
         <div className="hidden">
           <EffectNodesSection addEffectRaiserNode={addEffectRaiserNode} />
         </div>
+      )}
+
+      {addNotesNode && (
+        <NotesSection addNotesNode={addNotesNode} />
       )}
     </>
   );

@@ -13,7 +13,8 @@ import type {
   LogicNode,
   YargEventNode,
   YargNodeCueDefinition,
-  YargEffectDefinition
+  YargEffectDefinition,
+  NotesNode
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorDocument, EditorNode } from './types';
 import { getAudioEventLabel, getYargEventLabel } from './cueUtils';
@@ -97,7 +98,17 @@ const cueToFlow = (cue: CueDefinition | null): { nodes: EditorNode[]; edges: Edg
           effectName // Pass name to node component
         }
       };
-    })
+    }),
+    ...(cue.nodes.notes ?? []).map((notes: NotesNode) => ({
+      id: notes.id,
+      type: 'notes' as const,
+      position: nodePositions[notes.id] ?? { x: 320, y: 240 },
+      data: {
+        kind: 'notes' as const,
+        label: 'Notes',
+        payload: notes
+      }
+    }))
   ];
 
   const edges: Edge[] = cue.connections.map(connection => ({
@@ -137,6 +148,7 @@ const updateDocumentFromFlow = (
   const eventRaiserNodes = nodes.filter(node => node.data.kind === 'event-raiser');
   const eventListenerNodes = nodes.filter(node => node.data.kind === 'event-listener');
   const effectRaiserNodes = nodes.filter(node => node.data.kind === 'effect-raiser');
+  const notesNodes = nodes.filter(node => node.data.kind === 'notes');
   
   const validEdges = edges.filter(edge => {
     const sourceNode = nodes.find(node => node.id === edge.source);
@@ -166,7 +178,8 @@ const updateDocumentFromFlow = (
       logic: logicNodes.map(node => node.data.payload as LogicNode),
       eventRaisers: eventRaiserNodes.map(node => node.data.payload as EventRaiserNode),
       eventListeners: eventListenerNodes.map(node => node.data.payload as EventListenerNode),
-      effectRaisers: effectRaiserNodes.map(node => node.data.payload as EffectRaiserNode)
+      effectRaisers: effectRaiserNodes.map(node => node.data.payload as EffectRaiserNode),
+      notes: notesNodes.map(node => node.data.payload as NotesNode)
     },
     connections: validEdges.map(edge => ({
       from: edge.source,
@@ -263,6 +276,16 @@ const effectToFlow = (effect: EffectDefinition | null): { nodes: EditorNode[]; e
         label: 'Effect Listener',
         payload: listener
       }
+    })),
+    ...(effect.nodes.notes ?? []).map((notes: NotesNode) => ({
+      id: notes.id,
+      type: 'notes' as const,
+      position: nodePositions[notes.id] ?? { x: 320, y: 240 },
+      data: {
+        kind: 'notes' as const,
+        label: 'Notes',
+        payload: notes
+      }
     }))
   ];
 
@@ -303,6 +326,7 @@ const updateEffectDocumentFromFlow = (
   const eventRaiserNodes = nodes.filter(node => node.data.kind === 'event-raiser');
   const eventListenerNodes = nodes.filter(node => node.data.kind === 'event-listener');
   const effectListenerNodes = nodes.filter(node => node.data.kind === 'effect-listener');
+  const notesNodes = nodes.filter(node => node.data.kind === 'notes');
   
   const validEdges = edges.filter(edge => {
     const sourceNode = nodes.find(node => node.id === edge.source);
@@ -332,7 +356,8 @@ const updateEffectDocumentFromFlow = (
       logic: logicNodes.map(node => node.data.payload as LogicNode),
       eventRaisers: eventRaiserNodes.map(node => node.data.payload as EventRaiserNode),
       eventListeners: eventListenerNodes.map(node => node.data.payload as EventListenerNode),
-      effectListeners: effectListenerNodes.map(node => node.data.payload as EffectEventListenerNode)
+      effectListeners: effectListenerNodes.map(node => node.data.payload as EffectEventListenerNode),
+      notes: notesNodes.map(node => node.data.payload as NotesNode)
     },
     connections: validEdges.map(edge => ({
       from: edge.source,

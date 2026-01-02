@@ -32,7 +32,7 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => 
 
   // Build label: include variable name if color is from a variable
   const labelText = colorVarName ? `${data.label}(${colorVarName})` : data.label;
-  const selectedStyles = selected ? 'shadow-[0_0_24px_8px_rgba(59,130,246,0.8)] ring-4 ring-blue-400' : '';
+  const selectedStyles = selected ? 'shadow-[0_0_18px_16px_rgba(59,130,246,0.8)] ring-[5px] ring-blue-400' : '';
 
   return (
     <div

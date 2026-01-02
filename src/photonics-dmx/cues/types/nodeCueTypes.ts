@@ -218,6 +218,15 @@ export interface EffectRaiserNode {
   parameterValues?: Record<string, ValueSource>;  // Parameter name -> value
 }
 
+// Notes node - for documentation only, not part of execution
+export interface NotesNode {
+  id: string;
+  type: 'notes';
+  label?: string;
+  title?: string;  // Optional title for the note
+  note: string;  // Text content of the note
+}
+
 export interface NodeGraph<TEvent extends BaseEventNode, TAction extends ActionNode> {
   events: TEvent[];
   actions: TAction[];
@@ -226,6 +235,7 @@ export interface NodeGraph<TEvent extends BaseEventNode, TAction extends ActionN
   eventListeners?: EventListenerNode[];
   effectRaisers?: EffectRaiserNode[];
   effectListeners?: EffectEventListenerNode[];
+  notes?: NotesNode[];  // Notes nodes for documentation
 }
 
 export interface BaseCueDefinition {

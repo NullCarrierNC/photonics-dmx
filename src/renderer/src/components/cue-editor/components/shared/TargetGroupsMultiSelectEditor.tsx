@@ -9,7 +9,7 @@ interface TargetGroupsMultiSelectEditorProps {
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
 }
 
-const TARGET_GROUPS: Array<'front' | 'back' | 'strobe'> = ['front', 'back', 'strobe'];
+const TARGET_GROUPS: Array<'front' | 'back'> = ['front', 'back'];
 const FALLBACK_GROUPS: Array<'front' | 'back'> = ['front', 'back'];
 
 const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps> = ({
@@ -30,7 +30,7 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
     : [];
 
   // Check if group is selected
-  const isSelected = (group: 'front' | 'back' | 'strobe') => 
+  const isSelected = (group: 'front' | 'back') => 
     selectedGroups.includes(group);
 
   // Parse fallback comma-separated string to array (only front/back allowed)
@@ -43,7 +43,7 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
     fallbackGroups.includes(group);
 
   // Handle group toggle
-  const handleGroupToggle = (group: 'front' | 'back' | 'strobe', checked: boolean) => {
+  const handleGroupToggle = (group: 'front' | 'back', checked: boolean) => {
     const updated = checked 
       ? [...selectedGroups.filter(g => g !== group), group]
       : selectedGroups.filter(g => g !== group);

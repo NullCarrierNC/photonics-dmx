@@ -47,6 +47,7 @@ type Props = {
   addEventListenerNode?: (position?: { x: number; y: number }) => void;
   addEffectRaiserNode?: (position?: { x: number; y: number }) => void;
   addEffectListenerNode?: (position?: { x: number; y: number }) => void;
+  addNotesNode?: (position?: { x: number; y: number }) => void;
 };
 
 const CueFlowCanvas: React.FC<Props> = ({
@@ -77,7 +78,8 @@ const CueFlowCanvas: React.FC<Props> = ({
   addEventRaiserNode,
   addEventListenerNode,
   addEffectRaiserNode,
-  addEffectListenerNode
+  addEffectListenerNode,
+  addNotesNode
 }) => {
   const handlePaneMenuClick = (action: () => void) => {
     action();
@@ -266,6 +268,19 @@ const CueFlowCanvas: React.FC<Props> = ({
               onClick={() => handlePaneMenuClick(() => addEffectRaiserNode({ x: paneContextMenu.flowX, y: paneContextMenu.flowY }))}
             >
               Effect Raiser
+            </button>
+          </>
+        )}
+        {addNotesNode && (
+          <>
+            <div className="px-3 py-1 font-semibold italic text-yellow-900 dark:text-yellow-950 bg-yellow-400 dark:bg-yellow-500 border-t border-b border-yellow-500 dark:border-yellow-600">
+              Documentation
+            </div>
+            <button
+              className="block w-full text-left px-3 py-1 text-yellow-900 dark:text-yellow-950 bg-yellow-400 dark:bg-yellow-500 hover:bg-yellow-500 dark:hover:bg-yellow-600 font-semibold"
+              onClick={() => handlePaneMenuClick(() => addNotesNode({ x: paneContextMenu.flowX, y: paneContextMenu.flowY }))}
+            >
+              Notes
             </button>
           </>
         )}

@@ -11,6 +11,7 @@ import {
   EventDefinition,
   EventRaiserNode,
   EventListenerNode,
+  NotesNode,
   // Effect types - imported for future schema expansion
   EffectRaiserNode as _EffectRaiserNode,
   EffectEventListenerNode as _EffectEventListenerNode,
@@ -220,6 +221,19 @@ const eventListenerNodeSchema: JSONSchemaType<EventListenerNode> = {
       nullable: true,
       items: { type: 'string' }
     }
+  }
+};
+
+const notesNodeSchema: JSONSchemaType<NotesNode> = {
+  type: 'object',
+  required: ['id', 'type', 'note'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'notes' },
+    label: { type: 'string', nullable: true },
+    title: { type: 'string', nullable: true },
+    note: { type: 'string' }
   }
 };
 
@@ -707,6 +721,12 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
           nullable: true,
           items: { type: 'object' } as any, // Not used in cues, only in effects
           default: []
+        },
+        notes: {
+          type: 'array',
+          nullable: true,
+          items: notesNodeSchema,
+          default: []
         }
       }
     },
@@ -787,6 +807,12 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
           type: 'array',
           nullable: true,
           items: { type: 'object' } as any, // Not used in cues, only in effects
+          default: []
+        },
+        notes: {
+          type: 'array',
+          nullable: true,
+          items: notesNodeSchema,
           default: []
         }
       }

@@ -26,7 +26,8 @@ import {
   type DelayLogicNode,
   type YargEventNode,
   type YargNodeCueDefinition,
-  type YargEffectDefinition
+  type YargEffectDefinition,
+  type NotesNode
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { createId, buildDefaultAction } from '../lib/cueDefaults';
 import { calculateChainDuration } from '../lib/cueUtils';
@@ -500,6 +501,36 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
     setIsDirty(true);
   }, [findAvailablePosition, setIsDirty, setNodes]);
 
+  const addNotesNode = useCallback((position?: { x: number; y: number }) => {
+    const id = `notes-${createId()}`;
+    const payload: NotesNode = {
+      id,
+      type: 'notes',
+      label: 'Notes',
+      note: ''
+    };
+
+    // Center the node on the cursor position if provided
+    // Notes nodes are wider than regular nodes
+    const nodeWidth = 240;
+    const nodeHeight = 80;
+    const centeredPosition = position ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 } : undefined;
+    const pos = centeredPosition ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true) : findAvailablePosition(320, 240);
+    const newNode: EditorNode = {
+      id,
+      type: 'notes',
+      position: pos,
+      data: {
+        kind: 'notes',
+        label: 'Notes',
+        payload
+      }
+    };
+
+    setNodes(nds => [...nds, newNode]);
+    setIsDirty(true);
+  }, [findAvailablePosition, setIsDirty, setNodes]);
+
   const isValidNodeConnection = useCallback((sourceId?: string | null, targetId?: string | null) => {
     if (!sourceId || !targetId || sourceId === targetId) {
       return false;
@@ -507,6 +538,11 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
     const sourceNode = nodes.find(node => node.id === sourceId);
     const targetNode = nodes.find(node => node.id === targetId);
     if (!sourceNode || !targetNode) {
+      return false;
+    }
+
+    // Notes nodes cannot have any connections (no inputs or outputs)
+    if (sourceNode.data.kind === 'notes' || targetNode.data.kind === 'notes') {
       return false;
     }
 
@@ -716,7 +752,7 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
     });
   }, [reactFlowInstance, flowWrapperRef]);
 
-  const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectEventListenerNode>(updates: Partial<T>) => {
+  const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectEventListenerNode | NotesNode>(updates: Partial<T>) => {
     if (!selectedNodeId) return;
     const nodeMode = activeMode;
     setNodes(nds => nds.map(node => {
@@ -767,6 +803,7 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
     addEventListenerNode,
     addEffectRaiserNode,
     addEffectListenerNode,
+    addNotesNode,
     updateSelectedNode,
     loadCueIntoFlow,
     setReactFlowInstance,
