@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { addEdge, useEdgesState, useNodesState, type Connection, type Edge, type ReactFlowInstance } from 'reactflow';
 import {
   createDefaultActionTiming,
@@ -37,9 +37,10 @@ import { getDefaultEventOption } from '../lib/options';
 type UseCueFlowParams = {
   activeMode: NodeCueMode;
   setIsDirty: (dirty: boolean) => void;
+  flowWrapperRef?: React.RefObject<HTMLDivElement>;
 };
 
-const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
+const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<EditorNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -79,13 +80,9 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
   }, [setEdges, setNodes]);
 
   // Helper function to find a good position for a new node, avoiding overlaps
-  const findAvailablePosition = useCallback((preferredX: number, preferredY: number, nodeWidth: number = 150, nodeHeight: number = 80): { x: number; y: number } => {
+  const findAvailablePosition = useCallback((preferredX: number, preferredY: number, nodeWidth: number = 150, nodeHeight: number = 80, useExactPosition: boolean = false): { x: number; y: number } => {
     const padding = 20;
     const gridSize = 50;
-    
-    // Round to grid
-    let x = Math.round(preferredX / gridSize) * gridSize;
-    let y = Math.round(preferredY / gridSize) * gridSize;
     
     // Check for overlaps with existing nodes
     const checkOverlap = (posX: number, posY: number): boolean => {
@@ -103,6 +100,35 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
         );
       });
     };
+    
+    // If exact position is requested (e.g., from context menu), try to use it as-is first
+    if (useExactPosition) {
+      // Try exact position first
+      if (!checkOverlap(preferredX, preferredY)) {
+        return { x: preferredX, y: preferredY };
+      }
+      
+      // If exact position overlaps, try small offsets around it
+      const smallOffsets = [
+        { x: 0, y: 0 },
+        { x: nodeWidth + padding, y: 0 },
+        { x: -(nodeWidth + padding), y: 0 },
+        { x: 0, y: nodeHeight + padding },
+        { x: 0, y: -(nodeHeight + padding) },
+      ];
+      
+      for (const offset of smallOffsets) {
+        const testX = preferredX + offset.x;
+        const testY = preferredY + offset.y;
+        if (!checkOverlap(testX, testY)) {
+          return { x: testX, y: testY };
+        }
+      }
+    }
+    
+    // Default behavior: snap to grid
+    let x = Math.round(preferredX / gridSize) * gridSize;
+    let y = Math.round(preferredY / gridSize) * gridSize;
     
     // If preferred position is available, use it
     if (!checkOverlap(x, y)) {
@@ -148,7 +174,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     const nodeMode = activeMode;
     const newEventId = `event-${createId()}`;
     const defaultOption = option ?? getDefaultEventOption(nodeMode);
-    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(120, 80);
+    // Center the node on the cursor position if provided
+    const nodeWidth = 150;
+    const nodeHeight = 80;
+    const centeredPosition = position ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 } : undefined;
+    const pos = centeredPosition ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true) : findAvailablePosition(120, 80);
     const newNode: EditorNode = {
       id: newEventId,
       type: 'event',
@@ -167,7 +197,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
   const addActionNode = useCallback((effectType: NodeEffectType, position?: { x: number; y: number }) => {
     const action = { ...buildDefaultAction(), id: `action-${createId()}`, effectType };
-    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(480, 160);
+    // Center the node on the cursor position if provided
+    const nodeWidth = 150;
+    const nodeHeight = 80;
+    const centeredPosition = position ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 } : undefined;
+    const pos = centeredPosition ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true) : findAvailablePosition(480, 160);
     const newNode: EditorNode = {
       id: action.id,
       type: 'action',
@@ -326,7 +360,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
                                   right: { source: 'literal', value: 0 }
                                 } satisfies ConditionalLogicNode);
 
-    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(320, 120);
+    // Center the node on the cursor position if provided
+    const nodeWidth = 150;
+    const nodeHeight = 80;
+    const centeredPosition = position ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 } : undefined;
+    const pos = centeredPosition ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true) : findAvailablePosition(320, 120);
     const newNode: EditorNode = {
       id,
       type: 'logic',
@@ -353,7 +391,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       outputs: []
     };
 
-    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(320, 200);
+    // Center the node on the cursor position if provided
+    const nodeWidth = 150;
+    const nodeHeight = 80;
+    const centeredPosition = position ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 } : undefined;
+    const pos = centeredPosition ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true) : findAvailablePosition(320, 200);
     const newNode: EditorNode = {
       id,
       type: 'event-raiser',
@@ -379,7 +421,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       outputs: []
     };
 
-    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(120, 280);
+    // Center the node on the cursor position if provided
+    const nodeWidth = 150;
+    const nodeHeight = 80;
+    const centeredPosition = position ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 } : undefined;
+    const pos = centeredPosition ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true) : findAvailablePosition(120, 280);
     const newNode: EditorNode = {
       id,
       type: 'event-listener',
@@ -405,7 +451,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       outputs: []
     };
 
-    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(120, 280);
+    // Center the node on the cursor position if provided
+    const nodeWidth = 150;
+    const nodeHeight = 80;
+    const centeredPosition = position ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 } : undefined;
+    const pos = centeredPosition ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true) : findAvailablePosition(120, 280);
     const newNode: EditorNode = {
       id,
       type: 'effect-raiser',
@@ -430,7 +480,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       outputs: []
     };
 
-    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(120, 80);
+    // Center the node on the cursor position if provided
+    const nodeWidth = 150;
+    const nodeHeight = 80;
+    const centeredPosition = position ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 } : undefined;
+    const pos = centeredPosition ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true) : findAvailablePosition(120, 80);
     const newNode: EditorNode = {
       id,
       type: 'effect-listener',
@@ -610,14 +664,14 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     event.preventDefault();
     if (!reactFlowInstance) return;
     
-    const rect = (event.currentTarget as HTMLElement)?.getBoundingClientRect?.();
     const clientX = event.clientX;
     const clientY = event.clientY;
     
-    // Convert screen coordinates to flow coordinates
+    // Convert client coordinates to flow coordinates
+    // screenToFlowPosition handles the container offset and viewport transform internally
     const flowPosition = reactFlowInstance.screenToFlowPosition({
-      x: clientX - (rect?.left ?? 0),
-      y: clientY - (rect?.top ?? 0)
+      x: clientX,
+      y: clientY
     });
     
     // Estimate menu height: max possible items (~20px each) + headers (~24px each) + padding
@@ -660,7 +714,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       flowX: flowPosition.x,
       flowY: flowPosition.y
     });
-  }, [reactFlowInstance]);
+  }, [reactFlowInstance, flowWrapperRef]);
 
   const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectEventListenerNode>(updates: Partial<T>) => {
     if (!selectedNodeId) return;

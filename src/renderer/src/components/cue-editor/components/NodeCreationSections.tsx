@@ -70,12 +70,14 @@ const EffectListenerSection: React.FC<{
 }> = ({ addEffectListenerNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Effect Entry</h3>
-    <button
-      className="border-2 border-cyan-500 bg-cyan-100 dark:bg-cyan-800/60 text-cyan-900 dark:text-cyan-50 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity"
-      onClick={() => addEffectListenerNode()}
-    >
-      Effect Listener
-    </button>
+    <div className="grid grid-cols-2 gap-2 text-xs">
+      <button
+        className="border-2 border-cyan-500 bg-cyan-100 dark:bg-cyan-800/60 text-cyan-900 dark:text-cyan-50 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        onClick={() => addEffectListenerNode()}
+      >
+        Effect Listener
+      </button>
+    </div>
   </div>
 );
 
@@ -195,12 +197,14 @@ const RuntimeEventsSection: React.FC<{
 }> = ({ addEventRaiserNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Runtime Events</h3>
-    <button
-      className="border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity w-full"
-      onClick={() => addEventRaiserNode()}
-    >
-      Custom Event Raiser
-    </button>
+    <div className="grid grid-cols-2 gap-2 text-xs">
+      <button
+        className="border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        onClick={() => addEventRaiserNode()}
+      >
+        Custom Event Raiser
+      </button>
+    </div>
   </div>
 );
 
@@ -209,12 +213,14 @@ const EffectNodesSection: React.FC<{
 }> = ({ addEffectRaiserNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Effect Nodes</h3>
-    <button
-      className="border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-100 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity"
-      onClick={() => addEffectRaiserNode()}
-    >
-      Effect Raiser
-    </button>
+    <div className="grid grid-cols-2 gap-2 text-xs">
+      <button
+        className="border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        onClick={() => addEffectRaiserNode()}
+      >
+        Effect Raiser
+      </button>
+    </div>
   </div>
 );
 
