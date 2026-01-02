@@ -90,6 +90,7 @@ const CueEditor: React.FC = () => {
     selectedNode,
     selectedActionHasEventParent,
     contextMenu,
+    paneContextMenu,
     chainDuration,
     addEventNode,
     addActionNode,
@@ -102,7 +103,8 @@ const CueEditor: React.FC = () => {
     loadCueIntoFlow,
     setReactFlowInstance,
     reactFlowInstance,
-    closeContextMenu
+    closeContextMenu,
+    handlePaneContextMenu
   } = useCueFlow({ activeMode, setIsDirty });
 
   loadCueIntoFlowRef.current = loadCueIntoFlow;
@@ -476,7 +478,8 @@ const CueEditor: React.FC = () => {
             chainDuration={chainDuration}
             selectedCueName={currentCueDefinition?.name}
             contextMenu={contextMenu}
-          flowWrapperRef={flowWrapperRef}
+            paneContextMenu={paneContextMenu}
+            flowWrapperRef={flowWrapperRef}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -484,9 +487,19 @@ const CueEditor: React.FC = () => {
             onNodeContextMenu={handleNodeContextMenu}
             onEdgeContextMenu={onEdgeContextMenu}
             onPaneClick={closeContextMenu}
+            onPaneContextMenu={handlePaneContextMenu}
             onRemoveNode={handleRemoveNode}
             setReactFlowInstance={setReactFlowInstance}
             isValidConnection={isValidConnection}
+            activeMode={activeMode}
+            editorMode={editorDoc?.mode ?? 'cue'}
+            addEventNode={addEventNode}
+            addActionNode={addActionNode}
+            addLogicNode={addLogicNode}
+            addEventRaiserNode={addEventRaiserNode}
+            addEventListenerNode={addEventListenerNode}
+            addEffectRaiserNode={addEffectRaiserNode}
+            addEffectListenerNode={addEffectListenerNode}
           />
           {validationErrors.length > 0 && (
             <div className="p-3 text-xs text-red-600 dark:text-red-300 border-t border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40">

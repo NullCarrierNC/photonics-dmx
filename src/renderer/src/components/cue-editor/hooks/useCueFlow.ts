@@ -44,6 +44,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
+  const [paneContextMenu, setPaneContextMenu] = useState<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
 
   const selectedNode = useMemo(() => {
@@ -77,17 +78,81 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     setSelectedNodeId(null);
   }, [setEdges, setNodes]);
 
-  const addEventNode = useCallback((option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>) => {
+  // Helper function to find a good position for a new node, avoiding overlaps
+  const findAvailablePosition = useCallback((preferredX: number, preferredY: number, nodeWidth: number = 150, nodeHeight: number = 80): { x: number; y: number } => {
+    const padding = 20;
+    const gridSize = 50;
+    
+    // Round to grid
+    let x = Math.round(preferredX / gridSize) * gridSize;
+    let y = Math.round(preferredY / gridSize) * gridSize;
+    
+    // Check for overlaps with existing nodes
+    const checkOverlap = (posX: number, posY: number): boolean => {
+      return nodes.some(node => {
+        const nodeRight = node.position.x + nodeWidth;
+        const nodeBottom = node.position.y + nodeHeight;
+        const newRight = posX + nodeWidth;
+        const newBottom = posY + nodeHeight;
+        
+        return !(
+          posX >= nodeRight + padding ||
+          newRight <= node.position.x - padding ||
+          posY >= nodeBottom + padding ||
+          newBottom <= node.position.y - padding
+        );
+      });
+    };
+    
+    // If preferred position is available, use it
+    if (!checkOverlap(x, y)) {
+      return { x, y };
+    }
+    
+    // Try positions in a spiral pattern
+    const maxAttempts = 50;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const radius = attempt * gridSize;
+      const positions = [
+        { x: preferredX + radius, y: preferredY },
+        { x: preferredX - radius, y: preferredY },
+        { x: preferredX, y: preferredY + radius },
+        { x: preferredX, y: preferredY - radius },
+        { x: preferredX + radius, y: preferredY + radius },
+        { x: preferredX - radius, y: preferredY - radius },
+        { x: preferredX + radius, y: preferredY - radius },
+        { x: preferredX - radius, y: preferredY + radius },
+      ];
+      
+      for (const pos of positions) {
+        const gridX = Math.round(pos.x / gridSize) * gridSize;
+        const gridY = Math.round(pos.y / gridSize) * gridSize;
+        if (!checkOverlap(gridX, gridY)) {
+          return { x: gridX, y: gridY };
+        }
+      }
+    }
+    
+    // Fallback: find the rightmost node and place to its right
+    if (nodes.length > 0) {
+      const rightmostNode = nodes.reduce((prev, curr) => 
+        curr.position.x > prev.position.x ? curr : prev
+      );
+      return { x: rightmostNode.position.x + nodeWidth + padding, y: rightmostNode.position.y };
+    }
+    
+    return { x, y };
+  }, [nodes]);
+
+  const addEventNode = useCallback((option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>, position?: { x: number; y: number }) => {
     const nodeMode = activeMode;
     const newEventId = `event-${createId()}`;
     const defaultOption = option ?? getDefaultEventOption(nodeMode);
+    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(120, 80);
     const newNode: EditorNode = {
       id: newEventId,
       type: 'event',
-      position: {
-        x: 120,
-        y: 80 + nodes.length * 40
-      },
+      position: pos,
       data: {
         kind: 'event',
         label: defaultOption.label,
@@ -98,17 +163,15 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     };
     setNodes(nds => [...nds, newNode]);
     setIsDirty(true);
-  }, [activeMode, nodes.length, setIsDirty, setNodes]);
+  }, [activeMode, findAvailablePosition, setIsDirty, setNodes]);
 
-  const addActionNode = useCallback((effectType: NodeEffectType) => {
+  const addActionNode = useCallback((effectType: NodeEffectType, position?: { x: number; y: number }) => {
     const action = { ...buildDefaultAction(), id: `action-${createId()}`, effectType };
+    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(480, 160);
     const newNode: EditorNode = {
       id: action.id,
       type: 'action',
-      position: {
-        x: 480,
-        y: 160 + nodes.length * 40
-      },
+      position: pos,
       data: {
         kind: 'action',
         label: effectType,
@@ -119,7 +182,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     setIsDirty(true);
   }, [nodes.length, setIsDirty, setNodes]);
 
-  const addLogicNode = useCallback((logicType: LogicNode['logicType']) => {
+  const addLogicNode = useCallback((logicType: LogicNode['logicType'], position?: { x: number; y: number }) => {
     const id = `logic-${createId()}`;
 
     const payload: LogicNode =
@@ -263,13 +326,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
                                   right: { source: 'literal', value: 0 }
                                 } satisfies ConditionalLogicNode);
 
+    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(320, 120);
     const newNode: EditorNode = {
       id,
       type: 'logic',
-      position: {
-        x: 320,
-        y: 120 + nodes.length * 40
-      },
+      position: pos,
       data: {
         kind: 'logic',
         label: logicType,
@@ -279,9 +340,9 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
     setNodes(nds => [...nds, newNode]);
     setIsDirty(true);
-  }, [nodes.length, setIsDirty, setNodes]);
+  }, [findAvailablePosition, setIsDirty, setNodes]);
 
-  const addEventRaiserNode = useCallback(() => {
+  const addEventRaiserNode = useCallback((position?: { x: number; y: number }) => {
     const id = `event-raiser-${createId()}`;
     const payload: EventRaiserNode = {
       id,
@@ -292,13 +353,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       outputs: []
     };
 
+    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(320, 200);
     const newNode: EditorNode = {
       id,
       type: 'event-raiser',
-      position: {
-        x: 320,
-        y: 200 + nodes.length * 40
-      },
+      position: pos,
       data: {
         kind: 'event-raiser',
         label: 'Raise Event',
@@ -308,9 +367,9 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
     setNodes(nds => [...nds, newNode]);
     setIsDirty(true);
-  }, [nodes.length, setIsDirty, setNodes]);
+  }, [findAvailablePosition, setIsDirty, setNodes]);
 
-  const addEventListenerNode = useCallback(() => {
+  const addEventListenerNode = useCallback((position?: { x: number; y: number }) => {
     const id = `event-listener-${createId()}`;
     const payload: EventListenerNode = {
       id,
@@ -320,13 +379,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       outputs: []
     };
 
+    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(120, 280);
     const newNode: EditorNode = {
       id,
       type: 'event-listener',
-      position: {
-        x: 120,
-        y: 280 + nodes.length * 40
-      },
+      position: pos,
       data: {
         kind: 'event-listener',
         label: 'Listen Event',
@@ -336,9 +393,9 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
     setNodes(nds => [...nds, newNode]);
     setIsDirty(true);
-  }, [nodes.length, setIsDirty, setNodes]);
+  }, [findAvailablePosition, setIsDirty, setNodes]);
 
-  const addEffectRaiserNode = useCallback(() => {
+  const addEffectRaiserNode = useCallback((position?: { x: number; y: number }) => {
     const id = `effect-raiser-${createId()}`;
     const payload: import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode = {
       id,
@@ -348,13 +405,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       outputs: []
     };
 
+    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(120, 280);
     const newNode: EditorNode = {
       id,
       type: 'effect-raiser',
-      position: {
-        x: 120,
-        y: 280 + nodes.length * 40
-      },
+      position: pos,
       data: {
         kind: 'effect-raiser',
         label: 'Raise Effect',
@@ -364,9 +419,9 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
     setNodes(nds => [...nds, newNode]);
     setIsDirty(true);
-  }, [nodes.length, setIsDirty, setNodes]);
+  }, [findAvailablePosition, setIsDirty, setNodes]);
 
-  const addEffectListenerNode = useCallback(() => {
+  const addEffectListenerNode = useCallback((position?: { x: number; y: number }) => {
     const id = `effect-listener-${createId()}`;
     const payload: import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectEventListenerNode = {
       id,
@@ -375,13 +430,11 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
       outputs: []
     };
 
+    const pos = position ? findAvailablePosition(position.x, position.y) : findAvailablePosition(120, 80);
     const newNode: EditorNode = {
       id,
       type: 'effect-listener',
-      position: {
-        x: 120,
-        y: 80
-      },
+      position: pos,
       data: {
         kind: 'effect-listener',
         label: 'Effect Entry',
@@ -391,7 +444,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
     setNodes(nds => [...nds, newNode]);
     setIsDirty(true);
-  }, [nodes.length, setIsDirty, setNodes]);
+  }, [findAvailablePosition, setIsDirty, setNodes]);
 
   const isValidNodeConnection = useCallback((sourceId?: string | null, targetId?: string | null) => {
     if (!sourceId || !targetId || sourceId === targetId) {
@@ -533,9 +586,9 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
 
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: EditorNode) => {
     event.preventDefault();
-    const rect = (event.currentTarget as HTMLElement)?.getBoundingClientRect?.();
-    const x = rect ? event.clientX - rect.left : event.clientX;
-    const y = rect ? event.clientY - rect.top : event.clientY;
+    // Use viewport coordinates for fixed positioning
+    const x = event.clientX;
+    const y = event.clientY;
     setSelectedNodeId(node.id);
     setContextMenu({ x, y, nodeId: node.id });
   }, []);
@@ -548,7 +601,66 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     setContextMenu(null);
   }, [setEdges, setIsDirty, setNodes]);
 
-  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+    setPaneContextMenu(null);
+  }, []);
+
+  const handlePaneContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    if (!reactFlowInstance) return;
+    
+    const rect = (event.currentTarget as HTMLElement)?.getBoundingClientRect?.();
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    
+    // Convert screen coordinates to flow coordinates
+    const flowPosition = reactFlowInstance.screenToFlowPosition({
+      x: clientX - (rect?.left ?? 0),
+      y: clientY - (rect?.top ?? 0)
+    });
+    
+    // Estimate menu height: max possible items (~20px each) + headers (~24px each) + padding
+    // Worst case: ~6 sections * 24px + ~20 items * 20px + padding = ~544px
+    // Use max-h-[80vh] as the limit, so estimate based on that
+    const maxMenuHeight = window.innerHeight * 0.8;
+    const estimatedMenuHeight = Math.min(600, maxMenuHeight); // Conservative estimate
+    const menuWidth = 200; // Estimated menu width
+    
+    // Adjust position to prevent overflow
+    let adjustedX = clientX;
+    let adjustedY = clientY;
+    
+    // Check bottom overflow
+    if (clientY + estimatedMenuHeight > window.innerHeight) {
+      adjustedY = window.innerHeight - estimatedMenuHeight - 10; // 10px padding from bottom
+      // Don't go above the top
+      if (adjustedY < 10) {
+        adjustedY = 10;
+      }
+    }
+    
+    // Check right overflow
+    if (clientX + menuWidth > window.innerWidth) {
+      adjustedX = window.innerWidth - menuWidth - 10; // 10px padding from right
+      // Don't go off the left edge
+      if (adjustedX < 10) {
+        adjustedX = 10;
+      }
+    }
+    
+    // Check left overflow
+    if (adjustedX < 0) {
+      adjustedX = 10;
+    }
+    
+    setPaneContextMenu({
+      x: adjustedX,
+      y: adjustedY,
+      flowX: flowPosition.x,
+      flowY: flowPosition.y
+    });
+  }, [reactFlowInstance]);
 
   const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectEventListenerNode>(updates: Partial<T>) => {
     if (!selectedNodeId) return;
@@ -592,6 +704,7 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     selectedNode,
     selectedActionHasEventParent,
     contextMenu,
+    paneContextMenu,
     chainDuration,
     addEventNode,
     addActionNode,
@@ -604,7 +717,8 @@ const useCueFlow = ({ activeMode, setIsDirty }: UseCueFlowParams) => {
     loadCueIntoFlow,
     setReactFlowInstance,
     reactFlowInstance,
-    closeContextMenu
+    closeContextMenu,
+    handlePaneContextMenu
   };
 };
 
