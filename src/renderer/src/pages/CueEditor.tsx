@@ -356,9 +356,9 @@ const CueEditor: React.FC = () => {
               <option value="yarg">YARG Node Cues</option>
               <option value="audio">Audio Node Cues</option>
             </optgroup>
-            <optgroup label="Effects" style={{ display: 'none' }}>
-              <option value="yarg-effect">YARG Effects</option>
-              <option value="audio-effect">Audio Effects</option>
+            <optgroup label="Effects" hidden>
+              <option value="yarg-effect" hidden>YARG Effects</option>
+              <option value="audio-effect" hidden>Audio Effects</option>
             </optgroup>
           </select>
         </div>
@@ -371,7 +371,7 @@ const CueEditor: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-[minmax(208px,400px)_2fr_minmax(282px,400px)] gap-4 h-[calc(100vh-220px)]">
+      <div className="grid gap-4 h-[calc(100vh-220px)]" style={{ gridTemplateColumns: 'minmax(260px, 300px) minmax(50%, 2fr) minmax(260px, 400px)' }}>
         <div className="flex flex-col gap-4 overflow-hidden">
           <CueFileSidebar
             mode={mode}
