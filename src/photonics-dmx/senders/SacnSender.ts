@@ -23,13 +23,13 @@ export class SacnSender extends BaseSender {
   }
 
   public async start(): Promise<void> {
-    const universe = this.config.universe || 1;
+    const universe = this.config.universe !== undefined ? this.config.universe : 0;
     const networkInterface = this.config.networkInterface;
     const unicastDestination = this.config.unicastDestination;
     const useUnicast = this.config.useUnicast || false;
 
-    // Ensure universe is a valid number
-    const validUniverse = Math.max(1, Math.min(63999, Number(universe)));
+    // Ensure universe is a valid number (0-63999)
+    const validUniverse = Math.max(0, Math.min(63999, Number(universe)));
 
     // Configure sender options
     const senderOptions: any = {
@@ -128,5 +128,9 @@ export class SacnSender extends BaseSender {
 
   public removeSendError(listener: (error: SenderError) => void): void {
     this.eventEmitter.off('SenderError', listener);
+  }
+
+  public getUniverse(): number {
+    return this.config.universe !== undefined ? this.config.universe : 0;
   }
 }

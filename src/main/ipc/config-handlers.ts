@@ -6,6 +6,7 @@ import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRe
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers';
 import { BrowserWindow } from 'electron';
+import { DmxRig } from '../../photonics-dmx/types';
 
 /**
  * Set up configuration-related IPC handlers
@@ -56,6 +57,100 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error(`Error saving light layout ${filename}:`, error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // DMX Rigs handlers
+
+  // Get all DMX rigs
+  ipcMain.handle('get-dmx-rigs', async () => {
+    try {
+      return controllerManager.getConfig().getDmxRigs();
+    } catch (error) {
+      console.error('Error fetching DMX rigs:', error);
+      throw error;
+    }
+  });
+
+  // Get a specific DMX rig by ID
+  ipcMain.handle('get-dmx-rig', async (_, id: string) => {
+    try {
+      return controllerManager.getConfig().getDmxRig(id);
+    } catch (error) {
+      console.error(`Error fetching DMX rig ${id}:`, error);
+      throw error;
+    }
+  });
+
+  // Get only active DMX rigs
+  ipcMain.handle('get-active-rigs', async () => {
+    try {
+      return controllerManager.getConfig().getActiveRigs();
+    } catch (error) {
+      console.error('Error fetching active DMX rigs:', error);
+      throw error;
+    }
+  });
+
+  // Save or update a DMX rig
+  ipcMain.handle('save-dmx-rig', async (_, rig: DmxRig) => {
+    try {
+      const config = controllerManager.getConfig();
+      const existingRig = config.getDmxRig(rig.id);
+      const previousActiveState = existingRig?.active ?? false;
+      
+      // Save the rig
+      config.saveDmxRig(rig);
+      
+      // If active state changed, restart controllers to update DMX output
+      if (existingRig && previousActiveState !== rig.active) {
+        await controllerManager.restartControllers();
+        
+        // Send a notification to the renderer about the restart
+        const mainWindow = BrowserWindow.getFocusedWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send('controllers-restarted');
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error(`Error saving DMX rig ${rig.id}:`, error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // Delete a DMX rig
+  ipcMain.handle('delete-dmx-rig', async (_, id: string) => {
+    try {
+      const config = controllerManager.getConfig();
+      const rig = config.getDmxRig(id);
+      const wasActive = rig?.active ?? false;
+      
+      // Delete the rig
+      config.deleteDmxRig(id);
+      
+      // If the deleted rig was active, restart controllers
+      if (wasActive) {
+        await controllerManager.restartControllers();
+        
+        // Send a notification to the renderer about the restart
+        const mainWindow = BrowserWindow.getFocusedWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send('controllers-restarted');
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error(`Error deleting DMX rig ${id}:`, error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : String(error)

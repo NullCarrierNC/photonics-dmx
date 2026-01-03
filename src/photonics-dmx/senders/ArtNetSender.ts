@@ -130,4 +130,8 @@ export class ArtNetSender extends BaseSender {
   public removeSendError(listener: (error: SenderError) => void): void {
     this.eventEmitter.off("SenderError", listener);
   }
+
+  public getUniverse(): number {
+    return this.options.universe || 1;
+  }
 } 

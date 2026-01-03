@@ -23,6 +23,8 @@ const DmxOutputSettings: React.FC = () => {
   const [openDmxComPort, setOpenDmxComPort] = useAtom(openDmxComPortAtom);
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom);
   const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? 40;
+  const enttecProUniverse = prefs.enttecProConfig?.universe ?? 0;
+  const openDmxUniverse = prefs.openDmxConfig?.universe ?? 0;
 
   const [artNetExpanded, setArtNetExpanded] = useState(false);
   const [sacnExpanded, setSacnExpanded] = useState(false);
@@ -217,7 +219,8 @@ const DmxOutputSettings: React.FC = () => {
       console.log('Enabling Enttec Pro checkbox - starting Enttec Pro sender');
       window.electron.ipcRenderer.send('sender-enable', {
         sender: 'enttecpro',
-        port: comPort
+        port: comPort,
+        universe: enttecProUniverse
       });
       setIsEnttecProEnabled(true); // Turn on the toggle state
     }
@@ -263,7 +266,8 @@ const DmxOutputSettings: React.FC = () => {
       window.electron.ipcRenderer.send('sender-enable', {
         sender: 'opendmx',
         port: openDmxComPort,
-        dmxSpeed: openDmxSpeed
+        dmxSpeed: openDmxSpeed,
+        universe: openDmxUniverse
       });
       setIsOpenDmxEnabled(true);
     }
@@ -310,7 +314,7 @@ const DmxOutputSettings: React.FC = () => {
     setComPort(newPort);
 
     const newConfig = {
-      ...(prefs.enttecProConfig ?? { port: '' }),
+      ...(prefs.enttecProConfig ?? { port: '', universe: 0 }),
       port: newPort
     };
 
@@ -334,7 +338,7 @@ const DmxOutputSettings: React.FC = () => {
     setOpenDmxComPort(newPort);
 
     const newConfig = {
-      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40 }),
+      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40, universe: 0 }),
       port: newPort
     };
 
@@ -357,7 +361,7 @@ const DmxOutputSettings: React.FC = () => {
     const sanitized = Number.isFinite(parsed) && parsed > 0 ? Math.min(44, Math.max(1, parsed)) : 40;
 
     const newConfig = {
-      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40 }),
+      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40, universe: 0 }),
       dmxSpeed: sanitized
     };
 
@@ -372,6 +376,48 @@ const DmxOutputSettings: React.FC = () => {
       }));
     } catch (error) {
       console.error('Failed to save OpenDMX speed configuration:', error);
+    }
+  };
+
+  const handleEnttecProUniverseChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUniverse = parseInt(e.target.value) || 0;
+    const newConfig = {
+      ...(prefs.enttecProConfig ?? { port: '', universe: 0 }),
+      universe: newUniverse
+    };
+
+    try {
+      await window.electron.ipcRenderer.invoke('save-prefs', {
+        enttecProConfig: newConfig
+      });
+
+      setPrefs(prev => ({
+        ...prev,
+        enttecProConfig: newConfig
+      }));
+    } catch (error) {
+      console.error('Failed to save EnttecPro universe configuration:', error);
+    }
+  };
+
+  const handleOpenDmxUniverseChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUniverse = parseInt(e.target.value) || 0;
+    const newConfig = {
+      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40, universe: 0 }),
+      universe: newUniverse
+    };
+
+    try {
+      await window.electron.ipcRenderer.invoke('save-prefs', {
+        openDmxConfig: newConfig
+      });
+
+      setPrefs(prev => ({
+        ...prev,
+        openDmxConfig: newConfig
+      }));
+    } catch (error) {
+      console.error('Failed to save OpenDMX universe configuration:', error);
     }
   };
 
@@ -525,9 +571,9 @@ const DmxOutputSettings: React.FC = () => {
                       <input
                         type="number"
                         value={sacnConfig.universe}
-                        onChange={(e) => handleSacnConfigChange('universe', parseInt(e.target.value) || 1)}
+                        onChange={(e) => handleSacnConfigChange('universe', parseInt(e.target.value) || 0)}
                         className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        min="1"
+                        min="0"
                         max="63999"
                       />
                     </div>
@@ -738,6 +784,16 @@ const DmxOutputSettings: React.FC = () => {
                       placeholder="COM3"
                     />
                   </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Universe:</label>
+                    <input
+                      type="number"
+                      value={enttecProUniverse}
+                      onChange={handleEnttecProUniverseChange}
+                      min={0}
+                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 mt-4">
                     Enter the COM port of your Enttec Pro USB DMX interface.
                     <br />On PC this is usually COM3, COM4, etc.
@@ -810,6 +866,16 @@ const DmxOutputSettings: React.FC = () => {
                       onChange={handleOpenDmxSpeedChange}
                       min={1}
                       max={44}
+                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Universe:</label>
+                    <input
+                      type="number"
+                      value={openDmxUniverse}
+                      onChange={handleOpenDmxUniverseChange}
+                      min={0}
                       className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>

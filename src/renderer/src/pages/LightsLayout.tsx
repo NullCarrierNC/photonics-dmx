@@ -7,11 +7,12 @@ import {
     ConfigLightLayoutType,
     ConfigStrobeType,
     DmxLight,
-    FixtureTypes
+    FixtureTypes,
+    DmxRig
 } from '../../../photonics-dmx/types';
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers';
 import { v4 as uuidv4 } from 'uuid';
-import { activeDmxLightsConfigAtom, myValidDmxLightsAtom, myDmxLightsAtom } from '@renderer/atoms';
+import { activeDmxLightsConfigAtom, myValidDmxLightsAtom, myDmxLightsAtom, dmxRigsAtom, activeRigIdAtom } from '@renderer/atoms';
 
 const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
     { id: 'front', label: 'Front' },
@@ -29,6 +30,11 @@ const LightsLayout = () => {
     const [activeConfig, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom);
     const [myFixtures] = useAtom(myValidDmxLightsAtom);
     const [myFixtureLibrary] = useAtom(myDmxLightsAtom);
+    const [rigs, setRigs] = useAtom(dmxRigsAtom);
+    const [activeRigId, setActiveRigId] = useAtom(activeRigIdAtom);
+    
+    const [rigName, setRigName] = useState<string>('');
+    const [rigUniverse, setRigUniverse] = useState<number>(1);
    
     const [selectedCount, setSelectedCount] = useState<number | null>(() => {
         if (activeConfig?.numLights === 0) return null;
@@ -54,6 +60,107 @@ const LightsLayout = () => {
     const [highlightedLight, setHighlightedLight] = useState<number | null>(null);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [isInitializing, setIsInitializing] = useState(true);
+
+    // Load rigs on mount
+    useEffect(() => {
+        const loadRigs = async () => {
+            try {
+                const loadedRigs = await window.electron.ipcRenderer.invoke('get-dmx-rigs');
+                setRigs(loadedRigs || []);
+                
+                // If no active rig selected, select first rig or create default
+                if (!activeRigId && loadedRigs.length > 0) {
+                    setActiveRigId(loadedRigs[0].id);
+                } else if (loadedRigs.length === 0) {
+                    // No rigs exist, create a default one
+                    const defaultRig: DmxRig = {
+                        id: uuidv4(),
+                        name: 'Default Rig',
+                        universe: 1,
+                        active: true,
+                        config: {
+                            numLights: 0,
+                            lightLayout: { id: 'front', label: 'Front' },
+                            strobeType: ConfigStrobeType.None,
+                            frontLights: [],
+                            backLights: [],
+                            strobeLights: []
+                        }
+                    };
+                    await window.electron.ipcRenderer.invoke('save-dmx-rig', defaultRig);
+                    setRigs([defaultRig]);
+                    setActiveRigId(defaultRig.id);
+                }
+            } catch (error) {
+                console.error('Failed to load DMX rigs:', error);
+            }
+        };
+        
+        loadRigs();
+    }, []);
+
+    // Load active rig configuration when rig selection changes
+    useEffect(() => {
+        const loadRigConfig = async () => {
+            if (!activeRigId) return;
+            
+            try {
+                const rig = await window.electron.ipcRenderer.invoke('get-dmx-rig', activeRigId);
+                if (rig) {
+                    setRigName(rig.name);
+                    setRigUniverse(rig.universe || 1);
+                    setActiveLightsConfig(rig.config);
+                }
+            } catch (error) {
+                console.error('Failed to load rig configuration:', error);
+            }
+        };
+        
+        if (activeRigId) {
+            loadRigConfig();
+        }
+    }, [activeRigId, setActiveLightsConfig]);
+
+    // Update all dependent state when activeConfig changes (e.g., when switching rigs)
+    useEffect(() => {
+        if (!activeConfig) return;
+
+        // Update selected count
+        setSelectedCount(activeConfig.numLights > 0 ? activeConfig.numLights : null);
+
+        // Update selected layout
+        setSelectedLayout(activeConfig.lightLayout.id);
+
+        // Update selected strobe type
+        setSelectedStrobe(activeConfig.strobeType);
+
+        // Update assigned to back count
+        if (activeConfig.lightLayout.id === 'front-back') {
+            setAssignedToBack(activeConfig.backLights.length > 0 ? activeConfig.backLights.length : 'None');
+        } else {
+            setAssignedToBack('None');
+        }
+
+        // Update allPrimaryLights from the config
+        const front = activeConfig.frontLights || [];
+        const back = activeConfig.backLights || [];
+        const strobe = activeConfig.strobeLights || [];
+        
+        const merged = [
+            ...front.map((l) => ({ ...l, group: 'front' as const })),
+            ...back.map((l) => ({ ...l, group: 'back' as const })),
+            ...strobe.map((l) => ({ ...l, group: 'strobe' as const })),
+        ];
+        
+        setAllPrimaryLights(merged);
+
+        // Update dedicated strobe count if applicable
+        if (activeConfig.strobeType === ConfigStrobeType.Dedicated) {
+            setDedicatedStrobeCount(strobe.length > 0 ? strobe.length : 0);
+        } else {
+            setDedicatedStrobeCount(0);
+        }
+    }, [activeConfig]);
 
 
 
@@ -420,7 +527,12 @@ const LightsLayout = () => {
 
 
 
-    const handleSaveChanges = () => {
+    const handleSaveChanges = async () => {
+        if (!activeRigId) {
+            console.error('No rig selected');
+            return;
+        }
+
         // Decide final strobe set based on the strobe mode
         let finalStrobe: DmxLight[] = [];
 
@@ -444,7 +556,7 @@ const LightsLayout = () => {
         const backWithNewIds    = mapLightsToNewIds(finalBack, idMap);
         const strobeWithNewIds  = mapLightsToNewIds(finalStrobe, idMap);
 
-        setActiveLightsConfig({
+        const updatedConfig = {
             numLights: selectedCount || 0,
             lightLayout:
                 availableLayouts.find((layout) => layout.id === selectedLayout) ||
@@ -453,10 +565,31 @@ const LightsLayout = () => {
             frontLights: frontWithNewIds,
             backLights: backWithNewIds,
             strobeLights: strobeWithNewIds,
-        });
+        };
 
-        setShowSuccessMessage(true);
-        setTimeout(() => setShowSuccessMessage(false), 3000);
+        setActiveLightsConfig(updatedConfig);
+
+        // Save to the selected rig
+        try {
+            const currentRig = rigs.find(r => r.id === activeRigId);
+            if (currentRig) {
+                const updatedRig: DmxRig = {
+                    ...currentRig,
+                    name: rigName,
+                    universe: rigUniverse || 1, // Ensure minimum is 1
+                    config: updatedConfig
+                };
+                await window.electron.ipcRenderer.invoke('save-dmx-rig', updatedRig);
+                
+                // Update local rigs state
+                setRigs(prev => prev.map(r => r.id === activeRigId ? updatedRig : r));
+            }
+            
+            setShowSuccessMessage(true);
+            setTimeout(() => setShowSuccessMessage(false), 3000);
+        } catch (error) {
+            console.error('Failed to save rig:', error);
+        }
     };
 
     // Build Dropdown Options for Assigned to Back
@@ -514,6 +647,79 @@ const LightsLayout = () => {
                 </div>
             ) : (
                 <>
+                    {/* Rig Selection and Configuration */}
+                    <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-4 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Rig:</label>
+                                <select
+                                    value={activeRigId || ''}
+                                    onChange={(e) => setActiveRigId(e.target.value)}
+                                    className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[200px]"
+                                >
+                                    {rigs.map((rig) => (
+                                        <option key={rig.id} value={rig.id}>
+                                            {rig.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            <button
+                                onClick={async () => {
+                                    const newRig: DmxRig = {
+                                        id: uuidv4(),
+                                        name: `Rig ${rigs.length + 1}`,
+                                        universe: 1,
+                                        active: true,
+                                        config: {
+                                            numLights: 0,
+                                            lightLayout: { id: 'front', label: 'Front' },
+                                            strobeType: ConfigStrobeType.None,
+                                            frontLights: [],
+                                            backLights: [],
+                                            strobeLights: []
+                                        }
+                                    };
+                                    try {
+                                        await window.electron.ipcRenderer.invoke('save-dmx-rig', newRig);
+                                        setRigs(prev => [...prev, newRig]);
+                                        setActiveRigId(newRig.id);
+                                        setRigName(newRig.name);
+                                        setRigUniverse(newRig.universe);
+                                    } catch (error) {
+                                        console.error('Failed to create new rig:', error);
+                                    }
+                                }}
+                                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                            >
+                                New Rig
+                            </button>
+                            
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Name:</label>
+                                <input
+                                    type="text"
+                                    value={rigName}
+                                    onChange={(e) => setRigName(e.target.value)}
+                                    className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[150px]"
+                                    placeholder="Rig Name"
+                                />
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Universe:</label>
+                                <input
+                                    type="number"
+                                    value={rigUniverse}
+                                    onChange={(e) => setRigUniverse(parseInt(e.target.value) || 1)}
+                                    min={1}
+                                    className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-20"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     <form className="space-y-6 max-w-full">
                         <div className="flex flex-wrap gap-4">
                             {/* Number of Lights */}
@@ -645,7 +851,9 @@ const LightsLayout = () => {
                     <div className="mt-8 space-y-8">
                         {/* Front Lights */}
                         <div>
-                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Front Lights</h2>
+                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
+                                {rigName ? `${rigName} - ` : ''}Front Lights
+                            </h2>
                             <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
                                 {frontLights.map((light, index) => (
                                     <div key={light.id} className="flex flex-col">
@@ -667,7 +875,9 @@ const LightsLayout = () => {
                         {/* Back Lights */}
                         {selectedLayout === 'front-back' && backLights.length > 0 && (
                             <div>
-                                <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Back Lights</h2>
+                                <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
+                                    {rigName ? `${rigName} - ` : ''}Back Lights
+                                </h2>
                                 <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
                                     {backLights.map((light, index) => (
                                         <div key={light.id} className="flex flex-col">

@@ -390,6 +390,25 @@ export interface LightingConfiguration {
 }
 
 /**
+ * DMX Rig Interface
+ * Represents a complete DMX configuration with its own universe and active state
+ */
+export interface DmxRig {
+  id: string; // UUID
+  name: string;
+  universe: number; // Default 1
+  active: boolean; // Default true
+  config: LightingConfiguration;
+}
+
+/**
+ * DMX Rigs Configuration Interface
+ */
+export interface DmxRigsConfig {
+  rigs: DmxRig[];
+}
+
+/**
  * Defines the location a light can be placed.
  */
 export type LocationGroup = 'front' | 'back' | 'strobe';

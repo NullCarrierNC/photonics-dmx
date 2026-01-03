@@ -3,6 +3,7 @@ import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager
 import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer';
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher';
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager';
+import { LightingConfiguration, ConfigStrobeType } from '../../photonics-dmx/types';
 import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetworkListener';
 import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetworkListener';
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
@@ -88,24 +89,56 @@ export class ControllerManager {
   
   /**
    * Initialize the DMX Light Manager
+   * Creates a merged manager from all active rigs for backward compatibility
+   * Individual rig managers are handled by DmxPublisher
    */
   private async initializeDmxManager(): Promise<void> {
-    // Load configuration and set up DMX light manager
-    const layout = this.config.getLightingLayout();
-    if (!layout) {
-      console.error("Cannot start controllers without a valid configuration.");
+    // Load only active rigs
+    const activeRigs = this.config.getActiveRigs();
+    
+    if (activeRigs.length === 0) {
+      console.warn("No active DMX rigs found. DMX output will be disabled.");
+      // Create empty manager for backward compatibility
+      const emptyConfig = {
+        numLights: 0,
+        lightLayout: { id: "default-layout", label: "Default Layout" },
+        strobeType: ConfigStrobeType.None,
+        frontLights: [],
+        backLights: [],
+        strobeLights: []
+      };
+      this.dmxLightManager = new DmxLightManager(emptyConfig);
       return;
     }
     
-    this.dmxLightManager = new DmxLightManager(layout);
+    console.log(`Initializing ${activeRigs.length} active DMX rig(s)`);
+    
+    // Create merged configuration from all active rigs for backward compatibility
+    // This allows processors and cue handlers to work with all lights
+    const mergedConfig: LightingConfiguration = {
+      numLights: 0,
+      lightLayout: { id: "merged", label: "Merged Rigs" },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [],
+      backLights: [],
+      strobeLights: []
+    };
+    
+    // Merge all lights from all active rigs
+    for (const rig of activeRigs) {
+      mergedConfig.frontLights.push(...rig.config.frontLights);
+      mergedConfig.backLights.push(...rig.config.backLights);
+      mergedConfig.strobeLights.push(...rig.config.strobeLights);
+      mergedConfig.numLights += rig.config.numLights;
+    }
+    
+    this.dmxLightManager = new DmxLightManager(mergedConfig);
   }
   
   /**
    * Initialize the lighting system
    */
   private async initializeSequencer(): Promise<void> {
-    if (!this.dmxLightManager) return;
-
     // Get clock rate from configuration
     const clockRate = this.config.getClockRate();
     
@@ -123,12 +156,17 @@ export class ControllerManager {
     // Start the centralized timing system
     clock.start();
     
-    // Set up DMX publisher
+    // Set up DMX publisher (no longer takes DmxLightManager in constructor)
     this.dmxPublisher = new DmxPublisher(
-      this.dmxLightManager,
       this.senderManager!,
       this.lightStateManager
     );
+
+    // Load active rigs and set them up in the publisher
+    const activeRigs = this.config.getActiveRigs();
+    if (this.dmxPublisher && activeRigs.length > 0) {
+      this.dmxPublisher.updateActiveRigs(activeRigs);
+    }
 
     // Set up error handling
     this.senderManager!.onSendError(this.handleSenderError);
