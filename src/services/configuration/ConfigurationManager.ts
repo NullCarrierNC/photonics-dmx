@@ -61,6 +61,7 @@ export interface AppPreferences {
     sacnExpanded: boolean;
     openDmxExpanded: boolean;
   };
+  allowMultipleActiveRigs?: boolean;
   audioConfig?: AudioConfig;
   activeAudioCueType?: AudioCueType;
   simulationSettings?: {
@@ -137,6 +138,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     sacnExpanded: false,
     openDmxExpanded: false
   },
+  allowMultipleActiveRigs: false,
   audioConfig: DEFAULT_AUDIO_CONFIG
 };
 

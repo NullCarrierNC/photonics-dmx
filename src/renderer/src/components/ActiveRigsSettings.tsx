@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAtom } from 'jotai';
-import { dmxRigsAtom } from '../atoms';
+import { dmxRigsAtom, lightingPrefsAtom } from '../atoms';
 import { DmxRig } from '../../../photonics-dmx/types';
 
 const ActiveRigsSettings: React.FC = () => {
   const [rigs, setRigs] = useAtom(dmxRigsAtom);
+  const [prefs, setPrefs] = useAtom(lightingPrefsAtom);
   const [editingRig, setEditingRig] = useState<string | null>(null);
   const [editingUniverse, setEditingUniverse] = useState<number>(1);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  
+  const allowMultipleActiveRigs = prefs.allowMultipleActiveRigs ?? false;
 
   // Load rigs on mount
   useEffect(() => {
@@ -43,16 +46,80 @@ const ActiveRigsSettings: React.FC = () => {
   const handleActiveToggle = async (rigId: string, newActive: boolean) => {
     try {
       const rig = rigs.find(r => r.id === rigId);
-      if (rig) {
-        const updatedRig: DmxRig = {
-          ...rig,
-          active: newActive
-        };
-        await window.electron.ipcRenderer.invoke('save-dmx-rig', updatedRig);
-        setRigs(prev => prev.map(r => r.id === rigId ? updatedRig : r));
+      if (!rig) return;
+      
+      // If multiple active rigs are not allowed and we're activating a rig,
+      // deactivate all other rigs first
+      if (!allowMultipleActiveRigs && newActive) {
+        // Deactivate all other rigs
+        const otherRigs = rigs.filter(r => r.id !== rigId && r.active);
+        for (const otherRig of otherRigs) {
+          const deactivatedRig: DmxRig = {
+            ...otherRig,
+            active: false
+          };
+          await window.electron.ipcRenderer.invoke('save-dmx-rig', deactivatedRig);
+        }
       }
+      
+      // Update the selected rig
+      const updatedRig: DmxRig = {
+        ...rig,
+        active: newActive
+      };
+      await window.electron.ipcRenderer.invoke('save-dmx-rig', updatedRig);
+      
+      // Update local state
+      setRigs(prev => prev.map(r => {
+        if (r.id === rigId) {
+          return updatedRig;
+        }
+        // If multiple active rigs not allowed and we activated a rig, deactivate others
+        if (!allowMultipleActiveRigs && newActive && r.active) {
+          return { ...r, active: false };
+        }
+        return r;
+      }));
     } catch (error) {
       console.error('Failed to update rig active state:', error);
+    }
+  };
+
+  const handleAllowMultipleActiveRigsChange = async (enabled: boolean) => {
+    try {
+      await window.electron.ipcRenderer.invoke('save-prefs', {
+        allowMultipleActiveRigs: enabled
+      });
+      setPrefs(prev => ({
+        ...prev,
+        allowMultipleActiveRigs: enabled
+      }));
+      
+      // If disabling multiple active rigs, ensure only one rig is active
+      if (!enabled) {
+        const activeRigs = rigs.filter(r => r.active);
+        if (activeRigs.length > 1) {
+          // Keep only the first active rig, deactivate the rest
+          const firstActiveRig = activeRigs[0];
+          const otherActiveRigs = activeRigs.slice(1);
+          
+          for (const otherRig of otherActiveRigs) {
+            const deactivatedRig: DmxRig = {
+              ...otherRig,
+              active: false
+            };
+            await window.electron.ipcRenderer.invoke('save-dmx-rig', deactivatedRig);
+          }
+          
+          // Update local state
+          setRigs(prev => prev.map(r => 
+            r.id === firstActiveRig.id ? r : 
+            otherActiveRigs.some(or => or.id === r.id) ? { ...r, active: false } : r
+          ));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update allow multiple active rigs preference:', error);
     }
   };
 
@@ -87,6 +154,24 @@ const ActiveRigsSettings: React.FC = () => {
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         Manage your DMX rigs. Only active rigs will output DMX data to their configured universes.
       </p>
+      
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            type="checkbox"
+            id="allowMultipleActiveRigs"
+            checked={allowMultipleActiveRigs}
+            onChange={(e) => handleAllowMultipleActiveRigsChange(e.target.checked)}
+            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+          />
+          <label htmlFor="allowMultipleActiveRigs" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Allow Multiple Active Rigs
+          </label>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 ml-6">
+          When multiple rigs are active DMX data will be published to all active rigs simultaneously.
+        </p>
+      </div>
 
       {rigs.length === 0 ? (
         <p className="text-gray-600 dark:text-gray-400">No rigs configured. Create a rig in Lights Layout.</p>
@@ -139,12 +224,22 @@ const ActiveRigsSettings: React.FC = () => {
                     )}
                   </td>
                   <td className="p-2">
-                    <input
-                      type="checkbox"
-                      checked={rig.active}
-                      onChange={(e) => handleActiveToggle(rig.id, e.target.checked)}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                    />
+                    {allowMultipleActiveRigs ? (
+                      <input
+                        type="checkbox"
+                        checked={rig.active}
+                        onChange={(e) => handleActiveToggle(rig.id, e.target.checked)}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      />
+                    ) : (
+                      <input
+                        type="radio"
+                        name="activeRig"
+                        checked={rig.active}
+                        onChange={() => handleActiveToggle(rig.id, true)}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      />
+                    )}
                   </td>
                   <td className="p-2">
                     {showDeleteConfirm === rig.id ? (
