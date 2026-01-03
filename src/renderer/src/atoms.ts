@@ -121,7 +121,7 @@ export const artNetConfigAtom = atom((get) => {
 export const sacnConfigAtom = atom((get) => {
   const prefs = get(lightingPrefsAtom);
   return {
-    universe: prefs.sacnConfig?.universe ?? 0,
+    universe: prefs.sacnConfig?.universe ?? 1,
     networkInterface: prefs.sacnConfig?.networkInterface || "",
     unicastDestination: prefs.sacnConfig?.unicastDestination || "",
     useUnicast: prefs.sacnConfig?.useUnicast || false

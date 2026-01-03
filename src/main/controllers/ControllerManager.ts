@@ -283,13 +283,62 @@ export class ControllerManager {
   private handleSenderError = (error: SenderError): void => {
     console.error('Sender error:', error);
     
-    // Notify the renderer process
     const mainWindow = BrowserWindow.getFocusedWindow();
-    if (mainWindow) {
-      mainWindow.webContents.send('sender-error', error.err ? error.err.toString() : 'Unknown sender error');
-    }else{
+    if (!mainWindow) {
       console.error('handleSenderError: No main window found');
+      return;
     }
+    
+    // Check if this is a network error that should disable the sender
+    const shouldDisable = (error as any).shouldDisable === true;
+    const errorObj = error.err || error;
+    
+    // Try to determine which sender this error is from by checking error details
+    let senderId: string | null = null;
+    if (errorObj && typeof errorObj === 'object') {
+      const err = errorObj as any;
+      // Check port to determine sender type
+      if (err.port === 6454) {
+        senderId = 'artnet';
+      } else if (err.port === 5568) {
+        senderId = 'sacn';
+      } else if (err.address || err.syscall === 'send') {
+        // Fallback: check which network sender is enabled
+        const senderManager = this.getSenderManager();
+        if (senderManager.isSenderEnabled('artnet')) {
+          senderId = 'artnet';
+        } else if (senderManager.isSenderEnabled('sacn')) {
+          senderId = 'sacn';
+        }
+      }
+    }
+    
+    // If it's a network error that should disable the sender, disable it automatically
+    if (shouldDisable && senderId) {
+      console.log(`Automatically disabling ${senderId} sender due to network error`);
+      try {
+        const senderManager = this.getSenderManager();
+        
+        // Check if sender is still enabled (might have been removed already by uncaughtException handler)
+        if (senderManager.isSenderEnabled(senderId)) {
+          senderManager.disableSender(senderId).catch((disableErr) => {
+            console.error(`Failed to disable ${senderId} sender:`, disableErr);
+          });
+        }
+        
+        // Send a specific notification for network errors that caused auto-disable
+        mainWindow.webContents.send('sender-network-error', {
+          sender: senderId,
+          error: error.err ? (error.err instanceof Error ? error.err.message : String(error.err)) : 'Network unreachable',
+          autoDisabled: true
+        });
+      } catch (err) {
+        console.error('Error disabling sender:', err);
+      }
+    }
+    
+    // Also send the general error notification
+    mainWindow.webContents.send('sender-error', error.err ? error.err.toString() : 'Unknown sender error');
   };
   
   /**
@@ -797,6 +846,16 @@ export class ControllerManager {
   public getSenderManager(): SenderManager {
     this.ensureSenderManager();
     return this.senderManager!;
+  }
+
+  /**
+   * Set a callback for clearing sender error tracking when a sender is successfully enabled.
+   * This is used to allow senders to be re-enabled after network errors.
+   * @param callback Function to call with the sender ID when error tracking should be cleared
+   */
+  public setSenderErrorTrackingCallback(callback: (senderId: string) => void): void {
+    this.ensureSenderManager();
+    this.senderManager!.setOnSenderEnabled(callback);
   }
 
 

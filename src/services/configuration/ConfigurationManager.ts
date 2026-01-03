@@ -124,7 +124,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     universe: 0
   },
   sacnConfig: {
-    universe: 0,
+    universe: 1,
     useUnicast: false,
     unicastDestination: ''
   },

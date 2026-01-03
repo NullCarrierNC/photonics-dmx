@@ -21,10 +21,20 @@ export class SenderManager {
   private ipcSender: IpcSender | null = null;
   private initializingSenders: Set<string> = new Set();
   private senderUniverseMap: Map<string, number> = new Map();
+  private onSenderEnabledCallback: ((senderId: string) => void) | null = null;
 
   constructor() {
     this.enabledSenders = new Map<string, BaseSender>();
     this.eventEmitter = new EventEmitter();
+  }
+
+  /**
+   * Set a callback to be invoked when a sender is successfully enabled.
+   * This is used to clear error tracking state when a sender is re-enabled after a network error.
+   * @param callback Function to call with the sender ID when a sender is enabled
+   */
+  public setOnSenderEnabled(callback: (senderId: string) => void): void {
+    this.onSenderEnabledCallback = callback;
   }
 
   /**
@@ -93,7 +103,7 @@ export class SenderManager {
 
           case 'sacn':
             // sACN config: { universe, networkInterface, useUnicast, unicastDestination }
-            const sacnUniverse = config.universe !== undefined ? config.universe : 0;
+            const sacnUniverse = config.universe !== undefined ? config.universe : 1;
             sender = new SacnSender(config);
             this.senderUniverseMap.set(id, sacnUniverse);
             break;
@@ -138,6 +148,11 @@ export class SenderManager {
 
         // Remove from initializing set
         this.initializingSenders.delete(id);
+        
+        // Clear any error tracking for this sender (allows re-enabling after network errors)
+        if (this.onSenderEnabledCallback) {
+          this.onSenderEnabledCallback(id);
+        }
       }
     } catch (err) {
       console.error(`Error starting sender with ID "${id}":`, err);
@@ -275,12 +290,18 @@ export class SenderManager {
     }
 
     // Fire-and-forget - send only to senders configured for this universe
-    for (const [id, sender] of this.enabledSenders) {
+    // Create a copy of the map entries to avoid issues if senders are removed during iteration
+    const sendersToUse = Array.from(this.enabledSenders.entries());
+    for (const [id, sender] of sendersToUse) {
       const senderUniverse = this.senderUniverseMap.get(id);
       if (senderUniverse === universe) {
         // Use Promise.resolve to make it non-blocking
         Promise.resolve(sender.send(universeBuffer)).catch((error) => {
           console.error(`Error sending data with ${sender.constructor.name}:`, error);
+          // If it's a SenderError with shouldDisable flag, emit it so it can be handled
+          if (error instanceof SenderError && (error as any).shouldDisable) {
+            this.handleSenderError(error);
+          }
         });
       }
     }

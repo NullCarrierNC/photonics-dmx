@@ -61,7 +61,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
       let config: any = {};
 
       if (sender === 'sacn') {
-        const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 0;
+        const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 1;
         if (universeNum < 0 || universeNum > 63999) {
           console.error(`Invalid SACN universe: ${universeNum}. Must be between 0-63999`);
           return;

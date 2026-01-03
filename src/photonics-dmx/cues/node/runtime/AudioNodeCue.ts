@@ -274,6 +274,21 @@ export class AudioNodeCue implements IAudioCue {
             return edges.map(edge => edge.to);
           }
           
+          // For cue-type, treat it as a string (it's a string identifier)
+          if (logicNode.valueType === 'cue-type') {
+            const value = this.resolveValue('string', logicNode.value);
+            const varStore = this.getVariableStore(logicNode.varName);
+            
+            if (logicNode.mode === 'init') {
+              if (!varStore.has(logicNode.varName)) {
+                varStore.set(logicNode.varName, { type: logicNode.valueType, value });
+              }
+            } else {
+              varStore.set(logicNode.varName, { type: logicNode.valueType, value });
+            }
+            return edges.map(edge => edge.to);
+          }
+          
           const value = this.resolveValue(logicNode.valueType, logicNode.value);
           const varStore = this.getVariableStore(logicNode.varName);
           

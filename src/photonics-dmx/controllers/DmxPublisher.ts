@@ -95,7 +95,7 @@ export class DmxPublisher {
      */
     private publishNow(lights: Map<string, RGBIO>): void {
         // Process each active rig separately
-        for (const [rigId, { manager, rig }] of this._rigManagers) {
+        for (const [_rigId, { manager, rig }] of this._rigManagers) {
             // Only process active rigs
             if (!rig.active) {
                 continue;
