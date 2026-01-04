@@ -4,6 +4,7 @@ import { setupIpcHandlers } from './ipc/index';
 import { ControllerManager } from './controllers/ControllerManager';
 import { setupMenu } from './menu';
 import { setGlobalBrightnessConfig } from '../photonics-dmx/helpers/dmxHelpers';
+import { clearSenderErrorTracking } from './senderErrorTracking';
 
 export class Application {
   private windowManager: WindowManager;
@@ -17,6 +18,10 @@ export class Application {
   public async init(): Promise<void> {
     // Initialize controllers
     await this.controllerManager.init();
+    
+    // Set up sender error tracking callback
+    // This allows SenderManager to clear error state when senders are re-enabled
+    this.controllerManager.setSenderErrorTrackingCallback(clearSenderErrorTracking);
     
     // Initialize global brightness configuration
     const brightnessConfig = this.controllerManager.getConfig().getPreference('brightness');
@@ -47,6 +52,10 @@ export class Application {
     if (!this.windowManager.hasWindows()) {
       this.windowManager.createMainWindow();
     }
+  }
+
+  public getControllerManager(): ControllerManager {
+    return this.controllerManager;
   }
 
   public async shutdown(): Promise<void> {

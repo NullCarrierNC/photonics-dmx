@@ -6,14 +6,17 @@ export class EnttecProSender extends BaseSender {
   private dmx:DMX = new DMX();
   private universe?: IUniverseDriver;
   private eventEmitter: EventEmitter;
+  private dmxUniverse: number;
 
   constructor(
     private port: string,
     private options = { dmxSpeed: 20 },
-    private universeName: string = "uni1"
+    private universeName: string = "uni1",
+    universe: number = 0
   ) {
     super();
     this.eventEmitter = new EventEmitter();
+    this.dmxUniverse = universe;
   }
 
   public async start(): Promise<void> {
@@ -119,5 +122,9 @@ export class EnttecProSender extends BaseSender {
 
   public removeSendError(listener: (error: SenderError) => void): void {
     this.eventEmitter.off("SenderError", listener);
+  }
+
+  public getUniverse(): number {
+    return this.dmxUniverse;
   }
 }

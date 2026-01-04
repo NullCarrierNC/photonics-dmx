@@ -18,7 +18,7 @@ const SacnToggle = ({ disabled = false }: SacnToggleProps) => {
       // Get the latest sacnConfig when enabling
       const networkInterface = prefs.sacnConfig?.networkInterface;
       const currentSacnConfig = {
-        universe: prefs.sacnConfig?.universe || 1,
+        universe: prefs.sacnConfig?.universe ?? 1,
         networkInterface: networkInterface === "" ? undefined : networkInterface,
         unicastDestination: prefs.sacnConfig?.unicastDestination || "",
         useUnicast: prefs.sacnConfig?.useUnicast || false

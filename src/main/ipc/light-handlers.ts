@@ -62,8 +62,8 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
 
       if (sender === 'sacn') {
         const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 1;
-        if (universeNum < 1 || universeNum > 63999) {
-          console.error(`Invalid SACN universe: ${universeNum}. Must be between 1-63999`);
+        if (universeNum < 0 || universeNum > 63999) {
+          console.error(`Invalid SACN universe: ${universeNum}. Must be between 0-63999`);
           return;
         }
 
@@ -86,14 +86,16 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           console.error('Port is required for EnttecPro sender');
           return;
         }
-        config = { devicePath: port };
+        const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 0;
+        config = { devicePath: port, universe: universeNum };
       } else if (sender === 'opendmx') {
         if (!port) {
           console.error('Port is required for OpenDMX sender');
           return;
         }
         const dmxSpeed = typeof data.dmxSpeed === 'number' && data.dmxSpeed > 0 ? data.dmxSpeed : undefined;
-        config = { devicePath: port, dmxSpeed };
+        const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 0;
+        config = { devicePath: port, dmxSpeed, universe: universeNum };
       } else if (sender === 'artnet') {
         config = {
           host: host || '127.0.0.1',

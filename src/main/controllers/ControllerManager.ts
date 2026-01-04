@@ -3,6 +3,7 @@ import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager
 import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer';
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher';
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager';
+import { LightingConfiguration, ConfigStrobeType } from '../../photonics-dmx/types';
 import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetworkListener';
 import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetworkListener';
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
@@ -88,24 +89,56 @@ export class ControllerManager {
   
   /**
    * Initialize the DMX Light Manager
+   * Creates a merged manager from all active rigs for backward compatibility
+   * Individual rig managers are handled by DmxPublisher
    */
   private async initializeDmxManager(): Promise<void> {
-    // Load configuration and set up DMX light manager
-    const layout = this.config.getLightingLayout();
-    if (!layout) {
-      console.error("Cannot start controllers without a valid configuration.");
+    // Load only active rigs
+    const activeRigs = this.config.getActiveRigs();
+    
+    if (activeRigs.length === 0) {
+      console.warn("No active DMX rigs found. DMX output will be disabled.");
+      // Create empty manager for backward compatibility
+      const emptyConfig = {
+        numLights: 0,
+        lightLayout: { id: "default-layout", label: "Default Layout" },
+        strobeType: ConfigStrobeType.None,
+        frontLights: [],
+        backLights: [],
+        strobeLights: []
+      };
+      this.dmxLightManager = new DmxLightManager(emptyConfig);
       return;
     }
     
-    this.dmxLightManager = new DmxLightManager(layout);
+    console.log(`Initializing ${activeRigs.length} active DMX rig(s)`);
+    
+    // Create merged configuration from all active rigs for backward compatibility
+    // This allows processors and cue handlers to work with all lights
+    const mergedConfig: LightingConfiguration = {
+      numLights: 0,
+      lightLayout: { id: "merged", label: "Merged Rigs" },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [],
+      backLights: [],
+      strobeLights: []
+    };
+    
+    // Merge all lights from all active rigs
+    for (const rig of activeRigs) {
+      mergedConfig.frontLights.push(...rig.config.frontLights);
+      mergedConfig.backLights.push(...rig.config.backLights);
+      mergedConfig.strobeLights.push(...rig.config.strobeLights);
+      mergedConfig.numLights += rig.config.numLights;
+    }
+    
+    this.dmxLightManager = new DmxLightManager(mergedConfig);
   }
   
   /**
    * Initialize the lighting system
    */
   private async initializeSequencer(): Promise<void> {
-    if (!this.dmxLightManager) return;
-
     // Get clock rate from configuration
     const clockRate = this.config.getClockRate();
     
@@ -123,12 +156,17 @@ export class ControllerManager {
     // Start the centralized timing system
     clock.start();
     
-    // Set up DMX publisher
+    // Set up DMX publisher (no longer takes DmxLightManager in constructor)
     this.dmxPublisher = new DmxPublisher(
-      this.dmxLightManager,
       this.senderManager!,
       this.lightStateManager
     );
+
+    // Load active rigs and set them up in the publisher
+    const activeRigs = this.config.getActiveRigs();
+    if (this.dmxPublisher && activeRigs.length > 0) {
+      this.dmxPublisher.updateActiveRigs(activeRigs);
+    }
 
     // Set up error handling
     this.senderManager!.onSendError(this.handleSenderError);
@@ -245,13 +283,62 @@ export class ControllerManager {
   private handleSenderError = (error: SenderError): void => {
     console.error('Sender error:', error);
     
-    // Notify the renderer process
     const mainWindow = BrowserWindow.getFocusedWindow();
-    if (mainWindow) {
-      mainWindow.webContents.send('sender-error', error.err ? error.err.toString() : 'Unknown sender error');
-    }else{
+    if (!mainWindow) {
       console.error('handleSenderError: No main window found');
+      return;
     }
+    
+    // Check if this is a network error that should disable the sender
+    const shouldDisable = (error as any).shouldDisable === true;
+    const errorObj = error.err || error;
+    
+    // Try to determine which sender this error is from by checking error details
+    let senderId: string | null = null;
+    if (errorObj && typeof errorObj === 'object') {
+      const err = errorObj as any;
+      // Check port to determine sender type
+      if (err.port === 6454) {
+        senderId = 'artnet';
+      } else if (err.port === 5568) {
+        senderId = 'sacn';
+      } else if (err.address || err.syscall === 'send') {
+        // Fallback: check which network sender is enabled
+        const senderManager = this.getSenderManager();
+        if (senderManager.isSenderEnabled('artnet')) {
+          senderId = 'artnet';
+        } else if (senderManager.isSenderEnabled('sacn')) {
+          senderId = 'sacn';
+        }
+      }
+    }
+    
+    // If it's a network error that should disable the sender, disable it automatically
+    if (shouldDisable && senderId) {
+      console.log(`Automatically disabling ${senderId} sender due to network error`);
+      try {
+        const senderManager = this.getSenderManager();
+        
+        // Check if sender is still enabled (might have been removed already by uncaughtException handler)
+        if (senderManager.isSenderEnabled(senderId)) {
+          senderManager.disableSender(senderId).catch((disableErr) => {
+            console.error(`Failed to disable ${senderId} sender:`, disableErr);
+          });
+        }
+        
+        // Send a specific notification for network errors that caused auto-disable
+        mainWindow.webContents.send('sender-network-error', {
+          sender: senderId,
+          error: error.err ? (error.err instanceof Error ? error.err.message : String(error.err)) : 'Network unreachable',
+          autoDisabled: true
+        });
+      } catch (err) {
+        console.error('Error disabling sender:', err);
+      }
+    }
+    
+    // Also send the general error notification
+    mainWindow.webContents.send('sender-error', error.err ? error.err.toString() : 'Unknown sender error');
   };
   
   /**
@@ -759,6 +846,16 @@ export class ControllerManager {
   public getSenderManager(): SenderManager {
     this.ensureSenderManager();
     return this.senderManager!;
+  }
+
+  /**
+   * Set a callback for clearing sender error tracking when a sender is successfully enabled.
+   * This is used to allow senders to be re-enabled after network errors.
+   * @param callback Function to call with the sender ID when error tracking should be cleared
+   */
+  public setSenderErrorTrackingCallback(callback: (senderId: string) => void): void {
+    this.ensureSenderManager();
+    this.senderManager!.setOnSenderEnabled(callback);
   }
 
 

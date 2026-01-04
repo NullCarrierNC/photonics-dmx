@@ -20,10 +20,21 @@ export class SenderManager {
   private eventEmitter: EventEmitter;
   private ipcSender: IpcSender | null = null;
   private initializingSenders: Set<string> = new Set();
+  private senderUniverseMap: Map<string, number> = new Map();
+  private onSenderEnabledCallback: ((senderId: string) => void) | null = null;
 
   constructor() {
     this.enabledSenders = new Map<string, BaseSender>();
     this.eventEmitter = new EventEmitter();
+  }
+
+  /**
+   * Set a callback to be invoked when a sender is successfully enabled.
+   * This is used to clear error tracking state when a sender is re-enabled after a network error.
+   * @param callback Function to call with the sender ID when a sender is enabled
+   */
+  public setOnSenderEnabled(callback: (senderId: string) => void): void {
+    this.onSenderEnabledCallback = callback;
   }
 
   /**
@@ -60,6 +71,8 @@ export class SenderManager {
 
         // Register error handler (IPC sender doesn't use the same error system)
         // We'll handle IPC sender errors in the send method
+        // IPC sender returns -1 for universe (handles all universes)
+        this.senderUniverseMap.set(id, -1);
 
         console.log(`IPC sender enabled and started successfully.`);
         this.initializingSenders.delete(id);
@@ -83,28 +96,36 @@ export class SenderManager {
               base_refresh_interval: 1000,
               ...config.options  // Merge user-provided options, allowing override of defaults
             };
+            const artnetUniverse = artnetOptions.universe || 1;
             sender = new ArtNetSender(host, artnetOptions);
+            this.senderUniverseMap.set(id, artnetUniverse);
             break;
 
           case 'sacn':
             // sACN config: { universe, networkInterface, useUnicast, unicastDestination }
+            const sacnUniverse = config.universe !== undefined ? config.universe : 1;
             sender = new SacnSender(config);
+            this.senderUniverseMap.set(id, sacnUniverse);
             break;
 
           case 'enttecpro':
-            // EnttecPro config: { devicePath }
+            // EnttecPro config: { devicePath, universe }
             const devicePath = config.devicePath;
             if (!devicePath) {
               throw new Error('Device path (port) is required for EnttecPro sender');
             }
-            sender = new EnttecProSender(devicePath, { dmxSpeed: 20 }, 'uni1');
+            const enttecUniverse = config.universe !== undefined ? config.universe : 0;
+            sender = new EnttecProSender(devicePath, { dmxSpeed: 20 }, 'uni1', enttecUniverse);
+            this.senderUniverseMap.set(id, enttecUniverse);
             break;
           case 'opendmx':
             const openDevicePath = config.devicePath;
             if (!openDevicePath) {
               throw new Error('Device path (port) is required for OpenDMX sender');
             }
-            sender = new OpenDmxSender(openDevicePath, { dmxSpeed: config.dmxSpeed ?? 40 }, 'uni1');
+            const openDmxUniverse = config.universe !== undefined ? config.universe : 0;
+            sender = new OpenDmxSender(openDevicePath, { dmxSpeed: config.dmxSpeed ?? 40 }, 'uni1', openDmxUniverse);
+            this.senderUniverseMap.set(id, openDmxUniverse);
             break;
 
           default:
@@ -127,6 +148,11 @@ export class SenderManager {
 
         // Remove from initializing set
         this.initializingSenders.delete(id);
+        
+        // Clear any error tracking for this sender (allows re-enabling after network errors)
+        if (this.onSenderEnabledCallback) {
+          this.onSenderEnabledCallback(id);
+        }
       }
     } catch (err) {
       console.error(`Error starting sender with ID "${id}":`, err);
@@ -173,6 +199,7 @@ export class SenderManager {
     }
     sender.removeSendError(this.handleSenderError);
     this.enabledSenders.delete(id);
+    this.senderUniverseMap.delete(id);
     this.initializingSenders.delete(id);
     console.log(`Sender with ID "${id}" disabled.`);
   }
@@ -235,34 +262,76 @@ export class SenderManager {
     
     // Clear the lists regardless of any errors
     this.enabledSenders.clear();
+    this.senderUniverseMap.clear();
     this.initializingSenders.clear();
     console.log('All senders disabled and removed from manager');
   }
 
   /**
-   * Sends pre-built universe buffer to all enabled senders without blocking.
+   * Sends pre-built universe buffer to senders configured for the specified universe.
    * @param universeBuffer Complete DMX universe buffer (channel -> value mapping).
+   * @param universe The universe number to send to. Only senders configured for this universe will receive the data.
    */
-  public send(universeBuffer: Record<number, number>): void {
-    // Send to IPC sender if enabled
+  public send(universeBuffer: Record<number, number>, universe: number): void {
+    // Send to IPC sender if enabled (handles all universes)
     if (this.ipcSender) {
-      Promise.resolve(this.ipcSender.send(universeBuffer)).catch((error) => {
-        console.error('Error sending data to IPC sender:', error);
-      });
+      const ipcUniverse = this.ipcSender.getUniverse();
+      if (ipcUniverse === -1 || ipcUniverse === universe) {
+        // IPC sender needs to know the universe, so we'll pass it via a custom send method
+        Promise.resolve(this.ipcSender.sendWithUniverse(universeBuffer, universe)).catch((error) => {
+          console.error('Error sending data to IPC sender:', error);
+        });
+      }
     }
 
-    // Send to network senders if any are enabled
+    // Send only to network senders configured for this universe
     if (this.enabledSenders.size === 0) {
       return;
     }
 
-    // Fire-and-forget - send to all senders asynchronously
-    for (const sender of this.enabledSenders.values()) {
-      // Use Promise.resolve to make it non-blocking
-      Promise.resolve(sender.send(universeBuffer)).catch((error) => {
-        console.error(`Error sending data with ${sender.constructor.name}:`, error);
-      });
+    // Fire-and-forget - send only to senders configured for this universe
+    // Create a copy of the map entries to avoid issues if senders are removed during iteration
+    const sendersToUse = Array.from(this.enabledSenders.entries());
+    for (const [id, sender] of sendersToUse) {
+      const senderUniverse = this.senderUniverseMap.get(id);
+      if (senderUniverse === universe) {
+        // Use Promise.resolve to make it non-blocking
+        Promise.resolve(sender.send(universeBuffer)).catch((error) => {
+          console.error(`Error sending data with ${sender.constructor.name}:`, error);
+          // If it's a SenderError with shouldDisable flag, emit it so it can be handled
+          if (error instanceof SenderError && (error as any).shouldDisable) {
+            this.handleSenderError(error);
+          }
+        });
+      }
     }
+  }
+
+  /**
+   * Gets all senders configured for a specific universe (for debugging/logging)
+   * @param universe The universe number
+   * @returns Array of senders configured for this universe
+   */
+  public getSendersForUniverse(universe: number): BaseSender[] {
+    const senders: BaseSender[] = [];
+    
+    // Check IPC sender
+    if (this.ipcSender) {
+      const ipcUniverse = this.ipcSender.getUniverse();
+      if (ipcUniverse === -1 || ipcUniverse === universe) {
+        senders.push(this.ipcSender);
+      }
+    }
+    
+    // Check network senders
+    for (const [id, sender] of this.enabledSenders) {
+      const senderUniverse = this.senderUniverseMap.get(id);
+      if (senderUniverse === universe) {
+        senders.push(sender);
+      }
+    }
+    
+    return senders;
   }
 
   /**

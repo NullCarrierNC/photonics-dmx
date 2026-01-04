@@ -28,6 +28,17 @@ export class IpcSender extends BaseSender {
    * @param universeBuffer Pre-built universe buffer (channel -> value mapping).
    */
   public async send(universeBuffer: Record<number, number>): Promise<void> {
+    // This method is called by BaseSender interface, but we need universe info
+    // So we'll use sendWithUniverse instead from SenderManager
+    await this.sendWithUniverse(universeBuffer, -1);
+  }
+
+  /**
+   * Sends DMX data with universe information using Electron IPC protocol.
+   * @param universeBuffer Pre-built universe buffer (channel -> value mapping).
+   * @param universe The universe number this data belongs to.
+   */
+  public async sendWithUniverse(universeBuffer: Record<number, number>, universe: number): Promise<void> {
     if(!this.enabled) {
       console.error('IPC Sender: Not enabled');
       return;
@@ -36,8 +47,8 @@ export class IpcSender extends BaseSender {
     // Get the window when sending to ensure we have the current active window
     const window = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
     if(window){
-      // Send buffer directly to renderer
-      window.webContents.send("dmxValues", universeBuffer);
+      // Send buffer with universe info to renderer
+      window.webContents.send("dmxValues", { universeBuffer, universe });
     } else {
       console.error('IPC Sender: No browser window available when sending');
     }
@@ -64,5 +75,9 @@ export class IpcSender extends BaseSender {
 
     }
 
+    public getUniverse(): number {
+      // Return -1 to indicate IPC sender handles all universes (for preview purposes)
+      return -1;
+    }
 
 }

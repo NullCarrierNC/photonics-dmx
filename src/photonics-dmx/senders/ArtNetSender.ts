@@ -28,9 +28,29 @@ export class ArtNetSender extends BaseSender {
         "artnet-universe",
         new ArtnetDriver(this.host, this.options)
       );
+      
+      // Listen for error events from the DMX instance
+      this.dmx.on('error', (err: any) => {
+        console.error("ArtNetSender DMX error event:", err);
+        const isNetworkError = err && (
+          err.code === 'EHOSTUNREACH' ||
+          err.code === 'EHOSTDOWN' ||
+          err.code === 'ENETUNREACH' ||
+          err.code === 'ETIMEDOUT' ||
+          err.syscall === 'send'
+        );
+        
+        const errorEvent = new SenderError(err);
+        if (isNetworkError) {
+          (errorEvent as any).isNetworkError = true;
+          (errorEvent as any).shouldDisable = true;
+        }
+        this.eventEmitter.emit("SenderError", errorEvent);
+      });
     } catch (err) {
       const errorEvent = new SenderError(err);
       this.eventEmitter.emit("SenderError", errorEvent);
+      throw err; // Re-throw to allow SenderManager to handle it
     }
   }
 
@@ -110,9 +130,25 @@ export class ArtNetSender extends BaseSender {
       }
       
       this.universe!.update(convertedBuffer);
-    } catch (err) {
+    } catch (err: any) {
       console.error("ArtNetSender error:", err);
+      
+      // Check if this is a network error that indicates an invalid destination
+      const isNetworkError = err && (
+        err.code === 'EHOSTUNREACH' ||
+        err.code === 'EHOSTDOWN' ||
+        err.code === 'ENETUNREACH' ||
+        err.code === 'ETIMEDOUT' ||
+        err.syscall === 'send'
+      );
+      
+      // Add a flag to indicate this is a network error that should disable the sender
       const errorEvent = new SenderError(err);
+      if (isNetworkError) {
+        (errorEvent as any).isNetworkError = true;
+        (errorEvent as any).shouldDisable = true;
+      }
+      
       this.eventEmitter.emit("SenderError", errorEvent);
     }
   }
@@ -129,5 +165,9 @@ export class ArtNetSender extends BaseSender {
 
   public removeSendError(listener: (error: SenderError) => void): void {
     this.eventEmitter.off("SenderError", listener);
+  }
+
+  public getUniverse(): number {
+    return this.options.universe || 1;
   }
 } 

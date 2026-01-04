@@ -23,6 +23,8 @@ import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
 import { AudioCaptureManager } from './services/AudioCaptureManager';
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
+import { useToast } from './hooks/useToast';
+import ToastContainer from './components/Toast';
 
 /**
  * Main application component
@@ -52,6 +54,7 @@ export const App = (): JSX.Element => {
   const setOpenDmxEnabled = useSetAtom(senderOpenDmxEnabledAtom);
   const setIpcEnabled = useSetAtom(senderIpcEnabledAtom);
   const [appVer, setAppVer] = useState('');
+  const { toasts, showToast, hideToast } = useToast();
 
   // Audio capture manager ref (created once, persists for app lifetime)
   const audioCaptureManagerRef = useRef<AudioCaptureManager | null>(null);
@@ -111,6 +114,41 @@ export const App = (): JSX.Element => {
     setSenderError(`Failed to start ${data.sender} sender: ${data.error}`);
     resetErrorTimeout();
   }, [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setIpcEnabled, setIsSenderError, setSenderError, resetErrorTimeout]);
+
+  // Handler for sender network errors (invalid destinations, etc.)
+  const handleSenderNetworkError = useCallback((_evt: IpcRendererEvent, data: { sender: string; error: string; autoDisabled: boolean }): void => {
+    console.error(`Sender "${data.sender}" network error:`, data.error);
+
+    // Update the UI state to reflect that the sender is not running
+    switch (data.sender) {
+      case 'sacn':
+        setSacnEnabled(false);
+        break;
+      case 'artnet':
+        setArtNetEnabled(false);
+        break;
+      case 'enttecpro':
+        setEnttecProEnabled(false);
+        break;
+      case 'opendmx':
+        setOpenDmxEnabled(false);
+        break;
+      default:
+        console.warn(`Unknown sender type in network error notification: ${data.sender}`);
+    }
+
+    // Show error toast message
+    const senderName = data.sender === 'artnet' ? 'ArtNet' : data.sender === 'sacn' ? 'sACN' : data.sender.toUpperCase();
+    const errorMessage = data.autoDisabled 
+      ? `${senderName} destination unreachable. ${senderName} has been automatically disabled. Error: ${data.error}`
+      : `${senderName} network error: ${data.error}`;
+    showToast(errorMessage, 'error', 5000);
+
+    // Also set sender error state
+    setIsSenderError(true);
+    setSenderError(`Network error for ${data.sender} sender: ${data.error}`);
+    resetErrorTimeout();
+  }, [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setOpenDmxEnabled, setIsSenderError, setSenderError, resetErrorTimeout, showToast]);
 
   // Handler for audio:enable from main process
   const handleAudioEnable = useCallback(async (_evt: IpcRendererEvent, config: AudioConfig): Promise<void> => {
@@ -351,6 +389,7 @@ export const App = (): JSX.Element => {
 
     // Set up event listener for sender errors
     addIpcListener('sender-error', handleSenderError);
+    addIpcListener('sender-network-error', handleSenderNetworkError);
 
     // Set up event listener for cue state updates
     addIpcListener('cue-state-update', handleCueStateUpdate);
@@ -378,6 +417,7 @@ export const App = (): JSX.Element => {
     // Cleanup function
     return () => {
       removeIpcListener('sender-error', handleSenderError);
+      removeIpcListener('sender-network-error', handleSenderNetworkError);
       removeIpcListener('cue-state-update', handleCueStateUpdate);
       removeIpcListener('sender-start-failed', handleSenderStartFailure);
       removeIpcListener('audio:enable', handleAudioEnable);
@@ -389,7 +429,7 @@ export const App = (): JSX.Element => {
         audioCaptureManagerRef.current.stop();
       }
     };
-  }, [activeConfig, handleSenderError, handleCueStateUpdate, handleSenderStartFailure, handleAudioEnable, handleAudioDisable]);
+  }, [activeConfig, handleSenderError, handleSenderNetworkError, handleCueStateUpdate, handleSenderStartFailure, handleAudioEnable, handleAudioDisable]);
 
   const renderContent = () => {
     switch (currentPage) {
@@ -473,6 +513,7 @@ export const App = (): JSX.Element => {
         {/* Status Bar - Positioned at the bottom of the flex container */}
         <StatusBar />
       </div>
+      <ToastContainer toasts={toasts} onDismiss={hideToast} />
     </div>
   );
 }

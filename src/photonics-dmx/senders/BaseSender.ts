@@ -25,6 +25,12 @@ export abstract class BaseSender {
   public abstract send(universeBuffer: Record<number, number>): Promise<void>;
 
   /**
+   * Gets the universe number this sender is configured for.
+   * @returns The universe number, or -1 for senders that handle all universes (e.g., IPC preview)
+   */
+  public abstract getUniverse(): number;
+
+  /**
    * Verifies that the sender is ready to send data.
    * @throws Error if the sender is not started.
    */

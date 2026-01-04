@@ -1,5 +1,5 @@
 import { ConfigFile } from './ConfigFile';
-import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes } from '../../photonics-dmx/types';
+import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes, DmxRig, DmxRigsConfig } from '../../photonics-dmx/types';
 
 import type { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes';
@@ -13,10 +13,12 @@ export interface AppPreferences {
   complex: boolean;
   enttecProConfig?: {
     port: string;
+    universe: number;
   };
   openDmxConfig?: {
     port: string;
     dmxSpeed: number;
+    universe: number;
   };
   artNetConfig?: {
     host: string;
@@ -59,6 +61,7 @@ export interface AppPreferences {
     sacnExpanded: boolean;
     openDmxExpanded: boolean;
   };
+  allowMultipleActiveRigs?: boolean;
   audioConfig?: AudioConfig;
   activeAudioCueType?: AudioCueType;
   simulationSettings?: {
@@ -113,11 +116,13 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     openDmxEnabled: false
   },
   enttecProConfig: {
-    port: ''
+    port: '',
+    universe: 0
   },
   openDmxConfig: {
     port: '',
-    dmxSpeed: 40
+    dmxSpeed: 40,
+    universe: 0
   },
   sacnConfig: {
     universe: 1,
@@ -133,6 +138,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     sacnExpanded: false,
     openDmxExpanded: false
   },
+  allowMultipleActiveRigs: false,
   audioConfig: DEFAULT_AUDIO_CONFIG
 };
 
@@ -152,6 +158,10 @@ const DEFAULT_LIGHTING_LAYOUT: LightingConfiguration = {
   strobeLights: []
 };
 
+const DEFAULT_DMX_RIGS: DmxRigsConfig = {
+  rigs: []
+};
+
 /**
  * Simplified configuration manager using file-based organization
  */
@@ -159,16 +169,20 @@ export class ConfigurationManager {
   private preferences: ConfigFile<AppPreferences>;
   private userLights: ConfigFile<UserLightsConfig>;
   private lightingLayout: ConfigFile<LightingConfiguration>;
+  private dmxRigs: ConfigFile<DmxRigsConfig>;
 
   constructor() {
     // Initialize config files with version numbers
     this.preferences = new ConfigFile('prefs.json', DEFAULT_PREFERENCES, 3);
     this.userLights = new ConfigFile('lights.json', DEFAULT_USER_LIGHTS, 1);
     this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1);
+    this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1);
     
     // Handle legacy lights format migration
     this.migrateLegacyLightsFormat();
     this.migrateLegacyPreferences();
+    this.migrateToDmxRigs();
+    this.migrateSenderUniverseConfigs();
   }
 
   /**
@@ -200,7 +214,7 @@ export class ConfigurationManager {
     const currentPrefs = { ...this.preferences.get() } as any;
     let updated = false;
 
-    const defaultEnttecConfig = { port: '' };
+    const defaultEnttecConfig = { port: '', universe: 0 };
 
     // v2 -> v3: migrate legacy enttecProPort into enttecProConfig
     if (!currentPrefs.enttecProConfig) {
@@ -223,6 +237,71 @@ export class ConfigurationManager {
 
     if (updated) {
       this.preferences.update(currentPrefs);
+    }
+  }
+
+  /**
+   * Migrates existing lighting layout to a default DMX rig
+   */
+  private migrateToDmxRigs(): void {
+    const currentRigs = this.dmxRigs.get();
+    
+    // If rigs already exist, no migration needed
+    if (currentRigs.rigs.length > 0) {
+      return;
+    }
+
+    // Check if we have an existing layout to migrate
+    const existingLayout = this.lightingLayout.get();
+    
+    // Only migrate if layout has actual lights configured
+    if (existingLayout.numLights > 0 || 
+        existingLayout.frontLights.length > 0 || 
+        existingLayout.backLights.length > 0 || 
+        existingLayout.strobeLights.length > 0) {
+      const { v4: uuidv4 } = require('uuid');
+      
+      const defaultRig: DmxRig = {
+        id: uuidv4(),
+        name: 'Default Rig',
+        universe: 1,
+        active: true,
+        config: existingLayout
+      };
+      
+      this.dmxRigs.update({ rigs: [defaultRig] });
+      console.log('[Photonics Config] Migrated existing layout to default DMX rig');
+    }
+  }
+
+  /**
+   * Migrates sender configs to include universe field
+   */
+  private migrateSenderUniverseConfigs(): void {
+    const currentPrefs = { ...this.preferences.get() } as any;
+    let updated = false;
+
+    // Add universe to enttecProConfig if missing
+    if (currentPrefs.enttecProConfig && typeof currentPrefs.enttecProConfig.universe !== 'number') {
+      currentPrefs.enttecProConfig = {
+        ...currentPrefs.enttecProConfig,
+        universe: 0
+      };
+      updated = true;
+    }
+
+    // Add universe to openDmxConfig if missing
+    if (currentPrefs.openDmxConfig && typeof currentPrefs.openDmxConfig.universe !== 'number') {
+      currentPrefs.openDmxConfig = {
+        ...currentPrefs.openDmxConfig,
+        universe: 0
+      };
+      updated = true;
+    }
+
+    if (updated) {
+      this.preferences.update(currentPrefs);
+      console.log('[Photonics Config] Migrated sender configs to include universe field');
     }
   }
 
@@ -442,5 +521,55 @@ export class ConfigurationManager {
     const { enabled, ...configToSave } = updated;
 
     this.setPreference('audioConfig', configToSave as any);
+  }
+
+  // DMX Rigs Methods
+
+  /**
+   * Gets all DMX rigs
+   */
+  getDmxRigs(): DmxRig[] {
+    return this.dmxRigs.get().rigs;
+  }
+
+  /**
+   * Gets a specific DMX rig by ID
+   */
+  getDmxRig(id: string): DmxRig | null {
+    const rigs = this.getDmxRigs();
+    return rigs.find(rig => rig.id === id) || null;
+  }
+
+  /**
+   * Saves or updates a DMX rig
+   */
+  saveDmxRig(rig: DmxRig): void {
+    const current = this.dmxRigs.get();
+    const rigs = [...current.rigs];
+    const existingIndex = rigs.findIndex(r => r.id === rig.id);
+    
+    if (existingIndex >= 0) {
+      rigs[existingIndex] = rig;
+    } else {
+      rigs.push(rig);
+    }
+    
+    this.dmxRigs.update({ rigs });
+  }
+
+  /**
+   * Deletes a DMX rig by ID
+   */
+  deleteDmxRig(id: string): void {
+    const current = this.dmxRigs.get();
+    const rigs = current.rigs.filter(rig => rig.id !== id);
+    this.dmxRigs.update({ rigs });
+  }
+
+  /**
+   * Gets only active DMX rigs (where active === true)
+   */
+  getActiveRigs(): DmxRig[] {
+    return this.getDmxRigs().filter(rig => rig.active === true);
   }
 } 

@@ -23,13 +23,13 @@ export class SacnSender extends BaseSender {
   }
 
   public async start(): Promise<void> {
-    const universe = this.config.universe || 1;
+    const universe = this.config.universe !== undefined ? this.config.universe : 1;
     const networkInterface = this.config.networkInterface;
     const unicastDestination = this.config.unicastDestination;
     const useUnicast = this.config.useUnicast || false;
 
-    // Ensure universe is a valid number
-    const validUniverse = Math.max(1, Math.min(63999, Number(universe)));
+    // Ensure universe is a valid number (0-63999)
+    const validUniverse = Math.max(0, Math.min(63999, Number(universe)));
 
     // Configure sender options
     const senderOptions: any = {
@@ -109,9 +109,25 @@ export class SacnSender extends BaseSender {
     try {
       this.verifySenderStarted();
       await this.sender!.send({ payload: universeBuffer });
-    } catch (err) {
+    } catch (err: any) {
       console.error("SacnSender error:", err);
+      
+      // Check if this is a network error that indicates an invalid destination
+      const isNetworkError = err && (
+        err.code === 'EHOSTUNREACH' ||
+        err.code === 'EHOSTDOWN' ||
+        err.code === 'ENETUNREACH' ||
+        err.code === 'ETIMEDOUT' ||
+        err.syscall === 'send'
+      );
+      
+      // Add a flag to indicate this is a network error that should disable the sender
       const errorEvent = new SenderError(err);
+      if (isNetworkError) {
+        (errorEvent as any).isNetworkError = true;
+        (errorEvent as any).shouldDisable = true;
+      }
+      
       this.eventEmitter.emit('SenderError', errorEvent);
     }
   }
@@ -128,5 +144,9 @@ export class SacnSender extends BaseSender {
 
   public removeSendError(listener: (error: SenderError) => void): void {
     this.eventEmitter.off('SenderError', listener);
+  }
+
+  public getUniverse(): number {
+    return this.config.universe !== undefined ? this.config.universe : 1;
   }
 }

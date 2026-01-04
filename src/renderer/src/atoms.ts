@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import { DmxFixture, LightingConfiguration,  } from '../../photonics-dmx/types';
+import { DmxFixture, LightingConfiguration, DmxRig } from '../../photonics-dmx/types';
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 import { Pages } from './types';
@@ -65,6 +65,16 @@ export const myValidDmxLightsAtom = atom((get) => {
 
 export const activeDmxLightsConfigAtom = atom<LightingConfiguration | null>(null);
 
+/**
+ * Atom for storing all DMX rigs
+ */
+export const dmxRigsAtom = atom<DmxRig[]>([]);
+
+/**
+ * Atom for tracking the currently selected rig ID for editing
+ */
+export const activeRigIdAtom = atom<string | null>(null);
+
 
 export const senderSacnEnabledAtom = atom<boolean>(false);
 
@@ -111,7 +121,7 @@ export const artNetConfigAtom = atom((get) => {
 export const sacnConfigAtom = atom((get) => {
   const prefs = get(lightingPrefsAtom);
   return {
-    universe: prefs.sacnConfig?.universe || 1,
+    universe: prefs.sacnConfig?.universe ?? 1,
     networkInterface: prefs.sacnConfig?.networkInterface || "",
     unicastDestination: prefs.sacnConfig?.unicastDestination || "",
     useUnicast: prefs.sacnConfig?.useUnicast || false
@@ -128,10 +138,12 @@ export interface LightingPreferences {
   complex?: boolean;
   enttecProConfig?: {
     port: string;
+    universe: number;
   };
   openDmxConfig?: {
     port: string;
     dmxSpeed: number;
+    universe: number;
   };
   artNetConfig?: {
     host: string;
