@@ -274,9 +274,7 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
       )}
 
       {editorMode === 'cue' && addEffectRaiserNode && (
-        <div className="hidden">
-          <EffectNodesSection addEffectRaiserNode={addEffectRaiserNode} />
-        </div>
+        <EffectNodesSection addEffectRaiserNode={addEffectRaiserNode} />
       )}
 
       {addNotesNode && (

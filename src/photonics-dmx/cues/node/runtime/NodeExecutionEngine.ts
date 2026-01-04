@@ -56,6 +56,7 @@ export class NodeExecutionEngine {
   private variableDefinitions: VariableDefinition[];
   private eventListeners: Map<string, EventListenerNode[]> = new Map();
   private effectRegistry: EffectRegistry;
+  private activeEffectEngines: Map<string, EffectExecutionEngine> = new Map();
   /**
    * Instance snapshot of env-based debug setting. Note that runtime toggles are handled via
    * the static global flag so existing engines can start logging immediately.
@@ -879,7 +880,7 @@ export class NodeExecutionEngine {
   }
 
   /**
-   * Execute an effect raiser node: trigger effect and continue immediately (non-blocking).
+   * Execute an effect raiser node: trigger effect and block re-triggering until it completes.
    */
   private executeEffectRaiserNode(raiserNode: EffectRaiserNode, context: ExecutionContext): void {
     try {
@@ -890,6 +891,22 @@ export class NodeExecutionEngine {
         console.warn(`Effect raiser ${raiserNode.id} has no effect selected, skipping`);
         this.continueToNextNodes(raiserNode.id, context);
         return;
+      }
+
+      // Check if this effect raiser already has an active execution
+      const existingEngine = this.activeEffectEngines.get(raiserNode.id);
+      if (existingEngine) {
+        // If the existing engine still has active contexts, block re-triggering
+        if (existingEngine.hasActiveContexts()) {
+          this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`);
+          // Continue to next nodes (don't block the cue execution, just skip this trigger)
+          this.continueToNextNodes(raiserNode.id, context);
+          return;
+        } else {
+          // Engine exists but no active contexts - clean it up and allow new trigger
+          this.debugLog(`Effect raiser ${raiserNode.id} cleaning up completed engine`);
+          this.activeEffectEngines.delete(raiserNode.id);
+        }
       }
 
       // Look up effect from registry
@@ -920,7 +937,16 @@ export class NodeExecutionEngine {
         context.cueData  // Pass caller's cue data
       );
 
-      // Trigger effect (non-blocking, runs in parallel)
+      // Set up completion callback to remove from tracking when effect becomes idle
+      effectEngine.setOnIdle(() => {
+        this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`);
+        this.activeEffectEngines.delete(raiserNode.id);
+      });
+
+      // Store the engine in active tracking
+      this.activeEffectEngines.set(raiserNode.id, effectEngine);
+
+      // Trigger effect (blocking for this raiser node, but non-blocking for cue execution)
       effectEngine.triggerEffect(context.cueData);
 
       // Continue immediately (non-blocking like EventRaiserNode)
@@ -1028,6 +1054,12 @@ export class NodeExecutionEngine {
       context.dispose();
     }
     this.activeContexts.clear();
+
+    // Cancel all active effect engines
+    for (const effectEngine of this.activeEffectEngines.values()) {
+      effectEngine.cancelAll();
+    }
+    this.activeEffectEngines.clear();
   }
 
   /**
