@@ -25,7 +25,10 @@ type EffectDefinition = YargEffectDefinition | AudioEffectDefinition;
 const cueModeOf = (cue: CueDefinition): NodeCueMode =>
   'cueType' in cue ? 'yarg' : 'audio';
 
-const cueToFlow = (cue: CueDefinition | null): { nodes: EditorNode[]; edges: Edge[] } => {
+const cueToFlow = (
+  cue: CueDefinition | null,
+  effectDefinitions?: Map<string, EffectDefinition>
+): { nodes: EditorNode[]; edges: Edge[] } => {
   if (!cue) return { nodes: [], edges: [] };
 
   const cueMode = cueModeOf(cue);
@@ -87,6 +90,10 @@ const cueToFlow = (cue: CueDefinition | null): { nodes: EditorNode[]; edges: Edg
       // Look up effect name from cue's effects array
       const effectRef = cue.effects?.find(e => e.effectId === raiser.effectId);
       const effectName = effectRef?.name || raiser.effectId || 'none';
+      // Get effect definition if available
+      const effectDef = effectDefinitions?.get(raiser.effectId);
+      // Extract parameter definitions (variables with isParameter: true)
+      const parameterDefinitions = effectDef?.variables?.filter(v => v.isParameter) ?? [];
       return {
         id: raiser.id,
         type: 'effect-raiser' as const,
@@ -95,7 +102,8 @@ const cueToFlow = (cue: CueDefinition | null): { nodes: EditorNode[]; edges: Edg
           kind: 'effect-raiser' as const,
           label: `Effect: ${effectName}`,
           payload: raiser,
-          effectName // Pass name to node component
+          effectName, // Pass name to node component
+          parameterDefinitions // Pass parameter definitions to node component
         }
       };
     }),

@@ -107,7 +107,7 @@ const CueEditor: React.FC = () => {
     reactFlowInstance,
     closeContextMenu,
     handlePaneContextMenu
-  } = useCueFlow({ activeMode, setIsDirty, flowWrapperRef });
+  } = useCueFlow({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions: loadedEffectDefinitions });
 
   loadCueIntoFlowRef.current = loadCueIntoFlow;
 

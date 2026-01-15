@@ -27,7 +27,8 @@ import {
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargEffectDefinition,
-  type NotesNode
+  type NotesNode,
+  type EffectDefinition
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { createId, buildDefaultAction } from '../lib/cueDefaults';
 import { calculateChainDuration } from '../lib/cueUtils';
@@ -39,9 +40,10 @@ type UseCueFlowParams = {
   activeMode: NodeCueMode;
   setIsDirty: (dirty: boolean) => void;
   flowWrapperRef?: React.RefObject<HTMLDivElement>;
+  effectDefinitions?: Map<string, EffectDefinition>;
 };
 
-const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams) => {
+const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions }: UseCueFlowParams) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<EditorNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -68,17 +70,22 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
   const chainDuration = useMemo(() => calculateChainDuration(nodes, edges), [nodes, edges]);
 
   const loadCueIntoFlow = useCallback((cue: any) => {
-    // Check if this is an effect or a cue by looking for the 'parameters' property
-    const isEffect = cue && 'parameters' in cue;
+    // Check if this is an effect or a cue by looking for effectListeners in nodes
+    // Effects have effectListeners property, cues don't (cues use effectRaisers instead)
+    // Also check for 'parameters' property as a fallback for backward compatibility
+    const isEffect = cue && cue.nodes && (
+      'effectListeners' in cue.nodes || 
+      'parameters' in cue
+    );
     
     const { nodes: flowNodes, edges: flowEdges } = isEffect 
       ? effectToFlow(cue as YargEffectDefinition | AudioEffectDefinition)
-      : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null);
+      : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null, effectDefinitions);
     
     setNodes(flowNodes);
     setEdges(flowEdges);
     setSelectedNodeId(null);
-  }, [setEdges, setNodes]);
+  }, [setEdges, setNodes, effectDefinitions]);
 
   // Helper function to find a good position for a new node, avoiding overlaps
   const findAvailablePosition = useCallback((preferredX: number, preferredY: number, nodeWidth: number = 150, nodeHeight: number = 80, useExactPosition: boolean = false): { x: number; y: number } => {
