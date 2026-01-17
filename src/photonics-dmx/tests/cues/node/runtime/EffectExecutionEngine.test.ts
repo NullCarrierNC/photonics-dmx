@@ -201,6 +201,9 @@ describe('EffectExecutionEngine', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
+        variables: [
+          { name: 'effectVar', type: 'number', scope: 'cue', initialValue: 0 }
+        ],
         nodes: {
           events: [],
           actions: [

@@ -219,6 +219,38 @@ describe('NodeExecutionEngine', () => {
         }
       };
 
+      mockLightManager.getLights = jest.fn((group: any) => {
+        const groups = Array.isArray(group) ? group : [group];
+        if (groups.includes('back')) {
+          return [{
+            id: 'back1',
+            position: 1,
+            config: {
+              panHome: 0,
+              panMin: 0,
+              panMax: 255,
+              tiltHome: 0,
+              tiltMin: 0,
+              tiltMax: 255,
+              invert: false
+            }
+          }];
+        }
+        return [{
+          id: 'front1',
+          position: 0,
+          config: {
+            panHome: 0,
+            panMin: 0,
+            panMax: 255,
+            tiltHome: 0,
+            tiltMin: 0,
+            tiltMax: 255,
+            invert: false
+          }
+        }];
+      });
+
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
