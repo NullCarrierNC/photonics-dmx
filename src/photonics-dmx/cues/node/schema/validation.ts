@@ -146,6 +146,9 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
   additionalProperties: false,
   required: [],
   properties: {
+    perLightOffsetMs: { type: 'number', nullable: true, minimum: 0 },
+    order: { type: 'string', enum: ['linear', 'inverse-linear'], nullable: true },
+    loop: { type: 'boolean', nullable: true },
     custom: { type: 'object', nullable: true, additionalProperties: true }
   }
 };
@@ -566,19 +569,7 @@ const actionSchema: JSONSchemaType<ActionNode> = {
       items: { type: 'string' }
     },
     config: { ...actionConfigSchema, nullable: true }
-  },
-  allOf: [
-    {
-      if: {
-        properties: {
-          effectType: { enum: ['cross-fade'] }
-        }
-      },
-      then: {
-        required: ['secondaryColor']
-      }
-    }
-  ]
+  }
 } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const yargEventSchema: JSONSchemaType<YargEventNode> = {

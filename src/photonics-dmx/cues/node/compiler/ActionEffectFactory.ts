@@ -3,7 +3,8 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { getColor } from '../../../helpers/dmxHelpers';
 import {
   ActionNode,
-  createDefaultActionTiming
+  createDefaultActionTiming,
+  type NodeChaseOrder
 } from '../../types/nodeCueTypes';
 import { EasingType } from '../../../easing';
 import { VariableValue } from '../runtime/executionTypes';
@@ -161,6 +162,46 @@ const createSingleColorEffect = (params: {
   };
 };
 
+const orderLights = (lights: TrackedLight[], order: NodeChaseOrder): TrackedLight[] => {
+  const sorted = [...lights].sort((a, b) => a.position - b.position);
+  if (order === 'inverse-linear') {
+    return sorted.reverse();
+  }
+  return sorted;
+};
+
+const createChaseEffect = (params: {
+  lights: TrackedLight[];
+  layer: number;
+  timing: ResolvedActionTiming;
+  easing: EasingType;
+  color: RGBIO;
+  perLightOffsetMs: number;
+  order: NodeChaseOrder;
+}): Effect => {
+  const { lights, layer, timing, easing, color, perLightOffsetMs, order } = params;
+  const { waitForTime } = normalizeWaitFor(timing, 0);
+  const ordered = orderLights(lights, order);
+
+  const transitions = ordered.map((light, index) =>
+    createSingleColorTransition({
+      lights: [light],
+      layer,
+      waitFor: 'delay',
+      waitForTime: waitForTime + index * perLightOffsetMs,
+      color,
+      timing,
+      easing
+    })
+  );
+
+  return {
+    id: 'chase',
+    description: 'Per-light offset chase effect',
+    transitions
+  };
+};
+
 export class ActionEffectFactory {
   // Helper to resolve target if needed
   private static resolveTarget(target: any): ResolvedActionTarget {
@@ -275,14 +316,27 @@ export class ActionEffectFactory {
 
     switch (action.effectType) {
       case 'set-color': {
-        effect = createSingleColorEffect({
-          lights,
-          layer,
-          waitFor,
-          color: baseColor,
-          timing: timing,
-          easing
-        });
+        const perLightOffsetMs = action.config?.perLightOffsetMs;
+        if (typeof perLightOffsetMs === 'number' && perLightOffsetMs > 0) {
+          effect = createChaseEffect({
+            lights,
+            layer,
+            timing,
+            easing,
+            color: baseColor,
+            perLightOffsetMs,
+            order: action.config?.order ?? 'linear'
+          });
+        } else {
+          effect = createSingleColorEffect({
+            lights,
+            layer,
+            waitFor,
+            color: baseColor,
+            timing: timing,
+            easing
+          });
+        }
         break;
       }
       case 'blackout': {

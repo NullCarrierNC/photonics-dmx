@@ -341,7 +341,12 @@ export interface ActionTimingConfig {
   level?: ValueSource;
 }
 
+export type NodeChaseOrder = 'linear' | 'inverse-linear';
+
 export interface NodeActionConfig {
+  perLightOffsetMs?: number;
+  order?: NodeChaseOrder;
+  loop?: boolean;
   custom?: Record<string, unknown>;
 }
 

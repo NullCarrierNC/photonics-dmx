@@ -2317,6 +2317,190 @@ describe('Node runtime with real Sequencer', () => {
     randomSpy.mockRestore();
   });
 
+  it('applies per-light chase offsets in linear order', () => {
+    const eventNode: YargEventNode = {
+      id: 'event-1',
+      type: 'event',
+      eventType: 'beat'
+    };
+
+    const actionNode: ActionNode = {
+      id: 'action-1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' }
+      },
+      color: {
+        name: { source: 'literal', value: 'green' },
+        brightness: { source: 'literal', value: 'high' },
+        blendMode: { source: 'literal', value: 'replace' }
+      },
+      timing: {
+        waitForCondition: 'none',
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 0 },
+        waitUntilCondition: 'none',
+        waitUntilTime: { source: 'literal', value: 0 }
+      },
+      config: {
+        perLightOffsetMs: 20,
+        order: 'linear'
+      }
+    };
+
+    const definition: YargNodeCueDefinition = {
+      id: 'chase-linear',
+      name: 'Chase Linear',
+      cueType: CueType.Default,
+      style: 'primary',
+      nodes: {
+        events: [eventNode],
+        actions: [actionNode],
+        logic: [],
+        eventRaisers: [],
+        eventListeners: [],
+        effectRaisers: []
+      },
+      connections: [{ from: 'event-1', to: 'action-1' }]
+    };
+
+    const engine = new NodeExecutionEngine(
+      compileCue(definition),
+      'test-group:chase-linear',
+      harness.sequencer,
+      harness.lightManager,
+      cueLevelVarStore,
+      groupLevelVarStore,
+      new EffectRegistry()
+    );
+
+    engine.startExecution(eventNode, createCueData());
+    harness.advanceBy(1);
+
+    const green = getColor('green', 'high');
+    const [first, second, third, fourth] = harness.frontLightIds;
+
+    expect(harness.getLightState(first)).toMatchObject({
+      red: green.red,
+      green: green.green,
+      blue: green.blue,
+      blendMode: green.blendMode
+    });
+    expect(harness.getLightState(second)).toBeNull();
+    expect(harness.getLightState(third)).toBeNull();
+    expect(harness.getLightState(fourth)).toBeNull();
+
+    harness.advanceBy(20);
+    expect(harness.getLightState(second)).toMatchObject({
+      red: green.red,
+      green: green.green,
+      blue: green.blue,
+      blendMode: green.blendMode
+    });
+
+    harness.advanceBy(20);
+    expect(harness.getLightState(third)).toMatchObject({
+      red: green.red,
+      green: green.green,
+      blue: green.blue,
+      blendMode: green.blendMode
+    });
+
+    harness.advanceBy(20);
+    expect(harness.getLightState(fourth)).toMatchObject({
+      red: green.red,
+      green: green.green,
+      blue: green.blue,
+      blendMode: green.blendMode
+    });
+  });
+
+  it('applies per-light chase offsets in inverse order', () => {
+    const eventNode: YargEventNode = {
+      id: 'event-1',
+      type: 'event',
+      eventType: 'beat'
+    };
+
+    const actionNode: ActionNode = {
+      id: 'action-1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' }
+      },
+      color: {
+        name: { source: 'literal', value: 'blue' },
+        brightness: { source: 'literal', value: 'high' },
+        blendMode: { source: 'literal', value: 'replace' }
+      },
+      timing: {
+        waitForCondition: 'none',
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 0 },
+        waitUntilCondition: 'none',
+        waitUntilTime: { source: 'literal', value: 0 }
+      },
+      config: {
+        perLightOffsetMs: 15,
+        order: 'inverse-linear'
+      }
+    };
+
+    const definition: YargNodeCueDefinition = {
+      id: 'chase-inverse',
+      name: 'Chase Inverse',
+      cueType: CueType.Default,
+      style: 'primary',
+      nodes: {
+        events: [eventNode],
+        actions: [actionNode],
+        logic: [],
+        eventRaisers: [],
+        eventListeners: [],
+        effectRaisers: []
+      },
+      connections: [{ from: 'event-1', to: 'action-1' }]
+    };
+
+    const engine = new NodeExecutionEngine(
+      compileCue(definition),
+      'test-group:chase-inverse',
+      harness.sequencer,
+      harness.lightManager,
+      cueLevelVarStore,
+      groupLevelVarStore,
+      new EffectRegistry()
+    );
+
+    engine.startExecution(eventNode, createCueData());
+    harness.advanceBy(1);
+
+    const blue = getColor('blue', 'high');
+    const [first, second, third, fourth] = harness.frontLightIds;
+
+    expect(harness.getLightState(fourth)).toMatchObject({
+      red: blue.red,
+      green: blue.green,
+      blue: blue.blue,
+      blendMode: blue.blendMode
+    });
+    expect(harness.getLightState(first)).toBeNull();
+    expect(harness.getLightState(second)).toBeNull();
+    expect(harness.getLightState(third)).toBeNull();
+
+    harness.advanceBy(15);
+    expect(harness.getLightState(third)).toMatchObject({
+      red: blue.red,
+      green: blue.green,
+      blue: blue.blue,
+      blendMode: blue.blendMode
+    });
+  });
+
   it('raises events to trigger listener actions in a new context', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
