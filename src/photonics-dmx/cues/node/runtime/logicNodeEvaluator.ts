@@ -7,7 +7,8 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { TrackedLight } from '../../../types';
 import {
   LogicNode,
-  VariableDefinition
+  VariableDefinition,
+  VariableType
 } from '../../types/nodeCueTypes';
 import { ExecutionContext } from './ExecutionContext';
 import { VariableValue } from './executionTypes';
@@ -93,29 +94,67 @@ export function evaluateLogicNode(
     }
 
     case 'conditional': {
-      const left = Number(resolveValue('number', logicNode.left, context));
-      const right = Number(resolveValue('number', logicNode.right, context));
+      const resolveType = (source: any): VariableType => {
+        if (!source) return 'number';
+        if (source.source === 'literal') {
+          if (Array.isArray(source.value)) return 'light-array';
+          if (typeof source.value === 'boolean') return 'boolean';
+          if (typeof source.value === 'number') return 'number';
+          return 'string';
+        }
+        const cueVar = context.cueLevelVarStore.get(source.name);
+        const groupVar = context.groupLevelVarStore.get(source.name);
+        const existing = cueVar ?? groupVar;
+        if (existing) return existing.type as VariableType;
+        if (Array.isArray(source.fallback)) return 'light-array';
+        if (typeof source.fallback === 'boolean') return 'boolean';
+        if (typeof source.fallback === 'number') return 'number';
+        if (typeof source.fallback === 'string') return 'string';
+        return 'number';
+      };
+
+      const leftType = resolveType(logicNode.left);
+      const rightType = resolveType(logicNode.right);
+
+      const useStringCompare =
+        leftType === 'string' || rightType === 'string' ||
+        leftType === 'cue-type' || rightType === 'cue-type' ||
+        leftType === 'color' || rightType === 'color';
+      const useBooleanCompare = leftType === 'boolean' || rightType === 'boolean';
+
       let outcome = false;
-      
-      switch (logicNode.comparator) {
-        case '>':
-          outcome = left > right;
-          break;
-        case '>=':
-          outcome = left >= right;
-          break;
-        case '<':
-          outcome = left < right;
-          break;
-        case '<=':
-          outcome = left <= right;
-          break;
-        case '==':
-          outcome = left === right;
-          break;
-        case '!=':
-          outcome = left !== right;
-          break;
+
+      if (logicNode.comparator === '==' || logicNode.comparator === '!=') {
+        if (useBooleanCompare) {
+          const left = resolveValue('boolean', logicNode.left, context);
+          const right = resolveValue('boolean', logicNode.right, context);
+          outcome = logicNode.comparator === '==' ? left === right : left !== right;
+        } else if (useStringCompare) {
+          const left = resolveValue('string', logicNode.left, context);
+          const right = resolveValue('string', logicNode.right, context);
+          outcome = logicNode.comparator === '==' ? left === right : left !== right;
+        } else {
+          const left = Number(resolveValue('number', logicNode.left, context));
+          const right = Number(resolveValue('number', logicNode.right, context));
+          outcome = logicNode.comparator === '==' ? left === right : left !== right;
+        }
+      } else {
+        const left = Number(resolveValue('number', logicNode.left, context));
+        const right = Number(resolveValue('number', logicNode.right, context));
+        switch (logicNode.comparator) {
+          case '>':
+            outcome = left > right;
+            break;
+          case '>=':
+            outcome = left >= right;
+            break;
+          case '<':
+            outcome = left < right;
+            break;
+          case '<=':
+            outcome = left <= right;
+            break;
+        }
       }
       
       const branch = outcome ? 'true' : 'false';

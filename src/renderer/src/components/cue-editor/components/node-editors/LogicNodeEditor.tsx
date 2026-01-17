@@ -69,11 +69,14 @@ const VariableLogicEditor: React.FC<{
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.valueType}
-          onChange={event => updateNode({ valueType: event.target.value as 'number' | 'boolean' | 'string' })}
+          onChange={event => updateNode({ valueType: event.target.value as 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array' })}
         >
           <option value="number">number</option>
           <option value="boolean">boolean</option>
           <option value="string">string</option>
+          <option value="color">color</option>
+          <option value="cue-type">cue-type</option>
+          <option value="light-array">light-array</option>
         </select>
       </label>
       {showValue && (
@@ -81,7 +84,7 @@ const VariableLogicEditor: React.FC<{
           label="Value"
           value={node.value}
           onChange={next => updateNode({ value: next })}
-          expected={node.valueType as 'number' | 'boolean' | 'string'}
+          expected={node.valueType as 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array'}
           availableVariables={availableVariables}
         />
       )}

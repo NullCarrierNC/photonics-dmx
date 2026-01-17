@@ -293,9 +293,7 @@ export class EffectExecutionEngine {
     try {
       // Handle delay nodes specially - they block execution
       if (logic.logicType === 'delay') {
-        // Delay not implemented in effects yet
-        console.warn(`Delay nodes not supported in effects: ${logic.id}`);
-        this.continueToNextNodes(logic.id, context);
+        this.executeDelayNode(logic, context);
         return;
       }
 
@@ -324,6 +322,40 @@ export class EffectExecutionEngine {
       console.error(`Error executing logic node ${logic.id}:`, error);
       // Continue to all outgoing edges despite error
       this.continueToNextNodes(logic.id, context);
+    }
+  }
+
+  /**
+   * Execute a delay node inside an effect: block until delay completes.
+   */
+  private executeDelayNode(
+    delayNode: LogicNode & { logicType: 'delay'; delayTime: any },
+    context: ExecutionContext
+  ): void {
+    try {
+      const delayMs = Number(resolveValue('number', delayNode.delayTime, context));
+      const actualDelay = Math.max(0, delayMs);
+
+      // Register as active to block execution (dummy action for tracking)
+      const dummyAction: ActionNode = {
+        id: delayNode.id,
+        type: 'action',
+        effectType: 'set-color',
+        target: { groups: { source: 'literal', value: 'front' }, filter: { source: 'literal', value: 'all' } },
+        color: { name: { source: 'literal', value: 'blue' }, brightness: { source: 'literal', value: 'medium' } },
+        timing: { waitForCondition: 'none', waitForTime: { source: 'literal', value: 0 }, duration: { source: 'literal', value: 0 }, waitUntilCondition: 'none', waitUntilTime: { source: 'literal', value: 0 } }
+      };
+      context.registerActiveAction(delayNode.id, dummyAction);
+
+      setTimeout(() => {
+        if (context.hasVisited(delayNode.id)) {
+          context.completeAction(delayNode.id);
+          this.continueToNextNodes(delayNode.id, context);
+        }
+      }, actualDelay);
+    } catch (error) {
+      console.error(`Error executing delay node ${delayNode.id}:`, error);
+      this.continueToNextNodes(delayNode.id, context);
     }
   }
 

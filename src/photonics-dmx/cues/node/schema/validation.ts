@@ -156,7 +156,7 @@ const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
   additionalProperties: false,
   properties: {
     name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
-    type: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array'] },
+    type: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type'] },
     scope: { type: 'string', enum: ['cue', 'cue-group'] },
     initialValue: { type: ['number', 'boolean', 'string', 'array'] } as any,
     description: { type: 'string', nullable: true },
