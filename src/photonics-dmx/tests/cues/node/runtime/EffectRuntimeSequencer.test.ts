@@ -15,7 +15,7 @@ describe('Effect runtime with real Sequencer', () => {
   let harness: ReturnType<typeof createSequencerHarness>;
 
   beforeEach(() => {
-    harness = createSequencerHarness({ frontCount: 2, backCount: 0 });
+    harness = createSequencerHarness({ frontCount: 4, backCount: 0 });
   });
 
   afterEach(() => {
@@ -418,6 +418,235 @@ describe('Effect runtime with real Sequencer', () => {
 
     const state = harness.getLightState(harness.frontLightIds[0]);
     const expected = getColor('blue', 'high');
+    expect(state).toMatchObject({
+      red: expected.red,
+      green: expected.green,
+      blue: expected.blue,
+      blendMode: expected.blendMode
+    });
+  });
+
+  it('targets lights from light-array parameters', () => {
+    const effect: YargEffectDefinition = {
+      id: 'light-array-param',
+      mode: 'yarg',
+      name: 'Light Array Param',
+      description: '',
+      variables: [
+        { name: 'targetLights', type: 'light-array', scope: 'cue', initialValue: [], isParameter: true }
+      ],
+      nodes: {
+        events: [],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'variable', name: 'targetLights' },
+              filter: { source: 'literal', value: 'all' }
+            },
+            color: {
+              name: { source: 'literal', value: 'green' },
+              brightness: { source: 'literal', value: 'high' },
+              blendMode: { source: 'literal', value: 'replace' }
+            },
+            timing: {
+              waitForCondition: 'none',
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 0 },
+              waitUntilCondition: 'none',
+              waitUntilTime: { source: 'literal', value: 0 }
+            }
+          }
+        ],
+        logic: [],
+        eventRaisers: [],
+        eventListeners: [],
+        effectListeners: [
+          {
+            id: 'listener-1',
+            type: 'effect-listener',
+            label: 'Entry',
+            outputs: ['action-1']
+          }
+        ]
+      },
+      connections: [{ from: 'listener-1', to: 'action-1' }],
+      layout: { nodePositions: {} }
+    };
+
+    const selectedLights = harness.lightManager.getLights(['front'], ['all']).slice(0, 2);
+    const selectedIds = new Set(selectedLights.map((light) => light.id));
+
+    const compiledEffect = EffectCompiler.compile(effect);
+    const engine = new EffectExecutionEngine(
+      compiledEffect,
+      harness.sequencer,
+      harness.lightManager,
+      { targetLights: selectedLights },
+      createCueData()
+    );
+
+    engine.triggerEffect(createCueData());
+    harness.advanceBy(1);
+
+    const green = getColor('green', 'high');
+    for (const lightId of harness.frontLightIds) {
+      const state = harness.getLightState(lightId);
+      if (selectedIds.has(lightId)) {
+        expect(state).toMatchObject({
+          red: green.red,
+          green: green.green,
+          blue: green.blue,
+          blendMode: green.blendMode
+        });
+      } else {
+        expect(state?.intensity ?? 0).toBe(0);
+      }
+    }
+  });
+
+  it('uses color, brightness, and blend parameters', () => {
+    const effect: YargEffectDefinition = {
+      id: 'color-blend-param',
+      mode: 'yarg',
+      name: 'Color Blend Param',
+      description: '',
+      variables: [
+        { name: 'colorName', type: 'string', scope: 'cue', initialValue: 'red', isParameter: true },
+        { name: 'brightness', type: 'string', scope: 'cue', initialValue: 'high', isParameter: true },
+        { name: 'blendMode', type: 'string', scope: 'cue', initialValue: 'replace', isParameter: true }
+      ],
+      nodes: {
+        events: [],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' }
+            },
+            color: {
+              name: { source: 'variable', name: 'colorName', fallback: 'red' },
+              brightness: { source: 'variable', name: 'brightness', fallback: 'high' },
+              blendMode: { source: 'variable', name: 'blendMode', fallback: 'replace' }
+            },
+            timing: {
+              waitForCondition: 'none',
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 0 },
+              waitUntilCondition: 'none',
+              waitUntilTime: { source: 'literal', value: 0 }
+            }
+          }
+        ],
+        logic: [],
+        eventRaisers: [],
+        eventListeners: [],
+        effectListeners: [
+          {
+            id: 'listener-1',
+            type: 'effect-listener',
+            label: 'Entry',
+            outputs: ['action-1']
+          }
+        ]
+      },
+      connections: [{ from: 'listener-1', to: 'action-1' }],
+      layout: { nodePositions: {} }
+    };
+
+    const compiledEffect = EffectCompiler.compile(effect);
+    const engine = new EffectExecutionEngine(
+      compiledEffect,
+      harness.sequencer,
+      harness.lightManager,
+      { colorName: 'red', brightness: 'max', blendMode: 'add' },
+      createCueData()
+    );
+
+    engine.triggerEffect(createCueData());
+    harness.advanceBy(1);
+
+    const expected = getColor('red', 'max', 'add');
+    const state = harness.getLightState(harness.frontLightIds[0]);
+    expect(state).toMatchObject({
+      red: expected.red,
+      green: expected.green,
+      blue: expected.blue,
+      blendMode: expected.blendMode
+    });
+  });
+
+  it('applies primary color when secondary color is provided', () => {
+    const effect: YargEffectDefinition = {
+      id: 'secondary-color-effect',
+      mode: 'yarg',
+      name: 'Secondary Color Effect',
+      description: '',
+      nodes: {
+        events: [],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' }
+            },
+            color: {
+              name: { source: 'literal', value: 'red' },
+              brightness: { source: 'literal', value: 'high' },
+              blendMode: { source: 'literal', value: 'replace' }
+            },
+            secondaryColor: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'high' },
+              blendMode: { source: 'literal', value: 'replace' }
+            },
+            timing: {
+              waitForCondition: 'none',
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 0 },
+              waitUntilCondition: 'none',
+              waitUntilTime: { source: 'literal', value: 0 }
+            }
+          }
+        ],
+        logic: [],
+        eventRaisers: [],
+        eventListeners: [],
+        effectListeners: [
+          {
+            id: 'listener-1',
+            type: 'effect-listener',
+            label: 'Entry',
+            outputs: ['action-1']
+          }
+        ]
+      },
+      connections: [{ from: 'listener-1', to: 'action-1' }],
+      layout: { nodePositions: {} }
+    };
+
+    const compiledEffect = EffectCompiler.compile(effect);
+    const engine = new EffectExecutionEngine(
+      compiledEffect,
+      harness.sequencer,
+      harness.lightManager,
+      {},
+      createCueData()
+    );
+
+    engine.triggerEffect(createCueData());
+    harness.advanceBy(1);
+
+    const expected = getColor('red', 'high');
+    const state = harness.getLightState(harness.frontLightIds[0]);
     expect(state).toMatchObject({
       red: expected.red,
       green: expected.green,
