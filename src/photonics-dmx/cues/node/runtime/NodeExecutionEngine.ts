@@ -32,6 +32,16 @@ import { EffectExecutionEngine } from './EffectExecutionEngine';
 import { resolveValue, resolveLocationGroups, resolveLightTarget, resolveColor, resolveBrightness, resolveBlendMode } from './valueResolver';
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator';
 
+type ChainStep = {
+  action: ActionNode;
+  lights: TrackedLight[];
+  lightIds: string;
+  resolvedLayer: number;
+  resolvedTiming: ResolvedActionTiming;
+  resolvedColor: ResolvedColorSetting;
+  resolvedSecondaryColor?: ResolvedColorSetting;
+};
+
 export class NodeExecutionEngine {
   /**
    * Global runtime toggle for node-cue debug logging.
@@ -536,16 +546,6 @@ export class NodeExecutionEngine {
         submitSingleAction();
         return;
       }
-
-      type ChainStep = {
-        action: ActionNode;
-        lights: TrackedLight[];
-        lightIds: string;
-        resolvedLayer: number;
-        resolvedTiming: ResolvedActionTiming;
-        resolvedColor: ResolvedColorSetting;
-        resolvedSecondaryColor?: ResolvedColorSetting;
-      };
 
       const resolveChainStep = (a: ActionNode): ChainStep | null => {
         if (a.effectType === 'blackout') {
