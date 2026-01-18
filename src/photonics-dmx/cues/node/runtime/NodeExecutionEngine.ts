@@ -440,9 +440,8 @@ export class NodeExecutionEngine {
 
       const actionChain = buildActionChain();
 
-      const { secondaryColor, ...actionRest } = actionNode as ActionNode & { secondaryColor?: unknown };
       const resolvedAction: any = {
-        ...actionRest,
+        ...actionNode,
         target: resolvedTarget,
         color: resolvedColor,
         timing: resolvedTiming,

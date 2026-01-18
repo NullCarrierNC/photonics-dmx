@@ -89,13 +89,12 @@ function migrateActionNode(action: any): ActionNode {
     };
   };
 
-  const { secondaryColor, ...rest } = action;
   return {
-    ...rest,
-    target: migrateTarget(rest.target),
-    color: migrateColorSetting(rest.color),
-    timing: migrateTiming(rest.timing),
-    layer: rest.layer !== undefined ? migrateValueSource(rest.layer, 0) : undefined
+    ...action,
+    target: migrateTarget(action.target),
+    color: migrateColorSetting(action.color),
+    timing: migrateTiming(action.timing),
+    layer: action.layer !== undefined ? migrateValueSource(action.layer, 0) : undefined
   };
 }
 
