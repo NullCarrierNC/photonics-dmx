@@ -40,12 +40,6 @@ const buildDefaultAction = (): ActionNode => ({
     blendMode: { source: 'literal', value: 'replace' },
     opacity: { source: 'literal', value: 1.0 }
   },
-  secondaryColor: {
-    name: { source: 'literal', value: 'green' },
-    brightness: { source: 'literal', value: 'medium' },
-    blendMode: { source: 'literal', value: 'replace' },
-    opacity: { source: 'literal', value: 1.0 }
-  },
   timing: createDefaultActionTiming(),
   layer: { source: 'literal', value: 0 }
 });

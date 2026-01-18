@@ -603,11 +603,6 @@ describe('Effect runtime with real Sequencer', () => {
               brightness: { source: 'literal', value: 'high' },
               blendMode: { source: 'literal', value: 'replace' }
             },
-            secondaryColor: {
-              name: { source: 'literal', value: 'blue' },
-              brightness: { source: 'literal', value: 'high' },
-              blendMode: { source: 'literal', value: 'replace' }
-            },
             timing: {
               waitForCondition: 'none',
               waitForTime: { source: 'literal', value: 0 },
@@ -667,7 +662,7 @@ describe('Effect runtime with real Sequencer', () => {
           {
             id: 'action-1',
             type: 'action',
-            effectType: 'set-color',
+            effectType: 'chase',
             target: {
               groups: { source: 'literal', value: 'front' },
               filter: { source: 'literal', value: 'all' }

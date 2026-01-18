@@ -44,7 +44,6 @@ interface BuildEffectParams {
   // Add resolved values for direct use
   resolvedTarget?: ResolvedActionTarget;
   resolvedColor?: ResolvedColorSetting;
-  resolvedSecondaryColor?: ResolvedColorSetting;
   resolvedTiming?: ResolvedActionTiming;
   resolvedLayer?: number;
 }
@@ -316,27 +315,29 @@ export class ActionEffectFactory {
 
     switch (action.effectType) {
       case 'set-color': {
+        effect = createSingleColorEffect({
+          lights,
+          layer,
+          waitFor,
+          color: baseColor,
+          timing: timing,
+          easing
+        });
+        break;
+      }
+      case 'chase': {
         const perLightOffsetMs = action.config?.perLightOffsetMs;
-        if (typeof perLightOffsetMs === 'number' && perLightOffsetMs > 0) {
-          effect = createChaseEffect({
-            lights,
-            layer,
-            timing,
-            easing,
-            color: baseColor,
-            perLightOffsetMs,
-            order: action.config?.order ?? 'linear'
-          });
-        } else {
-          effect = createSingleColorEffect({
-            lights,
-            layer,
-            waitFor,
-            color: baseColor,
-            timing: timing,
-            easing
-          });
-        }
+        const order = action.config?.order ?? 'linear';
+        const offset = typeof perLightOffsetMs === 'number' && perLightOffsetMs > 0 ? perLightOffsetMs : 50;
+        effect = createChaseEffect({
+          lights,
+          layer,
+          timing,
+          easing,
+          color: baseColor,
+          perLightOffsetMs: offset,
+          order
+        });
         break;
       }
       case 'blackout': {

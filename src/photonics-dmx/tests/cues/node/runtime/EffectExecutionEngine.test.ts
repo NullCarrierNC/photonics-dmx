@@ -79,11 +79,6 @@ describe('EffectExecutionEngine', () => {
                 brightness: { source: 'literal', value: 'medium' }, 
                 blendMode: { source: 'literal', value: 'replace' } 
               },
-              secondaryColor: { 
-                name: { source: 'literal', value: 'white' }, 
-                brightness: { source: 'literal', value: 'medium' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
-              },
               timing: { 
                 waitForCondition: 'none',
                 waitForTime: { source: 'literal', value: 0 },
@@ -220,11 +215,6 @@ describe('EffectExecutionEngine', () => {
                 brightness: { source: 'literal', value: 'medium' }, 
                 blendMode: { source: 'literal', value: 'replace' } 
               },
-              secondaryColor: { 
-                name: { source: 'literal', value: 'white' }, 
-                brightness: { source: 'literal', value: 'medium' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
-              },
               timing: { 
                 waitForCondition: 'none',
                 waitForTime: { source: 'literal', value: 0 },
@@ -317,11 +307,6 @@ describe('EffectExecutionEngine', () => {
                 brightness: { source: 'literal', value: 'high' }, 
                 blendMode: { source: 'literal', value: 'replace' } 
               },
-              secondaryColor: { 
-                name: { source: 'literal', value: 'red' }, 
-                brightness: { source: 'literal', value: 'high' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
-              },
               timing: { 
                 waitForCondition: 'none',
                 waitForTime: { source: 'literal', value: 0 },
@@ -406,11 +391,6 @@ describe('EffectExecutionEngine', () => {
                 filter: { source: 'literal', value: 'all' } 
               },
               color: { 
-                name: { source: 'literal', value: 'white' }, 
-                brightness: { source: 'literal', value: 'medium' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
-              },
-              secondaryColor: { 
                 name: { source: 'literal', value: 'white' }, 
                 brightness: { source: 'literal', value: 'medium' }, 
                 blendMode: { source: 'literal', value: 'replace' } 

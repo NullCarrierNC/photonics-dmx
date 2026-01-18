@@ -935,11 +935,6 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'medium' }, 
           blendMode: { source: 'literal', value: 'replace' } 
         },
-        secondaryColor: { 
-          name: { source: 'literal', value: 'white' }, 
-          brightness: { source: 'literal', value: 'medium' }, 
-          blendMode: { source: 'literal', value: 'replace' } 
-        },
         timing: { 
           waitForCondition: 'none',
           waitForTime: { source: 'literal', value: 0 },

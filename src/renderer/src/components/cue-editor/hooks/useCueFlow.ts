@@ -205,6 +205,9 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
 
   const addActionNode = useCallback((effectType: NodeEffectType, position?: { x: number; y: number }) => {
     const action = { ...buildDefaultAction(), id: `action-${createId()}`, effectType };
+    if (effectType === 'chase') {
+      action.config = { ...action.config, perLightOffsetMs: 50, order: 'linear' };
+    }
     // Center the node on the cursor position if provided
     const nodeWidth = 150;
     const nodeHeight = 80;
@@ -631,7 +634,6 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
         } else if (sourceNode.data.kind === 'action') {
           const sourceAction = sourceNode.data.payload as ActionNode;
           targetAction.color = { ...sourceAction.color };
-          targetAction.secondaryColor = sourceAction.secondaryColor ? { ...sourceAction.secondaryColor } : undefined;
           targetAction.target = { ...sourceAction.target };
           targetAction.layer = sourceAction.layer;
         }

@@ -39,7 +39,6 @@ type ChainStep = {
   resolvedLayer: number;
   resolvedTiming: ResolvedActionTiming;
   resolvedColor: ResolvedColorSetting;
-  resolvedSecondaryColor?: ResolvedColorSetting;
 };
 
 export class NodeExecutionEngine {
@@ -380,17 +379,7 @@ export class NodeExecutionEngine {
           ? Number(resolveValue('number', actionNode.color.opacity, context))
           : undefined
       };
-      
-      // Resolve secondary color if present
-      const resolvedSecondaryColor: ResolvedColorSetting | undefined = actionNode.secondaryColor ? {
-        name: resolveColor(actionNode.secondaryColor.name, context),
-        brightness: resolveBrightness(actionNode.secondaryColor.brightness, context),
-        blendMode: resolveBlendMode(actionNode.secondaryColor.blendMode, context),
-        opacity: actionNode.secondaryColor.opacity
-          ? Number(resolveValue('number', actionNode.secondaryColor.opacity, context))
-          : undefined
-      } : undefined;
-      
+
       // Resolve timing
       const resolvedTiming: ResolvedActionTiming = {
         ...actionNode.timing,
@@ -450,13 +439,12 @@ export class NodeExecutionEngine {
       };
 
       const actionChain = buildActionChain();
-      
-      // Create resolved action node for effect building (keep config as-is, not used by factory)
+
+      const { secondaryColor, ...actionRest } = actionNode as ActionNode & { secondaryColor?: unknown };
       const resolvedAction: any = {
-        ...actionNode,
+        ...actionRest,
         target: resolvedTarget,
         color: resolvedColor,
-        secondaryColor: resolvedSecondaryColor,
         timing: resolvedTiming,
         layer: resolvedLayer
       };
@@ -501,7 +489,6 @@ export class NodeExecutionEngine {
           waitTime: 0,
           resolvedTarget,
           resolvedColor,
-          resolvedSecondaryColor,
           resolvedTiming,
           resolvedLayer
         });
@@ -522,8 +509,7 @@ export class NodeExecutionEngine {
           effectName,
           layer: resolvedLayer,
           timing: resolvedTiming,
-          color: resolvedColor,
-          secondaryColor: resolvedSecondaryColor
+          color: resolvedColor
         });
 
         // Submit effect to sequencer with completion callback
@@ -548,7 +534,7 @@ export class NodeExecutionEngine {
       }
 
       const resolveChainStep = (a: ActionNode): ChainStep | null => {
-        if (a.effectType === 'blackout') {
+        if (a.effectType === 'blackout' || a.effectType === 'chase') {
           return null;
         }
 
@@ -560,13 +546,6 @@ export class NodeExecutionEngine {
           blendMode: resolveBlendMode(a.color.blendMode, context),
           opacity: a.color.opacity ? Number(resolveValue('number', a.color.opacity, context)) : undefined
         };
-
-        const rsc: ResolvedColorSetting | undefined = a.secondaryColor ? {
-          name: resolveColor(a.secondaryColor.name, context),
-          brightness: resolveBrightness(a.secondaryColor.brightness, context),
-          blendMode: resolveBlendMode(a.secondaryColor.blendMode, context),
-          opacity: a.secondaryColor.opacity ? Number(resolveValue('number', a.secondaryColor.opacity, context)) : undefined
-        } : undefined;
 
         const rtiming: ResolvedActionTiming = {
           ...a.timing,
@@ -605,8 +584,7 @@ export class NodeExecutionEngine {
           lightIds,
           resolvedLayer: layerNum,
           resolvedTiming: rtiming,
-          resolvedColor: rc,
-          resolvedSecondaryColor: rsc
+          resolvedColor: rc
         };
       };
 

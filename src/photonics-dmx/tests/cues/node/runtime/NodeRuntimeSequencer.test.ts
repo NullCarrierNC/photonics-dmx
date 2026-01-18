@@ -2327,7 +2327,7 @@ describe('Node runtime with real Sequencer', () => {
     const actionNode: ActionNode = {
       id: 'action-1',
       type: 'action',
-      effectType: 'set-color',
+      effectType: 'chase',
       target: {
         groups: { source: 'literal', value: 'front' },
         filter: { source: 'literal', value: 'all' }
@@ -2427,7 +2427,7 @@ describe('Node runtime with real Sequencer', () => {
     const actionNode: ActionNode = {
       id: 'action-1',
       type: 'action',
-      effectType: 'set-color',
+      effectType: 'chase',
       target: {
         groups: { source: 'literal', value: 'front' },
         filter: { source: 'literal', value: 'all' }

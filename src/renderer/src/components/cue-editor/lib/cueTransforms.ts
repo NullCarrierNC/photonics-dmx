@@ -46,16 +46,19 @@ const cueToFlow = (
         payload: event
       }
     })),
-    ...cue.nodes.actions.map(action => ({
-      id: action.id,
-      type: 'action' as const,
-      position: nodePositions[action.id] ?? { x: 400, y: 100 },
-      data: {
-        kind: 'action' as const,
-        label: `${action.effectType}`,
-        payload: action
-      }
-    })),
+    ...cue.nodes.actions.map(action => {
+      const { secondaryColor, ...a } = action as typeof action & { secondaryColor?: unknown };
+      return {
+        id: a.id,
+        type: 'action' as const,
+        position: nodePositions[a.id] ?? { x: 400, y: 100 },
+        data: {
+          kind: 'action' as const,
+          label: `${a.effectType}`,
+          payload: a
+        }
+      };
+    }),
     ...(cue.nodes.logic ?? []).map((logic: LogicNode) => ({
       id: logic.id,
       type: 'logic' as const,
@@ -182,7 +185,10 @@ const updateDocumentFromFlow = (
     ...currentCueDefinition,
     nodes: {
       events: eventNodes.map(node => node.data.payload) as (YargEventNode[] | AudioEventNode[]),
-      actions: actionNodes.map(node => node.data.payload),
+      actions: actionNodes.map(node => {
+        const { secondaryColor, ...a } = node.data.payload as typeof node.data.payload & { secondaryColor?: unknown };
+        return a;
+      }),
       logic: logicNodes.map(node => node.data.payload as LogicNode),
       eventRaisers: eventRaiserNodes.map(node => node.data.payload as EventRaiserNode),
       eventListeners: eventListenerNodes.map(node => node.data.payload as EventListenerNode),
@@ -235,16 +241,19 @@ const effectToFlow = (effect: EffectDefinition | null): { nodes: EditorNode[]; e
         payload: event
       }
     })),
-    ...effect.nodes.actions.map(action => ({
-      id: action.id,
-      type: 'action' as const,
-      position: nodePositions[action.id] ?? { x: 400, y: 100 },
-      data: {
-        kind: 'action' as const,
-        label: `${action.effectType}`,
-        payload: action
-      }
-    })),
+    ...effect.nodes.actions.map(action => {
+      const { secondaryColor, ...a } = action as typeof action & { secondaryColor?: unknown };
+      return {
+        id: a.id,
+        type: 'action' as const,
+        position: nodePositions[a.id] ?? { x: 400, y: 100 },
+        data: {
+          kind: 'action' as const,
+          label: `${a.effectType}`,
+          payload: a
+        }
+      };
+    }),
     ...(effect.nodes.logic ?? []).map((logic: LogicNode) => ({
       id: logic.id,
       type: 'logic' as const,
@@ -360,7 +369,10 @@ const updateEffectDocumentFromFlow = (
     ...currentEffectDefinition,
     nodes: {
       events: eventNodes.map(node => node.data.payload) as (YargEventNode[] | AudioEventNode[]),
-      actions: actionNodes.map(node => node.data.payload),
+      actions: actionNodes.map(node => {
+        const { secondaryColor, ...a } = node.data.payload as typeof node.data.payload & { secondaryColor?: unknown };
+        return a;
+      }),
       logic: logicNodes.map(node => node.data.payload as LogicNode),
       eventRaisers: eventRaiserNodes.map(node => node.data.payload as EventRaiserNode),
       eventListeners: eventListenerNodes.map(node => node.data.payload as EventListenerNode),

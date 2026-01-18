@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ActionNode, NodeEffectType, NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { ActionNode, NodeChaseOrder, NodeEffectType, NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { NODE_EFFECT_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { WaitCondition } from '../../../../../../photonics-dmx/types';
 import {
@@ -48,7 +48,14 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.effectType}
-          onChange={event => updateNode({ effectType: event.target.value as NodeEffectType })}
+          onChange={event => {
+            const v = event.target.value as NodeEffectType;
+            if (v === 'chase') {
+              updateNode({ effectType: 'chase', config: { ...node.config, perLightOffsetMs: node.config?.perLightOffsetMs ?? 50, order: node.config?.order ?? 'linear' } });
+            } else {
+              updateNode({ effectType: v });
+            }
+          }}
         >
           {NODE_EFFECT_TYPES.map(effect => (
             <option key={effect} value={effect}>{effect}</option>
@@ -83,7 +90,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           />
         </>
       )}
-      {node.effectType === 'set-color' && (
+      {(node.effectType === 'set-color' || node.effectType === 'chase') && (
         <>
           <ValueSourceEditor
             label="Color"
@@ -136,6 +143,32 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
             expected="number"
             availableVariables={availableVariables}
           />
+        </>
+      )}
+      {node.effectType === 'chase' && (
+        <>
+          <label className="flex flex-col font-medium">
+            Per-light offset (ms)
+            <input
+              type="number"
+              min={0}
+              step={10}
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={node.config?.perLightOffsetMs ?? 50}
+              onChange={e => updateNode({ config: { ...node.config, perLightOffsetMs: Number(e.target.value) || 0 } })}
+            />
+          </label>
+          <label className="flex flex-col font-medium">
+            Order
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={node.config?.order ?? 'linear'}
+              onChange={e => updateNode({ config: { ...node.config, order: e.target.value as NodeChaseOrder } })}
+            >
+              <option value="linear">Linear</option>
+              <option value="inverse-linear">Inverse linear</option>
+            </select>
+          </label>
         </>
       )}
       {node.effectType !== 'blackout' && (

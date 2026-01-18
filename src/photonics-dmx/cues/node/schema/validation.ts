@@ -554,7 +554,6 @@ const actionSchema: JSONSchemaType<ActionNode> = {
     effectType: { type: 'string', enum: NODE_EFFECT_TYPES },
     target: targetSchema,
     color: colorSchema,
-    secondaryColor: { ...colorSchema, nullable: true },
     timing: timingSchema,
     layer: { ...valueSourceSchema, nullable: true },
     label: { type: 'string', nullable: true },

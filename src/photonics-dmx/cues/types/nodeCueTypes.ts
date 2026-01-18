@@ -313,7 +313,7 @@ export interface AudioEventNode extends BaseEventNode {
 }
 
 
-export const NODE_EFFECT_TYPES = ['set-color', 'blackout'] as const;
+export const NODE_EFFECT_TYPES = ['set-color', 'blackout', 'chase'] as const;
 
 export type NodeEffectType = typeof NODE_EFFECT_TYPES[number];
 
@@ -366,7 +366,6 @@ export interface ActionNode {
   effectType: NodeEffectType;
   target: NodeActionTarget;
   color: NodeColorSetting;
-  secondaryColor?: NodeColorSetting;
   timing: ActionTimingConfig;
   layer?: ValueSource;
   label?: string;
