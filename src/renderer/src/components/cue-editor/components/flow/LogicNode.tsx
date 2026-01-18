@@ -1,6 +1,7 @@
 import React from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import type { EditorNodeData } from '../../lib/types';
+import { FONT_COURIER_NEW } from '../../lib/styles';
 import type { LogicNode, ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 
 const formatValueSource = (value?: ValueSource): string => {
@@ -18,45 +19,47 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
   const logicType = (logic as any)?.logicType as string | undefined;
   if (!logicType) return null;
 
+  const Mono = ({ children }: { children: React.ReactNode }) => <span style={FONT_COURIER_NEW}>{children}</span>;
+
   const renderDetails = (): React.ReactNode => {
     if (logicType === 'variable') {
       const valueText = formatValueSource(logic.value);
-      const base = `${(logic.mode as string).toUpperCase()} ${logic.varName}`;
-      return valueText ? `${base} = ${valueText}` : base;
+      const mode = (logic.mode as string).toUpperCase();
+      return valueText ? <>{mode} <Mono>{logic.varName}</Mono> = <Mono>{valueText}</Mono></> : <>{mode} <Mono>{logic.varName}</Mono></>;
     }
     if (logicType === 'math') {
       const left = formatValueSource(logic.left);
       const right = formatValueSource(logic.right);
-      const operatorSymbol = logic.operator === 'add' ? '+' : 
-                            logic.operator === 'subtract' ? '-' : 
-                            logic.operator === 'multiply' ? '*' : 
-                            logic.operator === 'divide' ? '/' : 
+      const operatorSymbol = logic.operator === 'add' ? '+' :
+                            logic.operator === 'subtract' ? '-' :
+                            logic.operator === 'multiply' ? '*' :
+                            logic.operator === 'divide' ? '/' :
                             logic.operator === 'modulus' ? '%' : logic.operator;
       return (
         <>
-          <div>{logic.operator.toUpperCase()}: {left} {operatorSymbol} {right}</div>
-          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
+          <div>{logic.operator.toUpperCase()}: <Mono>{left}</Mono> {operatorSymbol} <Mono>{right}</Mono></div>
+          {logic.assignTo && <div>To Var: <Mono>{logic.assignTo}</Mono></div>}
         </>
       );
     }
     if (logicType === 'conditional') {
       const left = formatValueSource(logic.left);
       const right = formatValueSource(logic.right);
-      return `IF ${left} ${logic.comparator} ${right}`;
+      return <>IF <Mono>{left}</Mono> {logic.comparator} <Mono>{right}</Mono></>;
     }
     if (logicType === 'cue-data') {
       return (
         <>
-          <div>{logic.dataProperty}</div>
-          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
+          <div><Mono>{logic.dataProperty}</Mono></div>
+          {logic.assignTo && <div>To Var: <Mono>{logic.assignTo}</Mono></div>}
         </>
       );
     }
     if (logicType === 'config-data') {
       return (
         <>
-          <div>Assign: {logic.dataProperty}</div>
-          {logic.assignTo && <div>To Var Var: {logic.assignTo}</div>}
+          <div>Assign: <Mono>{logic.dataProperty}</Mono></div>
+          {logic.assignTo && <div>To Var: <Mono>{logic.assignTo}</Mono></div>}
         </>
       );
     }
@@ -64,8 +67,8 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
       const indexText = formatValueSource(logic.index);
       return (
         <>
-          <div>{logic.sourceVariable}[{indexText}]</div>
-          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
+          <div><Mono>{logic.sourceVariable || '?'}</Mono>[<Mono>{indexText}</Mono>]</div>
+          {logic.assignTo && <div>To Var: <Mono>{logic.assignTo}</Mono></div>}
         </>
       );
     }
@@ -74,26 +77,26 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
       const end = formatValueSource(logic.end);
       const step = formatValueSource(logic.step);
       const varName = logic.counterVariable || 'i';
-      return `FOR ${varName} = ${start} to ${end}, step ${step}`;
+      return <>FOR <Mono>{varName}</Mono> = <Mono>{start}</Mono> to <Mono>{end}</Mono>, step <Mono>{step}</Mono></>;
     }
     if (logicType === 'while-loop') {
       const left = formatValueSource(logic.left);
       const right = formatValueSource(logic.right);
-      return `WHILE ${left} ${logic.comparator} ${right}`;
+      return <>WHILE <Mono>{left}</Mono> {logic.comparator} <Mono>{right}</Mono></>;
     }
     if (logicType === 'array-length') {
       return (
         <>
-          <div>LENGTH OF {logic.sourceVariable || '?'}</div>
-          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
+          <div>LENGTH OF <Mono>{logic.sourceVariable || '?'}</Mono></div>
+          {logic.assignTo && <div>To Var: <Mono>{logic.assignTo}</Mono></div>}
         </>
       );
     }
     if (logicType === 'reverse-lights') {
       return (
         <>
-          <div>REVERSE {logic.sourceVariable || '?'}</div>
-          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
+          <div>REVERSE <Mono>{logic.sourceVariable || '?'}</Mono></div>
+          {logic.assignTo && <div>To Var: <Mono>{logic.assignTo}</Mono></div>}
         </>
       );
     }
@@ -101,8 +104,8 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
       return (
         <>
           <div>{(logic.pairType || 'opposite').toUpperCase()} PAIRS</div>
-          <div>FROM: {logic.sourceVariable || '?'}</div>
-          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
+          <div>FROM: <Mono>{logic.sourceVariable || '?'}</Mono></div>
+          {logic.assignTo && <div>To Var: <Mono>{logic.assignTo}</Mono></div>}
         </>
       );
     }
@@ -110,15 +113,15 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
       const vars = logic.sourceVariables || [];
       return (
         <>
-          <div>CONCAT {vars.length} ARRAYS</div>
-          {vars.length > 0 && <div>{vars.join(' + ')}</div>}
-          {logic.assignTo && <div>To Var: {logic.assignTo}</div>}
+          <div>CONCAT <Mono>{vars.length}</Mono> ARRAYS</div>
+          {vars.length > 0 && <div><Mono>{vars.join(' + ')}</Mono></div>}
+          {logic.assignTo && <div>To Var: <Mono>{logic.assignTo}</Mono></div>}
         </>
       );
     }
     if (logicType === 'delay') {
       const delayTime = formatValueSource(logic.delayTime);
-      return `${delayTime}ms`;
+      return <><Mono>{delayTime}</Mono>ms</>;
     }
     return logicType;
   };

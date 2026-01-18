@@ -1,6 +1,7 @@
 import React from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import type { EditorNodeData } from '../../lib/types';
+import { FONT_COURIER_NEW } from '../../lib/styles';
 
 const EventRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => {
   if (data.kind !== 'event-raiser') return null;
@@ -13,7 +14,7 @@ const EventRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }
       <Handle type="target" position={Position.Top} />
       <div className="flex items-center gap-1 font-semibold text-purple-800 dark:text-purple-100">
         <span role="img" aria-label="raise event">📢</span>
-        <span>{raiserPayload.eventName ? `Raise · ${eventName}` : 'Raise Event'}</span>
+        <span>{raiserPayload.eventName ? <>Raise · <span style={FONT_COURIER_NEW}>{eventName}</span></> : 'Raise Event'}</span>
       </div>
       <Handle type="source" position={Position.Bottom} />
     </div>

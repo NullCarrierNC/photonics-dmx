@@ -1,6 +1,7 @@
 import React from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import type { EditorNodeData } from '../../lib/types';
+import { FONT_COURIER_NEW } from '../../lib/styles';
 import type { EffectRaiserNode, ValueSource, VariableDefinition } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
 
 const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => {
@@ -56,7 +57,7 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected 
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1 font-semibold text-cyan-800 dark:text-cyan-100">
           <span role="img" aria-label="raise effect">✨</span>
-          <span className="truncate">{raiserPayload.effectId ? `Effect · ${effectName}` : 'Raise Effect'}</span>
+          <span className="truncate">{raiserPayload.effectId ? <>Effect · <span style={FONT_COURIER_NEW}>{effectName}</span></> : 'Raise Effect'}</span>
         </div>
         {hasParams && (
           <div className="mt-1 pt-1 border-t border-cyan-300 dark:border-cyan-700 space-y-0.5">
@@ -69,12 +70,12 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected 
               return (
                 <div key={paramName} className="text-[10px] text-cyan-600 dark:text-cyan-400">
                   <div className="truncate">
-                    <span className={`font-medium ${isSet ? '' : 'opacity-60'}`}>{paramName}</span>
+                    <span className={`font-medium ${isSet ? '' : 'opacity-60'}`} style={FONT_COURIER_NEW}>{paramName}</span>
                     {definition && <span className="text-cyan-500 dark:text-cyan-500 opacity-70"> ({paramType})</span>}
                     {isSet && (
                       <>
                         <span className="text-cyan-700 dark:text-cyan-300">: </span>
-                        <span className="text-cyan-500 dark:text-cyan-500">{formatValueSource(value)}</span>
+                        <span className="text-cyan-500 dark:text-cyan-500" style={FONT_COURIER_NEW}>{formatValueSource(value)}</span>
                       </>
                     )}
                     {!isSet && <span className="text-cyan-500 dark:text-cyan-500 opacity-50 italic"> (not set)</span>}
