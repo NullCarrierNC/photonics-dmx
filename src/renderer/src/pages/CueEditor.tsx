@@ -348,7 +348,7 @@ const CueEditor: React.FC = () => {
   const dangerButton = 'px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-500';
 
   return (
-    <div className="p-4 space-y-4 text-sm h-full">
+    <div className="p-4 space-y-4 text-sm h-full flex flex-col">
       <div className="flex justify-between items-center gap-4">
         <div className="flex items-center gap-2">
           <label className="font-semibold text-base">Mode</label>
@@ -376,7 +376,7 @@ const CueEditor: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-4 h-[calc(100vh-220px)]" style={{ gridTemplateColumns: 'minmax(260px, 300px) minmax(50%, 2fr) minmax(260px, 400px)' }}>
+      <div className="grid gap-4 flex-1 min-h-0" style={{ gridTemplateColumns: 'minmax(260px, 300px) minmax(50%, 2fr) minmax(260px, 400px)' }}>
         <div className="flex flex-col gap-4 overflow-hidden">
           <CueFileSidebar
             mode={mode}

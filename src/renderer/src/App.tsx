@@ -17,13 +17,13 @@ import { IpcRendererEvent } from 'electron';
 import About from './pages/About';
 import Preferences from './pages/Preferences';
 import AudioSettings from './pages/AudioSettings';
-import CueEditor from './pages/CueEditor';
 import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
 import { AudioCaptureManager } from './services/AudioCaptureManager';
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { useToast } from './hooks/useToast';
+import { openCueEditorWindow } from './ipcApi';
 import ToastContainer from './components/Toast';
 
 /**
@@ -446,7 +446,20 @@ export const App = (): JSX.Element => {
       case Pages.CueSequencer:
       //  return <CueSequencer />;
       case Pages.CueEditor:
-        return <CueEditor />;
+        return (
+          <div className="p-6">
+            <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Cue Editor</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              The Cue Editor opens in a separate window.
+            </p>
+            <button
+              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-500"
+              onClick={() => openCueEditorWindow()}
+            >
+              Open Cue Editor
+            </button>
+          </div>
+        );
       case Pages.NetworkDebug:
         return <NetworkDebug />;
       case Pages.Preferences:

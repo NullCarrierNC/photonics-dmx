@@ -79,6 +79,12 @@ export interface AppPreferences {
     x?: number;
     y?: number;
   };
+  cueEditorWindowState?: {
+    width: number;
+    height: number;
+    x?: number;
+    y?: number;
+  };
 }
 
 /**
@@ -139,7 +145,11 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     openDmxExpanded: false
   },
   allowMultipleActiveRigs: false,
-  audioConfig: DEFAULT_AUDIO_CONFIG
+  audioConfig: DEFAULT_AUDIO_CONFIG,
+  cueEditorWindowState: {
+    width: 1200,
+    height: 900
+  }
 };
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {

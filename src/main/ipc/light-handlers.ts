@@ -4,6 +4,7 @@ import { SenderConfig } from '../../photonics-dmx/types';
 import { YargCueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { CueType, DrumNoteType, InstrumentNoteType, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
+import { sendToAllWindows } from '../utils/windowUtils';
 
 
 /**
@@ -348,11 +349,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         }
         
         // Send the simulated cue data to the frontend for visual indicators
-        const allWindows = BrowserWindow.getAllWindows();
-        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-        if (mainWindow) {
-          mainWindow.webContents.send('cue-handled', mockCueData);
-        }
+        sendToAllWindows('cue-handled', mockCueData);
       }
       
       controllerManager.getLightingController()?.onBeat();
@@ -422,11 +419,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         }
         
         // Send the simulated cue data to the frontend for visual indicators
-        const allWindows = BrowserWindow.getAllWindows();
-        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-        if (mainWindow) {
-          mainWindow.webContents.send('cue-handled', mockCueData);
-        }
+        sendToAllWindows('cue-handled', mockCueData);
       }
       
       controllerManager.getLightingController()?.onKeyframe();
@@ -496,10 +489,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         }
         
         // Send the simulated cue data to the frontend for visual indicators
-        const mainWindow = BrowserWindow.getAllWindows()[0];
-        if (mainWindow) {
-          mainWindow.webContents.send('cue-handled', mockCueData);
-        }
+        sendToAllWindows('cue-handled', mockCueData);
       }
       
       controllerManager.getLightingController()?.onMeasure();
@@ -603,11 +593,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         }
         
         // Send the simulated cue data to the frontend
-        const allWindows = BrowserWindow.getAllWindows();
-        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-        if (mainWindow) {
-          mainWindow.webContents.send('cue-handled', mockCueData);
-        }
+        sendToAllWindows('cue-handled', mockCueData);
         
         return { success: true };
       } else {

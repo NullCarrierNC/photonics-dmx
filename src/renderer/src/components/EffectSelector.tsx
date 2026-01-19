@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { EffectSelector } from 'src/photonics-dmx/types';
+import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 
 interface EffectsDropdownProps {
   groupId: string;
@@ -60,6 +61,18 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
   // Fetch effects when group changes
   useEffect(() => {
     fetchEffects();
+  }, [fetchEffects]);
+
+  useEffect(() => {
+    const handleNodeCuesChanged = () => {
+      fetchEffects();
+    };
+    addIpcListener('node-cues:changed', handleNodeCuesChanged);
+    addIpcListener('effects:changed', handleNodeCuesChanged);
+    return () => {
+      removeIpcListener('node-cues:changed', handleNodeCuesChanged);
+      removeIpcListener('effects:changed', handleNodeCuesChanged);
+    };
   }, [fetchEffects]);
 
   // Update selected effect when value prop changes

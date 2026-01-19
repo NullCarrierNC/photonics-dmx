@@ -36,7 +36,7 @@ export class Application {
     this.windowManager.createMainWindow();
     
     // Set up IPC handlers
-    setupIpcHandlers(ipcMain, this.controllerManager);
+    setupIpcHandlers(ipcMain, this.controllerManager, this.windowManager);
     
     // Set up application menu
     setupMenu();

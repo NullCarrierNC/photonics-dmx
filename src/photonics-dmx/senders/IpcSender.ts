@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { BaseSender, SenderError } from './BaseSender';
+import { sendToAllWindows } from '../../main/utils/windowUtils';
 
 /**
  * IPC Sender uses Electron IPC's to communicate 
@@ -44,14 +45,13 @@ export class IpcSender extends BaseSender {
       return;
     }
 
-    // Get the window when sending to ensure we have the current active window
-    const window = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
-    if(window){
-      // Send buffer with universe info to renderer
-      window.webContents.send("dmxValues", { universeBuffer, universe });
-    } else {
+    const windows = BrowserWindow.getAllWindows();
+    if (windows.length === 0) {
       console.error('IPC Sender: No browser window available when sending');
+      return;
     }
+
+    sendToAllWindows("dmxValues", { universeBuffer, universe });
   }
 
 
