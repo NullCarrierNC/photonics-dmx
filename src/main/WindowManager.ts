@@ -245,7 +245,7 @@ export class WindowManager {
       height: validatedBounds.height,
       x: validatedBounds.x,
       y: validatedBounds.y,
-      title: 'Photonics - Cue Editor',
+      title: 'Cue Editor - Photonics',
       show: false,
       autoHideMenuBar: false,
       webPreferences: {
