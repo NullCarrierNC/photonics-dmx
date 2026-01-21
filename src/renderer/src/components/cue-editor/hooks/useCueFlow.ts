@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { addEdge, useEdgesState, useNodesState, type Connection, type Edge, type ReactFlowInstance } from 'reactflow';
 import {
   createDefaultActionTiming,
@@ -28,7 +28,9 @@ import {
   type YargNodeCueDefinition,
   type YargEffectDefinition,
   type NotesNode,
-  type EffectDefinition
+  type EffectDefinition,
+  type VariableDefinition,
+  type ValueSource
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { createId, buildDefaultAction } from '../lib/cueDefaults';
 import { calculateChainDuration } from '../lib/cueUtils';
@@ -60,6 +62,82 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
     if (!selectedNode || selectedNode.data.kind !== 'action') return false;
     return edges.some(edge => edge.target === selectedNode.id && nodes.find(n => n.id === edge.source)?.data.kind === 'event');
   }, [edges, nodes, selectedNode]);
+
+  const areParameterDefinitionsEqual = (
+    left?: VariableDefinition[],
+    right?: VariableDefinition[]
+  ): boolean => {
+    if (left === right) return true;
+    if (!left || !right) return false;
+    if (left.length !== right.length) return false;
+    return left.every((leftDef, index) => {
+      const rightDef = right[index];
+      if (!rightDef) return false;
+      return (
+        leftDef.name === rightDef.name &&
+        leftDef.type === rightDef.type &&
+        leftDef.scope === rightDef.scope &&
+        leftDef.isParameter === rightDef.isParameter &&
+        leftDef.description === rightDef.description &&
+        leftDef.initialValue === rightDef.initialValue
+      );
+    });
+  };
+
+  const buildDefaultValueSource = (def: VariableDefinition): ValueSource => ({
+    source: 'literal',
+    value: def.initialValue
+  });
+
+  useEffect(() => {
+    if (!effectDefinitions || effectDefinitions.size === 0) return;
+
+    setNodes(prevNodes => {
+      let didChange = false;
+      const nextNodes = prevNodes.map(node => {
+        if (node.data.kind !== 'effect-raiser') return node;
+        const raiser = node.data.payload as import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode;
+        if (!raiser.effectId) return node;
+
+        const effectDef = effectDefinitions.get(raiser.effectId);
+        if (!effectDef) return node;
+
+        const parameterDefinitions = effectDef.variables?.filter(v => v.isParameter) ?? [];
+        const existingDefinitions = (node.data as any).parameterDefinitions as VariableDefinition[] | undefined;
+        const definitionsChanged = !areParameterDefinitionsEqual(existingDefinitions, parameterDefinitions);
+
+        const nextParameterValues: Record<string, ValueSource> = { ...(raiser.parameterValues ?? {}) };
+        let valuesChanged = false;
+        for (const paramDef of parameterDefinitions) {
+          if (nextParameterValues[paramDef.name] === undefined) {
+            nextParameterValues[paramDef.name] = buildDefaultValueSource(paramDef);
+            valuesChanged = true;
+          }
+        }
+
+        const nextEffectName = effectDef.name || (node.data as any).effectName || raiser.effectId || 'none';
+        const effectNameChanged = nextEffectName !== (node.data as any).effectName;
+
+        if (!definitionsChanged && !valuesChanged && !effectNameChanged) {
+          return node;
+        }
+
+        didChange = true;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            label: `Effect: ${nextEffectName}`,
+            payload: valuesChanged ? { ...raiser, parameterValues: nextParameterValues } : raiser,
+            effectName: nextEffectName,
+            parameterDefinitions
+          }
+        };
+      });
+
+      return didChange ? nextNodes : prevNodes;
+    });
+  }, [effectDefinitions, setNodes]);
 
   const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
     event.preventDefault();

@@ -80,12 +80,13 @@ export class EffectLoader extends EventEmitter {
   }
 
   public async readFile(filePath: string): Promise<EffectFile> {
-    const mode = this.getModeFromPath(filePath);
+    const resolvedPath = this.resolvePath(filePath);
+    const mode = this.getModeFromPath(resolvedPath);
     if (!mode) {
       throw new Error('Unsupported effect file path.');
     }
 
-    const data = await fs.readFile(filePath, 'utf-8');
+    const data = await fs.readFile(resolvedPath, 'utf-8');
     const parsed = JSON.parse(data);
     const validation = validateEffectFile(parsed);
 
@@ -111,8 +112,8 @@ export class EffectLoader extends EventEmitter {
     }
 
     const targetDir = mode === 'yarg' ? this.yargDir : this.audioDir;
-    const sanitizedName = filename.endsWith('.json') ? filename : `${filename}.json`;
-    const filePath = path.join(targetDir, sanitizedName);
+    const sanitizedName = this.sanitizeFilename(filename);
+    const filePath = this.resolveInDir(targetDir, sanitizedName);
 
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, JSON.stringify(content, null, 2), 'utf-8');
@@ -123,13 +124,14 @@ export class EffectLoader extends EventEmitter {
   }
 
   public async deleteFile(filePath: string): Promise<{ success: boolean }> {
-    const mode = this.getModeFromPath(filePath);
+    const resolvedPath = this.resolvePath(filePath);
+    const mode = this.getModeFromPath(resolvedPath);
     if (!mode) {
       throw new Error('Unsupported effect file path.');
     }
 
-    await fs.rm(filePath, { force: true });
-    this.removeSummary(filePath);
+    await fs.rm(resolvedPath, { force: true });
+    this.removeSummary(resolvedPath);
     this.emit('changed', this.getSummary());
     return { success: true };
   }
@@ -294,12 +296,42 @@ export class EffectLoader extends EventEmitter {
   }
 
   private getModeFromPath(filePath: string): EffectMode | null {
-    if (filePath.startsWith(this.yargDir)) {
+    if (this.isPathWithinDir(filePath, this.yargDir)) {
       return 'yarg';
     }
-    if (filePath.startsWith(this.audioDir)) {
+    if (this.isPathWithinDir(filePath, this.audioDir)) {
       return 'audio';
     }
     return null;
+  }
+
+  private sanitizeFilename(filename: string): string {
+    const baseName = path.basename(filename);
+    if (!baseName || baseName === '.' || baseName === '..') {
+      throw new Error('Invalid filename.');
+    }
+    if (baseName !== filename) {
+      throw new Error('Invalid filename. Subdirectories are not allowed.');
+    }
+    return baseName.endsWith('.json') ? baseName : `${baseName}.json`;
+  }
+
+  private resolvePath(targetPath: string): string {
+    return path.resolve(targetPath);
+  }
+
+  private resolveInDir(baseDir: string, filename: string): string {
+    const resolvedBase = this.resolvePath(baseDir);
+    const resolvedPath = this.resolvePath(path.join(resolvedBase, filename));
+    if (!this.isPathWithinDir(resolvedPath, resolvedBase)) {
+      throw new Error('Resolved path is outside of the allowed directory.');
+    }
+    return resolvedPath;
+  }
+
+  private isPathWithinDir(targetPath: string, baseDir: string): boolean {
+    const resolvedBase = this.resolvePath(baseDir);
+    const resolvedTarget = this.resolvePath(targetPath);
+    return resolvedTarget === resolvedBase || resolvedTarget.startsWith(`${resolvedBase}${path.sep}`);
   }
 }
