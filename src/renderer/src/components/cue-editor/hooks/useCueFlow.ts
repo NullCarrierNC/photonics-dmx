@@ -23,6 +23,7 @@ import {
   type ReverseLightsLogicNode,
   type CreatePairsLogicNode,
   type ConcatLightsLogicNode,
+  type DebuggerLogicNode,
   type DelayLogicNode,
   type YargEventNode,
   type YargNodeCueDefinition,
@@ -305,149 +306,148 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
     setIsDirty(true);
   }, [nodes.length, setIsDirty, setNodes]);
 
+  const logicNodeFactories: Record<LogicNode['logicType'], (id: string) => LogicNode> = {
+    variable: id => ({
+      id,
+      type: 'logic',
+      logicType: 'variable',
+      label: 'variable',
+      outputs: [],
+      mode: 'set',
+      varName: 'var1',
+      valueType: 'number',
+      value: { source: 'literal', value: 0 }
+    } satisfies VariableLogicNode),
+    math: id => ({
+      id,
+      type: 'logic',
+      logicType: 'math',
+      label: 'math',
+      outputs: [],
+      operator: 'add',
+      left: { source: 'literal', value: 0 },
+      right: { source: 'literal', value: 0 },
+      assignTo: 'result'
+    } satisfies MathLogicNode),
+    'cue-data': id => ({
+      id,
+      type: 'logic',
+      logicType: 'cue-data',
+      label: 'cue-data',
+      outputs: [],
+      dataProperty: 'execution-count',
+      assignTo: undefined
+    } satisfies CueDataLogicNode as LogicNode),
+    'config-data': id => ({
+      id,
+      type: 'logic',
+      logicType: 'config-data',
+      label: 'config-data',
+      outputs: [],
+      dataProperty: 'total-lights',
+      assignTo: undefined
+    } satisfies ConfigDataLogicNode as LogicNode),
+    'lights-from-index': id => ({
+      id,
+      type: 'logic',
+      logicType: 'lights-from-index',
+      label: 'lights-from-index',
+      outputs: [],
+      sourceVariable: '',
+      index: { source: 'literal', value: 0 },
+      assignTo: ''
+    } satisfies LightsFromIndexLogicNode as LogicNode),
+    'for-loop': id => ({
+      id,
+      type: 'logic',
+      logicType: 'for-loop',
+      label: 'for-loop',
+      outputs: [],
+      start: { source: 'literal', value: 0 },
+      end: { source: 'literal', value: 10 },
+      step: { source: 'literal', value: 1 },
+      counterVariable: ''
+    } satisfies ForLoopLogicNode as LogicNode),
+    'while-loop': id => ({
+      id,
+      type: 'logic',
+      logicType: 'while-loop',
+      label: 'while-loop',
+      outputs: [],
+      comparator: '<',
+      left: { source: 'literal', value: 0 },
+      right: { source: 'literal', value: 10 },
+      maxIterations: { source: 'literal', value: 1000 }
+    } satisfies WhileLoopLogicNode as LogicNode),
+    'array-length': id => ({
+      id,
+      type: 'logic',
+      logicType: 'array-length',
+      label: 'array-length',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: ''
+    } satisfies ArrayLengthLogicNode as LogicNode),
+    'reverse-lights': id => ({
+      id,
+      type: 'logic',
+      logicType: 'reverse-lights',
+      label: 'reverse-lights',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: ''
+    } satisfies ReverseLightsLogicNode as LogicNode),
+    'create-pairs': id => ({
+      id,
+      type: 'logic',
+      logicType: 'create-pairs',
+      label: 'create-pairs',
+      outputs: [],
+      pairType: 'opposite',
+      sourceVariable: '',
+      assignTo: ''
+    } satisfies CreatePairsLogicNode as LogicNode),
+    'concat-lights': id => ({
+      id,
+      type: 'logic',
+      logicType: 'concat-lights',
+      label: 'concat-lights',
+      outputs: [],
+      sourceVariables: [],
+      assignTo: ''
+    } satisfies ConcatLightsLogicNode as LogicNode),
+    delay: id => ({
+      id,
+      type: 'logic',
+      logicType: 'delay',
+      label: 'delay',
+      outputs: [],
+      delayTime: { source: 'literal', value: 1000 }
+    } satisfies DelayLogicNode as LogicNode),
+    debugger: id => ({
+      id,
+      type: 'logic',
+      logicType: 'debugger',
+      label: 'debugger',
+      outputs: [],
+      message: { source: 'literal', value: 'Debug message' },
+      variablesToLog: []
+    } satisfies DebuggerLogicNode as LogicNode),
+    conditional: id => ({
+      id,
+      type: 'logic',
+      logicType: 'conditional',
+      label: 'conditional',
+      outputs: [],
+      comparator: '>',
+      left: { source: 'literal', value: 0 },
+      right: { source: 'literal', value: 0 }
+    } satisfies ConditionalLogicNode)
+  };
+
   const addLogicNode = useCallback((logicType: LogicNode['logicType'], position?: { x: number; y: number }) => {
     const id = `logic-${createId()}`;
-
-    const payload: LogicNode =
-      logicType === 'variable'
-        ? ({
-            id,
-            type: 'logic',
-            logicType: 'variable',
-            label: 'variable',
-            outputs: [],
-            mode: 'set',
-            varName: 'var1',
-            valueType: 'number',
-            value: { source: 'literal', value: 0 }
-          } satisfies VariableLogicNode)
-        : logicType === 'math'
-          ? ({
-              id,
-              type: 'logic',
-              logicType: 'math',
-              label: 'math',
-              outputs: [],
-              operator: 'add',
-              left: { source: 'literal', value: 0 },
-              right: { source: 'literal', value: 0 },
-              assignTo: 'result'
-            } satisfies MathLogicNode)
-          : logicType === 'cue-data'
-            ? ({
-                id,
-                type: 'logic',
-                logicType: 'cue-data',
-                label: 'cue-data',
-                outputs: [],
-                dataProperty: 'execution-count',
-                assignTo: undefined
-              } satisfies CueDataLogicNode as LogicNode)
-            : logicType === 'config-data'
-              ? ({
-                  id,
-                  type: 'logic',
-                  logicType: 'config-data',
-                  label: 'config-data',
-                  outputs: [],
-                  dataProperty: 'total-lights',
-                  assignTo: undefined
-                } satisfies ConfigDataLogicNode as LogicNode)
-              : logicType === 'lights-from-index'
-                ? ({
-                    id,
-                    type: 'logic',
-                    logicType: 'lights-from-index',
-                    label: 'lights-from-index',
-                    outputs: [],
-                    sourceVariable: '',
-                    index: { source: 'literal', value: 0 },
-                    assignTo: ''
-                  } satisfies LightsFromIndexLogicNode as LogicNode)
-                : logicType === 'for-loop'
-                  ? ({
-                      id,
-                      type: 'logic',
-                      logicType: 'for-loop',
-                      label: 'for-loop',
-                      outputs: [],
-                      start: { source: 'literal', value: 0 },
-                      end: { source: 'literal', value: 10 },
-                      step: { source: 'literal', value: 1 },
-                      counterVariable: ''
-                    } satisfies ForLoopLogicNode as LogicNode)
-                  : logicType === 'while-loop'
-                    ? ({
-                        id,
-                        type: 'logic',
-                        logicType: 'while-loop',
-                        label: 'while-loop',
-                        outputs: [],
-                        comparator: '<',
-                        left: { source: 'literal', value: 0 },
-                        right: { source: 'literal', value: 10 },
-                        maxIterations: { source: 'literal', value: 1000 }
-                      } satisfies WhileLoopLogicNode as LogicNode)
-                    : logicType === 'array-length'
-                      ? ({
-                          id,
-                          type: 'logic',
-                          logicType: 'array-length',
-                          label: 'array-length',
-                          outputs: [],
-                          sourceVariable: '',
-                          assignTo: ''
-                        } satisfies ArrayLengthLogicNode as LogicNode)
-                      : logicType === 'reverse-lights'
-                        ? ({
-                            id,
-                            type: 'logic',
-                            logicType: 'reverse-lights',
-                            label: 'reverse-lights',
-                            outputs: [],
-                            sourceVariable: '',
-                            assignTo: ''
-                          } satisfies ReverseLightsLogicNode as LogicNode)
-                        : logicType === 'create-pairs'
-                          ? ({
-                              id,
-                              type: 'logic',
-                              logicType: 'create-pairs',
-                              label: 'create-pairs',
-                              outputs: [],
-                              pairType: 'opposite',
-                              sourceVariable: '',
-                              assignTo: ''
-                            } satisfies CreatePairsLogicNode as LogicNode)
-                          : logicType === 'concat-lights'
-                            ? ({
-                                id,
-                                type: 'logic',
-                                logicType: 'concat-lights',
-                                label: 'concat-lights',
-                                outputs: [],
-                                sourceVariables: [],
-                                assignTo: ''
-                              } satisfies ConcatLightsLogicNode as LogicNode)
-                            : logicType === 'delay'
-                              ? ({
-                                  id,
-                                  type: 'logic',
-                                  logicType: 'delay',
-                                  label: 'delay',
-                                  outputs: [],
-                                  delayTime: { source: 'literal', value: 1000 }
-                                } satisfies DelayLogicNode as LogicNode)
-                              : ({
-                                  id,
-                                  type: 'logic',
-                                  logicType: 'conditional',
-                                  label: 'conditional',
-                                  outputs: [],
-                                  comparator: '>',
-                                  left: { source: 'literal', value: 0 },
-                                  right: { source: 'literal', value: 0 }
-                                } satisfies ConditionalLogicNode);
+    const payload = logicNodeFactories[logicType](id);
 
     // Center the node on the cursor position if provided
     const nodeWidth = 150;

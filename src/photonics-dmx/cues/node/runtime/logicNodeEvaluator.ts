@@ -15,6 +15,7 @@ import { VariableValue } from './executionTypes';
 import { Connection } from '../../types/nodeCueTypes';
 import { resolveValue, inferType, getVariableStore } from './valueResolver';
 import { extractCueDataValue, extractConfigDataValue } from './dataExtractors';
+import { sendToAllWindows } from '../../../../main/utils/windowUtils';
 
 export interface LogicNodeEvaluatorContext {
   cueId: string;
@@ -511,6 +512,40 @@ export function evaluateLogicNode(
     case 'delay': {
       // Delay nodes are handled specially in the execution engine (they block).
       // This case just returns the next nodes - the actual delay happens in NodeExecutionEngine.
+      return edges.map(edge => edge.to);
+    }
+
+    case 'debugger': {
+      // Log the message
+      const message = String(resolveValue('string', logicNode.message, context));
+      console.log(`[DebuggerNode] ${message}`);
+
+      // Log checked variables with their current values
+      const variablesForLog = logicNode.variablesToLog.map(varName => {
+        const varStore = getVarStore(varName);
+        const variable = varStore.get(varName);
+        return {
+          name: varName,
+          value: variable ? variable.value : undefined
+        };
+      });
+
+      for (const varName of logicNode.variablesToLog) {
+        const varStore = getVarStore(varName);
+        const variable = varStore.get(varName);
+        if (variable) {
+          console.log(`[DebuggerNode] ${varName}:`, variable.value);
+        } else {
+          console.log(`[DebuggerNode] ${varName}: <undefined>`);
+        }
+      }
+
+      sendToAllWindows('node-cues:debug-log', {
+        message,
+        variables: variablesForLog,
+        timestamp: Date.now()
+      });
+
       return edges.map(edge => edge.to);
     }
   }

@@ -11,6 +11,7 @@ import type {
   ReverseLightsLogicNode,
   CreatePairsLogicNode,
   ConcatLightsLogicNode,
+  DebuggerLogicNode,
   DelayLogicNode,
   ConfigDataProperty,
   MathOperator,
@@ -728,6 +729,52 @@ const DelayLogicEditor: React.FC<{
   );
 };
 
+const DebuggerLogicEditor: React.FC<{
+  node: DebuggerLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const selectedVariables = node.variablesToLog ?? [];
+
+  const toggleVariable = (varName: string) => {
+    const next = selectedVariables.includes(varName)
+      ? selectedVariables.filter(name => name !== varName)
+      : [...selectedVariables, varName];
+    updateNode({ variablesToLog: next });
+  };
+
+  return (
+    <div className="space-y-2 text-xs">
+      <ValueSourceEditor
+        label="Message"
+        value={node.message}
+        onChange={next => updateNode({ message: next })}
+        expected="string"
+        availableVariables={availableVariables}
+      />
+      <div className="space-y-1">
+        <p className="font-medium">Variables to log</p>
+        {availableVariables.length === 0 && (
+          <p className="text-[10px] text-gray-500">No registered variables.</p>
+        )}
+        {availableVariables.map(variable => (
+          <label key={variable.name} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="rounded border-gray-300"
+              checked={selectedVariables.includes(variable.name)}
+              onChange={() => toggleVariable(variable.name)}
+            />
+            <span>
+              {variable.name} ({variable.type}, {variable.scope})
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
   node,
   activeMode,
@@ -859,6 +906,16 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <DelayLogicEditor
         node={node as DelayLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'debugger') {
+    return (
+      <DebuggerLogicEditor
+        node={node as DebuggerLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

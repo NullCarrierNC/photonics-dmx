@@ -516,6 +516,28 @@ const delayLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
+const debuggerLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'message', 'variablesToLog'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'debugger' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    message: valueSourceSchema,
+    variablesToLog: {
+      type: 'array',
+      items: { type: 'string' }
+    }
+  }
+} as any;
+
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
   oneOf: [
     variableLogicSchema, 
@@ -530,7 +552,8 @@ const logicNodeSchema: JSONSchemaType<LogicNode> = {
     reverseLightsLogicSchema,
     createPairsLogicSchema,
     concatLightsLogicSchema,
-    delayLogicSchema
+    delayLogicSchema,
+    debuggerLogicSchema
   ]
 } as any;
 

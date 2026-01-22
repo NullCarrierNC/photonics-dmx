@@ -166,9 +166,15 @@ export interface DelayLogicNode extends BaseLogicNode {
   delayTime: ValueSource;        // Delay time in milliseconds
 }
 
-export type LogicNode = 
-  | VariableLogicNode 
-  | MathLogicNode 
+export interface DebuggerLogicNode extends BaseLogicNode {
+  logicType: 'debugger';
+  message: ValueSource;          // Message to log
+  variablesToLog: string[];      // List of variable names to log with their values
+}
+
+export type LogicNode =
+  | VariableLogicNode
+  | MathLogicNode
   | ConditionalLogicNode
   | CueDataLogicNode
   | ConfigDataLogicNode
@@ -179,7 +185,8 @@ export type LogicNode =
   | ReverseLightsLogicNode
   | CreatePairsLogicNode
   | ConcatLightsLogicNode
-  | DelayLogicNode;
+  | DelayLogicNode
+  | DebuggerLogicNode;
 
 export interface EventRaiserNode {
   id: string;
