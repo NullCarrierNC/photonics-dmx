@@ -51,7 +51,7 @@ const EventNodesSection: React.FC<{
 }> = ({ activeMode, addEventNode, addEventListenerNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Event Listeners</h3>
-    <div className="grid grid-cols-3 gap-2 text-xs">
+    <div className="grid grid-cols-2 gap-2 text-xs">
       <button
         className="border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
         onClick={() => addEventNode(getDefaultEventOption(activeMode))}
@@ -91,7 +91,7 @@ const ActionNodesSection: React.FC<{
 }> = ({ addActionNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
-    <div className="grid grid-cols-2 gap-2 text-xs">
+    <div className="grid grid-cols-3 gap-2 text-xs">
       {NODE_EFFECT_TYPES.map(effect => (
         <button
           key={effect}
