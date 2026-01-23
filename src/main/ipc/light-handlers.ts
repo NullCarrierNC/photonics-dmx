@@ -15,25 +15,21 @@ import { sendToAllWindows } from '../utils/windowUtils';
 export function setupLightHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   // Send cue state updates to renderer
   const sendCueStateUpdate = (cueState: CueStateUpdate) => {
-    const allWindows = BrowserWindow.getAllWindows();
-    const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-    if (mainWindow) {
-      const registry = YargCueRegistry.getInstance();
-      const group = registry.getGroup(cueState.groupId);
-      const groupName = group ? group.name : null;
-      
-      const frontendCueState = {
-        cueType: cueState.cueType,
-        groupId: cueState.groupId,
-        groupName,
-        isFallback: cueState.isFallback,
-        cueStyle: cueState.cueStyle,
-        counter: cueState.counter,
-        limit: cueState.limit
-      };
-      
-      mainWindow.webContents.send('cue-state-update', frontendCueState);
-    }
+    const registry = YargCueRegistry.getInstance();
+    const group = registry.getGroup(cueState.groupId);
+    const groupName = group ? group.name : null;
+    
+    const frontendCueState = {
+      cueType: cueState.cueType,
+      groupId: cueState.groupId,
+      groupName,
+      isFallback: cueState.isFallback,
+      cueStyle: cueState.cueStyle,
+      counter: cueState.counter,
+      limit: cueState.limit
+    };
+    
+    sendToAllWindows('cue-state-update', frontendCueState);
   };
   
   // Set up the callback with the CueRegistry

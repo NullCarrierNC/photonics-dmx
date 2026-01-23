@@ -31,7 +31,7 @@ interface DebugPanelProps {
 }
 
 const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [entries, setEntries] = useState<DebugLogEntry[]>([]);
 
   const handleDebugLog = useCallback((_: unknown, payload: DebugLogEntry) => {

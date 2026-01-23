@@ -54,6 +54,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
           <div className="font-semibold text-xs">Parameter Values</div>
           {parameterVars.map(param => {
             const currentValue = node.parameterValues?.[param.name];
+            const integerOnly = param.type === 'number' && param.name === 'paramLayer';
             return (
               <div key={param.name} className="space-y-1">
                 <ValueSourceEditor
@@ -65,6 +66,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
                     updateNode({ parameterValues: updatedValues });
                   }}
                   expected={param.type as 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array'}
+                  integerOnly={integerOnly}
                   availableVariables={availableVariables}
                 />
                 {param.description && (
