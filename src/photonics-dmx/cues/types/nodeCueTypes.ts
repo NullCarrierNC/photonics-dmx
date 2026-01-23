@@ -35,7 +35,7 @@ export interface Connection {
   toPort?: string;
 }
 
-export type VariableType = 'number' | 'boolean' | 'string' | 'color' | 'light-array' | 'cue-type';
+export type VariableType = 'number' | 'boolean' | 'string' | 'color' | 'light-array' | 'cue-type' | 'event';
 
 export type ValueSource =
   | { source: 'literal'; value: number | boolean | string | TrackedLight[] }
@@ -225,12 +225,15 @@ export interface EffectRaiserNode {
   parameterValues?: Record<string, ValueSource>;  // Parameter name -> value
 }
 
+export type NotesStyle = 'notes' | 'info' | 'important';
+
 // Notes node - for documentation only, not part of execution
 export interface NotesNode {
   id: string;
   type: 'notes';
   label?: string;
   title?: string;  // Optional title for the note
+  style?: NotesStyle;
   note: string;  // Text content of the note
 }
 

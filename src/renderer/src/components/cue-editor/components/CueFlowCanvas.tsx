@@ -12,7 +12,7 @@ import ReactFlow, {
   type OnNodesChange,
   type ReactFlowInstance
 } from 'reactflow';
-import type { EditorNode } from '../lib/types';
+import type { EditorNode, NotesVariant } from '../lib/types';
 import { formatDuration } from '../lib/cueUtils';
 import { NODE_EFFECT_TYPES } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { getDefaultEventOption } from '../lib/options';
@@ -47,7 +47,7 @@ type Props = {
   addEventListenerNode?: (position?: { x: number; y: number }) => void;
   addEffectRaiserNode?: (position?: { x: number; y: number }) => void;
   addEffectListenerNode?: (position?: { x: number; y: number }) => void;
-  addNotesNode?: (position?: { x: number; y: number }) => void;
+  addNotesNode?: (variant: NotesVariant, position?: { x: number; y: number }) => void;
 };
 
 const CueFlowCanvas: React.FC<Props> = ({
@@ -277,10 +277,22 @@ const CueFlowCanvas: React.FC<Props> = ({
               Documentation
             </div>
             <button
+              className="block w-full text-left px-3 py-1 text-blue-800 dark:text-blue-100 bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/60"
+              onClick={() => handlePaneMenuClick(() => addNotesNode('info', { x: paneContextMenu.flowX, y: paneContextMenu.flowY }))}
+            >
+              Info
+            </button>
+            <button
               className="block w-full text-left px-3 py-1 text-yellow-900 dark:text-yellow-950 bg-yellow-400 dark:bg-yellow-500 hover:bg-yellow-500 dark:hover:bg-yellow-600 font-semibold"
-              onClick={() => handlePaneMenuClick(() => addNotesNode({ x: paneContextMenu.flowX, y: paneContextMenu.flowY }))}
+              onClick={() => handlePaneMenuClick(() => addNotesNode('notes', { x: paneContextMenu.flowX, y: paneContextMenu.flowY }))}
             >
               Notes
+            </button>
+            <button
+              className="block w-full text-left px-3 py-1 text-red-800 dark:text-red-100 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50"
+              onClick={() => handlePaneMenuClick(() => addNotesNode('important', { x: paneContextMenu.flowX, y: paneContextMenu.flowY }))}
+            >
+              Important
             </button>
           </>
         )}

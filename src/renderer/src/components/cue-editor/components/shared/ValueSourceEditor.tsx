@@ -7,7 +7,7 @@ interface ValueSourceEditorProps {
   label: string;
   value: ValueSource | undefined;
   onChange: (next: ValueSource) => void;
-  expected?: 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array' | 'either';
+  expected?: 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array' | 'event' | 'either';
   validLiterals?: string[];
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
   integerOnly?: boolean; // For number fields that should only accept integers
@@ -28,11 +28,11 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   
   const source = value ?? { 
     source: 'literal', 
-    value: expected === 'boolean' ? false : (expected === 'string' || expected === 'color' || expected === 'either') ? '' : 0 
+    value: expected === 'boolean' ? false : (expected === 'string' || expected === 'color' || expected === 'event' || expected === 'either') ? '' : 0 
   };
   const isLiteral = source.source === 'literal';
   const isBoolean = expected === 'boolean';
-  const isString = expected === 'string' || expected === 'color';
+  const isString = expected === 'string' || expected === 'color' || expected === 'event';
   const allowTextInput = isString || expected === 'either';
 
   if (isLightArray) {
@@ -75,8 +75,9 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     : availableVariables.filter(v => 
         v.type === expected || 
         (expected === 'color' && v.type === 'string') ||
-        (expected === 'string' && (v.type === 'color' || v.type === 'cue-type')) ||
-        (expected === 'cue-type' && (v.type === 'string' || v.type === 'cue-type'))
+        (expected === 'string' && (v.type === 'color' || v.type === 'cue-type' || v.type === 'event')) ||
+        (expected === 'cue-type' && (v.type === 'string' || v.type === 'cue-type')) ||
+        (expected === 'event' && v.type === 'event')
       );
 
   const handleToggleVar = (checked: boolean) => {

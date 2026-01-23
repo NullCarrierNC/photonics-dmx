@@ -15,7 +15,7 @@ import type {
   AudioEffectDefinition,
   NotesNode
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { EditorMode } from '../lib/types';
+import type { EditorMode, NotesVariant } from '../lib/types';
 import type { EditorNode, EventOption } from '../lib/types';
 import NodeCreationSections from './NodeCreationSections';
 import DebugPanel from './DebugPanel';
@@ -44,7 +44,7 @@ type Props = {
   addEventListenerNode?: () => void;
   addEffectRaiserNode?: () => void;
   addEffectListenerNode?: () => void;
-  addNotesNode?: () => void;
+  addNotesNode?: (variant: NotesVariant) => void;
   updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | EffectRaiserNode | EffectEventListenerNode | NotesNode>(updates: Partial<T>) => void;
 };
 

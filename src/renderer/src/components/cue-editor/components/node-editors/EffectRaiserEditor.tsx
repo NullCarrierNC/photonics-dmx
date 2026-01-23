@@ -65,7 +65,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
                     updatedValues[param.name] = newValue;
                     updateNode({ parameterValues: updatedValues });
                   }}
-                  expected={param.type as 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array'}
+                  expected={param.type as 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array' | 'event'}
                   integerOnly={integerOnly}
                   availableVariables={availableVariables}
                 />

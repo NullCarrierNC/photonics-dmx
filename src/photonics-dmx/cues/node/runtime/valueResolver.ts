@@ -26,7 +26,7 @@ export function resolveValue(
     if (expectedType === 'light-array') {
       return Array.isArray(source.value) ? (source.value as TrackedLight[]) : [];
     }
-    if (expectedType === 'string' || expectedType === 'cue-type' || expectedType === 'color') {
+    if (expectedType === 'string' || expectedType === 'cue-type' || expectedType === 'color' || expectedType === 'event') {
       return String(source.value);
     }
     if (expectedType === 'number') {
@@ -51,7 +51,7 @@ export function resolveValue(
     if (expectedType === 'light-array') {
       return existing.type === 'light-array' ? (existing.value as TrackedLight[]) : [];
     }
-    if (expectedType === 'string' || expectedType === 'cue-type' || expectedType === 'color') {
+    if (expectedType === 'string' || expectedType === 'cue-type' || expectedType === 'color' || expectedType === 'event') {
       return String(existing.value);
     }
     if (expectedType === 'number') {
@@ -68,7 +68,7 @@ export function resolveValue(
   if (expectedType === 'light-array') {
     return Array.isArray(source.fallback) ? (source.fallback as TrackedLight[]) : [];
   }
-  if (expectedType === 'string' || expectedType === 'cue-type' || expectedType === 'color') {
+  if (expectedType === 'string' || expectedType === 'cue-type' || expectedType === 'color' || expectedType === 'event') {
     return source.fallback !== undefined ? String(source.fallback) : '';
   }
   if (expectedType === 'number') {

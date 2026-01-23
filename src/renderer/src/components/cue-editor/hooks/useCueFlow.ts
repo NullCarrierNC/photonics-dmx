@@ -36,7 +36,7 @@ import {
 import { createId, buildDefaultAction } from '../lib/cueDefaults';
 import { calculateChainDuration } from '../lib/cueUtils';
 import { cueToFlow, effectToFlow } from '../lib/cueTransforms';
-import type { EditorNode, EditorNodeData, EventOption } from '../lib/types';
+import type { EditorNode, EditorNodeData, EventOption, NotesVariant } from '../lib/types';
 import { getDefaultEventOption } from '../lib/options';
 
 type UseCueFlowParams = {
@@ -589,13 +589,16 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
     setIsDirty(true);
   }, [findAvailablePosition, setIsDirty, setNodes]);
 
-  const addNotesNode = useCallback((position?: { x: number; y: number }) => {
+  const addNotesNode = useCallback((variant: NotesVariant = 'notes', position?: { x: number; y: number }) => {
+    const normalizedVariant = variant.toLowerCase() as NotesVariant;
+    const label = normalizedVariant === 'info' ? 'Info' : normalizedVariant === 'important' ? 'Important' : 'Notes';
     const id = `notes-${createId()}`;
     const payload: NotesNode = {
       id,
       type: 'notes',
-      label: 'Notes',
-      note: ''
+      label,
+      note: '',
+      style: normalizedVariant
     };
 
     // Center the node on the cursor position if provided
@@ -610,7 +613,7 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
       position: pos,
       data: {
         kind: 'notes',
-        label: 'Notes',
+        label,
         payload
       }
     };

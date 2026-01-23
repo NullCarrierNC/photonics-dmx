@@ -120,7 +120,8 @@ export function evaluateLogicNode(
       const useStringCompare =
         leftType === 'string' || rightType === 'string' ||
         leftType === 'cue-type' || rightType === 'cue-type' ||
-        leftType === 'color' || rightType === 'color';
+        leftType === 'color' || rightType === 'color' ||
+        leftType === 'event' || rightType === 'event';
       const useBooleanCompare = leftType === 'boolean' || rightType === 'boolean';
 
       let outcome = false;

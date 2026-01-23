@@ -4,7 +4,7 @@ import { TrackedLight } from '../../../types';
  * Variable value stored in variable stores.
  */
 export interface VariableValue {
-  type: 'number' | 'boolean' | 'string' | 'color' | 'light-array' | 'cue-type';
+  type: 'number' | 'boolean' | 'string' | 'color' | 'light-array' | 'cue-type' | 'event';
   value: number | boolean | string | TrackedLight[];
 }
 

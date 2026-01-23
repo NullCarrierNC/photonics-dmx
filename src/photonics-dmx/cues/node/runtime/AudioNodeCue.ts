@@ -373,13 +373,13 @@ export class AudioNodeCue implements IAudioCue {
     return isCueLevel ? this.cueLevelVarStore : this.groupLevelVarStore;
   }
 
-  private resolveValue(expectedType: 'number' | 'boolean' | 'string' | 'color', source?: ValueSource): number | boolean | string {
+  private resolveValue(expectedType: 'number' | 'boolean' | 'string' | 'color' | 'event', source?: ValueSource): number | boolean | string {
     if (!source) {
       return expectedType === 'number' ? 0 : expectedType === 'boolean' ? false : '';
     }
 
     if (source.source === 'literal') {
-      if (expectedType === 'string' || expectedType === 'color') {
+      if (expectedType === 'string' || expectedType === 'color' || expectedType === 'event') {
         return String(source.value);
       }
       if (expectedType === 'number') {
@@ -401,7 +401,7 @@ export class AudioNodeCue implements IAudioCue {
     const existing = cueVar ?? groupVar;
     
     if (existing) {
-      if (expectedType === 'string' || expectedType === 'color') {
+      if (expectedType === 'string' || expectedType === 'color' || expectedType === 'event') {
         return String(existing.value);
       }
       if (expectedType === 'number') {
@@ -415,7 +415,7 @@ export class AudioNodeCue implements IAudioCue {
     }
 
     // Use fallback
-    if (expectedType === 'string') {
+    if (expectedType === 'string' || expectedType === 'event') {
       return source.fallback !== undefined ? String(source.fallback) : '';
     }
     if (expectedType === 'number') {

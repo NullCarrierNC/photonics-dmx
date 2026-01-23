@@ -1,6 +1,6 @@
 import React from 'react';
 import type { NodeCueMode, LogicNode, NodeEffectType, YargEventNode, AudioEventNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { EditorMode } from '../lib/types';
+import type { EditorMode, NotesVariant } from '../lib/types';
 import { NODE_EFFECT_TYPES } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { getDefaultEventOption } from '../lib/options';
 import type { EventOption } from '../lib/types';
@@ -41,7 +41,7 @@ interface NodeCreationSectionsProps {
   addEventListenerNode?: () => void;
   addEffectRaiserNode?: () => void;
   addEffectListenerNode?: () => void;
-  addNotesNode?: () => void;
+  addNotesNode?: (variant: NotesVariant) => void;
 }
 
 const EventNodesSection: React.FC<{
@@ -51,7 +51,7 @@ const EventNodesSection: React.FC<{
 }> = ({ activeMode, addEventNode, addEventListenerNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Event Listeners</h3>
-    <div className="grid grid-cols-2 gap-2 text-xs">
+    <div className="grid grid-cols-3 gap-2 text-xs">
       <button
         className="border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
         onClick={() => addEventNode(getDefaultEventOption(activeMode))}
@@ -75,7 +75,7 @@ const EffectListenerSection: React.FC<{
 }> = ({ addEffectListenerNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Effect Entry</h3>
-    <div className="grid grid-cols-2 gap-2 text-xs">
+    <div className="grid grid-cols-3 gap-2 text-xs">
       <button
         className="border-2 border-cyan-500 bg-cyan-100 dark:bg-cyan-800/60 text-cyan-900 dark:text-cyan-50 rounded px-2 py-1 hover:opacity-80 transition-opacity"
         onClick={() => addEffectListenerNode()}
@@ -237,16 +237,28 @@ const EffectNodesSection: React.FC<{
 );
 
 const NotesSection: React.FC<{
-  addNotesNode: () => void;
+  addNotesNode: (variant: NotesVariant) => void;
 }> = ({ addNotesNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Documentation</h3>
-    <div className="grid grid-cols-2 gap-2 text-xs">
+    <div className="grid grid-cols-3 gap-2 text-xs">
+      <button
+        className="border-2 border-blue-400 bg-blue-400 dark:bg-blue-500 text-blue-950 dark:text-blue-950 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        onClick={() => addNotesNode('info')}
+      >
+        Info
+      </button>
       <button
         className="border-2 border-yellow-500 bg-yellow-400 dark:bg-yellow-500 text-yellow-900 dark:text-yellow-950 rounded px-2 py-1 hover:opacity-80 transition-opacity font-semibold"
-        onClick={() => addNotesNode()}
+        onClick={() => addNotesNode('notes')}
       >
         Notes
+      </button>
+      <button
+        className="border-2 border-red-400 bg-red-400 dark:bg-red-500 text-red-950 dark:text-red-950 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        onClick={() => addNotesNode('important')}
+      >
+        Important
       </button>
     </div>
   </div>
@@ -265,7 +277,7 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
   addNotesNode
 }) => {
   return (
-    <>
+    <div className="space-y-4">
       {editorMode === 'cue' && (
         <EventNodesSection activeMode={activeMode} addEventNode={addEventNode} addEventListenerNode={addEventListenerNode} />
       )}
@@ -291,7 +303,7 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
       {addNotesNode && (
         <NotesSection addNotesNode={addNotesNode} />
       )}
-    </>
+    </div>
   );
 };
 
