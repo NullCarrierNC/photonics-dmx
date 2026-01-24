@@ -107,8 +107,16 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
         const existingDefinitions = (node.data as any).parameterDefinitions as VariableDefinition[] | undefined;
         const definitionsChanged = !areParameterDefinitionsEqual(existingDefinitions, parameterDefinitions);
 
-        const nextParameterValues: Record<string, ValueSource> = { ...(raiser.parameterValues ?? {}) };
+        const parameterNames = new Set(parameterDefinitions.map(def => def.name));
+        const nextParameterValues: Record<string, ValueSource> = {};
         let valuesChanged = false;
+        for (const [paramName, paramValue] of Object.entries(raiser.parameterValues ?? {})) {
+          if (parameterNames.has(paramName)) {
+            nextParameterValues[paramName] = paramValue;
+          } else {
+            valuesChanged = true;
+          }
+        }
         for (const paramDef of parameterDefinitions) {
           if (nextParameterValues[paramDef.name] === undefined) {
             nextParameterValues[paramDef.name] = buildDefaultValueSource(paramDef);
