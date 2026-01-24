@@ -21,7 +21,7 @@ import { useToast } from '../hooks/useToast';
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles';
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow';
 import { updateDocumentFromFlow, updateEffectDocumentFromFlow } from '../components/cue-editor/lib/cueTransforms';
-import type { NodeCueFile, EffectFile, VariableDefinition, EventDefinition, EffectReference, YargEffectDefinition, AudioEffectDefinition, EffectDefinition } from '../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { NodeCueFile, EffectFile, VariableDefinition, EventDefinition, EffectReference, YargEffectDefinition, AudioEffectDefinition, EffectDefinition, ActionNode, LogicNode, EffectRaiserNode, ValueSource } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 
 const CueEditor: React.FC = () => {
   const [registryTab, setRegistryTab] = useState<'variables' | 'events' | 'effects'>('variables');
@@ -174,46 +174,134 @@ const CueEditor: React.FC = () => {
     updateCueMetadata({ effects });
   }, [editorDoc, selectedCueId, updateCueMetadata]);
 
-  const getVariableReferences = useCallback((varName: string, scope: 'cue' | 'cue-group'): string[] => {
-    if (!editorDoc || editorDoc.mode !== 'cue') return [];
-    
-    const references: string[] = [];
-    const cueFile = editorDoc.file as NodeCueFile;
-    const cuesToCheck = scope === 'cue' && selectedCueId 
-      ? cueFile.cues.filter(c => c.id === selectedCueId)
-      : cueFile.cues;
+  const getVariableReferences = useCallback((varName: string, _scope: 'cue' | 'cue-group'): string[] => {
+    if (!editorDoc) return [];
 
-    for (const cue of cuesToCheck) {
-      // Check logic nodes
-      const logicNodes = cue.nodes.logic ?? [];
-      for (const logicNode of logicNodes) {
-        if (logicNode.logicType === 'variable' && logicNode.varName === varName) {
-          references.push(`${cue.name}: Logic Node ${logicNode.id}`);
+    const references: string[] = [];
+    const addReference = (nodeType: string, nodeId: string, label?: string, detail?: string) => {
+      const labelSuffix = label ? ` "${label}"` : '';
+      const detailSuffix = detail ? ` (${detail})` : '';
+      references.push(`${nodeType} ${nodeId}${labelSuffix}${detailSuffix}`);
+    };
+    const checkValueSource = (
+      source: ValueSource | undefined,
+      nodeType: string,
+      nodeId: string,
+      nodeLabel: string | undefined,
+      detail: string
+    ) => {
+      if (source?.source === 'variable' && source.name === varName) {
+        addReference(nodeType, nodeId, nodeLabel, detail);
+      }
+    };
+    const checkVarName = (
+      name: string | undefined,
+      nodeType: string,
+      nodeId: string,
+      nodeLabel: string | undefined,
+      detail: string
+    ) => {
+      if (name === varName) {
+        addReference(nodeType, nodeId, nodeLabel, detail);
+      }
+    };
+
+    for (const node of nodes) {
+      const nodeId = node.id;
+      const nodeLabel = typeof node.data.label === 'string' ? node.data.label : undefined;
+      if (node.data.kind === 'action') {
+        const action = node.data.payload as ActionNode;
+        const nodeType = 'Action Node';
+        checkValueSource(action.target?.groups, nodeType, nodeId, nodeLabel, 'target.groups');
+        checkValueSource(action.target?.filter, nodeType, nodeId, nodeLabel, 'target.filter');
+        checkValueSource(action.color?.name, nodeType, nodeId, nodeLabel, 'color.name');
+        checkValueSource(action.color?.brightness, nodeType, nodeId, nodeLabel, 'color.brightness');
+        checkValueSource(action.color?.blendMode, nodeType, nodeId, nodeLabel, 'color.blendMode');
+        checkValueSource(action.color?.opacity, nodeType, nodeId, nodeLabel, 'color.opacity');
+        checkValueSource(action.layer, nodeType, nodeId, nodeLabel, 'layer');
+        if (action.timing) {
+          checkValueSource(action.timing.waitForTime, nodeType, nodeId, nodeLabel, 'timing.waitForTime');
+          checkValueSource(action.timing.waitForConditionCount, nodeType, nodeId, nodeLabel, 'timing.waitForConditionCount');
+          checkValueSource(action.timing.duration, nodeType, nodeId, nodeLabel, 'timing.duration');
+          checkValueSource(action.timing.waitUntilTime, nodeType, nodeId, nodeLabel, 'timing.waitUntilTime');
+          checkValueSource(action.timing.waitUntilConditionCount, nodeType, nodeId, nodeLabel, 'timing.waitUntilConditionCount');
+          checkValueSource(action.timing.level, nodeType, nodeId, nodeLabel, 'timing.level');
         }
-        if (logicNode.logicType === 'math') {
-          if (logicNode.left.source === 'variable' && logicNode.left.name === varName) {
-            references.push(`${cue.name}: Math Node ${logicNode.id} (left)`);
-          }
-          if (logicNode.right.source === 'variable' && logicNode.right.name === varName) {
-            references.push(`${cue.name}: Math Node ${logicNode.id} (right)`);
-          }
-          if (logicNode.assignTo === varName) {
-            references.push(`${cue.name}: Math Node ${logicNode.id} (assignTo)`);
-          }
+      }
+
+      if (node.data.kind === 'logic') {
+        const logicNode = node.data.payload as LogicNode;
+        const nodeType = `Logic Node (${logicNode.logicType})`;
+        switch (logicNode.logicType) {
+          case 'variable':
+            checkVarName(logicNode.varName, nodeType, nodeId, nodeLabel, 'varName');
+            checkValueSource(logicNode.value, nodeType, nodeId, nodeLabel, 'value');
+            break;
+          case 'math':
+            checkValueSource(logicNode.left, nodeType, nodeId, nodeLabel, 'left');
+            checkValueSource(logicNode.right, nodeType, nodeId, nodeLabel, 'right');
+            checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo');
+            break;
+          case 'conditional':
+            checkValueSource(logicNode.left, nodeType, nodeId, nodeLabel, 'left');
+            checkValueSource(logicNode.right, nodeType, nodeId, nodeLabel, 'right');
+            break;
+          case 'cue-data':
+          case 'config-data':
+            checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo');
+            break;
+          case 'lights-from-index':
+            checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable');
+            checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index');
+            checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo');
+            break;
+          case 'for-loop':
+            checkValueSource(logicNode.start, nodeType, nodeId, nodeLabel, 'start');
+            checkValueSource(logicNode.end, nodeType, nodeId, nodeLabel, 'end');
+            checkValueSource(logicNode.step, nodeType, nodeId, nodeLabel, 'step');
+            checkVarName(logicNode.counterVariable, nodeType, nodeId, nodeLabel, 'counterVariable');
+            break;
+          case 'while-loop':
+            checkValueSource(logicNode.left, nodeType, nodeId, nodeLabel, 'left');
+            checkValueSource(logicNode.right, nodeType, nodeId, nodeLabel, 'right');
+            checkValueSource(logicNode.maxIterations, nodeType, nodeId, nodeLabel, 'maxIterations');
+            break;
+          case 'array-length':
+          case 'reverse-lights':
+          case 'create-pairs':
+            checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable');
+            checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo');
+            break;
+          case 'concat-lights':
+            for (const sourceVar of logicNode.sourceVariables ?? []) {
+              checkVarName(sourceVar, nodeType, nodeId, nodeLabel, 'sourceVariables');
+            }
+            checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo');
+            break;
+          case 'delay':
+            checkValueSource(logicNode.delayTime, nodeType, nodeId, nodeLabel, 'delayTime');
+            break;
+          case 'debugger':
+            checkValueSource(logicNode.message, nodeType, nodeId, nodeLabel, 'message');
+            for (const loggedVar of logicNode.variablesToLog ?? []) {
+              checkVarName(loggedVar, nodeType, nodeId, nodeLabel, 'variablesToLog');
+            }
+            break;
         }
-        if (logicNode.logicType === 'conditional') {
-          if (logicNode.left.source === 'variable' && logicNode.left.name === varName) {
-            references.push(`${cue.name}: Conditional Node ${logicNode.id} (left)`);
-          }
-          if (logicNode.right.source === 'variable' && logicNode.right.name === varName) {
-            references.push(`${cue.name}: Conditional Node ${logicNode.id} (right)`);
-          }
+      }
+
+      if (node.data.kind === 'effect-raiser') {
+        const raiser = node.data.payload as EffectRaiserNode;
+        const nodeType = 'Effect Raiser Node';
+        const parameterValues = raiser.parameterValues ?? {};
+        for (const [paramName, value] of Object.entries(parameterValues)) {
+          checkValueSource(value, nodeType, nodeId, nodeLabel, `parameterValues.${paramName}`);
         }
       }
     }
 
     return references;
-  }, [editorDoc, selectedCueId]);
+  }, [editorDoc, nodes]);
 
   const getEventReferences = useCallback((eventName: string): string[] => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return [];

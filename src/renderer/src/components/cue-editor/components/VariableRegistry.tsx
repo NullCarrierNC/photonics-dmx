@@ -3,6 +3,7 @@ import type { VariableDefinition, VariableType, NodeCueFile, NodeCueGroupMeta, Y
 import type { EditorDocument } from '../lib/types';
 import { COLOR_OPTIONS } from '../../../../../photonics-dmx/constants/options';
 import { AUDIO_EVENT_OPTIONS, YARG_EVENT_OPTIONS_CATEGORIZED, getDefaultEventOption } from '../lib/options';
+import VariableReferenceModal from './VariableReferenceModal';
 
 type Props = {
   editorDoc: EditorDocument | null;
@@ -21,6 +22,7 @@ const VariableRegistry: React.FC<Props> = ({
 }) => {
   const [showDialog, setShowDialog] = useState<'group' | 'cue' | null>(null);
   const [editingVar, setEditingVar] = useState<VariableDefinition | null>(null);
+  const [referenceModal, setReferenceModal] = useState<{ varName: string; references: string[] } | null>(null);
   const [formData, setFormData] = useState<Partial<VariableDefinition>>({
     name: '',
     type: 'number',
@@ -144,7 +146,7 @@ const VariableRegistry: React.FC<Props> = ({
   const handleDelete = (varName: string, scope: 'cue' | 'cue-group') => {
     const references = getVariableReferences(varName, scope);
     if (references.length > 0) {
-      alert(`Cannot delete "${varName}". It is referenced by: ${references.join(', ')}`);
+      setReferenceModal({ varName, references });
       return;
     }
 
@@ -513,6 +515,12 @@ const VariableRegistry: React.FC<Props> = ({
           </div>
         </div>
       )}
+      <VariableReferenceModal
+        isOpen={!!referenceModal}
+        variableName={referenceModal?.varName ?? ''}
+        references={referenceModal?.references ?? []}
+        onClose={() => setReferenceModal(null)}
+      />
     </>
   );
 };
