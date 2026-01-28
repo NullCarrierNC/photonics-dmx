@@ -22,7 +22,7 @@ import { ExecutionContext } from './ExecutionContext';
 import { VariableValue } from './executionTypes';
 import { resolveValue, resolveColor, resolveBrightness, resolveBlendMode } from './valueResolver';
 import { ResolvedColorSetting, ResolvedActionTiming } from '../compiler/ActionEffectFactory';
-import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator';
+import { evaluateLogicNode, LogicNodeEvaluatorContext, ExecuteNodeOptions } from './logicNodeEvaluator';
 
 export class EffectExecutionEngine {
   private compiledEffect: CompiledEffect<BaseEventNode>;
@@ -163,12 +163,27 @@ export class EffectExecutionEngine {
   /**
    * Execute a node by its ID.
    */
-  private executeNode(nodeId: string, context: ExecutionContext): void {
+  private executeNode(nodeId: string, context: ExecutionContext, options: ExecuteNodeOptions = {}): void {
+    const allowRevisit = options.allowRevisit === true;
+
     // Check if already visited
     if (context.hasVisited(nodeId)) {
-      // Allow action nodes to be revisited (blocking prevents infinite loops)
-      if (!this.compiledEffect.actionMap.has(nodeId)) {
-        return;
+      if (!allowRevisit) {
+        // Allow action nodes to be revisited (blocking prevents infinite loops)
+        if (!this.compiledEffect.actionMap.has(nodeId)) {
+          return;
+        }
+      } else {
+        const logicNode = this.compiledEffect.logicMap.get(nodeId);
+        if (logicNode && (logicNode.logicType === 'for-loop' || logicNode.logicType === 'while-loop')) {
+          return;
+        }
+
+        const actionNode = this.compiledEffect.actionMap.get(nodeId);
+        const eventRaiserNode = this.compiledEffect.eventRaiserMap.get(nodeId);
+        if (!actionNode && !logicNode && !eventRaiserNode) {
+          return;
+        }
       }
     }
 
@@ -307,7 +322,8 @@ export class EffectExecutionEngine {
         cueLevelVarStore: context.cueLevelVarStore, // Effect variables are stored as cue-level
         groupLevelVarStore: context.groupLevelVarStore, // Empty for effects
         variableDefinitions: this.variableDefinitions,
-        executeNode: (nextNodeId: string, ctx: ExecutionContext) => this.executeNode(nextNodeId, ctx)
+        executeNode: (nextNodeId: string, ctx: ExecutionContext, options) =>
+          this.executeNode(nextNodeId, ctx, options)
       };
 
       const nextNodes = evaluateLogicNode(logic, logic.id, edges, context, evaluatorContext);

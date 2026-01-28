@@ -17,13 +17,18 @@ import { resolveValue, inferType, getVariableStore } from './valueResolver';
 import { extractCueDataValue, extractConfigDataValue } from './dataExtractors';
 import { sendToAllWindows } from '../../../../main/utils/windowUtils';
 
+export type ExecuteNodeOptions = {
+  allowRevisit?: boolean;
+  reason?: 'loop';
+};
+
 export interface LogicNodeEvaluatorContext {
   cueId: string;
   lightManager: DmxLightManager;
   cueLevelVarStore: Map<string, VariableValue>;
   groupLevelVarStore: Map<string, VariableValue>;
   variableDefinitions: VariableDefinition[];
-  executeNode: (nodeId: string, context: ExecutionContext) => void;
+  executeNode: (nodeId: string, context: ExecutionContext, options?: ExecuteNodeOptions) => void;
 }
 
 /**
@@ -343,7 +348,7 @@ export function evaluateLogicNode(
           counterVarStore.set(logicNode.counterVariable, { type: 'number', value: i });
           // Execute all downstream nodes synchronously for this iteration
           for (const nextNodeId of downstreamNodes) {
-            executeNode(nextNodeId, context);
+            executeNode(nextNodeId, context, { allowRevisit: true, reason: 'loop' });
           }
         }
       } else {
@@ -354,7 +359,7 @@ export function evaluateLogicNode(
           }
           counterVarStore.set(logicNode.counterVariable, { type: 'number', value: i });
           for (const nextNodeId of downstreamNodes) {
-            executeNode(nextNodeId, context);
+            executeNode(nextNodeId, context, { allowRevisit: true, reason: 'loop' });
           }
         }
       }
@@ -408,7 +413,7 @@ export function evaluateLogicNode(
         
         // Execute all downstream nodes synchronously for this iteration
         for (const nextNodeId of downstreamNodes) {
-          executeNode(nextNodeId, context);
+          executeNode(nextNodeId, context, { allowRevisit: true, reason: 'loop' });
         }
       }
       

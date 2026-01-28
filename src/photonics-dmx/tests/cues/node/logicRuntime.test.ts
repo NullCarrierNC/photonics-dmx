@@ -138,4 +138,107 @@ describe('Node cue logic runtime', () => {
     expect(buildEffectSpy).not.toHaveBeenCalledWith(expect.objectContaining({ action: expect.objectContaining({ id: 'action-false' }) }));
     expect(addEffectWithCallback).toHaveBeenCalledTimes(1);
   });
+
+  it('replays loop downstream nodes per iteration', async () => {
+    const definition: YargNodeCueDefinition = {
+      id: 'loop-cue',
+      name: 'Loop Cue',
+      cueType: CueType.Chorus,
+      style: 'primary',
+      nodes: {
+        events: [
+          { id: 'event-1', type: 'event', eventType: 'beat' }
+        ],
+        actions: [
+          {
+            id: 'action-loop',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' }
+            },
+            color: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' }
+            },
+            timing: {
+              waitForCondition: 'none',
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 50 },
+              waitUntilCondition: 'none',
+              waitUntilTime: { source: 'literal', value: 0 },
+              easing: 'linear',
+              level: { source: 'literal', value: 1 }
+            }
+          }
+        ],
+        logic: [
+          {
+            id: 'loop-1',
+            type: 'logic',
+            logicType: 'for-loop',
+            start: { source: 'literal', value: 0 },
+            end: { source: 'literal', value: 3 },
+            step: { source: 'literal', value: 1 },
+            counterVariable: 'counter'
+          }
+        ]
+      },
+      connections: [
+        { from: 'event-1', to: 'loop-1' },
+        { from: 'loop-1', to: 'action-loop' }
+      ],
+      layout: { nodePositions: {} },
+      variables: [
+        {
+          name: 'counter',
+          type: 'number',
+          scope: 'cue',
+          initialValue: 0,
+          description: '',
+          isParameter: false
+        }
+      ]
+    };
+
+    const compiled = NodeCueCompiler.compileYargCue(definition);
+    const cue = new YargNodeCue('group-1', compiled);
+
+    const addEffectWithCallback = jest.fn((_name: string, _effect: any, onComplete: () => void) => {
+      onComplete();
+    });
+
+    const sequencer = {
+      addEffectWithCallback
+    } as any;
+
+    const lightManager = { getLights: jest.fn().mockReturnValue([{ id: 'l1', position: 0 }]) } as any;
+
+    jest.spyOn(ActionEffectFactory, 'resolveLights').mockReturnValue([{ id: 'l1', position: 0 } as any]);
+    jest.spyOn(ActionEffectFactory, 'buildEffect').mockImplementation(({ action, waitTime }) => ({
+      id: action.id,
+      description: 'mock',
+      transitions: [
+        {
+          lights: [],
+          layer: action.layer ?? 0,
+          waitForCondition: 'none',
+          waitForTime: waitTime ?? 0,
+          transform: {
+            color: { red: 0, green: 0, blue: 0, intensity: 0, opacity: 1, blendMode: 'replace' },
+            easing: 'sin.in',
+            duration: action.timing.duration
+          },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0
+        }
+      ]
+    }) as any);
+
+    await cue.execute({ beat: 'Strong' } as any, sequencer, lightManager);
+
+    expect(addEffectWithCallback).toHaveBeenCalledTimes(3);
+  });
 });

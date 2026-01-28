@@ -41,6 +41,11 @@ type ChainStep = {
   resolvedColor: ResolvedColorSetting;
 };
 
+type ExecuteNodeOptions = {
+  allowRevisit?: boolean;
+  reason?: 'loop';
+};
+
 export class NodeExecutionEngine {
   /**
    * Global runtime toggle for node-cue debug logging.
@@ -246,16 +251,35 @@ export class NodeExecutionEngine {
    * Execute a single node within a context.
    * Dispatches to appropriate handler based on node type.
    */
-  private executeNode(nodeId: string, context: ExecutionContext): void {
+  private executeNode(nodeId: string, context: ExecutionContext, options: ExecuteNodeOptions = {}): void {
+    const { actionMap, logicMap, eventRaiserMap, effectRaiserMap } = this.compiledCue;
+    const allowRevisit = options.allowRevisit === true;
+
     // Prevent cycles - don't execute a node twice in the same context
     if (context.hasVisited(nodeId)) {
-      this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`);
-      return;
+      if (!allowRevisit) {
+        this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`);
+        return;
+      }
+
+      const logicNode = logicMap.get(nodeId);
+      if (logicNode && (logicNode.logicType === 'for-loop' || logicNode.logicType === 'while-loop')) {
+        this.debugLog(`skip visited loop nodeId=${nodeId} ctx=${context.id}`, { reason: options.reason });
+        return;
+      }
+
+      const actionNode = actionMap.get(nodeId);
+      const eventRaiserNode = eventRaiserMap.get(nodeId);
+      const effectRaiserNode = effectRaiserMap?.get(nodeId);
+      if (!actionNode && !logicNode && !eventRaiserNode && !effectRaiserNode) {
+        this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`, { reason: options.reason });
+        return;
+      }
+
+      this.debugLog(`revisit nodeId=${nodeId} ctx=${context.id}`, { reason: options.reason });
     }
 
     context.markVisited(nodeId);
-
-    const { actionMap, logicMap, eventRaiserMap, effectRaiserMap } = this.compiledCue;
 
     // Check if it's an action node
     const actionNode = actionMap.get(nodeId);
@@ -702,7 +726,8 @@ export class NodeExecutionEngine {
         cueLevelVarStore: this.cueLevelVarStore,
         groupLevelVarStore: this.groupLevelVarStore,
         variableDefinitions: this.variableDefinitions,
-        executeNode: (nextNodeId: string, ctx: ExecutionContext) => this.executeNode(nextNodeId, ctx)
+        executeNode: (nextNodeId: string, ctx: ExecutionContext, options) =>
+          this.executeNode(nextNodeId, ctx, options)
       };
 
       const nextNodes = evaluateLogicNode(logicNode, nodeId, edges, context, evaluatorContext);
