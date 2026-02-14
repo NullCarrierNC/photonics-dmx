@@ -15,8 +15,9 @@ export class ExecutionContext {
   
   private visitedNodes: Set<string> = new Set();
   private activeNodes: Map<string, ActionNode> = new Map(); // Nodes waiting for completion
-  private pendingNodes: string[] = []; // Nodes queued for execution
-  
+  private completed = false;
+  private activeTimers: Set<ReturnType<typeof setTimeout>> = new Set();
+
   // Variable store references (shared with cue)
   public readonly cueLevelVarStore: Map<string, VariableValue>;
   public readonly groupLevelVarStore: Map<string, VariableValue>;
@@ -88,6 +89,20 @@ export class ExecutionContext {
   }
 
   /**
+   * Register a timer (e.g. from delay node) so it can be cleared on dispose.
+   */
+  public addTimer(timerId: ReturnType<typeof setTimeout>): void {
+    this.activeTimers.add(timerId);
+  }
+
+  /**
+   * Unregister a timer (e.g. when delay callback runs).
+   */
+  public removeTimer(timerId: ReturnType<typeof setTimeout>): void {
+    this.activeTimers.delete(timerId);
+  }
+
+  /**
    * Check if any actions are still active.
    */
   public hasActiveActions(): boolean {
@@ -95,28 +110,25 @@ export class ExecutionContext {
   }
 
   /**
-   * Queue nodes for execution.
-   */
-  public queueNodes(nodeIds: string[]): void {
-    this.pendingNodes.push(...nodeIds);
-  }
-
-  /**
-   * Get next queued node for execution.
-   */
-  public dequeueNode(): string | undefined {
-    return this.pendingNodes.shift();
-  }
-
-  /**
-   * Check if execution is complete (no active or pending nodes).
+   * Check if execution is complete (no active nodes). Pure getter, no side effects.
    */
   public isComplete(): boolean {
-    const complete = !this.hasActiveActions() && this.pendingNodes.length === 0;
-    if (complete && this.onContextCompleteCallback) {
+    return !this.hasActiveActions();
+  }
+
+  /**
+   * If execution is complete, fire the context-complete callback once and return true.
+   * Safe to call multiple times; callback fires at most once.
+   * Returns false while there are active actions, even if completed was set earlier.
+   */
+  public tryComplete(): boolean {
+    if (this.hasActiveActions()) return false;
+    if (this.completed) return true;
+    this.completed = true;
+    if (this.onContextCompleteCallback) {
       this.onContextCompleteCallback();
     }
-    return complete;
+    return true;
   }
 
   /**
@@ -128,18 +140,20 @@ export class ExecutionContext {
       eventNodeId: this.eventNode.id,
       startTime: this.startTime,
       visitedNodes: Array.from(this.visitedNodes),
-      activeNodes: Array.from(this.activeNodes.keys()),
-      pendingNodes: [...this.pendingNodes]
+      activeNodes: Array.from(this.activeNodes.keys())
     };
   }
 
   /**
-   * Clean up context resources.
+   * Clean up context resources. Clears all active delay timers.
    */
   public dispose(): void {
+    for (const timerId of this.activeTimers) {
+      clearTimeout(timerId);
+    }
+    this.activeTimers.clear();
     this.visitedNodes.clear();
     this.activeNodes.clear();
-    this.pendingNodes = [];
     this.onNodeCompleteCallback = undefined;
     this.onContextCompleteCallback = undefined;
   }

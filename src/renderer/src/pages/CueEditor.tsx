@@ -255,17 +255,6 @@ const CueEditor: React.FC = () => {
             checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index');
             checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo');
             break;
-          case 'for-loop':
-            checkValueSource(logicNode.start, nodeType, nodeId, nodeLabel, 'start');
-            checkValueSource(logicNode.end, nodeType, nodeId, nodeLabel, 'end');
-            checkValueSource(logicNode.step, nodeType, nodeId, nodeLabel, 'step');
-            checkVarName(logicNode.counterVariable, nodeType, nodeId, nodeLabel, 'counterVariable');
-            break;
-          case 'while-loop':
-            checkValueSource(logicNode.left, nodeType, nodeId, nodeLabel, 'left');
-            checkValueSource(logicNode.right, nodeType, nodeId, nodeLabel, 'right');
-            checkValueSource(logicNode.maxIterations, nodeType, nodeId, nodeLabel, 'maxIterations');
-            break;
           case 'array-length':
           case 'reverse-lights':
           case 'create-pairs':

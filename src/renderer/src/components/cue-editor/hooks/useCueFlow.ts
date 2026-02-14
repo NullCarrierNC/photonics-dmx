@@ -17,8 +17,6 @@ import {
   type CueDataLogicNode,
   type ConfigDataLogicNode,
   type LightsFromIndexLogicNode,
-  type ForLoopLogicNode,
-  type WhileLoopLogicNode,
   type ArrayLengthLogicNode,
   type ReverseLightsLogicNode,
   type CreatePairsLogicNode,
@@ -365,28 +363,6 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
       index: { source: 'literal', value: 0 },
       assignTo: ''
     } satisfies LightsFromIndexLogicNode as LogicNode),
-    'for-loop': id => ({
-      id,
-      type: 'logic',
-      logicType: 'for-loop',
-      label: 'for-loop',
-      outputs: [],
-      start: { source: 'literal', value: 0 },
-      end: { source: 'literal', value: 10 },
-      step: { source: 'literal', value: 1 },
-      counterVariable: ''
-    } satisfies ForLoopLogicNode as LogicNode),
-    'while-loop': id => ({
-      id,
-      type: 'logic',
-      logicType: 'while-loop',
-      label: 'while-loop',
-      outputs: [],
-      comparator: '<',
-      left: { source: 'literal', value: 0 },
-      right: { source: 'literal', value: 10 },
-      maxIterations: { source: 'literal', value: 1000 }
-    } satisfies WhileLoopLogicNode as LogicNode),
     'array-length': id => ({
       id,
       type: 'logic',

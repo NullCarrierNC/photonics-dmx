@@ -118,22 +118,6 @@ export interface LightsFromIndexLogicNode extends BaseLogicNode {
   assignTo: string;        // Variable to assign the single light to
 }
 
-export interface ForLoopLogicNode extends BaseLogicNode {
-  logicType: 'for-loop';
-  start: ValueSource;           // Starting value (inclusive)
-  end: ValueSource;             // Ending value (exclusive)
-  step: ValueSource;            // Increment per iteration (default: 1)
-  counterVariable: string;      // Variable to store current iteration value
-}
-
-export interface WhileLoopLogicNode extends BaseLogicNode {
-  logicType: 'while-loop';
-  comparator: LogicComparator;  // Condition comparator
-  left: ValueSource;            // Left side of condition
-  right: ValueSource;           // Right side of condition
-  maxIterations: ValueSource;   // Optional max iterations (default: 1000)
-}
-
 export interface ArrayLengthLogicNode extends BaseLogicNode {
   logicType: 'array-length';
   sourceVariable: string;       // Name of light-array variable
@@ -179,8 +163,6 @@ export type LogicNode =
   | CueDataLogicNode
   | ConfigDataLogicNode
   | LightsFromIndexLogicNode
-  | ForLoopLogicNode
-  | WhileLoopLogicNode
   | ArrayLengthLogicNode
   | ReverseLightsLogicNode
   | CreatePairsLogicNode

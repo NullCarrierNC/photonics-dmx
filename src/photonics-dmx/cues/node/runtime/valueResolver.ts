@@ -9,13 +9,20 @@ import { COLOR_OPTIONS, LIGHT_TARGET_OPTIONS } from '../../../constants/options'
 import { ExecutionContext } from './ExecutionContext';
 import { VariableValue } from './executionTypes';
 
+/** Optional; when provided, variable lookups use scope-aware store (cue vs cue-group). */
+type VariableDefinitionsForScope = { name: string; scope: 'cue' | 'cue-group' }[];
+
 /**
  * Resolve a value source to an actual value at runtime.
+ * When variableDefinitions is provided, variable sources are resolved from the scope-correct
+ * store (cue vs cue-group) to match scope-aware writes. When not provided, falls back to
+ * cue-level then group-level.
  */
 export function resolveValue(
   expectedType: VariableType,
   source: ValueSource | undefined,
-  context: ExecutionContext
+  context: ExecutionContext,
+  variableDefinitions?: VariableDefinitionsForScope
 ): number | boolean | string | TrackedLight[] {
   if (!source) {
     if (expectedType === 'light-array') return [];
@@ -42,10 +49,13 @@ export function resolveValue(
     return source.value === true || source.value === 'true';
   }
 
-  // Check cue-level store first, then group-level (use context's stores)
-  const cueVar = context.cueLevelVarStore.get(source.name);
-  const groupVar = context.groupLevelVarStore.get(source.name);
-  const existing = cueVar ?? groupVar;
+  // Variable source: use scope-aware store when definitions provided, else cue then group
+  const existing = variableDefinitions
+    ? (variableDefinitions.some(v => v.name === source.name && v.scope === 'cue')
+        ? context.cueLevelVarStore
+        : context.groupLevelVarStore
+      ).get(source.name)
+    : (context.cueLevelVarStore.get(source.name) ?? context.groupLevelVarStore.get(source.name));
   
   if (existing) {
     if (expectedType === 'light-array') {

@@ -29,8 +29,10 @@ import { EffectRegistry } from './EffectRegistry';
 import { EffectExecutionEngine } from './EffectExecutionEngine';
 
 // Import refactored modules
-import { resolveValue, resolveLocationGroups, resolveLightTarget, resolveColor, resolveBrightness, resolveBlendMode } from './valueResolver';
+import { resolveValue, resolveLocationGroups, resolveLightTarget } from './valueResolver';
+import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver';
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator';
+import { sendToAllWindows } from '../../../../main/utils/windowUtils';
 
 type ChainStep = {
   action: ActionNode;
@@ -39,11 +41,6 @@ type ChainStep = {
   resolvedLayer: number;
   resolvedTiming: ResolvedActionTiming;
   resolvedColor: ResolvedColorSetting;
-};
-
-type ExecuteNodeOptions = {
-  allowRevisit?: boolean;
-  reason?: 'loop';
 };
 
 export class NodeExecutionEngine {
@@ -251,32 +248,18 @@ export class NodeExecutionEngine {
    * Execute a single node within a context.
    * Dispatches to appropriate handler based on node type.
    */
-  private executeNode(nodeId: string, context: ExecutionContext, options: ExecuteNodeOptions = {}): void {
+  private executeNode(nodeId: string, context: ExecutionContext): void {
     const { actionMap, logicMap, eventRaiserMap, effectRaiserMap } = this.compiledCue;
-    const allowRevisit = options.allowRevisit === true;
 
-    // Prevent cycles - don't execute a node twice in the same context
+    // Prevent re-execution of logic nodes; action/event-raiser/effect-raiser can be revisited (blocking handles flow)
     if (context.hasVisited(nodeId)) {
-      if (!allowRevisit) {
+      const isAction = actionMap.has(nodeId);
+      const isEventRaiser = eventRaiserMap.has(nodeId);
+      const isEffectRaiser = effectRaiserMap?.has(nodeId);
+      if (!isAction && !isEventRaiser && !isEffectRaiser) {
         this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`);
         return;
       }
-
-      const logicNode = logicMap.get(nodeId);
-      if (logicNode && (logicNode.logicType === 'for-loop' || logicNode.logicType === 'while-loop')) {
-        this.debugLog(`skip visited loop nodeId=${nodeId} ctx=${context.id}`, { reason: options.reason });
-        return;
-      }
-
-      const actionNode = actionMap.get(nodeId);
-      const eventRaiserNode = eventRaiserMap.get(nodeId);
-      const effectRaiserNode = effectRaiserMap?.get(nodeId);
-      if (!actionNode && !logicNode && !eventRaiserNode && !effectRaiserNode) {
-        this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`, { reason: options.reason });
-        return;
-      }
-
-      this.debugLog(`revisit nodeId=${nodeId} ctx=${context.id}`, { reason: options.reason });
     }
 
     context.markVisited(nodeId);
@@ -352,22 +335,7 @@ export class NodeExecutionEngine {
     try {
       // Handle blackout specially - it uses sequencer.blackout() directly
       if (actionNode.effectType === 'blackout') {
-        // Resolve timing to get duration
-        const resolvedTiming: ResolvedActionTiming = {
-          ...actionNode.timing,
-          waitForTime: Number(resolveValue('number', actionNode.timing.waitForTime, context)),
-          waitForConditionCount: actionNode.timing.waitForConditionCount 
-            ? Number(resolveValue('number', actionNode.timing.waitForConditionCount, context))
-            : undefined,
-          duration: Number(resolveValue('number', actionNode.timing.duration, context)),
-          waitUntilTime: Number(resolveValue('number', actionNode.timing.waitUntilTime, context)),
-          waitUntilConditionCount: actionNode.timing.waitUntilConditionCount
-            ? Number(resolveValue('number', actionNode.timing.waitUntilConditionCount, context))
-            : undefined,
-          level: actionNode.timing.level
-            ? Number(resolveValue('number', actionNode.timing.level, context))
-            : 1
-        };
+        const resolvedTiming = resolveActionTiming(actionNode.timing, context);
 
         // Register this action as active (waiting for completion)
         context.registerActiveAction(actionNode.id, actionNode);
@@ -394,37 +362,9 @@ export class NodeExecutionEngine {
         filter: resolveLightTarget(actionNode.target.filter, context)
       };
       
-      // Resolve color
-      const resolvedColor: ResolvedColorSetting = {
-        name: resolveColor(actionNode.color.name, context),
-        brightness: resolveBrightness(actionNode.color.brightness, context),
-        blendMode: resolveBlendMode(actionNode.color.blendMode, context),
-        opacity: actionNode.color.opacity
-          ? Number(resolveValue('number', actionNode.color.opacity, context))
-          : undefined
-      };
-
-      // Resolve timing
-      const resolvedTiming: ResolvedActionTiming = {
-        ...actionNode.timing,
-        waitForTime: Number(resolveValue('number', actionNode.timing.waitForTime, context)),
-        waitForConditionCount: actionNode.timing.waitForConditionCount 
-          ? Number(resolveValue('number', actionNode.timing.waitForConditionCount, context))
-          : undefined,
-        duration: Number(resolveValue('number', actionNode.timing.duration, context)),
-        waitUntilTime: Number(resolveValue('number', actionNode.timing.waitUntilTime, context)),
-        waitUntilConditionCount: actionNode.timing.waitUntilConditionCount
-          ? Number(resolveValue('number', actionNode.timing.waitUntilConditionCount, context))
-          : undefined,
-        level: actionNode.timing.level
-          ? Number(resolveValue('number', actionNode.timing.level, context))
-          : 1
-      };
-      
-      // Resolve layer
-      const resolvedLayer = actionNode.layer
-        ? Number(resolveValue('number', actionNode.layer, context))
-        : 0;
+      const resolvedColor = resolveActionColor(actionNode.color, context);
+      const resolvedTiming = resolveActionTiming(actionNode.timing, context);
+      const resolvedLayer = resolveActionLayer(actionNode.layer, context);
 
       /**
        * Action chaining / pre-queueing
@@ -561,30 +501,9 @@ export class NodeExecutionEngine {
           return null;
         }
 
-        const layerNum = a.layer ? Number(resolveValue('number', a.layer, context)) : 0;
-
-        const rc: ResolvedColorSetting = {
-          name: resolveColor(a.color.name, context),
-          brightness: resolveBrightness(a.color.brightness, context),
-          blendMode: resolveBlendMode(a.color.blendMode, context),
-          opacity: a.color.opacity ? Number(resolveValue('number', a.color.opacity, context)) : undefined
-        };
-
-        const rtiming: ResolvedActionTiming = {
-          ...a.timing,
-          waitForTime: Number(resolveValue('number', a.timing.waitForTime, context)),
-          waitForConditionCount: a.timing.waitForConditionCount
-            ? Number(resolveValue('number', a.timing.waitForConditionCount, context))
-            : undefined,
-          duration: Number(resolveValue('number', a.timing.duration, context)),
-          waitUntilTime: Number(resolveValue('number', a.timing.waitUntilTime, context)),
-          waitUntilConditionCount: a.timing.waitUntilConditionCount
-            ? Number(resolveValue('number', a.timing.waitUntilConditionCount, context))
-            : undefined,
-          level: a.timing.level
-            ? Number(resolveValue('number', a.timing.level, context))
-            : 1
-        };
+        const layerNum = resolveActionLayer(a.layer, context);
+        const rc = resolveActionColor(a.color, context);
+        const rtiming = resolveActionTiming(a.timing, context);
 
         const chainLights = ActionEffectFactory.resolveLights(
           this.lightManager,
@@ -719,15 +638,15 @@ export class NodeExecutionEngine {
       const { adjacency } = this.compiledCue;
       const edges = adjacency.get(nodeId) ?? [];
 
-      // Create evaluator context with bound executeNode
       const evaluatorContext: LogicNodeEvaluatorContext = {
         cueId: this.cueId,
         lightManager: this.lightManager,
         cueLevelVarStore: this.cueLevelVarStore,
         groupLevelVarStore: this.groupLevelVarStore,
         variableDefinitions: this.variableDefinitions,
-        executeNode: (nextNodeId: string, ctx: ExecutionContext, options) =>
-          this.executeNode(nextNodeId, ctx, options)
+        executeNode: (nextNodeId: string, ctx: ExecutionContext) =>
+          this.executeNode(nextNodeId, ctx),
+        debugOutput: sendToAllWindows
       };
 
       const nextNodes = evaluateLogicNode(logicNode, nodeId, edges, context, evaluatorContext);
@@ -737,7 +656,7 @@ export class NodeExecutionEngine {
         this.continueExecution(nextNodes, context);
       } else {
         // No more nodes, check if context is complete
-        if (context.isComplete()) {
+        if (context.tryComplete()) {
           context.dispose();
         }
       }
@@ -772,8 +691,8 @@ export class NodeExecutionEngine {
       };
       context.registerActiveAction(nodeId, dummyAction);
 
-      // Set timeout to complete the delay
-      setTimeout(() => {
+      const timerId = setTimeout(() => {
+        context.removeTimer(timerId);
         if (context.hasVisited(nodeId)) {
           this.debugLog(`delay complete nodeId=${nodeId} ctx=${context.id}`);
           context.completeAction(nodeId);
@@ -787,12 +706,13 @@ export class NodeExecutionEngine {
             this.continueExecution(nextNodes, context);
           } else {
             // No more nodes, check if context is complete
-            if (context.isComplete()) {
+            if (context.tryComplete()) {
               context.dispose();
             }
           }
         }
       }, actualDelay);
+      context.addTimer(timerId);
     } catch (error) {
       console.error(`Error executing delay node ${nodeId}:`, error);
       // Continue to all outgoing edges despite error
@@ -965,7 +885,7 @@ export class NodeExecutionEngine {
     this.continueToNextNodes(nodeId, context);
 
     // Check if context is now complete
-    if (context.isComplete()) {
+    if (context.tryComplete()) {
       context.dispose();
     }
   }
@@ -982,7 +902,7 @@ export class NodeExecutionEngine {
       this.continueExecution(nextNodes, context);
     } else {
       // No more nodes, check if context is complete
-      if (context.isComplete()) {
+      if (context.tryComplete()) {
         context.dispose();
       }
     }
@@ -1025,8 +945,7 @@ export class NodeExecutionEngine {
         eventType: (context.eventNode as any).eventType || 'unknown',
         startTime: info.startTime,
         visitedNodes: info.visitedNodes,
-        activeNodes: info.activeNodes,
-        pendingNodes: info.pendingNodes
+        activeNodes: info.activeNodes
       };
     });
 

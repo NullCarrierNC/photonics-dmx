@@ -236,7 +236,7 @@ const CueFlowCanvas: React.FC<Props> = ({
         <div className="px-3 py-1 font-semibold italic text-amber-800 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/30 border-t border-b border-amber-400 dark:border-amber-600">
           Logic Nodes
         </div>
-        {(['variable', 'math', 'conditional', 'cue-data', 'config-data', 'lights-from-index', 'for-loop', 'while-loop', 'array-length', 'reverse-lights', 'create-pairs', 'concat-lights', 'delay'] as LogicNode['logicType'][]).sort().map(logicType => (
+        {(['variable', 'math', 'conditional', 'cue-data', 'config-data', 'lights-from-index', 'array-length', 'reverse-lights', 'create-pairs', 'concat-lights', 'delay', 'debugger'] as LogicNode['logicType'][]).sort().map(logicType => (
           <button
             key={logicType}
             className="block w-full text-left px-3 py-1 text-amber-800 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50"

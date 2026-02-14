@@ -9,7 +9,6 @@ import type { EventOption } from '../lib/types';
 const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string => {
   const baseClasses = 'border-2 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity';
   
-  const isLoopNode = logicType === 'for-loop' || logicType === 'while-loop';
   const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' ||
                       logicType === 'create-pairs' || logicType === 'concat-lights';
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data';
@@ -17,9 +16,6 @@ const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string =>
 
   if (isDebugNode) {
     return `${baseClasses} border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-100`;
-  }
-  if (isLoopNode) {
-    return `${baseClasses} border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-100`;
   }
   if (isArrayNode) {
     return `${baseClasses} border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-teal-800 dark:text-teal-100`;
@@ -179,19 +175,6 @@ const LogicNodesSection: React.FC<{
         onClick={() => addLogicNode('reverse-lights')}
       >
         Reverse Lights
-      </button>
-      {/* Loop nodes (purple) */}
-      <button
-        className={getLogicNodeButtonClasses('for-loop')}
-        onClick={() => addLogicNode('for-loop')}
-      >
-        For Loop
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('while-loop')}
-        onClick={() => addLogicNode('while-loop')}
-      >
-        While Loop
       </button>
       {/* Debug node (red) */}
       <button

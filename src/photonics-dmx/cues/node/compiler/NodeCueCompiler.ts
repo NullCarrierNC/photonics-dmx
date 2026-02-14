@@ -11,6 +11,7 @@ import {
   EventListenerNode,
   EffectRaiserNode,
   LogicNode,
+  VariableDefinition,
   YargEventNode,
   YargNodeCueDefinition,
   ValueSource,
@@ -108,6 +109,8 @@ export interface CompiledNodeCue<TEvent extends BaseEventNode> {
   effectRaiserMap: Map<string, EffectRaiserNode>;
   eventDefinitions: EventDefinition[];
   adjacency: Map<string, Connection[]>;
+  /** Group-level variable definitions; set by loader from file.group.variables */
+  groupVariables?: VariableDefinition[];
 }
 
 export type CompiledYargCue = CompiledNodeCue<YargEventNode>;

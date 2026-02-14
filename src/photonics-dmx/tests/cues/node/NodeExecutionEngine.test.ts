@@ -630,16 +630,28 @@ describe('NodeExecutionEngine', () => {
         groupLevelVarStore
       );
 
-      // Context with no active or pending nodes should be complete
+      // Context with no active nodes should be complete
       expect(context.isComplete()).toBe(true);
+      expect(context.tryComplete()).toBe(true);
 
-      // Queue a node
-      context.queueNodes(['action1']);
+      // With an active action, context is not complete
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: { groups: { source: 'literal', value: 'front' }, filter: { source: 'literal', value: 'all' } },
+        color: { name: { source: 'literal', value: 'red' }, brightness: { source: 'literal', value: 'high' } },
+        timing: {
+          waitForCondition: 'none',
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: 'none',
+          waitUntilTime: { source: 'literal', value: 0 }
+        }
+      };
+      context.registerActiveAction('action1', actionNode);
       expect(context.isComplete()).toBe(false);
-
-      // Dequeue node
-      context.dequeueNode();
-      expect(context.isComplete()).toBe(true);
+      expect(context.tryComplete()).toBe(false);
     });
   });
 

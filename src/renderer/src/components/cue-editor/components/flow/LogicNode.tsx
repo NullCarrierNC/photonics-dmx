@@ -72,18 +72,6 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
         </>
       );
     }
-    if (logicType === 'for-loop') {
-      const start = formatValueSource(logic.start);
-      const end = formatValueSource(logic.end);
-      const step = formatValueSource(logic.step);
-      const varName = logic.counterVariable || 'i';
-      return <>FOR <Mono>{varName}</Mono> = <Mono>{start}</Mono> to <Mono>{end}</Mono>, step <Mono>{step}</Mono></>;
-    }
-    if (logicType === 'while-loop') {
-      const left = formatValueSource(logic.left);
-      const right = formatValueSource(logic.right);
-      return <>WHILE <Mono>{left}</Mono> {logic.comparator} <Mono>{right}</Mono></>;
-    }
     if (logicType === 'array-length') {
       return (
         <>
@@ -138,49 +126,40 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ data, selecte
 
   const isConditional = logicType === 'conditional';
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data';
-  const isLoopNode = logicType === 'for-loop' || logicType === 'while-loop';
   const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' || logicType === 'create-pairs' || logicType === 'concat-lights';
   const isDebugNode = logicType === 'debugger';
 
   const nodeStyles = isDebugNode
     ? "border-red-400 bg-red-50 dark:bg-red-900/30 text-xs shadow-sm min-w-[150px]"
-    : isLoopNode
-      ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 text-xs shadow-sm min-w-[150px]"
-      : isArrayNode
-        ? "border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-xs shadow-sm min-w-[150px]"
-        : isDataNode
-          ? "border-orange-800 bg-orange-50 dark:bg-orange-900/30 text-xs shadow-sm min-w-[150px]"
-          : "border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-xs shadow-sm min-w-[150px]";
+    : isArrayNode
+      ? "border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-xs shadow-sm min-w-[150px]"
+      : isDataNode
+        ? "border-orange-800 bg-orange-50 dark:bg-orange-900/30 text-xs shadow-sm min-w-[150px]"
+        : "border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-xs shadow-sm min-w-[150px]";
 
   const titleStyles = isDebugNode
     ? "font-semibold text-red-800 dark:text-red-100 text-center"
-    : isLoopNode
-      ? "font-semibold text-indigo-800 dark:text-indigo-100 text-center"
-      : isArrayNode
-        ? "font-semibold text-teal-800 dark:text-teal-100 text-center"
-        : isDataNode
-          ? "font-semibold text-orange-200 dark:text-orange-100 text-center"
-          : "font-semibold text-amber-800 dark:text-amber-100 text-center";
+    : isArrayNode
+      ? "font-semibold text-teal-800 dark:text-teal-100 text-center"
+      : isDataNode
+        ? "font-semibold text-orange-200 dark:text-orange-100 text-center"
+        : "font-semibold text-amber-800 dark:text-amber-100 text-center";
 
   const detailStyles = isDebugNode
     ? "text-[11px] text-red-900 dark:text-red-50 opacity-90 text-center"
-    : isLoopNode
-      ? "text-[11px] text-indigo-900 dark:text-indigo-50 opacity-90 text-center"
-      : isArrayNode
-        ? "text-[11px] text-teal-900 dark:text-teal-50 opacity-90 text-center"
-        : isDataNode
-          ? "text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center"
-          : "text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center";
+    : isArrayNode
+      ? "text-[11px] text-teal-900 dark:text-teal-50 opacity-90 text-center"
+      : isDataNode
+        ? "text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center"
+        : "text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center";
 
   const handleStyles = isDebugNode
     ? "text-red-700 dark:text-red-100"
-    : isLoopNode
-      ? "text-indigo-700 dark:text-indigo-100"
-      : isArrayNode
-        ? "text-teal-700 dark:text-teal-100"
-        : isDataNode
-          ? "text-orange-700 dark:text-orange-100"
-          : "text-amber-700 dark:text-amber-100";
+    : isArrayNode
+      ? "text-teal-700 dark:text-teal-100"
+      : isDataNode
+        ? "text-orange-700 dark:text-orange-100"
+        : "text-amber-700 dark:text-amber-100";
 
   const selectedStyles = selected ? 'shadow-[0_0_18px_16px_rgba(59,130,246,0.8)] ring-[5px] ring-blue-400' : '';
 

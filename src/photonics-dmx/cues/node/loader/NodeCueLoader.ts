@@ -310,8 +310,7 @@ export class NodeCueLoader extends EventEmitter {
       }
 
       const compiled = NodeCueCompiler.compileYargCue(cue);
-      // Attach group variables to compiled cue for runtime initialization
-      (compiled as any).groupVariables = file.group.variables ?? [];
+      compiled.groupVariables = file.group.variables ?? [];
       
       // Build effect registry for this cue
       const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg');
@@ -340,8 +339,7 @@ export class NodeCueLoader extends EventEmitter {
       }
 
       const compiled = NodeCueCompiler.compileAudioCue(cue);
-      // Attach group variables to compiled cue for runtime initialization
-      (compiled as any).groupVariables = file.group.variables ?? [];
+      compiled.groupVariables = file.group.variables ?? [];
       
       // Build effect registry for this cue
       const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio');

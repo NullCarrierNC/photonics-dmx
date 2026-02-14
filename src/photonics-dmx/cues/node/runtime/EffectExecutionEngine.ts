@@ -20,9 +20,10 @@ import {
 } from '../../types/nodeCueTypes';
 import { ExecutionContext } from './ExecutionContext';
 import { VariableValue } from './executionTypes';
-import { resolveValue, resolveColor, resolveBrightness, resolveBlendMode } from './valueResolver';
-import { ResolvedColorSetting, ResolvedActionTiming } from '../compiler/ActionEffectFactory';
-import { evaluateLogicNode, LogicNodeEvaluatorContext, ExecuteNodeOptions } from './logicNodeEvaluator';
+import { resolveValue } from './valueResolver';
+import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver';
+import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator';
+import { sendToAllWindows } from '../../../../main/utils/windowUtils';
 
 export class EffectExecutionEngine {
   private compiledEffect: CompiledEffect<BaseEventNode>;
@@ -107,11 +108,6 @@ export class EffectExecutionEngine {
       new Map()  // No group-level variables for effects
     );
 
-    // Set up completion callbacks
-    context.setOnNodeComplete((nodeId: string) => {
-      this.onActionComplete(context.id, nodeId);
-    });
-
     context.setOnContextComplete(() => {
       this.activeContexts.delete(context.id);
       // Check if effect is now idle (all contexts done)
@@ -163,27 +159,13 @@ export class EffectExecutionEngine {
   /**
    * Execute a node by its ID.
    */
-  private executeNode(nodeId: string, context: ExecutionContext, options: ExecuteNodeOptions = {}): void {
-    const allowRevisit = options.allowRevisit === true;
-
-    // Check if already visited
+  private executeNode(nodeId: string, context: ExecutionContext): void {
+    // Prevent re-execution of logic nodes; action/event-raiser can be revisited (blocking handles flow)
     if (context.hasVisited(nodeId)) {
-      if (!allowRevisit) {
-        // Allow action nodes to be revisited (blocking prevents infinite loops)
-        if (!this.compiledEffect.actionMap.has(nodeId)) {
-          return;
-        }
-      } else {
-        const logicNode = this.compiledEffect.logicMap.get(nodeId);
-        if (logicNode && (logicNode.logicType === 'for-loop' || logicNode.logicType === 'while-loop')) {
-          return;
-        }
-
-        const actionNode = this.compiledEffect.actionMap.get(nodeId);
-        const eventRaiserNode = this.compiledEffect.eventRaiserMap.get(nodeId);
-        if (!actionNode && !logicNode && !eventRaiserNode) {
-          return;
-        }
+      const isAction = this.compiledEffect.actionMap.has(nodeId);
+      const isEventRaiser = this.compiledEffect.eventRaiserMap.has(nodeId);
+      if (!isAction && !isEventRaiser) {
+        return;
       }
     }
 
@@ -243,38 +225,10 @@ export class EffectExecutionEngine {
       return;
     }
     
-    // Resolve color
-    const resolvedColor: ResolvedColorSetting = {
-      name: resolveColor(action.color.name, context),
-      brightness: resolveBrightness(action.color.brightness, context),
-      blendMode: resolveBlendMode(action.color.blendMode, context),
-      opacity: action.color.opacity
-        ? Number(resolveValue('number', action.color.opacity, context))
-        : undefined
-    };
-    
-    // Resolve timing
-    const resolvedTiming: ResolvedActionTiming = {
-      ...action.timing,
-      waitForTime: Number(resolveValue('number', action.timing.waitForTime, context)),
-      waitForConditionCount: action.timing.waitForConditionCount 
-        ? Number(resolveValue('number', action.timing.waitForConditionCount, context))
-        : undefined,
-      duration: Number(resolveValue('number', action.timing.duration, context)),
-      waitUntilTime: Number(resolveValue('number', action.timing.waitUntilTime, context)),
-      waitUntilConditionCount: action.timing.waitUntilConditionCount
-        ? Number(resolveValue('number', action.timing.waitUntilConditionCount, context))
-        : undefined,
-      level: action.timing.level
-        ? Number(resolveValue('number', action.timing.level, context))
-        : 1
-    };
-    
-    // Resolve layer
-    const resolvedLayer = action.layer
-      ? Number(resolveValue('number', action.layer, context))
-      : 0;
-    
+    const resolvedColor = resolveActionColor(action.color, context);
+    const resolvedTiming = resolveActionTiming(action.timing, context);
+    const resolvedLayer = resolveActionLayer(action.layer, context);
+
     // Build effect using ActionEffectFactory with resolved values
     const effect = ActionEffectFactory.buildEffect({
       action,
@@ -315,15 +269,15 @@ export class EffectExecutionEngine {
       const { adjacency } = this.compiledEffect;
       const edges = adjacency.get(logic.id) ?? [];
 
-      // Create evaluator context with bound executeNode
       const evaluatorContext: LogicNodeEvaluatorContext = {
         cueId: this.compiledEffect.definition.id,
         lightManager: this.lightManager,
-        cueLevelVarStore: context.cueLevelVarStore, // Effect variables are stored as cue-level
-        groupLevelVarStore: context.groupLevelVarStore, // Empty for effects
+        cueLevelVarStore: context.cueLevelVarStore,
+        groupLevelVarStore: context.groupLevelVarStore,
         variableDefinitions: this.variableDefinitions,
-        executeNode: (nextNodeId: string, ctx: ExecutionContext, options) =>
-          this.executeNode(nextNodeId, ctx, options)
+        executeNode: (nextNodeId: string, ctx: ExecutionContext) =>
+          this.executeNode(nextNodeId, ctx),
+        debugOutput: sendToAllWindows
       };
 
       const nextNodes = evaluateLogicNode(logic, logic.id, edges, context, evaluatorContext);
@@ -363,12 +317,14 @@ export class EffectExecutionEngine {
       };
       context.registerActiveAction(delayNode.id, dummyAction);
 
-      setTimeout(() => {
+      const timerId = setTimeout(() => {
+        context.removeTimer(timerId);
         if (context.hasVisited(delayNode.id)) {
           context.completeAction(delayNode.id);
           this.continueToNextNodes(delayNode.id, context);
         }
       }, actualDelay);
+      context.addTimer(timerId);
     } catch (error) {
       console.error(`Error executing delay node ${delayNode.id}:`, error);
       this.continueToNextNodes(delayNode.id, context);
@@ -403,10 +359,6 @@ export class EffectExecutionEngine {
       new Map()
     );
 
-    context.setOnNodeComplete((nodeId: string) => {
-      this.onActionComplete(context.id, nodeId);
-    });
-
     context.setOnContextComplete(() => {
       this.activeContexts.delete(context.id);
     });
@@ -429,33 +381,13 @@ export class EffectExecutionEngine {
     const outgoing = adjacency.get(nodeId) ?? [];
 
     for (const conn of outgoing) {
-      // Skip conditional branches (handled by conditional logic)
-      if (conn.fromPort === 'true' || conn.fromPort === 'false') {
-        continue;
-      }
       this.executeNode(conn.to, context);
     }
 
-    // Check if context is complete
-    if (context.isComplete()) {
-      this.activeContexts.delete(context.id);
-      // Check if effect is now idle (all contexts done)
-      if (this.activeContexts.size === 0 && this.onIdleCallback) {
-        this.onIdleCallback();
-      }
+    // Check if context is complete (callback already ran inside tryComplete)
+    if (context.tryComplete()) {
+      context.dispose();
     }
-  }
-
-  /**
-   * Handle action completion callback.
-   */
-  private onActionComplete(contextId: string, _nodeId: string): void {
-    const context = this.activeContexts.get(contextId);
-    if (!context) {
-      return;
-    }
-
-    // Continue is handled by the callback registered with sequencer
   }
 
   /**

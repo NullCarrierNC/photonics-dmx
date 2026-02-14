@@ -192,7 +192,7 @@ export class AudioNodeCue implements IAudioCue {
     }
 
     // Initialize group-level variables from compiled cue metadata
-    const groupVariables = (this.compiledCue as any).groupVariables ?? [];
+    const groupVariables = this.compiledCue.groupVariables ?? [];
     for (const varDef of groupVariables) {
       if (!this.groupLevelVarStore.has(varDef.name)) {
         this.groupLevelVarStore.set(varDef.name, {

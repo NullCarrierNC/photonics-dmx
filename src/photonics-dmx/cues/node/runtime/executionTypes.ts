@@ -29,7 +29,6 @@ export interface ExecutionState {
     startTime: number;
     visitedNodes: string[];
     activeNodes: string[];
-    pendingNodes: string[];
   }[];
 }
 

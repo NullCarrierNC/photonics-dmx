@@ -376,48 +376,6 @@ const lightsFromIndexLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
-const forLoopLogicSchema: JSONSchemaType<LogicNode> = {
-  type: 'object',
-  required: ['id', 'type', 'logicType', 'start', 'end', 'step', 'counterVariable'],
-  additionalProperties: false,
-  properties: {
-    id: stringIdSchema,
-    type: { type: 'string', const: 'logic' },
-    logicType: { type: 'string', const: 'for-loop' },
-    label: { type: 'string', nullable: true },
-    outputs: {
-      type: 'array',
-      nullable: true,
-      items: { type: 'string' }
-    },
-    start: valueSourceSchema,
-    end: valueSourceSchema,
-    step: valueSourceSchema,
-    counterVariable: { type: 'string' }
-  }
-} as any;
-
-const whileLoopLogicSchema: JSONSchemaType<LogicNode> = {
-  type: 'object',
-  required: ['id', 'type', 'logicType', 'comparator', 'left', 'right', 'maxIterations'],
-  additionalProperties: false,
-  properties: {
-    id: stringIdSchema,
-    type: { type: 'string', const: 'logic' },
-    logicType: { type: 'string', const: 'while-loop' },
-    label: { type: 'string', nullable: true },
-    outputs: {
-      type: 'array',
-      nullable: true,
-      items: { type: 'string' }
-    },
-    comparator: { type: 'string', enum: LOGIC_COMPARATORS },
-    left: valueSourceSchema,
-    right: valueSourceSchema,
-    maxIterations: valueSourceSchema
-  }
-} as any;
-
 const arrayLengthLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
@@ -541,14 +499,12 @@ const debuggerLogicSchema: JSONSchemaType<LogicNode> = {
 
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
   oneOf: [
-    variableLogicSchema, 
-    mathLogicSchema, 
-    conditionalLogicSchema, 
-    cueDataLogicSchema, 
+    variableLogicSchema,
+    mathLogicSchema,
+    conditionalLogicSchema,
+    cueDataLogicSchema,
     configDataLogicSchema,
     lightsFromIndexLogicSchema,
-    forLoopLogicSchema,
-    whileLoopLogicSchema,
     arrayLengthLogicSchema,
     reverseLightsLogicSchema,
     createPairsLogicSchema,
