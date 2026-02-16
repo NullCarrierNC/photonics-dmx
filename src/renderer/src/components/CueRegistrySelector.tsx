@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 
 type CueRegistryType = 'YARG' | 'RB3E';
 
@@ -36,7 +37,6 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   const [registryType] = useState<CueRegistryType>('YARG');
   const [groups, setGroups] = useState<CueGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
-  const isMounted = useRef(false);
   const isInitialMount = useRef(true);
 
   // Wrap callback to avoid infinite loops
@@ -45,51 +45,47 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     onGroupChange([groupId]);
   }, [onGroupChange]);
 
-  useEffect(() => {
-    // Fetch available cue groups when component mounts or registry type changes
-    const fetchGroups = async () => {
-      try {
-        console.log('Fetching enabled cue groups...');
-        
-        // This will either get the user's preference or default to all groups
-        const enabledGroupIds = await window.electron.ipcRenderer.invoke('get-enabled-cue-groups');
-        
-        // We still need the full group objects for their descriptions
-        const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
-        
-        const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id));
+  const fetchGroups = useCallback(async () => {
+    try {
+      console.log('Fetching enabled cue groups...');
+      
+      const enabledGroupIds = await window.electron.ipcRenderer.invoke('get-enabled-cue-groups');
+      const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+      
+      const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id));
 
-        console.log(`Enabled groups:`, enabledGroups);
-        setGroups(enabledGroups);
-        
-        // Handle group selection logic
-        if (selectedGroup === '') {
-          // If no group is selected and we have groups, auto-select the first one
-          if (enabledGroups.length > 0 && isInitialMount.current) {
-            const firstGroup = enabledGroups[0];
-            setSelectedGroup(firstGroup.id);
-            handleGroupChangeCallback(firstGroup.id);
-            isInitialMount.current = false;
-          }
-        } else if (isInitialMount.current && enabledGroups.length > 0) {
-          // On initial mount with a specific group selected, fire the callback
-          handleGroupChangeCallback(selectedGroup);
+      console.log(`Enabled groups:`, enabledGroups);
+      setGroups(enabledGroups);
+      
+      if (selectedGroup === '') {
+        if (enabledGroups.length > 0 && isInitialMount.current) {
+          const firstGroup = enabledGroups[0];
+          setSelectedGroup(firstGroup.id);
+          handleGroupChangeCallback(firstGroup.id);
           isInitialMount.current = false;
         }
-
-      } catch (error) {
-        console.error('Error fetching cue groups:', error);
+      } else if (isInitialMount.current && enabledGroups.length > 0) {
+        handleGroupChangeCallback(selectedGroup);
+        isInitialMount.current = false;
       }
-    };
-
-    if (!isMounted.current) {
-      fetchGroups();
-      isMounted.current = true;
-    } else if (registryType) {
-      // Only re-fetch if registry type changed (not on initial mount)
-      fetchGroups();
+    } catch (error) {
+      console.error('Error fetching cue groups:', error);
     }
-  }, [registryType, handleGroupChangeCallback]);
+  }, [handleGroupChangeCallback, selectedGroup]);
+
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups, registryType]);
+
+  useEffect(() => {
+    const handleNodeCuesChanged = () => {
+      fetchGroups();
+    };
+    addIpcListener('node-cues:changed', handleNodeCuesChanged);
+    return () => {
+      removeIpcListener('node-cues:changed', handleNodeCuesChanged);
+    };
+  }, [fetchGroups]);
 
   // Separate effect to handle fallback when selected group becomes invalid
   useEffect(() => {

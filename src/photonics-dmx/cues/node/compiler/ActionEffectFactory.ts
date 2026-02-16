@@ -3,10 +3,15 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { getColor } from '../../../helpers/dmxHelpers';
 import {
   ActionNode,
-  createDefaultActionTiming
+  createDefaultActionTiming,
+  type NodeChaseOrder
 } from '../../types/nodeCueTypes';
 import { EasingType } from '../../../easing';
 import { VariableValue } from '../runtime/executionTypes';
+import { getSweepEffect } from '../../../effects/sweepEffect';
+import { getEffectClockwiseRotation, getEffectCounterClockwiseRotation, getEffectDualModeRotation, getEffectAlternatingPatterns } from '../../../effects/effectRotationPatterns';
+import { getEffectFlashColor } from '../../../effects/effectFlashColor';
+import { getEffectCycleLights } from '../../../effects/effectCycleLights';
 
 // Resolved action data (after ValueSource resolution)
 export interface ResolvedActionTarget {
@@ -43,9 +48,10 @@ interface BuildEffectParams {
   // Add resolved values for direct use
   resolvedTarget?: ResolvedActionTarget;
   resolvedColor?: ResolvedColorSetting;
-  resolvedSecondaryColor?: ResolvedColorSetting;
   resolvedTiming?: ResolvedActionTiming;
   resolvedLayer?: number;
+  /** For alternating-pattern: lights for pattern B (pattern A is lights) */
+  patternBLights?: TrackedLight[];
 }
 
 export interface BuildEffectChainStep {
@@ -158,6 +164,46 @@ const createSingleColorEffect = (params: {
         waitUntilConditionCount: timing.waitUntilConditionCount
       }
     ]
+  };
+};
+
+const orderLights = (lights: TrackedLight[], order: NodeChaseOrder): TrackedLight[] => {
+  const sorted = [...lights].sort((a, b) => a.position - b.position);
+  if (order === 'inverse-linear') {
+    return sorted.reverse();
+  }
+  return sorted;
+};
+
+const createChaseEffect = (params: {
+  lights: TrackedLight[];
+  layer: number;
+  timing: ResolvedActionTiming;
+  easing: EasingType;
+  color: RGBIO;
+  perLightOffsetMs: number;
+  order: NodeChaseOrder;
+}): Effect => {
+  const { lights, layer, timing, easing, color, perLightOffsetMs, order } = params;
+  const { waitForTime } = normalizeWaitFor(timing, 0);
+  const ordered = orderLights(lights, order);
+
+  const transitions = ordered.map((light, index) =>
+    createSingleColorTransition({
+      lights: [light],
+      layer,
+      waitFor: 'delay',
+      waitForTime: waitForTime + index * perLightOffsetMs,
+      color,
+      timing,
+      easing
+    })
+  );
+
+  return {
+    id: 'chase',
+    description: 'Per-light offset chase effect',
+    transitions
   };
 };
 
@@ -285,10 +331,171 @@ export class ActionEffectFactory {
         });
         break;
       }
+      case 'chase': {
+        const perLightOffsetMs = action.config?.perLightOffsetMs;
+        const order = action.config?.order ?? 'linear';
+        const offset = typeof perLightOffsetMs === 'number' && perLightOffsetMs > 0 ? perLightOffsetMs : 50;
+        effect = createChaseEffect({
+          lights,
+          layer,
+          timing,
+          easing,
+          color: baseColor,
+          perLightOffsetMs: offset,
+          order
+        });
+        break;
+      }
       case 'blackout': {
         // Blackout is handled directly by sequencer, not as an effect
         // Return null to indicate this should be handled specially
         return null;
+      }
+      case 'sweep': {
+        const cfg = action.config ?? {};
+        const sweepTime = typeof cfg.sweepTime === 'number' ? cfg.sweepTime : 900;
+        const fadeInDuration = typeof cfg.sweepFadeInDuration === 'number' ? cfg.sweepFadeInDuration : 300;
+        const fadeOutDuration = typeof cfg.sweepFadeOutDuration === 'number' ? cfg.sweepFadeOutDuration : 600;
+        const lightOverlap = typeof cfg.sweepLightOverlap === 'number' ? cfg.sweepLightOverlap : 70;
+        const betweenSweepDelay = typeof cfg.sweepBetweenDelay === 'number' ? cfg.sweepBetweenDelay : 0;
+        const low: RGBIO = getColor('black', 'low', 'replace');
+        low.intensity = 0;
+        low.opacity = 0;
+        let sweepLights = lights;
+        if (cfg.sweepDirection === 'reverse') {
+          sweepLights = [...lights].sort((a, b) => b.position - a.position);
+        }
+        effect = getSweepEffect({
+          lights: sweepLights,
+          high: baseColor,
+          low,
+          sweepTime,
+          fadeInDuration,
+          fadeOutDuration,
+          layer,
+          easing,
+          waitFor,
+          lightOverlap,
+          betweenSweepDelay
+        });
+        break;
+      }
+      case 'rotation': {
+        const cfg = action.config ?? {};
+        const direction = cfg.rotationDirection === 'counter-clockwise' ? 'counter-clockwise' : 'clockwise';
+        const beatsPerCycle = typeof cfg.beatsPerCycle === 'number' ? cfg.beatsPerCycle : 1;
+        const startOffset = Math.floor(typeof cfg.startOffset === 'number' ? cfg.startOffset : 0);
+        const baseColorRotation: RGBIO = getColor('transparent', 'low', 'replace');
+        baseColorRotation.intensity = 0;
+        baseColorRotation.opacity = 0;
+        const params = {
+          lights,
+          activeColor: baseColor,
+          baseColor: baseColorRotation,
+          layer,
+          waitForCondition: waitFor,
+          waitForTime,
+          waitForConditionCount: timing.waitForConditionCount ?? 0,
+          waitUntilCondition: timing.waitUntilCondition ?? 'none',
+          waitUntilTime: timing.waitUntilTime ?? 0,
+          waitUntilConditionCount: timing.waitUntilConditionCount ?? 0,
+          beatsPerCycle,
+          startOffset
+        };
+        effect = direction === 'counter-clockwise'
+          ? getEffectCounterClockwiseRotation(params)
+          : getEffectClockwiseRotation(params);
+        break;
+      }
+      case 'flash': {
+        const cfg = action.config ?? {};
+        const holdTime = typeof cfg.holdTime === 'number' ? cfg.holdTime : 100;
+        const durationIn = typeof cfg.flashDurationIn === 'number' ? cfg.flashDurationIn : 50;
+        const durationOut = typeof cfg.flashDurationOut === 'number' ? cfg.flashDurationOut : 100;
+        effect = getEffectFlashColor({
+          lights,
+          layer,
+          color: baseColor,
+          startTrigger: waitFor,
+          startWait: waitForTime,
+          endTrigger: 'delay',
+          endWait: 0,
+          holdTime,
+          durationIn,
+          durationOut,
+          easing
+        });
+        break;
+      }
+      case 'cycle': {
+        const cfg = action.config ?? {};
+        const transitionDuration = typeof cfg.cycleTransitionDuration === 'number' ? cfg.cycleTransitionDuration : 100;
+        const stepTrigger = (cfg.cycleStepTrigger as WaitCondition) ?? 'beat';
+        const baseColorName = (cfg.cycleBaseColor as Color) ?? 'transparent';
+        const baseBrightness = (cfg.cycleBaseBrightness as Brightness) ?? 'low';
+        const cycleBaseRgb = getColor(baseColorName, baseBrightness, primaryColor.blendMode ?? 'replace');
+        if (baseColorName === 'transparent' || baseColorName === 'black') {
+          cycleBaseRgb.intensity = 0;
+          cycleBaseRgb.opacity = 0;
+        }
+        effect = getEffectCycleLights({
+          lights,
+          baseColor: cycleBaseRgb,
+          activeColor: baseColor,
+          transitionDuration,
+          layer,
+          waitFor: stepTrigger
+        });
+        break;
+      }
+      case 'dual-mode-rotation': {
+        const cfg = action.config ?? {};
+        const beatsPerCycle = typeof cfg.beatsPerCycle === 'number' ? cfg.beatsPerCycle : 2;
+        const startOffset = Math.floor(typeof cfg.startOffset === 'number' ? cfg.startOffset : 0);
+        const isLargeVenue = cfg.dualModeIsLargeVenue === true;
+        const solidColorName = (cfg.dualModeSolidColor as Color) ?? (primaryColor.name as Color);
+        const solidColor = getColor(solidColorName, primaryColor.brightness ?? 'medium', primaryColor.blendMode ?? 'replace');
+        const modeSwitchCondition = (cfg.dualModeSwitchCondition as WaitCondition) ?? 'measure';
+        const baseColorRotation: RGBIO = getColor('transparent', 'low', 'replace');
+        baseColorRotation.intensity = 0;
+        baseColorRotation.opacity = 0;
+        effect = getEffectDualModeRotation({
+          lights,
+          activeColor: baseColor,
+          baseColor: baseColorRotation,
+          solidColor,
+          isLargeVenue,
+          layer,
+          waitForCondition: waitFor,
+          waitForTime,
+          waitForConditionCount: timing.waitForConditionCount ?? 0,
+          waitUntilCondition: timing.waitUntilCondition ?? 'none',
+          waitUntilTime: timing.waitUntilTime ?? 0,
+          waitUntilConditionCount: timing.waitUntilConditionCount ?? 0,
+          beatsPerCycle,
+          startOffset,
+          modeSwitchCondition
+        });
+        break;
+      }
+      case 'alternating-pattern': {
+        const cfg = action.config ?? {};
+        const switchCondition = (cfg.switchCondition as WaitCondition) ?? 'keyframe';
+        const completeCondition = (cfg.completeCondition as WaitCondition) ?? 'beat';
+        const patternBLights = params.patternBLights ?? [];
+        const baseColorAlt: RGBIO = getColor('transparent', 'low', 'replace');
+        baseColorAlt.intensity = 0;
+        baseColorAlt.opacity = 0;
+        effect = getEffectAlternatingPatterns({
+          patternALights: lights,
+          patternBLights,
+          activeColor: baseColor,
+          baseColor: baseColorAlt,
+          layer,
+          switchCondition,
+          completeCondition
+        });
+        break;
       }
       default:
         return null;

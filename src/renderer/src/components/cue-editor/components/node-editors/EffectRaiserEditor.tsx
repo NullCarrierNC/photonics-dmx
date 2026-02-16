@@ -53,12 +53,8 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
         <div className="mt-3 space-y-2 border-t pt-2">
           <div className="font-semibold text-xs">Parameter Values</div>
           {parameterVars.map(param => {
-            // Skip light-array parameters as they can't be set via ValueSource
-            if (param.type === 'light-array') {
-              return null;
-            }
-            
             const currentValue = node.parameterValues?.[param.name];
+            const integerOnly = param.type === 'number' && param.name === 'paramLayer';
             return (
               <div key={param.name} className="space-y-1">
                 <ValueSourceEditor
@@ -69,7 +65,8 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
                     updatedValues[param.name] = newValue;
                     updateNode({ parameterValues: updatedValues });
                   }}
-                  expected={param.type as 'number' | 'boolean' | 'string' | 'color'}
+                  expected={param.type as 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array' | 'event'}
+                  integerOnly={integerOnly}
                   availableVariables={availableVariables}
                 />
                 {param.description && (

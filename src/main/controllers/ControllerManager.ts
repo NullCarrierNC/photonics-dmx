@@ -13,6 +13,7 @@ import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProces
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
 import { BrowserWindow, ipcMain, app } from 'electron';
+import { sendToAllWindows } from '../utils/windowUtils';
 import * as path from 'path';
 import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader';
 
@@ -234,11 +235,13 @@ export class ControllerManager {
 
     const summary = await this.nodeCueLoader.loadAll();
     console.log(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`);
+    if (summary.failed > 0 && summary.errors.length > 0) {
+      summary.errors.forEach((err) => console.error('[NodeCueLoader]', err));
+    }
     await this.nodeCueLoader.startWatching();
 
     this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {
-      const window = BrowserWindow.getAllWindows()[0];
-      window?.webContents.send('node-cues:changed', payload);
+      sendToAllWindows('node-cues:changed', payload);
     });
   }
 
@@ -254,9 +257,15 @@ export class ControllerManager {
     console.log(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`);
     await this.effectLoader.startWatching();
 
-    this.effectLoader.on('changed', (payload: EffectListSummary) => {
-      const window = BrowserWindow.getAllWindows()[0];
-      window?.webContents.send('effects:changed', payload);
+    this.effectLoader.on('changed', async (payload: EffectListSummary) => {
+      sendToAllWindows('effects:changed', payload);
+      if (this.nodeCueLoader) {
+        try {
+          await this.nodeCueLoader.reload();
+        } catch (error) {
+          console.error('Failed to reload node cues after effect change:', error);
+        }
+      }
     });
   }
   
@@ -473,10 +482,7 @@ export class ControllerManager {
         this.cueHandler.handleCue(cue, data);
         
         // Emit cue-handled event for UI preview components
-        const mainWindow = BrowserWindow.getFocusedWindow();
-        if (mainWindow) {
-          mainWindow.webContents.send('cue-handled', data);
-        }
+        sendToAllWindows('cue-handled', data);
       } catch (error) {
         console.error("Error handling cue:", error);
       }

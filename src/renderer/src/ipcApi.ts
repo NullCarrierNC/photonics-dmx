@@ -59,6 +59,10 @@ export const getPrefs = () =>
 export const savePrefs = (updates: any) => 
   window.electron.ipcRenderer.invoke('save-prefs', updates);
 
+// Window management
+export const openCueEditorWindow = () =>
+  window.electron.ipcRenderer.invoke('open-cue-editor-window');
+
 // App information
 export const getAppVersion = () => 
   window.electron.ipcRenderer.invoke('get-app-version');

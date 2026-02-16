@@ -1,6 +1,7 @@
 import  { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { useAtom } from 'jotai';
 import { yargListenerEnabledAtom } from '../atoms';
+import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
 
 interface CueGroup {
   id: string;
@@ -78,6 +79,16 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
 
     useEffect(() => {
       fetchData();
+    }, [fetchData]);
+
+    useEffect(() => {
+      const handleNodeCuesChanged = () => {
+        fetchData();
+      };
+      addIpcListener('node-cues:changed', handleNodeCuesChanged);
+      return () => {
+        removeIpcListener('node-cues:changed', handleNodeCuesChanged);
+      };
     }, [fetchData]);
 
     const handleGroupToggle = async (groupId: string, isActive: boolean) => {

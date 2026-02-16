@@ -13,6 +13,18 @@ const NotesNodeEditor: React.FC<NotesNodeEditorProps> = ({
   return (
     <div className="space-y-2 text-xs">
       <label className="flex flex-col font-medium">
+        Style
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.style ?? 'notes'}
+          onChange={event => updateNode({ style: event.target.value as 'notes' | 'info' | 'important' })}
+        >
+          <option value="info">Info</option>
+          <option value="notes">Notes</option>
+          <option value="important">Important</option>
+        </select>
+      </label>
+      <label className="flex flex-col font-medium">
         Title
         <input
           type="text"

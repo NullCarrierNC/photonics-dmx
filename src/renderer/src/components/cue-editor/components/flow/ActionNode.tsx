@@ -2,9 +2,13 @@ import React from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import type { EditorNodeData } from '../../lib/types';
 import { getConditionLabel, getTextColorForBg, displayValueSource } from '../../lib/cueUtils';
+import { FONT_COURIER_NEW } from '../../lib/styles';
 import type { ActionNode as ActionPayload, ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import { useActiveNodesContext } from '../../context/ActiveNodesContext';
 
-const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => {
+const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) => {
+  const activeNodeIds = useActiveNodesContext();
+  const isActive = activeNodeIds.has(id);
   const action = data.payload as ActionPayload;
   
   // Handle color which is now ValueSource
@@ -48,33 +52,44 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => 
     return brightnessMap[brightnessStr] || 'brightness(1.0)';
   };
 
-  // Build label: include variable name if color is from a variable
-  const labelText = colorVarName ? `${data.label}(${colorVarName})` : data.label;
+  const layerValue = (action.effectType === 'set-color' || action.effectType === 'chase')
+    ? displayValueSource(action.layer, '0')
+    : null;
+  const baseLabel = data.label;
   const selectedStyles = selected ? 'shadow-[0_0_18px_16px_rgba(59,130,246,0.8)] ring-[5px] ring-blue-400' : '';
+  const activeStyles = isActive ? 'shadow-[0_0_20px_12px_rgba(34,197,94,0.7)] ring-[3px] ring-green-400 brightness-125 transition-shadow duration-150' : 'transition-shadow duration-300';
+
+  // When transparent is selected, use semi-transparent black (50%) for the node UI so it remains visible
+  const bgColorForNode = colorName === 'transparent' ? 'rgba(0,0,0,0.5)' : colorName;
+  const textColorForNode = colorName === 'transparent' ? '#f9fafb' : textColor;
 
   return (
     <div
-      className={`px-3 py-2 rounded-lg border text-xs shadow-sm min-w-[160px] relative ${selectedStyles}`}
+      className={`px-3 py-2 rounded-lg border text-xs shadow-sm min-w-[160px] relative ${selectedStyles} ${activeStyles}`}
       style={{
         borderColor: isColorVariable ? '#666' : 'rgba(0,0,0,0.15)',
         borderStyle: isColorVariable ? 'dashed' : 'solid',
         borderWidth: isColorVariable ? '2px' : '1px',
-        color: textColor
+        color: textColorForNode
       }}
     >
-      {/* Background layer with brightness filter */}
+      {/* Background layer with brightness filter (omit filter when transparent substitute is used) */}
       <div
         className="absolute inset-0 rounded-lg -z-10"
         style={{
-          backgroundColor: colorName,
-          filter: getBrightnessFilter(brightnessValue)
+          backgroundColor: bgColorForNode,
+          filter: colorName === 'transparent' ? 'none' : getBrightnessFilter(brightnessValue)
         }}
       />
       <Handle type="target" position={Position.Top} />
-      <div className="text-[11px] opacity-90">Wait for: {waitFor}</div>
-      <div className="font-semibold text-sm text-center">{labelText}</div>
-      <div className="text-[11px] opacity-90 text-center">{targetText} {durationText}</div>
-      <div className="text-[11px] opacity-90">Wait until: {waitUntil}</div>
+      <div className="text-[11px] opacity-90">Wait for: <span style={FONT_COURIER_NEW}>{waitFor}</span></div>
+      <div className="font-semibold text-sm text-center">
+        {baseLabel}
+        {layerValue != null ? <> (Layer: <span style={FONT_COURIER_NEW}>{layerValue}</span>)</> : null}
+        {colorVarName ? <> (<span style={FONT_COURIER_NEW}>{colorVarName}</span>)</> : null}
+      </div>
+      <div className="text-[11px] opacity-90 text-center"><span style={FONT_COURIER_NEW}>{targetText} {durationText}</span></div>
+      <div className="text-[11px] opacity-90">Wait until: <span style={FONT_COURIER_NEW}>{waitUntil}</span></div>
       <Handle type="source" position={Position.Bottom} />
     </div>
   );

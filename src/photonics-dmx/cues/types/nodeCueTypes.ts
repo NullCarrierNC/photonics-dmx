@@ -35,7 +35,7 @@ export interface Connection {
   toPort?: string;
 }
 
-export type VariableType = 'number' | 'boolean' | 'string' | 'color' | 'light-array' | 'cue-type';
+export type VariableType = 'number' | 'boolean' | 'string' | 'color' | 'light-array' | 'cue-type' | 'event';
 
 export type ValueSource =
   | { source: 'literal'; value: number | boolean | string | TrackedLight[] }
@@ -118,22 +118,6 @@ export interface LightsFromIndexLogicNode extends BaseLogicNode {
   assignTo: string;        // Variable to assign the single light to
 }
 
-export interface ForLoopLogicNode extends BaseLogicNode {
-  logicType: 'for-loop';
-  start: ValueSource;           // Starting value (inclusive)
-  end: ValueSource;             // Ending value (exclusive)
-  step: ValueSource;            // Increment per iteration (default: 1)
-  counterVariable: string;      // Variable to store current iteration value
-}
-
-export interface WhileLoopLogicNode extends BaseLogicNode {
-  logicType: 'while-loop';
-  comparator: LogicComparator;  // Condition comparator
-  left: ValueSource;            // Left side of condition
-  right: ValueSource;           // Right side of condition
-  maxIterations: ValueSource;   // Optional max iterations (default: 1000)
-}
-
 export interface ArrayLengthLogicNode extends BaseLogicNode {
   logicType: 'array-length';
   sourceVariable: string;       // Name of light-array variable
@@ -166,20 +150,54 @@ export interface DelayLogicNode extends BaseLogicNode {
   delayTime: ValueSource;        // Delay time in milliseconds
 }
 
-export type LogicNode = 
-  | VariableLogicNode 
-  | MathLogicNode 
+export interface DebuggerLogicNode extends BaseLogicNode {
+  logicType: 'debugger';
+  message: ValueSource;          // Message to log
+  variablesToLog: string[];      // List of variable names to log with their values
+}
+
+export type RandomMode = 'random-integer' | 'random-choice' | 'random-light';
+
+export interface RandomLogicNode extends BaseLogicNode {
+  logicType: 'random';
+  mode: RandomMode;
+  min?: ValueSource;             // random-integer: inclusive min
+  max?: ValueSource;             // random-integer: inclusive max
+  choices?: string[];            // random-choice: list of string options
+  sourceVariable?: string;       // random-light: light-array variable name
+  count?: ValueSource;           // random-light: number of lights to pick
+  assignTo: string;              // variable to store result
+}
+
+export interface ShuffleLightsLogicNode extends BaseLogicNode {
+  logicType: 'shuffle-lights';
+  sourceVariable: string;        // light-array to shuffle
+  assignTo: string;             // shuffled copy
+}
+
+export interface ForEachLightLogicNode extends BaseLogicNode {
+  logicType: 'for-each-light';
+  sourceVariable: string;        // light-array to iterate
+  currentLightVariable: string; // variable set to current TrackedLight[] (single light)
+  currentIndexVariable: string;  // variable set to current index (number)
+}
+
+export type LogicNode =
+  | VariableLogicNode
+  | MathLogicNode
   | ConditionalLogicNode
   | CueDataLogicNode
   | ConfigDataLogicNode
   | LightsFromIndexLogicNode
-  | ForLoopLogicNode
-  | WhileLoopLogicNode
   | ArrayLengthLogicNode
   | ReverseLightsLogicNode
   | CreatePairsLogicNode
   | ConcatLightsLogicNode
-  | DelayLogicNode;
+  | DelayLogicNode
+  | DebuggerLogicNode
+  | RandomLogicNode
+  | ShuffleLightsLogicNode
+  | ForEachLightLogicNode;
 
 export interface EventRaiserNode {
   id: string;
@@ -218,12 +236,15 @@ export interface EffectRaiserNode {
   parameterValues?: Record<string, ValueSource>;  // Parameter name -> value
 }
 
+export type NotesStyle = 'notes' | 'info' | 'important';
+
 // Notes node - for documentation only, not part of execution
 export interface NotesNode {
   id: string;
   type: 'notes';
   label?: string;
   title?: string;  // Optional title for the note
+  style?: NotesStyle;
   note: string;  // Text content of the note
 }
 
@@ -313,7 +334,7 @@ export interface AudioEventNode extends BaseEventNode {
 }
 
 
-export const NODE_EFFECT_TYPES = ['set-color', 'blackout'] as const;
+export const NODE_EFFECT_TYPES = ['set-color', 'blackout', 'chase', 'sweep', 'rotation', 'flash', 'cycle', 'dual-mode-rotation', 'alternating-pattern'] as const;
 
 export type NodeEffectType = typeof NODE_EFFECT_TYPES[number];
 
@@ -341,7 +362,44 @@ export interface ActionTimingConfig {
   level?: ValueSource;
 }
 
+export type NodeChaseOrder = 'linear' | 'inverse-linear';
+
+export type SweepDirection = 'forward' | 'reverse';
+export type RotationDirection = 'clockwise' | 'counter-clockwise';
+
 export interface NodeActionConfig {
+  perLightOffsetMs?: number;
+  order?: NodeChaseOrder;
+  loop?: boolean;
+  /** Sweep: total time (ms), fade durations (ms), overlap (0-100), delay between sweeps (ms), direction */
+  sweepTime?: number;
+  sweepFadeInDuration?: number;
+  sweepFadeOutDuration?: number;
+  sweepLightOverlap?: number;
+  sweepBetweenDelay?: number;
+  sweepDirection?: SweepDirection;
+  /** Rotation: direction, beats per cycle, start offset (number or variable) */
+  rotationDirection?: RotationDirection;
+  beatsPerCycle?: number;
+  startOffset?: number | ValueSource;
+  /** Flash: hold time (ms), fade in/out durations (ms) */
+  holdTime?: number;
+  flashDurationIn?: number;
+  flashDurationOut?: number;
+  /** Cycle: transition duration (ms), step trigger (WaitCondition), base color for inactive lights */
+  cycleTransitionDuration?: number;
+  cycleStepTrigger?: WaitCondition;
+  cycleBaseColor?: string;
+  cycleBaseBrightness?: string;
+  /** Dual-mode rotation: solid colour when not spinning, condition to switch mode, large venue flag */
+  dualModeEnabled?: boolean;
+  dualModeSolidColor?: string;
+  dualModeSwitchCondition?: WaitCondition;
+  dualModeIsLargeVenue?: boolean;
+  /** Alternating pattern: second target (pattern B), switch and complete conditions */
+  patternBTarget?: NodeActionTarget;
+  switchCondition?: WaitCondition;
+  completeCondition?: WaitCondition;
   custom?: Record<string, unknown>;
 }
 
@@ -361,7 +419,6 @@ export interface ActionNode {
   effectType: NodeEffectType;
   target: NodeActionTarget;
   color: NodeColorSetting;
-  secondaryColor?: NodeColorSetting;
   timing: ActionTimingConfig;
   layer?: ValueSource;
   label?: string;

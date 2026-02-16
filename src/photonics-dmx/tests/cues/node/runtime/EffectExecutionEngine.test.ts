@@ -5,6 +5,8 @@ import type { CueData } from '../../../../cues/types/cueTypes';
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager';
 
+jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+
 describe('EffectExecutionEngine', () => {
   let mockSequencer: jest.Mocked<ILightingController>;
   let mockLightManager: jest.Mocked<DmxLightManager>;
@@ -75,11 +77,6 @@ describe('EffectExecutionEngine', () => {
                 filter: { source: 'literal', value: 'all' } 
               },
               color: { 
-                name: { source: 'literal', value: 'white' }, 
-                brightness: { source: 'literal', value: 'medium' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
-              },
-              secondaryColor: { 
                 name: { source: 'literal', value: 'white' }, 
                 brightness: { source: 'literal', value: 'medium' }, 
                 blendMode: { source: 'literal', value: 'replace' } 
@@ -201,6 +198,9 @@ describe('EffectExecutionEngine', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
+        variables: [
+          { name: 'effectVar', type: 'number', scope: 'cue', initialValue: 0 }
+        ],
         nodes: {
           events: [],
           actions: [
@@ -213,11 +213,6 @@ describe('EffectExecutionEngine', () => {
                 filter: { source: 'literal', value: 'all' } 
               },
               color: { 
-                name: { source: 'literal', value: 'white' }, 
-                brightness: { source: 'literal', value: 'medium' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
-              },
-              secondaryColor: { 
                 name: { source: 'literal', value: 'white' }, 
                 brightness: { source: 'literal', value: 'medium' }, 
                 blendMode: { source: 'literal', value: 'replace' } 
@@ -314,11 +309,6 @@ describe('EffectExecutionEngine', () => {
                 brightness: { source: 'literal', value: 'high' }, 
                 blendMode: { source: 'literal', value: 'replace' } 
               },
-              secondaryColor: { 
-                name: { source: 'literal', value: 'red' }, 
-                brightness: { source: 'literal', value: 'high' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
-              },
               timing: { 
                 waitForCondition: 'none',
                 waitForTime: { source: 'literal', value: 0 },
@@ -403,11 +393,6 @@ describe('EffectExecutionEngine', () => {
                 filter: { source: 'literal', value: 'all' } 
               },
               color: { 
-                name: { source: 'literal', value: 'white' }, 
-                brightness: { source: 'literal', value: 'medium' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
-              },
-              secondaryColor: { 
                 name: { source: 'literal', value: 'white' }, 
                 brightness: { source: 'literal', value: 'medium' }, 
                 blendMode: { source: 'literal', value: 'replace' } 

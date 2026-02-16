@@ -146,6 +146,44 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
   additionalProperties: false,
   required: [],
   properties: {
+    perLightOffsetMs: { type: 'number', nullable: true, minimum: 0 },
+    order: { type: 'string', enum: ['linear', 'inverse-linear'], nullable: true },
+    loop: { type: 'boolean', nullable: true },
+    sweepTime: { type: 'number', nullable: true, minimum: 0 },
+    sweepFadeInDuration: { type: 'number', nullable: true, minimum: 0 },
+    sweepFadeOutDuration: { type: 'number', nullable: true, minimum: 0 },
+    sweepLightOverlap: { type: 'number', nullable: true, minimum: 0, maximum: 100 },
+    sweepBetweenDelay: { type: 'number', nullable: true, minimum: 0 },
+    sweepDirection: { type: 'string', enum: ['forward', 'reverse'], nullable: true },
+    rotationDirection: { type: 'string', enum: ['clockwise', 'counter-clockwise'], nullable: true },
+    beatsPerCycle: { type: 'number', nullable: true, minimum: 1 },
+    startOffset: {
+      oneOf: [
+        { type: 'number', minimum: 0 },
+        valueSourceSchema,
+        { type: 'null' }
+      ]
+    } as any,
+    holdTime: { type: 'number', nullable: true, minimum: 0 },
+    flashDurationIn: { type: 'number', nullable: true, minimum: 0 },
+    flashDurationOut: { type: 'number', nullable: true, minimum: 0 },
+    cycleTransitionDuration: { type: 'number', nullable: true, minimum: 0 },
+    cycleStepTrigger: { type: 'string', nullable: true },
+    cycleBaseColor: { type: 'string', nullable: true },
+    cycleBaseBrightness: { type: 'string', nullable: true },
+    dualModeEnabled: { type: 'boolean', nullable: true },
+    dualModeSolidColor: { type: 'string', nullable: true },
+    dualModeSwitchCondition: { type: 'string', nullable: true },
+    dualModeIsLargeVenue: { type: 'boolean', nullable: true },
+    patternBTarget: {
+      type: 'object',
+      nullable: true,
+      required: ['groups', 'filter'],
+      additionalProperties: false,
+      properties: { groups: valueSourceSchema, filter: valueSourceSchema }
+    } as any,
+    switchCondition: { type: 'string', nullable: true },
+    completeCondition: { type: 'string', nullable: true },
     custom: { type: 'object', nullable: true, additionalProperties: true }
   }
 };
@@ -156,7 +194,7 @@ const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
   additionalProperties: false,
   properties: {
     name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
-    type: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array'] },
+    type: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type', 'event'] },
     scope: { type: 'string', enum: ['cue', 'cue-group'] },
     initialValue: { type: ['number', 'boolean', 'string', 'array'] } as any,
     description: { type: 'string', nullable: true },
@@ -233,6 +271,7 @@ const notesNodeSchema: JSONSchemaType<NotesNode> = {
     type: { type: 'string', const: 'notes' },
     label: { type: 'string', nullable: true },
     title: { type: 'string', nullable: true },
+    style: { type: 'string', enum: ['notes', 'info', 'important'], nullable: true },
     note: { type: 'string' }
   }
 };
@@ -253,7 +292,7 @@ const variableLogicSchema: JSONSchemaType<LogicNode> = {
     },
     mode: { type: 'string', enum: ['set', 'get', 'init'] as const },
     varName: { type: 'string' },
-    valueType: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type'] as const },
+    valueType: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type', 'event'] as const },
     value: { ...valueSourceSchema, nullable: true }
   }
 } as any;
@@ -372,48 +411,6 @@ const lightsFromIndexLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
-const forLoopLogicSchema: JSONSchemaType<LogicNode> = {
-  type: 'object',
-  required: ['id', 'type', 'logicType', 'start', 'end', 'step', 'counterVariable'],
-  additionalProperties: false,
-  properties: {
-    id: stringIdSchema,
-    type: { type: 'string', const: 'logic' },
-    logicType: { type: 'string', const: 'for-loop' },
-    label: { type: 'string', nullable: true },
-    outputs: {
-      type: 'array',
-      nullable: true,
-      items: { type: 'string' }
-    },
-    start: valueSourceSchema,
-    end: valueSourceSchema,
-    step: valueSourceSchema,
-    counterVariable: { type: 'string' }
-  }
-} as any;
-
-const whileLoopLogicSchema: JSONSchemaType<LogicNode> = {
-  type: 'object',
-  required: ['id', 'type', 'logicType', 'comparator', 'left', 'right', 'maxIterations'],
-  additionalProperties: false,
-  properties: {
-    id: stringIdSchema,
-    type: { type: 'string', const: 'logic' },
-    logicType: { type: 'string', const: 'while-loop' },
-    label: { type: 'string', nullable: true },
-    outputs: {
-      type: 'array',
-      nullable: true,
-      items: { type: 'string' }
-    },
-    comparator: { type: 'string', enum: LOGIC_COMPARATORS },
-    left: valueSourceSchema,
-    right: valueSourceSchema,
-    maxIterations: valueSourceSchema
-  }
-} as any;
-
 const arrayLengthLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
@@ -513,21 +510,112 @@ const delayLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
+const debuggerLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'message', 'variablesToLog'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'debugger' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    message: valueSourceSchema,
+    variablesToLog: {
+      type: 'array',
+      items: { type: 'string' }
+    }
+  }
+} as any;
+
+const randomLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'mode', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'random' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    mode: { type: 'string', enum: ['random-integer', 'random-choice', 'random-light'] },
+    min: { ...valueSourceSchema, nullable: true },
+    max: { ...valueSourceSchema, nullable: true },
+    choices: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariable: { type: 'string', nullable: true },
+    count: { ...valueSourceSchema, nullable: true },
+    assignTo: { type: 'string' }
+  }
+} as any;
+
+const shuffleLightsLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'shuffle-lights' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariable: { type: 'string' },
+    assignTo: { type: 'string' }
+  }
+} as any;
+
+const forEachLightLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariable', 'currentLightVariable', 'currentIndexVariable'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'for-each-light' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariable: { type: 'string' },
+    currentLightVariable: { type: 'string' },
+    currentIndexVariable: { type: 'string' }
+  }
+} as any;
+
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
   oneOf: [
-    variableLogicSchema, 
-    mathLogicSchema, 
-    conditionalLogicSchema, 
-    cueDataLogicSchema, 
+    variableLogicSchema,
+    mathLogicSchema,
+    conditionalLogicSchema,
+    cueDataLogicSchema,
     configDataLogicSchema,
     lightsFromIndexLogicSchema,
-    forLoopLogicSchema,
-    whileLoopLogicSchema,
     arrayLengthLogicSchema,
     reverseLightsLogicSchema,
     createPairsLogicSchema,
     concatLightsLogicSchema,
-    delayLogicSchema
+    delayLogicSchema,
+    debuggerLogicSchema,
+    randomLogicSchema,
+    shuffleLightsLogicSchema,
+    forEachLightLogicSchema
   ]
 } as any;
 
@@ -544,14 +632,13 @@ const targetSchema: JSONSchemaType<NodeActionTarget> = {
 const actionSchema: JSONSchemaType<ActionNode> = {
   type: 'object',
   required: ['id', 'type', 'effectType', 'target', 'color', 'timing'],
-  additionalProperties: false,
+  additionalProperties: true, // Allow editor/backup metadata (e.g. position) to be ignored
   properties: {
     id: stringIdSchema,
     type: { type: 'string', const: 'action' },
     effectType: { type: 'string', enum: NODE_EFFECT_TYPES },
     target: targetSchema,
     color: colorSchema,
-    secondaryColor: { ...colorSchema, nullable: true },
     timing: timingSchema,
     layer: { ...valueSourceSchema, nullable: true },
     label: { type: 'string', nullable: true },
@@ -566,19 +653,7 @@ const actionSchema: JSONSchemaType<ActionNode> = {
       items: { type: 'string' }
     },
     config: { ...actionConfigSchema, nullable: true }
-  },
-  allOf: [
-    {
-      if: {
-        properties: {
-          effectType: { enum: ['cross-fade'] }
-        }
-      },
-      then: {
-        required: ['secondaryColor']
-      }
-    }
-  ]
+  }
 } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const yargEventSchema: JSONSchemaType<YargEventNode> = {
@@ -927,12 +1002,15 @@ const formatErrors = (errors: DefinedError[] | null | undefined): string[] => {
 };
 
 /**
- * Detects circular dependencies in action node chains using depth-first search.
- * Returns an array of error messages describing any cycles found.
+ * Detects circular dependencies that would cause infinite synchronous execution.
+ * Only logic-only cycles are reported; cycles that include at least one action node
+ * are allowed because the runtime advances phase on action completion, so the loop
+ * breaks across async boundaries.
  */
 const detectCycles = (
   connections: Connection[],
-  nodeIds: Set<string>
+  nodeIds: Set<string>,
+  actionIds: Set<string>
 ): string[] => {
   const errors: string[] = [];
 
@@ -962,7 +1040,10 @@ const detectCycles = (
         const cycleStart = path.indexOf(neighbour);
         const cycle = cycleStart >= 0 ? path.slice(cycleStart) : path;
         cycle.push(neighbour);
-        errors.push(`Circular dependency detected: ${cycle.join(' → ')}`);
+        const cycleHasAction = cycle.some((id) => actionIds.has(id));
+        if (!cycleHasAction) {
+          errors.push(`Circular dependency detected: ${cycle.join(' → ')}`);
+        }
         return true;
       }
     }
@@ -1011,11 +1092,11 @@ export const validateYargNodeCueFile = (value: unknown): NodeCueValidationResult
       cueVarNames.add(varDef.name);
     }
     
-    // Check for circular dependencies
+    // Check for circular dependencies (only logic-only cycles are invalid)
     const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
     const actionIds = new Set(cue.nodes.actions.map(a => a.id));
     const nonEventIds = new Set<string>([...logicIds, ...actionIds]);
-    const cycleErrors = detectCycles(cue.connections, nonEventIds);
+    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds);
     semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
   }
 
@@ -1065,11 +1146,11 @@ export const validateAudioNodeCueFile = (value: unknown): NodeCueValidationResul
       cueVarNames.add(varDef.name);
     }
     
-    // Check for circular dependencies
+    // Check for circular dependencies (only logic-only cycles are invalid)
     const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
     const actionIds = new Set(cue.nodes.actions.map(a => a.id));
     const nonEventIds = new Set<string>([...logicIds, ...actionIds]);
-    const cycleErrors = detectCycles(cue.connections, nonEventIds);
+    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds);
     semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
   }
 

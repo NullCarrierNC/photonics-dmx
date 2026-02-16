@@ -36,3 +36,5 @@ export type EventOption<T extends string> = {
   value: T;
   label: string;
 };
+
+export type NotesVariant = 'notes' | 'info' | 'important';

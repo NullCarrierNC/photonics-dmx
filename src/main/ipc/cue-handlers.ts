@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { CueData } from '../../photonics-dmx/cues/types/cueTypes';
-import { BrowserWindow } from 'electron';
+import { sendToAllWindows } from '../utils/windowUtils';
 
 /**
  * Set up cue-related IPC handlers
@@ -71,12 +71,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   
   // Send handled cue data to renderer
   const sendCueHandledData = (cueData: CueData) => {
-    // Get all windows and send data to the first one
-    const allWindows = BrowserWindow.getAllWindows();
-    const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-    if (mainWindow) {
-      mainWindow.webContents.send('cue-handled', cueData);
-    }
+    sendToAllWindows('cue-handled', cueData);
   };
   
   // Listen for cue data

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { NodeCueMode, LogicNode, NodeEffectType, YargEventNode, AudioEventNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { EditorMode } from '../lib/types';
+import type { EditorMode, NotesVariant } from '../lib/types';
 import { NODE_EFFECT_TYPES } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { getDefaultEventOption } from '../lib/options';
 import type { EventOption } from '../lib/types';
@@ -9,13 +9,14 @@ import type { EventOption } from '../lib/types';
 const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string => {
   const baseClasses = 'border-2 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity';
   
-  const isLoopNode = logicType === 'for-loop' || logicType === 'while-loop';
-  const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' || 
-                      logicType === 'create-pairs' || logicType === 'concat-lights';
+  const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' ||
+                      logicType === 'create-pairs' || logicType === 'concat-lights' ||
+                      logicType === 'shuffle-lights' || logicType === 'for-each-light';
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data';
-  
-  if (isLoopNode) {
-    return `${baseClasses} border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-100`;
+  const isDebugNode = logicType === 'debugger';
+
+  if (isDebugNode) {
+    return `${baseClasses} border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-100`;
   }
   if (isArrayNode) {
     return `${baseClasses} border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-teal-800 dark:text-teal-100`;
@@ -37,7 +38,7 @@ interface NodeCreationSectionsProps {
   addEventListenerNode?: () => void;
   addEffectRaiserNode?: () => void;
   addEffectListenerNode?: () => void;
-  addNotesNode?: () => void;
+  addNotesNode?: (variant: NotesVariant) => void;
 }
 
 const EventNodesSection: React.FC<{
@@ -71,7 +72,7 @@ const EffectListenerSection: React.FC<{
 }> = ({ addEffectListenerNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Effect Entry</h3>
-    <div className="grid grid-cols-2 gap-2 text-xs">
+    <div className="grid grid-cols-3 gap-2 text-xs">
       <button
         className="border-2 border-cyan-500 bg-cyan-100 dark:bg-cyan-800/60 text-cyan-900 dark:text-cyan-50 rounded px-2 py-1 hover:opacity-80 transition-opacity"
         onClick={() => addEffectListenerNode()}
@@ -87,7 +88,7 @@ const ActionNodesSection: React.FC<{
 }> = ({ addActionNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
-    <div className="grid grid-cols-2 gap-2 text-xs">
+    <div className="grid grid-cols-3 gap-2 text-xs">
       {NODE_EFFECT_TYPES.map(effect => (
         <button
           key={effect}
@@ -146,6 +147,12 @@ const LogicNodesSection: React.FC<{
         Math
       </button>
       <button
+        className={getLogicNodeButtonClasses('random')}
+        onClick={() => addLogicNode('random')}
+      >
+        Random
+      </button>
+      <button
         className={getLogicNodeButtonClasses('variable')}
         onClick={() => addLogicNode('variable')}
       >
@@ -176,18 +183,24 @@ const LogicNodesSection: React.FC<{
       >
         Reverse Lights
       </button>
-      {/* Loop nodes (purple) */}
       <button
-        className={getLogicNodeButtonClasses('for-loop')}
-        onClick={() => addLogicNode('for-loop')}
+        className={getLogicNodeButtonClasses('shuffle-lights')}
+        onClick={() => addLogicNode('shuffle-lights')}
       >
-        For Loop
+        Shuffle Lights
       </button>
       <button
-        className={getLogicNodeButtonClasses('while-loop')}
-        onClick={() => addLogicNode('while-loop')}
+        className={getLogicNodeButtonClasses('for-each-light')}
+        onClick={() => addLogicNode('for-each-light')}
       >
-        While Loop
+        For Each Light
+      </button>
+      {/* Debug node (red) */}
+      <button
+        className={getLogicNodeButtonClasses('debugger')}
+        onClick={() => addLogicNode('debugger')}
+      >
+        Debugger
       </button>
     </div>
   </div>
@@ -226,16 +239,28 @@ const EffectNodesSection: React.FC<{
 );
 
 const NotesSection: React.FC<{
-  addNotesNode: () => void;
+  addNotesNode: (variant: NotesVariant) => void;
 }> = ({ addNotesNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Documentation</h3>
-    <div className="grid grid-cols-2 gap-2 text-xs">
+    <div className="grid grid-cols-3 gap-2 text-xs">
+      <button
+        className="border-2 border-blue-400 bg-blue-400 dark:bg-blue-500 text-blue-950 dark:text-blue-950 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        onClick={() => addNotesNode('info')}
+      >
+        Info
+      </button>
       <button
         className="border-2 border-yellow-500 bg-yellow-400 dark:bg-yellow-500 text-yellow-900 dark:text-yellow-950 rounded px-2 py-1 hover:opacity-80 transition-opacity font-semibold"
-        onClick={() => addNotesNode()}
+        onClick={() => addNotesNode('notes')}
       >
         Notes
+      </button>
+      <button
+        className="border-2 border-red-400 bg-red-400 dark:bg-red-500 text-red-950 dark:text-red-950 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        onClick={() => addNotesNode('important')}
+      >
+        Important
       </button>
     </div>
   </div>
@@ -254,7 +279,7 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
   addNotesNode
 }) => {
   return (
-    <>
+    <div className="space-y-4">
       {editorMode === 'cue' && (
         <EventNodesSection activeMode={activeMode} addEventNode={addEventNode} addEventListenerNode={addEventListenerNode} />
       )}
@@ -274,15 +299,13 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
       )}
 
       {editorMode === 'cue' && addEffectRaiserNode && (
-        <div className="hidden">
-          <EffectNodesSection addEffectRaiserNode={addEffectRaiserNode} />
-        </div>
+        <EffectNodesSection addEffectRaiserNode={addEffectRaiserNode} />
       )}
 
       {addNotesNode && (
         <NotesSection addNotesNode={addNotesNode} />
       )}
-    </>
+    </div>
   );
 };
 

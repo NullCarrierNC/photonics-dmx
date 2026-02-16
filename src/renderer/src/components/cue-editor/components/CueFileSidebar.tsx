@@ -40,12 +40,15 @@ const CueFileSidebar: React.FC<Props> = ({
   const addLabel = isEffectMode ? '+ Add Effect' : '+ Add Cue';
   const itemCountLabel = isEffectMode ? 'effect(s)' : 'cue(s)';
   
-  // Get the items list based on mode
-  const items = editorDoc ? (
+  // Get the items list based on mode, sorted alphabetically by name
+  const rawItems = editorDoc ? (
     isEffectMode 
       ? (editorDoc.file as EffectFile).effects 
       : (editorDoc.file as NodeCueFile).cues
   ) : [];
+  const items = [...rawItems].sort((a, b) =>
+    (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' })
+  );
 
   // Use the appropriate file list based on editor mode
   const displayFileList = isEffectMode ? effectFileList : fileList;

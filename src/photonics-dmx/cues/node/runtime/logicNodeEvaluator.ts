@@ -1,13 +1,15 @@
 /**
  * Logic node evaluation for the node execution engine.
- * Handles all logic node types: variable, math, conditional, cue-data, config-data, loops.
+ * Handles all logic node types: variable, math, conditional, cue-data, config-data, etc.
  */
 
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { TrackedLight } from '../../../types';
+import { randomBetween } from '../../../helpers/utils';
 import {
   LogicNode,
-  VariableDefinition
+  VariableDefinition,
+  VariableType
 } from '../../types/nodeCueTypes';
 import { ExecutionContext } from './ExecutionContext';
 import { VariableValue } from './executionTypes';
@@ -22,6 +24,8 @@ export interface LogicNodeEvaluatorContext {
   groupLevelVarStore: Map<string, VariableValue>;
   variableDefinitions: VariableDefinition[];
   executeNode: (nodeId: string, context: ExecutionContext) => void;
+  /** Optional; when set, debugger nodes send payloads here (e.g. to renderer via IPC). */
+  debugOutput?: (channel: string, data: unknown) => void;
 }
 
 /**
@@ -35,7 +39,7 @@ export function evaluateLogicNode(
   context: ExecutionContext,
   evaluatorContext: LogicNodeEvaluatorContext
 ): string[] {
-  const { cueId, lightManager, cueLevelVarStore, groupLevelVarStore, variableDefinitions, executeNode } = evaluatorContext;
+  const { cueId, lightManager, cueLevelVarStore, groupLevelVarStore, variableDefinitions } = evaluatorContext;
 
   const getVarStore = (varName: string) => getVariableStore(
     varName,
@@ -47,7 +51,7 @@ export function evaluateLogicNode(
   switch (logicNode.logicType) {
     case 'variable': {
       if (logicNode.mode !== 'get') {
-        const value = resolveValue(logicNode.valueType, logicNode.value, context);
+        const value = resolveValue(logicNode.valueType, logicNode.value, context, variableDefinitions);
         const varStore = getVarStore(logicNode.varName);
         
         if (logicNode.mode === 'init') {
@@ -62,8 +66,8 @@ export function evaluateLogicNode(
     }
 
     case 'math': {
-      const left = Number(resolveValue('number', logicNode.left, context));
-      const right = Number(resolveValue('number', logicNode.right, context));
+      const left = Number(resolveValue('number', logicNode.left, context, variableDefinitions));
+      const right = Number(resolveValue('number', logicNode.right, context, variableDefinitions));
       let result = 0;
       
       switch (logicNode.operator) {
@@ -93,29 +97,68 @@ export function evaluateLogicNode(
     }
 
     case 'conditional': {
-      const left = Number(resolveValue('number', logicNode.left, context));
-      const right = Number(resolveValue('number', logicNode.right, context));
+      const resolveType = (source: any): VariableType => {
+        if (!source) return 'number';
+        if (source.source === 'literal') {
+          if (Array.isArray(source.value)) return 'light-array';
+          if (typeof source.value === 'boolean') return 'boolean';
+          if (typeof source.value === 'number') return 'number';
+          return 'string';
+        }
+        const cueVar = context.cueLevelVarStore.get(source.name);
+        const groupVar = context.groupLevelVarStore.get(source.name);
+        const existing = cueVar ?? groupVar;
+        if (existing) return existing.type as VariableType;
+        if (Array.isArray(source.fallback)) return 'light-array';
+        if (typeof source.fallback === 'boolean') return 'boolean';
+        if (typeof source.fallback === 'number') return 'number';
+        if (typeof source.fallback === 'string') return 'string';
+        return 'number';
+      };
+
+      const leftType = resolveType(logicNode.left);
+      const rightType = resolveType(logicNode.right);
+
+      const useStringCompare =
+        leftType === 'string' || rightType === 'string' ||
+        leftType === 'cue-type' || rightType === 'cue-type' ||
+        leftType === 'color' || rightType === 'color' ||
+        leftType === 'event' || rightType === 'event';
+      const useBooleanCompare = leftType === 'boolean' || rightType === 'boolean';
+
       let outcome = false;
-      
-      switch (logicNode.comparator) {
-        case '>':
-          outcome = left > right;
-          break;
-        case '>=':
-          outcome = left >= right;
-          break;
-        case '<':
-          outcome = left < right;
-          break;
-        case '<=':
-          outcome = left <= right;
-          break;
-        case '==':
-          outcome = left === right;
-          break;
-        case '!=':
-          outcome = left !== right;
-          break;
+
+      if (logicNode.comparator === '==' || logicNode.comparator === '!=') {
+        if (useBooleanCompare) {
+          const left = resolveValue('boolean', logicNode.left, context, variableDefinitions);
+          const right = resolveValue('boolean', logicNode.right, context, variableDefinitions);
+          outcome = logicNode.comparator === '==' ? left === right : left !== right;
+        } else if (useStringCompare) {
+          const left = resolveValue('string', logicNode.left, context, variableDefinitions);
+          const right = resolveValue('string', logicNode.right, context, variableDefinitions);
+          outcome = logicNode.comparator === '==' ? left === right : left !== right;
+        } else {
+          const left = Number(resolveValue('number', logicNode.left, context, variableDefinitions));
+          const right = Number(resolveValue('number', logicNode.right, context, variableDefinitions));
+          outcome = logicNode.comparator === '==' ? left === right : left !== right;
+        }
+      } else {
+        const left = Number(resolveValue('number', logicNode.left, context, variableDefinitions));
+        const right = Number(resolveValue('number', logicNode.right, context, variableDefinitions));
+        switch (logicNode.comparator) {
+          case '>':
+            outcome = left > right;
+            break;
+          case '>=':
+            outcome = left >= right;
+            break;
+          case '<':
+            outcome = left < right;
+            break;
+          case '<=':
+            outcome = left <= right;
+            break;
+        }
       }
       
       const branch = outcome ? 'true' : 'false';
@@ -277,108 +320,6 @@ export function evaluateLogicNode(
       return edges.map(edge => edge.to);
     }
 
-    case 'for-loop': {
-      const MAX_ITERATIONS = 1000;
-      const start = Math.floor(Number(resolveValue('number', logicNode.start, context)));
-      const end = Math.floor(Number(resolveValue('number', logicNode.end, context)));
-      const step = Math.floor(Number(resolveValue('number', logicNode.step, context)));
-      
-      if (step === 0) {
-        console.warn(`for-loop node ${nodeId}: step is 0, skipping loop`);
-        return [];
-      }
-      
-      const counterVarStore = getVarStore(logicNode.counterVariable);
-      const downstreamNodes = edges.map(edge => edge.to);
-      
-      let iterations = 0;
-      if (step > 0) {
-        for (let i = start; i < end; i += step) {
-          if (iterations++ >= MAX_ITERATIONS) {
-            console.warn(`for-loop node ${nodeId}: exceeded max iterations (${MAX_ITERATIONS}), terminating loop`);
-            break;
-          }
-          // Set counter variable
-          counterVarStore.set(logicNode.counterVariable, { type: 'number', value: i });
-          // Execute all downstream nodes synchronously for this iteration
-          for (const nextNodeId of downstreamNodes) {
-            executeNode(nextNodeId, context);
-          }
-        }
-      } else {
-        for (let i = start; i > end; i += step) {
-          if (iterations++ >= MAX_ITERATIONS) {
-            console.warn(`for-loop node ${nodeId}: exceeded max iterations (${MAX_ITERATIONS}), terminating loop`);
-            break;
-          }
-          counterVarStore.set(logicNode.counterVariable, { type: 'number', value: i });
-          for (const nextNodeId of downstreamNodes) {
-            executeNode(nextNodeId, context);
-          }
-        }
-      }
-      
-      // Don't return downstream nodes - we already executed them
-      return [];
-    }
-
-    case 'while-loop': {
-      const MAX_ITERATIONS = 1000;
-      const maxIterations = Math.min(
-        MAX_ITERATIONS,
-        Math.floor(Number(resolveValue('number', logicNode.maxIterations, context)))
-      );
-      
-      const downstreamNodes = edges.map(edge => edge.to);
-      let iterations = 0;
-      
-      while (iterations < maxIterations) {
-        // Evaluate condition
-        const left = Number(resolveValue('number', logicNode.left, context));
-        const right = Number(resolveValue('number', logicNode.right, context));
-        let conditionMet = false;
-        
-        switch (logicNode.comparator) {
-          case '>':
-            conditionMet = left > right;
-            break;
-          case '>=':
-            conditionMet = left >= right;
-            break;
-          case '<':
-            conditionMet = left < right;
-            break;
-          case '<=':
-            conditionMet = left <= right;
-            break;
-          case '==':
-            conditionMet = left === right;
-            break;
-          case '!=':
-            conditionMet = left !== right;
-            break;
-        }
-        
-        if (!conditionMet) {
-          break; // Exit loop when condition is false
-        }
-        
-        iterations++;
-        
-        // Execute all downstream nodes synchronously for this iteration
-        for (const nextNodeId of downstreamNodes) {
-          executeNode(nextNodeId, context);
-        }
-      }
-      
-      if (iterations >= maxIterations) {
-        console.warn(`while-loop node ${nodeId}: reached max iterations (${maxIterations}), terminating loop`);
-      }
-      
-      // Don't return downstream nodes - we already executed them
-      return [];
-    }
-
     case 'array-length': {
       // Get the source light array variable
       const sourceVarStore = getVarStore(logicNode.sourceVariable);
@@ -472,6 +413,121 @@ export function evaluateLogicNode(
     case 'delay': {
       // Delay nodes are handled specially in the execution engine (they block).
       // This case just returns the next nodes - the actual delay happens in NodeExecutionEngine.
+      return edges.map(edge => edge.to);
+    }
+
+    case 'shuffle-lights': {
+      const sourceVarStore = getVarStore(logicNode.sourceVariable);
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable);
+
+      if (!sourceVar || sourceVar.type !== 'light-array') {
+        console.warn(`shuffle-lights node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+        return edges.map(edge => edge.to);
+      }
+
+      const lightsArray = sourceVar.value as TrackedLight[];
+      const shuffled = [...lightsArray].sort(() => Math.random() - 0.5);
+      const targetVarStore = getVarStore(logicNode.assignTo);
+      targetVarStore.set(logicNode.assignTo, { type: 'light-array', value: shuffled });
+      return edges.map(edge => edge.to);
+    }
+
+    case 'for-each-light': {
+      const sourceVarStore = getVarStore(logicNode.sourceVariable);
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable);
+
+      if (!sourceVar || sourceVar.type !== 'light-array') {
+        console.warn(`for-each-light node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+        const doneEdges = edges.filter(edge => edge.fromPort === 'done');
+        return doneEdges.length > 0 ? doneEdges.map(edge => edge.to) : edges.map(edge => edge.to);
+      }
+
+      const lightsArray = sourceVar.value as TrackedLight[];
+      const length = lightsArray.length;
+      let state = context.getForEachLightState(nodeId);
+      if (state === undefined) {
+        state = { index: 0, length };
+      }
+
+      const currentLight = lightsArray[state.index];
+      const currentLightArray = currentLight ? [currentLight] : [];
+      const targetVarStore = getVarStore(logicNode.currentLightVariable);
+      targetVarStore.set(logicNode.currentLightVariable, { type: 'light-array', value: currentLightArray });
+      const indexVarStore = getVarStore(logicNode.currentIndexVariable);
+      indexVarStore.set(logicNode.currentIndexVariable, { type: 'number', value: state.index });
+
+      if (state.index + 1 < state.length) {
+        context.setForEachLightState(nodeId, { index: state.index + 1, length: state.length });
+        const eachEdges = edges.filter(edge => edge.fromPort === 'each');
+        return eachEdges.length > 0 ? eachEdges.map(edge => edge.to) : edges.map(edge => edge.to);
+      } else {
+        context.clearForEachLightState(nodeId);
+        const doneEdges = edges.filter(edge => edge.fromPort === 'done');
+        return doneEdges.length > 0 ? doneEdges.map(edge => edge.to) : edges.map(edge => edge.to);
+      }
+    }
+
+    case 'random': {
+      const varStore = getVarStore(logicNode.assignTo);
+      if (logicNode.mode === 'random-integer') {
+        const minVal = Number(resolveValue('number', logicNode.min ?? { source: 'literal', value: 0 }, context, variableDefinitions));
+        const maxVal = Number(resolveValue('number', logicNode.max ?? { source: 'literal', value: 1 }, context, variableDefinitions));
+        const min = Math.floor(minVal);
+        const max = Math.floor(maxVal);
+        const result = min <= max ? randomBetween(min, max) : min;
+        varStore.set(logicNode.assignTo, { type: 'number', value: result });
+      } else if (logicNode.mode === 'random-choice') {
+        const choices = logicNode.choices ?? [];
+        const result = choices.length > 0 ? choices[randomBetween(0, choices.length - 1)] ?? '' : '';
+        varStore.set(logicNode.assignTo, { type: 'string', value: result });
+      } else if (logicNode.mode === 'random-light') {
+        const sourceVarStore = getVarStore(logicNode.sourceVariable ?? '');
+        const sourceVar = sourceVarStore.get(logicNode.sourceVariable ?? '');
+        if (!sourceVar || sourceVar.type !== 'light-array') {
+          console.warn(`random node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+          return edges.map(edge => edge.to);
+        }
+        const lightsArray = sourceVar.value as TrackedLight[];
+        const countVal = Number(resolveValue('number', logicNode.count ?? { source: 'literal', value: 1 }, context, variableDefinitions));
+        const count = Math.max(0, Math.min(Math.floor(countVal), lightsArray.length));
+        const shuffled = [...lightsArray].sort(() => Math.random() - 0.5);
+        const picked = shuffled.slice(0, count);
+        varStore.set(logicNode.assignTo, { type: 'light-array', value: picked });
+      }
+      return edges.map(edge => edge.to);
+    }
+
+    case 'debugger': {
+      // Log the message
+      const message = String(resolveValue('string', logicNode.message, context, variableDefinitions));
+      console.log(`[DebuggerNode] ${message}`);
+
+      // Log checked variables with their current values
+      const variablesForLog = logicNode.variablesToLog.map(varName => {
+        const varStore = getVarStore(varName);
+        const variable = varStore.get(varName);
+        return {
+          name: varName,
+          value: variable ? variable.value : undefined
+        };
+      });
+
+      for (const varName of logicNode.variablesToLog) {
+        const varStore = getVarStore(varName);
+        const variable = varStore.get(varName);
+        if (variable) {
+          console.log(`[DebuggerNode] ${varName}:`, variable.value);
+        } else {
+          console.log(`[DebuggerNode] ${varName}: <undefined>`);
+        }
+      }
+
+      evaluatorContext.debugOutput?.('node-cues:debug-log', {
+        message,
+        variables: variablesForLog,
+        timestamp: Date.now()
+      });
+
       return edges.map(edge => edge.to);
     }
   }

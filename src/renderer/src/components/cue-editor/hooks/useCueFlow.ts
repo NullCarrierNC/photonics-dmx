@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { addEdge, useEdgesState, useNodesState, type Connection, type Edge, type ReactFlowInstance } from 'reactflow';
 import {
   createDefaultActionTiming,
@@ -17,31 +17,37 @@ import {
   type CueDataLogicNode,
   type ConfigDataLogicNode,
   type LightsFromIndexLogicNode,
-  type ForLoopLogicNode,
-  type WhileLoopLogicNode,
   type ArrayLengthLogicNode,
   type ReverseLightsLogicNode,
   type CreatePairsLogicNode,
   type ConcatLightsLogicNode,
+  type DebuggerLogicNode,
   type DelayLogicNode,
+  type RandomLogicNode,
+  type ShuffleLightsLogicNode,
+  type ForEachLightLogicNode,
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargEffectDefinition,
-  type NotesNode
+  type NotesNode,
+  type EffectDefinition,
+  type VariableDefinition,
+  type ValueSource
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { createId, buildDefaultAction } from '../lib/cueDefaults';
 import { calculateChainDuration } from '../lib/cueUtils';
 import { cueToFlow, effectToFlow } from '../lib/cueTransforms';
-import type { EditorNode, EditorNodeData, EventOption } from '../lib/types';
+import type { EditorNode, EditorNodeData, EventOption, NotesVariant } from '../lib/types';
 import { getDefaultEventOption } from '../lib/options';
 
 type UseCueFlowParams = {
   activeMode: NodeCueMode;
   setIsDirty: (dirty: boolean) => void;
   flowWrapperRef?: React.RefObject<HTMLDivElement>;
+  effectDefinitions?: Map<string, EffectDefinition>;
 };
 
-const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams) => {
+const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions }: UseCueFlowParams) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<EditorNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -59,6 +65,90 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
     return edges.some(edge => edge.target === selectedNode.id && nodes.find(n => n.id === edge.source)?.data.kind === 'event');
   }, [edges, nodes, selectedNode]);
 
+  const areParameterDefinitionsEqual = (
+    left?: VariableDefinition[],
+    right?: VariableDefinition[]
+  ): boolean => {
+    if (left === right) return true;
+    if (!left || !right) return false;
+    if (left.length !== right.length) return false;
+    return left.every((leftDef, index) => {
+      const rightDef = right[index];
+      if (!rightDef) return false;
+      return (
+        leftDef.name === rightDef.name &&
+        leftDef.type === rightDef.type &&
+        leftDef.scope === rightDef.scope &&
+        leftDef.isParameter === rightDef.isParameter &&
+        leftDef.description === rightDef.description &&
+        leftDef.initialValue === rightDef.initialValue
+      );
+    });
+  };
+
+  const buildDefaultValueSource = (def: VariableDefinition): ValueSource => ({
+    source: 'literal',
+    value: def.initialValue
+  });
+
+  useEffect(() => {
+    if (!effectDefinitions || effectDefinitions.size === 0) return;
+
+    setNodes(prevNodes => {
+      let didChange = false;
+      const nextNodes = prevNodes.map(node => {
+        if (node.data.kind !== 'effect-raiser') return node;
+        const raiser = node.data.payload as import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode;
+        if (!raiser.effectId) return node;
+
+        const effectDef = effectDefinitions.get(raiser.effectId);
+        if (!effectDef) return node;
+
+        const parameterDefinitions = effectDef.variables?.filter(v => v.isParameter) ?? [];
+        const existingDefinitions = (node.data as any).parameterDefinitions as VariableDefinition[] | undefined;
+        const definitionsChanged = !areParameterDefinitionsEqual(existingDefinitions, parameterDefinitions);
+
+        const parameterNames = new Set(parameterDefinitions.map(def => def.name));
+        const nextParameterValues: Record<string, ValueSource> = {};
+        let valuesChanged = false;
+        for (const [paramName, paramValue] of Object.entries(raiser.parameterValues ?? {})) {
+          if (parameterNames.has(paramName)) {
+            nextParameterValues[paramName] = paramValue;
+          } else {
+            valuesChanged = true;
+          }
+        }
+        for (const paramDef of parameterDefinitions) {
+          if (nextParameterValues[paramDef.name] === undefined) {
+            nextParameterValues[paramDef.name] = buildDefaultValueSource(paramDef);
+            valuesChanged = true;
+          }
+        }
+
+        const nextEffectName = effectDef.name || (node.data as any).effectName || raiser.effectId || 'none';
+        const effectNameChanged = nextEffectName !== (node.data as any).effectName;
+
+        if (!definitionsChanged && !valuesChanged && !effectNameChanged) {
+          return node;
+        }
+
+        didChange = true;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            label: `Effect: ${nextEffectName}`,
+            payload: valuesChanged ? { ...raiser, parameterValues: nextParameterValues } : raiser,
+            effectName: nextEffectName,
+            parameterDefinitions
+          }
+        };
+      });
+
+      return didChange ? nextNodes : prevNodes;
+    });
+  }, [effectDefinitions, setNodes]);
+
   const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
     event.preventDefault();
     setEdges(prev => prev.filter(e => e.id !== edge.id));
@@ -68,17 +158,22 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
   const chainDuration = useMemo(() => calculateChainDuration(nodes, edges), [nodes, edges]);
 
   const loadCueIntoFlow = useCallback((cue: any) => {
-    // Check if this is an effect or a cue by looking for the 'parameters' property
-    const isEffect = cue && 'parameters' in cue;
+    // Check if this is an effect or a cue by looking for effectListeners in nodes
+    // Effects have effectListeners property, cues don't (cues use effectRaisers instead)
+    // Also check for 'parameters' property as a fallback for backward compatibility
+    const isEffect = cue && cue.nodes && (
+      'effectListeners' in cue.nodes || 
+      'parameters' in cue
+    );
     
     const { nodes: flowNodes, edges: flowEdges } = isEffect 
       ? effectToFlow(cue as YargEffectDefinition | AudioEffectDefinition)
-      : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null);
+      : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null, effectDefinitions);
     
     setNodes(flowNodes);
     setEdges(flowEdges);
     setSelectedNodeId(null);
-  }, [setEdges, setNodes]);
+  }, [setEdges, setNodes, effectDefinitions]);
 
   // Helper function to find a good position for a new node, avoiding overlaps
   const findAvailablePosition = useCallback((preferredX: number, preferredY: number, nodeWidth: number = 150, nodeHeight: number = 80, useExactPosition: boolean = false): { x: number; y: number } => {
@@ -198,6 +293,9 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
 
   const addActionNode = useCallback((effectType: NodeEffectType, position?: { x: number; y: number }) => {
     const action = { ...buildDefaultAction(), id: `action-${createId()}`, effectType };
+    if (effectType === 'chase') {
+      action.config = { ...action.config, perLightOffsetMs: 50, order: 'linear' };
+    }
     // Center the node on the cursor position if provided
     const nodeWidth = 150;
     const nodeHeight = 80;
@@ -217,149 +315,156 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
     setIsDirty(true);
   }, [nodes.length, setIsDirty, setNodes]);
 
+  const logicNodeFactories: Record<LogicNode['logicType'], (id: string) => LogicNode> = {
+    variable: id => ({
+      id,
+      type: 'logic',
+      logicType: 'variable',
+      label: 'variable',
+      outputs: [],
+      mode: 'set',
+      varName: 'var1',
+      valueType: 'number',
+      value: { source: 'literal', value: 0 }
+    } satisfies VariableLogicNode),
+    math: id => ({
+      id,
+      type: 'logic',
+      logicType: 'math',
+      label: 'math',
+      outputs: [],
+      operator: 'add',
+      left: { source: 'literal', value: 0 },
+      right: { source: 'literal', value: 0 },
+      assignTo: 'result'
+    } satisfies MathLogicNode),
+    'cue-data': id => ({
+      id,
+      type: 'logic',
+      logicType: 'cue-data',
+      label: 'cue-data',
+      outputs: [],
+      dataProperty: 'execution-count',
+      assignTo: undefined
+    } satisfies CueDataLogicNode as LogicNode),
+    'config-data': id => ({
+      id,
+      type: 'logic',
+      logicType: 'config-data',
+      label: 'config-data',
+      outputs: [],
+      dataProperty: 'total-lights',
+      assignTo: undefined
+    } satisfies ConfigDataLogicNode as LogicNode),
+    'lights-from-index': id => ({
+      id,
+      type: 'logic',
+      logicType: 'lights-from-index',
+      label: 'lights-from-index',
+      outputs: [],
+      sourceVariable: '',
+      index: { source: 'literal', value: 0 },
+      assignTo: ''
+    } satisfies LightsFromIndexLogicNode as LogicNode),
+    'array-length': id => ({
+      id,
+      type: 'logic',
+      logicType: 'array-length',
+      label: 'array-length',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: ''
+    } satisfies ArrayLengthLogicNode as LogicNode),
+    'reverse-lights': id => ({
+      id,
+      type: 'logic',
+      logicType: 'reverse-lights',
+      label: 'reverse-lights',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: ''
+    } satisfies ReverseLightsLogicNode as LogicNode),
+    'create-pairs': id => ({
+      id,
+      type: 'logic',
+      logicType: 'create-pairs',
+      label: 'create-pairs',
+      outputs: [],
+      pairType: 'opposite',
+      sourceVariable: '',
+      assignTo: ''
+    } satisfies CreatePairsLogicNode as LogicNode),
+    'concat-lights': id => ({
+      id,
+      type: 'logic',
+      logicType: 'concat-lights',
+      label: 'concat-lights',
+      outputs: [],
+      sourceVariables: [],
+      assignTo: ''
+    } satisfies ConcatLightsLogicNode as LogicNode),
+    delay: id => ({
+      id,
+      type: 'logic',
+      logicType: 'delay',
+      label: 'delay',
+      outputs: [],
+      delayTime: { source: 'literal', value: 1000 }
+    } satisfies DelayLogicNode as LogicNode),
+    debugger: id => ({
+      id,
+      type: 'logic',
+      logicType: 'debugger',
+      label: 'debugger',
+      outputs: [],
+      message: { source: 'literal', value: 'Debug message' },
+      variablesToLog: []
+    } satisfies DebuggerLogicNode as LogicNode),
+    conditional: id => ({
+      id,
+      type: 'logic',
+      logicType: 'conditional',
+      label: 'conditional',
+      outputs: [],
+      comparator: '>',
+      left: { source: 'literal', value: 0 },
+      right: { source: 'literal', value: 0 }
+    } satisfies ConditionalLogicNode),
+    random: id => ({
+      id,
+      type: 'logic',
+      logicType: 'random',
+      label: 'random',
+      outputs: [],
+      mode: 'random-integer',
+      min: { source: 'literal', value: 0 },
+      max: { source: 'literal', value: 1 },
+      assignTo: ''
+    } satisfies RandomLogicNode as LogicNode),
+    'shuffle-lights': id => ({
+      id,
+      type: 'logic',
+      logicType: 'shuffle-lights',
+      label: 'shuffle-lights',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: ''
+    } satisfies ShuffleLightsLogicNode as LogicNode),
+    'for-each-light': id => ({
+      id,
+      type: 'logic',
+      logicType: 'for-each-light',
+      label: 'for-each-light',
+      outputs: [],
+      sourceVariable: '',
+      currentLightVariable: '',
+      currentIndexVariable: ''
+    } satisfies ForEachLightLogicNode as LogicNode)
+  };
+
   const addLogicNode = useCallback((logicType: LogicNode['logicType'], position?: { x: number; y: number }) => {
     const id = `logic-${createId()}`;
-
-    const payload: LogicNode =
-      logicType === 'variable'
-        ? ({
-            id,
-            type: 'logic',
-            logicType: 'variable',
-            label: 'variable',
-            outputs: [],
-            mode: 'set',
-            varName: 'var1',
-            valueType: 'number',
-            value: { source: 'literal', value: 0 }
-          } satisfies VariableLogicNode)
-        : logicType === 'math'
-          ? ({
-              id,
-              type: 'logic',
-              logicType: 'math',
-              label: 'math',
-              outputs: [],
-              operator: 'add',
-              left: { source: 'literal', value: 0 },
-              right: { source: 'literal', value: 0 },
-              assignTo: 'result'
-            } satisfies MathLogicNode)
-          : logicType === 'cue-data'
-            ? ({
-                id,
-                type: 'logic',
-                logicType: 'cue-data',
-                label: 'cue-data',
-                outputs: [],
-                dataProperty: 'execution-count',
-                assignTo: undefined
-              } satisfies CueDataLogicNode as LogicNode)
-            : logicType === 'config-data'
-              ? ({
-                  id,
-                  type: 'logic',
-                  logicType: 'config-data',
-                  label: 'config-data',
-                  outputs: [],
-                  dataProperty: 'total-lights',
-                  assignTo: undefined
-                } satisfies ConfigDataLogicNode as LogicNode)
-              : logicType === 'lights-from-index'
-                ? ({
-                    id,
-                    type: 'logic',
-                    logicType: 'lights-from-index',
-                    label: 'lights-from-index',
-                    outputs: [],
-                    sourceVariable: '',
-                    index: { source: 'literal', value: 0 },
-                    assignTo: ''
-                  } satisfies LightsFromIndexLogicNode as LogicNode)
-                : logicType === 'for-loop'
-                  ? ({
-                      id,
-                      type: 'logic',
-                      logicType: 'for-loop',
-                      label: 'for-loop',
-                      outputs: [],
-                      start: { source: 'literal', value: 0 },
-                      end: { source: 'literal', value: 10 },
-                      step: { source: 'literal', value: 1 },
-                      counterVariable: ''
-                    } satisfies ForLoopLogicNode as LogicNode)
-                  : logicType === 'while-loop'
-                    ? ({
-                        id,
-                        type: 'logic',
-                        logicType: 'while-loop',
-                        label: 'while-loop',
-                        outputs: [],
-                        comparator: '<',
-                        left: { source: 'literal', value: 0 },
-                        right: { source: 'literal', value: 10 },
-                        maxIterations: { source: 'literal', value: 1000 }
-                      } satisfies WhileLoopLogicNode as LogicNode)
-                    : logicType === 'array-length'
-                      ? ({
-                          id,
-                          type: 'logic',
-                          logicType: 'array-length',
-                          label: 'array-length',
-                          outputs: [],
-                          sourceVariable: '',
-                          assignTo: ''
-                        } satisfies ArrayLengthLogicNode as LogicNode)
-                      : logicType === 'reverse-lights'
-                        ? ({
-                            id,
-                            type: 'logic',
-                            logicType: 'reverse-lights',
-                            label: 'reverse-lights',
-                            outputs: [],
-                            sourceVariable: '',
-                            assignTo: ''
-                          } satisfies ReverseLightsLogicNode as LogicNode)
-                        : logicType === 'create-pairs'
-                          ? ({
-                              id,
-                              type: 'logic',
-                              logicType: 'create-pairs',
-                              label: 'create-pairs',
-                              outputs: [],
-                              pairType: 'opposite',
-                              sourceVariable: '',
-                              assignTo: ''
-                            } satisfies CreatePairsLogicNode as LogicNode)
-                          : logicType === 'concat-lights'
-                            ? ({
-                                id,
-                                type: 'logic',
-                                logicType: 'concat-lights',
-                                label: 'concat-lights',
-                                outputs: [],
-                                sourceVariables: [],
-                                assignTo: ''
-                              } satisfies ConcatLightsLogicNode as LogicNode)
-                            : logicType === 'delay'
-                              ? ({
-                                  id,
-                                  type: 'logic',
-                                  logicType: 'delay',
-                                  label: 'delay',
-                                  outputs: [],
-                                  delayTime: { source: 'literal', value: 1000 }
-                                } satisfies DelayLogicNode as LogicNode)
-                              : ({
-                                  id,
-                                  type: 'logic',
-                                  logicType: 'conditional',
-                                  label: 'conditional',
-                                  outputs: [],
-                                  comparator: '>',
-                                  left: { source: 'literal', value: 0 },
-                                  right: { source: 'literal', value: 0 }
-                                } satisfies ConditionalLogicNode);
+    const payload = logicNodeFactories[logicType](id);
 
     // Center the node on the cursor position if provided
     const nodeWidth = 150;
@@ -501,13 +606,16 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
     setIsDirty(true);
   }, [findAvailablePosition, setIsDirty, setNodes]);
 
-  const addNotesNode = useCallback((position?: { x: number; y: number }) => {
+  const addNotesNode = useCallback((variant: NotesVariant = 'notes', position?: { x: number; y: number }) => {
+    const normalizedVariant = variant.toLowerCase() as NotesVariant;
+    const label = normalizedVariant === 'info' ? 'Info' : normalizedVariant === 'important' ? 'Important' : 'Notes';
     const id = `notes-${createId()}`;
     const payload: NotesNode = {
       id,
       type: 'notes',
-      label: 'Notes',
-      note: ''
+      label,
+      note: '',
+      style: normalizedVariant
     };
 
     // Center the node on the cursor position if provided
@@ -522,7 +630,7 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
       position: pos,
       data: {
         kind: 'notes',
-        label: 'Notes',
+        label,
         payload
       }
     };
@@ -624,7 +732,6 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef }: UseCueFlowParams
         } else if (sourceNode.data.kind === 'action') {
           const sourceAction = sourceNode.data.payload as ActionNode;
           targetAction.color = { ...sourceAction.color };
-          targetAction.secondaryColor = sourceAction.secondaryColor ? { ...sourceAction.secondaryColor } : undefined;
           targetAction.target = { ...sourceAction.target };
           targetAction.layer = sourceAction.layer;
         }

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import type { VariableDefinition, VariableType, NodeCueFile, NodeCueGroupMeta, YargEffectDefinition, AudioEffectDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type { VariableDefinition, VariableType, NodeCueFile, NodeCueGroupMeta, YargEffectDefinition, AudioEffectDefinition, EffectFile, NodeCueMode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorDocument } from '../lib/types';
 import { COLOR_OPTIONS } from '../../../../../photonics-dmx/constants/options';
+import { AUDIO_EVENT_OPTIONS, YARG_EVENT_OPTIONS_CATEGORIZED, getDefaultEventOption } from '../lib/options';
+import VariableReferenceModal from './VariableReferenceModal';
 
 type Props = {
   editorDoc: EditorDocument | null;
@@ -20,6 +22,7 @@ const VariableRegistry: React.FC<Props> = ({
 }) => {
   const [showDialog, setShowDialog] = useState<'group' | 'cue' | null>(null);
   const [editingVar, setEditingVar] = useState<VariableDefinition | null>(null);
+  const [referenceModal, setReferenceModal] = useState<{ varName: string; references: string[] } | null>(null);
   const [formData, setFormData] = useState<Partial<VariableDefinition>>({
     name: '',
     type: 'number',
@@ -38,6 +41,7 @@ const VariableRegistry: React.FC<Props> = ({
   const cueVariables = currentCue?.variables ?? [];
 
   const isEffectMode = editorDoc?.mode === 'effect';
+  const activeMode: NodeCueMode = editorDoc?.file ? (editorDoc.file as NodeCueFile | EffectFile).mode : 'yarg';
   
   // For effects, get variables from currentEffect prop
   const effectVariables = isEffectMode && currentEffect
@@ -142,7 +146,7 @@ const VariableRegistry: React.FC<Props> = ({
   const handleDelete = (varName: string, scope: 'cue' | 'cue-group') => {
     const references = getVariableReferences(varName, scope);
     if (references.length > 0) {
-      alert(`Cannot delete "${varName}". It is referenced by: ${references.join(', ')}`);
+      setReferenceModal({ varName, references });
       return;
     }
 
@@ -163,6 +167,14 @@ const VariableRegistry: React.FC<Props> = ({
   };
 
   const getInitialValueInput = (type: VariableType, value: any, onChange: (val: any) => void) => {
+    const defaultEventValue = getDefaultEventOption(activeMode)?.value ?? '';
+    const eventOptionValues = activeMode === 'yarg'
+      ? YARG_EVENT_OPTIONS_CATEGORIZED.flatMap(category => category.events.map(event => event.value))
+      : AUDIO_EVENT_OPTIONS.map(option => option.value);
+    const selectedEventValue = typeof value === 'string' && eventOptionValues.includes(value)
+      ? value
+      : defaultEventValue;
+
     switch (type) {
       case 'boolean':
         return (
@@ -195,6 +207,28 @@ const VariableRegistry: React.FC<Props> = ({
             {COLOR_OPTIONS.map(color => (
               <option key={color} value={color}>{color}</option>
             ))}
+          </select>
+        );
+      case 'event':
+        return (
+          <select
+            className="rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+            value={selectedEventValue}
+            onChange={e => onChange(e.target.value)}
+          >
+            {activeMode === 'yarg' ? (
+              YARG_EVENT_OPTIONS_CATEGORIZED.map(category => (
+                <optgroup key={category.category} label={category.category}>
+                  {category.events.map(event => (
+                    <option key={event.value} value={event.value}>{event.label}</option>
+                  ))}
+                </optgroup>
+              ))
+            ) : (
+              AUDIO_EVENT_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))
+            )}
           </select>
         );
       case 'light-array':
@@ -412,6 +446,7 @@ const VariableRegistry: React.FC<Props> = ({
                     let newValue: any = 0;
                     if (newType === 'boolean') newValue = false;
                     else if (newType === 'string' || newType === 'cue-type') newValue = '';
+                    else if (newType === 'event') newValue = getDefaultEventOption(activeMode)?.value ?? '';
                     else if (newType === 'color') newValue = 'blue';
                     else if (newType === 'light-array') newValue = [];
                     setFormData({ ...formData, type: newType, initialValue: newValue });
@@ -423,6 +458,7 @@ const VariableRegistry: React.FC<Props> = ({
                   <option value="color">Color</option>
                   <option value="light-array">Light Array</option>
                   <option value="cue-type">Cue Type</option>
+                  <option value="event">Event</option>
                 </select>
               </label>
 
@@ -479,6 +515,12 @@ const VariableRegistry: React.FC<Props> = ({
           </div>
         </div>
       )}
+      <VariableReferenceModal
+        isOpen={!!referenceModal}
+        variableName={referenceModal?.varName ?? ''}
+        references={referenceModal?.references ?? []}
+        onClose={() => setReferenceModal(null)}
+      />
     </>
   );
 };

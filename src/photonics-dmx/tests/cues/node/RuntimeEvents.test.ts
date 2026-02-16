@@ -14,6 +14,8 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { CueData } from '../../../cues/types/cueTypes';
 import { VariableValue } from '../../../cues/node/runtime/executionTypes';
 
+jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+
 describe('Runtime Event System', () => {
   let mockSequencer: ILightingController;
   let mockLightManager: DmxLightManager;
@@ -169,7 +171,7 @@ describe('Runtime Event System', () => {
       engine.startExecution(systemEvent, createCueData());
 
       // Verify action was triggered via listener (synchronously)
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
     });
 
     it('should continue immediately after raising event (non-blocking)', () => {
@@ -270,7 +272,7 @@ describe('Runtime Event System', () => {
       engine.startExecution(systemEvent, createCueData());
 
       // Both actions should be triggered (synchronously)
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledTimes(2);
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -379,7 +381,7 @@ describe('Runtime Event System', () => {
       engine.startExecution(systemEvent, createCueData());
 
       // Both listeners should trigger their actions (synchronously)
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledTimes(2);
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -488,7 +490,7 @@ describe('Runtime Event System', () => {
 
       // Only listener1 should trigger (listening to event1) - synchronously
       // listener2 should not trigger (listening to event2, which wasn't raised)
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledTimes(1);
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1);
     });
   });
 

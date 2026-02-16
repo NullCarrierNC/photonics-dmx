@@ -4,6 +4,7 @@ import { SenderConfig } from '../../photonics-dmx/types';
 import { YargCueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { CueType, DrumNoteType, InstrumentNoteType, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
+import { sendToAllWindows } from '../utils/windowUtils';
 
 
 /**
@@ -14,25 +15,21 @@ import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRe
 export function setupLightHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   // Send cue state updates to renderer
   const sendCueStateUpdate = (cueState: CueStateUpdate) => {
-    const allWindows = BrowserWindow.getAllWindows();
-    const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-    if (mainWindow) {
-      const registry = YargCueRegistry.getInstance();
-      const group = registry.getGroup(cueState.groupId);
-      const groupName = group ? group.name : null;
-      
-      const frontendCueState = {
-        cueType: cueState.cueType,
-        groupId: cueState.groupId,
-        groupName,
-        isFallback: cueState.isFallback,
-        cueStyle: cueState.cueStyle,
-        counter: cueState.counter,
-        limit: cueState.limit
-      };
-      
-      mainWindow.webContents.send('cue-state-update', frontendCueState);
-    }
+    const registry = YargCueRegistry.getInstance();
+    const group = registry.getGroup(cueState.groupId);
+    const groupName = group ? group.name : null;
+    
+    const frontendCueState = {
+      cueType: cueState.cueType,
+      groupId: cueState.groupId,
+      groupName,
+      isFallback: cueState.isFallback,
+      cueStyle: cueState.cueStyle,
+      counter: cueState.counter,
+      limit: cueState.limit
+    };
+    
+    sendToAllWindows('cue-state-update', frontendCueState);
   };
   
   // Set up the callback with the CueRegistry
@@ -348,11 +345,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         }
         
         // Send the simulated cue data to the frontend for visual indicators
-        const allWindows = BrowserWindow.getAllWindows();
-        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-        if (mainWindow) {
-          mainWindow.webContents.send('cue-handled', mockCueData);
-        }
+        sendToAllWindows('cue-handled', mockCueData);
       }
       
       controllerManager.getLightingController()?.onBeat();
@@ -395,7 +388,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           performer: 'None',
           trackMode: 'simulated',
           beat: 'Unknown',
-          keyframe: 'On',
+          keyframe: 'Next',
           bonusEffect: 'None',
           ledPositions: [],
           ledColor: 'off',
@@ -422,11 +415,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         }
         
         // Send the simulated cue data to the frontend for visual indicators
-        const allWindows = BrowserWindow.getAllWindows();
-        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-        if (mainWindow) {
-          mainWindow.webContents.send('cue-handled', mockCueData);
-        }
+        sendToAllWindows('cue-handled', mockCueData);
       }
       
       controllerManager.getLightingController()?.onKeyframe();
@@ -496,10 +485,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         }
         
         // Send the simulated cue data to the frontend for visual indicators
-        const mainWindow = BrowserWindow.getAllWindows()[0];
-        if (mainWindow) {
-          mainWindow.webContents.send('cue-handled', mockCueData);
-        }
+        sendToAllWindows('cue-handled', mockCueData);
       }
       
       controllerManager.getLightingController()?.onMeasure();
@@ -603,11 +589,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
         }
         
         // Send the simulated cue data to the frontend
-        const allWindows = BrowserWindow.getAllWindows();
-        const mainWindow = allWindows.length > 0 ? allWindows[0] : null;
-        if (mainWindow) {
-          mainWindow.webContents.send('cue-handled', mockCueData);
-        }
+        sendToAllWindows('cue-handled', mockCueData);
         
         return { success: true };
       } else {

@@ -11,6 +11,7 @@ import {
   EventListenerNode,
   EffectRaiserNode,
   LogicNode,
+  VariableDefinition,
   YargEventNode,
   YargNodeCueDefinition,
   ValueSource,
@@ -93,7 +94,6 @@ function migrateActionNode(action: any): ActionNode {
     ...action,
     target: migrateTarget(action.target),
     color: migrateColorSetting(action.color),
-    secondaryColor: action.secondaryColor ? migrateColorSetting(action.secondaryColor) : undefined,
     timing: migrateTiming(action.timing),
     layer: action.layer !== undefined ? migrateValueSource(action.layer, 0) : undefined
   };
@@ -109,6 +109,8 @@ export interface CompiledNodeCue<TEvent extends BaseEventNode> {
   effectRaiserMap: Map<string, EffectRaiserNode>;
   eventDefinitions: EventDefinition[];
   adjacency: Map<string, Connection[]>;
+  /** Group-level variable definitions; set by loader from file.group.variables */
+  groupVariables?: VariableDefinition[];
 }
 
 export type CompiledYargCue = CompiledNodeCue<YargEventNode>;
@@ -162,7 +164,10 @@ export class NodeCueCompiler {
     }
 
     if (!actions.length && !eventRaisers.length && !eventListeners.length && !effectRaisers.length) {
-      throw new NodeCueCompilationError('At least one action, event raiser, event listener, or effect raiser node is required.');
+      const cueId = 'cueType' in definition ? definition.cueType : definition.cueTypeId;
+      throw new NodeCueCompilationError(
+        `At least one action, event raiser, event listener, or effect raiser node is required. Cue '${definition.name}' (${cueId}) has none.`
+      );
     }
 
     const eventMap = new Map(events.map(event => [event.id, event]));

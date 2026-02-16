@@ -1,9 +1,10 @@
 import * as React from 'react';
 import { FaMoon, FaSun, FaLightbulb, FaPlay, FaInfinity } from 'react-icons/fa';
-import { FiActivity, FiLayout, FiCpu, FiInfo, FiSliders, FiVolume2, FiPenTool, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiActivity, FiLayout, FiCpu, FiInfo, FiSliders, FiVolume2, FiPenTool, FiChevronLeft, FiChevronRight, FiExternalLink } from 'react-icons/fi';
 import { useAtom, useSetAtom } from 'jotai';
 import { Pages } from './../types';
 import { currentPageAtom } from './../atoms';
+import { openCueEditorWindow } from '../ipcApi';
 
 interface LeftMenuProps {
   isDarkMode: boolean;
@@ -19,6 +20,10 @@ const LeftMenu: React.FC<LeftMenuProps> = ({ isDarkMode, toggleDarkMode, isColla
   const handleMenuClick = (page: Pages) => {
     setActiveMenu(page);
     setCurrentPage(page);
+  };
+
+  const handleCueEditorClick = () => {
+    openCueEditorWindow();
   };
 
   const buttonClasses = (menuName: Pages) =>
@@ -84,12 +89,17 @@ const LeftMenu: React.FC<LeftMenuProps> = ({ isDarkMode, toggleDarkMode, isColla
 
         {/* Cue Editor Button */}
         <button
-          onClick={() => handleMenuClick(Pages.CueEditor)}
+          onClick={handleCueEditorClick}
           className={buttonClasses(Pages.CueEditor)}
           title={isCollapsed ? 'Cue Editor' : undefined}
         >
           <FiPenTool className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">Cue Editor</span>}
+          {!isCollapsed && (
+            <span className="text-[12pt] flex items-center gap-1">
+              Cue Editor
+              <FiExternalLink className="text-[10pt]" />
+            </span>
+          )}
         </button>
 
         {/* Network Debug Button */}

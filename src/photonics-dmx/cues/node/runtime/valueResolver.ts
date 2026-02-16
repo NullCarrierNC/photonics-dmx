@@ -3,25 +3,37 @@
  * Resolves ValueSource objects to actual runtime values.
  */
 
-import { Color, Brightness, BlendMode, LocationGroup, LightTarget } from '../../../types';
+import { Color, Brightness, BlendMode, LocationGroup, LightTarget, TrackedLight } from '../../../types';
 import { ValueSource, VariableType } from '../../types/nodeCueTypes';
+import { COLOR_OPTIONS, LIGHT_TARGET_OPTIONS } from '../../../constants/options';
 import { ExecutionContext } from './ExecutionContext';
 import { VariableValue } from './executionTypes';
 
+/** Optional; when provided, variable lookups use scope-aware store (cue vs cue-group). */
+type VariableDefinitionsForScope = { name: string; scope: 'cue' | 'cue-group' }[];
+
 /**
  * Resolve a value source to an actual value at runtime.
+ * When variableDefinitions is provided, variable sources are resolved from the scope-correct
+ * store (cue vs cue-group) to match scope-aware writes. When not provided, falls back to
+ * cue-level then group-level.
  */
 export function resolveValue(
   expectedType: VariableType,
   source: ValueSource | undefined,
-  context: ExecutionContext
-): number | boolean | string {
+  context: ExecutionContext,
+  variableDefinitions?: VariableDefinitionsForScope
+): number | boolean | string | TrackedLight[] {
   if (!source) {
+    if (expectedType === 'light-array') return [];
     return expectedType === 'number' ? 0 : expectedType === 'boolean' ? false : '';
   }
 
   if (source.source === 'literal') {
-    if (expectedType === 'string' || expectedType === 'cue-type') {
+    if (expectedType === 'light-array') {
+      return Array.isArray(source.value) ? (source.value as TrackedLight[]) : [];
+    }
+    if (expectedType === 'string' || expectedType === 'cue-type' || expectedType === 'color' || expectedType === 'event') {
       return String(source.value);
     }
     if (expectedType === 'number') {
@@ -37,13 +49,19 @@ export function resolveValue(
     return source.value === true || source.value === 'true';
   }
 
-  // Check cue-level store first, then group-level (use context's stores)
-  const cueVar = context.cueLevelVarStore.get(source.name);
-  const groupVar = context.groupLevelVarStore.get(source.name);
-  const existing = cueVar ?? groupVar;
+  // Variable source: use scope-aware store when definitions provided, else cue then group
+  const existing = variableDefinitions
+    ? (variableDefinitions.some(v => v.name === source.name && v.scope === 'cue')
+        ? context.cueLevelVarStore
+        : context.groupLevelVarStore
+      ).get(source.name)
+    : (context.cueLevelVarStore.get(source.name) ?? context.groupLevelVarStore.get(source.name));
   
   if (existing) {
-    if (expectedType === 'string' || expectedType === 'cue-type') {
+    if (expectedType === 'light-array') {
+      return existing.type === 'light-array' ? (existing.value as TrackedLight[]) : [];
+    }
+    if (expectedType === 'string' || expectedType === 'cue-type' || expectedType === 'color' || expectedType === 'event') {
       return String(existing.value);
     }
     if (expectedType === 'number') {
@@ -57,7 +75,10 @@ export function resolveValue(
   }
 
   // Use fallback
-  if (expectedType === 'string' || expectedType === 'cue-type') {
+  if (expectedType === 'light-array') {
+    return Array.isArray(source.fallback) ? (source.fallback as TrackedLight[]) : [];
+  }
+  if (expectedType === 'string' || expectedType === 'cue-type' || expectedType === 'color' || expectedType === 'event') {
     return source.fallback !== undefined ? String(source.fallback) : '';
   }
   if (expectedType === 'number') {
@@ -107,7 +128,7 @@ export function resolveLightTarget(
   context: ExecutionContext
 ): LightTarget {
   const value = resolveValue('string', source, context);
-  const valid: LightTarget[] = ['all', 'even', 'odd', 'random-1', 'random-2', 'random-3'];
+  const valid: LightTarget[] = LIGHT_TARGET_OPTIONS;
   return valid.includes(value as LightTarget) ? (value as LightTarget) : 'all';
 }
 
@@ -119,9 +140,7 @@ export function resolveColor(
   context: ExecutionContext
 ): Color {
   const value = resolveValue('string', source, context);
-  const validColors: Color[] = [
-    'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'white', 'transparent'
-  ];
+  const validColors: Color[] = COLOR_OPTIONS;
   return validColors.includes(value as Color) ? (value as Color) : 'blue';
 }
 

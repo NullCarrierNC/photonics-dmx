@@ -16,6 +16,7 @@ export class YargNodeCue implements INetCue {
 
   private static cueLevelVarStores = new Map<string, Map<string, VariableValue>>();
   private static groupLevelVarStores = new Map<string, Map<string, VariableValue>>();
+  private readonly groupId: string;
   private cueLevelVarStore: Map<string, VariableValue>;
   private groupLevelVarStore: Map<string, VariableValue>;
   private cueStartedFired = false;
@@ -27,6 +28,7 @@ export class YargNodeCue implements INetCue {
   private queuedParameters: CueData[] = [];
 
   constructor(groupId: string, private readonly compiledCue: CompiledYargCue, effectRegistry?: EffectRegistry) {
+    this.groupId = groupId;
     const definition = compiledCue.definition as YargNodeCueDefinition;
     this.cueId = definition.cueType;
     this.id = `${groupId}:${definition.id}`;
@@ -201,6 +203,7 @@ export class YargNodeCue implements INetCue {
 
     this.cueLevelVarStore.clear();
     YargNodeCue.cueLevelVarStores.delete(this.id);
+    YargNodeCue.groupLevelVarStores.delete(this.groupId);
     this.cueStartedFired = false;
     
     // Reset queuing state
@@ -223,7 +226,7 @@ export class YargNodeCue implements INetCue {
     }
 
     // Initialize group-level variables from compiled cue metadata
-    const groupVariables = (this.compiledCue as any).groupVariables ?? [];
+    const groupVariables = this.compiledCue.groupVariables ?? [];
     for (const varDef of groupVariables) {
       if (!this.groupLevelVarStore.has(varDef.name)) {
         this.groupLevelVarStore.set(varDef.name, {
@@ -267,7 +270,9 @@ export class YargNodeCue implements INetCue {
       return parameters.beat === 'Strong' || parameters.beat === 'Weak';
     }
     if (eventType === 'keyframe') {
-      return true; // Keyframe events are always active when present
+      return parameters.keyframe === 'First'
+        || parameters.keyframe === 'Next'
+        || parameters.keyframe === 'Previous';
     }
     
     // Check instrument events using the shared mapping function

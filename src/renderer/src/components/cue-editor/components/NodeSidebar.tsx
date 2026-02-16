@@ -15,9 +15,10 @@ import type {
   AudioEffectDefinition,
   NotesNode
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { EditorMode } from '../lib/types';
+import type { EditorMode, NotesVariant } from '../lib/types';
 import type { EditorNode, EventOption } from '../lib/types';
 import NodeCreationSections from './NodeCreationSections';
+import DebugPanel from './DebugPanel';
 import EffectRaiserEditor from './node-editors/EffectRaiserEditor';
 import EffectListenerEditor from './node-editors/EffectListenerEditor';
 import EventRaiserEditor from './node-editors/EventRaiserEditor';
@@ -43,7 +44,7 @@ type Props = {
   addEventListenerNode?: () => void;
   addEffectRaiserNode?: () => void;
   addEffectListenerNode?: () => void;
-  addNotesNode?: () => void;
+  addNotesNode?: (variant: NotesVariant) => void;
   updateSelectedNode: <T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | EffectRaiserNode | EffectEventListenerNode | NotesNode>(updates: Partial<T>) => void;
 };
 
@@ -68,23 +69,29 @@ const NodeSidebar: React.FC<Props> = ({
 }) => {
   return (
     <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner h-full flex flex-col overflow-hidden">
-      <div className="p-3 flex-1 overflow-y-auto space-y-4">
-        {!selectedNode ? (
-          <NodeCreationSections
-            activeMode={activeMode}
-            editorMode={editorMode}
-            addEventNode={addEventNode}
-            addActionNode={addActionNode}
-            addLogicNode={addLogicNode}
-            addEventRaiserNode={addEventRaiserNode}
-            addEventListenerNode={addEventListenerNode}
-            addEffectRaiserNode={addEffectRaiserNode}
-            addEffectListenerNode={addEffectListenerNode}
-            addNotesNode={addNotesNode}
-          />
-        ) : (
-          <>
-            <div>
+      {!selectedNode ? (
+        <div className="p-3 flex-1 overflow-hidden">
+          <div className="flex flex-col h-full space-y-4">
+            <div className="shrink-0">
+              <NodeCreationSections
+                activeMode={activeMode}
+                editorMode={editorMode}
+                addEventNode={addEventNode}
+                addActionNode={addActionNode}
+                addLogicNode={addLogicNode}
+                addEventRaiserNode={addEventRaiserNode}
+                addEventListenerNode={addEventListenerNode}
+                addEffectRaiserNode={addEffectRaiserNode}
+                addEffectListenerNode={addEffectListenerNode}
+                addNotesNode={addNotesNode}
+              />
+            </div>
+            <DebugPanel className="flex-1 min-h-0" />
+          </div>
+        </div>
+      ) : (
+        <div className="p-3 flex-1 overflow-y-auto space-y-4">
+          <div>
               <h3 className="font-semibold text-sm mb-2">Selected Node</h3>
               {selectedNode.data.kind === 'effect-raiser' && (
                 <EffectRaiserEditor
@@ -143,9 +150,8 @@ const NodeSidebar: React.FC<Props> = ({
                 />
               )}
             </div>
-          </>
-        )}
-      </div>
+          </div>
+      )}
     </aside>
   );
 };

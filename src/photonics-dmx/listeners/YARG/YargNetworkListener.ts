@@ -217,7 +217,7 @@ export class YargNetworkListener extends EventEmitter {
     try {
       let offset = 0;
 
-      // Ensure buffer has exactly the expected length
+      // Ensure buffer has at least the minimum required length (longer packets are allowed for forward compatibility)
       const expectedLength =
         4 + // Header
         1 + // Datagram version
@@ -246,8 +246,8 @@ export class YargNetworkListener extends EventEmitter {
         1 + // Spotlight
         1; // Singalong
 
-      if (buffer.length !== expectedLength) {
-        throw new Error(`Received packet is not the expected length: ${buffer.length} bytes, expected exactly ${expectedLength} bytes`);
+      if (buffer.length < expectedLength) {
+        throw new Error(`Received packet is too short: ${buffer.length} bytes, expected at least ${expectedLength} bytes`);
       }
 
       // Header (little-endian)
@@ -284,9 +284,9 @@ export class YargNetworkListener extends EventEmitter {
       const autoGenTrack = buffer.readUInt8(offset) === 1;
       offset += 1;
       
-      if(datagramVersion !== YARG_DATAGRAM_VERSION){
-        console.error(`Invalid datagram version: ${datagramVersion}`);
-        const errorMessage = `YARG Datagram Version mismatch: received version ${datagramVersion}, expected version ${YARG_DATAGRAM_VERSION}`;
+      if (datagramVersion < YARG_DATAGRAM_VERSION) {
+        console.error(`Unsupported datagram version: ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`);
+        const errorMessage = `YARG Datagram Version too old: received version ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`;
         
         // Emit error event for the controller to handle
         this.emit('yarg-error', {

@@ -79,6 +79,12 @@ export interface AppPreferences {
     x?: number;
     y?: number;
   };
+  cueEditorWindowState?: {
+    width: number;
+    height: number;
+    x?: number;
+    y?: number;
+  };
 }
 
 /**
@@ -139,7 +145,11 @@ const DEFAULT_PREFERENCES: AppPreferences = {
     openDmxExpanded: false
   },
   allowMultipleActiveRigs: false,
-  audioConfig: DEFAULT_AUDIO_CONFIG
+  audioConfig: DEFAULT_AUDIO_CONFIG,
+  cueEditorWindowState: {
+    width: 1200,
+    height: 900
+  }
 };
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {
@@ -245,20 +255,29 @@ export class ConfigurationManager {
    */
   private migrateToDmxRigs(): void {
     const currentRigs = this.dmxRigs.get();
+    const rigs = Array.isArray(currentRigs?.rigs) ? currentRigs.rigs : [];
     
     // If rigs already exist, no migration needed
-    if (currentRigs.rigs.length > 0) {
+    if (rigs.length > 0) {
       return;
     }
 
     // Check if we have an existing layout to migrate
-    const existingLayout = this.lightingLayout.get();
+    const existingLayout = this.lightingLayout.get() ?? ({} as LightingConfiguration);
+    const safeLayout: LightingConfiguration = {
+      numLights: existingLayout.numLights ?? 0,
+      lightLayout: existingLayout.lightLayout ?? { id: 'default-layout', label: 'Default Layout' },
+      strobeType: existingLayout.strobeType ?? ConfigStrobeType.None,
+      frontLights: Array.isArray(existingLayout.frontLights) ? existingLayout.frontLights : [],
+      backLights: Array.isArray(existingLayout.backLights) ? existingLayout.backLights : [],
+      strobeLights: Array.isArray(existingLayout.strobeLights) ? existingLayout.strobeLights : []
+    };
     
     // Only migrate if layout has actual lights configured
-    if (existingLayout.numLights > 0 || 
-        existingLayout.frontLights.length > 0 || 
-        existingLayout.backLights.length > 0 || 
-        existingLayout.strobeLights.length > 0) {
+    if (safeLayout.numLights > 0 || 
+        safeLayout.frontLights.length > 0 || 
+        safeLayout.backLights.length > 0 || 
+        safeLayout.strobeLights.length > 0) {
       const { v4: uuidv4 } = require('uuid');
       
       const defaultRig: DmxRig = {
@@ -266,7 +285,7 @@ export class ConfigurationManager {
         name: 'Default Rig',
         universe: 1,
         active: true,
-        config: existingLayout
+        config: safeLayout
       };
       
       this.dmxRigs.update({ rigs: [defaultRig] });

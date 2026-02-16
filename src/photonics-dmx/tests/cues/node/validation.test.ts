@@ -169,7 +169,8 @@ describe('Node cue validation', () => {
     });
     expect(valid.valid).toBe(true);
 
-    const invalid = validateYargNodeCueFile({
+    // Cycles that include an action node are allowed (runtime uses visit tracking to break loops)
+    const cycleWithAction = validateYargNodeCueFile({
       version: 1,
       mode: 'yarg',
       group: { id: 'g1', name: 'Group' },
@@ -181,6 +182,6 @@ describe('Node cue validation', () => {
         ]
       }]
     });
-    expect(invalid.valid).toBe(false);
+    expect(cycleWithAction.valid).toBe(true);
   });
 });
