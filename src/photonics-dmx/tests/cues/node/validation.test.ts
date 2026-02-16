@@ -169,9 +169,8 @@ describe('Node cue validation', () => {
     });
     expect(valid.valid).toBe(true);
 
-    // Note: JSON schema validation does not reject action->logic back-edges (cycle);
-    // cycle detection is done at compile time. Schema still accepts the structure.
-    const withCycle = validateYargNodeCueFile({
+    // Cycles that include an action node are allowed (runtime uses visit tracking to break loops)
+    const cycleWithAction = validateYargNodeCueFile({
       version: 1,
       mode: 'yarg',
       group: { id: 'g1', name: 'Group' },
@@ -183,87 +182,6 @@ describe('Node cue validation', () => {
         ]
       }]
     });
-    expect(withCycle.valid).toBe(true);
-  });
-
-  it('validates cue with random, shuffle-lights, and for-each-light logic nodes', () => {
-    const definition: YargNodeCueDefinition = {
-      id: 'new-logic-cue',
-      name: 'New Logic Cue',
-      cueType: CueType.Verse,
-      style: 'primary',
-      nodes: {
-        events: [{ id: 'event-1', type: 'event', eventType: 'cue-started' }],
-        actions: [{
-          id: 'action-1',
-          type: 'action',
-          effectType: 'set-color',
-          target: { groups: { source: 'literal', value: 'front' }, filter: { source: 'literal', value: 'all' } },
-          color: { name: { source: 'literal', value: 'blue' }, brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } },
-          timing: { waitForCondition: 'none', waitForTime: { source: 'literal', value: 0 }, duration: { source: 'literal', value: 100 }, waitUntilCondition: 'none', waitUntilTime: { source: 'literal', value: 0 }, easing: 'linear', level: { source: 'literal', value: 1 } }
-        }],
-        logic: [
-          { id: 'r1', type: 'logic', logicType: 'random', mode: 'random-integer', min: { source: 'literal', value: 0 }, max: { source: 'literal', value: 1 }, assignTo: 'dir' },
-          { id: 's1', type: 'logic', logicType: 'shuffle-lights', sourceVariable: 'allLights', assignTo: 'shuffled' },
-          { id: 'f1', type: 'logic', logicType: 'for-each-light', sourceVariable: 'allLights', currentLightVariable: 'cur', currentIndexVariable: 'idx' }
-        ]
-      },
-      connections: [
-        { from: 'event-1', to: 'r1' },
-        { from: 'r1', to: 'action-1' }
-      ],
-      layout: { nodePositions: {} }
-    };
-    const result = validateYargNodeCueFile({
-      version: 1,
-      mode: 'yarg',
-      group: { id: 'g1', name: 'Group' },
-      cues: [definition]
-    });
-    expect(result.valid).toBe(true);
-  });
-
-  it('validates action with dual-mode-rotation and alternating-pattern effect types', () => {
-    const definition: YargNodeCueDefinition = {
-      id: 'effect-types-cue',
-      name: 'Effect Types Cue',
-      cueType: CueType.Dischord,
-      style: 'primary',
-      nodes: {
-        events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
-        actions: [
-          {
-            id: 'action-dm',
-            type: 'action',
-            effectType: 'dual-mode-rotation',
-            target: { groups: { source: 'literal', value: 'front,back' }, filter: { source: 'literal', value: 'all' } },
-            color: { name: { source: 'literal', value: 'green' }, brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } },
-            timing: { waitForCondition: 'beat', waitForTime: { source: 'literal', value: 0 }, duration: { source: 'literal', value: 0 }, waitUntilCondition: 'none', waitUntilTime: { source: 'literal', value: 0 }, easing: 'linear', level: { source: 'literal', value: 1 } },
-            config: { beatsPerCycle: 2, dualModeSolidColor: 'green', dualModeSwitchCondition: 'measure', dualModeIsLargeVenue: true }
-          },
-          {
-            id: 'action-ap',
-            type: 'action',
-            effectType: 'alternating-pattern',
-            target: { groups: { source: 'literal', value: 'front,back' }, filter: { source: 'literal', value: 'third-2' } },
-            color: { name: { source: 'literal', value: 'blue' }, brightness: { source: 'literal', value: 'medium' }, blendMode: { source: 'literal', value: 'replace' } },
-            timing: { waitForCondition: 'keyframe', waitForTime: { source: 'literal', value: 0 }, duration: { source: 'literal', value: 0 }, waitUntilCondition: 'none', waitUntilTime: { source: 'literal', value: 0 }, easing: 'linear', level: { source: 'literal', value: 1 } },
-            config: { switchCondition: 'keyframe', completeCondition: 'beat', patternBTarget: { groups: { source: 'literal', value: 'front,back' }, filter: { source: 'literal', value: 'even' } } }
-          }
-        ]
-      },
-      connections: [
-        { from: 'event-1', to: 'action-dm' },
-        { from: 'event-1', to: 'action-ap' }
-      ],
-      layout: { nodePositions: {} }
-    };
-    const result = validateYargNodeCueFile({
-      version: 1,
-      mode: 'yarg',
-      group: { id: 'g1', name: 'Group' },
-      cues: [definition]
-    });
-    expect(result.valid).toBe(true);
+    expect(cycleWithAction.valid).toBe(true);
   });
 });

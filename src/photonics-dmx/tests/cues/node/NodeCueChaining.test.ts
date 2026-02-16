@@ -6,6 +6,8 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { CueType } from '../../../cues/types/cueTypes';
 import { Effect, TrackedLight } from '../../../types';
 
+jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+
 describe('Node cue chaining', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -93,16 +95,14 @@ describe('Node cue chaining', () => {
 
     const callOrder: string[] = [];
     const sequencerMock: Partial<ILightingController> = {
-      addEffectWithCallback: (name: string, _effect: Effect, onComplete: () => void) => {
+      addEffect: (name: string, _effect: Effect) => {
         callOrder.push(name);
-        // Call callback immediately to simulate completion
-        onComplete();
       }
     };
 
     await cue.execute({ beat: 'Strong' } as any, sequencerMock as ILightingController, null as any);
 
-    // Verify both actions were executed in order
+    // With different layers (10 and 1) chain is not composed; each action submitted (fire-and-forget)
     expect(callOrder.length).toBe(2);
     expect(callOrder[0]).toContain('a1');
     expect(callOrder[1]).toContain('a2');

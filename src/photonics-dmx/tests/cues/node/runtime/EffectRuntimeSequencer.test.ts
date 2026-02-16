@@ -5,6 +5,8 @@ import { defaultCueData, type CueData } from '../../../../cues';
 import { getColor } from '../../../../helpers/dmxHelpers';
 import { createSequencerHarness } from '../../../helpers/sequencerHarness';
 
+jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+
 const createCueData = (overrides: Partial<CueData> = {}): CueData => ({
   ...defaultCueData,
   beatsPerMinute: 120,

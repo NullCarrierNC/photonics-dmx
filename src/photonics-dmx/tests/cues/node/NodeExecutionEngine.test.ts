@@ -13,6 +13,8 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { CueData, CueType } from '../../../cues/types/cueTypes';
 import { VariableValue } from '../../../cues/node/runtime/executionTypes';
 
+jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+
 describe('NodeExecutionEngine', () => {
   let mockSequencer: ILightingController;
   let mockLightManager: DmxLightManager;
@@ -165,8 +167,8 @@ describe('NodeExecutionEngine', () => {
       const parameters = createCueData('Strong');
       engine.startExecution(eventNode, parameters);
 
-      // Verify that addEffectWithCallback was called
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledTimes(1);
+      // Verify that addEffect was called
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1);
       expect(mockLightManager.getLights).toHaveBeenCalled();
     });
 
@@ -297,16 +299,8 @@ describe('NodeExecutionEngine', () => {
 
       engine.startExecution(eventNode, createCueData('Strong'));
 
-      // First action should be called immediately
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledTimes(1);
-
-      // Simulate first action completing
-      const firstCall = (mockSequencer.addEffectWithCallback as any).mock.calls[0];
-      const completionCallback = firstCall[2];
-      completionCallback();
-
-      // Second action should now be called
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledTimes(2);
+      // With different layers chain is not composed; each action is submitted (fire-and-forget)
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -423,8 +417,8 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'));
 
       // Since 5 > 3 is true, action-true should be executed
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledTimes(1);
-      const call = (mockSequencer.addEffectWithCallback as any).mock.calls[0];
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1);
+      const call = (mockSequencer.addEffect as any).mock.calls[0];
       const effectName = call[0];
       expect(effectName).toContain('action-true');
     });
@@ -543,7 +537,7 @@ describe('NodeExecutionEngine', () => {
       });
 
       // Action should execute because 42 == 42
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledTimes(1);
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1020,7 +1014,7 @@ describe('NodeExecutionEngine', () => {
 
       // Both effect and subsequent action should execute
       // Effect executes async, action executes in chain
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
     });
   });
 
@@ -1118,7 +1112,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.type).toBe('number');
 
       // Action should still execute
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
     });
 
     it('should extract config data and assign to variable', () => {
@@ -1218,7 +1212,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.type).toBe('number');
 
       // Action should still execute
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
     });
 
     it('should handle cue data node without assignTo', () => {
@@ -1305,7 +1299,7 @@ describe('NodeExecutionEngine', () => {
       expect(cueLevelVarStore.size).toBe(0);
 
       // Action should still execute
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
     });
 
     it('should use cue data in conditional branching', () => {
@@ -1443,11 +1437,9 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.value).toBe(3);
 
       // Should execute high action (3 >= 2)
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalledWith(
+      expect(mockSequencer.addEffect).toHaveBeenCalledWith(
         expect.stringContaining('action-high'),
-        expect.anything(),
-        expect.anything(),
-        false
+        expect.anything()
       );
     });
 
@@ -1553,7 +1545,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.type).toBe('number');
 
       // Action should still execute
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
     });
   });
 
@@ -1651,7 +1643,7 @@ describe('NodeExecutionEngine', () => {
 
       // Wait for action to execute
       setTimeout(() => {
-        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        expect(mockSequencer.addEffect).toHaveBeenCalled();
         // The resolved color should be 'red' from the variable
       }, 10);
     });
@@ -1733,7 +1725,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'));
 
       setTimeout(() => {
-        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        expect(mockSequencer.addEffect).toHaveBeenCalled();
         // Groups should be resolved to ['front', 'back']
       }, 10);
     });
@@ -1801,7 +1793,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'));
 
       setTimeout(() => {
-        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        expect(mockSequencer.addEffect).toHaveBeenCalled();
         // Should use fallback color 'green'
       }, 10);
     });
@@ -1910,7 +1902,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'));
 
       setTimeout(() => {
-        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        expect(mockSequencer.addEffect).toHaveBeenCalled();
         // Duration should be 120 (BPM) * 5 = 600
         expect(cueLevelVarStore.get('calculatedDuration')?.value).toBe(600);
       }, 10);
@@ -2006,7 +1998,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'));
 
       setTimeout(() => {
-        expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
+        expect(mockSequencer.addEffect).toHaveBeenCalled();
         // Should resolve to default color 'blue' (from resolveColor method)
       }, 10);
     });

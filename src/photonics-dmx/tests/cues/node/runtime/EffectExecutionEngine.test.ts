@@ -5,6 +5,8 @@ import type { CueData } from '../../../../cues/types/cueTypes';
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces';
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager';
 
+jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+
 describe('EffectExecutionEngine', () => {
   let mockSequencer: jest.Mocked<ILightingController>;
   let mockLightManager: jest.Mocked<DmxLightManager>;
