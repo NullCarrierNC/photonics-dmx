@@ -305,7 +305,7 @@ export interface AudioEventNode extends BaseEventNode {
 }
 
 
-export const NODE_EFFECT_TYPES = ['set-color', 'blackout', 'chase'] as const;
+export const NODE_EFFECT_TYPES = ['set-color', 'blackout', 'chase', 'sweep', 'rotation', 'flash', 'cycle'] as const;
 
 export type NodeEffectType = typeof NODE_EFFECT_TYPES[number];
 
@@ -335,10 +335,33 @@ export interface ActionTimingConfig {
 
 export type NodeChaseOrder = 'linear' | 'inverse-linear';
 
+export type SweepDirection = 'forward' | 'reverse';
+export type RotationDirection = 'clockwise' | 'counter-clockwise';
+
 export interface NodeActionConfig {
   perLightOffsetMs?: number;
   order?: NodeChaseOrder;
   loop?: boolean;
+  /** Sweep: total time (ms), fade durations (ms), overlap (0-100), delay between sweeps (ms), direction */
+  sweepTime?: number;
+  sweepFadeInDuration?: number;
+  sweepFadeOutDuration?: number;
+  sweepLightOverlap?: number;
+  sweepBetweenDelay?: number;
+  sweepDirection?: SweepDirection;
+  /** Rotation: direction, beats per cycle, start offset */
+  rotationDirection?: RotationDirection;
+  beatsPerCycle?: number;
+  startOffset?: number;
+  /** Flash: hold time (ms), fade in/out durations (ms) */
+  holdTime?: number;
+  flashDurationIn?: number;
+  flashDurationOut?: number;
+  /** Cycle: transition duration (ms), step trigger (WaitCondition), base color for inactive lights */
+  cycleTransitionDuration?: number;
+  cycleStepTrigger?: WaitCondition;
+  cycleBaseColor?: string;
+  cycleBaseBrightness?: string;
   custom?: Record<string, unknown>;
 }
 

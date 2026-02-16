@@ -149,6 +149,22 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
     perLightOffsetMs: { type: 'number', nullable: true, minimum: 0 },
     order: { type: 'string', enum: ['linear', 'inverse-linear'], nullable: true },
     loop: { type: 'boolean', nullable: true },
+    sweepTime: { type: 'number', nullable: true, minimum: 0 },
+    sweepFadeInDuration: { type: 'number', nullable: true, minimum: 0 },
+    sweepFadeOutDuration: { type: 'number', nullable: true, minimum: 0 },
+    sweepLightOverlap: { type: 'number', nullable: true, minimum: 0, maximum: 100 },
+    sweepBetweenDelay: { type: 'number', nullable: true, minimum: 0 },
+    sweepDirection: { type: 'string', enum: ['forward', 'reverse'], nullable: true },
+    rotationDirection: { type: 'string', enum: ['clockwise', 'counter-clockwise'], nullable: true },
+    beatsPerCycle: { type: 'number', nullable: true, minimum: 1 },
+    startOffset: { type: 'number', nullable: true, minimum: 0 },
+    holdTime: { type: 'number', nullable: true, minimum: 0 },
+    flashDurationIn: { type: 'number', nullable: true, minimum: 0 },
+    flashDurationOut: { type: 'number', nullable: true, minimum: 0 },
+    cycleTransitionDuration: { type: 'number', nullable: true, minimum: 0 },
+    cycleStepTrigger: { type: 'string', nullable: true },
+    cycleBaseColor: { type: 'string', nullable: true },
+    cycleBaseBrightness: { type: 'string', nullable: true },
     custom: { type: 'object', nullable: true, additionalProperties: true }
   }
 };
@@ -527,7 +543,7 @@ const targetSchema: JSONSchemaType<NodeActionTarget> = {
 const actionSchema: JSONSchemaType<ActionNode> = {
   type: 'object',
   required: ['id', 'type', 'effectType', 'target', 'color', 'timing'],
-  additionalProperties: false,
+  additionalProperties: true, // Allow editor/backup metadata (e.g. position) to be ignored
   properties: {
     id: stringIdSchema,
     type: { type: 'string', const: 'action' },
@@ -897,12 +913,15 @@ const formatErrors = (errors: DefinedError[] | null | undefined): string[] => {
 };
 
 /**
- * Detects circular dependencies in action node chains using depth-first search.
- * Returns an array of error messages describing any cycles found.
+ * Detects circular dependencies that would cause infinite synchronous execution.
+ * Only logic-only cycles are reported; cycles that include at least one action node
+ * are allowed because the runtime advances phase on action completion, so the loop
+ * breaks across async boundaries.
  */
 const detectCycles = (
   connections: Connection[],
-  nodeIds: Set<string>
+  nodeIds: Set<string>,
+  actionIds: Set<string>
 ): string[] => {
   const errors: string[] = [];
 
@@ -932,7 +951,10 @@ const detectCycles = (
         const cycleStart = path.indexOf(neighbour);
         const cycle = cycleStart >= 0 ? path.slice(cycleStart) : path;
         cycle.push(neighbour);
-        errors.push(`Circular dependency detected: ${cycle.join(' → ')}`);
+        const cycleHasAction = cycle.some((id) => actionIds.has(id));
+        if (!cycleHasAction) {
+          errors.push(`Circular dependency detected: ${cycle.join(' → ')}`);
+        }
         return true;
       }
     }
@@ -981,11 +1003,11 @@ export const validateYargNodeCueFile = (value: unknown): NodeCueValidationResult
       cueVarNames.add(varDef.name);
     }
     
-    // Check for circular dependencies
+    // Check for circular dependencies (only logic-only cycles are invalid)
     const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
     const actionIds = new Set(cue.nodes.actions.map(a => a.id));
     const nonEventIds = new Set<string>([...logicIds, ...actionIds]);
-    const cycleErrors = detectCycles(cue.connections, nonEventIds);
+    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds);
     semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
   }
 
@@ -1035,11 +1057,11 @@ export const validateAudioNodeCueFile = (value: unknown): NodeCueValidationResul
       cueVarNames.add(varDef.name);
     }
     
-    // Check for circular dependencies
+    // Check for circular dependencies (only logic-only cycles are invalid)
     const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
     const actionIds = new Set(cue.nodes.actions.map(a => a.id));
     const nonEventIds = new Set<string>([...logicIds, ...actionIds]);
-    const cycleErrors = detectCycles(cue.connections, nonEventIds);
+    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds);
     semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
   }
 

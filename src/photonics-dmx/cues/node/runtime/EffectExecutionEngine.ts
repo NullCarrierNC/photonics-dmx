@@ -25,6 +25,8 @@ import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './a
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator';
 import { sendToAllWindows } from '../../../../main/utils/windowUtils';
 
+const NODE_EXECUTION_CHANNEL = 'node-cues:node-execution';
+
 export class EffectExecutionEngine {
   private compiledEffect: CompiledEffect<BaseEventNode>;
   private sequencer: ILightingController;
@@ -36,6 +38,17 @@ export class EffectExecutionEngine {
   private eventListeners: Map<string, EventListenerNode[]> = new Map();
   private callerCueData: CueData | AudioCueData;  // Cue data from caller
   private onIdleCallback?: () => void;  // Called when all contexts complete
+  /** Effect names and layers submitted via addEffectWithCallback, for cancelAll to remove. */
+  private submittedEffects: Map<string, number> = new Map();
+
+  private emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
+    sendToAllWindows(NODE_EXECUTION_CHANNEL, {
+      type,
+      cueId: this.compiledEffect.definition.id,
+      nodeId,
+      timestamp: Date.now()
+    });
+  }
 
   constructor(
     compiledEffect: CompiledEffect<BaseEventNode>,
@@ -170,6 +183,7 @@ export class EffectExecutionEngine {
     }
 
     context.markVisited(nodeId);
+    this.emitNodeExecution('activated', nodeId);
 
     // Determine node type and execute
     const action = this.compiledEffect.actionMap.get(nodeId);
@@ -220,6 +234,7 @@ export class EffectExecutionEngine {
     
     if (!lights || lights.length === 0) {
       console.warn(`No lights resolved for action ${action.id}, skipping`);
+      this.emitNodeExecution('deactivated', action.id);
       context.completeAction(action.id);
       this.continueToNextNodes(action.id, context);
       return;
@@ -241,6 +256,7 @@ export class EffectExecutionEngine {
 
     if (!effect) {
       console.warn(`Failed to create effect for action ${action.id}`);
+      this.emitNodeExecution('deactivated', action.id);
       context.completeAction(action.id);
       this.continueToNextNodes(action.id, context);
       return;
@@ -248,10 +264,14 @@ export class EffectExecutionEngine {
 
     // Add callback to continue execution after action completes
     const callback = () => {
+      this.submittedEffects.delete(effectName);
+      this.emitNodeExecution('deactivated', action.id);
+      context.advancePhase();
       context.completeAction(action.id);
       this.continueToNextNodes(action.id, context);
     };
 
+    this.submittedEffects.set(effectName, resolvedLayer);
     this.sequencer.addEffectWithCallback(effectName, effect, callback);
   }
 
@@ -287,9 +307,16 @@ export class EffectExecutionEngine {
         for (const nextNodeId of nextNodes) {
           this.executeNode(nextNodeId, context);
         }
+      } else {
+        // No more nodes, check if context is complete
+        if (context.tryComplete()) {
+          context.dispose();
+        }
       }
+      this.emitNodeExecution('deactivated', logic.id);
     } catch (error) {
       console.error(`Error executing logic node ${logic.id}:`, error);
+      this.emitNodeExecution('deactivated', logic.id);
       // Continue to all outgoing edges despite error
       this.continueToNextNodes(logic.id, context);
     }
@@ -320,6 +347,8 @@ export class EffectExecutionEngine {
       const timerId = setTimeout(() => {
         context.removeTimer(timerId);
         if (context.hasVisited(delayNode.id)) {
+          this.emitNodeExecution('deactivated', delayNode.id);
+          context.advancePhase();
           context.completeAction(delayNode.id);
           this.continueToNextNodes(delayNode.id, context);
         }
@@ -327,6 +356,7 @@ export class EffectExecutionEngine {
       context.addTimer(timerId);
     } catch (error) {
       console.error(`Error executing delay node ${delayNode.id}:`, error);
+      this.emitNodeExecution('deactivated', delayNode.id);
       this.continueToNextNodes(delayNode.id, context);
     }
   }
@@ -344,6 +374,7 @@ export class EffectExecutionEngine {
       this.startListenerExecution(listener);
     }
 
+    this.emitNodeExecution('deactivated', raiser.id);
     // Continue immediately (non-blocking)
     this.continueToNextNodes(raiser.id, context);
   }
@@ -361,6 +392,10 @@ export class EffectExecutionEngine {
 
     context.setOnContextComplete(() => {
       this.activeContexts.delete(context.id);
+      // Check if effect is now idle (all contexts done)
+      if (this.activeContexts.size === 0 && this.onIdleCallback) {
+        this.onIdleCallback();
+      }
     });
 
     this.activeContexts.set(context.id, context);
@@ -412,6 +447,10 @@ export class EffectExecutionEngine {
       context.dispose();
     }
     this.activeContexts.clear();
+    for (const [name, layer] of this.submittedEffects) {
+      this.sequencer.removeEffect(name, layer);
+    }
+    this.submittedEffects.clear();
   }
 
   /**

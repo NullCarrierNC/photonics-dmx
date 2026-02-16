@@ -20,6 +20,8 @@ import ToastContainer from '../components/Toast';
 import { useToast } from '../hooks/useToast';
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles';
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow';
+import { useActiveNodes } from '../components/cue-editor/hooks/useActiveNodes';
+import { ActiveNodesContext } from '../components/cue-editor/context/ActiveNodesContext';
 import { updateDocumentFromFlow, updateEffectDocumentFromFlow } from '../components/cue-editor/lib/cueTransforms';
 import type { NodeCueFile, EffectFile, VariableDefinition, EventDefinition, EffectReference, YargEffectDefinition, AudioEffectDefinition, EffectDefinition, ActionNode, LogicNode, EffectRaiserNode, ValueSource } from '../../../photonics-dmx/cues/types/nodeCueTypes';
 
@@ -132,6 +134,13 @@ const CueEditor: React.FC = () => {
   }, [editorDoc, currentCueDefinition, currentEffectDefinition, nodes, edges, reactFlowInstance]);
 
   getUpdatedDocumentRef.current = getUpdatedDocument;
+
+  const currentGraphId = editorDoc?.mode === 'effect'
+    ? (currentEffectDefinition as { id?: string } | null)?.id ?? null
+    : (editorDoc?.file && selectedCueId && 'group' in editorDoc.file)
+      ? `${(editorDoc.file as NodeCueFile).group.id}:${selectedCueId}`
+      : selectedCueId ?? null;
+  const activeNodeIds = useActiveNodes(currentGraphId);
 
   const nodeTypes = useMemo(() => ({
     event: EventNodeComponent,
@@ -551,6 +560,7 @@ const CueEditor: React.FC = () => {
             onEffectMetadataChange={updateEffectMetadata}
           />
 
+          <ActiveNodesContext.Provider value={activeNodeIds}>
           <CueFlowCanvas
             nodes={nodes}
             edges={edges}
@@ -582,6 +592,7 @@ const CueEditor: React.FC = () => {
             addEffectListenerNode={addEffectListenerNode}
             addNotesNode={addNotesNode}
           />
+          </ActiveNodesContext.Provider>
           {validationErrors.length > 0 && (
             <div className="p-3 text-xs text-red-600 dark:text-red-300 border-t border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40">
               <p className="font-semibold mb-1">Validation errors</p>

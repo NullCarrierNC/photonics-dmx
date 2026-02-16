@@ -164,7 +164,10 @@ export class NodeCueCompiler {
     }
 
     if (!actions.length && !eventRaisers.length && !eventListeners.length && !effectRaisers.length) {
-      throw new NodeCueCompilationError('At least one action, event raiser, event listener, or effect raiser node is required.');
+      const cueId = 'cueType' in definition ? definition.cueType : definition.cueTypeId;
+      throw new NodeCueCompilationError(
+        `At least one action, event raiser, event listener, or effect raiser node is required. Cue '${definition.name}' (${cueId}) has none.`
+      );
     }
 
     const eventMap = new Map(events.map(event => [event.id, event]));

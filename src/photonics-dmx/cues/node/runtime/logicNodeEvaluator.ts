@@ -38,7 +38,7 @@ export function evaluateLogicNode(
   context: ExecutionContext,
   evaluatorContext: LogicNodeEvaluatorContext
 ): string[] {
-  const { cueId, lightManager, cueLevelVarStore, groupLevelVarStore, variableDefinitions, executeNode } = evaluatorContext;
+  const { cueId, lightManager, cueLevelVarStore, groupLevelVarStore, variableDefinitions } = evaluatorContext;
 
   const getVarStore = (varName: string) => getVariableStore(
     varName,

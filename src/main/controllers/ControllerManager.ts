@@ -235,6 +235,9 @@ export class ControllerManager {
 
     const summary = await this.nodeCueLoader.loadAll();
     console.log(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`);
+    if (summary.failed > 0 && summary.errors.length > 0) {
+      summary.errors.forEach((err) => console.error('[NodeCueLoader]', err));
+    }
     await this.nodeCueLoader.startWatching();
 
     this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {

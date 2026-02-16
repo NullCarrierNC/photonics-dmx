@@ -13,7 +13,8 @@ export class ExecutionContext {
   public readonly eventNode: BaseEventNode;
   public readonly startTime: number;
   
-  private visitedNodes: Set<string> = new Set();
+  private visitedNodes: Map<string, number> = new Map(); // nodeId -> phase when last visited
+  private phase: number = 0;
   private activeNodes: Map<string, ActionNode> = new Map(); // Nodes waiting for completion
   private completed = false;
   private activeTimers: Set<ReturnType<typeof setTimeout>> = new Set();
@@ -58,17 +59,25 @@ export class ExecutionContext {
   }
 
   /**
-   * Mark a node as visited to prevent re-execution.
+   * Mark a node as visited in the current phase.
    */
   public markVisited(nodeId: string): void {
-    this.visitedNodes.add(nodeId);
+    this.visitedNodes.set(nodeId, this.phase);
   }
 
   /**
-   * Check if a node has been visited in this context.
+   * Check if a node has been visited in the current phase (allows re-execution after advancePhase).
    */
   public hasVisited(nodeId: string): boolean {
-    return this.visitedNodes.has(nodeId);
+    return this.visitedNodes.get(nodeId) === this.phase;
+  }
+
+  /**
+   * Advance the execution phase. Called when execution resumes from a blocking node (action or delay)
+   * so that logic nodes can re-execute in the new phase (enables Action -> Math -> Conditional -> Action loops).
+   */
+  public advancePhase(): void {
+    this.phase++;
   }
 
   /**
@@ -79,9 +88,18 @@ export class ExecutionContext {
   }
 
   /**
+   * Mark an action node as complete and remove from active set (no callback).
+   * Used for intermediate chain members so only the last action triggers continuation.
+   */
+  public completeActionSilent(nodeId: string): void {
+    this.activeNodes.delete(nodeId);
+  }
+
+  /**
    * Mark an action node as complete and remove from active set.
    */
   public completeAction(nodeId: string): void {
+    if (!this.activeNodes.has(nodeId)) return;
     this.activeNodes.delete(nodeId);
     if (this.onNodeCompleteCallback) {
       this.onNodeCompleteCallback(nodeId);
@@ -139,7 +157,8 @@ export class ExecutionContext {
       id: this.id,
       eventNodeId: this.eventNode.id,
       startTime: this.startTime,
-      visitedNodes: Array.from(this.visitedNodes),
+      phase: this.phase,
+      visitedNodes: Array.from(this.visitedNodes.keys()),
       activeNodes: Array.from(this.activeNodes.keys())
     };
   }
@@ -153,6 +172,7 @@ export class ExecutionContext {
     }
     this.activeTimers.clear();
     this.visitedNodes.clear();
+    this.phase = 0;
     this.activeNodes.clear();
     this.onNodeCompleteCallback = undefined;
     this.onContextCompleteCallback = undefined;

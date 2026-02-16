@@ -168,7 +168,8 @@ export interface LightingPreferences {
   enabledCueGroups?: string[];
   activeAudioCueType?: AudioCueType;
   cueConsistencyWindow?: number;
-  
+  allowMultipleActiveRigs?: boolean;
+
   // Frontend-specific preferences
   dmxOutputConfig?: {
     sacnEnabled: boolean;

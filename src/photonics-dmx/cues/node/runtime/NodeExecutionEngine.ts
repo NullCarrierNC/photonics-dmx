@@ -69,6 +69,8 @@ export class NodeExecutionEngine {
   private eventListeners: Map<string, EventListenerNode[]> = new Map();
   private effectRegistry: EffectRegistry;
   private activeEffectEngines: Map<string, EffectExecutionEngine> = new Map();
+  /** Effect names and layers submitted via addEffectWithCallback, for cancelAll to remove. */
+  private submittedEffects: Map<string, number> = new Map();
   /**
    * Instance snapshot of env-based debug setting. Note that runtime toggles are handled via
    * the static global flag so existing engines can start logging immediately.
@@ -244,6 +246,17 @@ export class NodeExecutionEngine {
     }
   }
 
+  private static readonly NODE_EXECUTION_CHANNEL = 'node-cues:node-execution';
+
+  private emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
+    sendToAllWindows(NodeExecutionEngine.NODE_EXECUTION_CHANNEL, {
+      type,
+      cueId: this.cueId,
+      nodeId,
+      timestamp: Date.now()
+    });
+  }
+
   /**
    * Execute a single node within a context.
    * Dispatches to appropriate handler based on node type.
@@ -263,6 +276,7 @@ export class NodeExecutionEngine {
     }
 
     context.markVisited(nodeId);
+    this.emitNodeExecution('activated', nodeId);
 
     // Check if it's an action node
     const actionNode = actionMap.get(nodeId);
@@ -344,12 +358,14 @@ export class NodeExecutionEngine {
         this.sequencer.blackout(resolvedTiming.duration).then(() => {
           // Blackout completed
           if (context.hasVisited(actionNode.id)) {
+            this.emitNodeExecution('deactivated', actionNode.id);
             context.completeAction(actionNode.id);
           }
         }).catch((error) => {
           console.error(`Error during blackout for action node ${actionNode.id}:`, error);
           // Continue execution despite error
           if (context.hasVisited(actionNode.id)) {
+            this.emitNodeExecution('deactivated', actionNode.id);
             context.completeAction(actionNode.id);
           }
         });
@@ -475,13 +491,17 @@ export class NodeExecutionEngine {
           color: resolvedColor
         });
 
+        // Track for cancelAll so we can remove if cue stops before effect completes
+        this.submittedEffects.set(effectName, resolvedLayer);
         // Submit effect to sequencer with completion callback
         this.sequencer.addEffectWithCallback(
           effectName,
           effect,
           () => {
+            this.submittedEffects.delete(effectName);
             // This callback is fired when the effect completes
             if (context.hasVisited(actionNode.id)) {
+              this.emitNodeExecution('deactivated', actionNode.id);
               this.debugLog(`effect complete nodeId=${actionNode.id} ctx=${context.id}`, { effectName });
               context.completeAction(actionNode.id);
             }
@@ -497,7 +517,8 @@ export class NodeExecutionEngine {
       }
 
       const resolveChainStep = (a: ActionNode): ChainStep | null => {
-        if (a.effectType === 'blackout' || a.effectType === 'chase') {
+        if (a.effectType === 'blackout' || a.effectType === 'chase' ||
+            a.effectType === 'sweep' || a.effectType === 'rotation' || a.effectType === 'flash' || a.effectType === 'cycle') {
           return null;
         }
 
@@ -573,6 +594,10 @@ export class NodeExecutionEngine {
       for (const a of actionChain) {
         context.registerActiveAction(a.id, a);
       }
+      // Emit activated for chain members that did not get executeNode (first node already emitted)
+      for (let i = 1; i < actionChain.length; i++) {
+        this.emitNodeExecution('activated', actionChain[i].id);
+      }
 
       const composedEffect = ActionEffectFactory.buildEffectChain(
         chainData.steps.map(step => ({
@@ -602,14 +627,23 @@ export class NodeExecutionEngine {
         }))
       });
 
+      this.submittedEffects.set(chainEffectName, chainData.baseLayer);
       this.sequencer.addEffectWithCallback(
         chainEffectName,
         composedEffect,
         () => {
-          for (const a of actionChain) {
+          this.submittedEffects.delete(chainEffectName);
+          const lastIndex = actionChain.length - 1;
+          for (let i = 0; i < actionChain.length; i++) {
+            const a = actionChain[i];
             if (context.hasVisited(a.id)) {
+              this.emitNodeExecution('deactivated', a.id);
               this.debugLog(`effect complete (chained) nodeId=${a.id} ctx=${context.id}`, { effectName: chainEffectName });
-              context.completeAction(a.id);
+              if (i === lastIndex) {
+                context.completeAction(a.id);
+              } else {
+                context.completeActionSilent(a.id);
+              }
             }
           }
         },
@@ -660,8 +694,10 @@ export class NodeExecutionEngine {
           context.dispose();
         }
       }
+      this.emitNodeExecution('deactivated', nodeId);
     } catch (error) {
       console.error(`Error executing logic node ${nodeId}:`, error);
+      this.emitNodeExecution('deactivated', nodeId);
       // Continue to all outgoing edges despite error
       this.continueToNextNodes(nodeId, context);
     }
@@ -695,6 +731,8 @@ export class NodeExecutionEngine {
         context.removeTimer(timerId);
         if (context.hasVisited(nodeId)) {
           this.debugLog(`delay complete nodeId=${nodeId} ctx=${context.id}`);
+          this.emitNodeExecution('deactivated', nodeId);
+          context.advancePhase();
           context.completeAction(nodeId);
           
           // Continue to next nodes after delay
@@ -741,6 +779,7 @@ export class NodeExecutionEngine {
         this.startListenerExecution(listener, context.cueData as CueData);
       }
       
+      this.emitNodeExecution('deactivated', raiserNode.id);
       // Continue immediately to raiser's child (non-blocking)
       this.continueToNextNodes(raiserNode.id, context);
     } catch (error) {
@@ -786,6 +825,7 @@ export class NodeExecutionEngine {
       if (!compiledEffect) {
         // Gracefully handle missing effect (may have been deleted)
         console.warn(`Effect ${effectId} not found (missing dependency), skipping effect raiser ${raiserNode.id}`);
+        this.emitNodeExecution('deactivated', raiserNode.id);
         this.continueToNextNodes(raiserNode.id, context);
         return;
       }
@@ -820,10 +860,12 @@ export class NodeExecutionEngine {
       // Trigger effect (blocking for this raiser node, but non-blocking for cue execution)
       effectEngine.triggerEffect(context.cueData);
 
+      this.emitNodeExecution('deactivated', raiserNode.id);
       // Continue immediately (non-blocking like EventRaiserNode)
       this.continueToNextNodes(raiserNode.id, context);
     } catch (error) {
       console.error(`Error executing effect raiser node ${raiserNode.id}:`, error);
+      this.emitNodeExecution('deactivated', raiserNode.id);
       // Continue execution despite error
       this.continueToNextNodes(raiserNode.id, context);
     }
@@ -881,6 +923,7 @@ export class NodeExecutionEngine {
       return; // Context already completed or cancelled
     }
 
+    context.advancePhase();
     // Continue to next nodes after this action
     this.continueToNextNodes(nodeId, context);
 
@@ -925,6 +968,12 @@ export class NodeExecutionEngine {
       context.dispose();
     }
     this.activeContexts.clear();
+
+    // Remove all submitted effects from the sequencer so lights stop immediately
+    for (const [name, layer] of this.submittedEffects) {
+      this.sequencer.removeEffect(name, layer);
+    }
+    this.submittedEffects.clear();
 
     // Cancel all active effect engines
     for (const effectEngine of this.activeEffectEngines.values()) {
