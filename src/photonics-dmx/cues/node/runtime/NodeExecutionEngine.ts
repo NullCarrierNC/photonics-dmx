@@ -279,15 +279,10 @@ export class NodeExecutionEngine {
   private executeNode(nodeId: string, context: ExecutionContext): void {
     const { actionMap, logicMap, eventRaiserMap, effectRaiserMap } = this.compiledCue;
 
-    // Prevent re-execution of logic nodes; action/event-raiser/effect-raiser can be revisited (blocking handles flow)
+    // Prevent re-execution of any node within the same context (avoids infinite loops from cycles)
     if (context.hasVisited(nodeId)) {
-      const isAction = actionMap.has(nodeId);
-      const isEventRaiser = eventRaiserMap.has(nodeId);
-      const isEffectRaiser = effectRaiserMap?.has(nodeId);
-      if (!isAction && !isEventRaiser && !isEffectRaiser) {
-        this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`);
-        return;
-      }
+      this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`);
+      return;
     }
 
     context.markVisited(nodeId);
@@ -626,7 +621,8 @@ export class NodeExecutionEngine {
       for (const a of actionChain) {
         this.emitNodeExecution('deactivated', a.id);
       }
-      this.continueToNextNodes(actionNode.id, context);
+      const lastChainNode = actionChain[actionChain.length - 1];
+      this.continueToNextNodes(lastChainNode.id, context);
     } catch (error) {
       console.error(`Error executing action node ${actionNode.id}:`, error);
       // Continue execution despite error

@@ -274,17 +274,18 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
               onChange={e => updateNode({ config: { ...node.config, beatsPerCycle: Number(e.target.value) || 1 } })}
             />
           </label>
-          <label className="flex flex-col font-medium">
-            Start offset
-            <input
-              type="number"
-              min={0}
-              step={1}
-              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={node.config?.startOffset ?? 0}
-              onChange={e => updateNode({ config: { ...node.config, startOffset: Number(e.target.value) || 0 } })}
-            />
-          </label>
+          <ValueSourceEditor
+            label="Start offset"
+            expected="number"
+            integerOnly={true}
+            value={
+              typeof node.config?.startOffset === 'object' && node.config?.startOffset !== null
+                ? node.config.startOffset
+                : { source: 'literal', value: node.config?.startOffset ?? 0 }
+            }
+            onChange={next => updateNode({ config: { ...node.config, startOffset: next } })}
+            availableVariables={availableVariables}
+          />
         </>
       )}
       {node.effectType === 'flash' && (
