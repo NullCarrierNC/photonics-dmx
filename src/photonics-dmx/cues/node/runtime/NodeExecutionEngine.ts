@@ -496,11 +496,8 @@ export class NodeExecutionEngine {
           return;
         }
 
-        // Register this action as active (waiting for completion)
-        context.registerActiveAction(actionNode.id, actionNode);
-
-        // Generate unique effect name
-        const effectName = `${this.cueId}:${context.eventNode.id}:${context.id}:${actionNode.id}`;
+        // Stable effect name so repeated submissions (e.g. cue-called) queue in the sequencer
+        const effectName = `${this.cueId}:${actionNode.id}`;
 
         this.debugLog(`submit effect nodeId=${actionNode.id} ctx=${context.id}`, {
           effectName,
@@ -511,21 +508,9 @@ export class NodeExecutionEngine {
 
         // Track for cancelAll so we can remove if cue stops before effect completes
         this.submittedEffects.set(effectName, resolvedLayer);
-        // Submit effect to sequencer with completion callback
-        this.sequencer.addEffectWithCallback(
-          effectName,
-          effect,
-          () => {
-            this.submittedEffects.delete(effectName);
-            // This callback is fired when the effect completes
-            if (context.hasVisited(actionNode.id)) {
-              this.emitNodeExecution('deactivated', actionNode.id);
-              this.debugLog(`effect complete nodeId=${actionNode.id} ctx=${context.id}`, { effectName });
-              context.completeAction(actionNode.id);
-            }
-          },
-          false // Not persistent
-        );
+        this.sequencer.addEffect(effectName, effect);
+        this.emitNodeExecution('deactivated', actionNode.id);
+        this.continueToNextNodes(actionNode.id, context);
       };
 
       // If we're not actually chaining anything, fall back to single-action behavior.
@@ -596,7 +581,7 @@ export class NodeExecutionEngine {
         return;
       }
 
-      const chainEffectName = `${this.cueId}:${context.eventNode.id}:${context.id}:layer-${chainData.baseLayer}`;
+      const chainEffectName = `${this.cueId}:chain:${actionChain[0].id}`;
       this.debugLog(`submit action-chain ctx=${context.id}`, {
         effectName: chainEffectName,
         layer: chainData.baseLayer,
@@ -606,15 +591,6 @@ export class NodeExecutionEngine {
       // Ensure the rest of the chain nodes won't execute independently later.
       for (let i = 1; i < actionChain.length; i++) {
         context.markVisited(actionChain[i].id);
-      }
-
-      // Register all chain actions as active so the context stays blocked until the chain completes.
-      for (const a of actionChain) {
-        context.registerActiveAction(a.id, a);
-      }
-      // Emit activated for chain members that did not get executeNode (first node already emitted)
-      for (let i = 1; i < actionChain.length; i++) {
-        this.emitNodeExecution('activated', actionChain[i].id);
       }
 
       const composedEffect = ActionEffectFactory.buildEffectChain(
@@ -646,27 +622,11 @@ export class NodeExecutionEngine {
       });
 
       this.submittedEffects.set(chainEffectName, chainData.baseLayer);
-      this.sequencer.addEffectWithCallback(
-        chainEffectName,
-        composedEffect,
-        () => {
-          this.submittedEffects.delete(chainEffectName);
-          const lastIndex = actionChain.length - 1;
-          for (let i = 0; i < actionChain.length; i++) {
-            const a = actionChain[i];
-            if (context.hasVisited(a.id)) {
-              this.emitNodeExecution('deactivated', a.id);
-              this.debugLog(`effect complete (chained) nodeId=${a.id} ctx=${context.id}`, { effectName: chainEffectName });
-              if (i === lastIndex) {
-                context.completeAction(a.id);
-              } else {
-                context.completeActionSilent(a.id);
-              }
-            }
-          }
-        },
-        false
-      );
+      this.sequencer.addEffect(chainEffectName, composedEffect);
+      for (const a of actionChain) {
+        this.emitNodeExecution('deactivated', a.id);
+      }
+      this.continueToNextNodes(actionNode.id, context);
     } catch (error) {
       console.error(`Error executing action node ${actionNode.id}:`, error);
       // Continue execution despite error
