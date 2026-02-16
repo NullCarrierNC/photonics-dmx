@@ -110,9 +110,43 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
         </>
       );
     }
+    if (logicType === 'shuffle-lights') {
+      return (
+        <>
+          <div>SHUFFLE <Mono>{logic.sourceVariable || '?'}</Mono></div>
+          {logic.assignTo && <div>To Var: <Mono>{logic.assignTo}</Mono></div>}
+        </>
+      );
+    }
+    if (logicType === 'for-each-light') {
+      return (
+        <>
+          <div>FOR EACH <Mono>{logic.sourceVariable || '?'}</Mono></div>
+          <div>Light → <Mono>{logic.currentLightVariable || '?'}</Mono> Index → <Mono>{logic.currentIndexVariable || '?'}</Mono></div>
+        </>
+      );
+    }
     if (logicType === 'delay') {
       const delayTime = formatValueSource(logic.delayTime);
       return <><Mono>{delayTime}</Mono>ms</>;
+    }
+    if (logicType === 'random') {
+      const mode = (logic.mode as string) ?? 'random-integer';
+      const assignTo = logic.assignTo ?? '?';
+      if (mode === 'random-integer') {
+        const min = formatValueSource(logic.min);
+        const max = formatValueSource(logic.max);
+        return <><Mono>int</Mono> [{min}..{max}] → <Mono>{assignTo}</Mono></>;
+      }
+      if (mode === 'random-choice') {
+        const n = (logic.choices as string[] | undefined)?.length ?? 0;
+        return <><Mono>choice</Mono> ({n} options) → <Mono>{assignTo}</Mono></>;
+      }
+      if (mode === 'random-light') {
+        const count = formatValueSource(logic.count);
+        return <><Mono>lights</Mono> from <Mono>{logic.sourceVariable ?? '?'}</Mono> ×{count} → <Mono>{assignTo}</Mono></>;
+      }
+      return <>random → <Mono>{assignTo}</Mono></>;
     }
     if (logicType === 'debugger') {
       const messageText = formatValueSource(logic.message);
@@ -128,8 +162,9 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
   };
 
   const isConditional = logicType === 'conditional';
+  const isForEachLight = logicType === 'for-each-light';
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data';
-  const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' || logicType === 'create-pairs' || logicType === 'concat-lights';
+  const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' || logicType === 'create-pairs' || logicType === 'concat-lights' || logicType === 'shuffle-lights' || logicType === 'for-each-light';
   const isDebugNode = logicType === 'debugger';
 
   const nodeStyles = isDebugNode
@@ -182,6 +217,17 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
           </span>
           <Handle type="source" id="true" position={Position.Bottom} style={{ left: '25%' }} />
           <Handle type="source" id="false" position={Position.Bottom} style={{ left: '75%' }} />
+        </div>
+      ) : isForEachLight ? (
+        <div className="relative mt-5 h-2">
+          <span className={`absolute left-[25%] -top-3 translate-x-[-50%] text-[10px] font-semibold uppercase ${handleStyles}`}>
+            each
+          </span>
+          <span className={`absolute left-[75%] -top-3 translate-x-[-50%] text-[10px] font-semibold uppercase ${handleStyles}`}>
+            done
+          </span>
+          <Handle type="source" id="each" position={Position.Bottom} style={{ left: '25%' }} />
+          <Handle type="source" id="done" position={Position.Bottom} style={{ left: '75%' }} />
         </div>
       ) : (
         <Handle type="source" position={Position.Bottom} />

@@ -10,7 +10,8 @@ const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string =>
   const baseClasses = 'border-2 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity';
   
   const isArrayNode = logicType === 'array-length' || logicType === 'reverse-lights' ||
-                      logicType === 'create-pairs' || logicType === 'concat-lights';
+                      logicType === 'create-pairs' || logicType === 'concat-lights' ||
+                      logicType === 'shuffle-lights' || logicType === 'for-each-light';
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data';
   const isDebugNode = logicType === 'debugger';
 
@@ -146,6 +147,12 @@ const LogicNodesSection: React.FC<{
         Math
       </button>
       <button
+        className={getLogicNodeButtonClasses('random')}
+        onClick={() => addLogicNode('random')}
+      >
+        Random
+      </button>
+      <button
         className={getLogicNodeButtonClasses('variable')}
         onClick={() => addLogicNode('variable')}
       >
@@ -175,6 +182,18 @@ const LogicNodesSection: React.FC<{
         onClick={() => addLogicNode('reverse-lights')}
       >
         Reverse Lights
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('shuffle-lights')}
+        onClick={() => addLogicNode('shuffle-lights')}
+      >
+        Shuffle Lights
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('for-each-light')}
+        onClick={() => addLogicNode('for-each-light')}
+      >
+        For Each Light
       </button>
       {/* Debug node (red) */}
       <button

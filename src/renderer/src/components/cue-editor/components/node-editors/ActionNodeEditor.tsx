@@ -60,6 +60,10 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
               updateNode({ effectType: 'flash', config: { ...node.config, holdTime: 100, flashDurationIn: 50, flashDurationOut: 100 } });
             } else if (v === 'cycle') {
               updateNode({ effectType: 'cycle', config: { ...node.config, cycleTransitionDuration: 100, cycleStepTrigger: 'beat', cycleBaseColor: 'transparent', cycleBaseBrightness: 'low' } });
+            } else if (v === 'dual-mode-rotation') {
+              updateNode({ effectType: 'dual-mode-rotation', config: { ...node.config, beatsPerCycle: 2, dualModeSolidColor: 'green', dualModeSwitchCondition: 'measure', dualModeIsLargeVenue: true } });
+            } else if (v === 'alternating-pattern') {
+              updateNode({ effectType: 'alternating-pattern', config: { ...node.config, switchCondition: 'keyframe', completeCondition: 'beat' } });
             } else {
               updateNode({ effectType: v });
             }
@@ -98,7 +102,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           />
         </>
       )}
-      {(node.effectType === 'set-color' || node.effectType === 'chase' || node.effectType === 'sweep' || node.effectType === 'rotation' || node.effectType === 'flash' || node.effectType === 'cycle') && (
+      {(node.effectType === 'set-color' || node.effectType === 'chase' || node.effectType === 'sweep' || node.effectType === 'rotation' || node.effectType === 'flash' || node.effectType === 'cycle' || node.effectType === 'dual-mode-rotation' || node.effectType === 'alternating-pattern') && (
         <>
           <ValueSourceEditor
             label="Color"
@@ -371,6 +375,112 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
             >
               {BRIGHTNESS_OPTIONS.map(opt => (
                 <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+      {node.effectType === 'dual-mode-rotation' && (
+        <>
+          <label className="flex flex-col font-medium">
+            Solid colour (when not spinning)
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={node.config?.dualModeSolidColor ?? 'green'}
+              onChange={e => updateNode({ config: { ...node.config, dualModeSolidColor: e.target.value } })}
+            >
+              {COLOR_OPTIONS.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col font-medium">
+            Mode switch condition
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={node.config?.dualModeSwitchCondition ?? 'measure'}
+              onChange={e => updateNode({ config: { ...node.config, dualModeSwitchCondition: e.target.value as WaitCondition } })}
+            >
+              {getActionWaitOptions(activeMode).map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col font-medium">
+            Beats per cycle
+            <input
+              type="number"
+              min={1}
+              step={1}
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={node.config?.beatsPerCycle ?? 2}
+              onChange={e => updateNode({ config: { ...node.config, beatsPerCycle: Number(e.target.value) || 2 } })}
+            />
+          </label>
+          <label className="flex items-center gap-2 font-medium">
+            <input
+              type="checkbox"
+              checked={node.config?.dualModeIsLargeVenue ?? true}
+              onChange={e => updateNode({ config: { ...node.config, dualModeIsLargeVenue: e.target.checked } })}
+            />
+            Large venue (toggle spinning/solid on measure)
+          </label>
+        </>
+      )}
+      {node.effectType === 'alternating-pattern' && (
+        <>
+          <div className="font-medium">Pattern B target (main target is Pattern A)</div>
+          <TargetGroupsMultiSelectEditor
+            label="Pattern B Groups"
+            value={node.config?.patternBTarget?.groups ?? { source: 'literal', value: 'front,back' }}
+            onChange={next => updateNode({
+              config: {
+                ...node.config,
+                patternBTarget: {
+                  groups: next,
+                  filter: node.config?.patternBTarget?.filter ?? { source: 'literal', value: 'even' }
+                }
+              }
+            })}
+            availableVariables={availableVariables}
+          />
+          <ValueSourceEditor
+            label="Pattern B Filter"
+            value={node.config?.patternBTarget?.filter ?? { source: 'literal', value: 'even' }}
+            onChange={next => updateNode({
+              config: {
+                ...node.config,
+                patternBTarget: {
+                  groups: node.config?.patternBTarget?.groups ?? { source: 'literal', value: 'front,back' },
+                  filter: next
+                }
+              }
+            })}
+            expected="string"
+            validLiterals={LIGHT_TARGET_OPTIONS}
+            availableVariables={availableVariables}
+          />
+          <label className="flex flex-col font-medium">
+            Switch condition
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={node.config?.switchCondition ?? 'keyframe'}
+              onChange={e => updateNode({ config: { ...node.config, switchCondition: e.target.value as WaitCondition } })}
+            >
+              {getActionWaitOptions(activeMode).map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col font-medium">
+            Complete condition
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={node.config?.completeCondition ?? 'beat'}
+              onChange={e => updateNode({ config: { ...node.config, completeCondition: e.target.value as WaitCondition } })}
+            >
+              {getActionWaitOptions(activeMode).map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>

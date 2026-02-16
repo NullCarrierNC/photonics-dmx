@@ -280,12 +280,17 @@ export class NodeExecutionEngine {
     const { actionMap, logicMap, eventRaiserMap, effectRaiserMap } = this.compiledCue;
 
     // Prevent re-execution of any node within the same context (avoids infinite loops from cycles)
+    // Exception: for-each-light is not marked visited when returning "each" so the loop can re-enter
+    const logicNodeForVisit = logicMap.get(nodeId);
+    const isForEachLight = logicNodeForVisit?.logicType === 'for-each-light';
     if (context.hasVisited(nodeId)) {
       this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`);
       return;
     }
 
-    context.markVisited(nodeId);
+    if (!isForEachLight) {
+      context.markVisited(nodeId);
+    }
     this.emitNodeExecution('activated', nodeId);
 
     // Check if it's an action node
@@ -473,6 +478,20 @@ export class NodeExecutionEngine {
         return;
       }
 
+      const getVar = (varName: string) => {
+        const cueVar = context.cueLevelVarStore.get(varName);
+        const groupVar = context.groupLevelVarStore.get(varName);
+        return cueVar ?? groupVar;
+      };
+      let patternBLights: TrackedLight[] | undefined;
+      if (actionNode.effectType === 'alternating-pattern' && actionNode.config?.patternBTarget) {
+        patternBLights = ActionEffectFactory.resolveLights(
+          this.lightManager,
+          actionNode.config.patternBTarget,
+          getVar
+        ) ?? [];
+      }
+
       const submitSingleAction = (): void => {
         const effect = ActionEffectFactory.buildEffect({
           action: resolvedAction,
@@ -482,7 +501,8 @@ export class NodeExecutionEngine {
           resolvedTarget,
           resolvedColor,
           resolvedTiming,
-          resolvedLayer
+          resolvedLayer,
+          patternBLights
         });
 
         if (!effect) {
@@ -516,7 +536,8 @@ export class NodeExecutionEngine {
 
       const resolveChainStep = (a: ActionNode): ChainStep | null => {
         if (a.effectType === 'blackout' || a.effectType === 'chase' ||
-            a.effectType === 'sweep' || a.effectType === 'rotation' || a.effectType === 'flash' || a.effectType === 'cycle') {
+            a.effectType === 'sweep' || a.effectType === 'rotation' || a.effectType === 'flash' || a.effectType === 'cycle' ||
+            a.effectType === 'dual-mode-rotation' || a.effectType === 'alternating-pattern') {
           return null;
         }
 
@@ -658,7 +679,14 @@ export class NodeExecutionEngine {
       };
 
       const nextNodes = evaluateLogicNode(logicNode, nodeId, edges, context, evaluatorContext);
-      
+
+      // for-each-light: only mark visited when we took the "done" branch (state cleared), so loop can re-enter
+      if (logicNode.logicType === 'for-each-light' && context.getForEachLightState(nodeId) === undefined) {
+        context.markVisited(nodeId);
+      } else if (logicNode.logicType !== 'for-each-light') {
+        context.markVisited(nodeId);
+      }
+
       // Logic nodes execute immediately - continue to next nodes without waiting
       if (nextNodes.length > 0) {
         this.continueExecution(nextNodes, context);

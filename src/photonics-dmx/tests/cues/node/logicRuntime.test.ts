@@ -4,6 +4,8 @@ import { CueType } from '../../../cues/types/cueTypes';
 import type { YargNodeCueDefinition } from '../../../cues/types/nodeCueTypes';
 import { ActionEffectFactory } from '../../../cues/node/compiler/ActionEffectFactory';
 
+jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+
 describe('Node cue logic runtime', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -99,13 +101,10 @@ describe('Node cue logic runtime', () => {
     const compiled = NodeCueCompiler.compileYargCue(definition);
     const cue = new YargNodeCue('group-1', compiled);
 
-    const addEffectWithCallback = jest.fn((_name: string, _effect: any, onComplete: () => void) => {
-      // Call callback immediately to simulate completion
-      onComplete();
-    });
+    const addEffect = jest.fn();
     
     const sequencer = { 
-      addEffectWithCallback
+      addEffect
     } as any;
     
     const lightManager = { getLights: jest.fn().mockReturnValue([{ id: 'l1', position: 0 }]) } as any;
@@ -136,6 +135,35 @@ describe('Node cue logic runtime', () => {
     // Verify the conditional logic evaluated correctly (10/0 = 0, 0 == 0 is true)
     expect(buildEffectSpy).toHaveBeenCalledWith(expect.objectContaining({ action: expect.objectContaining({ id: 'action-true' }) }));
     expect(buildEffectSpy).not.toHaveBeenCalledWith(expect.objectContaining({ action: expect.objectContaining({ id: 'action-false' }) }));
-    expect(addEffectWithCallback).toHaveBeenCalledTimes(1);
+    expect(addEffect).toHaveBeenCalledTimes(1);
+  });
+
+  it('buildEffect returns effect for dual-mode-rotation and alternating-pattern', () => {
+    const lights = [{ id: 'l1', position: 0 }, { id: 'l2', position: 1 }] as any[];
+    const resolvedColor = { name: 'green' as const, brightness: 'medium' as const, blendMode: 'replace' as const };
+    const dualModeAction = {
+      id: 'a1',
+      type: 'action' as const,
+      effectType: 'dual-mode-rotation' as const,
+      target: { groups: { source: 'literal' as const, value: 'front' }, filter: { source: 'literal' as const, value: 'all' } },
+      color: { name: { source: 'literal' as const, value: 'green' }, brightness: { source: 'literal' as const, value: 'medium' }, blendMode: { source: 'literal' as const, value: 'replace' } },
+      timing: { waitForCondition: 'beat' as const, waitForTime: { source: 'literal' as const, value: 0 }, duration: { source: 'literal' as const, value: 0 }, waitUntilCondition: 'none' as const, waitUntilTime: { source: 'literal' as const, value: 0 }, easing: 'linear', level: { source: 'literal' as const, value: 1 } },
+      config: { beatsPerCycle: 2, dualModeSolidColor: 'green', dualModeSwitchCondition: 'measure' as const, dualModeIsLargeVenue: true }
+    } as any;
+    const altAction = {
+      id: 'a2',
+      type: 'action' as const,
+      effectType: 'alternating-pattern' as const,
+      target: { groups: { source: 'literal' as const, value: 'front' }, filter: { source: 'literal' as const, value: 'third-2' } },
+      color: { name: { source: 'literal' as const, value: 'blue' }, brightness: { source: 'literal' as const, value: 'medium' }, blendMode: { source: 'literal' as const, value: 'replace' } },
+      timing: { waitForCondition: 'keyframe' as const, waitForTime: { source: 'literal' as const, value: 0 }, duration: { source: 'literal' as const, value: 0 }, waitUntilCondition: 'none' as const, waitUntilTime: { source: 'literal' as const, value: 0 }, easing: 'linear', level: { source: 'literal' as const, value: 1 } },
+      config: { switchCondition: 'keyframe' as const, completeCondition: 'beat' as const }
+    } as any;
+    const dualEffect = ActionEffectFactory.buildEffect({ action: dualModeAction, lights, resolvedColor, resolvedTiming: { waitForCondition: 'beat', waitForTime: 0, duration: 0, waitUntilCondition: 'none', waitUntilTime: 0 }, resolvedLayer: 1 });
+    const altEffect = ActionEffectFactory.buildEffect({ action: altAction, lights, patternBLights: [lights[1]], resolvedColor: { name: 'blue' as const, brightness: 'medium' as const, blendMode: 'replace' as const }, resolvedTiming: { waitForCondition: 'keyframe', waitForTime: 0, duration: 0, waitUntilCondition: 'none', waitUntilTime: 0 }, resolvedLayer: 0 });
+    expect(dualEffect).not.toBeNull();
+    expect(dualEffect!.transitions.length).toBeGreaterThan(0);
+    expect(altEffect).not.toBeNull();
+    expect(altEffect!.transitions.length).toBeGreaterThan(0);
   });
 });

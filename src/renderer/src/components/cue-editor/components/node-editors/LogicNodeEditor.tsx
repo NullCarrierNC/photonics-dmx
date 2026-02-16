@@ -13,6 +13,10 @@ import type {
   ConcatLightsLogicNode,
   DebuggerLogicNode,
   DelayLogicNode,
+  RandomLogicNode,
+  RandomMode,
+  ShuffleLightsLogicNode,
+  ForEachLightLogicNode,
   ConfigDataProperty,
   MathOperator,
   LogicComparator,
@@ -634,6 +638,231 @@ const DelayLogicEditor: React.FC<{
   );
 };
 
+const ForEachLightLogicEditor: React.FC<{
+  node: ForEachLightLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
+  const numberVars = availableVariables.filter(v => v.type === 'number');
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Source Variable (light-array)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.sourceVariable}
+          onChange={event => updateNode({ sourceVariable: event.target.value })}
+        >
+          <option value="">-- Select light-array --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>{v.name} ({v.scope})</option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col font-medium">
+        Current Light Variable (light-array, single light per iteration)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.currentLightVariable}
+          onChange={event => updateNode({ currentLightVariable: event.target.value })}
+        >
+          <option value="">-- Select variable --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>{v.name} ({v.scope})</option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col font-medium">
+        Current Index Variable (number)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.currentIndexVariable}
+          onChange={event => updateNode({ currentIndexVariable: event.target.value })}
+        >
+          <option value="">-- Select variable --</option>
+          {numberVars.map(v => (
+            <option key={v.name} value={v.name}>{v.name} ({v.scope})</option>
+          ))}
+        </select>
+      </label>
+      <p className="text-[10px] text-gray-500 italic">
+        Iterates over each light. Connect &quot;each&quot; to the loop body (then back to this node or to actions). Connect &quot;done&quot; to nodes after the loop.
+      </p>
+    </div>
+  );
+};
+
+const ShuffleLightsLogicEditor: React.FC<{
+  node: ShuffleLightsLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Source Variable (light-array)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.sourceVariable}
+          onChange={event => updateNode({ sourceVariable: event.target.value })}
+        >
+          <option value="">-- Select light-array --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col font-medium">
+        Assign To (light-array variable)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo}
+          onChange={event => updateNode({ assignTo: event.target.value })}
+        >
+          <option value="">-- Select variable --</option>
+          {lightArrayVars.map(v => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="text-[10px] text-gray-500 italic">
+        Randomly reorders the lights in the array. Combined with for-each-light or iteration, useful for per-light random assignment.
+      </p>
+    </div>
+  );
+};
+
+const RandomLogicEditor: React.FC<{
+  node: RandomLogicNode;
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  updateNode: (updates: Partial<LogicNode>) => void;
+}> = ({ node, availableVariables, updateNode }) => {
+  const mode = node.mode ?? 'random-integer';
+  const choices = node.choices ?? [];
+  const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
+  const assignToVars = availableVariables;
+
+  const addChoice = (value: string) => {
+    if (value && !choices.includes(value)) {
+      updateNode({ choices: [...choices, value] });
+    }
+  };
+  const removeChoice = (index: number) => {
+    const next = [...choices];
+    next.splice(index, 1);
+    updateNode({ choices: next });
+  };
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex flex-col font-medium">
+        Mode
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={mode}
+          onChange={e => updateNode({ mode: e.target.value as RandomMode })}
+        >
+          <option value="random-integer">Random Integer (min..max)</option>
+          <option value="random-choice">Random Choice (from list)</option>
+          <option value="random-light">Random Lights (pick N from array)</option>
+        </select>
+      </label>
+      {mode === 'random-integer' && (
+        <>
+          <ValueSourceEditor
+            label="Min (inclusive)"
+            value={node.min}
+            onChange={next => updateNode({ min: next })}
+            expected="number"
+            availableVariables={availableVariables}
+          />
+          <ValueSourceEditor
+            label="Max (inclusive)"
+            value={node.max}
+            onChange={next => updateNode({ max: next })}
+            expected="number"
+            availableVariables={availableVariables}
+          />
+        </>
+      )}
+      {mode === 'random-choice' && (
+        <div className="space-y-1">
+          <span className="font-medium">Choices (one will be picked at random)</span>
+          <div className="space-y-1">
+            {(choices as string[]).map((choice, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <span className="flex-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">{choice}</span>
+                <button type="button" className="text-red-500 hover:text-red-700 px-1" onClick={() => removeChoice(index)}>×</button>
+              </div>
+            ))}
+            <input
+              type="text"
+              className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              placeholder="Add choice and press Enter"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  const value = (e.target as HTMLInputElement).value.trim();
+                  if (value) { addChoice(value); (e.target as HTMLInputElement).value = ''; }
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {mode === 'random-light' && (
+        <>
+          <label className="flex flex-col font-medium">
+            Source Variable (light-array)
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={node.sourceVariable ?? ''}
+              onChange={e => updateNode({ sourceVariable: e.target.value || undefined })}
+            >
+              <option value="">-- Select light-array --</option>
+              {lightArrayVars.map(v => (
+                <option key={v.name} value={v.name}>{v.name} ({v.scope})</option>
+              ))}
+            </select>
+          </label>
+          <ValueSourceEditor
+            label="Count (number of lights to pick)"
+            value={node.count}
+            onChange={next => updateNode({ count: next })}
+            expected="number"
+            availableVariables={availableVariables}
+          />
+        </>
+      )}
+      <label className="flex flex-col font-medium">
+        Assign To
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo ?? ''}
+          onChange={e => updateNode({ assignTo: e.target.value })}
+        >
+          <option value="">-- Select variable --</option>
+          {assignToVars.map(v => (
+            <option key={v.name} value={v.name}>{v.name} ({v.type}, {v.scope})</option>
+          ))}
+        </select>
+      </label>
+      <p className="text-[10px] text-gray-500 italic">
+        {mode === 'random-integer' && 'Random integer in [min, max] (inclusive).'}
+        {mode === 'random-choice' && 'Picks one string from the list at random.'}
+        {mode === 'random-light' && 'Picks count lights at random from the source array.'}
+      </p>
+    </div>
+  );
+};
+
 const DebuggerLogicEditor: React.FC<{
   node: DebuggerLogicNode;
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
@@ -791,6 +1020,36 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <DelayLogicEditor
         node={node as DelayLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'random') {
+    return (
+      <RandomLogicEditor
+        node={node as RandomLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'shuffle-lights') {
+    return (
+      <ShuffleLightsLogicEditor
+        node={node as ShuffleLightsLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    );
+  }
+
+  if (node.logicType === 'for-each-light') {
+    return (
+      <ForEachLightLogicEditor
+        node={node as ForEachLightLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

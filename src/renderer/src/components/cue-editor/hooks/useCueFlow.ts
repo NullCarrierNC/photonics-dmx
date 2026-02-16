@@ -23,6 +23,9 @@ import {
   type ConcatLightsLogicNode,
   type DebuggerLogicNode,
   type DelayLogicNode,
+  type RandomLogicNode,
+  type ShuffleLightsLogicNode,
+  type ForEachLightLogicNode,
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargEffectDefinition,
@@ -426,7 +429,37 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
       comparator: '>',
       left: { source: 'literal', value: 0 },
       right: { source: 'literal', value: 0 }
-    } satisfies ConditionalLogicNode)
+    } satisfies ConditionalLogicNode),
+    random: id => ({
+      id,
+      type: 'logic',
+      logicType: 'random',
+      label: 'random',
+      outputs: [],
+      mode: 'random-integer',
+      min: { source: 'literal', value: 0 },
+      max: { source: 'literal', value: 1 },
+      assignTo: ''
+    } satisfies RandomLogicNode as LogicNode),
+    'shuffle-lights': id => ({
+      id,
+      type: 'logic',
+      logicType: 'shuffle-lights',
+      label: 'shuffle-lights',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: ''
+    } satisfies ShuffleLightsLogicNode as LogicNode),
+    'for-each-light': id => ({
+      id,
+      type: 'logic',
+      logicType: 'for-each-light',
+      label: 'for-each-light',
+      outputs: [],
+      sourceVariable: '',
+      currentLightVariable: '',
+      currentIndexVariable: ''
+    } satisfies ForEachLightLogicNode as LogicNode)
   };
 
   const addLogicNode = useCallback((logicType: LogicNode['logicType'], position?: { x: number; y: number }) => {

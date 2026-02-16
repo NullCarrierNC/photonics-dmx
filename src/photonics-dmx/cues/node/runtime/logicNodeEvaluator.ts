@@ -5,6 +5,7 @@
 
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { TrackedLight } from '../../../types';
+import { randomBetween } from '../../../helpers/utils';
 import {
   LogicNode,
   VariableDefinition,
@@ -412,6 +413,87 @@ export function evaluateLogicNode(
     case 'delay': {
       // Delay nodes are handled specially in the execution engine (they block).
       // This case just returns the next nodes - the actual delay happens in NodeExecutionEngine.
+      return edges.map(edge => edge.to);
+    }
+
+    case 'shuffle-lights': {
+      const sourceVarStore = getVarStore(logicNode.sourceVariable);
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable);
+
+      if (!sourceVar || sourceVar.type !== 'light-array') {
+        console.warn(`shuffle-lights node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+        return edges.map(edge => edge.to);
+      }
+
+      const lightsArray = sourceVar.value as TrackedLight[];
+      const shuffled = [...lightsArray].sort(() => Math.random() - 0.5);
+      const targetVarStore = getVarStore(logicNode.assignTo);
+      targetVarStore.set(logicNode.assignTo, { type: 'light-array', value: shuffled });
+      return edges.map(edge => edge.to);
+    }
+
+    case 'for-each-light': {
+      const sourceVarStore = getVarStore(logicNode.sourceVariable);
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable);
+
+      if (!sourceVar || sourceVar.type !== 'light-array') {
+        console.warn(`for-each-light node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+        const doneEdges = edges.filter(edge => edge.fromPort === 'done');
+        return doneEdges.length > 0 ? doneEdges.map(edge => edge.to) : edges.map(edge => edge.to);
+      }
+
+      const lightsArray = sourceVar.value as TrackedLight[];
+      const length = lightsArray.length;
+      let state = context.getForEachLightState(nodeId);
+      if (state === undefined) {
+        state = { index: 0, length };
+      }
+
+      const currentLight = lightsArray[state.index];
+      const currentLightArray = currentLight ? [currentLight] : [];
+      const targetVarStore = getVarStore(logicNode.currentLightVariable);
+      targetVarStore.set(logicNode.currentLightVariable, { type: 'light-array', value: currentLightArray });
+      const indexVarStore = getVarStore(logicNode.currentIndexVariable);
+      indexVarStore.set(logicNode.currentIndexVariable, { type: 'number', value: state.index });
+
+      if (state.index + 1 < state.length) {
+        context.setForEachLightState(nodeId, { index: state.index + 1, length: state.length });
+        const eachEdges = edges.filter(edge => edge.fromPort === 'each');
+        return eachEdges.length > 0 ? eachEdges.map(edge => edge.to) : edges.map(edge => edge.to);
+      } else {
+        context.clearForEachLightState(nodeId);
+        const doneEdges = edges.filter(edge => edge.fromPort === 'done');
+        return doneEdges.length > 0 ? doneEdges.map(edge => edge.to) : edges.map(edge => edge.to);
+      }
+    }
+
+    case 'random': {
+      const varStore = getVarStore(logicNode.assignTo);
+      if (logicNode.mode === 'random-integer') {
+        const minVal = Number(resolveValue('number', logicNode.min ?? { source: 'literal', value: 0 }, context, variableDefinitions));
+        const maxVal = Number(resolveValue('number', logicNode.max ?? { source: 'literal', value: 1 }, context, variableDefinitions));
+        const min = Math.floor(minVal);
+        const max = Math.floor(maxVal);
+        const result = min <= max ? randomBetween(min, max) : min;
+        varStore.set(logicNode.assignTo, { type: 'number', value: result });
+      } else if (logicNode.mode === 'random-choice') {
+        const choices = logicNode.choices ?? [];
+        const result = choices.length > 0 ? choices[randomBetween(0, choices.length - 1)] ?? '' : '';
+        varStore.set(logicNode.assignTo, { type: 'string', value: result });
+      } else if (logicNode.mode === 'random-light') {
+        const sourceVarStore = getVarStore(logicNode.sourceVariable ?? '');
+        const sourceVar = sourceVarStore.get(logicNode.sourceVariable ?? '');
+        if (!sourceVar || sourceVar.type !== 'light-array') {
+          console.warn(`random node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`);
+          return edges.map(edge => edge.to);
+        }
+        const lightsArray = sourceVar.value as TrackedLight[];
+        const countVal = Number(resolveValue('number', logicNode.count ?? { source: 'literal', value: 1 }, context, variableDefinitions));
+        const count = Math.max(0, Math.min(Math.floor(countVal), lightsArray.length));
+        const shuffled = [...lightsArray].sort(() => Math.random() - 0.5);
+        const picked = shuffled.slice(0, count);
+        varStore.set(logicNode.assignTo, { type: 'light-array', value: picked });
+      }
       return edges.map(edge => edge.to);
     }
 

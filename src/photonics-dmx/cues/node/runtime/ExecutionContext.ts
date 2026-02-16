@@ -16,6 +16,8 @@ export class ExecutionContext {
   private visitedNodes: Map<string, number> = new Map(); // nodeId -> phase when last visited
   private phase: number = 0;
   private activeNodes: Map<string, ActionNode> = new Map(); // Nodes waiting for completion
+  /** Per-node state for for-each-light iteration (index for next iteration, length). */
+  private forEachLightState: Map<string, { index: number; length: number }> = new Map();
   private completed = false;
   private activeTimers: Set<ReturnType<typeof setTimeout>> = new Set();
 
@@ -70,6 +72,27 @@ export class ExecutionContext {
    */
   public hasVisited(nodeId: string): boolean {
     return this.visitedNodes.get(nodeId) === this.phase;
+  }
+
+  /**
+   * Get iteration state for a for-each-light node. Returns undefined if not yet started.
+   */
+  public getForEachLightState(nodeId: string): { index: number; length: number } | undefined {
+    return this.forEachLightState.get(nodeId);
+  }
+
+  /**
+   * Set iteration state for a for-each-light node (next index and length).
+   */
+  public setForEachLightState(nodeId: string, state: { index: number; length: number }): void {
+    this.forEachLightState.set(nodeId, state);
+  }
+
+  /**
+   * Clear iteration state for a for-each-light node (when loop is done).
+   */
+  public clearForEachLightState(nodeId: string): void {
+    this.forEachLightState.delete(nodeId);
   }
 
   /**
@@ -174,6 +197,7 @@ export class ExecutionContext {
     this.visitedNodes.clear();
     this.phase = 0;
     this.activeNodes.clear();
+    this.forEachLightState.clear();
     this.onNodeCompleteCallback = undefined;
     this.onContextCompleteCallback = undefined;
   }

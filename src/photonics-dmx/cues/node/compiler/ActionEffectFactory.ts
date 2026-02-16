@@ -9,7 +9,7 @@ import {
 import { EasingType } from '../../../easing';
 import { VariableValue } from '../runtime/executionTypes';
 import { getSweepEffect } from '../../../effects/sweepEffect';
-import { getEffectClockwiseRotation, getEffectCounterClockwiseRotation } from '../../../effects/effectRotationPatterns';
+import { getEffectClockwiseRotation, getEffectCounterClockwiseRotation, getEffectDualModeRotation, getEffectAlternatingPatterns } from '../../../effects/effectRotationPatterns';
 import { getEffectFlashColor } from '../../../effects/effectFlashColor';
 import { getEffectCycleLights } from '../../../effects/effectCycleLights';
 
@@ -50,6 +50,8 @@ interface BuildEffectParams {
   resolvedColor?: ResolvedColorSetting;
   resolvedTiming?: ResolvedActionTiming;
   resolvedLayer?: number;
+  /** For alternating-pattern: lights for pattern B (pattern A is lights) */
+  patternBLights?: TrackedLight[];
 }
 
 export interface BuildEffectChainStep {
@@ -443,6 +445,55 @@ export class ActionEffectFactory {
           transitionDuration,
           layer,
           waitFor: stepTrigger
+        });
+        break;
+      }
+      case 'dual-mode-rotation': {
+        const cfg = action.config ?? {};
+        const beatsPerCycle = typeof cfg.beatsPerCycle === 'number' ? cfg.beatsPerCycle : 2;
+        const startOffset = Math.floor(typeof cfg.startOffset === 'number' ? cfg.startOffset : 0);
+        const isLargeVenue = cfg.dualModeIsLargeVenue === true;
+        const solidColorName = (cfg.dualModeSolidColor as Color) ?? (primaryColor.name as Color);
+        const solidColor = getColor(solidColorName, primaryColor.brightness ?? 'medium', primaryColor.blendMode ?? 'replace');
+        const modeSwitchCondition = (cfg.dualModeSwitchCondition as WaitCondition) ?? 'measure';
+        const baseColorRotation: RGBIO = getColor('transparent', 'low', 'replace');
+        baseColorRotation.intensity = 0;
+        baseColorRotation.opacity = 0;
+        effect = getEffectDualModeRotation({
+          lights,
+          activeColor: baseColor,
+          baseColor: baseColorRotation,
+          solidColor,
+          isLargeVenue,
+          layer,
+          waitForCondition: waitFor,
+          waitForTime,
+          waitForConditionCount: timing.waitForConditionCount ?? 0,
+          waitUntilCondition: timing.waitUntilCondition ?? 'none',
+          waitUntilTime: timing.waitUntilTime ?? 0,
+          waitUntilConditionCount: timing.waitUntilConditionCount ?? 0,
+          beatsPerCycle,
+          startOffset,
+          modeSwitchCondition
+        });
+        break;
+      }
+      case 'alternating-pattern': {
+        const cfg = action.config ?? {};
+        const switchCondition = (cfg.switchCondition as WaitCondition) ?? 'keyframe';
+        const completeCondition = (cfg.completeCondition as WaitCondition) ?? 'beat';
+        const patternBLights = params.patternBLights ?? [];
+        const baseColorAlt: RGBIO = getColor('transparent', 'low', 'replace');
+        baseColorAlt.intensity = 0;
+        baseColorAlt.opacity = 0;
+        effect = getEffectAlternatingPatterns({
+          patternALights: lights,
+          patternBLights,
+          activeColor: baseColor,
+          baseColor: baseColorAlt,
+          layer,
+          switchCondition,
+          completeCondition
         });
         break;
       }

@@ -171,6 +171,19 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
     cycleStepTrigger: { type: 'string', nullable: true },
     cycleBaseColor: { type: 'string', nullable: true },
     cycleBaseBrightness: { type: 'string', nullable: true },
+    dualModeEnabled: { type: 'boolean', nullable: true },
+    dualModeSolidColor: { type: 'string', nullable: true },
+    dualModeSwitchCondition: { type: 'string', nullable: true },
+    dualModeIsLargeVenue: { type: 'boolean', nullable: true },
+    patternBTarget: {
+      type: 'object',
+      nullable: true,
+      required: ['groups', 'filter'],
+      additionalProperties: false,
+      properties: { groups: valueSourceSchema, filter: valueSourceSchema }
+    } as any,
+    switchCondition: { type: 'string', nullable: true },
+    completeCondition: { type: 'string', nullable: true },
     custom: { type: 'object', nullable: true, additionalProperties: true }
   }
 };
@@ -519,6 +532,73 @@ const debuggerLogicSchema: JSONSchemaType<LogicNode> = {
   }
 } as any;
 
+const randomLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'mode', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'random' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    mode: { type: 'string', enum: ['random-integer', 'random-choice', 'random-light'] },
+    min: { ...valueSourceSchema, nullable: true },
+    max: { ...valueSourceSchema, nullable: true },
+    choices: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariable: { type: 'string', nullable: true },
+    count: { ...valueSourceSchema, nullable: true },
+    assignTo: { type: 'string' }
+  }
+} as any;
+
+const shuffleLightsLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'shuffle-lights' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariable: { type: 'string' },
+    assignTo: { type: 'string' }
+  }
+} as any;
+
+const forEachLightLogicSchema: JSONSchemaType<LogicNode> = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariable', 'currentLightVariable', 'currentIndexVariable'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'for-each-light' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' }
+    },
+    sourceVariable: { type: 'string' },
+    currentLightVariable: { type: 'string' },
+    currentIndexVariable: { type: 'string' }
+  }
+} as any;
+
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
   oneOf: [
     variableLogicSchema,
@@ -532,7 +612,10 @@ const logicNodeSchema: JSONSchemaType<LogicNode> = {
     createPairsLogicSchema,
     concatLightsLogicSchema,
     delayLogicSchema,
-    debuggerLogicSchema
+    debuggerLogicSchema,
+    randomLogicSchema,
+    shuffleLightsLogicSchema,
+    forEachLightLogicSchema
   ]
 } as any;
 

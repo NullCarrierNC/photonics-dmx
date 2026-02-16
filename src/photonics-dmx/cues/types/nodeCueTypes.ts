@@ -156,6 +156,32 @@ export interface DebuggerLogicNode extends BaseLogicNode {
   variablesToLog: string[];      // List of variable names to log with their values
 }
 
+export type RandomMode = 'random-integer' | 'random-choice' | 'random-light';
+
+export interface RandomLogicNode extends BaseLogicNode {
+  logicType: 'random';
+  mode: RandomMode;
+  min?: ValueSource;             // random-integer: inclusive min
+  max?: ValueSource;             // random-integer: inclusive max
+  choices?: string[];            // random-choice: list of string options
+  sourceVariable?: string;       // random-light: light-array variable name
+  count?: ValueSource;           // random-light: number of lights to pick
+  assignTo: string;              // variable to store result
+}
+
+export interface ShuffleLightsLogicNode extends BaseLogicNode {
+  logicType: 'shuffle-lights';
+  sourceVariable: string;        // light-array to shuffle
+  assignTo: string;             // shuffled copy
+}
+
+export interface ForEachLightLogicNode extends BaseLogicNode {
+  logicType: 'for-each-light';
+  sourceVariable: string;        // light-array to iterate
+  currentLightVariable: string; // variable set to current TrackedLight[] (single light)
+  currentIndexVariable: string;  // variable set to current index (number)
+}
+
 export type LogicNode =
   | VariableLogicNode
   | MathLogicNode
@@ -168,7 +194,10 @@ export type LogicNode =
   | CreatePairsLogicNode
   | ConcatLightsLogicNode
   | DelayLogicNode
-  | DebuggerLogicNode;
+  | DebuggerLogicNode
+  | RandomLogicNode
+  | ShuffleLightsLogicNode
+  | ForEachLightLogicNode;
 
 export interface EventRaiserNode {
   id: string;
@@ -305,7 +334,7 @@ export interface AudioEventNode extends BaseEventNode {
 }
 
 
-export const NODE_EFFECT_TYPES = ['set-color', 'blackout', 'chase', 'sweep', 'rotation', 'flash', 'cycle'] as const;
+export const NODE_EFFECT_TYPES = ['set-color', 'blackout', 'chase', 'sweep', 'rotation', 'flash', 'cycle', 'dual-mode-rotation', 'alternating-pattern'] as const;
 
 export type NodeEffectType = typeof NODE_EFFECT_TYPES[number];
 
@@ -362,6 +391,15 @@ export interface NodeActionConfig {
   cycleStepTrigger?: WaitCondition;
   cycleBaseColor?: string;
   cycleBaseBrightness?: string;
+  /** Dual-mode rotation: solid colour when not spinning, condition to switch mode, large venue flag */
+  dualModeEnabled?: boolean;
+  dualModeSolidColor?: string;
+  dualModeSwitchCondition?: WaitCondition;
+  dualModeIsLargeVenue?: boolean;
+  /** Alternating pattern: second target (pattern B), switch and complete conditions */
+  patternBTarget?: NodeActionTarget;
+  switchCondition?: WaitCondition;
+  completeCondition?: WaitCondition;
   custom?: Record<string, unknown>;
 }
 
