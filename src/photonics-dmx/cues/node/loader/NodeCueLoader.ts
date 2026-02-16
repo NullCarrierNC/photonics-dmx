@@ -309,13 +309,17 @@ export class NodeCueLoader extends EventEmitter {
         throw new NodeCueCompilationError(`Duplicate cueType '${cue.cueType}' in group '${file.group.name}'.`);
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(cue);
-      compiled.groupVariables = file.group.variables ?? [];
-      
-      // Build effect registry for this cue
-      const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg');
-      
-      cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled, effectRegistry));
+      try {
+        const compiled = NodeCueCompiler.compileYargCue(cue);
+        compiled.groupVariables = file.group.variables ?? [];
+        
+        // Build effect registry for this cue
+        const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg');
+        
+        cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled, effectRegistry));
+      } catch (err) {
+        console.warn(`Skipping cue '${cue.cueType}':`, err);
+      }
     }
 
     if (cueMap.size === 0) {
@@ -338,13 +342,17 @@ export class NodeCueLoader extends EventEmitter {
         throw new NodeCueCompilationError(`Duplicate audio cue id '${cue.cueTypeId}' in group '${file.group.name}'.`);
       }
 
-      const compiled = NodeCueCompiler.compileAudioCue(cue);
-      compiled.groupVariables = file.group.variables ?? [];
-      
-      // Build effect registry for this cue
-      const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio');
-      
-      cueMap.set(cue.cueTypeId, new AudioNodeCue(file.group.id, compiled, effectRegistry));
+      try {
+        const compiled = NodeCueCompiler.compileAudioCue(cue);
+        compiled.groupVariables = file.group.variables ?? [];
+        
+        // Build effect registry for this cue
+        const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio');
+        
+        cueMap.set(cue.cueTypeId, new AudioNodeCue(file.group.id, compiled, effectRegistry));
+      } catch (err) {
+        console.warn(`Skipping audio cue '${cue.cueTypeId}':`, err);
+      }
     }
 
     if (cueMap.size === 0) {

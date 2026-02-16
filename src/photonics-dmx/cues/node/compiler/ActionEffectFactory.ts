@@ -382,7 +382,7 @@ export class ActionEffectFactory {
         const cfg = action.config ?? {};
         const direction = cfg.rotationDirection === 'counter-clockwise' ? 'counter-clockwise' : 'clockwise';
         const beatsPerCycle = typeof cfg.beatsPerCycle === 'number' ? cfg.beatsPerCycle : 1;
-        const startOffset = typeof cfg.startOffset === 'number' ? cfg.startOffset : 0;
+        const startOffset = Math.floor(typeof cfg.startOffset === 'number' ? cfg.startOffset : 0);
         const baseColorRotation: RGBIO = getColor('transparent', 'low', 'replace');
         baseColorRotation.intensity = 0;
         baseColorRotation.opacity = 0;

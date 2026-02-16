@@ -349,10 +349,10 @@ export interface NodeActionConfig {
   sweepLightOverlap?: number;
   sweepBetweenDelay?: number;
   sweepDirection?: SweepDirection;
-  /** Rotation: direction, beats per cycle, start offset */
+  /** Rotation: direction, beats per cycle, start offset (number or variable) */
   rotationDirection?: RotationDirection;
   beatsPerCycle?: number;
-  startOffset?: number;
+  startOffset?: number | ValueSource;
   /** Flash: hold time (ms), fade in/out durations (ms) */
   holdTime?: number;
   flashDurationIn?: number;

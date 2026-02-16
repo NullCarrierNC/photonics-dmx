@@ -20,6 +20,7 @@ import {
   EventListenerNode,
   EffectRaiserNode,
   LogicNode,
+  NodeActionConfig,
   VariableDefinition
 } from '../../types/nodeCueTypes';
 import { TrackedLight } from '../../../types';
@@ -166,6 +167,20 @@ export class NodeExecutionEngine {
 
   private getVariableValue(name: string, context: ExecutionContext): VariableValue | undefined {
     return context.cueLevelVarStore.get(name) ?? context.groupLevelVarStore.get(name);
+  }
+
+  /**
+   * Resolve config values that may be ValueSource (e.g. startOffset for rotation).
+   * Returns a copy of config with resolved numbers; non-ValueSource fields are passed through.
+   */
+  private resolveConfigValues(config: NodeActionConfig | undefined, context: ExecutionContext): NodeActionConfig | undefined {
+    if (!config) return undefined;
+    const out: NodeActionConfig = { ...config };
+    if (config.startOffset !== undefined && typeof config.startOffset === 'object' && config.startOffset !== null && 'source' in config.startOffset) {
+      const resolved = Number(resolveValue('number', config.startOffset, context, this.variableDefinitions));
+      out.startOffset = Math.max(0, resolved);
+    }
+    return out;
   }
 
   /**
@@ -420,12 +435,15 @@ export class NodeExecutionEngine {
 
       const actionChain = buildActionChain();
 
+      const resolvedConfig = this.resolveConfigValues(actionNode.config, context);
+
       const resolvedAction: any = {
         ...actionNode,
         target: resolvedTarget,
         color: resolvedColor,
         timing: resolvedTiming,
-        layer: resolvedLayer
+        layer: resolvedLayer,
+        config: resolvedConfig
       };
       
       const lights = ActionEffectFactory.resolveLights(

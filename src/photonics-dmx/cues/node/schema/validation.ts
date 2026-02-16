@@ -157,7 +157,13 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
     sweepDirection: { type: 'string', enum: ['forward', 'reverse'], nullable: true },
     rotationDirection: { type: 'string', enum: ['clockwise', 'counter-clockwise'], nullable: true },
     beatsPerCycle: { type: 'number', nullable: true, minimum: 1 },
-    startOffset: { type: 'number', nullable: true, minimum: 0 },
+    startOffset: {
+      oneOf: [
+        { type: 'number', minimum: 0 },
+        valueSourceSchema,
+        { type: 'null' }
+      ]
+    } as any,
     holdTime: { type: 'number', nullable: true, minimum: 0 },
     flashDurationIn: { type: 'number', nullable: true, minimum: 0 },
     flashDurationOut: { type: 'number', nullable: true, minimum: 0 },

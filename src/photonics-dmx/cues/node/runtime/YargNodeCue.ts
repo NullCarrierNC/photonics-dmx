@@ -270,7 +270,9 @@ export class YargNodeCue implements INetCue {
       return parameters.beat === 'Strong' || parameters.beat === 'Weak';
     }
     if (eventType === 'keyframe') {
-      return true; // Keyframe events are always active when present
+      return parameters.keyframe === 'First'
+        || parameters.keyframe === 'Next'
+        || parameters.keyframe === 'Previous';
     }
     
     // Check instrument events using the shared mapping function
