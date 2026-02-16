@@ -388,7 +388,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
           performer: 'None',
           trackMode: 'simulated',
           beat: 'Unknown',
-          keyframe: 'On',
+          keyframe: 'Next',
           bonusEffect: 'None',
           ledPositions: [],
           ledColor: 'off',
