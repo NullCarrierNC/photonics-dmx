@@ -2,6 +2,7 @@ import { IpcMain } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { CueData } from '../../photonics-dmx/cues/types/cueTypes';
 import { sendToAllWindows } from '../utils/windowUtils';
+import { ipcError } from './ipcResult';
 
 /**
  * Set up cue-related IPC handlers
@@ -33,10 +34,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
       return { success: true };
     } catch (error) {
       console.error('Error disabling YARG:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error) 
-      };
+      return ipcError(error);
     }
   });
 
@@ -47,10 +45,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
       return { success: true };
     } catch (error) {
       console.error('Error disabling RB3:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error) 
-      };
+      return ipcError(error);
     }
   });
 

@@ -7,6 +7,7 @@ import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers';
 import { BrowserWindow } from 'electron';
 import { DmxRig } from '../../photonics-dmx/types';
+import { ipcError } from './ipcResult';
 
 /**
  * Set up configuration-related IPC handlers
@@ -57,10 +58,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error(`Error saving light layout ${filename}:`, error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -120,10 +118,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error(`Error saving DMX rig ${rig.id}:`, error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -151,10 +146,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error(`Error deleting DMX rig ${id}:`, error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -181,10 +173,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error saving preferences:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -236,10 +225,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error setting enabled cue groups:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -269,10 +255,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error setting enabled audio cue groups:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -289,8 +272,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     } catch (error) {
       console.error('Error getting audio reactive cue state:', error);
       return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
+        ...ipcError(error),
         activeCueType: null,
         cues: []
       };
@@ -307,10 +289,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error setting active audio cue:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -340,10 +319,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error setting stage kit priority:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -354,10 +330,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true, clockRate };
     } catch (error) {
       console.error('Error getting clock rate:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -383,10 +356,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error setting clock rate:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -454,10 +424,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error saving audio configuration:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 
@@ -478,10 +445,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true };
     } catch (error) {
       console.error('Error setting audio enabled state:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ipcError(error);
     }
   });
 } 

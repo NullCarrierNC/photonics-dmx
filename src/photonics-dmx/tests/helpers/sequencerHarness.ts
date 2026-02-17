@@ -7,7 +7,7 @@ import { createMockDmxLight, createMockLightingConfig } from './testFixtures';
 import type { Clock } from '../../controllers/sequencer/Clock';
 import type { DmxLight, RGBIO } from '../../types';
 
-class ManualTestClock {
+export class ManualTestClock {
   private callbacks = new Set<(deltaTime: number) => void>();
   private currentTimeMs = 0;
   private tickCount = 0;

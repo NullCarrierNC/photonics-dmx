@@ -5,58 +5,13 @@ import { LightTransitionController } from '../../controllers/sequencer/LightTran
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager';
 import { DmxLightManager } from '../../controllers/DmxLightManager';
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures';
+import { ManualTestClock } from '../helpers/sequencerHarness';
 import { getColor } from '../../helpers/dmxHelpers';
 import { StageKitMenuCue } from '../../cues/yarg/handlers/stagekit/StageKitMenuCue';
 import { StageKitCoolManualCue } from '../../cues/yarg/handlers/stagekit/StageKitCoolManualCue';
 import { Effect, RGBIO } from '../../types';
 import { Clock } from '../../controllers/sequencer/Clock';
 import { CueData, CueType, DrumNoteType, defaultCueData } from '../../cues';
-
-class ManualTestClock {
-  private callbacks = new Set<(deltaTime: number) => void>();
-  private currentTimeMs = 0;
-  private tickCount = 0;
-
-  public onTick(callback: (deltaTime: number) => void): void {
-    this.callbacks.add(callback);
-  }
-
-  public offTick(callback: (deltaTime: number) => void): void {
-    this.callbacks.delete(callback);
-  }
-
-  public start(): void {
-    // no-op
-  }
-
-  public stop(): void {
-    // no-op
-  }
-
-  public isActive(): boolean {
-    return true;
-  }
-
-  public getCurrentTimeMs(): number {
-    return this.currentTimeMs;
-  }
-
-  public getAbsoluteTimeMs(): number {
-    return this.currentTimeMs;
-  }
-
-  public getTickCount(): number {
-    return this.tickCount;
-  }
-
-  public tick(deltaMs: number): void {
-    this.currentTimeMs += deltaMs;
-    this.tickCount++;
-    for (const cb of Array.from(this.callbacks)) {
-      cb(deltaMs);
-    }
-  }
-}
 
 type SequencerHarness = {
   sequencer: Sequencer;

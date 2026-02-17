@@ -25,6 +25,7 @@ import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { useToast } from './hooks/useToast';
 import { openCueEditorWindow } from './ipcApi';
 import ToastContainer from './components/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 /**
  * Main application component
@@ -519,8 +520,12 @@ export const App = (): JSX.Element => {
 
         {/* Scrollable Content Area - Using flex-grow to fill available space */}
         <div className="flex-grow overflow-y-auto bg-gray-200 dark:bg-gray-800">
-          <SenderErrorIndicator />
-          {renderContent()}
+          <ErrorBoundary name="AppContent">
+            <SenderErrorIndicator />
+            <ErrorBoundary key={currentPage} name={`Page:${currentPage}`}>
+              {renderContent()}
+            </ErrorBoundary>
+          </ErrorBoundary>
         </div>
         
         {/* Status Bar - Positioned at the bottom of the flex container */}

@@ -1641,11 +1641,9 @@ describe('NodeExecutionEngine', () => {
 
       engine.startExecution(eventNode, createCueData('Strong'));
 
-      // Wait for action to execute
-      setTimeout(() => {
-        expect(mockSequencer.addEffect).toHaveBeenCalled();
-        // The resolved color should be 'red' from the variable
-      }, 10);
+      jest.runAllTimers();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
+      // The resolved color should be 'red' from the variable
     });
 
     it('should resolve variable for target groups', () => {
@@ -1724,10 +1722,9 @@ describe('NodeExecutionEngine', () => {
 
       engine.startExecution(eventNode, createCueData('Strong'));
 
-      setTimeout(() => {
-        expect(mockSequencer.addEffect).toHaveBeenCalled();
-        // Groups should be resolved to ['front', 'back']
-      }, 10);
+      jest.runAllTimers();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
+      // Groups should be resolved to ['front', 'back']
     });
 
     it('should use fallback when variable not found', () => {
@@ -1792,10 +1789,9 @@ describe('NodeExecutionEngine', () => {
 
       engine.startExecution(eventNode, createCueData('Strong'));
 
-      setTimeout(() => {
-        expect(mockSequencer.addEffect).toHaveBeenCalled();
-        // Should use fallback color 'green'
-      }, 10);
+      jest.runAllTimers();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
+      // Should use fallback color 'green'
     });
 
     it('should resolve variable for duration', () => {
@@ -1901,11 +1897,10 @@ describe('NodeExecutionEngine', () => {
 
       engine.startExecution(eventNode, createCueData('Strong'));
 
-      setTimeout(() => {
-        expect(mockSequencer.addEffect).toHaveBeenCalled();
-        // Duration should be 120 (BPM) * 5 = 600
-        expect(cueLevelVarStore.get('calculatedDuration')?.value).toBe(600);
-      }, 10);
+      jest.runAllTimers();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
+      // Duration should be 120 (BPM) * 5 = 600
+      expect(cueLevelVarStore.get('calculatedDuration')?.value).toBe(600);
     });
 
     it('should handle invalid color variable gracefully', () => {
@@ -1997,10 +1992,9 @@ describe('NodeExecutionEngine', () => {
 
       engine.startExecution(eventNode, createCueData('Strong'));
 
-      setTimeout(() => {
-        expect(mockSequencer.addEffect).toHaveBeenCalled();
-        // Should resolve to default color 'blue' (from resolveColor method)
-      }, 10);
+      jest.runAllTimers();
+      expect(mockSequencer.addEffect).toHaveBeenCalled();
+      // Should resolve to default color 'blue' (from resolveColor method)
     });
   });
 

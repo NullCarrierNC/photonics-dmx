@@ -20,8 +20,9 @@ import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/l
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces';
 import { SenderError } from '../../photonics-dmx/senders/BaseSender';
 import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager';
+import { createSenderErrorHandler } from './senderErrorHandler';
+import { TestEffectRunner } from './TestEffectRunner';
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController';
-import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
 import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes';
@@ -47,9 +48,8 @@ export class ControllerManager {
   private nodeCueLoader: NodeCueLoader | null = null;
   private effectLoader: EffectLoader | null = null;
 
-  private testEffectInterval: NodeJS.Timeout | null = null;
-  private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large';
-  private testBpm: number = 120;
+  private readonly testEffectRunner: TestEffectRunner;
+  private readonly senderErrorHandler: (error: SenderError) => void;
 
   private isInitialized = false;
   private isYargEnabled = false;
@@ -59,6 +59,19 @@ export class ControllerManager {
   constructor() {
     this.config = new ConfigurationManager();
     this.senderManager = new SenderManager();
+    this.senderErrorHandler = createSenderErrorHandler(
+      () => this.getSenderManager(),
+      () => BrowserWindow.getFocusedWindow()
+    );
+    this.testEffectRunner = new TestEffectRunner({
+      getConfig: () => ({ getPreference: (key: string) => (key === 'effectDebounce' ? this.config.getPreference('effectDebounce') : 0) }),
+      getCueHandler: () => (this.cueHandler instanceof YargCueHandler ? this.cueHandler : null),
+      getEffectsController: () => this.effectsController,
+      getDmxLightManager: () => this.dmxLightManager!,
+      ensureInitialized: () => this.init(),
+      createCueHandler: (dmx, eff, debounce) => new YargCueHandler(dmx, eff, debounce),
+      setCueHandler: (h) => { this.cueHandler = h; }
+    });
   }
 
   /**
@@ -170,7 +183,7 @@ export class ControllerManager {
     }
 
     // Set up error handling
-    this.senderManager!.onSendError(this.handleSenderError);
+    this.senderManager!.onSendError(this.senderErrorHandler);
   }
   
   /**
@@ -287,210 +300,19 @@ export class ControllerManager {
   }
   
   /**
-   * Handle sender errors
-   */
-  private handleSenderError = (error: SenderError): void => {
-    console.error('Sender error:', error);
-    
-    const mainWindow = BrowserWindow.getFocusedWindow();
-    if (!mainWindow) {
-      console.error('handleSenderError: No main window found');
-      return;
-    }
-    
-    // Check if this is a network error that should disable the sender
-    const shouldDisable = (error as any).shouldDisable === true;
-    const errorObj = error.err || error;
-    
-    // Try to determine which sender this error is from by checking error details
-    let senderId: string | null = null;
-    if (errorObj && typeof errorObj === 'object') {
-      const err = errorObj as any;
-      // Check port to determine sender type
-      if (err.port === 6454) {
-        senderId = 'artnet';
-      } else if (err.port === 5568) {
-        senderId = 'sacn';
-      } else if (err.address || err.syscall === 'send') {
-        // Fallback: check which network sender is enabled
-        const senderManager = this.getSenderManager();
-        if (senderManager.isSenderEnabled('artnet')) {
-          senderId = 'artnet';
-        } else if (senderManager.isSenderEnabled('sacn')) {
-          senderId = 'sacn';
-        }
-      }
-    }
-    
-    // If it's a network error that should disable the sender, disable it automatically
-    if (shouldDisable && senderId) {
-      console.log(`Automatically disabling ${senderId} sender due to network error`);
-      try {
-        const senderManager = this.getSenderManager();
-        
-        // Check if sender is still enabled (might have been removed already by uncaughtException handler)
-        if (senderManager.isSenderEnabled(senderId)) {
-          senderManager.disableSender(senderId).catch((disableErr) => {
-            console.error(`Failed to disable ${senderId} sender:`, disableErr);
-          });
-        }
-        
-        // Send a specific notification for network errors that caused auto-disable
-        mainWindow.webContents.send('sender-network-error', {
-          sender: senderId,
-          error: error.err ? (error.err instanceof Error ? error.err.message : String(error.err)) : 'Network unreachable',
-          autoDisabled: true
-        });
-      } catch (err) {
-        console.error('Error disabling sender:', err);
-      }
-    }
-    
-    // Also send the general error notification
-    mainWindow.webContents.send('sender-error', error.err ? error.err.toString() : 'Unknown sender error');
-  };
-  
-  /**
    * Start a test effect
-   * @param effectId The effect ID to test
-   * @param venueSize The venue size to use for testing
-   * @param bpm The BPM to use for testing
    */
   public startTestEffect(effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large', bpm?: number): void {
-    console.log(`ControllerManager.startTestEffect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}`);
-    
-    // If an existing test interval is running, clear it
-    if (this.testEffectInterval) {
-      clearInterval(this.testEffectInterval);
-      this.testEffectInterval = null;
-    }
-    
-    // Store the venue size and BPM for use in testCue
-    this.testVenueSize = venueSize || 'Large';
-    this.testBpm = bpm || 120;
-    console.log(`Set testVenueSize to: ${this.testVenueSize}, testBpm to: ${this.testBpm}`);
-    
-    // If system is not initialized, initialize it first
-    if (!this.isInitialized) {
-      console.log("Initializing system before testing effect");
-      this.init().then(() => {
-        this.startTestEffectInternal(effectId);
-      }).catch(error => {
-        console.error("Error during initialization:", error);
-      });
-      return;
-    }
-    
-    this.startTestEffectInternal(effectId);
+    this.testEffectRunner.startTestEffect(effectId, venueSize, bpm);
   }
-  
-  /**
-   * Actually starts the test effect
-   */
-  private startTestEffectInternal(effectId: string): void {
-    // Check if we have the necessary components for testing
-    if (!this.effectsController || !this.dmxLightManager) {
-      console.error("Cannot test effect: lighting system not initialized");
-      return;
-    }
-    
-    // If no cue handler is set up, create one for testing purposes
-    if (!this.cueHandler) {
-      console.log("Creating temporary YARG cue handler for testing");
-      const debouncePeriod = this.config.getPreference('effectDebounce');
-      this.cueHandler = new YargCueHandler(
-        this.dmxLightManager,
-        this.effectsController,
-        debouncePeriod
-      );
-    }
-    
-    // Create a new interval to test the effect
-    this.testEffectInterval = setInterval(() => {
-      this.testCue(effectId);
-    }, 16); // ~60fps
-  }
-  
+
   /**
    * Stop the currently running test effect
    */
   public async stopTestEffect(): Promise<void> {
-    if (this.testEffectInterval) {
-      clearInterval(this.testEffectInterval);
-      this.testEffectInterval = null;
-    }
+    await this.testEffectRunner.stopTestEffect();
+  }
 
-    // Important: stopping the simulation must also stop the active cue.
-    // Otherwise node cues can remain mid-execution (waiting on callbacks),
-    // and restarting the same cue will appear to do nothing.
-    if (this.cueHandler instanceof YargCueHandler) {
-      this.cueHandler.stopActiveCue();
-    }
-    
-    if (this.effectsController) {
-      await this.effectsController.blackout(0);
-    }
-  }
-  
-  /**
-   * Test a specific cue
-   * @param cueId The cue ID to test
-   */
-  private testCue(cueId: string): void {
-    if (!this.cueHandler) {
-      console.error("No cue handler available. Make sure YARG or RB3 is enabled.");
-      return;
-    }
-    
-    const cue = getCueTypeFromId(cueId);
-    
-    let strobe: StrobeState = 'Strobe_Off' as StrobeState;
-    if (cueId.indexOf("Strobe") > -1) {
-      strobe = cueId as StrobeState;
-    }
-    
-    const data: CueData = {
-      datagramVersion: 0,
-      platform: 'Windows',
-      currentScene: 'Gameplay',
-      pauseState: 'Unpaused',
-      venueSize: this.testVenueSize,
-      beatsPerMinute: this.testBpm,
-      songSection: 'Verse',
-      guitarNotes: [],
-      bassNotes: [],
-      drumNotes: [],
-      keysNotes: [],
-      vocalNote: 0,
-      harmony0Note: 0,
-      harmony1Note: 0,
-      harmony2Note: 0,
-      lightingCue: cueId,
-      postProcessing: 'Default',
-      fogState: false,
-      strobeState: strobe,
-      performer: 0,
-      trackMode: 'simulated',
-      beat: 'Off',
-      keyframe: 'Off',
-      bonusEffect: false,
-      ledColor: '',
-    };
-    
-    if (cue !== undefined) {
-      try {
-        this.cueHandler.handleCue(cue, data);
-        
-        // Emit cue-handled event for UI preview components
-        sendToAllWindows('cue-handled', data);
-      } catch (error) {
-        console.error("Error handling cue:", error);
-      }
-    } else {
-      console.error("\n Test Cue Error: no cue for ID ", cueId);
-    }
-  }
-  
   /**
    * Enable YARG listener
    */

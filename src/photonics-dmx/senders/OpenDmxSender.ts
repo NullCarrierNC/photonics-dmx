@@ -26,7 +26,7 @@ export class OpenDmxSender extends BaseSender {
         new EnttecOpenUSBDMXDriver(this.port, this.options)
       );
     } catch (err) {
-      const errorEvent = new SenderError(err);
+      const errorEvent = new SenderError(err, { senderId: 'opendmx' });
       this.eventEmitter.emit("SenderError", errorEvent);
     }
   }
@@ -93,7 +93,7 @@ export class OpenDmxSender extends BaseSender {
       this.universe!.update(universeBuffer);
     } catch (err) {
       console.error("OpenDmxSender error:", err);
-      const errorEvent = new SenderError(err);
+      const errorEvent = new SenderError(err, { senderId: 'opendmx' });
       this.eventEmitter.emit("SenderError", errorEvent);
     }
   }

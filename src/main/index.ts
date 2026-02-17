@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { Application } from './application'
-import { SenderError } from '../photonics-dmx/senders/BaseSender'
+import { SenderError, SenderId } from '../photonics-dmx/senders/BaseSender'
 import { 
   isSenderErrorHandled, 
   markSenderErrorHandled, 
@@ -82,10 +82,8 @@ process.on('uncaughtException', (error: any) => {
             (senderManager as any).senderUniverseMap.delete(senderId);
             
             // Now emit the error (this will trigger cleanup and UI update)
-            const senderError = new SenderError(error);
-            (senderError as any).isNetworkError = true;
-            (senderError as any).shouldDisable = true;
-            
+            const senderError = new SenderError(error, { senderId: senderId as SenderId, shouldDisable: true });
+
             if (sender.eventEmitter) {
               sender.eventEmitter.emit('SenderError', senderError);
             }

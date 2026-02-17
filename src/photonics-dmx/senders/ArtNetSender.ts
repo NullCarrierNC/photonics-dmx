@@ -40,15 +40,15 @@ export class ArtNetSender extends BaseSender {
           err.syscall === 'send'
         );
         
-        const errorEvent = new SenderError(err);
-        if (isNetworkError) {
-          (errorEvent as any).isNetworkError = true;
-          (errorEvent as any).shouldDisable = true;
-        }
+        const errorEvent = new SenderError(err, {
+          senderId: 'artnet',
+          shouldDisable: isNetworkError,
+          code: err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : undefined
+        });
         this.eventEmitter.emit("SenderError", errorEvent);
       });
     } catch (err) {
-      const errorEvent = new SenderError(err);
+      const errorEvent = new SenderError(err, { senderId: 'artnet' });
       this.eventEmitter.emit("SenderError", errorEvent);
       throw err; // Re-throw to allow SenderManager to handle it
     }
@@ -142,13 +142,11 @@ export class ArtNetSender extends BaseSender {
         err.syscall === 'send'
       );
       
-      // Add a flag to indicate this is a network error that should disable the sender
-      const errorEvent = new SenderError(err);
-      if (isNetworkError) {
-        (errorEvent as any).isNetworkError = true;
-        (errorEvent as any).shouldDisable = true;
-      }
-      
+      const errorEvent = new SenderError(err, {
+        senderId: 'artnet',
+        shouldDisable: isNetworkError,
+        code: err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : undefined
+      });
       this.eventEmitter.emit("SenderError", errorEvent);
     }
   }

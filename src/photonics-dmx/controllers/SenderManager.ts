@@ -299,7 +299,7 @@ export class SenderManager {
         Promise.resolve(sender.send(universeBuffer)).catch((error) => {
           console.error(`Error sending data with ${sender.constructor.name}:`, error);
           // If it's a SenderError with shouldDisable flag, emit it so it can be handled
-          if (error instanceof SenderError && (error as any).shouldDisable) {
+          if (error instanceof SenderError && error.shouldDisable) {
             this.handleSenderError(error);
           }
         });

@@ -2,6 +2,8 @@
  * IPC API utility for renderer process
  */
 
+import { NODE_CUES, EFFECTS, WINDOW } from '../../shared/ipcChannels';
+
 // Cue consistency window management
 export const setCueConsistencyWindow = (windowMs: number) => 
   window.electron.ipcRenderer.invoke('set-cue-consistency-window', windowMs);
@@ -61,7 +63,7 @@ export const savePrefs = (updates: any) =>
 
 // Window management
 export const openCueEditorWindow = () =>
-  window.electron.ipcRenderer.invoke('open-cue-editor-window');
+  window.electron.ipcRenderer.invoke(WINDOW.OPEN_CUE_EDITOR);
 
 // App information
 export const getAppVersion = () => 
@@ -116,58 +118,58 @@ export const stopTestEffect = () =>
   window.electron.ipcRenderer.invoke('stop-test-effect');
 
 export const setNodeCueDebug = (enabled: boolean) =>
-  window.electron.ipcRenderer.invoke('node-cues:set-debug', enabled);
+  window.electron.ipcRenderer.invoke(NODE_CUES.SET_DEBUG, enabled);
 
 // Node cue management
 export const listNodeCueFiles = () =>
-  window.electron.ipcRenderer.invoke('node-cues:list');
+  window.electron.ipcRenderer.invoke(NODE_CUES.LIST);
 
 export const reloadNodeCueFiles = () =>
-  window.electron.ipcRenderer.invoke('node-cues:reload');
+  window.electron.ipcRenderer.invoke(NODE_CUES.RELOAD);
 
 export const readNodeCueFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke('node-cues:read', filePath);
+  window.electron.ipcRenderer.invoke(NODE_CUES.READ, filePath);
 
-export const saveNodeCueFile = (payload: { mode: 'yarg' | 'audio'; filename: string; content: any }) =>
-  window.electron.ipcRenderer.invoke('node-cues:save', payload);
+export const saveNodeCueFile = (payload: { mode: 'yarg' | 'audio'; filename: string; content: unknown }) =>
+  window.electron.ipcRenderer.invoke(NODE_CUES.SAVE, payload);
 
 export const deleteNodeCueFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke('node-cues:delete', filePath);
+  window.electron.ipcRenderer.invoke(NODE_CUES.DELETE, filePath);
 
-export const validateNodeCue = (payload: { path?: string; content?: any }) =>
-  window.electron.ipcRenderer.invoke('node-cues:validate', payload);
+export const validateNodeCue = (payload: { path?: string; content?: unknown }) =>
+  window.electron.ipcRenderer.invoke(NODE_CUES.VALIDATE, payload);
 
 export const getNodeCueTypes = (mode: 'yarg' | 'audio') =>
-  window.electron.ipcRenderer.invoke('node-cues:get-cue-types', mode);
+  window.electron.ipcRenderer.invoke(NODE_CUES.GET_CUE_TYPES, mode);
 
 export const importNodeCueFile = (mode?: 'yarg' | 'audio') =>
-  window.electron.ipcRenderer.invoke('node-cues:import', mode);
+  window.electron.ipcRenderer.invoke(NODE_CUES.IMPORT, mode);
 
 export const exportNodeCueFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke('node-cues:export', filePath);
+  window.electron.ipcRenderer.invoke(NODE_CUES.EXPORT, filePath);
 
 // Effect file management
 export const listEffectFiles = () =>
-  window.electron.ipcRenderer.invoke('effects:list');
+  window.electron.ipcRenderer.invoke(EFFECTS.LIST);
 
 export const reloadEffectFiles = () =>
-  window.electron.ipcRenderer.invoke('effects:reload');
+  window.electron.ipcRenderer.invoke(EFFECTS.RELOAD);
 
 export const readEffectFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke('effects:read', filePath);
+  window.electron.ipcRenderer.invoke(EFFECTS.READ, filePath);
 
-export const saveEffectFile = (payload: { mode: 'yarg' | 'audio'; filename: string; content: any }) =>
-  window.electron.ipcRenderer.invoke('effects:save', payload);
+export const saveEffectFile = (payload: { mode: 'yarg' | 'audio'; filename: string; content: unknown }) =>
+  window.electron.ipcRenderer.invoke(EFFECTS.SAVE, payload);
 
 export const deleteEffectFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke('effects:delete', filePath);
+  window.electron.ipcRenderer.invoke(EFFECTS.DELETE, filePath);
 
-export const validateEffect = (payload: { path?: string; content?: any }) =>
-  window.electron.ipcRenderer.invoke('effects:validate', payload);
+export const validateEffect = (payload: { path?: string; content?: unknown }) =>
+  window.electron.ipcRenderer.invoke(EFFECTS.VALIDATE, payload);
 
 export const importEffectFile = (mode?: 'yarg' | 'audio') =>
-  window.electron.ipcRenderer.invoke('effects:import', mode);
+  window.electron.ipcRenderer.invoke(EFFECTS.IMPORT, mode);
 
 export const exportEffectFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke('effects:export', filePath);
+  window.electron.ipcRenderer.invoke(EFFECTS.EXPORT, filePath);
 

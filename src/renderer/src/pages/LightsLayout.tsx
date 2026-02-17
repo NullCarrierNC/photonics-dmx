@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import LightLayoutPreview from '../components/LightLayoutPreview';
-import LightChannelsConfig from '../components/LightChannelsConfig';
 import { useAtom } from 'jotai';
 
 import {
@@ -14,16 +13,17 @@ import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers';
 import { v4 as uuidv4 } from 'uuid';
 import { activeDmxLightsConfigAtom, myValidDmxLightsAtom, myDmxLightsAtom, dmxRigsAtom, activeRigIdAtom } from '@renderer/atoms';
 
+import LightsLayoutRigSection from './LightsLayout/LightsLayoutRigSection';
+import LightsLayoutForm from './LightsLayout/LightsLayoutForm';
+import LightChannelAssignmentSection from './LightsLayout/LightChannelAssignmentSection';
+
 const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
     { id: 'front', label: 'Front' },
     { id: 'front-back', label: 'Front and Back' },
 ];
 
-const LIGHT_COUNT_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
 /**
- * Handles the light layout and chanel configuration.
- * TODO: there is far too much going on in this one component...!
+ * Handles the light layout and channel configuration.
  * @returns React component
  */
 const LightsLayout = () => {
@@ -647,197 +647,33 @@ const LightsLayout = () => {
                 </div>
             ) : (
                 <>
-                    {/* Rig Selection and Configuration */}
-                    <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center gap-4 flex-wrap">
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Rig:</label>
-                                <select
-                                    value={activeRigId || ''}
-                                    onChange={(e) => setActiveRigId(e.target.value)}
-                                    className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[200px]"
-                                >
-                                    {rigs.map((rig) => (
-                                        <option key={rig.id} value={rig.id}>
-                                            {rig.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            
-                            <button
-                                onClick={async () => {
-                                    const newRig: DmxRig = {
-                                        id: uuidv4(),
-                                        name: `Rig ${rigs.length + 1}`,
-                                        universe: 1,
-                                        active: true,
-                                        config: {
-                                            numLights: 0,
-                                            lightLayout: { id: 'front', label: 'Front' },
-                                            strobeType: ConfigStrobeType.None,
-                                            frontLights: [],
-                                            backLights: [],
-                                            strobeLights: []
-                                        }
-                                    };
-                                    try {
-                                        await window.electron.ipcRenderer.invoke('save-dmx-rig', newRig);
-                                        setRigs(prev => [...prev, newRig]);
-                                        setActiveRigId(newRig.id);
-                                        setRigName(newRig.name);
-                                        setRigUniverse(newRig.universe);
-                                    } catch (error) {
-                                        console.error('Failed to create new rig:', error);
-                                    }
-                                }}
-                                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-                            >
-                                New Rig
-                            </button>
-                            
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Name:</label>
-                                <input
-                                    type="text"
-                                    value={rigName}
-                                    onChange={(e) => setRigName(e.target.value)}
-                                    className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[150px]"
-                                    placeholder="Rig Name"
-                                />
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Universe:</label>
-                                <input
-                                    type="number"
-                                    value={rigUniverse}
-                                    onChange={(e) => setRigUniverse(parseInt(e.target.value) || 1)}
-                                    min={1}
-                                    className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-20"
-                                />
-                            </div>
-                        </div>
-                    </div>
+                    <LightsLayoutRigSection
+                        rigs={rigs}
+                        activeRigId={activeRigId}
+                        setActiveRigId={setActiveRigId}
+                        rigName={rigName}
+                        setRigName={setRigName}
+                        rigUniverse={rigUniverse}
+                        setRigUniverse={setRigUniverse}
+                        onRigsChange={setRigs}
+                    />
 
-                    <form className="space-y-6 max-w-full">
-                        <div className="flex flex-wrap gap-4">
-                            {/* Number of Lights */}
-                            <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                <span className="mb-2 text-gray-700 dark:text-gray-300">Number of Primary Lights</span>
-                                <select
-                                    value={selectedCount || ''}
-                                    onChange={(e) => {
-                                        const newCount = e.target.value ? Number(e.target.value) : null;
-                                        setSelectedCount(newCount);
-                                        if (newCount && assignedToBack !== 'None' && assignedToBack >= newCount) {
-                                            setAssignedToBack('None');
-                                        }
-                                    }}
-                                    className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-                                >
-                                    {!selectedCount && <option value="">Select</option>}
-                                    {LIGHT_COUNT_OPTIONS.map((cnt) => (
-                                        <option key={cnt} value={cnt}>
-                                            {cnt} Light{cnt > 1 ? 's' : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            {/* Light Layout */}
-                            <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                <span className="mb-2 text-gray-700 dark:text-gray-300">Primary Light Layout</span>
-                                <select
-                                    value={selectedLayout}
-                                    onChange={(e) => {
-                                        setSelectedLayout(e.target.value);
-                                        if (e.target.value !== 'front-back') {
-                                            setAssignedToBack('None');
-                                        } else {
-                                            // If switching to 'front-back', reflect how many are currently group='back'
-                                            const existingBackCount = allPrimaryLights.filter(
-                                                (l) => l.group === 'back'
-                                            ).length;
-                                            setAssignedToBack(existingBackCount || 'None');
-                                        }
-                                    }}
-                                    className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-                                >
-                                    {availableLayouts.map((layout) => (
-                                        <option key={layout.id} value={layout.id}>
-                                            {layout.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            {/* Assigned to Back */}
-                            {selectedLayout === 'front-back' && (
-                                <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                    <span className="mb-2 text-gray-700 dark:text-gray-300">Assigned to Back</span>
-                                    <select
-                                        value={assignedToBack}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setAssignedToBack(val === 'None' ? 'None' : Number(val));
-                                        }}
-                                        className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-                                    >
-                                        {assignedToBackOptions.map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
-
-                            {/* Strobe Effects */}
-                            <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                <span className="mb-2 text-gray-700 dark:text-gray-300">Strobe Effects</span>
-                                <select
-                                    value={selectedStrobe}
-                                    onChange={(e) => {
-                                        const value = e.target.value as ConfigStrobeType;
-                                        setSelectedStrobe(value);
-                                        if (value === ConfigStrobeType.Dedicated) {
-                                            // Default to 1 if switching to dedicated and no count exists
-                                            setDedicatedStrobeCount((prev) => (prev === 0 ? 1 : prev));
-                                        } else {
-                                            setDedicatedStrobeCount(0);
-                                        }
-                                    }}
-                                    className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-                                >
-                                    <option value={ConfigStrobeType.None}>None</option>
-                                    {/* Show Dedicated Strobe only if we have at least one physical strobe fixture */}
-                                    {hasPhysicalStrobe && (
-                                        <option value={ConfigStrobeType.Dedicated}>Dedicated Strobe Lights</option>
-                                    )}
-                                    <option value={ConfigStrobeType.AllCapable}>Strobe Enabled Lights</option>
-                                </select>
-                            </label>
-
-                            {/* Number of Strobes dropdown (only for Dedicated Strobe) */}
-                            {selectedStrobe === ConfigStrobeType.Dedicated && (
-                                <label className="flex flex-col items-start flex-1 min-w-[200px]">
-                                    <span className="mb-2 text-gray-700 dark:text-gray-300">Number of Strobes</span>
-                                    <select
-                                        value={dedicatedStrobeCount}
-                                        onChange={(e) => setDedicatedStrobeCount(Number(e.target.value))}
-                                        className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-                                    >
-                                        {[1, 2, 3, 4].map((num) => (
-                                            <option key={num} value={num}>
-                                                {num}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
-                        </div>
-                    </form>
+                    <LightsLayoutForm
+                        selectedCount={selectedCount}
+                        setSelectedCount={setSelectedCount}
+                        selectedLayout={selectedLayout}
+                        setSelectedLayout={setSelectedLayout}
+                        assignedToBack={assignedToBack}
+                        setAssignedToBack={setAssignedToBack}
+                        assignedToBackOptions={assignedToBackOptions}
+                        availableLayouts={availableLayouts}
+                        allPrimaryLightsCountBack={allPrimaryLights.filter((l) => l.group === 'back').length}
+                        selectedStrobe={selectedStrobe}
+                        setSelectedStrobe={setSelectedStrobe}
+                        dedicatedStrobeCount={dedicatedStrobeCount}
+                        setDedicatedStrobeCount={setDedicatedStrobeCount}
+                        hasPhysicalStrobe={hasPhysicalStrobe}
+                    />
 
                     {/* Light Layout Preview */}
                     <LightLayoutPreview
@@ -847,80 +683,40 @@ const LightsLayout = () => {
                         selectedStrobe={selectedStrobe}
                     />
 
-                    {/* Light Channels Configuration */}
                     <div className="mt-8 space-y-8">
-                        {/* Front Lights */}
-                        <div>
-                            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
-                                {rigName ? `${rigName} - ` : ''}Front Lights
-                            </h2>
-                            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-                                {frontLights.map((light, index) => (
-                                    <div key={light.id} className="flex flex-col">
-                                        <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
-                                            Front {index + 1} (Position {light.position})
-                                        </div>
-                                        <LightChannelsConfig
-                                            light={light}
-                                            myLights={myFixtures}
-                                            onChange={handleLightChange}
-                                            isHighlighted={highlightedLight === light.position}
-                                            onClick={() => handleLightClick(light.position)}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <LightChannelAssignmentSection
+                            title={rigName ? `${rigName} - Front Lights` : 'Front Lights'}
+                            lights={frontLights}
+                            myLights={myFixtures}
+                            onLightChange={handleLightChange}
+                            highlightedLight={highlightedLight}
+                            onLightClick={handleLightClick}
+                            lightLabel={(light, index) => `Front ${index + 1} (Position ${light.position})`}
+                        />
 
-                        {/* Back Lights */}
                         {selectedLayout === 'front-back' && backLights.length > 0 && (
-                            <div>
-                                <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
-                                    {rigName ? `${rigName} - ` : ''}Back Lights
-                                </h2>
-                                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-                                    {backLights.map((light, index) => (
-                                        <div key={light.id} className="flex flex-col">
-                                            <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
-                                                Back {index + 1} (Position {light.position})
-                                            </div>
-                                            <LightChannelsConfig
-                                                light={light}
-                                                myLights={myFixtures}
-                                                onChange={handleLightChange}
-                                                isHighlighted={highlightedLight === light.position}
-                                                onClick={() => handleLightClick(light.position)}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                            <LightChannelAssignmentSection
+                                title={rigName ? `${rigName} - Back Lights` : 'Back Lights'}
+                                lights={backLights}
+                                myLights={myFixtures}
+                                onLightChange={handleLightChange}
+                                highlightedLight={highlightedLight}
+                                onLightClick={handleLightClick}
+                                lightLabel={(light, index) => `Back ${index + 1} (Position ${light.position})`}
+                            />
                         )}
 
-                        {/* Strobe Lights: Only show if Dedicated Strobe is selected */}
                         {selectedStrobe === ConfigStrobeType.Dedicated &&
                             allPrimaryLights.filter((l) => l.group === 'strobe').length > 0 && (
-                                <div>
-                                    <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Dedicated Strobe Lights</h2>
-                                    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-                                        {allPrimaryLights
-                                            .filter((l) => l.group === 'strobe')
-                                            .map((light, _index) => (
-                                                <div key={light.id} className="flex flex-col">
-                                                    <div className="text-center mb-2 font-semibold text-gray-800 dark:text-gray-200">
-                                                        Dedicated Strobe (Position {light.position})
-                                                    </div>
-                                                    <LightChannelsConfig
-                                                        light={light}
-                                                        myLights={myFixtures}
-                                                        onChange={handleLightChange}
-                                                        isHighlighted={highlightedLight === light.position}
-                                                        onClick={() => handleLightClick(light.position)}
-                                                    />
-                                                </div>
-                                            ))}
-                                    </div>
-                                </div>
+                                <LightChannelAssignmentSection
+                                    title="Dedicated Strobe Lights"
+                                    lights={allPrimaryLights.filter((l) => l.group === 'strobe')}
+                                    myLights={myFixtures}
+                                    onLightChange={handleLightChange}
+                                    highlightedLight={highlightedLight}
+                                    onLightClick={handleLightClick}
+                                    lightLabel={(light) => `Dedicated Strobe (Position ${light.position})`}
+                                />
                             )}
                     </div>
 

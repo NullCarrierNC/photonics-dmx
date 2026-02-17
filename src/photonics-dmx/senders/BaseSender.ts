@@ -1,9 +1,35 @@
 // src/senders/BaseSender.ts
 
+/** Sender type identifier for error reporting and auto-disable behaviour. */
+export type SenderId = 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc';
+
+export interface SenderErrorOptions {
+  /** Which sender raised the error; used instead of port heuristics. */
+  senderId?: SenderId;
+  /** If true, the sender should be disabled (e.g. network unreachable). */
+  shouldDisable?: boolean;
+  /** Optional error code (e.g. 'ENETUNREACH'). */
+  code?: string;
+}
+
 export class SenderError {
-  err: any;
-  constructor(err: any) {
+  /** Raw error for backwards compatibility and logging. */
+  readonly err: unknown;
+  /** Human-readable message. */
+  readonly message: string;
+  /** Which sender raised the error. */
+  readonly senderId?: SenderId;
+  /** If true, the sender should be disabled. */
+  readonly shouldDisable: boolean;
+  /** Error code when available. */
+  readonly code?: string;
+
+  constructor(err: unknown, options: SenderErrorOptions = {}) {
     this.err = err;
+    this.message = err instanceof Error ? err.message : String(err);
+    this.senderId = options.senderId;
+    this.shouldDisable = options.shouldDisable === true;
+    this.code = options.code ?? (err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : undefined);
   }
 }
 

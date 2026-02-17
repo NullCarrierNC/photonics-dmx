@@ -310,22 +310,19 @@ export class NodeExecutionEngine {
     // Check if it's a logic node
     const logicNode = logicMap.get(nodeId);
     if (logicNode) {
-      // Pre-log variable inputs if applicable
-      const logicLog: any = { logicType: (logicNode as any).logicType, nodeId, ctx: context.id };
-      if ((logicNode as any).sourceVariable) {
-        const src = (logicNode as any).sourceVariable as string;
+      const logicLog: Record<string, unknown> = { logicType: logicNode.logicType, nodeId, ctx: context.id };
+      if ('sourceVariable' in logicNode && logicNode.sourceVariable) {
+        const src = logicNode.sourceVariable as string;
         logicLog.sourceVariable = src;
         logicLog.sourceValue = this.getVariableValue(src, context);
       }
-      if ((logicNode as any).varName) {
-        const vn = (logicNode as any).varName as string;
-        logicLog.varName = vn;
-        logicLog.varValueBefore = this.getVariableValue(vn, context);
+      if ('varName' in logicNode && logicNode.varName) {
+        logicLog.varName = logicNode.varName;
+        logicLog.varValueBefore = this.getVariableValue(logicNode.varName, context);
       }
-      if ((logicNode as any).assignTo) {
-        const at = (logicNode as any).assignTo as string;
-        logicLog.assignTo = at;
-        logicLog.assignToBefore = this.getVariableValue(at, context);
+      if ('assignTo' in logicNode && logicNode.assignTo) {
+        logicLog.assignTo = logicNode.assignTo;
+        logicLog.assignToBefore = this.getVariableValue(logicNode.assignTo, context);
       }
       this.debugLog(`exec logic nodeId=${nodeId} ctx=${context.id}`, logicLog);
       this.executeLogicNode(logicNode, nodeId, context);
