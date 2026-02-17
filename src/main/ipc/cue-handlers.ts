@@ -3,6 +3,7 @@ import { ControllerManager } from '../controllers/ControllerManager';
 import { CueData } from '../../photonics-dmx/cues/types/cueTypes';
 import { sendToAllWindows } from '../utils/windowUtils';
 import { ipcError } from './ipcResult';
+import { CUE, RENDERER_RECEIVE } from '../../shared/ipcChannels';
 
 /**
  * Set up cue-related IPC handlers
@@ -11,24 +12,24 @@ import { ipcError } from './ipcResult';
  */
 export function setupCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   // Event listeners for YARG and RB3
-  ipcMain.on('yarg-listener-enabled', () => {
+  ipcMain.on(CUE.YARG_LISTENER_ENABLED, () => {
     controllerManager.enableYarg();
   });
 
-  ipcMain.on('yarg-listener-disabled', async () => {
+  ipcMain.on(CUE.YARG_LISTENER_DISABLED, async () => {
     await controllerManager.disableYarg();
   });
 
-  ipcMain.on('rb3e-listener-enabled', () => {
+  ipcMain.on(CUE.RB3E_LISTENER_ENABLED, () => {
     controllerManager.enableRb3();
   });
 
-  ipcMain.on('rb3e-listener-disabled', async () => {
+  ipcMain.on(CUE.RB3E_LISTENER_DISABLED, async () => {
     await controllerManager.disableRb3();
   });
 
   // Disable YARG
-  ipcMain.handle('disable-yarg', async () => {
+  ipcMain.handle(CUE.DISABLE_YARG, async () => {
     try {
       await controllerManager.disableYarg();
       return { success: true };
@@ -39,7 +40,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   });
 
   // Disable RB3
-  ipcMain.handle('disable-rb3', async () => {
+  ipcMain.handle(CUE.DISABLE_RB3, async () => {
     try {
       await controllerManager.disableRb3();
       return { success: true };
@@ -50,27 +51,27 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   });
 
   // RB3 mode switching
-  ipcMain.on('rb3e-switch-mode', async (_, mode: 'direct' | 'cueBased') => {
+  ipcMain.on(CUE.RB3E_SWITCH_MODE, async (_, mode: 'direct' | 'cueBased') => {
     await controllerManager.switchRb3Mode(mode);
   });
 
   // Get RB3 current mode
-  ipcMain.handle('rb3e-get-mode', () => {
+  ipcMain.handle(CUE.RB3E_GET_MODE, () => {
     return controllerManager.getRb3Mode();
   });
 
   // Get RB3 processor statistics
-  ipcMain.handle('rb3e-get-stats', () => {
+  ipcMain.handle(CUE.RB3E_GET_STATS, () => {
     return controllerManager.getRb3ProcessorStats();
   });
   
   // Send handled cue data to renderer
   const sendCueHandledData = (cueData: CueData) => {
-    sendToAllWindows('cue-handled', cueData);
+    sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, cueData);
   };
   
   // Listen for cue data
-  ipcMain.on('set-listen-cue-data', (_, shouldListen: boolean) => {
+  ipcMain.on(CUE.SET_LISTEN_CUE_DATA, (_, shouldListen: boolean) => {
     if (shouldListen) {
       // Listen to cue handler if it exists
       const cueHandler = controllerManager.getCueHandler();
@@ -98,7 +99,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   });
 
   // Update effect debounce time
-  ipcMain.on('update-effect-debounce', (_, debounceTime: number) => {
+  ipcMain.on(CUE.UPDATE_EFFECT_DEBOUNCE, (_, debounceTime: number) => {
     // Save the debounce time to preferences
     controllerManager.getConfig().setPreference('effectDebounce', debounceTime);
     
@@ -112,18 +113,18 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   });
 
   // Set cue style
-  ipcMain.on('cue-style', (_, style: 'simple' | 'complex') => {
+  ipcMain.on(CUE.CUE_STYLE, (_, style: 'simple' | 'complex') => {
     // Save complex cue style preference
     controllerManager.getConfig().setPreference('complex', style === 'complex');
   });
 
   // Get YARG enabled state
-  ipcMain.handle('get-yarg-enabled', () => {
+  ipcMain.handle(CUE.GET_YARG_ENABLED, () => {
     return controllerManager.getIsYargEnabled();
   });
 
   // Get RB3 enabled state
-  ipcMain.handle('get-rb3-enabled', () => {
+  ipcMain.handle(CUE.GET_RB3_ENABLED, () => {
     return controllerManager.getIsRb3Enabled();
   });
 } 

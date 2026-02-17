@@ -32,6 +32,7 @@ import {
   exportEffectFile
 } from '../../../ipcApi';
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers';
+import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels';
 import { createBlankCue, createDefaultFile, createDefaultEffectFile, createDefaultEffect } from '../lib/cueDefaults';
 import { clearStoredLastFilePath, getStoredLastFilePath, setStoredLastFilePath } from './useLastCueFilePath';
 import type { EditorDocument } from '../lib/types';
@@ -115,11 +116,11 @@ const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: Use
     const effectHandler = (_: unknown, payload: { yarg: EffectFileSummary[]; audio: EffectFileSummary[] }) => {
       setEffectFiles([...payload.yarg, ...payload.audio]);
     };
-    addIpcListener('node-cues:changed', handler);
-    addIpcListener('effects:changed', effectHandler);
+    addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handler);
+    addIpcListener(RENDERER_RECEIVE.EFFECTS_CHANGED, effectHandler);
     return () => {
-      removeIpcListener('node-cues:changed', handler);
-      removeIpcListener('effects:changed', effectHandler);
+      removeIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handler);
+      removeIpcListener(RENDERER_RECEIVE.EFFECTS_CHANGED, effectHandler);
     };
   }, [refreshFiles, refreshEffectFiles]);
 

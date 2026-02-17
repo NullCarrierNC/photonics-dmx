@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CONFIG } from '../../../shared/ipcChannels';
 
 interface AudioDevice {
   deviceId: string;
@@ -17,7 +18,7 @@ const AudioDeviceSelector: React.FC = () => {
     const loadConfigAndDevices = async () => {
       try {
         // Load saved config
-        const config = await window.electron.ipcRenderer.invoke('get-audio-config');
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
         setSelectedDeviceId(config?.deviceId || 'default');
         
         // Load available devices
@@ -63,7 +64,7 @@ const AudioDeviceSelector: React.FC = () => {
 
     try {
       setIsSaving(true);
-      const result = await window.electron.ipcRenderer.invoke('save-audio-config', {
+      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
         deviceId: newDeviceId === 'default' ? undefined : newDeviceId
       });
       
@@ -72,7 +73,7 @@ const AudioDeviceSelector: React.FC = () => {
         setError('Failed to save device selection');
         
         // Revert on failure
-        const config = await window.electron.ipcRenderer.invoke('get-audio-config');
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
         setSelectedDeviceId(config?.deviceId || 'default');
       }
     } catch (error) {
@@ -80,7 +81,7 @@ const AudioDeviceSelector: React.FC = () => {
       setError('Failed to save device selection');
       
       // Revert on failure
-      const config = await window.electron.ipcRenderer.invoke('get-audio-config');
+      const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
       setSelectedDeviceId(config?.deviceId || 'default');
     } finally {
       setIsSaving(false);

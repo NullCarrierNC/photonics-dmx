@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { DmxRig } from '../../../photonics-dmx/types';
+import { CONFIG } from '../../../shared/ipcChannels';
 
 interface DmxRigSelectorProps {
   selectedRigId: string | null;
@@ -20,7 +21,7 @@ const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({
   useEffect(() => {
     const loadActiveRigs = async () => {
       try {
-        const activeRigs: DmxRig[] = await window.electron.ipcRenderer.invoke('get-active-rigs');
+        const activeRigs: DmxRig[] = await window.electron.ipcRenderer.invoke(CONFIG.GET_ACTIVE_RIGS);
         setAvailableRigs(activeRigs);
         
         // Set default selected rig to the first available rig if none selected

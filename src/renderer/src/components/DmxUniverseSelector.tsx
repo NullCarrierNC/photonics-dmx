@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { DmxRig } from '../../../photonics-dmx/types';
+import { CONFIG } from '../../../shared/ipcChannels';
 
 interface DmxUniverseSelectorProps {
   selectedUniverse: number | null;
@@ -28,7 +29,7 @@ const DmxUniverseSelector: React.FC<DmxUniverseSelectorProps> = ({
 
     const loadActiveRigs = async () => {
       try {
-        const activeRigs: DmxRig[] = await window.electron.ipcRenderer.invoke('get-active-rigs');
+        const activeRigs: DmxRig[] = await window.electron.ipcRenderer.invoke(CONFIG.GET_ACTIVE_RIGS);
         const universes = activeRigs.map(rig => rig.universe || 1).sort((a, b) => a - b);
         setAvailableUniverses(universes);
         

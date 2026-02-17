@@ -2,6 +2,7 @@ import { useAtom } from 'jotai';
 import { useEffect } from 'react';
 import { rb3eListenerEnabledAtom, yargListenerEnabledAtom, audioListenerEnabledAtom } from '../atoms';
 import { useIpcListener } from '../utils/ipcHelpers';
+import { CONFIG, CUE, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 
 interface Rb3ToggleProps {
   disabled?: boolean;
@@ -16,7 +17,7 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
     // Initialize toggle state from system status
     const initializeState = async () => {
       try {
-        const response = await window.electron.ipcRenderer.invoke('get-system-status');
+        const response = await window.electron.ipcRenderer.invoke(LIGHT.GET_SYSTEM_STATUS);
         if (response.success) {
           setIsRb3Enabled(response.isRb3Enabled);
         }
@@ -31,7 +32,7 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
       initializeState();
     };
     
-    const cleanup = useIpcListener('controllers-restarted', handleControllersRestarted);
+    const cleanup = useIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted);
     
     // Initialize on mount
     initializeState();
@@ -45,15 +46,15 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
     setIsRb3Enabled(newState);
 
     if (newState) {
-      window.electron.ipcRenderer.send('rb3e-listener-enabled');
+      window.electron.ipcRenderer.send(CUE.RB3E_LISTENER_ENABLED);
       console.log('RB3E Listener enabled');
       // Disable Audio when RB3E is enabled (mutual exclusion)
       if (isAudioEnabled) {
         setIsAudioEnabled(false);
-        window.electron.ipcRenderer.invoke('set-audio-enabled', false);
+        window.electron.ipcRenderer.invoke(CONFIG.SET_AUDIO_ENABLED, false);
       }
     } else {
-      window.electron.ipcRenderer.send('rb3e-listener-disabled');
+      window.electron.ipcRenderer.send(CUE.RB3E_LISTENER_DISABLED);
       console.log('rb3e Listener disabled');
     }
   };

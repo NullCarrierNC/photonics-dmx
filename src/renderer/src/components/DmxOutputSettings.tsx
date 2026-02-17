@@ -11,6 +11,9 @@ import {
   openDmxComPortAtom,
   lightingPrefsAtom
 } from '../atoms';
+import CollapsibleSenderCard from './DmxOutputSettings/CollapsibleSenderCard';
+import DmxOutputEnabledModes from './DmxOutputSettings/DmxOutputEnabledModes';
+import { LIGHT, CONFIG } from '../../../shared/ipcChannels';
 
 const DmxOutputSettings: React.FC = () => {
   const [isArtNetEnabled, setIsArtNetEnabled] = useAtom(senderArtNetEnabledAtom);
@@ -53,7 +56,7 @@ const DmxOutputSettings: React.FC = () => {
   useEffect(() => {
     const loadNetworkInterfaces = async () => {
       try {
-        const result = await window.electron.ipcRenderer.invoke('get-network-interfaces');
+        const result = await window.electron.ipcRenderer.invoke(LIGHT.GET_NETWORK_INTERFACES);
         if (result.success) {
           setNetworkInterfaces(result.interfaces);
         } else {
@@ -92,7 +95,7 @@ const DmxOutputSettings: React.FC = () => {
         dmxOutputConfig: initialConfig
       }));
 
-      window.electron.ipcRenderer.invoke('save-prefs', {
+      window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         dmxOutputConfig: initialConfig
       }).catch(error => {
         console.error('Failed to save initial DMX output configuration:', error);
@@ -123,7 +126,7 @@ const DmxOutputSettings: React.FC = () => {
 
     // If enabling sACN, start the sender
     if (newState && !isSacnEnabled) {
-      window.electron.ipcRenderer.send('sender-enable', {
+      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
         sender: 'sacn',
         ...sacnConfig
       });
@@ -133,12 +136,12 @@ const DmxOutputSettings: React.FC = () => {
     // If disabling sACN, stop the sender if it's running and turn off the toggle
     if (!newState && isSacnEnabled) {
       console.log('Disabling sACN checkbox - stopping sACN sender and turning off toggle');
-      window.electron.ipcRenderer.send('sender-disable', { sender: 'sacn' });
+      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'sacn' });
       setIsSacnEnabled(false); // Turn off the toggle state
     }
 
     try {
-      const result = await window.electron.ipcRenderer.invoke('save-prefs', {
+      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         dmxOutputConfig: newConfig
       });
       console.log('Save result:', result);
@@ -170,7 +173,7 @@ const DmxOutputSettings: React.FC = () => {
     // If enabling ArtNet, start the sender
     if (newState && !isArtNetEnabled) {
       console.log('Enabling ArtNet checkbox - starting ArtNet sender');
-      window.electron.ipcRenderer.send('sender-enable', {
+      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
         sender: 'artnet',
         ...artNetConfig
       });
@@ -180,12 +183,12 @@ const DmxOutputSettings: React.FC = () => {
     // If disabling ArtNet, stop the sender if it's running and turn off the toggle
     if (!newState && isArtNetEnabled) {
       console.log('Disabling ArtNet checkbox - stopping ArtNet sender and turning off toggle');
-      window.electron.ipcRenderer.send('sender-disable', { sender: 'artnet' });
+      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'artnet' });
       setIsArtNetEnabled(false); // Turn off the toggle state
     }
 
     try {
-      const result = await window.electron.ipcRenderer.invoke('save-prefs', {
+      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         dmxOutputConfig: newConfig
       });
       console.log('Save result:', result);
@@ -217,7 +220,7 @@ const DmxOutputSettings: React.FC = () => {
     // If enabling Enttec Pro, start the sender
     if (newState && !isEnttecProEnabled) {
       console.log('Enabling Enttec Pro checkbox - starting Enttec Pro sender');
-      window.electron.ipcRenderer.send('sender-enable', {
+      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
         sender: 'enttecpro',
         port: comPort,
         universe: enttecProUniverse
@@ -228,12 +231,12 @@ const DmxOutputSettings: React.FC = () => {
     // If disabling Enttec Pro, stop the sender if it's running and turn off the toggle
     if (!newState && isEnttecProEnabled) {
       console.log('Disabling Enttec Pro checkbox - stopping Enttec Pro sender and turning off toggle');
-      window.electron.ipcRenderer.send('sender-disable', { sender: 'enttecpro' });
+      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'enttecpro' });
       setIsEnttecProEnabled(false); // Turn off the toggle state
     }
 
     try {
-      const result = await window.electron.ipcRenderer.invoke('save-prefs', {
+      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         dmxOutputConfig: newConfig
       });
       console.log('Save result:', result);
@@ -263,7 +266,7 @@ const DmxOutputSettings: React.FC = () => {
 
     if (newState && !isOpenDmxEnabled) {
       console.log('Enabling OpenDMX checkbox - starting OpenDMX sender');
-      window.electron.ipcRenderer.send('sender-enable', {
+      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
         sender: 'opendmx',
         port: openDmxComPort,
         dmxSpeed: openDmxSpeed,
@@ -274,12 +277,12 @@ const DmxOutputSettings: React.FC = () => {
 
     if (!newState && isOpenDmxEnabled) {
       console.log('Disabling OpenDMX checkbox - stopping OpenDMX sender and turning off toggle');
-      window.electron.ipcRenderer.send('sender-disable', { sender: 'opendmx' });
+      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'opendmx' });
       setIsOpenDmxEnabled(false);
     }
 
     try {
-      const result = await window.electron.ipcRenderer.invoke('save-prefs', {
+      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         dmxOutputConfig: newConfig
       });
       console.log('Save result:', result);
@@ -295,7 +298,7 @@ const DmxOutputSettings: React.FC = () => {
     };
 
     try {
-      await window.electron.ipcRenderer.invoke('save-prefs', {
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         artNetConfig: newConfig
       });
 
@@ -319,7 +322,7 @@ const DmxOutputSettings: React.FC = () => {
     };
 
     try {
-      await window.electron.ipcRenderer.invoke('save-prefs', {
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         enttecProConfig: newConfig
       });
 
@@ -343,7 +346,7 @@ const DmxOutputSettings: React.FC = () => {
     };
 
     try {
-      await window.electron.ipcRenderer.invoke('save-prefs', {
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         openDmxConfig: newConfig
       });
 
@@ -366,7 +369,7 @@ const DmxOutputSettings: React.FC = () => {
     };
 
     try {
-      await window.electron.ipcRenderer.invoke('save-prefs', {
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         openDmxConfig: newConfig
       });
 
@@ -387,7 +390,7 @@ const DmxOutputSettings: React.FC = () => {
     };
 
     try {
-      await window.electron.ipcRenderer.invoke('save-prefs', {
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         enttecProConfig: newConfig
       });
 
@@ -408,7 +411,7 @@ const DmxOutputSettings: React.FC = () => {
     };
 
     try {
-      await window.electron.ipcRenderer.invoke('save-prefs', {
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         openDmxConfig: newConfig
       });
 
@@ -429,7 +432,7 @@ const DmxOutputSettings: React.FC = () => {
 
     try {
       // Save to preferences
-      await window.electron.ipcRenderer.invoke('save-prefs', {
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         sacnConfig: newConfig
       });
 
@@ -441,7 +444,7 @@ const DmxOutputSettings: React.FC = () => {
 
       // Update the running sender if sACN is enabled
       if (isSacnEnabled) {
-        await window.electron.ipcRenderer.invoke('update-sacn-config', newConfig);
+        await window.electron.ipcRenderer.invoke(LIGHT.UPDATE_SACN_CONFIG, newConfig);
       }
     } catch (error) {
       console.error('Failed to save sACN configuration:', error);
@@ -458,7 +461,7 @@ const DmxOutputSettings: React.FC = () => {
     };
 
     try {
-      await window.electron.ipcRenderer.invoke('save-prefs', {
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
         dmxSettingsPrefs: newDmxSettingsPrefs
       });
 
@@ -478,88 +481,28 @@ const DmxOutputSettings: React.FC = () => {
         DMX Output Configuration
       </h2>
 
-      {/* Enabled Modes */}
-      <div className="mb-8">
-        <h3 className="text-lg font-medium mb-3 text-gray-800 dark:text-gray-200">Enabled DMX Output Modes</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-          Select the DMX modes you want to use. This will make them available for use in Game Settings on the Status page.
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Each sender can be configured individually below.
-        </p>
-        <div className="flex items-center space-x-6 flex-wrap">
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={prefs.dmxOutputConfig?.sacnEnabled || false}
-              onChange={handleSacnToggle}
-              className="form-checkbox h-4 w-4 text-blue-600 rounded"
-            />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">sACN</span>
-          </label>
+      <DmxOutputEnabledModes
+        sacnEnabled={prefs.dmxOutputConfig?.sacnEnabled || false}
+        onSacnToggle={handleSacnToggle}
+        artNetEnabled={prefs.dmxOutputConfig?.artNetEnabled || false}
+        onArtNetToggle={handleArtNetToggle}
+        enttecProEnabled={prefs.dmxOutputConfig?.enttecProEnabled || false}
+        onEnttecProToggle={handleEnttecProToggle}
+        openDmxEnabled={prefs.dmxOutputConfig?.openDmxEnabled || false}
+        onOpenDmxToggle={handleOpenDmxToggle}
+      />
 
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={prefs.dmxOutputConfig?.artNetEnabled || false}
-              onChange={handleArtNetToggle}
-              className="form-checkbox h-4 w-4 text-blue-600 rounded"
-            />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ArtNet</span>
-          </label>
-
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={prefs.dmxOutputConfig?.enttecProEnabled || false}
-              onChange={handleEnttecProToggle}
-              className="form-checkbox h-4 w-4 text-blue-600 rounded"
-            />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enttec Pro USB</span>
-          </label>
-
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={prefs.dmxOutputConfig?.openDmxEnabled || false}
-              onChange={handleOpenDmxToggle}
-              className="form-checkbox h-4 w-4 text-blue-600 rounded"
-            />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">OpenDMX USB</span>
-          </label>
-        </div>
-      </div>
-
-      {/* sACN Configuration */}
       {prefs.dmxOutputConfig?.sacnEnabled && (
         <div className="mb-6">
-          <div className="border rounded-lg border-gray-200 dark:border-gray-600">
-            <div
-              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              onClick={() => {
-                const newSacnExpanded = !sacnExpanded;
-                setSacnExpanded(newSacnExpanded);
-                saveExpandedStates(artNetExpanded, newSacnExpanded, enttecProExpanded, openDmxExpanded);
-              }}
-            >
-              <div className="flex items-center flex-1">
-                <div className="mr-3 text-gray-600 dark:text-gray-400">
-                  {sacnExpanded ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  )}
-                </div>
-                <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">sACN Configuration</h3>
-              </div>
-            </div>
-
-            {sacnExpanded && (
-              <div className="p-4 border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+          <CollapsibleSenderCard
+            title="sACN Configuration"
+            expanded={sacnExpanded}
+            onToggle={() => {
+              const newSacnExpanded = !sacnExpanded;
+              setSacnExpanded(newSacnExpanded);
+              saveExpandedStates(artNetExpanded, newSacnExpanded, enttecProExpanded, openDmxExpanded);
+            }}
+          >
                 <div className="space-y-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                     Configure sACN network settings. By default, sACN broadcasts to the entire network. You can specify a network interface or unicast destination for specific targeting.
@@ -626,42 +569,21 @@ const DmxOutputSettings: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+          </CollapsibleSenderCard>
         </div>
       )}
 
-      {/* ArtNet Configuration */}
       {prefs.dmxOutputConfig?.artNetEnabled && (
         <div className="mb-6">
-          <div className="border rounded-lg border-gray-200 dark:border-gray-600">
-            <div
-              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              onClick={() => {
-                const newArtNetExpanded = !artNetExpanded;
-                setArtNetExpanded(newArtNetExpanded);
-                saveExpandedStates(newArtNetExpanded, sacnExpanded, enttecProExpanded, openDmxExpanded);
-              }}
-            >
-              <div className="flex items-center flex-1">
-                <div className="mr-3 text-gray-600 dark:text-gray-400">
-                  {artNetExpanded ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  )}
-                </div>
-                <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">ArtNet Configuration</h3>
-              </div>
-            </div>
-
-            {artNetExpanded && (
-              <div className="p-4 border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+          <CollapsibleSenderCard
+            title="ArtNet Configuration"
+            expanded={artNetExpanded}
+            onToggle={() => {
+              const newArtNetExpanded = !artNetExpanded;
+              setArtNetExpanded(newArtNetExpanded);
+              saveExpandedStates(newArtNetExpanded, sacnExpanded, enttecProExpanded, openDmxExpanded);
+            }}
+          >
                 <div className="space-y-3">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 mb-4">
                     ArtNet requires you to specify the host IP address of the ArtNet device you are using.
@@ -743,42 +665,21 @@ const DmxOutputSettings: React.FC = () => {
                     />
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+          </CollapsibleSenderCard>
         </div>
       )}
 
-      {/* Enttec Pro USB Configuration */}
       {prefs.dmxOutputConfig?.enttecProEnabled && (
         <div>
-          <div className="border rounded-lg border-gray-200 dark:border-gray-600">
-            <div
-              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              onClick={() => {
-                const newEnttecProExpanded = !enttecProExpanded;
-                setEnttecProExpanded(newEnttecProExpanded);
-                saveExpandedStates(artNetExpanded, sacnExpanded, newEnttecProExpanded, openDmxExpanded);
-              }}
-            >
-              <div className="flex items-center flex-1">
-                <div className="mr-3 text-gray-600 dark:text-gray-400">
-                  {enttecProExpanded ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  )}
-                </div>
-                <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">Enttec Pro USB Configuration</h3>
-              </div>
-            </div>
-
-            {enttecProExpanded && (
-              <div className="p-4 border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+          <CollapsibleSenderCard
+            title="Enttec Pro USB Configuration"
+            expanded={enttecProExpanded}
+            onToggle={() => {
+              const newEnttecProExpanded = !enttecProExpanded;
+              setEnttecProExpanded(newEnttecProExpanded);
+              saveExpandedStates(artNetExpanded, sacnExpanded, newEnttecProExpanded, openDmxExpanded);
+            }}
+          >
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">COM:</label>
@@ -809,41 +710,21 @@ const DmxOutputSettings: React.FC = () => {
                     <br />On Mac it is usually something like /dev/tty.usbserial-A9000001.
                   </p>
                 </div>
-              </div>
-            )}
-          </div>
+          </CollapsibleSenderCard>
         </div>
       )}
 
       {prefs.dmxOutputConfig?.openDmxEnabled && (
         <div className="mt-6">
-          <div className="border rounded-lg border-gray-200 dark:border-gray-600">
-            <div
-              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              onClick={() => {
-                const newOpenDmxExpanded = !openDmxExpanded;
-                setOpenDmxExpanded(newOpenDmxExpanded);
-                saveExpandedStates(artNetExpanded, sacnExpanded, enttecProExpanded, newOpenDmxExpanded);
-              }}
-            >
-              <div className="flex items-center flex-1">
-                <div className="mr-3 text-gray-600 dark:text-gray-400">
-                  {openDmxExpanded ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  )}
-                </div>
-                <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">OpenDMX USB Configuration</h3>
-              </div>
-            </div>
-
-            {openDmxExpanded && (
-              <div className="p-4 border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+          <CollapsibleSenderCard
+            title="OpenDMX USB Configuration"
+            expanded={openDmxExpanded}
+            onToggle={() => {
+              const newOpenDmxExpanded = !openDmxExpanded;
+              setOpenDmxExpanded(newOpenDmxExpanded);
+              saveExpandedStates(artNetExpanded, sacnExpanded, enttecProExpanded, newOpenDmxExpanded);
+            }}
+          >
                 <div className="space-y-3">
                   <p className="text-sm text-red-600 dark:text-red-500 ">
                     OpenDMX USB adapters are very poor quality - we <b>HIGHLY</b> recommend against using them!
@@ -900,9 +781,7 @@ const DmxOutputSettings: React.FC = () => {
                     <br />On macOS it is usually something like /dev/tty.usbserial-XXXX.
                   </p>
                 </div>
-              </div>
-            )}
-          </div>
+          </CollapsibleSenderCard>
         </div>
       )}
     </div>

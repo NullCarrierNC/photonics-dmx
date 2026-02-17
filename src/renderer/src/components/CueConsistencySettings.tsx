@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { LIGHT } from '../../../shared/ipcChannels';
 
 const CueConsistencySettings: React.FC = () => {
   const [consistencyWindow, setConsistencyWindow] = useState(60000);
@@ -8,7 +9,7 @@ const CueConsistencySettings: React.FC = () => {
   useEffect(() => {
     const loadConsistencyWindow = async () => {
       try {
-        const result = await window.electron.ipcRenderer.invoke('get-cue-consistency-window');
+        const result = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_CONSISTENCY_WINDOW);
         if (result.success) {
           setConsistencyWindow(result.windowMs);
         }
@@ -30,7 +31,7 @@ const CueConsistencySettings: React.FC = () => {
     
     try {
       setIsSaving(true);
-      const result = await window.electron.ipcRenderer.invoke('set-cue-consistency-window', newValue);
+      const result = await window.electron.ipcRenderer.invoke(LIGHT.SET_CUE_CONSISTENCY_WINDOW, newValue);
       if (result.success) {
         setConsistencyWindow(result.windowMs);
       } else {

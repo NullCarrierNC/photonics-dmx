@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
+import { CONFIG, LIGHT } from '../../../shared/ipcChannels';
 
 interface AudioCueInfo {
   id: string;
@@ -24,8 +25,8 @@ const AudioEnabledCueGroups: React.FC = () => {
     try {
       setLoading(true);
       const [groups, enabled] = await Promise.all([
-        window.electron.ipcRenderer.invoke('get-audio-cue-groups'),
-        window.electron.ipcRenderer.invoke('get-enabled-audio-cue-groups'),
+        window.electron.ipcRenderer.invoke(LIGHT.GET_AUDIO_CUE_GROUPS),
+        window.electron.ipcRenderer.invoke(CONFIG.GET_ENABLED_AUDIO_CUE_GROUPS),
       ]);
 
       const mappedGroups: AudioCueGroupDetails[] = groups.map((group: { id: string; name: string; description: string }) => ({
@@ -57,7 +58,7 @@ const AudioEnabledCueGroups: React.FC = () => {
     }
 
     setEnabledGroupIds(updatedEnabledIds);
-    window.electron.ipcRenderer.invoke('set-enabled-audio-cue-groups', updatedEnabledIds);
+    window.electron.ipcRenderer.invoke(CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS, updatedEnabledIds);
   };
 
   const handleAccordionToggle = async (groupId: string) => {
@@ -66,7 +67,7 @@ const AudioEnabledCueGroups: React.FC = () => {
 
     if (!group.isExpanded && group.cues.length === 0) {
       try {
-        const cueDetails = await window.electron.ipcRenderer.invoke('get-available-audio-cues', groupId);
+        const cueDetails = await window.electron.ipcRenderer.invoke(LIGHT.GET_AVAILABLE_AUDIO_CUES, groupId);
         setAllGroups((prev) =>
           prev.map((g) =>
             g.id === groupId ? { ...g, cues: cueDetails, isExpanded: true } : g,

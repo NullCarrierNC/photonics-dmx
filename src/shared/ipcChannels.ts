@@ -48,6 +48,15 @@ export const CUE = {
   RB3E_GET_STATS: 'rb3e-get-stats',
   GET_YARG_ENABLED: 'get-yarg-enabled',
   GET_RB3_ENABLED: 'get-rb3-enabled',
+  YARG_LISTENER_ENABLED: 'yarg-listener-enabled',
+  YARG_LISTENER_DISABLED: 'yarg-listener-disabled',
+  RB3E_LISTENER_ENABLED: 'rb3e-listener-enabled',
+  RB3E_LISTENER_DISABLED: 'rb3e-listener-disabled',
+  RB3E_SWITCH_MODE: 'rb3e-switch-mode',
+  SET_LISTEN_CUE_DATA: 'set-listen-cue-data',
+  CUE_STYLE: 'cue-style',
+  UPDATE_EFFECT_DEBOUNCE: 'update-effect-debounce',
+  GET_EFFECT_DEBOUNCE: 'get-effect-debounce',
 } as const;
 
 // ---- Light / senders / simulation ----
@@ -69,6 +78,14 @@ export const LIGHT = {
   SIMULATE_KEYFRAME: 'simulate-keyframe',
   SIMULATE_MEASURE: 'simulate-measure',
   SIMULATE_INSTRUMENT_NOTE: 'simulate-instrument-note',
+  GET_AVAILABLE_CUES: 'get-available-cues',
+  GET_AVAILABLE_AUDIO_CUES: 'get-available-audio-cues',
+  GET_AUDIO_CUE_GROUPS: 'get-audio-cue-groups',
+  GET_CUE_SOURCE_GROUP: 'get-cue-source-group',
+  SET_CUE_CONSISTENCY_WINDOW: 'set-cue-consistency-window',
+  GET_CUE_CONSISTENCY_WINDOW: 'get-cue-consistency-window',
+  GET_CONSISTENCY_STATUS: 'get-consistency-status',
+  UPDATE_SACN_CONFIG: 'update-sacn-config',
 } as const;
 
 // ---- Config ----
@@ -94,6 +111,12 @@ export const CONFIG = {
   SAVE_AUDIO_CONFIG: 'save-audio-config',
   GET_AUDIO_ENABLED: 'get-audio-enabled',
   SET_AUDIO_ENABLED: 'set-audio-enabled',
+  GET_ENABLED_AUDIO_CUE_GROUPS: 'get-enabled-audio-cue-groups',
+  SET_ENABLED_AUDIO_CUE_GROUPS: 'set-enabled-audio-cue-groups',
+  GET_AUDIO_REACTIVE_CUES: 'get-audio-reactive-cues',
+  SET_ACTIVE_AUDIO_CUE: 'set-active-audio-cue',
+  GET_STAGE_KIT_PRIORITY: 'get-stage-kit-priority',
+  SET_STAGE_KIT_PRIORITY: 'set-stage-kit-priority',
 } as const;
 
 /** All handle/invoke channel names in one object for lookup. */
@@ -108,3 +131,24 @@ export const CHANNELS = {
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
+
+/** Main process -> renderer (one-way send). Use when main calls webContents.send(). */
+export const RENDERER_RECEIVE = {
+  SENDER_START_FAILED: 'sender-start-failed',
+  SENDER_ERROR: 'sender-error',
+  SENDER_NETWORK_ERROR: 'sender-network-error',
+  CONTROLLERS_RESTARTED: 'controllers-restarted',
+  AUDIO_ENABLE: 'audio:enable',
+  AUDIO_DISABLE: 'audio:disable',
+  AUDIO_CONFIG_UPDATE: 'audio:config-update',
+  CUE_STATE_UPDATE: 'cue-state-update',
+  DMX_VALUES: 'dmxValues',
+  CUE_HANDLED: 'cue-handled',
+  NODE_CUES_CHANGED: 'node-cues:changed',
+  EFFECTS_CHANGED: 'effects:changed',
+} as const;
+
+/** Renderer -> main (main process listens). Use when main calls ipcMain.on(). */
+export const RENDERER_SEND = {
+  AUDIO_DATA: 'audio:data',
+} as const;

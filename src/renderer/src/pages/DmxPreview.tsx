@@ -6,6 +6,7 @@ import {
 import LightsDmxPreview from '@renderer/components/LightsDmxPreview';
 import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
 import CuePreview from '@renderer/components/CuePreview';
 import ActiveGroupsSelector from '@renderer/components/ActiveCueGroupsSelector';
@@ -30,13 +31,13 @@ const DmxPreview: React.FC = () => {
       }
 
       try {
-        const rig: DmxRig = await window.electron.ipcRenderer.invoke('get-dmx-rig', selectedRigId);
+        const rig: DmxRig = await window.electron.ipcRenderer.invoke(CONFIG.GET_DMX_RIG, selectedRigId);
         if (rig) {
           setSelectedRig(rig);
           setRigConfig(rig.config);
           
           // Automatically enable IPC sender for preview functionality when rig is selected
-          window.electron.ipcRenderer.send('sender-enable', {sender:'ipc'});
+          window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {sender:'ipc'});
           console.log('IPC sender enabled for preview functionality');
         }
       } catch (error) {
@@ -76,11 +77,11 @@ const DmxPreview: React.FC = () => {
     };
 
     // Add the listener
-    addIpcListener('dmxValues', handleDmxValues);
+    addIpcListener(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues);
 
     return () => {
       // Remove the listener
-      removeIpcListener('dmxValues', handleDmxValues);
+      removeIpcListener(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues);
     };
   }, []); // Empty deps - we use functional updates for state
 

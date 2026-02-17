@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAtom } from 'jotai';
 import { lightingPrefsAtom } from '../atoms';
+import { CONFIG } from '../../../shared/ipcChannels';
 
 const StageKitModeSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom);
@@ -22,7 +23,7 @@ const StageKitModeSettings: React.FC = () => {
     
     try {
       // Save to backend using the specific stage kit priority handler
-      await window.electron.ipcRenderer.invoke('set-stage-kit-priority', priority);
+      await window.electron.ipcRenderer.invoke(CONFIG.SET_STAGE_KIT_PRIORITY, priority);
       console.log(`[StageKitModeSettings] Stage Kit priority changed to: ${priority}`);
     } catch (error) {
       console.error('Failed to save Stage Kit priority:', error);

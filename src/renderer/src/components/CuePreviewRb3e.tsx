@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CueData } from '../../../photonics-dmx/cues/types/cueTypes';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { CUE, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 import { useAtom } from 'jotai';
 import { rb3eListenerEnabledAtom } from '../atoms';
 
@@ -42,7 +43,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({
         }
 
         // Tell the main process to start sending cue data
-        window.electron.ipcRenderer.send('set-listen-cue-data', true);
+        window.electron.ipcRenderer.send(CUE.SET_LISTEN_CUE_DATA, true);
 
         const handleCueData = (_: unknown, cueData: CueData) => {
             console.log('Received RB3E cue data:', cueData);
@@ -64,14 +65,14 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({
         };
 
         // Add the listener for handled cues
-        addIpcListener('cue-handled', handleCueData);
+        addIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData);
 
         return () => {
             // Tell the main process to stop sending cue data
-            window.electron.ipcRenderer.send('set-listen-cue-data', false);
+            window.electron.ipcRenderer.send(CUE.SET_LISTEN_CUE_DATA, false);
 
             // Clean up
-            removeIpcListener('cue-handled', handleCueData);
+            removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData);
         };
     }, [rb3eListenerEnabled]);
 

@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { SenderError } from '../../photonics-dmx/senders/BaseSender';
 import type { SenderManager } from '../../photonics-dmx/controllers/SenderManager';
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels';
 
 /**
  * Creates a handler for sender errors that notifies the renderer and optionally auto-disables the sender.
@@ -31,7 +32,7 @@ export function createSenderErrorHandler(
             console.error(`Failed to disable ${senderId} sender:`, disableErr);
           });
         }
-        mainWindow.webContents.send('sender-network-error', {
+        mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, {
           sender: senderId,
           error: error.message,
           autoDisabled: true
@@ -41,6 +42,6 @@ export function createSenderErrorHandler(
       }
     }
 
-    mainWindow.webContents.send('sender-error', error.message);
+    mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_ERROR, error.message);
   };
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { CONFIG } from '../../../shared/ipcChannels';
 
 const ClockRateSettings: React.FC = () => {
   const [clockRate, setClockRate] = useState(5);
@@ -8,7 +9,7 @@ const ClockRateSettings: React.FC = () => {
   useEffect(() => {
     const loadClockRate = async () => {
       try {
-        const result = await window.electron.ipcRenderer.invoke('get-clock-rate');
+        const result = await window.electron.ipcRenderer.invoke(CONFIG.GET_CLOCK_RATE);
         if (result.success) {
           setClockRate(result.clockRate);
         }
@@ -30,7 +31,7 @@ const ClockRateSettings: React.FC = () => {
 
     try {
       setIsSaving(true);
-      const result = await window.electron.ipcRenderer.invoke('set-clock-rate', newValue);
+      const result = await window.electron.ipcRenderer.invoke(CONFIG.SET_CLOCK_RATE, newValue);
       if (result.success) {
         setClockRate(newValue);
       } else {

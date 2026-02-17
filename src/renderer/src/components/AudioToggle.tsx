@@ -2,6 +2,7 @@ import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import { yargListenerEnabledAtom, rb3eListenerEnabledAtom, audioListenerEnabledAtom } from '../atoms';
 import { useIpcListener } from '../utils/ipcHelpers';
+import { CONFIG, CUE, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 
 interface AudioToggleProps {
   disabled?: boolean;
@@ -17,7 +18,7 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
     // Initialize toggle state from runtime enabled state (not config)
     const initializeState = async () => {
       try {
-        const enabled = await window.electron.ipcRenderer.invoke('get-audio-enabled');
+        const enabled = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_ENABLED);
         setIsAudioEnabled(enabled);
       } catch (error) {
         console.error('Error initializing Audio toggle state:', error);
@@ -30,7 +31,7 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
       setIsAudioEnabled(false);
     };
     
-    const cleanup = useIpcListener('controllers-restarted', handleControllersRestarted);
+    const cleanup = useIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted);
     
     // Initialize on mount
     initializeState();
@@ -46,7 +47,7 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
 
     try {
       setIsSaving(true);
-      const result = await window.electron.ipcRenderer.invoke('set-audio-enabled', newState);
+      const result = await window.electron.ipcRenderer.invoke(CONFIG.SET_AUDIO_ENABLED, newState);
       if (!result.success) {
         console.error('Failed to save audio enabled state:', result.error);
         setIsAudioEnabled(!newState); // Revert on failure
@@ -55,11 +56,11 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
         if (newState) {
           if (isYargEnabled) {
             setIsYargEnabled(false);
-            window.electron.ipcRenderer.send('yarg-listener-disabled');
+            window.electron.ipcRenderer.send(CUE.YARG_LISTENER_DISABLED);
           }
           if (isRb3Enabled) {
             setIsRb3Enabled(false);
-            window.electron.ipcRenderer.send('rb3e-listener-disabled');
+            window.electron.ipcRenderer.send(CUE.RB3E_LISTENER_DISABLED);
           }
         }
       }

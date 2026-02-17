@@ -1,6 +1,7 @@
 
 import { useAtom } from 'jotai';
 import {  lightingPrefsAtom, useComplexCuesAtom } from '../atoms';
+import { CUE } from '../../../shared/ipcChannels';
 import { useEffect } from 'react';
 
 
@@ -17,10 +18,10 @@ const CueStyleToggle = () => {
     }));
 
     if (newState) {
-      window.electron.ipcRenderer.send('cue-style', 'complex');
+      window.electron.ipcRenderer.send(CUE.CUE_STYLE, 'complex');
       console.log('Complex');
     } else {
-      window.electron.ipcRenderer.send('cue-style', 'simple');
+      window.electron.ipcRenderer.send(CUE.CUE_STYLE, 'simple');
       console.log('Simple');
     }
   };

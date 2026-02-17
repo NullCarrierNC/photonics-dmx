@@ -2,12 +2,13 @@ import { IpcMain, BrowserWindow } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import { SenderConfig } from '../../photonics-dmx/types';
 import { ipcError } from './ipcResult';
+import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels';
 
 /**
  * Set up sender-related IPC handlers (enable/disable, sACN config, network interfaces).
  */
 export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  ipcMain.on('sender-enable', async (_, data: SenderConfig) => {
+  ipcMain.on(LIGHT.SENDER_ENABLE, async (_, data: SenderConfig) => {
     try {
       const { sender, port, host, universe, net, subnet, subuni, artNetPort } = data;
 
@@ -80,7 +81,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
         console.error(`Failed to enable ${sender} sender:`, error);
         const mainWindow = BrowserWindow.getFocusedWindow();
         if (mainWindow) {
-          mainWindow.webContents.send('sender-start-failed', {
+          mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_START_FAILED, {
             sender: sender,
             error: ipcError(error).error
           });
@@ -92,7 +93,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
     }
   });
 
-  ipcMain.on('sender-disable', (_, data: { sender: string }) => {
+  ipcMain.on(LIGHT.SENDER_DISABLE, (_, data: { sender: string }) => {
     try {
       const { sender } = data;
       if (!sender) {
@@ -105,7 +106,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
     }
   });
 
-  ipcMain.handle('update-sacn-config', async (_, config: Record<string, unknown>) => {
+  ipcMain.handle(LIGHT.UPDATE_SACN_CONFIG, async (_, config: Record<string, unknown>) => {
     try {
       const senderManager = controllerManager.getSenderManager();
       if (senderManager.getEnabledSenders().includes('sacn')) {
@@ -124,7 +125,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
     }
   });
 
-  ipcMain.handle('get-network-interfaces', async () => {
+  ipcMain.handle(LIGHT.GET_NETWORK_INTERFACES, async () => {
     try {
       const os = require('os');
       const networkInterfaces = os.networkInterfaces();

@@ -2,6 +2,7 @@ import React from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { DmxRig } from '../../../../photonics-dmx/types';
 import { ConfigStrobeType } from '../../../../photonics-dmx/types';
+import { CONFIG } from '../../../../shared/ipcChannels';
 
 interface LightsLayoutRigSectionProps {
   rigs: DmxRig[];
@@ -58,7 +59,7 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
             }
           };
           try {
-            await window.electron.ipcRenderer.invoke('save-dmx-rig', newRig);
+            await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, newRig);
             onRigsChange([...rigs, newRig]);
             setActiveRigId(newRig.id);
             setRigName(newRig.name);

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 
 const AudioLinearResponseToggle: React.FC = () => {
   const [linearResponse, setLinearResponse] = useState(true);
@@ -9,7 +10,7 @@ const AudioLinearResponseToggle: React.FC = () => {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke('get-audio-config');
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
         setLinearResponse(config?.linearResponse !== false);
       } catch (error) {
         console.error('Failed to load audio linear response setting:', error);
@@ -24,8 +25,8 @@ const AudioLinearResponseToggle: React.FC = () => {
       setLinearResponse(config?.linearResponse !== false);
     };
 
-    addIpcListener('audio:config-update', handleUpdate as any);
-    return () => removeIpcListener('audio:config-update', handleUpdate as any);
+    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleUpdate as any);
+    return () => removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleUpdate as any);
   }, []);
 
   const handleToggle = async () => {
@@ -36,18 +37,18 @@ const AudioLinearResponseToggle: React.FC = () => {
 
     try {
       setIsSaving(true);
-      const result = await window.electron.ipcRenderer.invoke('save-audio-config', {
+      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
         linearResponse: nextValue
       });
 
       if (!result?.success) {
         console.error('Failed to save linear response setting:', result?.error);
-        const config = await window.electron.ipcRenderer.invoke('get-audio-config');
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
         setLinearResponse(config?.linearResponse !== false);
       }
     } catch (error) {
       console.error('Failed to save linear response setting:', error);
-      const config = await window.electron.ipcRenderer.invoke('get-audio-config');
+      const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
       setLinearResponse(config?.linearResponse !== false);
     } finally {
       setIsSaving(false);

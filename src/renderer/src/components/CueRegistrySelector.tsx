@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 
 type CueRegistryType = 'YARG' | 'RB3E';
 
@@ -49,8 +50,8 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     try {
       console.log('Fetching enabled cue groups...');
       
-      const enabledGroupIds = await window.electron.ipcRenderer.invoke('get-enabled-cue-groups');
-      const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+      const enabledGroupIds = await window.electron.ipcRenderer.invoke(CONFIG.GET_ENABLED_CUE_GROUPS);
+      const allGroups = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS);
       
       const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id));
 
@@ -81,9 +82,9 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     const handleNodeCuesChanged = () => {
       fetchGroups();
     };
-    addIpcListener('node-cues:changed', handleNodeCuesChanged);
+    addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged);
     return () => {
-      removeIpcListener('node-cues:changed', handleNodeCuesChanged);
+      removeIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged);
     };
   }, [fetchGroups]);
 

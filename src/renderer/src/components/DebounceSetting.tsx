@@ -1,6 +1,7 @@
 import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import { effectDebounceTimeAtom } from '../atoms';
+import { CUE } from '../../../shared/ipcChannels';
 
 const DebounceSetting = () => {
   const [debounce, setDebounce] = useAtom(effectDebounceTimeAtom);
@@ -9,7 +10,7 @@ const DebounceSetting = () => {
   // On mount, retrieve the effect debounce value via IPC and update the atom and input state.
   useEffect(() => {
     window.electron.ipcRenderer
-      .invoke('get-effect-debounce')
+      .invoke(CUE.GET_EFFECT_DEBOUNCE)
       .then((value) => {
         setDebounce(value);
         setInputValue(value.toString());
@@ -27,7 +28,7 @@ const DebounceSetting = () => {
 
     if (!isNaN(newValue)) {
       setDebounce(newValue);
-      window.electron.ipcRenderer.send('update-effect-debounce', newValue);
+      window.electron.ipcRenderer.send(CUE.UPDATE_EFFECT_DEBOUNCE, newValue);
     }
   };
 

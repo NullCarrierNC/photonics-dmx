@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { BaseSender, SenderError } from './BaseSender';
 import { sendToAllWindows } from '../../main/utils/windowUtils';
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels';
 
 /**
  * IPC Sender uses Electron IPC's to communicate 
@@ -51,7 +52,7 @@ export class IpcSender extends BaseSender {
       return;
     }
 
-    sendToAllWindows("dmxValues", { universeBuffer, universe });
+    sendToAllWindows(RENDERER_RECEIVE.DMX_VALUES, { universeBuffer, universe });
   }
 
 

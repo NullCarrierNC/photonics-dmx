@@ -5,6 +5,7 @@ import { sendToAllWindows } from '../utils/windowUtils';
 import { setupSenderHandlers } from './sender-handlers';
 import { setupSimulationHandlers } from './simulation-handlers';
 import { setupCueGroupHandlers } from './cue-group-handlers';
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels';
 
 /**
  * Set up light-related IPC handlers.
@@ -15,7 +16,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     const registry = YargCueRegistry.getInstance();
     const group = registry.getGroup(cueState.groupId);
     const groupName = group ? group.name : null;
-    sendToAllWindows('cue-state-update', {
+    sendToAllWindows(RENDERER_RECEIVE.CUE_STATE_UPDATE, {
       cueType: cueState.cueType,
       groupId: cueState.groupId,
       groupName,

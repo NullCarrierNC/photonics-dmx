@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CueData, InstrumentNoteType, DrumNoteType } from '../../../photonics-dmx/cues/types/cueTypes';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { CUE, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 import { useAtom } from 'jotai';
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms';
 
@@ -171,7 +172,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
         // Only tell the main process to start sending cue data if not in simulation mode
         if (!simulationMode) {
-            window?.electron?.ipcRenderer?.send('set-listen-cue-data', true);
+            window?.electron?.ipcRenderer?.send(CUE.SET_LISTEN_CUE_DATA, true);
         }
 
         const handleCueData = (_: unknown, cueData: CueData) => {
@@ -309,14 +310,14 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         };
 
         // Add the listener for handled cues
-        addIpcListener('cue-handled', handleCueData);
+        addIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData);
 
         return () => {
             // Tell the main process to stop sending cue data
-            window?.electron?.ipcRenderer?.send('set-listen-cue-data', false);
+            window?.electron?.ipcRenderer?.send(CUE.SET_LISTEN_CUE_DATA, false);
 
             // Clean up
-            removeIpcListener('cue-handled', handleCueData);
+            removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData);
         };
     }, [yargListenerEnabled, simulationMode]);
 

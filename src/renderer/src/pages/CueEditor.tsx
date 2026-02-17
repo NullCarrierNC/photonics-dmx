@@ -24,6 +24,7 @@ import { useActiveNodes } from '../components/cue-editor/hooks/useActiveNodes';
 import { ActiveNodesContext } from '../components/cue-editor/context/ActiveNodesContext';
 import { updateDocumentFromFlow, updateEffectDocumentFromFlow } from '../components/cue-editor/lib/cueTransforms';
 import type { NodeCueFile, EffectFile, VariableDefinition, EventDefinition, EffectReference, YargEffectDefinition, AudioEffectDefinition, EffectDefinition, ActionNode, LogicNode, EffectRaiserNode, ValueSource } from '../../../photonics-dmx/cues/types/nodeCueTypes';
+import { EFFECTS, SHELL } from '../../../shared/ipcChannels';
 
 const CueEditor: React.FC = () => {
   const [registryTab, setRegistryTab] = useState<'variables' | 'events' | 'effects'>('variables');
@@ -399,7 +400,7 @@ const CueEditor: React.FC = () => {
           const fileEntry = effectFile.find(f => f.groupId === effectRef.effectFileId);
           
           if (fileEntry) {
-            const effectFileData = await window.electron.ipcRenderer.invoke('effects:read', fileEntry.path) as EffectFile;
+            const effectFileData = await window.electron.ipcRenderer.invoke(EFFECTS.READ, fileEntry.path) as EffectFile;
             const effectDef = effectFileData.effects.find(e => e.id === effectRef.effectId);
             if (effectDef) {
               newDefinitions.set(effectRef.effectId, effectDef);
@@ -631,7 +632,7 @@ const CueEditor: React.FC = () => {
         {editorDoc?.path ? (
           <button
             className="hover:text-blue-600 hover:underline text-left"
-            onClick={() => window.electron.ipcRenderer.invoke('shell:showItemInFolder', editorDoc.path)}
+            onClick={() => window.electron.ipcRenderer.invoke(SHELL.SHOW_ITEM_IN_FOLDER, editorDoc.path)}
             title="Click to reveal in file explorer"
           >
             {editorDoc.path}

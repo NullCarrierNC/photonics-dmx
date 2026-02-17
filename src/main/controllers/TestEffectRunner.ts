@@ -1,6 +1,7 @@
 import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
 import { sendToAllWindows } from '../utils/windowUtils';
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels';
 import type { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces';
 import type { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager';
 
@@ -131,7 +132,7 @@ export class TestEffectRunner {
     if (cue !== undefined) {
       try {
         cueHandler.handleCue(cue, data);
-        sendToAllWindows('cue-handled', data);
+        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, data);
       } catch (error) {
         console.error('Error handling cue:', error);
       }

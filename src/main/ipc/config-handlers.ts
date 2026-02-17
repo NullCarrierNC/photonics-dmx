@@ -1,13 +1,13 @@
-import { IpcMain } from 'electron';
+import { IpcMain, BrowserWindow } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
 import '../../photonics-dmx/cues';
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers';
-import { BrowserWindow } from 'electron';
 import { DmxRig } from '../../photonics-dmx/types';
 import { ipcError } from './ipcResult';
+import { CONFIG, RENDERER_RECEIVE } from '../../shared/ipcChannels';
 
 /**
  * Set up configuration-related IPC handlers
@@ -16,22 +16,22 @@ import { ipcError } from './ipcResult';
  */
 export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   // Get light library (default templates)
-  ipcMain.handle('get-light-library', async () => {
+  ipcMain.handle(CONFIG.GET_LIGHT_LIBRARY, async () => {
     return controllerManager.getConfig().getLightLibrary();
   });
 
   // Get user's lights
-  ipcMain.handle('get-my-lights', async () => {
+  ipcMain.handle(CONFIG.GET_MY_LIGHTS, async () => {
     return controllerManager.getConfig().getUserLights();
   });
 
   // Save user's lights
-  ipcMain.on('save-my-lights', (_, data) => {
+  ipcMain.on(CONFIG.SAVE_MY_LIGHTS, (_, data) => {
     controllerManager.getConfig().updateUserLights(data);
   });
 
   // Get light layout
-  ipcMain.handle('get-light-layout', async (_, filename: string) => {
+  ipcMain.handle(CONFIG.GET_LIGHT_LAYOUT, async (_, filename: string) => {
     try {
       return controllerManager.getConfig().getLightingLayout();
     } catch (error) {
@@ -41,7 +41,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Save light layout
-  ipcMain.handle('save-light-layout', async (_, filename: string, data: any) => {
+  ipcMain.handle(CONFIG.SAVE_LIGHT_LAYOUT, async (_, filename: string, data: any) => {
     try {
       // First save the layout
       controllerManager.getConfig().updateLightingLayout(data);
@@ -52,7 +52,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       // Send a notification to the renderer about the restart
       const mainWindow = require('electron').BrowserWindow.getFocusedWindow();
       if (mainWindow) {
-        mainWindow.webContents.send('controllers-restarted');
+        mainWindow.webContents.send(RENDERER_RECEIVE.CONTROLLERS_RESTARTED);
       }
       
       return { success: true };
@@ -65,7 +65,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // DMX Rigs handlers
 
   // Get all DMX rigs
-  ipcMain.handle('get-dmx-rigs', async () => {
+  ipcMain.handle(CONFIG.GET_DMX_RIGS, async () => {
     try {
       return controllerManager.getConfig().getDmxRigs();
     } catch (error) {
@@ -75,7 +75,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Get a specific DMX rig by ID
-  ipcMain.handle('get-dmx-rig', async (_, id: string) => {
+  ipcMain.handle(CONFIG.GET_DMX_RIG, async (_, id: string) => {
     try {
       return controllerManager.getConfig().getDmxRig(id);
     } catch (error) {
@@ -85,7 +85,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Get only active DMX rigs
-  ipcMain.handle('get-active-rigs', async () => {
+  ipcMain.handle(CONFIG.GET_ACTIVE_RIGS, async () => {
     try {
       return controllerManager.getConfig().getActiveRigs();
     } catch (error) {
@@ -95,7 +95,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Save or update a DMX rig
-  ipcMain.handle('save-dmx-rig', async (_, rig: DmxRig) => {
+  ipcMain.handle(CONFIG.SAVE_DMX_RIG, async (_, rig: DmxRig) => {
     try {
       const config = controllerManager.getConfig();
       const existingRig = config.getDmxRig(rig.id);
@@ -111,7 +111,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
         // Send a notification to the renderer about the restart
         const mainWindow = BrowserWindow.getFocusedWindow();
         if (mainWindow) {
-          mainWindow.webContents.send('controllers-restarted');
+          mainWindow.webContents.send(RENDERER_RECEIVE.CONTROLLERS_RESTARTED);
         }
       }
       
@@ -123,7 +123,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Delete a DMX rig
-  ipcMain.handle('delete-dmx-rig', async (_, id: string) => {
+  ipcMain.handle(CONFIG.DELETE_DMX_RIG, async (_, id: string) => {
     try {
       const config = controllerManager.getConfig();
       const rig = config.getDmxRig(id);
@@ -139,7 +139,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
         // Send a notification to the renderer about the restart
         const mainWindow = BrowserWindow.getFocusedWindow();
         if (mainWindow) {
-          mainWindow.webContents.send('controllers-restarted');
+          mainWindow.webContents.send(RENDERER_RECEIVE.CONTROLLERS_RESTARTED);
         }
       }
       
@@ -151,17 +151,17 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Get app version
-  ipcMain.handle('get-app-version', () => {
+  ipcMain.handle(CONFIG.GET_APP_VERSION, () => {
     return require('electron').app.getVersion();
   });
 
   // Get app preferences
-  ipcMain.handle('get-prefs', async () => {
+  ipcMain.handle(CONFIG.GET_PREFS, async () => {
     return controllerManager.getConfig().getAllPreferences();
   });
 
   // Save app preferences
-  ipcMain.handle('save-prefs', async (_, updates: any) => {
+  ipcMain.handle(CONFIG.SAVE_PREFS, async (_, updates: any) => {
     try {
       controllerManager.getConfig().updatePreferences(updates);
       
@@ -178,7 +178,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Get enabled cue groups
-  ipcMain.handle('get-enabled-cue-groups', async () => {
+  ipcMain.handle(CONFIG.GET_ENABLED_CUE_GROUPS, async () => {
     const registry = YargCueRegistry.getInstance();
     const prefs = controllerManager.getConfig().getAllPreferences();
     let enabled = prefs.enabledCueGroups;
@@ -211,7 +211,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Set enabled cue groups
-  ipcMain.handle('set-enabled-cue-groups', async (_, groupIds: string[]) => {
+  ipcMain.handle(CONFIG.SET_ENABLED_CUE_GROUPS, async (_, groupIds: string[]) => {
     try {
       controllerManager.getConfig().setEnabledCueGroups(groupIds);
       
@@ -230,7 +230,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Get enabled audio cue groups
-  ipcMain.handle('get-enabled-audio-cue-groups', async () => {
+  ipcMain.handle(CONFIG.GET_ENABLED_AUDIO_CUE_GROUPS, async () => {
     const registry = AudioCueRegistry.getInstance();
     const enabled = controllerManager.getConfig().getEnabledAudioCueGroups();
 
@@ -245,7 +245,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Set enabled audio cue groups
-  ipcMain.handle('set-enabled-audio-cue-groups', async (_, groupIds: string[]) => {
+  ipcMain.handle(CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS, async (_, groupIds: string[]) => {
     try {
       controllerManager.getConfig().setEnabledAudioCueGroups(groupIds);
       const registry = AudioCueRegistry.getInstance();
@@ -260,7 +260,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Get cue options + active selection for audio reactive mode
-  ipcMain.handle('get-audio-reactive-cues', async () => {
+  ipcMain.handle(CONFIG.GET_AUDIO_REACTIVE_CUES, async () => {
     try {
       const cues = controllerManager.getAudioCueOptions();
       const activeCueType = controllerManager.getActiveAudioCueType();
@@ -280,7 +280,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Set the active audio cue type
-  ipcMain.handle('set-active-audio-cue', async (_, cueType: AudioCueType) => {
+  ipcMain.handle(CONFIG.SET_ACTIVE_AUDIO_CUE, async (_, cueType: AudioCueType) => {
     try {
       const result = controllerManager.setActiveAudioCueType(cueType);
       if (!result.success) {
@@ -294,13 +294,13 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Get stage kit priority preference
-  ipcMain.handle('get-stage-kit-priority', async () => {
+  ipcMain.handle(CONFIG.GET_STAGE_KIT_PRIORITY, async () => {
     const prefs = controllerManager.getConfig().getAllPreferences();
     return prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked';
   });
 
   // Set stage kit priority preference
-  ipcMain.handle('set-stage-kit-priority', async (_, priority: 'prefer-for-tracked' | 'random' | 'never') => {
+  ipcMain.handle(CONFIG.SET_STAGE_KIT_PRIORITY, async (_, priority: 'prefer-for-tracked' | 'random' | 'never') => {
     try {
       // Update the preference in the config
       controllerManager.getConfig().updatePreferences({
@@ -324,7 +324,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Get clock rate preference
-  ipcMain.handle('get-clock-rate', async () => {
+  ipcMain.handle(CONFIG.GET_CLOCK_RATE, async () => {
     try {
       const clockRate = controllerManager.getConfig().getClockRate();
       return { success: true, clockRate };
@@ -335,7 +335,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Set clock rate preference
-  ipcMain.handle('set-clock-rate', async (_, clockRate: number) => {
+  ipcMain.handle(CONFIG.SET_CLOCK_RATE, async (_, clockRate: number) => {
     try {
       // Validate clock rate range
       if (clockRate < 1 || clockRate > 100) {
@@ -363,12 +363,12 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Audio configuration handlers
   
   // Get audio configuration
-  ipcMain.handle('get-audio-config', async () => {
+  ipcMain.handle(CONFIG.GET_AUDIO_CONFIG, async () => {
     return controllerManager.getConfig().getAudioConfig();
   });
 
   // Save audio configuration
-  ipcMain.handle('save-audio-config', async (_, updates: any) => {
+  ipcMain.handle(CONFIG.SAVE_AUDIO_CONFIG, async (_, updates: any) => {
     try {
       // Get current config to check if deviceId changed
       const currentConfig = controllerManager.getConfig().getAudioConfig();
@@ -389,7 +389,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       // This ensures the UI stays in sync with saved config
       const mainWindow = BrowserWindow.getFocusedWindow();
       if (mainWindow) {
-        mainWindow.webContents.send('audio:config-update', updatedConfig);
+        mainWindow.webContents.send(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, updatedConfig);
         console.log('Sent audio:config-update to renderer');
       }
       
@@ -429,12 +429,12 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Get audio enabled state
-  ipcMain.handle('get-audio-enabled', async () => {
+  ipcMain.handle(CONFIG.GET_AUDIO_ENABLED, async () => {
     return controllerManager.getIsAudioEnabled();
   });
 
   // Enable/disable audio
-  ipcMain.handle('set-audio-enabled', async (_, enabled: boolean) => {
+  ipcMain.handle(CONFIG.SET_AUDIO_ENABLED, async (_, enabled: boolean) => {
     try {
       if (enabled) {
         await controllerManager.enableAudio();

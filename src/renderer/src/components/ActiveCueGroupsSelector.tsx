@@ -2,6 +2,7 @@ import  { useState, useEffect, useCallback, useImperativeHandle, forwardRef } fr
 import { useAtom } from 'jotai';
 import { yargListenerEnabledAtom } from '../atoms';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 
 interface CueGroup {
   id: string;
@@ -29,8 +30,8 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
     const fetchActiveGroups = useCallback(async () => {
       try {
         const [active, priority] = await Promise.all([
-          window.electron.ipcRenderer.invoke('get-active-cue-groups'),
-          window.electron.ipcRenderer.invoke('get-stage-kit-priority')
+          window.electron.ipcRenderer.invoke(LIGHT.GET_ACTIVE_CUE_GROUPS),
+          window.electron.ipcRenderer.invoke(CONFIG.GET_STAGE_KIT_PRIORITY)
         ]);
         const newActiveGroupIds = active.map((g: CueGroup) => g.id);
         
@@ -52,14 +53,14 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
       try {
         setLoading(true);
         const [enabled, active, priority] = await Promise.all([
-          window.electron.ipcRenderer.invoke('get-enabled-cue-groups'),
-          window.electron.ipcRenderer.invoke('get-active-cue-groups'),
-          window.electron.ipcRenderer.invoke('get-stage-kit-priority')
+          window.electron.ipcRenderer.invoke(CONFIG.GET_ENABLED_CUE_GROUPS),
+          window.electron.ipcRenderer.invoke(LIGHT.GET_ACTIVE_CUE_GROUPS),
+          window.electron.ipcRenderer.invoke(CONFIG.GET_STAGE_KIT_PRIORITY)
         ]);
         
         // Get full group details for enabled groups
         const enabledGroupIds = Array.isArray(enabled) ? enabled : [];
-        const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
+        const allGroups = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS);
         const enabledGroupDetails = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id));
         
         setEnabledGroups(enabledGroupDetails);
@@ -85,9 +86,9 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
       const handleNodeCuesChanged = () => {
         fetchData();
       };
-      addIpcListener('node-cues:changed', handleNodeCuesChanged);
+      addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged);
       return () => {
-        removeIpcListener('node-cues:changed', handleNodeCuesChanged);
+        removeIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged);
       };
     }, [fetchData]);
 
@@ -104,7 +105,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
         }
         
         // Update backend
-        const result = await window.electron.ipcRenderer.invoke('set-active-cue-groups', updatedActiveGroupIds);
+        const result = await window.electron.ipcRenderer.invoke(LIGHT.SET_ACTIVE_CUE_GROUPS, updatedActiveGroupIds);
         
         if (result.success) {
           setActiveGroupIds(updatedActiveGroupIds);

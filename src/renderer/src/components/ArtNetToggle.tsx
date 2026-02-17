@@ -4,6 +4,7 @@ import {
   artNetConfigAtom,
   lightingPrefsAtom
 } from '../atoms';
+import { LIGHT } from '../../../shared/ipcChannels';
 
 interface ArtNetToggleProps {
   disabled?: boolean;
@@ -19,13 +20,13 @@ const ArtNetToggle = ({ disabled = false }: ArtNetToggleProps) => {
     setIsArtNetEnabled(newState);
 
     if (newState) {
-      window.electron.ipcRenderer.send('sender-enable', { 
+      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, { 
         sender: 'artnet', 
         ...artNetConfig
       });
       console.log('ArtNet enabled');
     } else {
-      window.electron.ipcRenderer.send('sender-disable', { sender: 'artnet' });
+      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'artnet' });
       console.log('ArtNet disabled');
     }
   };

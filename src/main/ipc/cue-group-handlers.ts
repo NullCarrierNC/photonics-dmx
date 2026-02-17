@@ -3,12 +3,13 @@ import { ControllerManager } from '../controllers/ControllerManager';
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { CueType } from '../../photonics-dmx/cues/types/cueTypes';
 import { ipcError } from './ipcResult';
+import { LIGHT } from '../../shared/ipcChannels';
 
 /**
  * Set up cue-group and consistency IPC handlers.
  */
 export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  ipcMain.handle('get-cue-groups', async () => {
+  ipcMain.handle(LIGHT.GET_CUE_GROUPS, async () => {
     const registry = YargCueRegistry.getInstance();
     const groupIds = registry.getAllGroups();
     return groupIds.map(groupId => {
@@ -22,7 +23,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     });
   });
 
-  ipcMain.handle('get-active-cue-groups', async () => {
+  ipcMain.handle(LIGHT.GET_ACTIVE_CUE_GROUPS, async () => {
     const registry = YargCueRegistry.getInstance();
     const activeGroupIds = registry.getActiveGroups();
     console.log('Active group IDs:', activeGroupIds);
@@ -38,7 +39,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     });
   });
 
-  ipcMain.handle('activate-cue-group', async (_, groupId: string) => {
+  ipcMain.handle(LIGHT.ACTIVATE_CUE_GROUP, async (_, groupId: string) => {
     try {
       const registry = YargCueRegistry.getInstance();
       const group = registry.getGroup(groupId);
@@ -58,7 +59,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     }
   });
 
-  ipcMain.handle('deactivate-cue-group', async (_, groupId: string) => {
+  ipcMain.handle(LIGHT.DEACTIVATE_CUE_GROUP, async (_, groupId: string) => {
     try {
       const registry = YargCueRegistry.getInstance();
       const group = registry.getGroup(groupId);
@@ -78,7 +79,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     }
   });
 
-  ipcMain.handle('enable-cue-group', async (_, groupId: string) => {
+  ipcMain.handle(LIGHT.ENABLE_CUE_GROUP, async (_, groupId: string) => {
     try {
       const registry = YargCueRegistry.getInstance();
       const group = registry.getGroup(groupId);
@@ -98,7 +99,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     }
   });
 
-  ipcMain.handle('disable-cue-group', async (_, groupId: string) => {
+  ipcMain.handle(LIGHT.DISABLE_CUE_GROUP, async (_, groupId: string) => {
     try {
       const registry = YargCueRegistry.getInstance();
       const group = registry.getGroup(groupId);
@@ -118,7 +119,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     }
   });
 
-  ipcMain.handle('set-active-cue-groups', async (_, groupIds: string[]) => {
+  ipcMain.handle(LIGHT.SET_ACTIVE_CUE_GROUPS, async (_, groupIds: string[]) => {
     try {
       const registry = YargCueRegistry.getInstance();
       const invalidGroups: string[] = [];
@@ -163,7 +164,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     }
   });
 
-  ipcMain.handle('get-cue-source-group', async (_, cueType: string) => {
+  ipcMain.handle(LIGHT.GET_CUE_SOURCE_GROUP, async (_, cueType: string) => {
     try {
       const registry = YargCueRegistry.getInstance();
       const cueState = registry.getCueState(cueType as CueType);
@@ -185,7 +186,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     }
   });
 
-  ipcMain.handle('set-cue-consistency-window', async (_, windowMs: number) => {
+  ipcMain.handle(LIGHT.SET_CUE_CONSISTENCY_WINDOW, async (_, windowMs: number) => {
     try {
       controllerManager.getConfig().setCueConsistencyWindow(windowMs);
       const registry = YargCueRegistry.getInstance();
@@ -197,7 +198,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     }
   });
 
-  ipcMain.handle('get-cue-consistency-window', async () => {
+  ipcMain.handle(LIGHT.GET_CUE_CONSISTENCY_WINDOW, async () => {
     try {
       const windowMs = controllerManager.getConfig().getCueConsistencyWindow();
       return { success: true, windowMs };
@@ -207,7 +208,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain, controllerManager: Contr
     }
   });
 
-  ipcMain.handle('get-consistency-status', async () => {
+  ipcMain.handle(LIGHT.GET_CONSISTENCY_STATUS, async () => {
     try {
       const registry = YargCueRegistry.getInstance();
       const status = registry.getConsistencyStatus();

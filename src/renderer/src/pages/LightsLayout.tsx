@@ -12,6 +12,7 @@ import {
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers';
 import { v4 as uuidv4 } from 'uuid';
 import { activeDmxLightsConfigAtom, myValidDmxLightsAtom, myDmxLightsAtom, dmxRigsAtom, activeRigIdAtom } from '@renderer/atoms';
+import { CONFIG } from '../../../shared/ipcChannels';
 
 import LightsLayoutRigSection from './LightsLayout/LightsLayoutRigSection';
 import LightsLayoutForm from './LightsLayout/LightsLayoutForm';
@@ -65,7 +66,7 @@ const LightsLayout = () => {
     useEffect(() => {
         const loadRigs = async () => {
             try {
-                const loadedRigs = await window.electron.ipcRenderer.invoke('get-dmx-rigs');
+                const loadedRigs = await window.electron.ipcRenderer.invoke(CONFIG.GET_DMX_RIGS);
                 setRigs(loadedRigs || []);
                 
                 // If no active rig selected, select first rig or create default
@@ -87,7 +88,7 @@ const LightsLayout = () => {
                             strobeLights: []
                         }
                     };
-                    await window.electron.ipcRenderer.invoke('save-dmx-rig', defaultRig);
+                    await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, defaultRig);
                     setRigs([defaultRig]);
                     setActiveRigId(defaultRig.id);
                 }
@@ -105,7 +106,7 @@ const LightsLayout = () => {
             if (!activeRigId) return;
             
             try {
-                const rig = await window.electron.ipcRenderer.invoke('get-dmx-rig', activeRigId);
+                const rig = await window.electron.ipcRenderer.invoke(CONFIG.GET_DMX_RIG, activeRigId);
                 if (rig) {
                     setRigName(rig.name);
                     setRigUniverse(rig.universe || 1);
@@ -579,7 +580,7 @@ const LightsLayout = () => {
                     universe: rigUniverse || 1, // Ensure minimum is 1
                     config: updatedConfig
                 };
-                await window.electron.ipcRenderer.invoke('save-dmx-rig', updatedRig);
+                await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, updatedRig);
                 
                 // Update local rigs state
                 setRigs(prev => prev.map(r => r.id === activeRigId ? updatedRig : r));

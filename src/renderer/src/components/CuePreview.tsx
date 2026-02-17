@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAtom } from 'jotai';
 import { yargListenerEnabledAtom, rb3eListenerEnabledAtom } from '../atoms';
+import { CONFIG } from '../../../shared/ipcChannels';
 import CuePreviewYarg from './CuePreviewYarg';
 import CuePreviewRb3e from './CuePreviewRb3e';
 import CuePreviewAudio from './CuePreviewAudio';
@@ -33,7 +34,7 @@ const CuePreview: React.FC<CuePreviewProps> = ({
     useEffect(() => {
         const checkAudioState = async () => {
             try {
-                const enabled = await window.electron.ipcRenderer.invoke('get-audio-enabled');
+                const enabled = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_ENABLED);
                 setAudioEnabled(enabled);
             } catch (error) {
                 console.error('Failed to check audio enabled state:', error);

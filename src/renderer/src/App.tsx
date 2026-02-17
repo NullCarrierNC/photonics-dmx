@@ -26,6 +26,7 @@ import { useToast } from './hooks/useToast';
 import { openCueEditorWindow } from './ipcApi';
 import ToastContainer from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { CONFIG, RENDERER_RECEIVE } from '../../shared/ipcChannels';
 
 /**
  * Main application component
@@ -182,7 +183,7 @@ export const App = (): JSX.Element => {
       
       // Automatically disable audio in main process since it failed to start
       try {
-        await window.electron.ipcRenderer.invoke('set-audio-enabled', false);
+        await window.electron.ipcRenderer.invoke(CONFIG.SET_AUDIO_ENABLED, false);
         console.log('Audio automatically disabled due to capture failure');
       } catch (disableError) {
         console.error('Failed to disable audio after capture failure:', disableError);
@@ -243,7 +244,7 @@ export const App = (): JSX.Element => {
     const newCollapsed = !isLeftMenuCollapsed;
     setIsLeftMenuCollapsed(newCollapsed);
     try {
-      await window.electron.ipcRenderer.invoke('save-prefs', { leftMenuCollapsed: newCollapsed });
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, { leftMenuCollapsed: newCollapsed });
     } catch (error) {
       console.error('Failed to save left menu collapsed state:', error);
     }
@@ -253,7 +254,7 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     const loadLightLibrary = async (): Promise<void> => {
       try {
-        const data: DmxFixture[] = await window.electron.ipcRenderer.invoke('get-light-library');
+        const data: DmxFixture[] = await window.electron.ipcRenderer.invoke(CONFIG.GET_LIGHT_LIBRARY);
         setLightLibrary(data || []);
         setIsLibraryLoaded(true); 
       } catch (error) {
@@ -268,7 +269,7 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     const loadMyLights = async (): Promise<void> => {
       try {
-        const data: DmxFixture[] = await window.electron.ipcRenderer.invoke('get-my-lights');
+        const data: DmxFixture[] = await window.electron.ipcRenderer.invoke(CONFIG.GET_MY_LIGHTS);
         setMyLights(data || []);
         setIsLibraryLoaded(true); 
       } catch (error) {
@@ -305,7 +306,7 @@ export const App = (): JSX.Element => {
         // Skip saving on the initial mount
         isInitialMount.current = false;
         try {
-          const ver = await window.electron.ipcRenderer.invoke('get-app-version');
+          const ver = await window.electron.ipcRenderer.invoke(CONFIG.GET_APP_VERSION);
           setAppVer(ver);
         } catch (error) {
           console.error("Failed to get app version:", error);
@@ -315,7 +316,7 @@ export const App = (): JSX.Element => {
     };
 
     const getPrefs = async () => {
-      const prefs = await window.electron.ipcRenderer.invoke('get-prefs');
+      const prefs = await window.electron.ipcRenderer.invoke(CONFIG.GET_PREFS);
       console.log("\n Prefs", prefs);
       
       // Prepare all preference updates in a single object
@@ -389,24 +390,24 @@ export const App = (): JSX.Element => {
     getPrefs();
 
     // Set up event listener for sender errors
-    addIpcListener('sender-error', handleSenderError);
-    addIpcListener('sender-network-error', handleSenderNetworkError);
+    addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError);
+    addIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError);
 
     // Set up event listener for cue state updates
-    addIpcListener('cue-state-update', handleCueStateUpdate);
+    addIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate);
 
     // Set up event listener for sender start failures
-    addIpcListener('sender-start-failed', handleSenderStartFailure);
+    addIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure);
 
     // Set up event listeners for audio control
-    addIpcListener('audio:enable', handleAudioEnable);
-    addIpcListener('audio:disable', handleAudioDisable);
-    addIpcListener('audio:config-update', handleAudioConfigUpdate);
+    addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable);
+    addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable);
+    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate);
 
     const saveLightLayout = async () => {
       if (activeConfig) {
         try {
-          await window.electron.ipcRenderer.invoke('save-light-layout', 'myLayout.json', activeConfig);
+          await window.electron.ipcRenderer.invoke(CONFIG.SAVE_LIGHT_LAYOUT, 'myLayout.json', activeConfig);
         } catch (error) {
           console.error("Failed to save light layout:", error);
         }
@@ -417,13 +418,13 @@ export const App = (): JSX.Element => {
 
     // Cleanup function
     return () => {
-      removeIpcListener('sender-error', handleSenderError);
-      removeIpcListener('sender-network-error', handleSenderNetworkError);
-      removeIpcListener('cue-state-update', handleCueStateUpdate);
-      removeIpcListener('sender-start-failed', handleSenderStartFailure);
-      removeIpcListener('audio:enable', handleAudioEnable);
-      removeIpcListener('audio:disable', handleAudioDisable);
-      removeIpcListener('audio:config-update', handleAudioConfigUpdate);
+      removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError);
+      removeIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError);
+      removeIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate);
+      removeIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure);
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable);
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable);
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate);
       
       // Cleanup audio capture manager on unmount
       if (audioCaptureManagerRef.current) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Color, Brightness } from '../../../photonics-dmx/types';
+import { CONFIG } from '../../../shared/ipcChannels';
 import FrequencyRangeSlider from './FrequencyRangeSlider';
 
 // Colors suitable for audio-reactive lighting (excludes black, and colors that don't make sense for lighting)
@@ -122,7 +123,7 @@ const AudioColorMapping: React.FC = () => {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke('get-audio-config');
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
         if (config?.frequencyBands?.ranges && Array.isArray(config.frequencyBands.ranges) && config.frequencyBands.ranges.length > 0) {
           const normalized = normalizeRanges(config.frequencyBands.ranges as FrequencyRange[]);
           setRanges(normalized);
@@ -152,7 +153,7 @@ const AudioColorMapping: React.FC = () => {
     
     setIsSaving(true);
     try {
-      await window.electron.ipcRenderer.invoke('save-audio-config', {
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
         frequencyBands: {
           bandCount: overrideBandCount ?? bandCount,
           ranges: updatedRanges

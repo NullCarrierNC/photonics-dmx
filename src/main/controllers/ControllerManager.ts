@@ -22,6 +22,7 @@ import { SenderError } from '../../photonics-dmx/senders/BaseSender';
 import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager';
 import { createSenderErrorHandler } from './senderErrorHandler';
 import { TestEffectRunner } from './TestEffectRunner';
+import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels';
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController';
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
@@ -254,7 +255,7 @@ export class ControllerManager {
     await this.nodeCueLoader.startWatching();
 
     this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {
-      sendToAllWindows('node-cues:changed', payload);
+      sendToAllWindows(RENDERER_RECEIVE.NODE_CUES_CHANGED, payload);
     });
   }
 
@@ -271,7 +272,7 @@ export class ControllerManager {
     await this.effectLoader.startWatching();
 
     this.effectLoader.on('changed', async (payload: EffectListSummary) => {
-      sendToAllWindows('effects:changed', payload);
+      sendToAllWindows(RENDERER_RECEIVE.EFFECTS_CHANGED, payload);
       if (this.nodeCueLoader) {
         try {
           await this.nodeCueLoader.reload();
@@ -373,7 +374,7 @@ export class ControllerManager {
       // Send error to frontend
       const mainWindow = BrowserWindow.getFocusedWindow();
       if (mainWindow) {
-        mainWindow.webContents.send('sender-error', errorData.message);
+        mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_ERROR, errorData.message);
       }
     });
     
@@ -849,7 +850,7 @@ export class ControllerManager {
       
       // Set up IPC handler to receive audio data from renderer
       // Remove existing listener first to prevent duplicates
-      ipcMain.removeAllListeners('audio:data');
+      ipcMain.removeAllListeners(RENDERER_SEND.AUDIO_DATA);
       
       const audioDataHandler = (_, data) => {
         if (this.audioProcessor && this.isAudioEnabled) {
@@ -857,12 +858,12 @@ export class ControllerManager {
         }
       };
       
-      ipcMain.on('audio:data', audioDataHandler);
+      ipcMain.on(RENDERER_SEND.AUDIO_DATA, audioDataHandler);
       
       // Tell renderer to start capturing audio
       const mainWindow = BrowserWindow.getFocusedWindow();
       if (mainWindow) {
-        mainWindow.webContents.send('audio:enable', audioConfig);
+        mainWindow.webContents.send(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig);
         console.log('Sent audio:enable to renderer');
       } else {
         console.warn('No focused window to send audio:enable command');
@@ -900,12 +901,12 @@ export class ControllerManager {
     // Tell renderer to stop capturing audio
     const mainWindow = BrowserWindow.getFocusedWindow();
     if (mainWindow) {
-      mainWindow.webContents.send('audio:disable');
+      mainWindow.webContents.send(RENDERER_RECEIVE.AUDIO_DISABLE);
       console.log('Sent audio:disable to renderer');
     }
     
     // Remove IPC handler
-    ipcMain.removeAllListeners('audio:data');
+    ipcMain.removeAllListeners(RENDERER_SEND.AUDIO_DATA);
     
     // Shutdown processor
     if (this.audioProcessor) {

@@ -2,6 +2,7 @@ import { useAtom } from 'jotai';
 import { useEffect } from 'react';
 import { yargListenerEnabledAtom, rb3eListenerEnabledAtom, audioListenerEnabledAtom } from '../atoms';
 import { useIpcListener } from '../utils/ipcHelpers';
+import { CONFIG, CUE, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 
 interface YargToggleProps {
   disabled?: boolean;
@@ -16,7 +17,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
     // Initialize toggle state from system status
     const initializeState = async () => {
       try {
-        const response = await window.electron.ipcRenderer.invoke('get-system-status');
+        const response = await window.electron.ipcRenderer.invoke(LIGHT.GET_SYSTEM_STATUS);
         if (response.success) {
           setIsYargEnabled(response.isYargEnabled);
         }
@@ -31,7 +32,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
       initializeState();
     };
     
-    const cleanup = useIpcListener('controllers-restarted', handleControllersRestarted);
+    const cleanup = useIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted);
     
     // Initialize on mount
     initializeState();
@@ -44,15 +45,15 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
     setIsYargEnabled(newState);
 
     if (newState) {
-      window.electron.ipcRenderer.send('yarg-listener-enabled');
+      window.electron.ipcRenderer.send(CUE.YARG_LISTENER_ENABLED);
       console.log('YARG Listener enabled');
       // Disable Audio when YARG is enabled (mutual exclusion)
       if (isAudioEnabled) {
         setIsAudioEnabled(false);
-        window.electron.ipcRenderer.invoke('set-audio-enabled', false);
+        window.electron.ipcRenderer.invoke(CONFIG.SET_AUDIO_ENABLED, false);
       }
     } else {
-      window.electron.ipcRenderer.send('yarg-listener-disabled');
+      window.electron.ipcRenderer.send(CUE.YARG_LISTENER_DISABLED);
       console.log('YARG Listener disabled');
     }
   };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CueGroup } from 'src/photonics-dmx/types';
+import { CONFIG, LIGHT } from '../../../shared/ipcChannels';
 import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
 
 interface CueInfo {
@@ -23,8 +24,8 @@ const YargEnabledCueGroups: React.FC = () => {
     try {
       setLoading(true);
       const [all, enabled] = await Promise.all([
-        window.electron.ipcRenderer.invoke('get-cue-groups'),
-        window.electron.ipcRenderer.invoke('get-enabled-cue-groups')
+        window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS),
+        window.electron.ipcRenderer.invoke(CONFIG.GET_ENABLED_CUE_GROUPS)
       ]);
       
       // Transform groups and add expanded state
@@ -64,7 +65,7 @@ const YargEnabledCueGroups: React.FC = () => {
     }
     
     setEnabledGroupIds(updatedEnabledGroupIds);
-    window.electron.ipcRenderer.invoke('set-enabled-cue-groups', updatedEnabledGroupIds);
+    window.electron.ipcRenderer.invoke(CONFIG.SET_ENABLED_CUE_GROUPS, updatedEnabledGroupIds);
   };
 
   const handleAccordionToggle = async (groupName: string) => {
@@ -74,7 +75,7 @@ const YargEnabledCueGroups: React.FC = () => {
     // If expanding and cues haven't been loaded, fetch them
     if (!group.isExpanded && group.cues.length === 0) {
       try {
-        const cueDetails = await window.electron.ipcRenderer.invoke('get-available-cues', group.id);
+        const cueDetails = await window.electron.ipcRenderer.invoke(LIGHT.GET_AVAILABLE_CUES, group.id);
         
         // Update the group with cue details
         setAllGroups(prevGroups => 

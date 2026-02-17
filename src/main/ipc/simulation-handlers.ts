@@ -6,12 +6,13 @@ import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRe
 import { sendToAllWindows } from '../utils/windowUtils';
 import { ipcError } from './ipcResult';
 import { createMockCueData } from './mockCueData';
+import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels';
 
 /**
  * Set up simulation and test-effect IPC handlers (beat/keyframe/measure/instrument, test effects, system status, available cues).
  */
 export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  ipcMain.handle('get-audio-cue-groups', async () => {
+  ipcMain.handle(LIGHT.GET_AUDIO_CUE_GROUPS, async () => {
     try {
       const registry = AudioCueRegistry.getInstance();
       return registry.getGroupSummaries();
@@ -21,7 +22,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
     }
   });
 
-  ipcMain.handle('get-available-audio-cues', async (_, groupId?: string) => {
+  ipcMain.handle(LIGHT.GET_AVAILABLE_AUDIO_CUES, async (_, groupId?: string) => {
     try {
       const registry = AudioCueRegistry.getInstance();
       const targetGroupId =
@@ -36,7 +37,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
     }
   });
 
-  ipcMain.handle('get-available-cues', async (_, groupId?: string) => {
+  ipcMain.handle(LIGHT.GET_AVAILABLE_CUES, async (_, groupId?: string) => {
     try {
       const registry = YargCueRegistry.getInstance();
       const targetGroupId = groupId || 'default';
@@ -68,7 +69,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
     }
   });
 
-  ipcMain.handle('start-test-effect', async (_, effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large', bpm?: number) => {
+  ipcMain.handle(LIGHT.START_TEST_EFFECT, async (_, effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large', bpm?: number) => {
     console.log(`IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}`);
     try {
       if (!controllerManager.getIsInitialized()) {
@@ -83,7 +84,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
     }
   });
 
-  ipcMain.handle('stop-test-effect', async () => {
+  ipcMain.handle(LIGHT.STOP_TEST_EFFECT, async () => {
     try {
       await controllerManager.stopTestEffect();
       return true;
@@ -93,7 +94,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
     }
   });
 
-  ipcMain.handle('simulate-beat', async (_, data?: {
+  ipcMain.handle(LIGHT.SIMULATE_BEAT, async (_, data?: {
     venueSize?: 'NoVenue' | 'Small' | 'Large';
     bpm?: number;
     cueGroup?: string;
@@ -116,7 +117,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
           const cueType = getCueTypeFromId(effectId);
           if (cueType) await cueHandler.handleCue(cueType, mockCueData);
         }
-        sendToAllWindows('cue-handled', mockCueData);
+        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData);
       }
       controllerManager.getLightingController()?.onBeat();
       return true;
@@ -124,7 +125,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
     return false;
   });
 
-  ipcMain.handle('simulate-keyframe', async (_, data?: {
+  ipcMain.handle(LIGHT.SIMULATE_KEYFRAME, async (_, data?: {
     venueSize?: 'NoVenue' | 'Small' | 'Large';
     bpm?: number;
     cueGroup?: string;
@@ -147,7 +148,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
           const cueType = getCueTypeFromId(effectId);
           if (cueType) await cueHandler.handleCue(cueType, mockCueData);
         }
-        sendToAllWindows('cue-handled', mockCueData);
+        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData);
       }
       controllerManager.getLightingController()?.onKeyframe();
       return true;
@@ -155,7 +156,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
     return false;
   });
 
-  ipcMain.handle('simulate-measure', async (_, data?: {
+  ipcMain.handle(LIGHT.SIMULATE_MEASURE, async (_, data?: {
     venueSize?: 'NoVenue' | 'Small' | 'Large';
     bpm?: number;
     cueGroup?: string;
@@ -178,7 +179,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
           const cueType = getCueTypeFromId(effectId);
           if (cueType) await cueHandler.handleCue(cueType, mockCueData);
         }
-        sendToAllWindows('cue-handled', mockCueData);
+        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData);
       }
       controllerManager.getLightingController()?.onMeasure();
       return true;
@@ -186,7 +187,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
     return false;
   });
 
-  ipcMain.handle('simulate-instrument-note', async (_, data: {
+  ipcMain.handle(LIGHT.SIMULATE_INSTRUMENT_NOTE, async (_, data: {
     instrument: string;
     noteType: string;
     venueSize?: 'NoVenue' | 'Small' | 'Large';
@@ -244,7 +245,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
             console.warn(`Failed to set active cue group: ${error}`);
           }
         }
-        sendToAllWindows('cue-handled', mockCueData);
+        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData);
         return { success: true };
       }
       return { success: false, error: 'No cue handler available' };
@@ -254,7 +255,7 @@ export function setupSimulationHandlers(ipcMain: IpcMain, controllerManager: Con
     }
   });
 
-  ipcMain.handle('get-system-status', async () => {
+  ipcMain.handle(LIGHT.GET_SYSTEM_STATUS, async () => {
     try {
       return {
         success: true,

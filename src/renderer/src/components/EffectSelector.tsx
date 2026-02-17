@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { EffectSelector } from 'src/photonics-dmx/types';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 
 interface EffectsDropdownProps {
   groupId: string;
@@ -36,7 +37,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
       // Clear current selection when switching groups
       setSelectedEffect(null);
       // This retrieves cues from the specified group without changing the active group state
-      const availableEffects = await window.electron.ipcRenderer.invoke('get-available-cues', groupId);
+      const availableEffects = await window.electron.ipcRenderer.invoke(LIGHT.GET_AVAILABLE_CUES, groupId);
       
       if (Array.isArray(availableEffects) && availableEffects.length > 0) {
         // Sort effects by ID in ascending order for consistent display
@@ -67,11 +68,11 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
     const handleNodeCuesChanged = () => {
       fetchEffects();
     };
-    addIpcListener('node-cues:changed', handleNodeCuesChanged);
-    addIpcListener('effects:changed', handleNodeCuesChanged);
+    addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged);
+    addIpcListener(RENDERER_RECEIVE.EFFECTS_CHANGED, handleNodeCuesChanged);
     return () => {
-      removeIpcListener('node-cues:changed', handleNodeCuesChanged);
-      removeIpcListener('effects:changed', handleNodeCuesChanged);
+      removeIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged);
+      removeIpcListener(RENDERER_RECEIVE.EFFECTS_CHANGED, handleNodeCuesChanged);
     };
   }, [fetchEffects]);
 

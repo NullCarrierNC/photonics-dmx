@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
 
 interface AudioCueOption {
   id: string;
@@ -39,7 +40,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         if (!silent) {
           setLoading(true);
         }
-        const enabled = await window.electron.ipcRenderer.invoke('get-audio-enabled');
+        const enabled = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_ENABLED);
         setAudioEnabled(enabled);
 
         if (!enabled) {
@@ -51,7 +52,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
           return;
         }
 
-        const response: CueStateResponse = await window.electron.ipcRenderer.invoke('get-audio-reactive-cues');
+        const response: CueStateResponse = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_REACTIVE_CUES);
         if (response?.success) {
           const sortedCues = (response.cues ?? []).sort((a, b) => {
             if (a.groupName === b.groupName) {
@@ -90,14 +91,14 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     loadCueState();
 
     const handleAudioEvent = () => loadCueState(true);
-    addIpcListener('audio:config-update', handleAudioEvent);
-    addIpcListener('audio:enable', handleAudioEvent);
-    addIpcListener('audio:disable', handleAudioEvent);
+    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent);
+    addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent);
+    addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent);
 
     return () => {
-      removeIpcListener('audio:config-update', handleAudioEvent);
-      removeIpcListener('audio:enable', handleAudioEvent);
-      removeIpcListener('audio:disable', handleAudioEvent);
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent);
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent);
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent);
     };
   }, [loadCueState]);
 
@@ -169,7 +170,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     setSaving(true);
     try {
       const result: { success: boolean; error?: string } = await window.electron.ipcRenderer.invoke(
-        'set-active-audio-cue',
+        CONFIG.SET_ACTIVE_AUDIO_CUE,
         cueId
       );
       if (result?.success) {
