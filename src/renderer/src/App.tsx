@@ -1,29 +1,19 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { activeDmxLightsConfigAtom, currentPageAtom, dmxLightsLibraryAtom, isSenderErrorAtom, lightingPrefsAtom, myDmxLightsAtom, senderErrorAtom, currentCueStateAtom, CueStateInfo, enttecProComPortAtom, senderSacnEnabledAtom, senderArtNetEnabledAtom, senderEnttecProEnabledAtom, senderIpcEnabledAtom, LightingPreferences, senderOpenDmxEnabledAtom, openDmxComPortAtom } from './atoms';
-import { Pages } from './types';
 import squareLogo from './assets/images/photonics-icon.png';
 import LeftMenu from './components/LeftMenu';
 import HeaderProjects from './components/Header';
-import Status from './pages/Status';
-import MyLights from './pages/MyLights';
-import LightsLayout from './pages/LightsLayout';
-import NetworkDebug from './pages/NetworkDebug';
 import StatusBar from './components/StatusBar';
-import DmxPreview from './pages/DmxPreview';
-import CueSimulation from './pages/CueSimulation';
+import { AppPageRouter } from './components/AppPageRouter';
+import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types';
 import { IpcRendererEvent } from 'electron';
-import About from './pages/About';
-import Preferences from './pages/Preferences';
-import AudioSettings from './pages/AudioSettings';
-import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
 import { AudioCaptureManager } from './services/AudioCaptureManager';
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
 import { useToast } from './hooks/useToast';
-import { openCueEditorWindow } from './ipcApi';
 import ToastContainer from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CONFIG, RENDERER_RECEIVE } from '../../shared/ipcChannels';
@@ -433,48 +423,6 @@ export const App = (): JSX.Element => {
     };
   }, [activeConfig, handleSenderError, handleSenderNetworkError, handleCueStateUpdate, handleSenderStartFailure, handleAudioEnable, handleAudioDisable]);
 
-  const renderContent = () => {
-    switch (currentPage) {
-      case Pages.Status:
-        return <Status />;
-      case Pages.MyLights:
-        return <MyLights />;
-      case Pages.LightLayout:
-        return <LightsLayout />;
-      case Pages.CuePreview:
-        return <DmxPreview />;
-      case Pages.CueSimulation:
-        return <CueSimulation />;
-      case Pages.CueSequencer:
-      //  return <CueSequencer />;
-      case Pages.CueEditor:
-        return (
-          <div className="p-6">
-            <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Cue Editor</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              The Cue Editor opens in a separate window.
-            </p>
-            <button
-              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-500"
-              onClick={() => openCueEditorWindow()}
-            >
-              Open Cue Editor
-            </button>
-          </div>
-        );
-      case Pages.NetworkDebug:
-        return <NetworkDebug />;
-      case Pages.Preferences:
-        return <Preferences />;
-      case Pages.AudioSettings:
-        return <AudioSettings />;
-      case Pages.About:
-        return <About />;
-      default:
-        return <Status />;
-    }
-  };
-
   const sidebarWidth = isLeftMenuCollapsed ? 80 : 208;
 
   return (
@@ -524,7 +472,7 @@ export const App = (): JSX.Element => {
           <ErrorBoundary name="AppContent">
             <SenderErrorIndicator />
             <ErrorBoundary key={currentPage} name={`Page:${currentPage}`}>
-              {renderContent()}
+              <AppPageRouter currentPage={currentPage} />
             </ErrorBoundary>
           </ErrorBoundary>
         </div>

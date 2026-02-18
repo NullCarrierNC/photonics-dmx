@@ -11,8 +11,11 @@ import {
   openDmxComPortAtom,
   lightingPrefsAtom
 } from '../atoms';
-import CollapsibleSenderCard from './DmxOutputSettings/CollapsibleSenderCard';
 import DmxOutputEnabledModes from './DmxOutputSettings/DmxOutputEnabledModes';
+import SacnConfigCard from './DmxOutputSettings/SacnConfigCard';
+import ArtNetConfigCard from './DmxOutputSettings/ArtNetConfigCard';
+import EnttecProConfigCard from './DmxOutputSettings/EnttecProConfigCard';
+import OpenDmxConfigCard from './DmxOutputSettings/OpenDmxConfigCard';
 import { LIGHT, CONFIG } from '../../../shared/ipcChannels';
 
 const DmxOutputSettings: React.FC = () => {
@@ -494,294 +497,68 @@ const DmxOutputSettings: React.FC = () => {
 
       {prefs.dmxOutputConfig?.sacnEnabled && (
         <div className="mb-6">
-          <CollapsibleSenderCard
-            title="sACN Configuration"
+          <SacnConfigCard
+            config={sacnConfig}
+            networkInterfaces={networkInterfaces}
             expanded={sacnExpanded}
             onToggle={() => {
               const newSacnExpanded = !sacnExpanded;
               setSacnExpanded(newSacnExpanded);
               saveExpandedStates(artNetExpanded, newSacnExpanded, enttecProExpanded, openDmxExpanded);
             }}
-          >
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Configure sACN network settings. By default, sACN broadcasts to the entire network. You can specify a network interface or unicast destination for specific targeting.
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">Universe:</label>
-                      <input
-                        type="number"
-                        value={sacnConfig.universe}
-                        onChange={(e) => handleSacnConfigChange('universe', parseInt(e.target.value) || 1)}
-                        className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        min="0"
-                        max="63999"
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                        (sACN universes start at 1)
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">Network Interface:</label>
-                      <select
-                        value={sacnConfig.networkInterface || ""}
-                        onChange={(e) => handleSacnConfigChange('networkInterface', e.target.value)}
-                        className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-64 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      >
-                        <option value="">Auto-detect (recommended)</option>
-                        {networkInterfaces.map((iface) => (
-                          <option key={iface.value} value={iface.value}>
-                            {iface.name} ({iface.family})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="sacn-unicast"
-                          checked={sacnConfig.useUnicast}
-                          onChange={(e) => handleSacnConfigChange('useUnicast', e.target.checked)}
-                          className="form-checkbox h-4 w-4 text-blue-600 rounded"
-                        />
-                        <label htmlFor="sacn-unicast" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Use Unicast Destination
-                        </label>
-                      </div>
-
-                      {sacnConfig.useUnicast && (
-                        <div className="flex items-center gap-2 ml-6">
-                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">Destination IP:</label>
-                          <input
-                            type="text"
-                            value={sacnConfig.unicastDestination}
-                            onChange={(e) => handleSacnConfigChange('unicastDestination', e.target.value)}
-                            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-48 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            placeholder="192.168.1.100"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-          </CollapsibleSenderCard>
+            onConfigChange={handleSacnConfigChange}
+          />
         </div>
       )}
 
       {prefs.dmxOutputConfig?.artNetEnabled && (
         <div className="mb-6">
-          <CollapsibleSenderCard
-            title="ArtNet Configuration"
+          <ArtNetConfigCard
+            config={artNetConfig}
             expanded={artNetExpanded}
             onToggle={() => {
               const newArtNetExpanded = !artNetExpanded;
               setArtNetExpanded(newArtNetExpanded);
               saveExpandedStates(newArtNetExpanded, sacnExpanded, enttecProExpanded, openDmxExpanded);
             }}
-          >
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 mb-4">
-                    ArtNet requires you to specify the host IP address of the ArtNet device you are using.
-                    <br />
-                    Net, subnet, universe, and sub universe are usually 0 unless you've modified them. The default port is 6454.
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Host:</label>
-                    <input
-                      type="text"
-                      value={artNetConfig.host}
-                      onChange={(e) => handleArtNetConfigChange('host', e.target.value)}
-                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      placeholder="127.0.0.1"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Net:</label>
-                      <input
-                        type="number"
-                        value={artNetConfig.net}
-                        onChange={(e) => handleArtNetConfigChange('net', parseInt(e.target.value) || 0)}
-                        className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        min="0"
-                        max="255"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Subnet:</label>
-                      <input
-                        type="number"
-                        value={artNetConfig.subnet}
-                        onChange={(e) => handleArtNetConfigChange('subnet', parseInt(e.target.value) || 0)}
-                        className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        min="0"
-                        max="255"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Universe:</label>
-                      <input
-                        type="number"
-                        value={artNetConfig.universe}
-                        onChange={(e) => handleArtNetConfigChange('universe', parseInt(e.target.value) || 0)}
-                        className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        min="0"
-                        max="255"
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                        (ArtNet universes start at 0)
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Sub Universe:</label>
-                      <input
-                        type="number"
-                        value={artNetConfig.subuni}
-                        onChange={(e) => handleArtNetConfigChange('subuni', parseInt(e.target.value) || 0)}
-                        className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        min="0"
-                        max="255"
-                      />
-                    </div>
-
-
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Port:</label>
-                    <input
-                      type="number"
-                      value={artNetConfig.port}
-                      onChange={(e) => handleArtNetConfigChange('port', parseInt(e.target.value) || 6454)}
-                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      min="1024"
-                      max="65535"
-                    />
-                  </div>
-                </div>
-          </CollapsibleSenderCard>
+            onConfigChange={handleArtNetConfigChange}
+          />
         </div>
       )}
 
       {prefs.dmxOutputConfig?.enttecProEnabled && (
         <div>
-          <CollapsibleSenderCard
-            title="Enttec Pro USB Configuration"
+          <EnttecProConfigCard
+            comPort={comPort}
+            universe={enttecProUniverse}
+            onComPortChange={handleComPortChange}
+            onUniverseChange={handleEnttecProUniverseChange}
             expanded={enttecProExpanded}
             onToggle={() => {
               const newEnttecProExpanded = !enttecProExpanded;
               setEnttecProExpanded(newEnttecProExpanded);
               saveExpandedStates(artNetExpanded, sacnExpanded, newEnttecProExpanded, openDmxExpanded);
             }}
-          >
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">COM:</label>
-                    <input
-                      type="text"
-                      value={comPort}
-                      onChange={handleComPortChange}
-                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-64 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      placeholder="COM3"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Universe:</label>
-                    <input
-                      type="number"
-                      value={enttecProUniverse}
-                      onChange={handleEnttecProUniverseChange}
-                      min={0}
-                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      (Enttec Pro universes start at 0)
-                    </p>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 mt-4">
-                    Enter the COM port of your Enttec Pro USB DMX interface.
-                    <br />On PC this is usually COM3, COM4, etc.
-                    <br />On Mac it is usually something like /dev/tty.usbserial-A9000001.
-                  </p>
-                </div>
-          </CollapsibleSenderCard>
+          />
         </div>
       )}
 
       {prefs.dmxOutputConfig?.openDmxEnabled && (
         <div className="mt-6">
-          <CollapsibleSenderCard
-            title="OpenDMX USB Configuration"
+          <OpenDmxConfigCard
+            comPort={openDmxComPort}
+            refreshRate={openDmxSpeed}
+            universe={openDmxUniverse}
+            onComPortChange={handleOpenDmxComPortChange}
+            onRefreshRateChange={handleOpenDmxSpeedChange}
+            onUniverseChange={handleOpenDmxUniverseChange}
             expanded={openDmxExpanded}
             onToggle={() => {
               const newOpenDmxExpanded = !openDmxExpanded;
               setOpenDmxExpanded(newOpenDmxExpanded);
               saveExpandedStates(artNetExpanded, sacnExpanded, enttecProExpanded, newOpenDmxExpanded);
             }}
-          >
-                <div className="space-y-3">
-                  <p className="text-sm text-red-600 dark:text-red-500 ">
-                    OpenDMX USB adapters are very poor quality - we <b>HIGHLY</b> recommend against using them!
-                  </p>
-                  <p className="text-sm text-red-600 dark:text-red-500 ">
-                    If you want to use one, please be aware that:
-                    <ul className="list-disc list-inside">
-                      <li>They are not electrically isolated between DMX and USB. This increases the chances you could damage your computer. </li>
-                      <li>You will likely experience DMX drop-outs or other timing issues which will cause flickering.</li>
-                      <li>Do NOT use with Moving Heads - drop-outs can cause thrashing of the motors.</li>
-                      <li><b>These are fundamental issues with the hardware and not something we can fix.</b></li>
-                    </ul>
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">COM:</label>
-                    <input
-                      type="text"
-                      value={openDmxComPort}
-                      onChange={handleOpenDmxComPortChange}
-                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-64 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      placeholder="COM4"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Refresh:</label>
-                    <input
-                      type="number"
-                      value={openDmxSpeed}
-                      onChange={handleOpenDmxSpeedChange}
-                      min={1}
-                      max={44}
-                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Universe:</label>
-                    <input
-                      type="number"
-                      value={openDmxUniverse}
-                      onChange={handleOpenDmxUniverseChange}
-                      min={0}
-                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      (OpenDMX universes start at 0)
-                    </p>
-                  </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    Default is 40 Hz. Higher values reduce latency but can increase flicker on lower-quality adapters.
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 mt-4">
-                    Enter the COM port of your OpenDMX USB interface.
-                    <br />On Windows this is usually COM4, COM5, etc.
-                    <br />On macOS it is usually something like /dev/tty.usbserial-XXXX.
-                  </p>
-                </div>
-          </CollapsibleSenderCard>
+          />
         </div>
       )}
     </div>
