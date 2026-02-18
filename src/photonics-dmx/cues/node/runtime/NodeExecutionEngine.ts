@@ -21,7 +21,8 @@ import {
   EffectRaiserNode,
   LogicNode,
   NodeActionConfig,
-  VariableDefinition
+  VariableDefinition,
+  ValueSource
 } from '../../types/nodeCueTypes';
 import { TrackedLight } from '../../../types';
 import { ExecutionContext } from './ExecutionContext';
@@ -127,7 +128,7 @@ export class NodeExecutionEngine {
     const maxArray = 12;
     const maxString = 300;
 
-    const previewAny = (v: any): any => {
+    const previewAny = (v: unknown): unknown => {
       if (v === null || v === undefined) return v;
       if (typeof v === 'string') {
         return v.length > maxString ? `${v.slice(0, maxString)}…` : v;
@@ -138,21 +139,20 @@ export class NodeExecutionEngine {
         return v.length > maxArray ? { items: head, truncated: v.length - maxArray } : head;
       }
       if (v && typeof v === 'object') {
+        const obj = v as Record<string, unknown>;
         // Special-case TrackedLight-ish objects
-        if ('id' in v && typeof (v as any).id === 'string') {
-          const out: any = { id: (v as any).id };
-          if ('position' in v && typeof (v as any).position === 'number') out.position = (v as any).position;
+        if ('id' in obj && typeof obj.id === 'string') {
+          const out: Record<string, unknown> = { id: obj.id };
+          if ('position' in obj && typeof obj.position === 'number') out.position = obj.position;
           return out;
         }
 
         // VariableValue preview
-        if ('type' in v && 'value' in v) {
-          const vv = v as any;
-          return { type: vv.type, value: previewAny(vv.value) };
+        if ('type' in obj && 'value' in obj) {
+          return { type: obj.type, value: previewAny(obj.value) };
         }
 
         // Generic object: shallow preview keys
-        const obj = v as Record<string, unknown>;
         const result: Record<string, unknown> = {};
         for (const [k, val] of Object.entries(obj)) {
           result[k] = previewAny(val);
@@ -223,7 +223,8 @@ export class NodeExecutionEngine {
         this.groupLevelVarStore
       );
 
-      this.debugLog(`startExecution event=${(eventNode as any).eventType ?? 'unknown'} nodeId=${eventNode.id} ctx=${context.id}`);
+      const eventType = 'eventType' in eventNode && typeof eventNode.eventType === 'string' ? eventNode.eventType : 'unknown';
+      this.debugLog(`startExecution event=${eventType} nodeId=${eventNode.id} ctx=${context.id}`);
 
       // Set up completion callbacks
       context.setOnNodeComplete((nodeId: string) => {
@@ -434,13 +435,19 @@ export class NodeExecutionEngine {
 
       const resolvedConfig = this.resolveConfigValues(actionNode.config, context);
 
-      const resolvedAction: any = {
+      const resolvedAction = {
         ...actionNode,
         target: resolvedTarget,
         color: resolvedColor,
         timing: resolvedTiming,
         layer: resolvedLayer,
         config: resolvedConfig
+      } as ActionNode & {
+        target: ResolvedActionTarget;
+        color: ResolvedColorSetting;
+        timing: ResolvedActionTiming;
+        layer: number;
+        config?: NodeActionConfig;
       };
       
       const lights = ActionEffectFactory.resolveLights(
@@ -459,12 +466,12 @@ export class NodeExecutionEngine {
         this.debugLog(`action target groups from var=$${varName} ctx=${context.id}`, {
           varValue: this.getVariableValue(varName, context),
           resolvedLightsCount: lights?.length ?? 0,
-          resolvedLights: (lights ?? []).map(l => ({ id: (l as any).id, position: (l as any).position }))
+          resolvedLights: (lights ?? []).map(l => ({ id: l.id, position: l.position }))
         });
       } else {
         this.debugLog(`action resolved lights ctx=${context.id}`, {
           resolvedLightsCount: lights?.length ?? 0,
-          resolvedLights: (lights ?? []).map(l => ({ id: (l as any).id, position: (l as any).position }))
+          resolvedLights: (lights ?? []).map(l => ({ id: l.id, position: l.position }))
         });
       }
 
@@ -706,7 +713,7 @@ export class NodeExecutionEngine {
    * Execute a delay node: wait for the specified delay time before continuing.
    * Delay nodes block execution like action nodes.
    */
-  private executeDelayNode(delayNode: LogicNode & { logicType: 'delay'; delayTime: any }, nodeId: string, context: ExecutionContext): void {
+  private executeDelayNode(delayNode: LogicNode & { logicType: 'delay'; delayTime: ValueSource }, nodeId: string, context: ExecutionContext): void {
     try {
       // Resolve delay time from ValueSource
       const delayMs = Number(resolveValue('number', delayNode.delayTime, context));
@@ -830,7 +837,7 @@ export class NodeExecutionEngine {
       }
 
       // Resolve parameter values
-      const paramValues: Record<string, any> = {};
+      const paramValues: Record<string, string | number | boolean | TrackedLight[]> = {};
       for (const [paramName, valueSource] of Object.entries(raiserNode.parameterValues ?? {})) {
         // Get parameter type from effect definition
         const paramDef = compiledEffect.parameters.get(paramName);
@@ -876,9 +883,9 @@ export class NodeExecutionEngine {
    */
   private startListenerExecution(listenerNode: EventListenerNode, cueData: CueData): void {
     try {
-      // Create new context for listener chain (treat listener as event-like node)
+      // Create new context for listener chain (listener has id; ExecutionContext only needs event-like shape)
       const context = new ExecutionContext(
-        listenerNode as any, // Treat as event-like node
+        listenerNode as unknown as BaseEventNode,
         cueData,
         this.cueLevelVarStore,
         this.groupLevelVarStore
@@ -990,7 +997,7 @@ export class NodeExecutionEngine {
       return {
         id: info.id,
         eventNodeId: info.eventNodeId,
-        eventType: (context.eventNode as any).eventType || 'unknown',
+        eventType: ('eventType' in context.eventNode && typeof context.eventNode.eventType === 'string') ? context.eventNode.eventType : 'unknown',
         startTime: info.startTime,
         visitedNodes: info.visitedNodes,
         activeNodes: info.activeNodes

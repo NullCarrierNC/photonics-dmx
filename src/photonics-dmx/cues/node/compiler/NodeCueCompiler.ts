@@ -14,9 +14,7 @@ import {
   VariableDefinition,
   YargEventNode,
   YargNodeCueDefinition,
-  ValueSource,
-  NodeColorSetting,
-  NodeActionTarget
+  ValueSource
 } from '../../types/nodeCueTypes';
 
 export class NodeCueCompilationError extends Error {
@@ -24,79 +22,6 @@ export class NodeCueCompilationError extends Error {
     super(message);
     this.name = 'NodeCueCompilationError';
   }
-}
-
-/**
- * Migrate old action nodes (with literal values) to new format (with ValueSource).
- */
-function migrateActionNode(action: any): ActionNode {
-  const migrateValueSource = (value: any, defaultValue: string | number | boolean): ValueSource => {
-    // Already a ValueSource
-    if (value && typeof value === 'object' && 'source' in value) {
-      return value as ValueSource;
-    }
-    // Old format - convert to literal ValueSource
-    return { source: 'literal', value: value ?? defaultValue };
-  };
-
-  const migrateColorSetting = (color: any): NodeColorSetting => {
-    if (!color) {
-      return {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'medium' },
-        blendMode: { source: 'literal', value: 'replace' }
-      };
-    }
-    return {
-      name: migrateValueSource(color.name, 'blue'),
-      brightness: migrateValueSource(color.brightness, 'medium'),
-      blendMode: color.blendMode ? migrateValueSource(color.blendMode, 'replace') : undefined,
-      opacity: color.opacity ? migrateValueSource(color.opacity, 1) : undefined
-    };
-  };
-
-  const migrateTarget = (target: any): NodeActionTarget => {
-    if (!target) {
-      return {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
-      };
-    }
-    // If groups is an array (old format), convert to comma-separated string
-    if (Array.isArray(target.groups)) {
-      return {
-        groups: { source: 'literal', value: target.groups.join(',') },
-        filter: migrateValueSource(target.filter, 'all')
-      };
-    }
-    return {
-      groups: migrateValueSource(target.groups, 'front'),
-      filter: migrateValueSource(target.filter, 'all')
-    };
-  };
-
-  const migrateTiming = (timing: any): ActionTimingConfig => {
-    if (!timing) return createDefaultActionTiming();
-    return {
-      waitForCondition: timing.waitForCondition ?? 'none',
-      waitForTime: migrateValueSource(timing.waitForTime, 0),
-      waitForConditionCount: timing.waitForConditionCount ? migrateValueSource(timing.waitForConditionCount, 0) : undefined,
-      duration: migrateValueSource(timing.duration, 200),
-      waitUntilCondition: timing.waitUntilCondition ?? 'none',
-      waitUntilTime: migrateValueSource(timing.waitUntilTime, 0),
-      waitUntilConditionCount: timing.waitUntilConditionCount ? migrateValueSource(timing.waitUntilConditionCount, 0) : undefined,
-      easing: timing.easing,
-      level: timing.level ? migrateValueSource(timing.level, 1) : undefined
-    };
-  };
-
-  return {
-    ...action,
-    target: migrateTarget(action.target),
-    color: migrateColorSetting(action.color),
-    timing: migrateTiming(action.timing),
-    layer: action.layer !== undefined ? migrateValueSource(action.layer, 0) : undefined
-  };
 }
 
 export interface CompiledNodeCue<TEvent extends BaseEventNode> {
@@ -152,7 +77,7 @@ export class NodeCueCompiler {
     definition: YargNodeCueDefinition | AudioNodeCueDefinition
   ): CompiledNodeCue<TEvent> {
     const events = definition.nodes.events as unknown as TEvent[];
-    const actions = definition.nodes.actions.map(migrateActionNode); // Migrate old format
+    const actions = (definition.nodes.actions ?? []) as ActionNode[];
     const logic = definition.nodes.logic ?? [];
     const eventRaisers = definition.nodes.eventRaisers ?? [];
     const eventListeners = definition.nodes.eventListeners ?? [];

@@ -1,8 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { addEdge, useEdgesState, useNodesState, type Connection, type Edge, type ReactFlowInstance } from 'reactflow';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { useEdgesState, useNodesState, type Edge } from 'reactflow';
 import {
-  createDefaultActionTiming,
-  type ActionNode,
   type AudioEventNode,
   type AudioNodeCueDefinition,
   type AudioEffectDefinition,
@@ -30,15 +28,14 @@ import {
   type YargNodeCueDefinition,
   type YargEffectDefinition,
   type NotesNode,
-  type EffectDefinition,
-  type VariableDefinition,
-  type ValueSource
+  type EffectDefinition
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import { createId, buildDefaultAction } from '../lib/cueDefaults';
-import { calculateChainDuration } from '../lib/cueUtils';
-import { cueToFlow, effectToFlow } from '../lib/cueTransforms';
 import type { EditorNode, EditorNodeData, EventOption, NotesVariant } from '../lib/types';
 import { getDefaultEventOption } from '../lib/options';
+import { useFlowSync } from './useFlowSync';
+import { useEdgeManagement } from './useEdgeManagement';
+import { useNodeSelection } from './useNodeSelection';
 
 type UseCueFlowParams = {
   activeMode: NodeCueMode;
@@ -48,132 +45,38 @@ type UseCueFlowParams = {
 };
 
 const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions }: UseCueFlowParams) => {
+  const setSelectedNodeIdRef = useRef<(id: string | null) => void>(() => {});
   const [nodes, setNodes, onNodesChange] = useNodesState<EditorNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
-  const [paneContextMenu, setPaneContextMenu] = useState<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
-  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
 
-  const selectedNode = useMemo(() => {
-    if (!selectedNodeId) return null;
-    return nodes.find(node => node.id === selectedNodeId) ?? null;
-  }, [nodes, selectedNodeId]);
+  const flowSync = useFlowSync({
+    setNodes,
+    setEdges,
+    effectDefinitions,
+    onCueLoaded: () => setSelectedNodeIdRef.current(null)
+  });
 
-  const selectedActionHasEventParent = useMemo(() => {
-    if (!selectedNode || selectedNode.data.kind !== 'action') return false;
-    return edges.some(edge => edge.target === selectedNode.id && nodes.find(n => n.id === edge.source)?.data.kind === 'event');
-  }, [edges, nodes, selectedNode]);
-
-  const areParameterDefinitionsEqual = (
-    left?: VariableDefinition[],
-    right?: VariableDefinition[]
-  ): boolean => {
-    if (left === right) return true;
-    if (!left || !right) return false;
-    if (left.length !== right.length) return false;
-    return left.every((leftDef, index) => {
-      const rightDef = right[index];
-      if (!rightDef) return false;
-      return (
-        leftDef.name === rightDef.name &&
-        leftDef.type === rightDef.type &&
-        leftDef.scope === rightDef.scope &&
-        leftDef.isParameter === rightDef.isParameter &&
-        leftDef.description === rightDef.description &&
-        leftDef.initialValue === rightDef.initialValue
-      );
-    });
-  };
-
-  const buildDefaultValueSource = (def: VariableDefinition): ValueSource => ({
-    source: 'literal',
-    value: def.initialValue
+  const selection = useNodeSelection({
+    nodes,
+    setNodes,
+    edges,
+    setEdges,
+    reactFlowInstance: flowSync.reactFlowInstance,
+    flowWrapperRef,
+    activeMode,
+    setIsDirty
   });
 
   useEffect(() => {
-    if (!effectDefinitions || effectDefinitions.size === 0) return;
+    setSelectedNodeIdRef.current = selection.setSelectedNodeId;
+  }, [selection.setSelectedNodeId]);
 
-    setNodes(prevNodes => {
-      let didChange = false;
-      const nextNodes = prevNodes.map(node => {
-        if (node.data.kind !== 'effect-raiser') return node;
-        const raiser = node.data.payload as import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode;
-        if (!raiser.effectId) return node;
+  const edgeMgmt = useEdgeManagement({ nodes, edges, setEdges, setNodes, setIsDirty });
 
-        const effectDef = effectDefinitions.get(raiser.effectId);
-        if (!effectDef) return node;
-
-        const parameterDefinitions = effectDef.variables?.filter(v => v.isParameter) ?? [];
-        const existingDefinitions = (node.data as any).parameterDefinitions as VariableDefinition[] | undefined;
-        const definitionsChanged = !areParameterDefinitionsEqual(existingDefinitions, parameterDefinitions);
-
-        const parameterNames = new Set(parameterDefinitions.map(def => def.name));
-        const nextParameterValues: Record<string, ValueSource> = {};
-        let valuesChanged = false;
-        for (const [paramName, paramValue] of Object.entries(raiser.parameterValues ?? {})) {
-          if (parameterNames.has(paramName)) {
-            nextParameterValues[paramName] = paramValue;
-          } else {
-            valuesChanged = true;
-          }
-        }
-        for (const paramDef of parameterDefinitions) {
-          if (nextParameterValues[paramDef.name] === undefined) {
-            nextParameterValues[paramDef.name] = buildDefaultValueSource(paramDef);
-            valuesChanged = true;
-          }
-        }
-
-        const nextEffectName = effectDef.name || (node.data as any).effectName || raiser.effectId || 'none';
-        const effectNameChanged = nextEffectName !== (node.data as any).effectName;
-
-        if (!definitionsChanged && !valuesChanged && !effectNameChanged) {
-          return node;
-        }
-
-        didChange = true;
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            label: `Effect: ${nextEffectName}`,
-            payload: valuesChanged ? { ...raiser, parameterValues: nextParameterValues } : raiser,
-            effectName: nextEffectName,
-            parameterDefinitions
-          }
-        };
-      });
-
-      return didChange ? nextNodes : prevNodes;
-    });
-  }, [effectDefinitions, setNodes]);
-
-  const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
-    event.preventDefault();
-    setEdges(prev => prev.filter(e => e.id !== edge.id));
-    setIsDirty(true);
-  }, [setEdges, setIsDirty]);
-
-  const chainDuration = useMemo(() => calculateChainDuration(nodes, edges), [nodes, edges]);
-
-  const loadCueIntoFlow = useCallback((cue: any) => {
-    // Check if this is an effect or a cue by looking for effectListeners in nodes
-    // Effects have effectListeners property, cues don't (cues use effectRaisers instead)
-    // Also check for 'parameters' property as a fallback for backward compatibility
-    const isEffect = cue && cue.nodes && (
-      'effectListeners' in cue.nodes || 
-      'parameters' in cue
-    );
-    
-    const { nodes: flowNodes, edges: flowEdges } = isEffect 
-      ? effectToFlow(cue as YargEffectDefinition | AudioEffectDefinition)
-      : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null, effectDefinitions);
-    
-    setNodes(flowNodes);
-    setEdges(flowEdges);
-    setSelectedNodeId(null);
-  }, [setEdges, setNodes, effectDefinitions]);
+  const loadCueIntoFlow = useCallback((cue: YargNodeCueDefinition | AudioNodeCueDefinition | YargEffectDefinition | AudioEffectDefinition | null) => {
+    flowSync.loadCueIntoFlow(cue);
+    selection.setSelectedNodeId(null);
+  }, [flowSync.loadCueIntoFlow, selection.setSelectedNodeId]);
 
   // Helper function to find a good position for a new node, avoiding overlaps
   const findAvailablePosition = useCallback((preferredX: number, preferredY: number, nodeWidth: number = 150, nodeHeight: number = 80, useExactPosition: boolean = false): { x: number; y: number } => {
@@ -639,270 +542,22 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
     setIsDirty(true);
   }, [findAvailablePosition, setIsDirty, setNodes]);
 
-  const isValidNodeConnection = useCallback((sourceId?: string | null, targetId?: string | null) => {
-    if (!sourceId || !targetId || sourceId === targetId) {
-      return false;
-    }
-    const sourceNode = nodes.find(node => node.id === sourceId);
-    const targetNode = nodes.find(node => node.id === targetId);
-    if (!sourceNode || !targetNode) {
-      return false;
-    }
-
-    // Notes nodes cannot have any connections (no inputs or outputs)
-    if (sourceNode.data.kind === 'notes' || targetNode.data.kind === 'notes') {
-      return false;
-    }
-
-    // Event listeners and Effect listeners can only be sources (no inputs allowed)
-    if (targetNode.data.kind === 'event-listener' || targetNode.data.kind === 'effect-listener') {
-      return false;
-    }
-
-    // Valid target types for all nodes
-    const validTargets = ['action', 'logic', 'event-raiser', 'effect-raiser'];
-    
-    // Event nodes can connect to actions, logic, event raisers, and effect raisers
-    if (sourceNode.data.kind === 'event' && validTargets.includes(targetNode.data.kind)) {
-      return true;
-    }
-    
-    // Logic nodes can connect to actions, logic, event raisers, and effect raisers
-    if (sourceNode.data.kind === 'logic' && validTargets.includes(targetNode.data.kind)) {
-      return true;
-    }
-    
-    // Action nodes can connect to actions, logic, event raisers, and effect raisers
-    if (sourceNode.data.kind === 'action' && validTargets.includes(targetNode.data.kind)) {
-      return true;
-    }
-    
-    // Event raiser nodes can connect to actions, logic, event raisers, and effect raisers
-    if (sourceNode.data.kind === 'event-raiser' && validTargets.includes(targetNode.data.kind)) {
-      return true;
-    }
-    
-    // Effect raiser nodes can connect to actions, logic, event raisers, and effect raisers
-    if (sourceNode.data.kind === 'effect-raiser' && validTargets.includes(targetNode.data.kind)) {
-      return true;
-    }
-    
-    // Event listener nodes can connect to actions, logic, event raisers, and effect raisers
-    if (sourceNode.data.kind === 'event-listener' && validTargets.includes(targetNode.data.kind)) {
-      return true;
-    }
-    
-    // Effect listener nodes can connect to actions, logic, event raisers, and effect raisers (for internal effect communication)
-    if (sourceNode.data.kind === 'effect-listener' && validTargets.includes(targetNode.data.kind)) {
-      return true;
-    }
-    
-    return false;
-  }, [nodes]);
-
-  const onConnect = useCallback((connection: Connection) => {
-    if (!isValidNodeConnection(connection.source, connection.target)) {
-      return;
-    }
-
-    setNodes(prevNodes => {
-      const sourceNode = prevNodes.find(n => n.id === connection.source);
-      const targetNode = prevNodes.find(n => n.id === connection.target);
-      if (!sourceNode || !targetNode) return prevNodes;
-
-      if (targetNode.data.kind === 'action') {
-        const targetAction = { ...(targetNode.data.payload as ActionNode) };
-
-        if (sourceNode.data.kind === 'event') {
-          const sourceEvent = sourceNode.data.payload as YargEventNode | AudioEventNode;
-          // Event nodes are graph entry points. For song-driven events (beat/keyframe/etc) we can
-          // optionally mirror the event onto the action's waitForCondition. For system events
-          // (cue-started/cue-called) we MUST NOT write them into action timing (schema/runtime),
-          // so we default to 'none'.
-          const inheritedWaitForCondition =
-            sourceEvent.eventType === 'cue-started' || sourceEvent.eventType === 'cue-called'
-              ? 'none'
-              : (sourceEvent.eventType as any);
-          targetAction.timing = {
-            ...createDefaultActionTiming(),
-            ...(targetAction.timing ?? {}),
-            waitForCondition: inheritedWaitForCondition,
-            waitForTime: { source: 'literal', value: 0 }
-          };
-        } else if (sourceNode.data.kind === 'action') {
-          const sourceAction = sourceNode.data.payload as ActionNode;
-          targetAction.color = { ...sourceAction.color };
-          targetAction.target = { ...sourceAction.target };
-          targetAction.layer = sourceAction.layer;
-        }
-
-        return prevNodes.map(node =>
-          node.id === targetNode.id
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  payload: targetAction
-                }
-              }
-            : node
-        );
-      }
-
-      return prevNodes;
-    });
-
-    const sourceNode = nodes.find(n => n.id === connection.source);
-    let fromPort: string | null = null;
-    if (connection.sourceHandle) {
-      fromPort = connection.sourceHandle;
-    } else if (sourceNode?.data.kind === 'logic') {
-      const logicPayload = sourceNode.data.payload as LogicNode;
-      if (logicPayload.logicType === 'conditional') {
-        const existingEdges = edges.filter(e => e.source === sourceNode.id);
-        if (existingEdges.length === 0) {
-          fromPort = 'true';
-        } else if (existingEdges.length === 1) {
-          fromPort = 'false';
-        }
-      }
-    }
-
-    setEdges(eds => addEdge({ ...connection, type: 'default', data: { fromPort } }, eds));
-    setIsDirty(true);
-  }, [edges, isValidNodeConnection, nodes, setEdges, setIsDirty, setNodes]);
-
-  const isValidConnection = useCallback((connection: Connection) => {
-    return isValidNodeConnection(connection.source, connection.target);
-  }, [isValidNodeConnection]);
-
-  const handleNodeSelection = useCallback(({ nodes: selected }: { nodes: EditorNode[] }) => {
-    setSelectedNodeId(selected[0]?.id ?? null);
-    setContextMenu(null);
-  }, []);
-
-  const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: EditorNode) => {
-    event.preventDefault();
-    // Use viewport coordinates for fixed positioning
-    const x = event.clientX;
-    const y = event.clientY;
-    setSelectedNodeId(node.id);
-    setContextMenu({ x, y, nodeId: node.id });
-  }, []);
-
-  const handleRemoveNode = useCallback((nodeId: string) => {
-    setNodes(nds => nds.filter(node => node.id !== nodeId));
-    setEdges(eds => eds.filter(edge => edge.source !== nodeId && edge.target !== nodeId));
-    setSelectedNodeId(prev => (prev === nodeId ? null : prev));
-    setIsDirty(true);
-    setContextMenu(null);
-  }, [setEdges, setIsDirty, setNodes]);
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(null);
-    setPaneContextMenu(null);
-  }, []);
-
-  const handlePaneContextMenu = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    if (!reactFlowInstance) return;
-    
-    const clientX = event.clientX;
-    const clientY = event.clientY;
-    
-    // Convert client coordinates to flow coordinates
-    // screenToFlowPosition handles the container offset and viewport transform internally
-    const flowPosition = reactFlowInstance.screenToFlowPosition({
-      x: clientX,
-      y: clientY
-    });
-    
-    // Estimate menu height: max possible items (~20px each) + headers (~24px each) + padding
-    // Worst case: ~6 sections * 24px + ~20 items * 20px + padding = ~544px
-    // Use max-h-[80vh] as the limit, so estimate based on that
-    const maxMenuHeight = window.innerHeight * 0.8;
-    const estimatedMenuHeight = Math.min(600, maxMenuHeight); // Conservative estimate
-    const menuWidth = 200; // Estimated menu width
-    
-    // Adjust position to prevent overflow
-    let adjustedX = clientX;
-    let adjustedY = clientY;
-    
-    // Check bottom overflow
-    if (clientY + estimatedMenuHeight > window.innerHeight) {
-      adjustedY = window.innerHeight - estimatedMenuHeight - 10; // 10px padding from bottom
-      // Don't go above the top
-      if (adjustedY < 10) {
-        adjustedY = 10;
-      }
-    }
-    
-    // Check right overflow
-    if (clientX + menuWidth > window.innerWidth) {
-      adjustedX = window.innerWidth - menuWidth - 10; // 10px padding from right
-      // Don't go off the left edge
-      if (adjustedX < 10) {
-        adjustedX = 10;
-      }
-    }
-    
-    // Check left overflow
-    if (adjustedX < 0) {
-      adjustedX = 10;
-    }
-    
-    setPaneContextMenu({
-      x: adjustedX,
-      y: adjustedY,
-      flowX: flowPosition.x,
-      flowY: flowPosition.y
-    });
-  }, [reactFlowInstance, flowWrapperRef]);
-
-  const updateSelectedNode = useCallback(<T extends YargEventNode | AudioEventNode | ActionNode | LogicNode | EventRaiserNode | EventListenerNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode | import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectEventListenerNode | NotesNode>(updates: Partial<T>) => {
-    if (!selectedNodeId) return;
-    const nodeMode = activeMode;
-    setNodes(nds => nds.map(node => {
-      if (node.id !== selectedNodeId) return node;
-      const nextPayload = { ...node.data.payload, ...updates } as T;
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          payload: nextPayload,
-          label: node.data.kind === 'event'
-            ? nodeMode === 'yarg'
-              ? (nextPayload as YargEventNode).eventType
-              : (nextPayload as AudioEventNode).eventType
-            : node.data.kind === 'action'
-              ? (nextPayload as ActionNode).effectType
-              : node.data.kind === 'logic'
-                ? (nextPayload as LogicNode).logicType
-                : node.data.kind === 'event-raiser'
-                  ? (nextPayload as EventRaiserNode).eventName ? `Raise: ${(nextPayload as EventRaiserNode).eventName}` : 'Raise Event'
-                  : (nextPayload as EventListenerNode).eventName ? `Listen: ${(nextPayload as EventListenerNode).eventName}` : 'Listen Event'
-        }
-      };
-    }));
-    setIsDirty(true);
-  }, [activeMode, selectedNodeId, setNodes, setIsDirty]);
-
   return {
     nodes,
     edges,
     onNodesChange,
     onEdgesChange,
-    onConnect,
-    isValidConnection,
-    handleNodeSelection,
-    handleNodeContextMenu,
-    handleRemoveNode,
-    onEdgeContextMenu,
-    selectedNode,
-    selectedActionHasEventParent,
-    contextMenu,
-    paneContextMenu,
-    chainDuration,
+    onConnect: edgeMgmt.onConnect,
+    isValidConnection: edgeMgmt.isValidConnection,
+    handleNodeSelection: selection.handleNodeSelection,
+    handleNodeContextMenu: selection.handleNodeContextMenu,
+    handleRemoveNode: selection.handleRemoveNode,
+    onEdgeContextMenu: edgeMgmt.onEdgeContextMenu,
+    selectedNode: selection.selectedNode,
+    selectedActionHasEventParent: selection.selectedActionHasEventParent,
+    contextMenu: selection.contextMenu,
+    paneContextMenu: selection.paneContextMenu,
+    chainDuration: selection.chainDuration,
     addEventNode,
     addActionNode,
     addLogicNode,
@@ -911,12 +566,12 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
     addEffectRaiserNode,
     addEffectListenerNode,
     addNotesNode,
-    updateSelectedNode,
+    updateSelectedNode: selection.updateSelectedNode,
     loadCueIntoFlow,
-    setReactFlowInstance,
-    reactFlowInstance,
-    closeContextMenu,
-    handlePaneContextMenu
+    setReactFlowInstance: flowSync.setReactFlowInstance,
+    reactFlowInstance: flowSync.reactFlowInstance,
+    closeContextMenu: selection.closeContextMenu,
+    handlePaneContextMenu: selection.handlePaneContextMenu
   };
 };
 

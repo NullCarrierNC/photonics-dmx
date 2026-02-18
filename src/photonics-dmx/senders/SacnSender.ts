@@ -147,4 +147,8 @@ export class SacnSender extends BaseSender {
   public getUniverse(): number {
     return this.config.universe !== undefined ? this.config.universe : 1;
   }
+
+  public getConfiguredPort(): number {
+    return 5568;
+  }
 }

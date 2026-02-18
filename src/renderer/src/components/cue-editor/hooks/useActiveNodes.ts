@@ -70,7 +70,7 @@ export function useActiveNodes(currentGraphId: string | null): Set<string> {
     [currentGraphId, flushPending]
   );
 
-  useEffect(() => useIpcListener(NODE_EXECUTION_CHANNEL, handleNodeExecution), [handleNodeExecution]);
+  useEffect(() => useIpcListener<NodeExecutionPayload>(NODE_EXECUTION_CHANNEL, handleNodeExecution), [handleNodeExecution]);
 
   useEffect(() => {
     if (!currentGraphId) {

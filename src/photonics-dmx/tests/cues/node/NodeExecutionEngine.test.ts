@@ -10,8 +10,14 @@ import {
 } from '../../../cues/types/nodeCueTypes';
 import { ILightingController } from '../../../controllers/sequencer/interfaces';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { CueData, CueType } from '../../../cues/types/cueTypes';
+import { Beat, CueData, CueType } from '../../../cues/types/cueTypes';
 import { VariableValue } from '../../../cues/node/runtime/executionTypes';
+import type { CompiledEffect } from '../../../cues/node/runtime/EffectRegistry';
+import type { TrackedLight } from '../../../types';
+import type { FixtureConfig } from '../../../types';
+
+/** Minimal fixture config for test TrackedLight objects */
+type MinimalLightConfig = Partial<FixtureConfig>;
 
 jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
 
@@ -22,7 +28,7 @@ describe('NodeExecutionEngine', () => {
   let groupLevelVarStore: Map<string, VariableValue>;
 
   // Helper to create minimal CueData
-  const createCueData = (beat?: string): CueData => ({
+  const createCueData = (beat?: Beat): CueData => ({
     datagramVersion: 1,
     platform: 'Unknown',
     currentScene: 'Gameplay',
@@ -45,7 +51,7 @@ describe('NodeExecutionEngine', () => {
     performer: 0,
     keyframe: '',
     bonusEffect: false,
-    beat: beat as any
+    beat: beat ?? 'Unknown'
   });
 
   beforeEach(() => {
@@ -80,15 +86,14 @@ describe('NodeExecutionEngine', () => {
       enableDebug: jest.fn(),
       debugLightLayers: jest.fn(),
       shutdown: jest.fn()
-    } as any;
+    } as unknown as ILightingController;
 
-    // Create mock light manager with proper getLights method
     mockLightManager = {
       getLights: jest.fn().mockReturnValue([
         { id: 'light1', config: {} },
         { id: 'light2', config: {} }
       ])
-    } as any;
+    } as unknown as DmxLightManager;
 
     cueLevelVarStore = new Map();
     groupLevelVarStore = new Map();
@@ -221,7 +226,7 @@ describe('NodeExecutionEngine', () => {
         }
       };
 
-      mockLightManager.getLights = jest.fn((group: any) => {
+      mockLightManager.getLights = jest.fn((group: string | string[]) => {
         const groups = Array.isArray(group) ? group : [group];
         if (groups.includes('back')) {
           return [{
@@ -418,7 +423,7 @@ describe('NodeExecutionEngine', () => {
 
       // Since 5 > 3 is true, action-true should be executed
       expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1);
-      const call = (mockSequencer.addEffect as any).mock.calls[0];
+      const call = jest.mocked(mockSequencer.addEffect).mock.calls[0];
       const effectName = call[0];
       expect(effectName).toContain('action-true');
     });
@@ -832,7 +837,7 @@ describe('NodeExecutionEngine', () => {
       };
 
       const effectRegistry = new EffectRegistry();
-      effectRegistry.registerEffect('test-effect', mockEffect as any);
+      effectRegistry.registerEffect('test-effect', mockEffect as CompiledEffect);
 
       const engine = new NodeExecutionEngine(
         compiledCue,
@@ -998,7 +1003,7 @@ describe('NodeExecutionEngine', () => {
       };
 
       const effectRegistry = new EffectRegistry();
-      effectRegistry.registerEffect('test-effect', mockEffect as any);
+      effectRegistry.registerEffect('test-effect', mockEffect as CompiledEffect);
 
       const engine = new NodeExecutionEngine(
         compiledCue,
@@ -1429,7 +1434,7 @@ describe('NodeExecutionEngine', () => {
 
       // Test with 3 guitar notes (should trigger high action)
       const parameters = createCueData('Strong');
-      parameters.guitarNotes = ['Green', 'Red', 'Yellow'] as any;
+      parameters.guitarNotes = ['Green', 'Red', 'Yellow'] as CueData['guitarNotes'];
       engine.startExecution(eventNode, parameters);
 
       // Verify variable was set correctly
@@ -1523,7 +1528,7 @@ describe('NodeExecutionEngine', () => {
           ];
         }
         return [];
-      }) as any;
+      });
 
       const engine = new NodeExecutionEngine(
         compiledCue,
@@ -1552,14 +1557,14 @@ describe('NodeExecutionEngine', () => {
   describe('Action Node Variable Resolution', () => {
     beforeEach(() => {
       // Update mock light manager to return lights with position
-      mockLightManager.getLightsInGroup = jest.fn((group) => {
+      mockLightManager.getLightsInGroup = jest.fn((group: string | string[]) => {
         const groups = Array.isArray(group) ? group : [group];
-        const lights: any[] = [];
+        const lights: TrackedLight[] = [];
         if (groups.includes('front')) {
-          lights.push({ id: 'f1', position: { x: 0, y: 0, z: 0 } }, { id: 'f2', position: { x: 0, y: 0, z: 0 } });
+          lights.push({ id: 'f1', position: 0 }, { id: 'f2', position: 0 });
         }
         if (groups.includes('back')) {
-          lights.push({ id: 'b1', position: { x: 0, y: 0, z: 0 } });
+          lights.push({ id: 'b1', position: 0 });
         }
         return lights;
       });
@@ -2074,19 +2079,19 @@ describe('NodeExecutionEngine', () => {
     });
 
     it('should get all config-data array types', () => {
-      const mockFrontLights = [
-        { id: 'front1', position: 0, config: {} as any },
-        { id: 'front2', position: 1, config: {} as any }
+      const mockFrontLights: TrackedLight[] = [
+        { id: 'front1', position: 0, config: {} as FixtureConfig },
+        { id: 'front2', position: 1, config: {} as FixtureConfig }
       ];
-      const mockBackLights = [
-        { id: 'back1', position: 0, config: {} as any }
+      const mockBackLights: TrackedLight[] = [
+        { id: 'back1', position: 0, config: {} as FixtureConfig }
       ];
 
-      mockLightManager.getLightsInGroup = jest.fn((groups: any) => {
+      mockLightManager.getLightsInGroup = jest.fn((groups: string | string[]) => {
         if (groups === 'front') return mockFrontLights;
         if (groups === 'back') return mockBackLights;
         return [];
-      });
+      }) as unknown as DmxLightManager['getLightsInGroup'];
 
       const eventNode: YargEventNode = {
         id: 'event1',
@@ -2171,10 +2176,10 @@ describe('NodeExecutionEngine', () => {
   describe('Lights From Index Node', () => {
     it('should extract single light from array using index', () => {
       const mockLights = [
-        { id: 'light0', position: 0, config: {} as any },
-        { id: 'light1', position: 1, config: {} as any },
-        { id: 'light2', position: 2, config: {} as any },
-        { id: 'light3', position: 3, config: {} as any }
+        { id: 'light0', position: 0, config: {} as MinimalLightConfig },
+        { id: 'light1', position: 1, config: {} as MinimalLightConfig },
+        { id: 'light2', position: 2, config: {} as MinimalLightConfig },
+        { id: 'light3', position: 3, config: {} as MinimalLightConfig }
       ];
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights);
@@ -2261,9 +2266,9 @@ describe('NodeExecutionEngine', () => {
 
     it('should handle wraparound for out-of-bounds index', () => {
       const mockLights = [
-        { id: 'light0', position: 0, config: {} as any },
-        { id: 'light1', position: 1, config: {} as any },
-        { id: 'light2', position: 2, config: {} as any }
+        { id: 'light0', position: 0, config: {} as MinimalLightConfig },
+        { id: 'light1', position: 1, config: {} as MinimalLightConfig },
+        { id: 'light2', position: 2, config: {} as MinimalLightConfig }
       ];
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights);
@@ -2351,9 +2356,9 @@ describe('NodeExecutionEngine', () => {
 
     it('should handle negative index with wraparound', () => {
       const mockLights = [
-        { id: 'light0', position: 0, config: {} as any },
-        { id: 'light1', position: 1, config: {} as any },
-        { id: 'light2', position: 2, config: {} as any }
+        { id: 'light0', position: 0, config: {} as MinimalLightConfig },
+        { id: 'light1', position: 1, config: {} as MinimalLightConfig },
+        { id: 'light2', position: 2, config: {} as MinimalLightConfig }
       ];
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights);

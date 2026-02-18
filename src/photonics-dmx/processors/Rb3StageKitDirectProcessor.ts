@@ -136,8 +136,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     this.boundHandleStageKitEvent = this.handleStageKitEvent.bind(this);
     this.boundHandleGameStateEvent = this.handleGameStateEvent.bind(this);
     
-    networkListener.on('stagekit:data', this.boundHandleStageKitEvent);
-    networkListener.on('rb3e:gameState', this.boundHandleGameStateEvent);
+    networkListener.on('stagekit:data', this.boundHandleStageKitEvent as (event: StageKitData) => void);
+    networkListener.on('rb3e:gameState', this.boundHandleGameStateEvent as (event: unknown) => void);
     
     console.log('StageKitDirectProcessor: Registered listeners for stagekit:data and rb3e:gameState events');
   }

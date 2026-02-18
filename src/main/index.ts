@@ -12,12 +12,24 @@ import {
 // Global reference to application for error handling
 let applicationInstance: Application | null = null;
 
+// Type for Node.js network errors (code, syscall, port, address)
+interface NetworkErrorLike {
+  code?: string;
+  syscall?: string;
+  port?: number;
+  address?: string;
+}
+
+function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
+  return err !== null && typeof err === 'object' && 'code' in err && 'syscall' in err;
+}
+
 // Global error handling
-process.on('uncaughtException', (error: any) => {
+process.on('uncaughtException', (error: unknown) => {
   console.error('Uncaught exception:', error)
   
   // Check if this is a network sender error (UDP socket error)
-  const isNetworkError = error && (
+  const isNetworkError = isNetworkErrorLike(error) && (
     error.code === 'EHOSTUNREACH' ||
     error.code === 'EHOSTDOWN' ||
     error.code === 'ENETUNREACH' ||
@@ -28,24 +40,23 @@ process.on('uncaughtException', (error: any) => {
     return;
   }
   
-  // Determine which sender this error is from based on port
+  // Determine which sender this error is from (use configured port, then address fallback)
   let senderId: string | null = null;
-  if (error.port === 6454) {
-    senderId = 'artnet';
-  } else if (error.port === 5568) {
-    senderId = 'sacn';
-  } else if (error.address) {
-    // If we have an address but port doesn't match, try to determine from enabled senders
-    // This handles cases where port might be different or we need to check by address
+  if (isNetworkErrorLike(error)) {
     const controllerManager = applicationInstance.getControllerManager();
     if (controllerManager && controllerManager.getIsInitialized()) {
       const senderManager = controllerManager.getSenderManager();
       if (senderManager) {
-        // Check which network sender is enabled and might be using this address
-        if (senderManager.isSenderEnabled('artnet')) {
-          senderId = 'artnet';
-        } else if (senderManager.isSenderEnabled('sacn')) {
-          senderId = 'sacn';
+        if (error.port != null) {
+          senderId = senderManager.getSenderIdByPort(error.port);
+        }
+        if (!senderId && error.address) {
+          // Port absent or unmatched — fall back to checking which network sender is enabled
+          if (senderManager.isSenderEnabled('artnet')) {
+            senderId = 'artnet';
+          } else if (senderManager.isSenderEnabled('sacn')) {
+            senderId = 'sacn';
+          }
         }
       }
     }
@@ -74,22 +85,14 @@ process.on('uncaughtException', (error: any) => {
           markSenderErrorHandled(senderId, now);
           
           // IMMEDIATELY remove from enabled senders to stop further send() calls
-          // This prevents the loop by stopping the sender from receiving more data
-          const sender = (senderManager as any).enabledSenders?.get(senderId);
+          const sender = senderManager.getAndRemoveSenderForEmergency(senderId);
           if (sender) {
-            // Remove from enabled senders map immediately to stop send() calls
-            (senderManager as any).enabledSenders.delete(senderId);
-            (senderManager as any).senderUniverseMap.delete(senderId);
-            
-            // Now emit the error (this will trigger cleanup and UI update)
             const senderError = new SenderError(error, { senderId: senderId as SenderId, shouldDisable: true });
-
-            if (sender.eventEmitter) {
-              sender.eventEmitter.emit('SenderError', senderError);
+            const senderWithEmit = sender as { eventEmitter?: { emit(event: string, payload: SenderError): void } };
+            if (senderWithEmit.eventEmitter) {
+              senderWithEmit.eventEmitter.emit('SenderError', senderError);
             }
-            
-            // Stop the sender asynchronously (don't await to avoid blocking)
-            sender.stop().catch((stopErr: any) => {
+            sender.stop().catch((stopErr: unknown) => {
               console.error(`Error stopping ${senderId} sender after network error:`, stopErr);
             });
           }

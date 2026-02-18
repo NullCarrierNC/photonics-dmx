@@ -396,6 +396,34 @@ export class SenderManager {
     return this.enabledSenders.has(senderId) || this.initializingSenders.has(senderId);
   }
 
+  /**
+   * Get the sender ID whose configured port matches the given port (for network error identification).
+   * @param port The port number from the error
+   * @returns The sender ID, or null if no enabled sender uses this port
+   */
+  public getSenderIdByPort(port: number): string | null {
+    for (const [id, sender] of this.enabledSenders) {
+      if (sender.getConfiguredPort() === port) {
+        return id;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Remove a sender from the enabled maps immediately (e.g. on uncaught network error)
+   * and return it so the caller can emit SenderError and stop it.
+   * @param senderId The sender ID to remove
+   * @returns The sender if it was enabled, null otherwise
+   */
+  public getAndRemoveSenderForEmergency(senderId: string): BaseSender | null {
+    const sender = this.enabledSenders.get(senderId) ?? null;
+    if (sender) {
+      this.enabledSenders.delete(senderId);
+      this.senderUniverseMap.delete(senderId);
+    }
+    return sender;
+  }
 
   // Using an arrow function to ensure correct "this" binding.
   private handleSenderError = (senderErr: SenderError): void => {

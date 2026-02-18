@@ -35,7 +35,7 @@ const NetworkDebug = () => {
     window.electron.ipcRenderer.send(CUE.SET_LISTEN_CUE_DATA, true);
 
     // Handler for the cue-handled event.
-    const handleCueHandled = (_event: any, cueData: CueData) => {
+    const handleCueHandled = (_event: unknown, cueData: CueData) => {
       // Get the LED color from the cue data
       const currentLedColorValue = cueData.ledColor || '';
       
@@ -60,8 +60,7 @@ const NetworkDebug = () => {
       setHandledCount((prev) => prev + 1);
     };
 
-    // Use our custom IPC listener utility to register handlers
-    const cleanupHandled = useIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueHandled);
+    const cleanupHandled = useIpcListener<CueData>(RENDERER_RECEIVE.CUE_HANDLED, handleCueHandled);
 
     return () => {
       console.log('NetworkDebug unmounting, cleaning up listeners');

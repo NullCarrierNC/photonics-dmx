@@ -146,6 +146,7 @@ export const RENDERER_RECEIVE = {
   CUE_HANDLED: 'cue-handled',
   NODE_CUES_CHANGED: 'node-cues:changed',
   EFFECTS_CHANGED: 'effects:changed',
+  DEBUG_LOG: 'node-cues:debug-log',
 } as const;
 
 /** Renderer -> main (main process listens). Use when main calls ipcMain.on(). */

@@ -308,15 +308,10 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
             setCurrentCueData(cueData);
         };
-
-        // Add the listener for handled cues
-        addIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData);
+        addIpcListener<CueData>(RENDERER_RECEIVE.CUE_HANDLED, handleCueData);
 
         return () => {
-            // Tell the main process to stop sending cue data
             window?.electron?.ipcRenderer?.send(CUE.SET_LISTEN_CUE_DATA, false);
-
-            // Clean up
             removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData);
         };
     }, [yargListenerEnabled, simulationMode]);

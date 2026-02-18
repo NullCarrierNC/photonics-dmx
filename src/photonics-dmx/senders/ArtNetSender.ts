@@ -168,4 +168,8 @@ export class ArtNetSender extends BaseSender {
   public getUniverse(): number {
     return this.options.universe || 1;
   }
+
+  public getConfiguredPort(): number {
+    return this.options.port;
+  }
 } 

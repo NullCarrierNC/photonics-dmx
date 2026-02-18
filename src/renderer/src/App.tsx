@@ -8,7 +8,6 @@ import StatusBar from './components/StatusBar';
 import { AppPageRouter } from './components/AppPageRouter';
 import SenderErrorIndicator from './components/SenderErrorIndicator';
 import { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types';
-import { IpcRendererEvent } from 'electron';
 import { addIpcListener, removeIpcListener } from './utils/ipcHelpers';
 import { useTimeout } from './utils/useTimeout';
 import { AudioCaptureManager } from './services/AudioCaptureManager';
@@ -60,7 +59,7 @@ export const App = (): JSX.Element => {
   const {  reset: resetErrorTimeout } = useTimeout(clearErrorState, 6000);
 
   // Handler for sender errors
-  const handleSenderError = useCallback((evt: IpcRendererEvent, msg: string): void => {
+  const handleSenderError = useCallback((evt: unknown, msg: string): void => {
     console.error('IPC event:', evt);
     console.error('IPC message:', msg);
 
@@ -72,12 +71,12 @@ export const App = (): JSX.Element => {
   }, [setIsSenderError, setSenderError, resetErrorTimeout]);
 
   // Handler for cue state updates
-  const handleCueStateUpdate = useCallback((_evt: IpcRendererEvent, cueState: CueStateInfo): void => {
+  const handleCueStateUpdate = useCallback((_evt: unknown, cueState: CueStateInfo): void => {
     setCueState(cueState);
   }, [setCueState]);
 
   // Handler for sender start failures
-  const handleSenderStartFailure = useCallback((_evt: IpcRendererEvent, data: { sender: string; error: string }): void => {
+  const handleSenderStartFailure = useCallback((_evt: unknown, data: { sender: string; error: string }): void => {
     console.error(`Sender "${data.sender}" failed to start:`, data.error);
 
     // Update the UI state to reflect that the sender is not running
@@ -108,7 +107,7 @@ export const App = (): JSX.Element => {
   }, [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setIpcEnabled, setIsSenderError, setSenderError, resetErrorTimeout]);
 
   // Handler for sender network errors (invalid destinations, etc.)
-  const handleSenderNetworkError = useCallback((_evt: IpcRendererEvent, data: { sender: string; error: string; autoDisabled: boolean }): void => {
+  const handleSenderNetworkError = useCallback((_evt: unknown, data: { sender: string; error: string; autoDisabled: boolean }): void => {
     console.error(`Sender "${data.sender}" network error:`, data.error);
 
     // Update the UI state to reflect that the sender is not running
@@ -143,7 +142,7 @@ export const App = (): JSX.Element => {
   }, [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setOpenDmxEnabled, setIsSenderError, setSenderError, resetErrorTimeout, showToast]);
 
   // Handler for audio:enable from main process
-  const handleAudioEnable = useCallback(async (_evt: IpcRendererEvent, config: AudioConfig): Promise<void> => {
+  const handleAudioEnable = useCallback(async (_evt: unknown, config: AudioConfig): Promise<void> => {
     console.log('Received audio:enable from main process', config);
     
     try {
@@ -192,7 +191,7 @@ export const App = (): JSX.Element => {
   }, []);
 
   // Handler for audio:config-update from main process
-  const handleAudioConfigUpdate = useCallback((_evt: IpcRendererEvent, config: AudioConfig): void => {
+  const handleAudioConfigUpdate = useCallback((_evt: unknown, config: AudioConfig): void => {
     console.log('Received audio:config-update from main process', config);
     
     // Update AudioCaptureManager if it exists
@@ -275,7 +274,7 @@ export const App = (): JSX.Element => {
     const loadLightLayout = async (): Promise<void> => {
       try {
         const data: LightingConfiguration = await window.electron.ipcRenderer.invoke(
-          'get-light-layout',
+          CONFIG.GET_LIGHT_LAYOUT,
           'myLayout.json'
         );
         setActiveLightsConfig(data || null);
@@ -379,20 +378,19 @@ export const App = (): JSX.Element => {
     fetchAppVersion();
     getPrefs();
 
-    // Set up event listener for sender errors
-    addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError);
-    addIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError);
-
-    // Set up event listener for cue state updates
-    addIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate);
-
-    // Set up event listener for sender start failures
-    addIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure);
-
-    // Set up event listeners for audio control
-    addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable);
-    addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable);
-    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate);
+    addIpcListener<string>(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError);
+    addIpcListener<{ sender: string; error: string; autoDisabled: boolean }>(
+      RENDERER_RECEIVE.SENDER_NETWORK_ERROR,
+      handleSenderNetworkError,
+    );
+    addIpcListener<CueStateInfo>(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate);
+    addIpcListener<{ sender: string; error: string }>(
+      RENDERER_RECEIVE.SENDER_START_FAILED,
+      handleSenderStartFailure,
+    );
+    addIpcListener<AudioConfig>(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable);
+    addIpcListener<unknown>(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable);
+    addIpcListener<AudioConfig>(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate);
 
     const saveLightLayout = async () => {
       if (activeConfig) {

@@ -57,6 +57,14 @@ export abstract class BaseSender {
   public abstract getUniverse(): number;
 
   /**
+   * Gets the configured network port for this sender, if applicable.
+   * @returns The port number, or null for non-network senders (e.g. IPC, EnttecPro)
+   */
+  public getConfiguredPort(): number | null {
+    return null;
+  }
+
+  /**
    * Verifies that the sender is ready to send data.
    * @throws Error if the sender is not started.
    */

@@ -131,12 +131,10 @@ const CueSimulation: React.FC = () => {
         return newMap;
       });
     };
-
-    // Add the listener
-    addIpcListener(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues);
+    type DmxPayload = { universeBuffer: Record<number, number>; universe: number } | Record<number, number>;
+    addIpcListener<DmxPayload>(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues);
 
     return () => {
-      // Remove the listener
       removeIpcListener(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues);
     };
   }, []); // Empty deps - we use functional updates for state

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels';
 import { useIpcListener } from '../../../utils/ipcHelpers';
 
 type DebugVariableEntry = {
@@ -45,7 +46,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
     });
   }, []);
 
-  useEffect(() => useIpcListener('node-cues:debug-log', handleDebugLog), [handleDebugLog]);
+  useEffect(() => useIpcListener<DebugLogEntry>(RENDERER_RECEIVE.DEBUG_LOG, handleDebugLog), [handleDebugLog]);
 
   const outputRows = useMemo(() => entries.map(entry => ({
     key: `${entry.timestamp}-${entry.message}`,

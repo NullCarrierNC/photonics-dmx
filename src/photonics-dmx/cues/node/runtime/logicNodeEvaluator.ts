@@ -3,6 +3,7 @@
  * Handles all logic node types: variable, math, conditional, cue-data, config-data, etc.
  */
 
+import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels';
 import { DmxLightManager } from '../../../controllers/DmxLightManager';
 import { TrackedLight } from '../../../types';
 import { randomBetween } from '../../../helpers/utils';
@@ -522,7 +523,7 @@ export function evaluateLogicNode(
         }
       }
 
-      evaluatorContext.debugOutput?.('node-cues:debug-log', {
+      evaluatorContext.debugOutput?.(RENDERER_RECEIVE.DEBUG_LOG, {
         message,
         variables: variablesForLog,
         timestamp: Date.now()

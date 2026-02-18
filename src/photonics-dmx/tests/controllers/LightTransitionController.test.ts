@@ -15,24 +15,35 @@ import { createMockRGBIP } from '../helpers/testFixtures';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager';
 
+type MockLightStateManager = Pick<LightStateManager, 'setLightState' | 'getLightState' | 'publishLightStates' | 'getTrackedLightIds'>;
+
+/** Test-only access to private LTC state; use cast to avoid private-member intersection reducing to never */
+type LTCTestAccess = {
+  _transitionsByLight: Map<string, Map<number, unknown>>;
+  _currentLayerStates: Map<string, Map<number, RGBIO>>;
+  _lightStateManager: MockLightStateManager;
+  calculateFinalColorForLight: (lightId: string) => RGBIO;
+};
+
+function ltcAccess(ctrl: LightTransitionController): LTCTestAccess {
+  return ctrl as unknown as LTCTestAccess;
+}
+
 describe('LightTransitionController', () => {
   let lightTransitionController: LightTransitionController;
   
   beforeEach(() => {
-    // Create a mock LightStateManager
     const mockLightStateManager = {
       setLightState: jest.fn(),
       getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
       publishLightStates: jest.fn(),
       getTrackedLightIds: jest.fn().mockReturnValue([])
-    };
-    
-    // Create a fresh instance for each test
-    lightTransitionController = new LightTransitionController(mockLightStateManager as any);
-    
-    // Add test properties to match implementation
-    (lightTransitionController as any)._transitionsByLight = new Map();
-    (lightTransitionController as any)._currentLayerStates = new Map();
+    } as unknown as MockLightStateManager;
+
+    lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
+    const ltc = ltcAccess(lightTransitionController);
+    ltc._transitionsByLight = new Map();
+    ltc._currentLayerStates = new Map();
   });
 
   describe('setTransition', () => {
@@ -106,7 +117,7 @@ describe('LightTransitionController', () => {
       // Mock implementation
       const layerMap = new Map();
       layerMap.set(layer, mockState);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerMap);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerMap);
       
       // Get the state
       const state = lightTransitionController.getLightState(lightId, layer);
@@ -117,7 +128,7 @@ describe('LightTransitionController', () => {
     
     it('should return a transparent color for a light with no transitions', () => {
       // Override the mock implementation for this test only
-      (lightTransitionController as any)._lightStateManager.getLightState.mockReturnValueOnce(undefined);
+      (ltcAccess(lightTransitionController)._lightStateManager.getLightState as unknown as jest.Mock).mockReturnValueOnce(undefined);
       
       const lightId = 'nonexistent-light';
       const layer = 1;
@@ -178,15 +189,15 @@ describe('LightTransitionController', () => {
       lightTransitionController.removeTransitionsByLayer(layer1);
       
       // Transitions on layer2 should still exist
-      const transitions = (lightTransitionController as any)._transitionsByLight;
-      const layerExists = Array.from(transitions.values()).some((layerMap: any) => 
+      const transitions = ltcAccess(lightTransitionController)._transitionsByLight;
+      const layerExists = Array.from(transitions.values() as Iterable<Map<number, unknown>>).some((layerMap) =>
         layerMap.has(layer1)
       );
       
       expect(layerExists).toBeFalsy();
       
       // Make sure transitions for layer2 still exist
-      const layer2Exists = Array.from(transitions.values()).some((layerMap: any) => 
+      const layer2Exists = Array.from(transitions.values() as Iterable<Map<number, unknown>>).some((layerMap) =>
         layerMap.has(layer2)
       );
       
@@ -228,19 +239,19 @@ describe('LightTransitionController', () => {
       );
       
       // Verify the transition data was stored correctly
-      const transitions = (lightTransitionController as any)._transitionsByLight;
+      const transitions = ltcAccess(lightTransitionController)._transitionsByLight;
       expect(transitions.has(lightId)).toBeTruthy();
       
       const lightTransitions = transitions.get(lightId);
       expect(lightTransitions).toBeDefined();
-      expect(lightTransitions.has(layer)).toBeTruthy();
+      expect(lightTransitions!.has(layer)).toBeTruthy();
       
-      const transitionData = lightTransitions.get(layer);
+      const transitionData = lightTransitions!.get(layer) as { startState: RGBIO; endState: RGBIO; transition: { transform: { duration: number; easing: string } } } | undefined;
       expect(transitionData).toBeDefined();
-      expect(transitionData.startState).toEqual(startState);
-      expect(transitionData.endState).toEqual(endState);
-      expect(transitionData.transition.transform.duration).toBe(duration);
-      expect(transitionData.transition.transform.easing).toBe(easing);
+      expect(transitionData!.startState).toEqual(startState);
+      expect(transitionData!.endState).toEqual(endState);
+      expect(transitionData!.transition.transform.duration).toBe(duration);
+      expect(transitionData!.transition.transform.easing).toBe(easing);
       
       // Verify initial state is available
       const initialLightState = lightTransitionController.getLightState(lightId, layer);
@@ -257,7 +268,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -274,10 +285,10 @@ describe('LightTransitionController', () => {
       layerStates.set(layer1, state1);
       layerStates.set(layer2, state2);
       layerStates.set(layer3, state3);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Manually call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Get the final state from the light state manager
       expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, state3);
@@ -291,7 +302,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -305,10 +316,10 @@ describe('LightTransitionController', () => {
       const layerStates = new Map<number, RGBIO>();
       layerStates.set(layer1, state1);
       layerStates.set(layer3, state3);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Manually call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Get the final state from the light state manager
       expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, state3);
@@ -322,7 +333,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -338,10 +349,10 @@ describe('LightTransitionController', () => {
       const layerStates = new Map<number, RGBIO>();
       layerStates.set(layer0, baseState);
       layerStates.set(layer1, higherState);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Manually call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Higher layer state should completely override base layer
       expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, higherState);
@@ -355,7 +366,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -385,10 +396,10 @@ describe('LightTransitionController', () => {
       const layerStates = new Map<number, RGBIO>();
       layerStates.set(layer0, baseState);
       layerStates.set(layer1, higherState);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Manually call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Should blend each channel according to its individual opacity
       expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, expectedState);
@@ -402,7 +413,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -425,10 +436,10 @@ describe('LightTransitionController', () => {
       const layerStates = new Map<number, RGBIO>();
       layerStates.set(layer0, baseState);
       layerStates.set(layer1, higherState);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Verify that the setLightState method was called
       expect(mockLightStateManager.setLightState).toHaveBeenCalled();
@@ -468,7 +479,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -491,10 +502,10 @@ describe('LightTransitionController', () => {
       const layerStates = new Map<number, RGBIO>();
       layerStates.set(layer0, baseState);
       layerStates.set(layer1, higherState);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Manually call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Get the actual blended result
       const actualBlendedResult = mockLightStateManager.setLightState.mock.calls[0][1] as RGBIO;
@@ -521,7 +532,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -544,10 +555,10 @@ describe('LightTransitionController', () => {
       const layerStates = new Map<number, RGBIO>();
       layerStates.set(layer0, baseState);
       layerStates.set(layer1, higherState);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Manually call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Get the actual blended result
       const actualBlendedResult = mockLightStateManager.setLightState.mock.calls[0][1] as RGBIO;
@@ -583,7 +594,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -622,10 +633,10 @@ describe('LightTransitionController', () => {
       layerStates.set(layer1, state1);
       layerStates.set(layer2, state2);
       layerStates.set(layer3, state3);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Manually call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Verify that the setLightState method was called
       expect(mockLightStateManager.setLightState).toHaveBeenCalled();
@@ -653,7 +664,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -683,10 +694,10 @@ describe('LightTransitionController', () => {
       const layerStates = new Map<number, RGBIO>();
       layerStates.set(baseLayer, baseState);
       layerStates.set(upperLayer, upperState);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Manually call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Verify the result
       expect(mockLightStateManager.setLightState).toHaveBeenCalled();
@@ -723,7 +734,7 @@ describe('LightTransitionController', () => {
         publishLightStates: jest.fn(),
         getTrackedLightIds: jest.fn().mockReturnValue([])
       };
-      lightTransitionController = new LightTransitionController(mockLightStateManager as any);
+      lightTransitionController = new LightTransitionController(mockLightStateManager as unknown as LightStateManager);
       
       // Set states for different layers
       const lightId = 'test-light';
@@ -746,10 +757,10 @@ describe('LightTransitionController', () => {
       const layerStates = new Map<number, RGBIO>();
       layerStates.set(lowerLayer, lowerState);
       layerStates.set(upperLayer, upperState);
-      (lightTransitionController as any)._currentLayerStates.set(lightId, layerStates);
+      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates);
       
       // Call the calculateFinalColorForLight method
-      (lightTransitionController as any).calculateFinalColorForLight(lightId);
+      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId);
       
       // Verify the result
       expect(mockLightStateManager.setLightState).toHaveBeenCalled();
