@@ -9,8 +9,7 @@ export type MockCueDataOptions = {
 };
 
 /**
- * Creates mock cue data for simulation handlers (beat, keyframe, measure, instrument).
- * Single factory to avoid copy-paste across simulate-beat, simulate-keyframe, simulate-measure, simulate-instrument-note.
+ * Creates mock cue data for simulation handlers (beat, keyframe, measure, instrument)
  */
 export function createMockCueData(options: MockCueDataOptions = {}): CueData {
   const {
