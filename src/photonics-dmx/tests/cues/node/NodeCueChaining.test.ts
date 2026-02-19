@@ -97,12 +97,16 @@ describe('Node cue chaining', () => {
     const sequencerMock: Partial<ILightingController> = {
       addEffect: (name: string, _effect: Effect) => {
         callOrder.push(name);
+      },
+      addEffectWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+        callOrder.push(name);
+        callback();
       }
     };
 
     await cue.execute({ beat: 'Strong' } as any, sequencerMock as ILightingController, null as any);
 
-    // With different layers (10 and 1) chain is not composed; each action submitted (fire-and-forget)
+    // a1 and a2 target different lights so the chain is not composed; each action submitted individually
     expect(callOrder.length).toBe(2);
     expect(callOrder[0]).toContain('a1');
     expect(callOrder[1]).toContain('a2');
