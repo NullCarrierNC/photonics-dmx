@@ -5,9 +5,14 @@ import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegi
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes';
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers';
-import { DmxRig } from '../../photonics-dmx/types';
+import { DmxRig, DmxFixture } from '../../photonics-dmx/types';
 import { ipcError } from './ipcResult';
 import { CONFIG, RENDERER_RECEIVE } from '../../shared/ipcChannels';
+import {
+  isPlainObject,
+  validateLightingConfiguration,
+  validateOptionalStringArray
+} from './inputValidation';
 
 /**
  * Set up configuration-related IPC handlers
@@ -26,8 +31,12 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Save user's lights
-  ipcMain.on(CONFIG.SAVE_MY_LIGHTS, (_, data) => {
-    controllerManager.getConfig().updateUserLights(data);
+  ipcMain.on(CONFIG.SAVE_MY_LIGHTS, (_, data: unknown) => {
+    if (!Array.isArray(data)) {
+      console.error('SAVE_MY_LIGHTS: payload must be an array');
+      return;
+    }
+    controllerManager.getConfig().updateUserLights(data as DmxFixture[]);
   });
 
   // Get light layout
@@ -41,11 +50,14 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   });
 
   // Save light layout
-  ipcMain.handle(CONFIG.SAVE_LIGHT_LAYOUT, async (_, filename: string, data: any) => {
+  ipcMain.handle(CONFIG.SAVE_LIGHT_LAYOUT, async (_, filename: string, data: unknown) => {
     try {
-      // First save the layout
-      controllerManager.getConfig().updateLightingLayout(data);
-      
+      const validation = validateLightingConfiguration(data);
+      if (!validation.ok) {
+        return { success: false, error: validation.error };
+      }
+      controllerManager.getConfig().updateLightingLayout(validation.value);
+
       // Then restart controllers to pick up the changes
       await controllerManager.restartControllers();
       
@@ -97,6 +109,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Save or update a DMX rig
   ipcMain.handle(CONFIG.SAVE_DMX_RIG, async (_, rig: DmxRig) => {
     try {
+      if (!isPlainObject(rig) || typeof rig.id !== 'string' || rig.id.trim().length === 0) {
+        return { success: false, error: 'Invalid DMX rig payload' };
+      }
       const config = controllerManager.getConfig();
       const existingRig = config.getDmxRig(rig.id);
       const previousActiveState = existingRig?.active ?? false;
@@ -163,11 +178,17 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Save app preferences
   ipcMain.handle(CONFIG.SAVE_PREFS, async (_, updates: any) => {
     try {
+      if (!isPlainObject(updates)) {
+        return { success: false, error: 'Preferences payload must be an object' };
+      }
       controllerManager.getConfig().updatePreferences(updates);
       
       // Update global brightness configuration if brightness settings were changed
       if (updates.brightness) {
-        setGlobalBrightnessConfig(updates.brightness);
+        const brightnessConfig = controllerManager.getConfig().getAllPreferences().brightness;
+        if (brightnessConfig) {
+          setGlobalBrightnessConfig(brightnessConfig);
+        }
       }
       
       return { success: true };
@@ -213,6 +234,10 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Set enabled cue groups
   ipcMain.handle(CONFIG.SET_ENABLED_CUE_GROUPS, async (_, groupIds: string[]) => {
     try {
+      const validation = validateOptionalStringArray(groupIds, 'groupIds');
+      if (!validation.ok) {
+        return { success: false, error: validation.error };
+      }
       controllerManager.getConfig().setEnabledCueGroups(groupIds);
       
       // Update the CueRegistry with the new enabled groups
@@ -247,6 +272,10 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Set enabled audio cue groups
   ipcMain.handle(CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS, async (_, groupIds: string[]) => {
     try {
+      const validation = validateOptionalStringArray(groupIds, 'groupIds');
+      if (!validation.ok) {
+        return { success: false, error: validation.error };
+      }
       controllerManager.getConfig().setEnabledAudioCueGroups(groupIds);
       const registry = AudioCueRegistry.getInstance();
       registry.setEnabledGroups(groupIds);
@@ -302,6 +331,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Set stage kit priority preference
   ipcMain.handle(CONFIG.SET_STAGE_KIT_PRIORITY, async (_, priority: 'prefer-for-tracked' | 'random' | 'never') => {
     try {
+      if (!['prefer-for-tracked', 'random', 'never'].includes(priority)) {
+        return { success: false, error: 'Invalid stage kit priority' };
+      }
       // Update the preference in the config
       controllerManager.getConfig().updatePreferences({
         stageKitPrefs: { yargPriority: priority }
@@ -370,6 +402,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Save audio configuration
   ipcMain.handle(CONFIG.SAVE_AUDIO_CONFIG, async (_, updates: any) => {
     try {
+      if (!isPlainObject(updates)) {
+        return { success: false, error: 'Audio configuration payload must be an object' };
+      }
       // Get current config to check if deviceId changed
       const currentConfig = controllerManager.getConfig().getAudioConfig();
       const currentDeviceId = currentConfig?.deviceId;

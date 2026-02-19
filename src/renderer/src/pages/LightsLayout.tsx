@@ -147,13 +147,17 @@ const LightsLayout = () => {
         const front = activeConfig.frontLights || [];
         const back = activeConfig.backLights || [];
         const strobe = activeConfig.strobeLights || [];
-        
+        // Only include strobe lights in the working array when Dedicated; for AllCapable
+        // they are copies of front lights (same IDs) and would cause ghost duplicates when editing.
+        const strobeForMerge =
+            activeConfig.strobeType === ConfigStrobeType.Dedicated
+                ? strobe.map((l) => ({ ...l, group: 'strobe' as const }))
+                : [];
         const merged = [
             ...front.map((l) => ({ ...l, group: 'front' as const })),
             ...back.map((l) => ({ ...l, group: 'back' as const })),
-            ...strobe.map((l) => ({ ...l, group: 'strobe' as const })),
+            ...strobeForMerge,
         ];
-        
         setAllPrimaryLights(merged);
 
         // Update dedicated strobe count if applicable

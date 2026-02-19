@@ -31,8 +31,16 @@ export class SacnSender extends BaseSender {
     // Ensure universe is a valid number (0-63999)
     const validUniverse = Math.max(0, Math.min(63999, Number(universe)));
 
-    // Configure sender options
-    const senderOptions: any = {
+    // Configure sender options (sacn library does not export types for Sender options)
+    const senderOptions: {
+      universe: number;
+      port: number;
+      reuseAddr: boolean;
+      minRefreshRate: number;
+      defaultPacketOptions: { sourceName: string; useRawDmxValues: boolean };
+      iface?: string;
+      useUnicastDestination?: string;
+    } = {
       universe: validUniverse,
       port: 5568,
       reuseAddr: true,
@@ -109,22 +117,20 @@ export class SacnSender extends BaseSender {
     try {
       this.verifySenderStarted();
       await this.sender!.send({ payload: universeBuffer });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("SacnSender error:", err);
-      
-      // Check if this is a network error that indicates an invalid destination
-      const isNetworkError = err && (
-        err.code === 'EHOSTUNREACH' ||
-        err.code === 'EHOSTDOWN' ||
-        err.code === 'ENETUNREACH' ||
-        err.code === 'ETIMEDOUT' ||
-        err.syscall === 'send'
+      const errObj = err && typeof err === 'object' ? err as { code?: string; syscall?: string } : null;
+      const isNetworkError = errObj && (
+        errObj.code === 'EHOSTUNREACH' ||
+        errObj.code === 'EHOSTDOWN' ||
+        errObj.code === 'ENETUNREACH' ||
+        errObj.code === 'ETIMEDOUT' ||
+        errObj.syscall === 'send'
       );
-      
       const errorEvent = new SenderError(err, {
         senderId: 'sacn',
-        shouldDisable: isNetworkError,
-        code: err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : undefined
+        shouldDisable: Boolean(isNetworkError),
+        code: errObj && 'code' in errObj ? String(errObj.code) : undefined
       });
       this.eventEmitter.emit('SenderError', errorEvent);
     }

@@ -102,8 +102,11 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
    */
   const handleMasterDimmerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (light && localChannels) {
-      const newMasterValue = Number(e.target.value);
-      
+      let newMasterValue = Number(e.target.value);
+      // DMX channels are 1-based; reject values less than 1
+      if (!Number.isFinite(newMasterValue) || newMasterValue < 1) {
+        newMasterValue = 1;
+      }
       // Find the fixture template to get the original offsets
       const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId);
       if (!fixtureTemplate) {
@@ -287,7 +290,8 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                   {channelName === 'masterDimmer' ? (
                     <input
                       type="number"
-                      value={value || 0}
+                      min={1}
+                      value={value || 1}
                       onChange={handleMasterDimmerChange}
                       className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
                     />

@@ -539,19 +539,44 @@ export const easingFunctions: { [key: string]: EasingFunction } = {
 };
 
 export type Senders = 'sacn' | 'ipc' | 'enttecpro' | 'artnet' | 'opendmx';
-export interface SenderConfig {
-  sender: Senders
-  port?: string
-  devicePath?: string
-  dmxSpeed?: number
-  host?: string
-  universe?: number
-  net?: number
-  subnet?: number
-  subuni?: number
-  artNetPort?: number
-  networkInterface?: string
-  useUnicast?: boolean
-  unicastDestination?: string
+
+interface BaseSenderConfig {
+  sender: Senders;
 }
+
+export interface ArtNetSenderConfig extends BaseSenderConfig {
+  sender: 'artnet';
+  host?: string;
+  universe?: number;
+  net?: number;
+  subnet?: number;
+  subuni?: number;
+  port?: number;
+  base_refresh_interval?: number;
+}
+
+export interface SacnSenderConfig extends BaseSenderConfig {
+  sender: 'sacn';
+  universe?: number;
+  networkInterface?: string;
+  useUnicast?: boolean;
+  unicastDestination?: string;
+}
+
+export interface SerialSenderConfig extends BaseSenderConfig {
+  sender: 'enttecpro' | 'opendmx';
+  devicePath?: string;
+  universe?: number;
+  dmxSpeed?: number;
+}
+
+export interface IpcSenderConfig extends BaseSenderConfig {
+  sender: 'ipc';
+}
+
+export type SenderConfig =
+  | ArtNetSenderConfig
+  | SacnSenderConfig
+  | SerialSenderConfig
+  | IpcSenderConfig;
 

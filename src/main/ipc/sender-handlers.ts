@@ -1,22 +1,28 @@
 import { IpcMain, BrowserWindow } from 'electron';
 import { ControllerManager } from '../controllers/ControllerManager';
-import { SenderConfig } from '../../photonics-dmx/types';
+import type { SacnSenderConfig } from '../../photonics-dmx/types';
 import { ipcError } from './ipcResult';
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels';
+import {
+  isPlainObject,
+  validateNumberInRange,
+  validateSenderEnablePayload,
+  validateSenderId
+} from './inputValidation';
 
 /**
  * Set up sender-related IPC handlers (enable/disable, sACN config, network interfaces).
  */
 export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  ipcMain.on(LIGHT.SENDER_ENABLE, async (_, data: SenderConfig) => {
+  ipcMain.on(LIGHT.SENDER_ENABLE, async (_, data: unknown) => {
     try {
-      const { sender, port, host, universe, net, subnet, subuni, artNetPort } = data;
-
-      if (!sender) {
-        console.error('Sender name is required');
+      const payloadValidation = validateSenderEnablePayload(data);
+      if (!payloadValidation.ok) {
+        console.error(payloadValidation.error);
         return;
       }
-
+      const config = payloadValidation.value;
+      const sender = config.sender;
       const senderManager = controllerManager.getSenderManager();
 
       if (senderManager.isSenderEnabled(sender)) {
@@ -24,58 +30,9 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
         return;
       }
 
-      let config: Record<string, unknown> = {};
-
-      if (sender === 'sacn') {
-        const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 1;
-        if (universeNum < 0 || universeNum > 63999) {
-          console.error(`Invalid SACN universe: ${universeNum}. Must be between 0-63999`);
-          return;
-        }
-        const networkInterface = data.networkInterface;
-        const useUnicast = data.useUnicast;
-        const unicastDestination = data.unicastDestination;
-        config = {
-          universe: universeNum,
-          networkInterface: networkInterface,
-          useUnicast: useUnicast,
-          unicastDestination: unicastDestination,
-        };
-        console.log(`sACN config: universe=${universeNum}, networkInterface=${networkInterface}, useUnicast=${useUnicast}, unicastDestination=${unicastDestination}`);
-      } else if (sender === 'ipc') {
-        config = {};
-      } else if (sender === 'enttecpro') {
-        if (!port) {
-          console.error('Port is required for EnttecPro sender');
-          return;
-        }
-        const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 0;
-        config = { devicePath: port, universe: universeNum };
-      } else if (sender === 'opendmx') {
-        if (!port) {
-          console.error('Port is required for OpenDMX sender');
-          return;
-        }
-        const dmxSpeed = typeof data.dmxSpeed === 'number' && data.dmxSpeed > 0 ? data.dmxSpeed : undefined;
-        const universeNum = (universe !== undefined && universe !== null) ? Number(universe) : 0;
-        config = { devicePath: port, dmxSpeed, universe: universeNum };
-      } else if (sender === 'artnet') {
-        config = {
-          host: host || '127.0.0.1',
-          options: {
-            universe: universe !== undefined ? universe : 0,
-            net: net !== undefined ? net : 0,
-            subnet: subnet !== undefined ? subnet : 0,
-            subuni: subuni !== undefined ? subuni : 0,
-            port: artNetPort !== undefined ? artNetPort : 6454,
-            base_refresh_interval: 1000
-          }
-        };
-      }
-
       console.log(`Enabling ${sender} sender with config:`, config);
       try {
-        await senderManager.enableSender(sender, sender as 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc', config);
+        await senderManager.enableSender(sender, sender, config);
         console.log(`Successfully enabled ${sender} sender`);
       } catch (error) {
         console.error(`Failed to enable ${sender} sender:`, error);
@@ -93,27 +50,46 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
     }
   });
 
-  ipcMain.on(LIGHT.SENDER_DISABLE, (_, data: { sender: string }) => {
+  ipcMain.on(LIGHT.SENDER_DISABLE, (_, data: { sender: unknown }) => {
     try {
-      const { sender } = data;
-      if (!sender) {
-        console.error('Sender name is required');
+      const senderValidation = validateSenderId(data?.sender);
+      if (!senderValidation.ok) {
+        console.error(senderValidation.error);
         return;
       }
-      controllerManager.getSenderManager().disableSender(sender);
+      controllerManager.getSenderManager().disableSender(senderValidation.value);
     } catch (error) {
       console.error('Error disabling sender:', error);
     }
   });
 
-  ipcMain.handle(LIGHT.UPDATE_SACN_CONFIG, async (_, config: Record<string, unknown>) => {
+  ipcMain.handle(LIGHT.UPDATE_SACN_CONFIG, async (_, config: unknown) => {
     try {
+      if (!isPlainObject(config)) {
+        return { success: false, error: 'Invalid sACN config payload' };
+      }
+      let universe: number | undefined;
+      if (config.universe !== undefined) {
+        const universeValidation = validateNumberInRange(config.universe, 0, 63999, 'SACN universe');
+        if (!universeValidation.ok) {
+          return { success: false, error: universeValidation.error };
+        }
+        universe = universeValidation.value;
+      }
+      const sacnConfig: SacnSenderConfig = {
+        sender: 'sacn',
+        universe,
+        networkInterface:
+          typeof config.networkInterface === 'string' && config.networkInterface.trim() !== ''
+            ? config.networkInterface
+            : undefined,
+        useUnicast: Boolean(config.useUnicast),
+        unicastDestination:
+          typeof config.unicastDestination === 'string' ? config.unicastDestination : undefined
+      };
       const senderManager = controllerManager.getSenderManager();
       if (senderManager.getEnabledSenders().includes('sacn')) {
-        await senderManager.restartSender('sacn', {
-          senderType: 'sacn',
-          ...config
-        });
+        await senderManager.restartSender('sacn', sacnConfig);
         console.log('sACN configuration updated and sender restarted');
       } else {
         console.log('sACN not currently enabled, configuration saved for next enable');

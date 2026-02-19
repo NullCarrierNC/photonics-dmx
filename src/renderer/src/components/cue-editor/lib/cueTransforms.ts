@@ -19,6 +19,9 @@ import type {
 import type { EditorDocument, EditorNode } from './types';
 import { getAudioEventLabel, getYargEventLabel } from './cueUtils';
 
+/** Edge data for editor edges (port info for logic/conditional nodes). */
+export type EditorEdgeData = { fromPort?: string | null; toPort?: string | null };
+
 type CueDefinition = YargNodeCueDefinition | AudioNodeCueDefinition;
 type EffectDefinition = YargEffectDefinition | AudioEffectDefinition;
 
@@ -189,12 +192,15 @@ const updateDocumentFromFlow = (
       effectRaisers: effectRaiserNodes.map(node => node.data.payload as EffectRaiserNode),
       notes: notesNodes.map(node => node.data.payload as NotesNode)
     },
-    connections: validEdges.map(edge => ({
-      from: edge.source,
-      to: edge.target,
-      fromPort: (edge.data as any)?.fromPort ?? undefined,
-      toPort: (edge.data as any)?.toPort ?? undefined
-    })),
+    connections: validEdges.map(edge => {
+      const data = edge.data as EditorEdgeData | undefined;
+      return {
+        from: edge.source,
+        to: edge.target,
+        fromPort: data?.fromPort ?? undefined,
+        toPort: data?.toPort ?? undefined
+      };
+    }),
     layout: {
       nodePositions: layoutPositions,
       viewport: reactFlowInstance ? reactFlowInstance.toObject().viewport : currentCueDefinition.layout?.viewport
@@ -367,12 +373,15 @@ const updateEffectDocumentFromFlow = (
       effectListeners: effectListenerNodes.map(node => node.data.payload as EffectEventListenerNode),
       notes: notesNodes.map(node => node.data.payload as NotesNode)
     },
-    connections: validEdges.map(edge => ({
-      from: edge.source,
-      to: edge.target,
-      fromPort: (edge.data as any)?.fromPort ?? undefined,
-      toPort: (edge.data as any)?.toPort ?? undefined
-    })),
+    connections: validEdges.map(edge => {
+      const data = edge.data as EditorEdgeData | undefined;
+      return {
+        from: edge.source,
+        to: edge.target,
+        fromPort: data?.fromPort ?? undefined,
+        toPort: data?.toPort ?? undefined
+      };
+    }),
     layout: {
       nodePositions: layoutPositions,
       viewport: reactFlowInstance ? reactFlowInstance.toObject().viewport : currentEffectDefinition.layout?.viewport

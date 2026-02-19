@@ -4,7 +4,13 @@ import type { VariableDefinition, ValueSource } from '../../../../../photonics-d
 import type { EffectDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 import type { EditorNodeData } from '../lib/types';
 import { cueToFlow, effectToFlow } from '../lib/cueTransforms';
-import type { YargNodeCueDefinition, AudioNodeCueDefinition, YargEffectDefinition, AudioEffectDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import type {
+  YargNodeCueDefinition,
+  AudioNodeCueDefinition,
+  YargEffectDefinition,
+  AudioEffectDefinition,
+  EffectRaiserNode
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
 
 export type UseFlowSyncParams = {
   setNodes: React.Dispatch<React.SetStateAction<import('reactflow').Node<EditorNodeData>[]>>;
@@ -54,7 +60,7 @@ export function useFlowSync({
       let didChange = false;
       const nextNodes = prevNodes.map(node => {
         if (node.data.kind !== 'effect-raiser') return node;
-        const raiser = node.data.payload as import('../../../../../photonics-dmx/cues/types/nodeCueTypes').EffectRaiserNode;
+        const raiser = node.data.payload as EffectRaiserNode;
         if (!raiser.effectId) return node;
 
         const effectDef = effectDefinitions.get(raiser.effectId);

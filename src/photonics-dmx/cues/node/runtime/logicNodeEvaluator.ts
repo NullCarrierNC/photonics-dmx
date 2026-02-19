@@ -9,6 +9,7 @@ import { TrackedLight } from '../../../types';
 import { randomBetween } from '../../../helpers/utils';
 import {
   LogicNode,
+  ValueSource,
   VariableDefinition,
   VariableType
 } from '../../types/nodeCueTypes';
@@ -98,7 +99,7 @@ export function evaluateLogicNode(
     }
 
     case 'conditional': {
-      const resolveType = (source: any): VariableType => {
+      const resolveType = (source: ValueSource | undefined): VariableType => {
         if (!source) return 'number';
         if (source.source === 'literal') {
           if (Array.isArray(source.value)) return 'light-array';
@@ -269,7 +270,7 @@ export function evaluateLogicNode(
             }
           } else if (Array.isArray(varValue.value)) {
             // Array variable - assume it's an array of numbers (for future support)
-            indices = (varValue.value as any[])
+            indices = (varValue.value as unknown[])
               .map(v => {
                 const num = typeof v === 'number' ? v : Number(v);
                 return isNaN(num) ? null : Math.floor(num);

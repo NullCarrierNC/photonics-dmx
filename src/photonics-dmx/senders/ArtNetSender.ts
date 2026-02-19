@@ -30,20 +30,20 @@ export class ArtNetSender extends BaseSender {
       );
       
       // Listen for error events from the DMX instance
-      this.dmx.on('error', (err: any) => {
+      this.dmx.on('error', (err: unknown) => {
         console.error("ArtNetSender DMX error event:", err);
-        const isNetworkError = err && (
-          err.code === 'EHOSTUNREACH' ||
-          err.code === 'EHOSTDOWN' ||
-          err.code === 'ENETUNREACH' ||
-          err.code === 'ETIMEDOUT' ||
-          err.syscall === 'send'
+        const errObj = err && typeof err === 'object' ? err as { code?: string; syscall?: string } : null;
+        const isNetworkError = errObj && (
+          errObj.code === 'EHOSTUNREACH' ||
+          errObj.code === 'EHOSTDOWN' ||
+          errObj.code === 'ENETUNREACH' ||
+          errObj.code === 'ETIMEDOUT' ||
+          errObj.syscall === 'send'
         );
-        
         const errorEvent = new SenderError(err, {
           senderId: 'artnet',
-          shouldDisable: isNetworkError,
-          code: err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : undefined
+          shouldDisable: Boolean(isNetworkError),
+          code: errObj && 'code' in errObj ? String(errObj.code) : undefined
         });
         this.eventEmitter.emit("SenderError", errorEvent);
       });
@@ -130,22 +130,20 @@ export class ArtNetSender extends BaseSender {
       }
       
       this.universe!.update(convertedBuffer);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("ArtNetSender error:", err);
-      
-      // Check if this is a network error that indicates an invalid destination
-      const isNetworkError = err && (
-        err.code === 'EHOSTUNREACH' ||
-        err.code === 'EHOSTDOWN' ||
-        err.code === 'ENETUNREACH' ||
-        err.code === 'ETIMEDOUT' ||
-        err.syscall === 'send'
+      const errObj = err && typeof err === 'object' ? err as { code?: string; syscall?: string } : null;
+      const isNetworkError = errObj && (
+        errObj.code === 'EHOSTUNREACH' ||
+        errObj.code === 'EHOSTDOWN' ||
+        errObj.code === 'ENETUNREACH' ||
+        errObj.code === 'ETIMEDOUT' ||
+        errObj.syscall === 'send'
       );
-      
       const errorEvent = new SenderError(err, {
         senderId: 'artnet',
-        shouldDisable: isNetworkError,
-        code: err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : undefined
+        shouldDisable: Boolean(isNetworkError),
+        code: errObj && 'code' in errObj ? String(errObj.code) : undefined
       });
       this.eventEmitter.emit("SenderError", errorEvent);
     }

@@ -6,7 +6,7 @@ import { ArtNetSender } from '../senders/ArtNetSender';
 import { SacnSender } from '../senders/SacnSender';
 import { EnttecProSender } from '../senders/EnttecProSender';
 import { OpenDmxSender } from '../senders/OpenDmxSender';
-
+import type { SenderConfig } from '../types';
 
 /**
  * Senders are responsible for actually broadcasting the 
@@ -46,7 +46,7 @@ export class SenderManager {
   public async enableSender(
     id: string,
     senderType: 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc',
-    config: any
+    config: SenderConfig
   ): Promise<void> {
     // Check if sender is already enabled or currently initializing
     if (this.enabledSenders.has(id) || this.initializingSenders.has(id)) {
@@ -82,43 +82,47 @@ export class SenderManager {
 
         let sender: BaseSender;
 
-        // Create sender instance based on type
-        switch (senderType) {
-          case 'artnet':
-            // ArtNet config: { host, options: { universe, net, subnet, subuni, port, base_refresh_interval } }
+        // Create sender instance based on type (switch on config.sender for type narrowing)
+        switch (config.sender) {
+          case 'artnet': {
             const host = config.host || '127.0.0.1';
             const artnetOptions = {
-              universe: 1,
-              net: 0,
-              subnet: 0,
-              subuni: 0,
-              port: 6454,
-              base_refresh_interval: 1000,
-              ...config.options  // Merge user-provided options, allowing override of defaults
+              universe: config.universe ?? 1,
+              net: config.net ?? 0,
+              subnet: config.subnet ?? 0,
+              subuni: config.subuni ?? 0,
+              port: config.port ?? 6454,
+              base_refresh_interval: config.base_refresh_interval ?? 1000
             };
-            const artnetUniverse = artnetOptions.universe || 1;
             sender = new ArtNetSender(host, artnetOptions);
-            this.senderUniverseMap.set(id, artnetUniverse);
+            this.senderUniverseMap.set(id, artnetOptions.universe);
             break;
+          }
 
-          case 'sacn':
-            // sACN config: { universe, networkInterface, useUnicast, unicastDestination }
+          case 'sacn': {
             const sacnUniverse = config.universe !== undefined ? config.universe : 1;
-            sender = new SacnSender(config);
+            sender = new SacnSender({
+              universe: config.universe,
+              networkInterface: config.networkInterface,
+              useUnicast: config.useUnicast,
+              unicastDestination: config.unicastDestination
+            });
             this.senderUniverseMap.set(id, sacnUniverse);
             break;
+          }
 
-          case 'enttecpro':
-            // EnttecPro config: { devicePath, universe }
+          case 'enttecpro': {
             const devicePath = config.devicePath;
             if (!devicePath) {
               throw new Error('Device path (port) is required for EnttecPro sender');
             }
             const enttecUniverse = config.universe !== undefined ? config.universe : 0;
-            sender = new EnttecProSender(devicePath, { dmxSpeed: 20 }, 'uni1', enttecUniverse);
+            sender = new EnttecProSender(devicePath, { dmxSpeed: config.dmxSpeed ?? 20 }, 'uni1', enttecUniverse);
             this.senderUniverseMap.set(id, enttecUniverse);
             break;
-          case 'opendmx':
+          }
+
+          case 'opendmx': {
             const openDevicePath = config.devicePath;
             if (!openDevicePath) {
               throw new Error('Device path (port) is required for OpenDMX sender');
@@ -127,6 +131,11 @@ export class SenderManager {
             sender = new OpenDmxSender(openDevicePath, { dmxSpeed: config.dmxSpeed ?? 40 }, 'uni1', openDmxUniverse);
             this.senderUniverseMap.set(id, openDmxUniverse);
             break;
+          }
+
+          case 'ipc':
+            // IPC is handled above; should not reach here
+            throw new Error('IPC sender must be enabled via ipc branch');
 
           default:
             throw new Error(`Unknown sender type: ${senderType}`);
@@ -209,7 +218,7 @@ export class SenderManager {
    * @param id The unique string identifier for the sender.
    * @param config New configuration for the sender.
    */
-  public async restartSender(id: string, config: any): Promise<void> {
+  public async restartSender(id: string, config: SenderConfig): Promise<void> {
     if (this.enabledSenders.has(id)) {
       console.log(`Restarting sender with ID "${id}" with new configuration`);
 
@@ -217,7 +226,7 @@ export class SenderManager {
       await this.disableSender(id);
 
       // Re-enable with new configuration
-      await this.enableSender(id, config.senderType || 'sacn', config);
+      await this.enableSender(id, config.sender || 'sacn', config);
     } else {
       console.warn(`Sender with ID "${id}" is not enabled, cannot restart.`);
     }
