@@ -73,6 +73,8 @@ export class NodeExecutionEngine {
   private activeEffectEngines: Map<string, EffectExecutionEngine> = new Map();
   /** Effect names and layers submitted via addEffect/addEffectWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map();
+  /** Node IDs that have emitted 'activated' but not yet 'deactivated', so cancelAll can flush them. */
+  private pendingActivations: Set<string> = new Set();
   /**
    * Instance snapshot of env-based debug setting. Note that runtime toggles are handled via
    * the static global flag so existing engines can start logging immediately.
@@ -265,6 +267,11 @@ export class NodeExecutionEngine {
   private static readonly NODE_EXECUTION_CHANNEL = 'node-cues:node-execution';
 
   private emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
+    if (type === 'activated') {
+      this.pendingActivations.add(nodeId);
+    } else {
+      this.pendingActivations.delete(nodeId);
+    }
     sendToAllWindows(NodeExecutionEngine.NODE_EXECUTION_CHANNEL, {
       type,
       cueId: this.cueId,
@@ -985,6 +992,16 @@ export class NodeExecutionEngine {
    * Cancel all active executions (called on cue stop).
    */
   public cancelAll(): void {
+    for (const nodeId of this.pendingActivations) {
+      sendToAllWindows(NodeExecutionEngine.NODE_EXECUTION_CHANNEL, {
+        type: 'deactivated',
+        cueId: this.cueId,
+        nodeId,
+        timestamp: Date.now()
+      });
+    }
+    this.pendingActivations.clear();
+
     for (const context of this.activeContexts.values()) {
       context.dispose();
     }
