@@ -71,7 +71,7 @@ export class NodeExecutionEngine {
   private eventListeners: Map<string, EventListenerNode[]> = new Map();
   private effectRegistry: EffectRegistry;
   private activeEffectEngines: Map<string, EffectExecutionEngine> = new Map();
-  /** Effect names and layers submitted via addEffectWithCallback, for cancelAll to remove. */
+  /** Effect names and layers submitted via addEffect/addEffectWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map();
   /**
    * Instance snapshot of env-based debug setting. Note that runtime toggles are handled via
@@ -525,11 +525,23 @@ export class NodeExecutionEngine {
           color: resolvedColor
         });
 
-        // Track for cancelAll so we can remove if cue stops before effect completes
-        this.submittedEffects.set(effectName, resolvedLayer);
-        this.sequencer.addEffect(effectName, effect);
-        this.emitNodeExecution('deactivated', actionNode.id);
-        this.continueToNextNodes(actionNode.id, context);
+        const shouldBlock = resolvedTiming.waitUntilCondition !== 'none';
+
+        if (shouldBlock) {
+          context.registerActiveAction(actionNode.id, actionNode);
+          const callback = (): void => {
+            this.submittedEffects.delete(effectName);
+            this.emitNodeExecution('deactivated', actionNode.id);
+            context.completeAction(actionNode.id);
+          };
+          this.submittedEffects.set(effectName, resolvedLayer);
+          this.sequencer.addEffectWithCallback(effectName, effect, callback);
+        } else {
+          this.submittedEffects.set(effectName, resolvedLayer);
+          this.sequencer.addEffect(effectName, effect);
+          this.emitNodeExecution('deactivated', actionNode.id);
+          this.continueToNextNodes(actionNode.id, context);
+        }
       };
 
       // If we're not actually chaining anything, fall back to single-action behavior.
@@ -611,6 +623,7 @@ export class NodeExecutionEngine {
       // Ensure the rest of the chain nodes won't execute independently later.
       for (let i = 1; i < actionChain.length; i++) {
         context.markVisited(actionChain[i].id);
+        this.emitNodeExecution('activated', actionChain[i].id);
       }
 
       const composedEffect = ActionEffectFactory.buildEffectChain(
@@ -641,13 +654,30 @@ export class NodeExecutionEngine {
         }))
       });
 
-      this.submittedEffects.set(chainEffectName, chainData.baseLayer);
-      this.sequencer.addEffect(chainEffectName, composedEffect);
-      for (const a of actionChain) {
-        this.emitNodeExecution('deactivated', a.id);
-      }
+      const chainHasBlockingStep = chainData.steps.some(
+        step => step.resolvedTiming.waitUntilCondition !== 'none'
+      );
       const lastChainNode = actionChain[actionChain.length - 1];
-      this.continueToNextNodes(lastChainNode.id, context);
+
+      if (chainHasBlockingStep) {
+        context.registerActiveAction(lastChainNode.id, lastChainNode);
+        const callback = (): void => {
+          this.submittedEffects.delete(chainEffectName);
+          for (const a of actionChain) {
+            this.emitNodeExecution('deactivated', a.id);
+          }
+          context.completeAction(lastChainNode.id);
+        };
+        this.submittedEffects.set(chainEffectName, chainData.baseLayer);
+        this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback);
+      } else {
+        this.submittedEffects.set(chainEffectName, chainData.baseLayer);
+        this.sequencer.addEffect(chainEffectName, composedEffect);
+        for (const a of actionChain) {
+          this.emitNodeExecution('deactivated', a.id);
+        }
+        this.continueToNextNodes(lastChainNode.id, context);
+      }
     } catch (error) {
       console.error(`Error executing action node ${actionNode.id}:`, error);
       // Continue execution despite error
@@ -738,22 +768,7 @@ export class NodeExecutionEngine {
         if (context.hasVisited(nodeId)) {
           this.debugLog(`delay complete nodeId=${nodeId} ctx=${context.id}`);
           this.emitNodeExecution('deactivated', nodeId);
-          context.advancePhase();
           context.completeAction(nodeId);
-          
-          // Continue to next nodes after delay
-          const { adjacency } = this.compiledCue;
-          const edges = adjacency.get(nodeId) ?? [];
-          const nextNodes = edges.map(edge => edge.to);
-          
-          if (nextNodes.length > 0) {
-            this.continueExecution(nextNodes, context);
-          } else {
-            // No more nodes, check if context is complete
-            if (context.tryComplete()) {
-              context.dispose();
-            }
-          }
         }
       }, actualDelay);
       context.addTimer(timerId);

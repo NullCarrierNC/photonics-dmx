@@ -137,8 +137,8 @@ export class EffectManager implements IEffectManager {
   private fireEffectCallback(effectName: string): void {
     const callback = this.effectCallbacks.get(effectName);
     if (callback) {
-      callback();
       this.effectCallbacks.delete(effectName);
+      callback();
     }
   }
 
@@ -497,7 +497,7 @@ export class EffectManager implements IEffectManager {
 
       if (firstTransition.waitForCondition === 'none') {
         // Prepare the color with pan/tilt defaults if needed
-        let color = { ...firstTransition.transform.color };
+        const color = { ...firstTransition.transform.color };
         if (light.config) {
           if (color.pan === undefined) {
             color.pan = light.config.panHome;
