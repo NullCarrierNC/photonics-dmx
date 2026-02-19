@@ -1,16 +1,19 @@
-import React from 'react';
-import type { ConditionalLogicNode, LogicComparator } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import ValueSourceEditor from '../../shared/ValueSourceEditor';
-import type { LogicEditorCommonProps } from './LogicNodeEditorShared';
+import React from 'react'
+import type {
+  ConditionalLogicNode,
+  LogicComparator,
+} from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import ValueSourceEditor from '../../shared/ValueSourceEditor'
+import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
 export interface ConditionalLogicEditorProps extends LogicEditorCommonProps {
-  node: ConditionalLogicNode;
+  node: ConditionalLogicNode
 }
 
 const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
   node,
   availableVariables,
-  updateNode
+  updateNode,
 }) => (
   <div className="space-y-2 text-xs">
     <label className="flex flex-col font-medium">
@@ -18,8 +21,7 @@ const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
       <select
         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
         value={node.comparator}
-        onChange={event => updateNode({ comparator: event.target.value as LogicComparator })}
-      >
+        onChange={(event) => updateNode({ comparator: event.target.value as LogicComparator })}>
         <option value=">">&gt;</option>
         <option value=">=">&gt;=</option>
         <option value="<">&lt;</option>
@@ -31,17 +33,19 @@ const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
     <ValueSourceEditor
       label="Left"
       value={node.left}
-      onChange={next => updateNode({ left: next })}
+      onChange={(next) => updateNode({ left: next })}
       availableVariables={availableVariables}
     />
     <ValueSourceEditor
       label="Right"
       value={node.right}
-      onChange={next => updateNode({ right: next })}
+      onChange={(next) => updateNode({ right: next })}
       availableVariables={availableVariables}
     />
-    <p className="text-[10px] text-gray-500">First outgoing edge becomes TRUE branch, second becomes FALSE.</p>
+    <p className="text-[10px] text-gray-500">
+      First outgoing edge becomes TRUE branch, second becomes FALSE.
+    </p>
   </div>
-);
+)
 
-export default ConditionalLogicEditor;
+export default ConditionalLogicEditor

@@ -1,6 +1,9 @@
-import { validateYargNodeCueFile, validateAudioNodeCueFile } from '../../../cues/node/schema/validation';
-import { YargNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes';
-import { CueType } from '../../../cues/types/cueTypes';
+import {
+  validateYargNodeCueFile,
+  validateAudioNodeCueFile,
+} from '../../../cues/node/schema/validation'
+import { YargNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
+import { CueType } from '../../../cues/types/cueTypes'
 
 describe('Node cue validation', () => {
   it('validates a simple YARG node cue', () => {
@@ -11,22 +14,20 @@ describe('Node cue validation', () => {
       cueType: CueType.Chorus,
       style: 'primary',
       nodes: {
-        events: [
-          { id: 'event-1', type: 'event', eventType: 'beat' }
-        ],
+        events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
         actions: [
           {
             id: 'action-1',
             type: 'action',
             effectType: 'set-color',
-            target: { 
-              groups: { source: 'literal', value: 'front' }, 
-              filter: { source: 'literal', value: 'all' } 
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
             },
-            color: { 
-              name: { source: 'literal', value: 'blue' }, 
-              brightness: { source: 'literal', value: 'medium' }, 
-              blendMode: { source: 'literal', value: 'replace' } 
+            color: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
               waitForCondition: 'none',
@@ -35,31 +36,29 @@ describe('Node cue validation', () => {
               waitUntilCondition: 'none',
               waitUntilTime: { source: 'literal', value: 0 },
               easing: 'sinInOut',
-              level: { source: 'literal', value: 1 }
-            }
-          }
-        ]
+              level: { source: 'literal', value: 1 },
+            },
+          },
+        ],
       },
-      connections: [
-        { from: 'event-1', to: 'action-1' }
-      ],
+      connections: [{ from: 'event-1', to: 'action-1' }],
       layout: {
-        nodePositions: {}
-      }
-    };
+        nodePositions: {},
+      },
+    }
 
     const result = validateYargNodeCueFile({
       version: 1,
       mode: 'yarg',
       group: {
         id: 'group-1',
-        name: 'Test Group'
+        name: 'Test Group',
       },
-      cues: [definition]
-    });
+      cues: [definition],
+    })
 
-    expect(result.valid).toBe(true);
-  });
+    expect(result.valid).toBe(true)
+  })
 
   it('validates a simple audio node cue', () => {
     const definition: AudioNodeCueDefinition = {
@@ -68,21 +67,27 @@ describe('Node cue validation', () => {
       cueTypeId: 'custom-audio',
       nodes: {
         events: [
-          { id: 'event-1', type: 'event', eventType: 'audio-beat', threshold: 0.5, triggerMode: 'edge' }
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-beat',
+            threshold: 0.5,
+            triggerMode: 'edge',
+          },
         ],
         actions: [
           {
             id: 'action-1',
             type: 'action',
             effectType: 'set-color',
-            target: { 
-              groups: { source: 'literal', value: 'front' }, 
-              filter: { source: 'literal', value: 'all' } 
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
             },
-            color: { 
-              name: { source: 'literal', value: 'red' }, 
-              brightness: { source: 'literal', value: 'high' }, 
-              blendMode: { source: 'literal', value: 'add' } 
+            color: {
+              name: { source: 'literal', value: 'red' },
+              brightness: { source: 'literal', value: 'high' },
+              blendMode: { source: 'literal', value: 'add' },
             },
             timing: {
               waitForCondition: 'none',
@@ -91,24 +96,24 @@ describe('Node cue validation', () => {
               waitUntilCondition: 'delay',
               waitUntilTime: { source: 'literal', value: 100 },
               easing: 'sinInOut',
-              level: { source: 'literal', value: 1 }
-            }
-          }
-        ]
+              level: { source: 'literal', value: 1 },
+            },
+          },
+        ],
       },
       connections: [{ from: 'event-1', to: 'action-1' }],
-      layout: { nodePositions: {} }
-    };
+      layout: { nodePositions: {} },
+    }
 
     const result = validateAudioNodeCueFile({
       version: 1,
       mode: 'audio',
       group: { id: 'audio-group', name: 'Audio Group' },
-      cues: [definition]
-    });
+      cues: [definition],
+    })
 
-    expect(result.valid).toBe(true);
-  });
+    expect(result.valid).toBe(true)
+  })
 
   it('validates logic nodes and detects cycles across logic/actions', () => {
     const definition: YargNodeCueDefinition = {
@@ -123,14 +128,14 @@ describe('Node cue validation', () => {
             id: 'action-1',
             type: 'action',
             effectType: 'set-color',
-            target: { 
-              groups: { source: 'literal', value: 'front' }, 
-              filter: { source: 'literal', value: 'all' } 
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
             },
-            color: { 
-              name: { source: 'literal', value: 'blue' }, 
-              brightness: { source: 'literal', value: 'medium' }, 
-              blendMode: { source: 'literal', value: 'replace' } 
+            color: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
               waitForCondition: 'none',
@@ -139,9 +144,9 @@ describe('Node cue validation', () => {
               waitUntilCondition: 'none',
               waitUntilTime: { source: 'literal', value: 0 },
               easing: 'sinInOut',
-              level: { source: 'literal', value: 1 }
-            }
-          }
+              level: { source: 'literal', value: 1 },
+            },
+          },
         ],
         logic: [
           {
@@ -150,38 +155,40 @@ describe('Node cue validation', () => {
             logicType: 'conditional',
             comparator: '>',
             left: { source: 'literal', value: 1 },
-            right: { source: 'literal', value: 0 }
-          }
-        ]
+            right: { source: 'literal', value: 0 },
+          },
+        ],
       },
       connections: [
         { from: 'event-1', to: 'logic-1' },
-        { from: 'logic-1', to: 'action-1', fromPort: 'true' }
+        { from: 'logic-1', to: 'action-1', fromPort: 'true' },
       ],
-      layout: { nodePositions: {} }
-    };
+      layout: { nodePositions: {} },
+    }
 
     const valid = validateYargNodeCueFile({
       version: 1,
       mode: 'yarg',
       group: { id: 'g1', name: 'Group' },
-      cues: [definition]
-    });
-    expect(valid.valid).toBe(true);
+      cues: [definition],
+    })
+    expect(valid.valid).toBe(true)
 
     // Cycles that include an action node are allowed (runtime uses visit tracking to break loops)
     const cycleWithAction = validateYargNodeCueFile({
       version: 1,
       mode: 'yarg',
       group: { id: 'g1', name: 'Group' },
-      cues: [{
-        ...definition,
-        connections: [
-          { from: 'logic-1', to: 'action-1' },
-          { from: 'action-1', to: 'logic-1' }
-        ]
-      }]
-    });
-    expect(cycleWithAction.valid).toBe(true);
-  });
-});
+      cues: [
+        {
+          ...definition,
+          connections: [
+            { from: 'logic-1', to: 'action-1' },
+            { from: 'action-1', to: 'logic-1' },
+          ],
+        },
+      ],
+    })
+    expect(cycleWithAction.valid).toBe(true)
+  })
+})

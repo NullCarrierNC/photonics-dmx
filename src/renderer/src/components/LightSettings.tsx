@@ -1,11 +1,11 @@
-import React from 'react';
-import LightType from './../components/LightType';
-import DmxChannels from './../components/DmxChannels';
-import { DmxFixture, FixtureTypes, LightTypes } from '../../../photonics-dmx/types';
+import React from 'react'
+import LightType from './../components/LightType'
+import DmxChannels from './../components/DmxChannels'
+import { DmxFixture, FixtureTypes, LightTypes } from '../../../photonics-dmx/types'
 
 interface LightSettingsProps {
-  currentLight: DmxFixture | null;
-  setCurrentLight: (light: DmxFixture | null) => void;
+  currentLight: DmxFixture | null
+  setCurrentLight: (light: DmxFixture | null) => void
 }
 
 /**
@@ -16,18 +16,17 @@ interface LightSettingsProps {
  * @returns {JSX.Element | null} Form for editing light properties
  */
 const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentLight }) => {
-
   if (!currentLight) {
-    return null; // Hide form if currentLight is null
+    return null // Hide form if currentLight is null
   }
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCurrentLight({ ...currentLight, name: e.target.value });
-  };
+    setCurrentLight({ ...currentLight, name: e.target.value })
+  }
 
   const handleTypeChange = (newType: FixtureTypes) => {
-    const defaultType = LightTypes.find((type) => type.fixture === newType);
-    if (!defaultType) return;
+    const defaultType = LightTypes.find((type) => type.fixture === newType)
+    if (!defaultType) return
 
     // Update channels and configChannels based on the selected type
     setCurrentLight({
@@ -35,8 +34,8 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
       fixture: newType,
       channels: defaultType.channels,
       config: defaultType.config ? { ...defaultType.config } : undefined,
-    });
-  };
+    })
+  }
 
   // Updated handleChannelChange to accept number | boolean
   const handleChannelChange = (channelName: string, value: number | boolean) => {
@@ -48,7 +47,7 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
           ...currentLight.config,
           [channelName]: value,
         },
-      });
+      })
     } else {
       // Update regular channels
       setCurrentLight({
@@ -57,9 +56,9 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
           ...currentLight.channels,
           [channelName]: value as number, // Type assertion since channels expect number
         },
-      });
+      })
     }
-  };
+  }
 
   return (
     <form className="space-y-4">
@@ -89,7 +88,7 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
       {/* DMX Channels Field */}
       <DmxChannels light={currentLight} onChannelChange={handleChannelChange} />
     </form>
-  );
-};
+  )
+}
 
-export default LightSettings;
+export default LightSettings

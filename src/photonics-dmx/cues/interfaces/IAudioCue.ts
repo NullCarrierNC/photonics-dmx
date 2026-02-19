@@ -1,21 +1,20 @@
-import { AudioCueData, AudioCueType } from '../types/audioCueTypes';
-import { ILightingController } from '../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../controllers/DmxLightManager';
-
+import { AudioCueData, AudioCueType } from '../types/audioCueTypes'
+import { ILightingController } from '../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../controllers/DmxLightManager'
 
 /**
  * Interface for audio-reactive lighting cues
  */
 export interface IAudioCue {
   /** Unique identifier for the cue */
-  id: string;
-  
+  id: string
+
   /** The AudioCueType this cue implements */
-  cueType: AudioCueType;
-  
+  cueType: AudioCueType
+
   /** Description of the cue effect's appearance */
-  description: string;
-  
+  description: string
+
   /**
    * Execute the cue with the given audio data
    * @param data The audio cue data
@@ -25,22 +24,21 @@ export interface IAudioCue {
   execute(
     data: AudioCueData,
     sequencer: ILightingController,
-    lightManager: DmxLightManager
-  ): void | Promise<void>;
-  
+    lightManager: DmxLightManager,
+  ): void | Promise<void>
+
   /**
    * Called when the cue is stopped or being replaced
    */
-  onStop?(): void;
-  
+  onStop?(): void
+
   /**
    * Called when the cue is paused
    */
-  onPause?(): void;
-  
+  onPause?(): void
+
   /**
    * Called when the cue is completely removed/destroyed
    */
-  onDestroy?(): void;
+  onDestroy?(): void
 }
-

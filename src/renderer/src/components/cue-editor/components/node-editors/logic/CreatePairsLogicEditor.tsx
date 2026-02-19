@@ -1,17 +1,20 @@
-import React from 'react';
-import type { CreatePairsLogicNode, CreatePairsType } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { LogicEditorCommonProps } from './LogicNodeEditorShared';
+import React from 'react'
+import type {
+  CreatePairsLogicNode,
+  CreatePairsType,
+} from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
 export interface CreatePairsLogicEditorProps extends LogicEditorCommonProps {
-  node: CreatePairsLogicNode;
+  node: CreatePairsLogicNode
 }
 
 const CreatePairsLogicEditor: React.FC<CreatePairsLogicEditorProps> = ({
   node,
   availableVariables,
-  updateNode
+  updateNode,
 }) => {
-  const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
+  const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
 
   return (
     <div className="space-y-2 text-xs">
@@ -20,8 +23,7 @@ const CreatePairsLogicEditor: React.FC<CreatePairsLogicEditorProps> = ({
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.pairType}
-          onChange={event => updateNode({ pairType: event.target.value as CreatePairsType })}
-        >
+          onChange={(event) => updateNode({ pairType: event.target.value as CreatePairsType })}>
           <option value="opposite">Opposite Pairs</option>
           <option value="diagonal">Diagonal Pairs</option>
         </select>
@@ -32,10 +34,9 @@ const CreatePairsLogicEditor: React.FC<CreatePairsLogicEditorProps> = ({
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.sourceVariable}
-          onChange={event => updateNode({ sourceVariable: event.target.value })}
-        >
+          onChange={(event) => updateNode({ sourceVariable: event.target.value })}>
           <option value="">-- Select light-array --</option>
-          {lightArrayVars.map(v => (
+          {lightArrayVars.map((v) => (
             <option key={v.name} value={v.name}>
               {v.name} ({v.scope})
             </option>
@@ -48,10 +49,9 @@ const CreatePairsLogicEditor: React.FC<CreatePairsLogicEditorProps> = ({
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.assignTo}
-          onChange={event => updateNode({ assignTo: event.target.value })}
-        >
+          onChange={(event) => updateNode({ assignTo: event.target.value })}>
           <option value="">-- Select variable --</option>
-          {lightArrayVars.map(v => (
+          {lightArrayVars.map((v) => (
             <option key={v.name} value={v.name}>
               {v.name} ({v.scope})
             </option>
@@ -65,7 +65,7 @@ const CreatePairsLogicEditor: React.FC<CreatePairsLogicEditorProps> = ({
           : 'Opposite: Pairs lights across the ring (0,4), (1,5), (2,6), (3,7)'}
       </p>
     </div>
-  );
-};
+  )
+}
 
-export default CreatePairsLogicEditor;
+export default CreatePairsLogicEditor

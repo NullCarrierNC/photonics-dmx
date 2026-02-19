@@ -1,213 +1,213 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
-import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 interface AudioCueOption {
-  id: string;
-  label: string;
-  description: string;
-  groupId: string;
-  groupName: string;
-  groupDescription?: string;
+  id: string
+  label: string
+  description: string
+  groupId: string
+  groupName: string
+  groupDescription?: string
 }
 
 interface CueStateResponse {
-  success: boolean;
-  activeCueType?: string | null;
-  cues?: AudioCueOption[];
-  error?: string;
+  success: boolean
+  activeCueType?: string | null
+  cues?: AudioCueOption[]
+  error?: string
 }
 
 interface AudioCueSelectorPanelProps {
-  className?: string;
+  className?: string
 }
 
-const DROPDOWN_WIDTH = 'min-w-[220px] md:w-[240px]';
+const DROPDOWN_WIDTH = 'min-w-[220px] md:w-[240px]'
 
 const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className = '' }) => {
-  const [audioEnabled, setAudioEnabled] = useState(false);
-  const [availableCues, setAvailableCues] = useState<AudioCueOption[]>([]);
-  const [activeCue, setActiveCue] = useState<string | null>(null);
-  const [selectedCueId, setSelectedCueId] = useState<string>('');
-  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false)
+  const [availableCues, setAvailableCues] = useState<AudioCueOption[]>([])
+  const [activeCue, setActiveCue] = useState<string | null>(null)
+  const [selectedCueId, setSelectedCueId] = useState<string>('')
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const loadCueState = useCallback(
-    async (silent = false) => {
-      try {
-        if (!silent) {
-          setLoading(true);
-        }
-        const enabled = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_ENABLED);
-        setAudioEnabled(enabled);
-
-        if (!enabled) {
-          setAvailableCues([]);
-          setActiveCue(null);
-          setSelectedCueId('');
-          setSelectedGroupId('');
-          setError(null);
-          return;
-        }
-
-        const response: CueStateResponse = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_REACTIVE_CUES);
-        if (response?.success) {
-          const sortedCues = (response.cues ?? []).sort((a, b) => {
-            if (a.groupName === b.groupName) {
-              return (a.label || a.id).localeCompare(b.label || b.id);
-            }
-            return a.groupName.localeCompare(b.groupName);
-          });
-          setAvailableCues(sortedCues);
-          const initialCueId = response.activeCueType ?? sortedCues[0]?.id ?? '';
-          const initialGroupId =
-            sortedCues.find((cue) => cue.id === initialCueId)?.groupId ?? sortedCues[0]?.groupId ?? '';
-          setActiveCue(initialCueId || null);
-          setSelectedCueId(initialCueId || '');
-          setSelectedGroupId(initialGroupId || '');
-          setError(null);
-        } else {
-          setAvailableCues([]);
-          setActiveCue(null);
-          setSelectedCueId('');
-          setSelectedGroupId('');
-          setError(response?.error || 'Unable to load audio cue state');
-        }
-      } catch (err) {
-        console.error('Failed to load audio reactive cues', err);
-        setError('Failed to load audio cue state');
-      } finally {
-        if (!silent) {
-          setLoading(false);
-        }
+  const loadCueState = useCallback(async (silent = false) => {
+    try {
+      if (!silent) {
+        setLoading(true)
       }
-    },
-    []
-  );
+      const enabled = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_ENABLED)
+      setAudioEnabled(enabled)
+
+      if (!enabled) {
+        setAvailableCues([])
+        setActiveCue(null)
+        setSelectedCueId('')
+        setSelectedGroupId('')
+        setError(null)
+        return
+      }
+
+      const response: CueStateResponse = await window.electron.ipcRenderer.invoke(
+        CONFIG.GET_AUDIO_REACTIVE_CUES,
+      )
+      if (response?.success) {
+        const sortedCues = (response.cues ?? []).sort((a, b) => {
+          if (a.groupName === b.groupName) {
+            return (a.label || a.id).localeCompare(b.label || b.id)
+          }
+          return a.groupName.localeCompare(b.groupName)
+        })
+        setAvailableCues(sortedCues)
+        const initialCueId = response.activeCueType ?? sortedCues[0]?.id ?? ''
+        const initialGroupId =
+          sortedCues.find((cue) => cue.id === initialCueId)?.groupId ?? sortedCues[0]?.groupId ?? ''
+        setActiveCue(initialCueId || null)
+        setSelectedCueId(initialCueId || '')
+        setSelectedGroupId(initialGroupId || '')
+        setError(null)
+      } else {
+        setAvailableCues([])
+        setActiveCue(null)
+        setSelectedCueId('')
+        setSelectedGroupId('')
+        setError(response?.error || 'Unable to load audio cue state')
+      }
+    } catch (err) {
+      console.error('Failed to load audio reactive cues', err)
+      setError('Failed to load audio cue state')
+    } finally {
+      if (!silent) {
+        setLoading(false)
+      }
+    }
+  }, [])
 
   useEffect(() => {
-    loadCueState();
+    loadCueState()
 
-    const handleAudioEvent = () => loadCueState(true);
-    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent);
-    addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent);
-    addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent);
+    const handleAudioEvent = () => loadCueState(true)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
 
     return () => {
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent);
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent);
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent);
-    };
-  }, [loadCueState]);
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent)
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
+    }
+  }, [loadCueState])
 
   const groupOptions = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; description?: string }>();
+    const map = new Map<string, { id: string; name: string; description?: string }>()
     availableCues.forEach((cue) => {
       if (!map.has(cue.groupId)) {
         map.set(cue.groupId, {
           id: cue.groupId,
           name: cue.groupName,
-          description: cue.groupDescription
-        });
+          description: cue.groupDescription,
+        })
       }
-    });
-    return Array.from(map.values());
-  }, [availableCues]);
+    })
+    return Array.from(map.values())
+  }, [availableCues])
 
   // Ensure we always have a valid group selection when cues load
   useEffect(() => {
     if (availableCues.length === 0) {
-      setSelectedGroupId('');
-      setSelectedCueId('');
-      return;
+      setSelectedGroupId('')
+      setSelectedCueId('')
+      return
     }
 
     if (!selectedGroupId) {
-      const firstGroupId = availableCues[0].groupId;
-      setSelectedGroupId(firstGroupId);
-      const firstCue = availableCues.find((cue) => cue.groupId === firstGroupId);
+      const firstGroupId = availableCues[0].groupId
+      setSelectedGroupId(firstGroupId)
+      const firstCue = availableCues.find((cue) => cue.groupId === firstGroupId)
       if (firstCue) {
-        setSelectedCueId(firstCue.id);
+        setSelectedCueId(firstCue.id)
       }
-      return;
+      return
     }
 
-    const hasGroup = availableCues.some((cue) => cue.groupId === selectedGroupId);
+    const hasGroup = availableCues.some((cue) => cue.groupId === selectedGroupId)
     if (!hasGroup) {
-      const fallbackGroupId = availableCues[0].groupId;
-      setSelectedGroupId(fallbackGroupId);
-      const fallbackCue = availableCues.find((cue) => cue.groupId === fallbackGroupId);
+      const fallbackGroupId = availableCues[0].groupId
+      setSelectedGroupId(fallbackGroupId)
+      const fallbackCue = availableCues.find((cue) => cue.groupId === fallbackGroupId)
       if (fallbackCue) {
-        setSelectedCueId(fallbackCue.id);
+        setSelectedCueId(fallbackCue.id)
       }
     }
-  }, [availableCues, selectedGroupId]);
+  }, [availableCues, selectedGroupId])
 
   const cuesForSelectedGroup = useMemo(
     () => availableCues.filter((cue) => cue.groupId === selectedGroupId),
-    [availableCues, selectedGroupId]
-  );
+    [availableCues, selectedGroupId],
+  )
 
   const selectedGroupInfo = useMemo(
     () => groupOptions.find((group) => group.id === selectedGroupId),
-    [groupOptions, selectedGroupId]
-  );
+    [groupOptions, selectedGroupId],
+  )
 
   const selectedCue = useMemo(
     () => availableCues.find((cue) => cue.id === (selectedCueId || activeCue || '')),
-    [availableCues, selectedCueId, activeCue]
-  );
+    [availableCues, selectedCueId, activeCue],
+  )
 
   const handleCueChange = async (cueId: string) => {
-    setSelectedCueId(cueId);
+    setSelectedCueId(cueId)
 
     if (!cueId || saving || cueId === activeCue) {
-      return;
+      return
     }
 
-    setSaving(true);
+    setSaving(true)
     try {
       const result: { success: boolean; error?: string } = await window.electron.ipcRenderer.invoke(
         CONFIG.SET_ACTIVE_AUDIO_CUE,
-        cueId
-      );
+        cueId,
+      )
       if (result?.success) {
-        setActiveCue(cueId);
-        setError(null);
+        setActiveCue(cueId)
+        setError(null)
       } else {
-        setError(result?.error || 'Unable to update cue selection');
+        setError(result?.error || 'Unable to update cue selection')
       }
     } catch (err) {
-      console.error('Failed to set active audio cue', err);
-      setError('Failed to set active cue');
+      console.error('Failed to set active audio cue', err)
+      setError('Failed to set active cue')
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   const handleGroupChange = (groupId: string) => {
-    setSelectedGroupId(groupId);
-    const firstCueInGroup = availableCues.find((cue) => cue.groupId === groupId);
+    setSelectedGroupId(groupId)
+    const firstCueInGroup = availableCues.find((cue) => cue.groupId === groupId)
     if (firstCueInGroup) {
-      handleCueChange(firstCueInGroup.id);
+      handleCueChange(firstCueInGroup.id)
     } else {
-      setSelectedCueId('');
+      setSelectedCueId('')
     }
-  };
+  }
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md  ${className}`}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Audio Reactive Cue</h2>
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+          Audio Reactive Cue
+        </h2>
         <span
           className={`text-xs font-semibold px-2 py-1 rounded ${
             audioEnabled
               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
               : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-          }`}
-        >
+          }`}>
           {audioEnabled ? 'Audio Reactive Enabled' : 'Audio Reactive Disabled'}
         </span>
       </div>
@@ -232,7 +232,9 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       )}
 
       {audioEnabled && !loading && availableCues.length === 0 && (
-        <p className="text-sm text-gray-600 dark:text-gray-400">No audio cues are available in the enabled groups.</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          No audio cues are available in the enabled groups.
+        </p>
       )}
 
       {audioEnabled && !loading && availableCues.length > 0 && (
@@ -246,8 +248,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
                 className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
                 value={selectedGroupId || ''}
                 onChange={(event) => handleGroupChange(event.target.value)}
-                disabled={saving || groupOptions.length === 0}
-              >
+                disabled={saving || groupOptions.length === 0}>
                 <option value="" disabled>
                   {groupOptions.length === 0 ? 'No groups available' : 'Choose a group'}
                 </option>
@@ -267,8 +268,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
                 className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
                 value={selectedCueId || activeCue || ''}
                 onChange={(event) => handleCueChange(event.target.value)}
-                disabled={saving || cuesForSelectedGroup.length === 0}
-              >
+                disabled={saving || cuesForSelectedGroup.length === 0}>
                 <option value="" disabled>
                   {cuesForSelectedGroup.length === 0 ? 'No cues for this group' : 'Choose a cue'}
                 </option>
@@ -286,14 +286,16 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
               {selectedGroupInfo && (
                 <div>
                   <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    <strong>Group Description:</strong> {selectedGroupInfo.description || 'No description available for this group.'}
+                    <strong>Group Description:</strong>{' '}
+                    {selectedGroupInfo.description || 'No description available for this group.'}
                   </div>
                 </div>
               )}
               {selectedCue && (
                 <div>
                   <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    <strong>Cue Description:</strong> {selectedCue.description || 'No description available for this cue.'}
+                    <strong>Cue Description:</strong>{' '}
+                    {selectedCue.description || 'No description available for this cue.'}
                   </div>
                 </div>
               )}
@@ -302,8 +304,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default AudioCueSelectorPanel;
-
+export default AudioCueSelectorPanel

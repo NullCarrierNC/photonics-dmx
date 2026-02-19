@@ -1,26 +1,27 @@
 module.exports = {
   extends: [
-    "@electron-toolkit/eslint-config-ts/recommended",
-    "@electron-toolkit/eslint-config-prettier",
+    '@electron-toolkit/eslint-config-ts/recommended',
+    'plugin:react-hooks/recommended',
+    '@electron-toolkit/eslint-config-prettier',
   ],
   rules: {
-    "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-    "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/explicit-function-return-type": "off",
-    "@typescript-eslint/no-empty-function": "off",
+    'semi': ['error', 'never'],
+    '@typescript-eslint/semi': ['error', 'never'],
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+    ],
+    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/no-empty-function': 'off',
   },
   overrides: [
     {
-      files: [
-        "**/*.test.ts",
-        "**/*.test.tsx",
-        "**/tests/**/*.ts",
-        "**/tests/**/*.tsx",
-      ],
+      files: ['**/*.test.ts', '**/*.test.tsx', '**/tests/**/*.ts', '**/tests/**/*.tsx'],
       rules: {
-        "@typescript-eslint/no-empty-function": "off",
-        "@typescript-eslint/no-explicit-any": "off",
+        '@typescript-eslint/no-empty-function': 'off',
+        '@typescript-eslint/no-explicit-any': 'off',
       },
     },
   ],
-};
+}

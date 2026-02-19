@@ -1,15 +1,15 @@
-import React from 'react';
-import type { Toast } from '../hooks/useToast';
+import React from 'react'
+import type { Toast } from '../hooks/useToast'
 
 interface ToastContainerProps {
-  toasts: Toast[];
-  onDismiss: (id: string) => void;
+  toasts: Toast[]
+  onDismiss: (id: string) => void
 }
 
 const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   return (
     <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
-      {toasts.map(toast => (
+      {toasts.map((toast) => (
         <div
           key={toast.id}
           className={`
@@ -21,20 +21,18 @@ const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) =>
             ${toast.type === 'error' ? 'bg-red-500 text-white' : ''}
             ${toast.type === 'warning' ? 'bg-amber-500 text-white' : ''}
             ${toast.type === 'info' ? 'bg-blue-500 text-white' : ''}
-          `}
-        >
+          `}>
           <span className="text-sm font-medium">{toast.message}</span>
           <button
             onClick={() => onDismiss(toast.id)}
             className="ml-2 text-white/80 hover:text-white"
-            aria-label="Dismiss"
-          >
+            aria-label="Dismiss">
             ✕
           </button>
         </div>
       ))}
     </div>
-  );
-};
+  )
+}
 
-export default ToastContainer;
+export default ToastContainer

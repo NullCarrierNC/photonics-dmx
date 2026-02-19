@@ -1,41 +1,44 @@
-import { CueData, CueType } from '../../../types/cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { INetCue, CueStyle } from '../../../interfaces/INetCue';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
-
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { getEffectSingleColor } from '../../../../effects/effectSingleColor'
 
 export class SilhouettesCue implements INetCue {
-  id = 'default-silhouettes';
-  cueId = CueType.Silhouettes;
-  description = 'Solid green color on back lights, or front lights if no back lights are available';
-  style = CueStyle.Primary;
+  id = 'default-silhouettes'
+  cueId = CueType.Silhouettes
+  description = 'Solid green color on back lights, or front lights if no back lights are available'
+  style = CueStyle.Primary
 
-  private isFirstExecution: boolean = true;
+  private isFirstExecution: boolean = true
 
-  async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const back = lightManager.getLights(['back'], 'all');
-    const front = lightManager.getLights(['front'], 'all');
-    const green = getColor('green', 'medium');
+  async execute(
+    _parameters: CueData,
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const back = lightManager.getLights(['back'], 'all')
+    const front = lightManager.getLights(['front'], 'all')
+    const green = getColor('green', 'medium')
 
     const singleColor = getEffectSingleColor({
       color: green,
       duration: 500,
       lights: back.length > 0 ? back : front,
       layer: 0,
-    });
-    
+    })
+
     if (this.isFirstExecution) {
-      sequencer.setEffect('silhouettes', singleColor);
-      this.isFirstExecution = false;
+      sequencer.setEffect('silhouettes', singleColor)
+      this.isFirstExecution = false
     } else {
-      sequencer.addEffect('silhouettes', singleColor);
+      sequencer.addEffect('silhouettes', singleColor)
     }
   }
 
   onStop(): void {
-    this.isFirstExecution = true;
+    this.isFirstExecution = true
   }
 
   onPause(): void {
@@ -45,4 +48,4 @@ export class SilhouettesCue implements INetCue {
   onDestroy(): void {
     // Cleanup handled by effect system
   }
-} 
+}

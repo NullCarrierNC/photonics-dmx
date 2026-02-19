@@ -1,12 +1,12 @@
-import type { CueData } from '../../photonics-dmx/cues/types/cueTypes';
+import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
 
 export type MockCueDataOptions = {
-  venueSize?: 'NoVenue' | 'Small' | 'Large';
-  bpm?: number;
-  effectId?: string | null;
-  beat?: CueData['beat'];
-  keyframe?: string;
-};
+  venueSize?: 'NoVenue' | 'Small' | 'Large'
+  bpm?: number
+  effectId?: string | null
+  beat?: CueData['beat']
+  keyframe?: string
+}
 
 /**
  * Creates mock cue data for simulation handlers (beat, keyframe, measure, instrument)
@@ -17,8 +17,8 @@ export function createMockCueData(options: MockCueDataOptions = {}): CueData {
     bpm = 120,
     effectId,
     beat = 'Unknown',
-    keyframe = 'Unknown'
-  } = options;
+    keyframe = 'Unknown',
+  } = options
 
   const base: CueData = {
     datagramVersion: 1,
@@ -46,7 +46,7 @@ export function createMockCueData(options: MockCueDataOptions = {}): CueData {
     keyframe,
     bonusEffect: false,
     ledPositions: [],
-    ledColor: 'off'
-  };
-  return { ...base, timestamp: Date.now() } as CueData;
+    ledColor: 'off',
+  }
+  return { ...base, timestamp: Date.now() } as CueData
 }

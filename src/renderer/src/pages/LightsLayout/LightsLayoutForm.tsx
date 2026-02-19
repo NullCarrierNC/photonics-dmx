@@ -1,29 +1,29 @@
-import React from 'react';
-import type { ConfigLightLayoutType } from '../../../../photonics-dmx/types';
-import { ConfigStrobeType } from '../../../../photonics-dmx/types';
+import React from 'react'
+import type { ConfigLightLayoutType } from '../../../../photonics-dmx/types'
+import { ConfigStrobeType } from '../../../../photonics-dmx/types'
 
-const LIGHT_COUNT_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const LIGHT_COUNT_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 interface AssignedToBackOption {
-  value: string;
-  label: string;
+  value: string
+  label: string
 }
 
 interface LightsLayoutFormProps {
-  selectedCount: number | null;
-  setSelectedCount: (n: number | null) => void;
-  selectedLayout: string;
-  setSelectedLayout: (id: string) => void;
-  assignedToBack: number | 'None';
-  setAssignedToBack: (v: number | 'None') => void;
-  assignedToBackOptions: AssignedToBackOption[];
-  availableLayouts: ConfigLightLayoutType[];
-  allPrimaryLightsCountBack: number;
-  selectedStrobe: ConfigStrobeType;
-  setSelectedStrobe: (v: ConfigStrobeType) => void;
-  dedicatedStrobeCount: number;
-  setDedicatedStrobeCount: (n: number) => void;
-  hasPhysicalStrobe: boolean;
+  selectedCount: number | null
+  setSelectedCount: (n: number | null) => void
+  selectedLayout: string
+  setSelectedLayout: (id: string) => void
+  assignedToBack: number | 'None'
+  setAssignedToBack: (v: number | 'None') => void
+  assignedToBackOptions: AssignedToBackOption[]
+  availableLayouts: ConfigLightLayoutType[]
+  allPrimaryLightsCountBack: number
+  selectedStrobe: ConfigStrobeType
+  setSelectedStrobe: (v: ConfigStrobeType) => void
+  dedicatedStrobeCount: number
+  setDedicatedStrobeCount: (n: number) => void
+  hasPhysicalStrobe: boolean
 }
 
 const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
@@ -40,7 +40,7 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
   setSelectedStrobe,
   dedicatedStrobeCount,
   setDedicatedStrobeCount,
-  hasPhysicalStrobe
+  hasPhysicalStrobe,
 }) => (
   <form className="space-y-6 max-w-full">
     <div className="flex flex-wrap gap-4">
@@ -49,14 +49,13 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
         <select
           value={selectedCount ?? ''}
           onChange={(e) => {
-            const newCount = e.target.value ? Number(e.target.value) : null;
-            setSelectedCount(newCount);
+            const newCount = e.target.value ? Number(e.target.value) : null
+            setSelectedCount(newCount)
             if (newCount && assignedToBack !== 'None' && assignedToBack >= newCount) {
-              setAssignedToBack('None');
+              setAssignedToBack('None')
             }
           }}
-          className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-        >
+          className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700">
           {!selectedCount && <option value="">Select</option>}
           {LIGHT_COUNT_OPTIONS.map((cnt) => (
             <option key={cnt} value={cnt}>
@@ -71,15 +70,14 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
         <select
           value={selectedLayout}
           onChange={(e) => {
-            setSelectedLayout(e.target.value);
+            setSelectedLayout(e.target.value)
             if (e.target.value !== 'front-back') {
-              setAssignedToBack('None');
+              setAssignedToBack('None')
             } else {
-              setAssignedToBack(allPrimaryLightsCountBack || 'None');
+              setAssignedToBack(allPrimaryLightsCountBack || 'None')
             }
           }}
-          className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-        >
+          className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700">
           {availableLayouts.map((layout) => (
             <option key={layout.id} value={layout.id}>
               {layout.label}
@@ -94,11 +92,10 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
           <select
             value={assignedToBack}
             onChange={(e) => {
-              const val = e.target.value;
-              setAssignedToBack(val === 'None' ? 'None' : Number(val));
+              const val = e.target.value
+              setAssignedToBack(val === 'None' ? 'None' : Number(val))
             }}
-            className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-          >
+            className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700">
             {assignedToBackOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -113,16 +110,15 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
         <select
           value={selectedStrobe}
           onChange={(e) => {
-            const value = e.target.value as ConfigStrobeType;
-            setSelectedStrobe(value);
+            const value = e.target.value as ConfigStrobeType
+            setSelectedStrobe(value)
             if (value === ConfigStrobeType.Dedicated) {
-              setDedicatedStrobeCount(dedicatedStrobeCount === 0 ? 1 : dedicatedStrobeCount);
+              setDedicatedStrobeCount(dedicatedStrobeCount === 0 ? 1 : dedicatedStrobeCount)
             } else {
-              setDedicatedStrobeCount(0);
+              setDedicatedStrobeCount(0)
             }
           }}
-          className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-        >
+          className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700">
           <option value={ConfigStrobeType.None}>None</option>
           {hasPhysicalStrobe && (
             <option value={ConfigStrobeType.Dedicated}>Dedicated Strobe Lights</option>
@@ -137,8 +133,7 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
           <select
             value={dedicatedStrobeCount}
             onChange={(e) => setDedicatedStrobeCount(Number(e.target.value))}
-            className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-          >
+            className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700">
             {[1, 2, 3, 4].map((num) => (
               <option key={num} value={num}>
                 {num}
@@ -149,6 +144,6 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
       )}
     </div>
   </form>
-);
+)
 
-export default LightsLayoutForm;
+export default LightsLayoutForm

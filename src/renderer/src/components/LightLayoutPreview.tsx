@@ -1,13 +1,13 @@
-import React from 'react';
-import { MdTv } from 'react-icons/md';
-import { FaUser } from 'react-icons/fa';
-import { ConfigStrobeType } from '../../../photonics-dmx/types';
+import React from 'react'
+import { MdTv } from 'react-icons/md'
+import { FaUser } from 'react-icons/fa'
+import { ConfigStrobeType } from '../../../photonics-dmx/types'
 
 interface LightLayoutPreviewProps {
-  frontCount: number;
-  backCount: number;
-  highlightedLight: number | null;
-  selectedStrobe: ConfigStrobeType;
+  frontCount: number
+  backCount: number
+  highlightedLight: number | null
+  selectedStrobe: ConfigStrobeType
 }
 
 const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
@@ -28,11 +28,10 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
           highlightedLight === number
             ? 'bg-yellow-500 text-black'
             : 'bg-gray-300 dark:bg-[#303548] text-gray-800 dark:text-gray-200'
-        }`}
-    >
+        }`}>
       {number}
     </div>
-  );
+  )
 
   /**
    * Helper function to render a row of light circles from `start` to `end`.
@@ -41,7 +40,7 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
     <div className="flex justify-center gap-x-4 mb-4">
       {Array.from({ length: end - start + 1 }, (_, i) => renderLightCircle(start + i))}
     </div>
-  );
+  )
 
   /**
    * Helper function to render the strobe indicator.
@@ -52,20 +51,19 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
    * it represents one of the dedicated strobe lights.
    */
   const renderStrobeIndicator = () => {
-    const strobeStart = frontCount + backCount + 1;
+    const strobeStart = frontCount + backCount + 1
     const isHighlighted =
       selectedStrobe === ConfigStrobeType.Dedicated &&
       highlightedLight !== null &&
-      highlightedLight >= strobeStart;
+      highlightedLight >= strobeStart
     return (
       <div
         className={`w-24 h-8 flex items-center justify-center text-white dark:text-black rounded mt-4 mx-auto
-        ${isHighlighted ? 'bg-yellow-500 dark:bg-yellow-600' : 'bg-gray-400 dark:bg-gray-500'}`}
-      >
+        ${isHighlighted ? 'bg-yellow-500 dark:bg-yellow-600' : 'bg-gray-400 dark:bg-gray-500'}`}>
         Strobe
       </div>
-    );
-  };
+    )
+  }
 
   /**
    * Helper function to render people icons.
@@ -78,7 +76,7 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
         </div>
       ))}
     </div>
-  );
+  )
 
   return (
     <div className="mt-8 pt-2 pb-4 bg-gray-200 dark:bg-gray-700 rounded-lg">
@@ -98,9 +96,7 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
 
         {/* Render strobe indicator if dedicated */}
         {selectedStrobe === ConfigStrobeType.Dedicated && (
-          <div className="w-full flex justify-center">
-            {renderStrobeIndicator()}
-          </div>
+          <div className="w-full flex justify-center">{renderStrobeIndicator()}</div>
         )}
 
         {/* Render people icons between front and back */}
@@ -112,15 +108,15 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
             <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">Back</div>
             {/* Render back lights in reverse order to match new natural ring progression */}
             <div className="flex justify-center gap-x-4 mb-4">
-              {Array.from({ length: backCount }, (_, i) => 
-                renderLightCircle(frontCount + backCount - i)
+              {Array.from({ length: backCount }, (_, i) =>
+                renderLightCircle(frontCount + backCount - i),
               )}
             </div>
           </div>
         )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default LightLayoutPreview;
+export default LightLayoutPreview

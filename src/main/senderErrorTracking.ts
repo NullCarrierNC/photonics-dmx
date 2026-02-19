@@ -1,6 +1,6 @@
 // Track which senders have already had errors handled to prevent loops
-const handledSenderErrors = new Set<string>();
-const errorHandlingDebounce = new Map<string, number>(); // senderId -> timestamp
+const handledSenderErrors = new Set<string>()
+const errorHandlingDebounce = new Map<string, number>() // senderId -> timestamp
 
 /**
  * Clear error tracking when a sender is successfully re-enabled.
@@ -8,8 +8,8 @@ const errorHandlingDebounce = new Map<string, number>(); // senderId -> timestam
  * @param senderId The ID of the sender to clear error tracking for
  */
 export function clearSenderErrorTracking(senderId: string): void {
-  handledSenderErrors.delete(senderId);
-  errorHandlingDebounce.delete(senderId);
+  handledSenderErrors.delete(senderId)
+  errorHandlingDebounce.delete(senderId)
 }
 
 /**
@@ -18,7 +18,7 @@ export function clearSenderErrorTracking(senderId: string): void {
  * @returns true if the error has been handled, false otherwise
  */
 export function isSenderErrorHandled(senderId: string): boolean {
-  return handledSenderErrors.has(senderId);
+  return handledSenderErrors.has(senderId)
 }
 
 /**
@@ -27,8 +27,8 @@ export function isSenderErrorHandled(senderId: string): boolean {
  * @param timestamp The current timestamp
  */
 export function markSenderErrorHandled(senderId: string, timestamp: number): void {
-  handledSenderErrors.add(senderId);
-  errorHandlingDebounce.set(senderId, timestamp);
+  handledSenderErrors.add(senderId)
+  errorHandlingDebounce.set(senderId, timestamp)
 }
 
 /**
@@ -37,7 +37,7 @@ export function markSenderErrorHandled(senderId: string, timestamp: number): voi
  * @returns The timestamp of the last handled error, or 0 if never handled
  */
 export function getLastErrorHandledTime(senderId: string): number {
-  return errorHandlingDebounce.get(senderId) || 0;
+  return errorHandlingDebounce.get(senderId) || 0
 }
 
 /**
@@ -45,6 +45,5 @@ export function getLastErrorHandledTime(senderId: string): number {
  * @param senderId The ID of the sender
  */
 export function removeSenderErrorHandled(senderId: string): void {
-  handledSenderErrors.delete(senderId);
+  handledSenderErrors.delete(senderId)
 }
-

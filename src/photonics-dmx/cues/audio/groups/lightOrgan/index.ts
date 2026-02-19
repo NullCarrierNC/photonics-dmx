@@ -1,11 +1,11 @@
-import { AudioCueGroup } from '../../../registries/AudioCueRegistry';
-import { AudioCueType, BuiltInAudioCues } from '../../../types/audioCueTypes';
-import { LinearLightOrganCue } from './LinearLightOrganCue';
-import { SplitLightOrganCue } from './SplitLightOrganCue';
-import { StackedLightOrganCue } from './StackedLightOrganCue';
-import { DiagonalLightOrganCue } from './DiagonalLightOrganCue';
-import { GatedLightOrganCue } from './GatedLightOrganCue';
-import { IAudioCue } from '../../../interfaces/IAudioCue';
+import { AudioCueGroup } from '../../../registries/AudioCueRegistry'
+import { AudioCueType, BuiltInAudioCues } from '../../../types/audioCueTypes'
+import { LinearLightOrganCue } from './LinearLightOrganCue'
+import { SplitLightOrganCue } from './SplitLightOrganCue'
+import { StackedLightOrganCue } from './StackedLightOrganCue'
+import { DiagonalLightOrganCue } from './DiagonalLightOrganCue'
+import { GatedLightOrganCue } from './GatedLightOrganCue'
+import { IAudioCue } from '../../../interfaces/IAudioCue'
 
 export const lightOrganGroup: AudioCueGroup = {
   id: 'audio-light-organ',
@@ -16,8 +16,6 @@ export const lightOrganGroup: AudioCueGroup = {
     [BuiltInAudioCues.SplitLightOrgan, new SplitLightOrganCue()],
     [BuiltInAudioCues.StackedLightOrgan, new StackedLightOrganCue()],
     [BuiltInAudioCues.DiagonalLightOrgan, new DiagonalLightOrganCue()],
-    [BuiltInAudioCues.GatedLightOrgan, new GatedLightOrganCue()]
-  ])
-};
-
-
+    [BuiltInAudioCues.GatedLightOrgan, new GatedLightOrganCue()],
+  ]),
+}

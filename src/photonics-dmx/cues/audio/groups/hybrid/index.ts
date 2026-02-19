@@ -1,9 +1,9 @@
-import { AudioCueGroup } from '../../../registries/AudioCueRegistry';
-import { AudioCueType, BuiltInAudioCues } from '../../../types/audioCueTypes';
-import { BeatSpectrumMorphCue } from './BeatSpectrumMorphCue';
-import { TriadCascadeCue } from './TriadCascadeCue';
-import { AuroraDriftCue } from './AuroraDriftCue';
-import { IAudioCue } from '../../../interfaces/IAudioCue';
+import { AudioCueGroup } from '../../../registries/AudioCueRegistry'
+import { AudioCueType, BuiltInAudioCues } from '../../../types/audioCueTypes'
+import { BeatSpectrumMorphCue } from './BeatSpectrumMorphCue'
+import { TriadCascadeCue } from './TriadCascadeCue'
+import { AuroraDriftCue } from './AuroraDriftCue'
+import { IAudioCue } from '../../../interfaces/IAudioCue'
 
 export const hybridGroup: AudioCueGroup = {
   id: 'audio-hybrid',
@@ -13,7 +13,5 @@ export const hybridGroup: AudioCueGroup = {
     [BuiltInAudioCues.BeatSpectrumMorph, new BeatSpectrumMorphCue()],
     [BuiltInAudioCues.TriadCascade, new TriadCascadeCue()],
     [BuiltInAudioCues.AuroraDrift, new AuroraDriftCue()],
-  ])
-};
-
-
+  ]),
+}

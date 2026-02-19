@@ -1,17 +1,17 @@
-import { ChorusCue } from '../../../cues/yarg/handlers/yarg1/ChorusCue';
-import { CueData } from '../../../cues/types/cueTypes';
-import { ILightingController } from '../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { beforeEach, describe, jest, it, expect } from '@jest/globals';
+import { ChorusCue } from '../../../cues/yarg/handlers/yarg1/ChorusCue'
+import { CueData } from '../../../cues/types/cueTypes'
+import { ILightingController } from '../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../controllers/DmxLightManager'
+import { beforeEach, describe, jest, it, expect } from '@jest/globals'
 
 describe('ChorusCue', () => {
-  let cue: ChorusCue;
-  let mockController: jest.Mocked<ILightingController>;
-  let mockLightManager: jest.Mocked<DmxLightManager>;
+  let cue: ChorusCue
+  let mockController: jest.Mocked<ILightingController>
+  let mockLightManager: jest.Mocked<DmxLightManager>
 
   beforeEach(() => {
-    cue = new ChorusCue();
-    
+    cue = new ChorusCue()
+
     // Create mock controller
     mockController = {
       addEffect: jest.fn(),
@@ -29,7 +29,7 @@ describe('ChorusCue', () => {
       enableDebug: jest.fn(),
       debugLightLayers: jest.fn(),
       shutdown: jest.fn(),
-    } as any;
+    } as any
 
     // Create mock light manager
     mockLightManager = {
@@ -42,22 +42,22 @@ describe('ChorusCue', () => {
       getDmxLight: jest.fn(),
       setConfiguration: jest.fn(),
       shutdown: jest.fn(),
-    } as any;
-  });
+    } as any
+  })
 
   describe('execute', () => {
     it('should set chorus lighting state', async () => {
       // Reset the cue to ensure fresh state
-      cue.onStop();
-      
+      cue.onStop()
+
       const data: CueData = {
         datagramVersion: 1,
-        platform: "RB3E",
-        currentScene: "Gameplay",
-        pauseState: "Unpaused",
-        venueSize: "Large",
+        platform: 'RB3E',
+        currentScene: 'Gameplay',
+        pauseState: 'Unpaused',
+        venueSize: 'Large',
         beatsPerMinute: 120,
-        songSection: "Verse",
+        songSection: 'Verse',
         guitarNotes: [],
         bassNotes: [],
         drumNotes: [],
@@ -66,42 +66,42 @@ describe('ChorusCue', () => {
         harmony0Note: 0,
         harmony1Note: 0,
         harmony2Note: 0,
-        lightingCue: "Chorus",
-        postProcessing: "Default",
+        lightingCue: 'Chorus',
+        postProcessing: 'Default',
         fogState: false,
-        strobeState: "Strobe_Off",
+        strobeState: 'Strobe_Off',
         performer: 0,
         trackMode: 'tracked',
-        beat: "Strong",
-        keyframe: "Unknown",
+        beat: 'Strong',
+        keyframe: 'Unknown',
         bonusEffect: false,
         cueHistory: [],
-      executionCount: 1,
-      cueStartTime: Date.now(),
-      timeSinceLastCue: 0,
-      };
+        executionCount: 1,
+        cueStartTime: Date.now(),
+        timeSinceLastCue: 0,
+      }
 
-      await cue.execute(data, mockController, mockLightManager);
+      await cue.execute(data, mockController, mockLightManager)
 
       // Verify that setEffect was called for the first light and addEffect for the second
-      expect(mockController.setEffect).toHaveBeenCalledTimes(1);
-      expect(mockController.setEffect).toHaveBeenCalledWith('chorus-0', expect.any(Object));
-      expect(mockController.addEffect).toHaveBeenCalledTimes(1);
-      expect(mockController.addEffect).toHaveBeenCalledWith('chorus-1', expect.any(Object));
-    });
+      expect(mockController.setEffect).toHaveBeenCalledTimes(1)
+      expect(mockController.setEffect).toHaveBeenCalledWith('chorus-0', expect.any(Object))
+      expect(mockController.addEffect).toHaveBeenCalledTimes(1)
+      expect(mockController.addEffect).toHaveBeenCalledWith('chorus-1', expect.any(Object))
+    })
 
     it('should handle missing data', async () => {
       // Reset the cue to simulate a fresh execution
-      cue.onStop();
-      
+      cue.onStop()
+
       const data: CueData = {
         datagramVersion: 1,
-        platform: "RB3E",
-        currentScene: "Gameplay",
-        pauseState: "Unpaused",
-        venueSize: "Large",
+        platform: 'RB3E',
+        currentScene: 'Gameplay',
+        pauseState: 'Unpaused',
+        venueSize: 'Large',
         beatsPerMinute: 120,
-        songSection: "Verse",
+        songSection: 'Verse',
         guitarNotes: [],
         bassNotes: [],
         drumNotes: [],
@@ -110,28 +110,28 @@ describe('ChorusCue', () => {
         harmony0Note: 0,
         harmony1Note: 0,
         harmony2Note: 0,
-        lightingCue: "Chorus",
-        postProcessing: "Default",
+        lightingCue: 'Chorus',
+        postProcessing: 'Default',
         fogState: false,
-        strobeState: "Strobe_Off",
+        strobeState: 'Strobe_Off',
         performer: 0,
         trackMode: 'tracked',
-        beat: "Strong",
-        keyframe: "Unknown",
+        beat: 'Strong',
+        keyframe: 'Unknown',
         bonusEffect: false,
         cueHistory: [],
-      executionCount: 1,
-      cueStartTime: Date.now(),
-      timeSinceLastCue: 0,
-      };
+        executionCount: 1,
+        cueStartTime: Date.now(),
+        timeSinceLastCue: 0,
+      }
 
-      await cue.execute(data, mockController, mockLightManager);
+      await cue.execute(data, mockController, mockLightManager)
 
       // Verify that setEffect was called for the first light and addEffect for the second
-      expect(mockController.setEffect).toHaveBeenCalledTimes(1);
-      expect(mockController.setEffect).toHaveBeenCalledWith('chorus-0', expect.any(Object));
-      expect(mockController.addEffect).toHaveBeenCalledTimes(1);
-      expect(mockController.addEffect).toHaveBeenCalledWith('chorus-1', expect.any(Object));
-    });
-  });
-}); 
+      expect(mockController.setEffect).toHaveBeenCalledTimes(1)
+      expect(mockController.setEffect).toHaveBeenCalledWith('chorus-0', expect.any(Object))
+      expect(mockController.addEffect).toHaveBeenCalledTimes(1)
+      expect(mockController.addEffect).toHaveBeenCalledWith('chorus-1', expect.any(Object))
+    })
+  })
+})

@@ -1,37 +1,41 @@
-import { CueData, CueType } from '../../../types/cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { INetCue, CueStyle } from '../../../interfaces/INetCue';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { getEffectSingleColor } from '../../../../effects/effectSingleColor'
 
 export class SoloCue implements INetCue {
-  id = 'default-solo';
-  cueId = CueType.Solo;
-  description = 'Rapid alternating white and purple colors on all lights with short transitions';
-  style = CueStyle.Primary;
+  id = 'default-solo'
+  cueId = CueType.Solo
+  description = 'Rapid alternating white and purple colors on all lights with short transitions'
+  style = CueStyle.Primary
 
-  private isFirstExecution: boolean = true;
+  private isFirstExecution: boolean = true
 
-  async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const all = lightManager.getLights(['front'], 'all');
-    const purple = getColor('purple', 'medium');
+  async execute(
+    _parameters: CueData,
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const all = lightManager.getLights(['front'], 'all')
+    const purple = getColor('purple', 'medium')
     const effect = getEffectSingleColor({
       lights: all,
       color: purple,
       duration: 10,
-    });
-    
+    })
+
     if (this.isFirstExecution) {
-      sequencer.setEffect('solo', effect);
-      this.isFirstExecution = false;
+      sequencer.setEffect('solo', effect)
+      this.isFirstExecution = false
     } else {
-      sequencer.addEffect('solo', effect);
+      sequencer.addEffect('solo', effect)
     }
   }
 
   onStop(): void {
-    this.isFirstExecution = true;
+    this.isFirstExecution = true
   }
 
   onPause(): void {
@@ -41,4 +45,4 @@ export class SoloCue implements INetCue {
   onDestroy(): void {
     // Cleanup handled by effect system
   }
-} 
+}

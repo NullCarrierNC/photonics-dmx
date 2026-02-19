@@ -1,7 +1,7 @@
-import { YargCueRegistry } from '../registries/YargCueRegistry';
-import { CueType } from '../types/cueTypes';
-import { ICueGroup } from '../interfaces/INetCueGroup';
-import { SearchlightsAlt1Cue } from './handlers/commonAlt1/SearchlightsAlt1Cue';
+import { YargCueRegistry } from '../registries/YargCueRegistry'
+import { CueType } from '../types/cueTypes'
+import { ICueGroup } from '../interfaces/INetCueGroup'
+import { SearchlightsAlt1Cue } from './handlers/commonAlt1/SearchlightsAlt1Cue'
 
 const group: ICueGroup = {
   id: 'commonAlt1',
@@ -11,9 +11,8 @@ const group: ICueGroup = {
     [CueType.Searchlights, new SearchlightsAlt1Cue()],
     [CueType.Dischord, new SearchlightsAlt1Cue()],
   ]),
-};
+}
 
-
-const registry = YargCueRegistry.getInstance();
-registry.registerGroup(group);
-registry.activateGroup(group.id);
+const registry = YargCueRegistry.getInstance()
+registry.registerGroup(group)
+registry.activateGroup(group.id)

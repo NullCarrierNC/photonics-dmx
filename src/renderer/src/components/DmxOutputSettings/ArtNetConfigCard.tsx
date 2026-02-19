@@ -1,34 +1,35 @@
-import React from 'react';
-import CollapsibleSenderCard from './CollapsibleSenderCard';
+import React from 'react'
+import CollapsibleSenderCard from './CollapsibleSenderCard'
 
 export interface ArtNetConfig {
-  host: string;
-  net: number;
-  subnet: number;
-  universe: number;
-  subuni: number;
-  port: number;
+  host: string
+  net: number
+  subnet: number
+  universe: number
+  subuni: number
+  port: number
 }
 
 interface ArtNetConfigCardProps {
-  config: ArtNetConfig;
-  expanded: boolean;
-  onToggle: () => void;
-  onConfigChange: (field: keyof ArtNetConfig, value: string | number) => void;
+  config: ArtNetConfig
+  expanded: boolean
+  onToggle: () => void
+  onConfigChange: (field: keyof ArtNetConfig, value: string | number) => void
 }
 
 export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
   config,
   expanded,
   onToggle,
-  onConfigChange
+  onConfigChange,
 }) => (
   <CollapsibleSenderCard title="ArtNet Configuration" expanded={expanded} onToggle={onToggle}>
     <div className="space-y-3">
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 mb-4">
         ArtNet requires you to specify the host IP address of the ArtNet device you are using.
         <br />
-        Net, subnet, universe, and sub universe are usually 0 unless you&apos;ve modified them. The default port is 6454.
+        Net, subnet, universe, and sub universe are usually 0 unless you&apos;ve modified them. The
+        default port is 6454.
       </p>
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Host:</label>
@@ -53,7 +54,9 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Subnet:</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
+            Subnet:
+          </label>
           <input
             type="number"
             value={config.subnet}
@@ -64,7 +67,9 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Universe:</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
+            Universe:
+          </label>
           <input
             type="number"
             value={config.universe}
@@ -73,10 +78,14 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
             min="0"
             max="255"
           />
-          <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">(ArtNet universes start at 0)</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+            (ArtNet universes start at 0)
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Sub Universe:</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
+            Sub Universe:
+          </label>
           <input
             type="number"
             value={config.subuni}
@@ -100,6 +109,6 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
       </div>
     </div>
   </CollapsibleSenderCard>
-);
+)
 
-export default ArtNetConfigCard;
+export default ArtNetConfigCard

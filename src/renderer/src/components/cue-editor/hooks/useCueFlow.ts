@@ -1,37 +1,42 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { useEdgesState, useNodesState, type Edge } from 'reactflow';
+import React, { useCallback, useEffect, useRef } from 'react'
+import { useEdgesState, useNodesState, type Edge } from 'reactflow'
 import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
   NodeCueMode,
   YargNodeCueDefinition,
   YargEffectDefinition,
-  EffectDefinition
-} from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { EditorNodeData } from '../lib/types';
-import { useFlowSync } from './useFlowSync';
-import { useEdgeManagement } from './useEdgeManagement';
-import { useNodeSelection } from './useNodeSelection';
-import { useNodeCreation } from './useNodeCreation';
+  EffectDefinition,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { EditorNodeData } from '../lib/types'
+import { useFlowSync } from './useFlowSync'
+import { useEdgeManagement } from './useEdgeManagement'
+import { useNodeSelection } from './useNodeSelection'
+import { useNodeCreation } from './useNodeCreation'
 
 type UseCueFlowParams = {
-  activeMode: NodeCueMode;
-  setIsDirty: (dirty: boolean) => void;
-  flowWrapperRef?: React.RefObject<HTMLDivElement>;
-  effectDefinitions?: Map<string, EffectDefinition>;
-};
+  activeMode: NodeCueMode
+  setIsDirty: (dirty: boolean) => void
+  flowWrapperRef?: React.RefObject<HTMLDivElement>
+  effectDefinitions?: Map<string, EffectDefinition>
+}
 
-const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions }: UseCueFlowParams) => {
-  const setSelectedNodeIdRef = useRef<(id: string | null) => void>(() => {});
-  const [nodes, setNodes, onNodesChange] = useNodesState<EditorNodeData>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
+const useCueFlow = ({
+  activeMode,
+  setIsDirty,
+  flowWrapperRef,
+  effectDefinitions,
+}: UseCueFlowParams) => {
+  const setSelectedNodeIdRef = useRef<(id: string | null) => void>(() => {})
+  const [nodes, setNodes, onNodesChange] = useNodesState<EditorNodeData>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([])
 
   const flowSync = useFlowSync({
     setNodes,
     setEdges,
     effectDefinitions,
-    onCueLoaded: () => setSelectedNodeIdRef.current(null)
-  });
+    onCueLoaded: () => setSelectedNodeIdRef.current(null),
+  })
 
   const selection = useNodeSelection({
     nodes,
@@ -41,16 +46,16 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
     reactFlowInstance: flowSync.reactFlowInstance,
     flowWrapperRef,
     activeMode,
-    setIsDirty
-  });
+    setIsDirty,
+  })
 
   useEffect(() => {
-    setSelectedNodeIdRef.current = selection.setSelectedNodeId;
-  }, [selection.setSelectedNodeId]);
+    setSelectedNodeIdRef.current = selection.setSelectedNodeId
+  }, [selection.setSelectedNodeId])
 
-  const edgeMgmt = useEdgeManagement({ nodes, edges, setEdges, setNodes, setIsDirty });
+  const edgeMgmt = useEdgeManagement({ nodes, edges, setEdges, setNodes, setIsDirty })
 
-  const nodeCreation = useNodeCreation({ nodes, setNodes, activeMode, setIsDirty });
+  const nodeCreation = useNodeCreation({ nodes, setNodes, activeMode, setIsDirty })
 
   const loadCueIntoFlow = useCallback(
     (
@@ -59,13 +64,13 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
         | AudioNodeCueDefinition
         | YargEffectDefinition
         | AudioEffectDefinition
-        | null
+        | null,
     ) => {
-      flowSync.loadCueIntoFlow(cue);
-      selection.setSelectedNodeId(null);
+      flowSync.loadCueIntoFlow(cue)
+      selection.setSelectedNodeId(null)
     },
-    [flowSync.loadCueIntoFlow, selection.setSelectedNodeId]
-  );
+    [flowSync, selection],
+  )
 
   return {
     nodes,
@@ -96,8 +101,8 @@ const useCueFlow = ({ activeMode, setIsDirty, flowWrapperRef, effectDefinitions 
     setReactFlowInstance: flowSync.setReactFlowInstance,
     reactFlowInstance: flowSync.reactFlowInstance,
     closeContextMenu: selection.closeContextMenu,
-    handlePaneContextMenu: selection.handlePaneContextMenu
-  };
-};
+    handlePaneContextMenu: selection.handlePaneContextMenu,
+  }
+}
 
-export { useCueFlow };
+export { useCueFlow }

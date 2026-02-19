@@ -1,14 +1,14 @@
-import React from 'react';
+import React from 'react'
 
 interface DmxOutputEnabledModesProps {
-  sacnEnabled: boolean;
-  onSacnToggle: () => void;
-  artNetEnabled: boolean;
-  onArtNetToggle: () => void;
-  enttecProEnabled: boolean;
-  onEnttecProToggle: () => void;
-  openDmxEnabled: boolean;
-  onOpenDmxToggle: () => void;
+  sacnEnabled: boolean
+  onSacnToggle: () => void
+  artNetEnabled: boolean
+  onArtNetToggle: () => void
+  enttecProEnabled: boolean
+  onEnttecProToggle: () => void
+  openDmxEnabled: boolean
+  onOpenDmxToggle: () => void
 }
 
 const DmxOutputEnabledModes: React.FC<DmxOutputEnabledModesProps> = ({
@@ -19,12 +19,15 @@ const DmxOutputEnabledModes: React.FC<DmxOutputEnabledModesProps> = ({
   enttecProEnabled,
   onEnttecProToggle,
   openDmxEnabled,
-  onOpenDmxToggle
+  onOpenDmxToggle,
 }) => (
   <div className="mb-8">
-    <h3 className="text-lg font-medium mb-3 text-gray-800 dark:text-gray-200">Enabled DMX Output Modes</h3>
+    <h3 className="text-lg font-medium mb-3 text-gray-800 dark:text-gray-200">
+      Enabled DMX Output Modes
+    </h3>
     <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-      Select the DMX modes you want to use. This will make them available for use in Game Settings on the Status page.
+      Select the DMX modes you want to use. This will make them available for use in Game Settings
+      on the Status page.
     </p>
     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
       Each sender can be configured individually below.
@@ -68,6 +71,6 @@ const DmxOutputEnabledModes: React.FC<DmxOutputEnabledModesProps> = ({
       </label>
     </div>
   </div>
-);
+)
 
-export default DmxOutputEnabledModes;
+export default DmxOutputEnabledModes

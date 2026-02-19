@@ -1,10 +1,10 @@
-import { AudioCueGroup } from '../../../registries/AudioCueRegistry';
-import { AudioCueType, BuiltInAudioCues } from '../../../types/audioCueTypes';
-import { PulseChaserCue } from './PulseChaserCue';
-import { BeatSplitPulseCue } from './BeatSplitPulseCue';
-import { BassSnareRippleCue } from './BassSnareRippleCue';
-import { MirrorBandBounceCue } from './MirrorBandBounceCue';
-import { IAudioCue } from '../../../interfaces/IAudioCue';
+import { AudioCueGroup } from '../../../registries/AudioCueRegistry'
+import { AudioCueType, BuiltInAudioCues } from '../../../types/audioCueTypes'
+import { PulseChaserCue } from './PulseChaserCue'
+import { BeatSplitPulseCue } from './BeatSplitPulseCue'
+import { BassSnareRippleCue } from './BassSnareRippleCue'
+import { MirrorBandBounceCue } from './MirrorBandBounceCue'
+import { IAudioCue } from '../../../interfaces/IAudioCue'
 
 export const pulseGroup: AudioCueGroup = {
   id: 'audio-pulse',
@@ -14,8 +14,6 @@ export const pulseGroup: AudioCueGroup = {
     [BuiltInAudioCues.PulseChaser, new PulseChaserCue()],
     [BuiltInAudioCues.BeatSplitPulse, new BeatSplitPulseCue()],
     [BuiltInAudioCues.BassSnareRipple, new BassSnareRippleCue()],
-    [BuiltInAudioCues.MirrorBandBounce, new MirrorBandBounceCue()]
-  ])
-};
-
-
+    [BuiltInAudioCues.MirrorBandBounce, new MirrorBandBounceCue()],
+  ]),
+}

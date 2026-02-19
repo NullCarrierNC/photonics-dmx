@@ -4,7 +4,7 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest'
+    '^.+\\.tsx?$': 'ts-jest',
   },
   testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
@@ -13,17 +13,14 @@ module.exports = {
   collectCoverage: false,
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
-  coveragePathIgnorePatterns: [
-    '/node_modules/',
-    '/dist/'
-  ],
+  coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
   coverageThreshold: {
     global: {
       statements: 30,
       branches: 25,
       functions: 25,
-      lines: 30
-    }
+      lines: 30,
+    },
   },
-  setupFilesAfterEnv: ['<rootDir>/src/photonics-dmx/tests/jest.setup.ts']
-};
+  setupFilesAfterEnv: ['<rootDir>/src/photonics-dmx/tests/jest.setup.ts'],
+}

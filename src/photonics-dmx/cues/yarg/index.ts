@@ -1,6 +1,6 @@
 // Import the cue registry initialization to ensure it runs
-import './stagekit';
-import './yarg1';
+import './stagekit'
+import './yarg1'
 
 // These are not ready for prime time yet.
 // import './coolWarmAlt1';
@@ -8,4 +8,4 @@ import './yarg1';
 // import './commonAlt1';
 
 // Export the registry for use by other modules
-export { YargCueRegistry as CueRegistry } from '../registries/YargCueRegistry'; 
+export { YargCueRegistry as CueRegistry } from '../registries/YargCueRegistry'

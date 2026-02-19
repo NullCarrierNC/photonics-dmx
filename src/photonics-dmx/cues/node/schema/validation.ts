@@ -1,5 +1,6 @@
-import Ajv, { DefinedError, JSONSchemaType } from 'ajv';
-import addFormats from 'ajv-formats';
+/* eslint-disable @typescript-eslint/no-explicit-any -- schema validation works with unknown payloads */
+import Ajv, { DefinedError, JSONSchemaType } from 'ajv'
+import addFormats from 'ajv-formats'
 import {
   ActionNode,
   ActionTimingConfig,
@@ -36,41 +37,41 @@ import {
   VariableDefinition,
   YargEventNode,
   YargNodeCueDefinition,
-  YargNodeCueFile
-} from '../../types/nodeCueTypes';
+  YargNodeCueFile,
+} from '../../types/nodeCueTypes'
 import {
   WaitCondition,
   YargEventType,
-  YARG_EVENT_TYPES as YARG_EVENT_TYPES_SOURCE
-} from '../../../types';
+  YARG_EVENT_TYPES as YARG_EVENT_TYPES_SOURCE,
+} from '../../../types'
 import {
   WAIT_CONDITIONS_WITH_NONE_DELAY,
-  AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY
-} from '../../../constants/options';
+  AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY,
+} from '../../../constants/options'
 
 // Song-based wait conditions for action timing (excludes system events)
-const WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY];
+const WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY]
 
 // All event types for YARG event nodes (includes system events + song events)
-const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENT_TYPES_SOURCE];
+const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENT_TYPES_SOURCE]
 
-const AUDIO_EVENT_TYPES: AudioEventType[] = [...AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY];
+const AUDIO_EVENT_TYPES: AudioEventType[] = [...AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY]
 
-const LOGIC_COMPARATORS: LogicComparator[] = ['>', '>=', '<', '<=', '==', '!='];
-const MATH_OPERATORS: MathOperator[] = ['add', 'subtract', 'multiply', 'divide', 'modulus'];
+const LOGIC_COMPARATORS: LogicComparator[] = ['>', '>=', '<', '<=', '==', '!=']
+const MATH_OPERATORS: MathOperator[] = ['add', 'subtract', 'multiply', 'divide', 'modulus']
 
 const ajv = new Ajv({
   allErrors: true,
   allowUnionTypes: true,
-  strict: false
-});
-addFormats(ajv);
+  strict: false,
+})
+addFormats(ajv)
 
 const stringIdSchema: JSONSchemaType<string> = {
   type: 'string',
   minLength: 1,
-  maxLength: 128
-};
+  maxLength: 128,
+}
 
 // Define ValueSource schema first so it can be reused
 const valueSourceSchema: JSONSchemaType<ValueSource> = {
@@ -81,37 +82,37 @@ const valueSourceSchema: JSONSchemaType<ValueSource> = {
     source: { type: 'string', enum: ['literal', 'variable'] },
     value: { type: ['number', 'boolean', 'string'], nullable: true },
     name: { type: 'string', nullable: true },
-    fallback: { type: ['number', 'boolean', 'string'], nullable: true }
+    fallback: { type: ['number', 'boolean', 'string'], nullable: true },
   },
   allOf: [
     {
       if: {
         properties: {
-          source: { const: 'literal' }
-        }
+          source: { const: 'literal' },
+        },
       },
       then: {
-        required: ['value']
-      }
+        required: ['value'],
+      },
     },
     {
       if: {
         properties: {
-          source: { const: 'variable' }
-        }
+          source: { const: 'variable' },
+        },
       },
       then: {
-        required: ['name']
-      }
-    }
-  ]
-} as any;
+        required: ['name'],
+      },
+    },
+  ],
+} as any
 
 const colorSchema: JSONSchemaType<{
-  name: ValueSource;
-  brightness: ValueSource;
-  blendMode?: ValueSource;
-  opacity?: ValueSource;
+  name: ValueSource
+  brightness: ValueSource
+  blendMode?: ValueSource
+  opacity?: ValueSource
 }> = {
   type: 'object',
   required: ['name', 'brightness'],
@@ -120,9 +121,9 @@ const colorSchema: JSONSchemaType<{
     name: valueSourceSchema,
     brightness: valueSourceSchema,
     blendMode: { ...valueSourceSchema, nullable: true },
-    opacity: { ...valueSourceSchema, nullable: true }
-  }
-} as any;
+    opacity: { ...valueSourceSchema, nullable: true },
+  },
+} as any
 
 const timingSchema: JSONSchemaType<ActionTimingConfig> = {
   type: 'object',
@@ -137,9 +138,9 @@ const timingSchema: JSONSchemaType<ActionTimingConfig> = {
     waitUntilTime: valueSourceSchema,
     waitUntilConditionCount: { ...valueSourceSchema, nullable: true },
     easing: { type: 'string', nullable: true },
-    level: { ...valueSourceSchema, nullable: true }
-  }
-} as any;
+    level: { ...valueSourceSchema, nullable: true },
+  },
+} as any
 
 const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
   type: 'object',
@@ -158,11 +159,7 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
     rotationDirection: { type: 'string', enum: ['clockwise', 'counter-clockwise'], nullable: true },
     beatsPerCycle: { type: 'number', nullable: true, minimum: 1 },
     startOffset: {
-      oneOf: [
-        { type: 'number', minimum: 0 },
-        valueSourceSchema,
-        { type: 'null' }
-      ]
+      oneOf: [{ type: 'number', minimum: 0 }, valueSourceSchema, { type: 'null' }],
     } as any,
     holdTime: { type: 'number', nullable: true, minimum: 0 },
     flashDurationIn: { type: 'number', nullable: true, minimum: 0 },
@@ -180,13 +177,13 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
       nullable: true,
       required: ['groups', 'filter'],
       additionalProperties: false,
-      properties: { groups: valueSourceSchema, filter: valueSourceSchema }
+      properties: { groups: valueSourceSchema, filter: valueSourceSchema },
     } as any,
     switchCondition: { type: 'string', nullable: true },
     completeCondition: { type: 'string', nullable: true },
-    custom: { type: 'object', nullable: true, additionalProperties: true }
-  }
-};
+    custom: { type: 'object', nullable: true, additionalProperties: true },
+  },
+}
 
 const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
   type: 'object',
@@ -194,13 +191,16 @@ const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
   additionalProperties: false,
   properties: {
     name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
-    type: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type', 'event'] },
+    type: {
+      type: 'string',
+      enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type', 'event'],
+    },
     scope: { type: 'string', enum: ['cue', 'cue-group'] },
     initialValue: { type: ['number', 'boolean', 'string', 'array'] } as any,
     description: { type: 'string', nullable: true },
-    isParameter: { type: 'boolean', nullable: true }
-  }
-};
+    isParameter: { type: 'boolean', nullable: true },
+  },
+}
 
 const eventDefinitionSchema: JSONSchemaType<EventDefinition> = {
   type: 'object',
@@ -208,9 +208,9 @@ const eventDefinitionSchema: JSONSchemaType<EventDefinition> = {
   additionalProperties: false,
   properties: {
     name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
-    description: { type: 'string', nullable: true }
-  }
-};
+    description: { type: 'string', nullable: true },
+  },
+}
 
 const effectReferenceSchema: JSONSchemaType<EffectReference> = {
   type: 'object',
@@ -219,9 +219,9 @@ const effectReferenceSchema: JSONSchemaType<EffectReference> = {
   properties: {
     effectId: { type: 'string', minLength: 1 },
     effectFileId: { type: 'string', minLength: 1 },
-    name: { type: 'string', minLength: 1 }
-  }
-};
+    name: { type: 'string', minLength: 1 },
+  },
+}
 
 const eventRaiserNodeSchema: JSONSchemaType<EventRaiserNode> = {
   type: 'object',
@@ -235,15 +235,15 @@ const eventRaiserNodeSchema: JSONSchemaType<EventRaiserNode> = {
     inputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
-    }
-  }
-};
+      items: { type: 'string' },
+    },
+  },
+}
 
 const eventListenerNodeSchema: JSONSchemaType<EventListenerNode> = {
   type: 'object',
@@ -257,10 +257,10 @@ const eventListenerNodeSchema: JSONSchemaType<EventListenerNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
-    }
-  }
-};
+      items: { type: 'string' },
+    },
+  },
+}
 
 const notesNodeSchema: JSONSchemaType<NotesNode> = {
   type: 'object',
@@ -272,9 +272,9 @@ const notesNodeSchema: JSONSchemaType<NotesNode> = {
     label: { type: 'string', nullable: true },
     title: { type: 'string', nullable: true },
     style: { type: 'string', enum: ['notes', 'info', 'important'], nullable: true },
-    note: { type: 'string' }
-  }
-};
+    note: { type: 'string' },
+  },
+}
 
 const variableLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -288,14 +288,17 @@ const variableLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     mode: { type: 'string', enum: ['set', 'get', 'init'] as const },
     varName: { type: 'string' },
-    valueType: { type: 'string', enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type', 'event'] as const },
-    value: { ...valueSourceSchema, nullable: true }
-  }
-} as any;
+    valueType: {
+      type: 'string',
+      enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type', 'event'] as const,
+    },
+    value: { ...valueSourceSchema, nullable: true },
+  },
+} as any
 
 const mathLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -309,14 +312,14 @@ const mathLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     operator: { type: 'string', enum: MATH_OPERATORS },
     left: valueSourceSchema,
     right: valueSourceSchema,
-    assignTo: { type: 'string', nullable: true }
-  }
-} as any;
+    assignTo: { type: 'string', nullable: true },
+  },
+} as any
 
 const conditionalLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -330,28 +333,28 @@ const conditionalLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     comparator: { type: 'string', enum: LOGIC_COMPARATORS },
     left: valueSourceSchema,
-    right: valueSourceSchema
-  }
-} as any;
+    right: valueSourceSchema,
+  },
+} as any
 
 // Import shared constants for DRY compliance
 import {
   YARG_CUE_DATA_PROPERTIES,
   AUDIO_CUE_DATA_PROPERTIES,
-  ALL_CONFIG_DATA_PROPERTIES
-} from '../../../constants/nodeConstants';
+  ALL_CONFIG_DATA_PROPERTIES,
+} from '../../../constants/nodeConstants'
 
 // Combine cue data properties without duplicates (dedupe overlapping properties like 'cue-name', 'bpm', 'execution-count')
 const CUE_DATA_PROPERTIES = [
-  ...new Set([...YARG_CUE_DATA_PROPERTIES, ...AUDIO_CUE_DATA_PROPERTIES])
-];
+  ...new Set([...YARG_CUE_DATA_PROPERTIES, ...AUDIO_CUE_DATA_PROPERTIES]),
+]
 
 // Use shared config data properties
-const CONFIG_DATA_PROPERTIES = ALL_CONFIG_DATA_PROPERTIES;
+const CONFIG_DATA_PROPERTIES = ALL_CONFIG_DATA_PROPERTIES
 
 const cueDataLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -365,12 +368,12 @@ const cueDataLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     dataProperty: { type: 'string', enum: CUE_DATA_PROPERTIES },
-    assignTo: { type: 'string', nullable: true }
-  }
-} as any;
+    assignTo: { type: 'string', nullable: true },
+  },
+} as any
 
 const configDataLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -384,12 +387,12 @@ const configDataLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     dataProperty: { type: 'string', enum: CONFIG_DATA_PROPERTIES },
-    assignTo: { type: 'string', nullable: true }
-  }
-} as any;
+    assignTo: { type: 'string', nullable: true },
+  },
+} as any
 
 const lightsFromIndexLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -403,13 +406,13 @@ const lightsFromIndexLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     sourceVariable: { type: 'string' },
     index: valueSourceSchema,
-    assignTo: { type: 'string' }
-  }
-} as any;
+    assignTo: { type: 'string' },
+  },
+} as any
 
 const arrayLengthLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -423,12 +426,12 @@ const arrayLengthLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     sourceVariable: { type: 'string' },
-    assignTo: { type: 'string' }
-  }
-} as any;
+    assignTo: { type: 'string' },
+  },
+} as any
 
 const reverseLightsLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -442,12 +445,12 @@ const reverseLightsLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     sourceVariable: { type: 'string' },
-    assignTo: { type: 'string' }
-  }
-} as any;
+    assignTo: { type: 'string' },
+  },
+} as any
 
 const createPairsLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -461,13 +464,13 @@ const createPairsLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     pairType: { type: 'string', enum: ['opposite', 'diagonal'] as const },
     sourceVariable: { type: 'string' },
-    assignTo: { type: 'string' }
-  }
-} as any;
+    assignTo: { type: 'string' },
+  },
+} as any
 
 const concatLightsLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -481,16 +484,16 @@ const concatLightsLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
-    sourceVariables: { 
+    sourceVariables: {
       type: 'array',
       items: { type: 'string' },
-      minItems: 1
+      minItems: 1,
     },
-    assignTo: { type: 'string' }
-  }
-} as any;
+    assignTo: { type: 'string' },
+  },
+} as any
 
 const delayLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -504,11 +507,11 @@ const delayLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
-    delayTime: valueSourceSchema
-  }
-} as any;
+    delayTime: valueSourceSchema,
+  },
+} as any
 
 const debuggerLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -522,15 +525,15 @@ const debuggerLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     message: valueSourceSchema,
     variablesToLog: {
       type: 'array',
-      items: { type: 'string' }
-    }
-  }
-} as any;
+      items: { type: 'string' },
+    },
+  },
+} as any
 
 const randomLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -544,7 +547,7 @@ const randomLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     mode: { type: 'string', enum: ['random-integer', 'random-choice', 'random-light'] },
     min: { ...valueSourceSchema, nullable: true },
@@ -552,13 +555,13 @@ const randomLogicSchema: JSONSchemaType<LogicNode> = {
     choices: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     sourceVariable: { type: 'string', nullable: true },
     count: { ...valueSourceSchema, nullable: true },
-    assignTo: { type: 'string' }
-  }
-} as any;
+    assignTo: { type: 'string' },
+  },
+} as any
 
 const shuffleLightsLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
@@ -572,16 +575,23 @@ const shuffleLightsLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     sourceVariable: { type: 'string' },
-    assignTo: { type: 'string' }
-  }
-} as any;
+    assignTo: { type: 'string' },
+  },
+} as any
 
 const forEachLightLogicSchema: JSONSchemaType<LogicNode> = {
   type: 'object',
-  required: ['id', 'type', 'logicType', 'sourceVariable', 'currentLightVariable', 'currentIndexVariable'],
+  required: [
+    'id',
+    'type',
+    'logicType',
+    'sourceVariable',
+    'currentLightVariable',
+    'currentIndexVariable',
+  ],
   additionalProperties: false,
   properties: {
     id: stringIdSchema,
@@ -591,13 +601,13 @@ const forEachLightLogicSchema: JSONSchemaType<LogicNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     sourceVariable: { type: 'string' },
     currentLightVariable: { type: 'string' },
-    currentIndexVariable: { type: 'string' }
-  }
-} as any;
+    currentIndexVariable: { type: 'string' },
+  },
+} as any
 
 const logicNodeSchema: JSONSchemaType<LogicNode> = {
   oneOf: [
@@ -615,9 +625,9 @@ const logicNodeSchema: JSONSchemaType<LogicNode> = {
     debuggerLogicSchema,
     randomLogicSchema,
     shuffleLightsLogicSchema,
-    forEachLightLogicSchema
-  ]
-} as any;
+    forEachLightLogicSchema,
+  ],
+} as any
 
 const targetSchema: JSONSchemaType<NodeActionTarget> = {
   type: 'object',
@@ -625,9 +635,9 @@ const targetSchema: JSONSchemaType<NodeActionTarget> = {
   additionalProperties: false,
   properties: {
     groups: valueSourceSchema,
-    filter: valueSourceSchema
-  }
-} as any;
+    filter: valueSourceSchema,
+  },
+} as any
 
 const actionSchema: JSONSchemaType<ActionNode> = {
   type: 'object',
@@ -645,16 +655,16 @@ const actionSchema: JSONSchemaType<ActionNode> = {
     inputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
-    config: { ...actionConfigSchema, nullable: true }
-  }
-} as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    config: { ...actionConfigSchema, nullable: true },
+  },
+} as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const yargEventSchema: JSONSchemaType<YargEventNode> = {
   type: 'object',
@@ -667,13 +677,13 @@ const yargEventSchema: JSONSchemaType<YargEventNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     // Uses YARG_EVENT_TYPES which includes both system events (cue-started, cue-called)
     // and song events (beat, measure, keyframe, instruments, etc.)
-    eventType: { type: 'string', enum: YARG_EVENT_TYPES }
-  }
-};
+    eventType: { type: 'string', enum: YARG_EVENT_TYPES },
+  },
+}
 
 const audioEventSchema: JSONSchemaType<AudioEventNode> = {
   type: 'object',
@@ -686,19 +696,19 @@ const audioEventSchema: JSONSchemaType<AudioEventNode> = {
     outputs: {
       type: 'array',
       nullable: true,
-      items: { type: 'string' }
+      items: { type: 'string' },
     },
     eventType: { type: 'string', enum: AUDIO_EVENT_TYPES },
     threshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
-    triggerMode: { type: 'string', enum: ['edge', 'level'] }
-  }
-};
+    triggerMode: { type: 'string', enum: ['edge', 'level'] },
+  },
+}
 
 const connectionSchema: JSONSchemaType<{
-  from: string;
-  to: string;
-  fromPort?: string;
-  toPort?: string;
+  from: string
+  to: string
+  fromPort?: string
+  toPort?: string
 }> = {
   type: 'object',
   required: ['from', 'to'],
@@ -707,9 +717,9 @@ const connectionSchema: JSONSchemaType<{
     from: stringIdSchema,
     to: stringIdSchema,
     fromPort: { type: 'string', nullable: true },
-    toPort: { type: 'string', nullable: true }
-  }
-};
+    toPort: { type: 'string', nullable: true },
+  },
+}
 
 const layoutSchema: JSONSchemaType<NodeLayoutMetadata> = {
   type: 'object',
@@ -725,9 +735,9 @@ const layoutSchema: JSONSchemaType<NodeLayoutMetadata> = {
         additionalProperties: false,
         properties: {
           x: { type: 'number' },
-          y: { type: 'number' }
-        }
-      }
+          y: { type: 'number' },
+        },
+      },
     },
     viewport: {
       type: 'object',
@@ -737,11 +747,11 @@ const layoutSchema: JSONSchemaType<NodeLayoutMetadata> = {
       properties: {
         x: { type: 'number' },
         y: { type: 'number' },
-        zoom: { type: 'number', minimum: 0.01 }
-      }
-    }
-  }
-};
+        zoom: { type: 'number', minimum: 0.01 },
+      },
+    },
+  },
+}
 
 const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
   type: 'object',
@@ -761,75 +771,75 @@ const yargCueSchema: JSONSchemaType<YargNodeCueDefinition> = {
         events: {
           type: 'array',
           minItems: 1,
-          items: yargEventSchema
+          items: yargEventSchema,
         },
         actions: {
           type: 'array',
-          items: actionSchema
+          items: actionSchema,
         },
         logic: {
           type: 'array',
           nullable: true,
           items: logicNodeSchema,
-          default: []
+          default: [],
         },
         eventRaisers: {
           type: 'array',
           nullable: true,
           items: eventRaiserNodeSchema,
-          default: []
+          default: [],
         },
         eventListeners: {
           type: 'array',
           nullable: true,
           items: eventListenerNodeSchema,
-          default: []
+          default: [],
         },
         effectRaisers: {
           type: 'array',
           nullable: true,
           items: { type: 'object' } as any, // Simplified schema for now
-          default: []
+          default: [],
         },
         effectListeners: {
           type: 'array',
           nullable: true,
           items: { type: 'object' } as any, // Not used in cues, only in effects
-          default: []
+          default: [],
         },
         notes: {
           type: 'array',
           nullable: true,
           items: notesNodeSchema,
-          default: []
-        }
-      }
+          default: [],
+        },
+      },
     },
     connections: {
       type: 'array',
-      items: connectionSchema
+      items: connectionSchema,
     },
     layout: { ...layoutSchema, nullable: true },
     variables: {
       type: 'array',
       nullable: true,
       items: variableDefinitionSchema,
-      default: []
+      default: [],
     },
     events: {
       type: 'array',
       nullable: true,
       items: eventDefinitionSchema,
-      default: []
+      default: [],
     },
     effects: {
       type: 'array',
       nullable: true,
       items: effectReferenceSchema,
-      default: []
-    }
-  }
-};
+      default: [],
+    },
+  },
+}
 
 const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
   type: 'object',
@@ -848,75 +858,75 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
         events: {
           type: 'array',
           minItems: 1,
-          items: audioEventSchema
+          items: audioEventSchema,
         },
         actions: {
           type: 'array',
-          items: actionSchema
+          items: actionSchema,
         },
         logic: {
           type: 'array',
           nullable: true,
           items: logicNodeSchema,
-          default: []
+          default: [],
         },
         eventRaisers: {
           type: 'array',
           nullable: true,
           items: eventRaiserNodeSchema,
-          default: []
+          default: [],
         },
         eventListeners: {
           type: 'array',
           nullable: true,
           items: eventListenerNodeSchema,
-          default: []
+          default: [],
         },
         effectRaisers: {
           type: 'array',
           nullable: true,
           items: { type: 'object' } as any, // Simplified schema for now
-          default: []
+          default: [],
         },
         effectListeners: {
           type: 'array',
           nullable: true,
           items: { type: 'object' } as any, // Not used in cues, only in effects
-          default: []
+          default: [],
         },
         notes: {
           type: 'array',
           nullable: true,
           items: notesNodeSchema,
-          default: []
-        }
-      }
+          default: [],
+        },
+      },
     },
     connections: {
       type: 'array',
-      items: connectionSchema
+      items: connectionSchema,
     },
     layout: { ...layoutSchema, nullable: true },
     variables: {
       type: 'array',
       nullable: true,
       items: variableDefinitionSchema,
-      default: []
+      default: [],
     },
     events: {
       type: 'array',
       nullable: true,
       items: eventDefinitionSchema,
-      default: []
+      default: [],
     },
     effects: {
       type: 'array',
       nullable: true,
       items: effectReferenceSchema,
-      default: []
-    }
-  }
-};
+      default: [],
+    },
+  },
+}
 
 const groupSchema: JSONSchemaType<NodeCueGroupMeta> = {
   type: 'object',
@@ -930,10 +940,10 @@ const groupSchema: JSONSchemaType<NodeCueGroupMeta> = {
       type: 'array',
       nullable: true,
       items: variableDefinitionSchema,
-      default: []
-    }
-  }
-};
+      default: [],
+    },
+  },
+}
 
 const yargFileSchema: JSONSchemaType<YargNodeCueFile> = {
   type: 'object',
@@ -946,10 +956,10 @@ const yargFileSchema: JSONSchemaType<YargNodeCueFile> = {
     cues: {
       type: 'array',
       minItems: 1,
-      items: yargCueSchema
-    }
-  }
-};
+      items: yargCueSchema,
+    },
+  },
+}
 
 const audioFileSchema: JSONSchemaType<AudioNodeCueFile> = {
   type: 'object',
@@ -962,44 +972,44 @@ const audioFileSchema: JSONSchemaType<AudioNodeCueFile> = {
     cues: {
       type: 'array',
       minItems: 1,
-      items: audioCueSchema
-    }
-  }
-};
+      items: audioCueSchema,
+    },
+  },
+}
 
-const validateYargSchema = ajv.compile<YargNodeCueFile>(yargFileSchema);
-const validateAudioSchema = ajv.compile<AudioNodeCueFile>(audioFileSchema);
+const validateYargSchema = ajv.compile<YargNodeCueFile>(yargFileSchema)
+const validateAudioSchema = ajv.compile<AudioNodeCueFile>(audioFileSchema)
 
 export interface NodeCueValidationSuccess<T extends NodeCueFile> {
-  valid: true;
-  data: T;
-  errors: [];
-  mode: NodeCueMode;
+  valid: true
+  data: T
+  errors: []
+  mode: NodeCueMode
 }
 
 export interface NodeCueValidationFailure {
-  valid: false;
-  errors: string[];
+  valid: false
+  errors: string[]
 }
 
 export type NodeCueValidationResult<T extends NodeCueFile = NodeCueFile> =
   | NodeCueValidationSuccess<T>
-  | NodeCueValidationFailure;
+  | NodeCueValidationFailure
 
 const formatErrors = (errors: DefinedError[] | null | undefined): string[] => {
   if (!errors || errors.length === 0) {
-    return ['Unknown validation error'];
+    return ['Unknown validation error']
   }
 
-  return errors.map(err => {
-    const instancePath = err.instancePath || 'file';
-    const message = err.message || 'Invalid value';
+  return errors.map((err) => {
+    const instancePath = err.instancePath || 'file'
+    const message = err.message || 'Invalid value'
     if (err.params && 'allowedValues' in err.params) {
-      return `${instancePath}: ${message} (${(err.params as any).allowedValues.join(', ')})`;
+      return `${instancePath}: ${message} (${(err.params as any).allowedValues.join(', ')})`
     }
-    return `${instancePath}: ${message}`;
-  });
-};
+    return `${instancePath}: ${message}`
+  })
+}
 
 /**
  * Detects circular dependencies that would cause infinite synchronous execution.
@@ -1010,197 +1020,205 @@ const formatErrors = (errors: DefinedError[] | null | undefined): string[] => {
 const detectCycles = (
   connections: Connection[],
   nodeIds: Set<string>,
-  actionIds: Set<string>
+  actionIds: Set<string>,
 ): string[] => {
-  const errors: string[] = [];
+  const errors: string[] = []
 
-  const actionToAction = new Map<string, string[]>();
+  const actionToAction = new Map<string, string[]>()
   for (const conn of connections) {
     if (nodeIds.has(conn.from) && nodeIds.has(conn.to)) {
-      const existing = actionToAction.get(conn.from) ?? [];
-      existing.push(conn.to);
-      actionToAction.set(conn.from, existing);
+      const existing = actionToAction.get(conn.from) ?? []
+      existing.push(conn.to)
+      actionToAction.set(conn.from, existing)
     }
   }
 
-  const visited = new Set<string>();
-  const recursionStack = new Set<string>();
+  const visited = new Set<string>()
+  const recursionStack = new Set<string>()
 
   const dfs = (nodeId: string, path: string[]): boolean => {
-    visited.add(nodeId);
-    recursionStack.add(nodeId);
+    visited.add(nodeId)
+    recursionStack.add(nodeId)
 
-    const neighbours = actionToAction.get(nodeId) ?? [];
+    const neighbours = actionToAction.get(nodeId) ?? []
     for (const neighbour of neighbours) {
       if (!visited.has(neighbour)) {
         if (dfs(neighbour, [...path, neighbour])) {
-          return true;
+          return true
         }
       } else if (recursionStack.has(neighbour)) {
-        const cycleStart = path.indexOf(neighbour);
-        const cycle = cycleStart >= 0 ? path.slice(cycleStart) : path;
-        cycle.push(neighbour);
-        const cycleHasAction = cycle.some((id) => actionIds.has(id));
+        const cycleStart = path.indexOf(neighbour)
+        const cycle = cycleStart >= 0 ? path.slice(cycleStart) : path
+        cycle.push(neighbour)
+        const cycleHasAction = cycle.some((id) => actionIds.has(id))
         if (!cycleHasAction) {
-          errors.push(`Circular dependency detected: ${cycle.join(' → ')}`);
+          errors.push(`Circular dependency detected: ${cycle.join(' → ')}`)
         }
-        return true;
+        return true
       }
     }
 
-    recursionStack.delete(nodeId);
-    return false;
-  };
+    recursionStack.delete(nodeId)
+    return false
+  }
 
   for (const nodeId of nodeIds) {
     if (!visited.has(nodeId)) {
-      dfs(nodeId, [nodeId]);
+      dfs(nodeId, [nodeId])
     }
   }
 
-  return errors;
-};
+  return errors
+}
 
-export const validateYargNodeCueFile = (value: unknown): NodeCueValidationResult<YargNodeCueFile> => {
+export const validateYargNodeCueFile = (
+  value: unknown,
+): NodeCueValidationResult<YargNodeCueFile> => {
   if (!validateYargSchema(value)) {
     return {
       valid: false,
-      errors: formatErrors(validateYargSchema.errors as DefinedError[])
-    };
+      errors: formatErrors(validateYargSchema.errors as DefinedError[]),
+    }
   }
 
-  const semanticErrors: string[] = [];
-  
+  const semanticErrors: string[] = []
+
   // Check for duplicate group-level variable names
-  const groupVariables = value.group.variables ?? [];
-  const groupVarNames = new Set<string>();
+  const groupVariables = value.group.variables ?? []
+  const groupVarNames = new Set<string>()
   for (const varDef of groupVariables) {
     if (groupVarNames.has(varDef.name)) {
-      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`);
+      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`)
     }
-    groupVarNames.add(varDef.name);
+    groupVarNames.add(varDef.name)
   }
-  
+
   for (const cue of value.cues) {
     // Check for duplicate cue-level variable names
-    const cueVariables = cue.variables ?? [];
-    const cueVarNames = new Set<string>();
+    const cueVariables = cue.variables ?? []
+    const cueVarNames = new Set<string>()
     for (const varDef of cueVariables) {
       if (cueVarNames.has(varDef.name)) {
-        semanticErrors.push(`cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`);
+        semanticErrors.push(
+          `cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`,
+        )
       }
-      cueVarNames.add(varDef.name);
+      cueVarNames.add(varDef.name)
     }
-    
+
     // Check for circular dependencies (only logic-only cycles are invalid)
-    const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
-    const actionIds = new Set(cue.nodes.actions.map(a => a.id));
-    const nonEventIds = new Set<string>([...logicIds, ...actionIds]);
-    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds);
-    semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
+    const logicIds = new Set((cue.nodes.logic ?? []).map((node) => node.id))
+    const actionIds = new Set(cue.nodes.actions.map((a) => a.id))
+    const nonEventIds = new Set<string>([...logicIds, ...actionIds])
+    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
+    semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
   }
 
   if (semanticErrors.length > 0) {
     return {
       valid: false,
-      errors: semanticErrors
-    };
+      errors: semanticErrors,
+    }
   }
 
   return {
     valid: true,
     data: value,
     errors: [],
-    mode: 'yarg'
-  };
-};
+    mode: 'yarg',
+  }
+}
 
-export const validateAudioNodeCueFile = (value: unknown): NodeCueValidationResult<AudioNodeCueFile> => {
+export const validateAudioNodeCueFile = (
+  value: unknown,
+): NodeCueValidationResult<AudioNodeCueFile> => {
   if (!validateAudioSchema(value)) {
     return {
       valid: false,
-      errors: formatErrors(validateAudioSchema.errors as DefinedError[])
-    };
+      errors: formatErrors(validateAudioSchema.errors as DefinedError[]),
+    }
   }
 
-  const semanticErrors: string[] = [];
-  
+  const semanticErrors: string[] = []
+
   // Check for duplicate group-level variable names
-  const groupVariables = value.group.variables ?? [];
-  const groupVarNames = new Set<string>();
+  const groupVariables = value.group.variables ?? []
+  const groupVarNames = new Set<string>()
   for (const varDef of groupVariables) {
     if (groupVarNames.has(varDef.name)) {
-      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`);
+      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`)
     }
-    groupVarNames.add(varDef.name);
+    groupVarNames.add(varDef.name)
   }
-  
+
   for (const cue of value.cues) {
     // Check for duplicate cue-level variable names
-    const cueVariables = cue.variables ?? [];
-    const cueVarNames = new Set<string>();
+    const cueVariables = cue.variables ?? []
+    const cueVarNames = new Set<string>()
     for (const varDef of cueVariables) {
       if (cueVarNames.has(varDef.name)) {
-        semanticErrors.push(`cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`);
+        semanticErrors.push(
+          `cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`,
+        )
       }
-      cueVarNames.add(varDef.name);
+      cueVarNames.add(varDef.name)
     }
-    
+
     // Check for circular dependencies (only logic-only cycles are invalid)
-    const logicIds = new Set((cue.nodes.logic ?? []).map(node => node.id));
-    const actionIds = new Set(cue.nodes.actions.map(a => a.id));
-    const nonEventIds = new Set<string>([...logicIds, ...actionIds]);
-    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds);
-    semanticErrors.push(...cycleErrors.map(e => `cue '${cue.name}': ${e}`));
+    const logicIds = new Set((cue.nodes.logic ?? []).map((node) => node.id))
+    const actionIds = new Set(cue.nodes.actions.map((a) => a.id))
+    const nonEventIds = new Set<string>([...logicIds, ...actionIds])
+    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
+    semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
   }
 
   if (semanticErrors.length > 0) {
     return {
       valid: false,
-      errors: semanticErrors
-    };
+      errors: semanticErrors,
+    }
   }
 
   return {
     valid: true,
     data: value,
     errors: [],
-    mode: 'audio'
-  };
-};
+    mode: 'audio',
+  }
+}
 
 export const validateNodeCueFile = (value: unknown): NodeCueValidationResult => {
   if (!value || typeof value !== 'object') {
     return {
       valid: false,
-      errors: ['File must be a JSON object']
-    };
+      errors: ['File must be a JSON object'],
+    }
   }
 
-  const mode = (value as Partial<NodeCueFile>).mode;
+  const mode = (value as Partial<NodeCueFile>).mode
   if (mode === 'audio') {
-    return validateAudioNodeCueFile(value);
+    return validateAudioNodeCueFile(value)
   }
 
   if (mode === 'yarg') {
-    return validateYargNodeCueFile(value);
+    return validateYargNodeCueFile(value)
   }
 
   return {
     valid: false,
-    errors: ['mode must be either "yarg" or "audio"']
-  };
-};
+    errors: ['mode must be either "yarg" or "audio"'],
+  }
+}
 
 // ============================================================================
 // Effect File Validation
 // ============================================================================
 
 export interface EffectValidationResult<T = EffectFile> {
-  valid: boolean;
-  data?: T;
-  errors: string[];
-  mode?: EffectMode;
+  valid: boolean
+  data?: T
+  errors: string[]
+  mode?: EffectMode
 }
 
 /**
@@ -1212,39 +1230,39 @@ export const validateYargEffectFile = (value: unknown): EffectValidationResult<Y
   if (!value || typeof value !== 'object') {
     return {
       valid: false,
-      errors: ['Effect file must be a JSON object']
-    };
+      errors: ['Effect file must be a JSON object'],
+    }
   }
 
-  const file = value as any;
-  
+  const file = value as any
+
   // Check required fields
   if (file.version !== 1) {
     return {
       valid: false,
-      errors: ['version must be 1']
-    };
+      errors: ['version must be 1'],
+    }
   }
 
   if (file.mode !== 'yarg') {
     return {
       valid: false,
-      errors: ['mode must be "yarg"']
-    };
+      errors: ['mode must be "yarg"'],
+    }
   }
 
   if (!file.group || !file.group.id || !file.group.name) {
     return {
       valid: false,
-      errors: ['group must have id and name']
-    };
+      errors: ['group must have id and name'],
+    }
   }
 
   if (!Array.isArray(file.effects)) {
     return {
       valid: false,
-      errors: ['effects must be an array']
-    };
+      errors: ['effects must be an array'],
+    }
   }
 
   // Basic effect validation
@@ -1252,15 +1270,15 @@ export const validateYargEffectFile = (value: unknown): EffectValidationResult<Y
     if (!effect.id || !effect.name || !effect.mode) {
       return {
         valid: false,
-        errors: ['Each effect must have id, name, and mode']
-      };
+        errors: ['Each effect must have id, name, and mode'],
+      }
     }
-    
+
     if (effect.mode !== 'yarg') {
       return {
         valid: false,
-        errors: [`Effect ${effect.name} mode must be "yarg"`]
-      };
+        errors: [`Effect ${effect.name} mode must be "yarg"`],
+      }
     }
   }
 
@@ -1268,52 +1286,54 @@ export const validateYargEffectFile = (value: unknown): EffectValidationResult<Y
     valid: true,
     data: file as YargEffectFile,
     errors: [],
-    mode: 'yarg'
-  };
-};
+    mode: 'yarg',
+  }
+}
 
 /**
  * Validate Audio Effect File
  * Note: Simplified validation - expand schemas as needed
  */
-export const validateAudioEffectFile = (value: unknown): EffectValidationResult<AudioEffectFile> => {
+export const validateAudioEffectFile = (
+  value: unknown,
+): EffectValidationResult<AudioEffectFile> => {
   // Basic validation
   if (!value || typeof value !== 'object') {
     return {
       valid: false,
-      errors: ['Effect file must be a JSON object']
-    };
+      errors: ['Effect file must be a JSON object'],
+    }
   }
 
-  const file = value as any;
-  
+  const file = value as any
+
   // Check required fields
   if (file.version !== 1) {
     return {
       valid: false,
-      errors: ['version must be 1']
-    };
+      errors: ['version must be 1'],
+    }
   }
 
   if (file.mode !== 'audio') {
     return {
       valid: false,
-      errors: ['mode must be "audio"']
-    };
+      errors: ['mode must be "audio"'],
+    }
   }
 
   if (!file.group || !file.group.id || !file.group.name) {
     return {
       valid: false,
-      errors: ['group must have id and name']
-    };
+      errors: ['group must have id and name'],
+    }
   }
 
   if (!Array.isArray(file.effects)) {
     return {
       valid: false,
-      errors: ['effects must be an array']
-    };
+      errors: ['effects must be an array'],
+    }
   }
 
   // Basic effect validation
@@ -1321,15 +1341,15 @@ export const validateAudioEffectFile = (value: unknown): EffectValidationResult<
     if (!effect.id || !effect.name || !effect.mode) {
       return {
         valid: false,
-        errors: ['Each effect must have id, name, and mode']
-      };
+        errors: ['Each effect must have id, name, and mode'],
+      }
     }
-    
+
     if (effect.mode !== 'audio') {
       return {
         valid: false,
-        errors: [`Effect ${effect.name} mode must be "audio"`]
-      };
+        errors: [`Effect ${effect.name} mode must be "audio"`],
+      }
     }
   }
 
@@ -1337,9 +1357,9 @@ export const validateAudioEffectFile = (value: unknown): EffectValidationResult<
     valid: true,
     data: file as AudioEffectFile,
     errors: [],
-    mode: 'audio'
-  };
-};
+    mode: 'audio',
+  }
+}
 
 /**
  * Validate Effect File (auto-detects mode)
@@ -1348,22 +1368,21 @@ export const validateEffectFile = (value: unknown): EffectValidationResult => {
   if (!value || typeof value !== 'object') {
     return {
       valid: false,
-      errors: ['File must be a JSON object']
-    };
+      errors: ['File must be a JSON object'],
+    }
   }
 
-  const mode = (value as Partial<EffectFile>).mode;
+  const mode = (value as Partial<EffectFile>).mode
   if (mode === 'audio') {
-    return validateAudioEffectFile(value);
+    return validateAudioEffectFile(value)
   }
 
   if (mode === 'yarg') {
-    return validateYargEffectFile(value);
+    return validateYargEffectFile(value)
   }
 
   return {
     valid: false,
-    errors: ['mode must be either "yarg" or "audio"']
-  };
-};
-
+    errors: ['mode must be either "yarg" or "audio"'],
+  }
+}

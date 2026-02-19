@@ -1,4 +1,4 @@
-import { AudioConfig } from './AudioTypes';
+import { AudioConfig } from './AudioTypes'
 
 /**
  * Default audio configuration for Web Audio API
@@ -22,15 +22,55 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   frequencyBands: {
     bandCount: 4,
     ranges: [
-      { id: 'range1', name: 'Bass', minHz: 20, maxHz: 220, color: 'red', brightness: 'medium', sensitivity: 1.0 },
-      { id: 'range2', name: 'Lower-Mids', minHz: 220, maxHz: 800, color: 'blue', brightness: 'medium', sensitivity: 1.0 },
-      { id: 'range3', name: 'Upper-Mids', minHz: 800, maxHz: 2500, color: 'yellow', brightness: 'medium', sensitivity: 1.0 },
-      { id: 'range4', name: 'Highs', minHz: 2500, maxHz: 6000, color: 'green', brightness: 'medium', sensitivity: 1.0 },
-      { id: 'range5', name: 'Air', minHz: 6000, maxHz: 20000, color: 'cyan', brightness: 'medium', sensitivity: 1.0 },
+      {
+        id: 'range1',
+        name: 'Bass',
+        minHz: 20,
+        maxHz: 220,
+        color: 'red',
+        brightness: 'medium',
+        sensitivity: 1.0,
+      },
+      {
+        id: 'range2',
+        name: 'Lower-Mids',
+        minHz: 220,
+        maxHz: 800,
+        color: 'blue',
+        brightness: 'medium',
+        sensitivity: 1.0,
+      },
+      {
+        id: 'range3',
+        name: 'Upper-Mids',
+        minHz: 800,
+        maxHz: 2500,
+        color: 'yellow',
+        brightness: 'medium',
+        sensitivity: 1.0,
+      },
+      {
+        id: 'range4',
+        name: 'Highs',
+        minHz: 2500,
+        maxHz: 6000,
+        color: 'green',
+        brightness: 'medium',
+        sensitivity: 1.0,
+      },
+      {
+        id: 'range5',
+        name: 'Air',
+        minHz: 6000,
+        maxHz: 20000,
+        color: 'cyan',
+        brightness: 'medium',
+        sensitivity: 1.0,
+      },
     ],
   },
   enabled: false,
   linearResponse: true,
-};
+}
 
-export default DEFAULT_AUDIO_CONFIG;
+export default DEFAULT_AUDIO_CONFIG

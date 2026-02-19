@@ -1,11 +1,14 @@
-import React from 'react';
-import type { ActionNode, NodeEffectType } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import React from 'react'
+import type {
+  ActionNode,
+  NodeEffectType,
+} from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
   BLEND_MODE_OPTIONS,
   BRIGHTNESS_OPTIONS,
-  COLOR_OPTIONS
-} from '../../../../../../../photonics-dmx/constants/options';
-import ValueSourceEditor from '../../shared/ValueSourceEditor';
+  COLOR_OPTIONS,
+} from '../../../../../../../photonics-dmx/constants/options'
+import ValueSourceEditor from '../../shared/ValueSourceEditor'
 
 const EFFECT_TYPES_WITH_COLOR: NodeEffectType[] = [
   'set-color',
@@ -15,29 +18,29 @@ const EFFECT_TYPES_WITH_COLOR: NodeEffectType[] = [
   'flash',
   'cycle',
   'dual-mode-rotation',
-  'alternating-pattern'
-];
+  'alternating-pattern',
+]
 
 type ActionColorFieldsProps = {
-  node: ActionNode;
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
-  updateNode: (updates: Partial<ActionNode>) => void;
-};
+  node: ActionNode
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  updateNode: (updates: Partial<ActionNode>) => void
+}
 
 const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
   node,
   availableVariables,
-  updateNode
+  updateNode,
 }) => {
-  if (!EFFECT_TYPES_WITH_COLOR.includes(node.effectType)) return null;
+  if (!EFFECT_TYPES_WITH_COLOR.includes(node.effectType)) return null
   return (
     <>
       <ValueSourceEditor
         label="Color"
         value={node.color.name}
-        onChange={next =>
+        onChange={(next) =>
           updateNode({
-            color: { ...node.color, name: next }
+            color: { ...node.color, name: next },
           })
         }
         expected="string"
@@ -47,9 +50,9 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
       <ValueSourceEditor
         label="Brightness"
         value={node.color.brightness}
-        onChange={next =>
+        onChange={(next) =>
           updateNode({
-            color: { ...node.color, brightness: next }
+            color: { ...node.color, brightness: next },
           })
         }
         expected="string"
@@ -59,9 +62,9 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
       <ValueSourceEditor
         label="Blend Mode"
         value={node.color.blendMode}
-        onChange={next =>
+        onChange={(next) =>
           updateNode({
-            color: { ...node.color, blendMode: next }
+            color: { ...node.color, blendMode: next },
           })
         }
         expected="string"
@@ -71,16 +74,16 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
       <ValueSourceEditor
         label="Opacity (0.0 - 1.0)"
         value={node.color.opacity}
-        onChange={next =>
+        onChange={(next) =>
           updateNode({
-            color: { ...node.color, opacity: next }
+            color: { ...node.color, opacity: next },
           })
         }
         expected="number"
         availableVariables={availableVariables}
       />
     </>
-  );
-};
+  )
+}
 
-export default ActionColorFields;
+export default ActionColorFields

@@ -1,18 +1,18 @@
-import React from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import type { DmxRig } from '../../../../photonics-dmx/types';
-import { ConfigStrobeType } from '../../../../photonics-dmx/types';
-import { CONFIG } from '../../../../shared/ipcChannels';
+import React from 'react'
+import { v4 as uuidv4 } from 'uuid'
+import type { DmxRig } from '../../../../photonics-dmx/types'
+import { ConfigStrobeType } from '../../../../photonics-dmx/types'
+import { CONFIG } from '../../../../shared/ipcChannels'
 
 interface LightsLayoutRigSectionProps {
-  rigs: DmxRig[];
-  activeRigId: string | null;
-  setActiveRigId: (id: string) => void;
-  rigName: string;
-  setRigName: (name: string) => void;
-  rigUniverse: number;
-  setRigUniverse: (n: number) => void;
-  onRigsChange: (rigs: DmxRig[]) => void;
+  rigs: DmxRig[]
+  activeRigId: string | null
+  setActiveRigId: (id: string) => void
+  rigName: string
+  setRigName: (name: string) => void
+  rigUniverse: number
+  setRigUniverse: (n: number) => void
+  onRigsChange: (rigs: DmxRig[]) => void
 }
 
 const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
@@ -23,7 +23,7 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
   setRigName,
   rigUniverse,
   setRigUniverse,
-  onRigsChange
+  onRigsChange,
 }) => (
   <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
     <div className="flex items-center gap-4 flex-wrap">
@@ -32,8 +32,7 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
         <select
           value={activeRigId || ''}
           onChange={(e) => setActiveRigId(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[200px]"
-        >
+          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[200px]">
           {rigs.map((rig) => (
             <option key={rig.id} value={rig.id}>
               {rig.name}
@@ -55,21 +54,20 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
               strobeType: ConfigStrobeType.None,
               frontLights: [],
               backLights: [],
-              strobeLights: []
-            }
-          };
+              strobeLights: [],
+            },
+          }
           try {
-            await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, newRig);
-            onRigsChange([...rigs, newRig]);
-            setActiveRigId(newRig.id);
-            setRigName(newRig.name);
-            setRigUniverse(newRig.universe);
+            await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, newRig)
+            onRigsChange([...rigs, newRig])
+            setActiveRigId(newRig.id)
+            setRigName(newRig.name)
+            setRigUniverse(newRig.universe)
           } catch (error) {
-            console.error('Failed to create new rig:', error);
+            console.error('Failed to create new rig:', error)
           }
         }}
-        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-      >
+        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm">
         New Rig
       </button>
 
@@ -96,6 +94,6 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
       </div>
     </div>
   </div>
-);
+)
 
-export default LightsLayoutRigSection;
+export default LightsLayoutRigSection

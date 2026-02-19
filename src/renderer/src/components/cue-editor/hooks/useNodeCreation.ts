@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react'
 import {
   type AudioEventNode,
   type EventRaiserNode,
@@ -24,55 +24,50 @@ import {
   type YargEventNode,
   type NotesNode,
   type EffectRaiserNode,
-  type EffectEventListenerNode
-} from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import { createId, buildDefaultAction } from '../lib/cueDefaults';
-import type { EditorNode, EventOption, NotesVariant } from '../lib/types';
-import { getDefaultEventOption } from '../lib/options';
+  type EffectEventListenerNode,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { createId, buildDefaultAction } from '../lib/cueDefaults'
+import type { EditorNode, EventOption, NotesVariant } from '../lib/types'
+import { getDefaultEventOption } from '../lib/options'
 
 type UseNodeCreationParams = {
-  nodes: Array<{ id: string; position: { x: number; y: number } }>;
-  setNodes: React.Dispatch<React.SetStateAction<EditorNode[]>>;
-  activeMode: NodeCueMode;
-  setIsDirty: (dirty: boolean) => void;
-};
+  nodes: Array<{ id: string; position: { x: number; y: number } }>
+  setNodes: React.Dispatch<React.SetStateAction<EditorNode[]>>
+  activeMode: NodeCueMode
+  setIsDirty: (dirty: boolean) => void
+}
 
-const useNodeCreation = ({
-  nodes,
-  setNodes,
-  activeMode,
-  setIsDirty
-}: UseNodeCreationParams) => {
+const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCreationParams) => {
   const findAvailablePosition = useCallback(
     (
       preferredX: number,
       preferredY: number,
       nodeWidth: number = 150,
       nodeHeight: number = 80,
-      useExactPosition: boolean = false
+      useExactPosition: boolean = false,
     ): { x: number; y: number } => {
-      const padding = 20;
-      const gridSize = 50;
+      const padding = 20
+      const gridSize = 50
 
       const checkOverlap = (posX: number, posY: number): boolean => {
-        return nodes.some(node => {
-          const nodeRight = node.position.x + nodeWidth;
-          const nodeBottom = node.position.y + nodeHeight;
-          const newRight = posX + nodeWidth;
-          const newBottom = posY + nodeHeight;
+        return nodes.some((node) => {
+          const nodeRight = node.position.x + nodeWidth
+          const nodeBottom = node.position.y + nodeHeight
+          const newRight = posX + nodeWidth
+          const newBottom = posY + nodeHeight
 
           return !(
             posX >= nodeRight + padding ||
             newRight <= node.position.x - padding ||
             posY >= nodeBottom + padding ||
             newBottom <= node.position.y - padding
-          );
-        });
-      };
+          )
+        })
+      }
 
       if (useExactPosition) {
         if (!checkOverlap(preferredX, preferredY)) {
-          return { x: preferredX, y: preferredY };
+          return { x: preferredX, y: preferredY }
         }
 
         const smallOffsets = [
@@ -80,28 +75,28 @@ const useNodeCreation = ({
           { x: nodeWidth + padding, y: 0 },
           { x: -(nodeWidth + padding), y: 0 },
           { x: 0, y: nodeHeight + padding },
-          { x: 0, y: -(nodeHeight + padding) }
-        ];
+          { x: 0, y: -(nodeHeight + padding) },
+        ]
 
         for (const offset of smallOffsets) {
-          const testX = preferredX + offset.x;
-          const testY = preferredY + offset.y;
+          const testX = preferredX + offset.x
+          const testY = preferredY + offset.y
           if (!checkOverlap(testX, testY)) {
-            return { x: testX, y: testY };
+            return { x: testX, y: testY }
           }
         }
       }
 
-      let x = Math.round(preferredX / gridSize) * gridSize;
-      let y = Math.round(preferredY / gridSize) * gridSize;
+      const x = Math.round(preferredX / gridSize) * gridSize
+      const y = Math.round(preferredY / gridSize) * gridSize
 
       if (!checkOverlap(x, y)) {
-        return { x, y };
+        return { x, y }
       }
 
-      const maxAttempts = 50;
+      const maxAttempts = 50
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const radius = attempt * gridSize;
+        const radius = attempt * gridSize
         const positions = [
           { x: preferredX + radius, y: preferredY },
           { x: preferredX - radius, y: preferredY },
@@ -110,36 +105,36 @@ const useNodeCreation = ({
           { x: preferredX + radius, y: preferredY + radius },
           { x: preferredX - radius, y: preferredY - radius },
           { x: preferredX + radius, y: preferredY - radius },
-          { x: preferredX - radius, y: preferredY + radius }
-        ];
+          { x: preferredX - radius, y: preferredY + radius },
+        ]
 
         for (const pos of positions) {
-          const gridX = Math.round(pos.x / gridSize) * gridSize;
-          const gridY = Math.round(pos.y / gridSize) * gridSize;
+          const gridX = Math.round(pos.x / gridSize) * gridSize
+          const gridY = Math.round(pos.y / gridSize) * gridSize
           if (!checkOverlap(gridX, gridY)) {
-            return { x: gridX, y: gridY };
+            return { x: gridX, y: gridY }
           }
         }
       }
 
       if (nodes.length > 0) {
         const rightmostNode = nodes.reduce((prev, curr) =>
-          curr.position.x > prev.position.x ? curr : prev
-        );
+          curr.position.x > prev.position.x ? curr : prev,
+        )
         return {
           x: rightmostNode.position.x + nodeWidth + padding,
-          y: rightmostNode.position.y
-        };
+          y: rightmostNode.position.y,
+        }
       }
 
-      return { x, y };
+      return { x, y }
     },
-    [nodes]
-  );
+    [nodes],
+  )
 
   const logicNodeFactories: Record<LogicNode['logicType'], (id: string) => LogicNode> = useMemo(
     () => ({
-      variable: id =>
+      'variable': (id) =>
         ({
           id,
           type: 'logic',
@@ -149,9 +144,9 @@ const useNodeCreation = ({
           mode: 'set',
           varName: 'var1',
           valueType: 'number',
-          value: { source: 'literal', value: 0 }
-        } satisfies VariableLogicNode),
-      math: id =>
+          value: { source: 'literal', value: 0 },
+        }) satisfies VariableLogicNode,
+      'math': (id) =>
         ({
           id,
           type: 'logic',
@@ -161,9 +156,9 @@ const useNodeCreation = ({
           operator: 'add',
           left: { source: 'literal', value: 0 },
           right: { source: 'literal', value: 0 },
-          assignTo: 'result'
-        } satisfies MathLogicNode),
-      'cue-data': id =>
+          assignTo: 'result',
+        }) satisfies MathLogicNode,
+      'cue-data': (id) =>
         ({
           id,
           type: 'logic',
@@ -171,9 +166,9 @@ const useNodeCreation = ({
           label: 'cue-data',
           outputs: [],
           dataProperty: 'execution-count',
-          assignTo: undefined
-        } satisfies CueDataLogicNode as LogicNode),
-      'config-data': id =>
+          assignTo: undefined,
+        }) satisfies CueDataLogicNode as LogicNode,
+      'config-data': (id) =>
         ({
           id,
           type: 'logic',
@@ -181,9 +176,9 @@ const useNodeCreation = ({
           label: 'config-data',
           outputs: [],
           dataProperty: 'total-lights',
-          assignTo: undefined
-        } satisfies ConfigDataLogicNode as LogicNode),
-      'lights-from-index': id =>
+          assignTo: undefined,
+        }) satisfies ConfigDataLogicNode as LogicNode,
+      'lights-from-index': (id) =>
         ({
           id,
           type: 'logic',
@@ -192,9 +187,9 @@ const useNodeCreation = ({
           outputs: [],
           sourceVariable: '',
           index: { source: 'literal', value: 0 },
-          assignTo: ''
-        } satisfies LightsFromIndexLogicNode as LogicNode),
-      'array-length': id =>
+          assignTo: '',
+        }) satisfies LightsFromIndexLogicNode as LogicNode,
+      'array-length': (id) =>
         ({
           id,
           type: 'logic',
@@ -202,9 +197,9 @@ const useNodeCreation = ({
           label: 'array-length',
           outputs: [],
           sourceVariable: '',
-          assignTo: ''
-        } satisfies ArrayLengthLogicNode as LogicNode),
-      'reverse-lights': id =>
+          assignTo: '',
+        }) satisfies ArrayLengthLogicNode as LogicNode,
+      'reverse-lights': (id) =>
         ({
           id,
           type: 'logic',
@@ -212,9 +207,9 @@ const useNodeCreation = ({
           label: 'reverse-lights',
           outputs: [],
           sourceVariable: '',
-          assignTo: ''
-        } satisfies ReverseLightsLogicNode as LogicNode),
-      'create-pairs': id =>
+          assignTo: '',
+        }) satisfies ReverseLightsLogicNode as LogicNode,
+      'create-pairs': (id) =>
         ({
           id,
           type: 'logic',
@@ -223,9 +218,9 @@ const useNodeCreation = ({
           outputs: [],
           pairType: 'opposite',
           sourceVariable: '',
-          assignTo: ''
-        } satisfies CreatePairsLogicNode as LogicNode),
-      'concat-lights': id =>
+          assignTo: '',
+        }) satisfies CreatePairsLogicNode as LogicNode,
+      'concat-lights': (id) =>
         ({
           id,
           type: 'logic',
@@ -233,18 +228,18 @@ const useNodeCreation = ({
           label: 'concat-lights',
           outputs: [],
           sourceVariables: [],
-          assignTo: ''
-        } satisfies ConcatLightsLogicNode as LogicNode),
-      delay: id =>
+          assignTo: '',
+        }) satisfies ConcatLightsLogicNode as LogicNode,
+      'delay': (id) =>
         ({
           id,
           type: 'logic',
           logicType: 'delay',
           label: 'delay',
           outputs: [],
-          delayTime: { source: 'literal', value: 1000 }
-        } satisfies DelayLogicNode as LogicNode),
-      debugger: id =>
+          delayTime: { source: 'literal', value: 1000 },
+        }) satisfies DelayLogicNode as LogicNode,
+      'debugger': (id) =>
         ({
           id,
           type: 'logic',
@@ -252,9 +247,9 @@ const useNodeCreation = ({
           label: 'debugger',
           outputs: [],
           message: { source: 'literal', value: 'Debug message' },
-          variablesToLog: []
-        } satisfies DebuggerLogicNode as LogicNode),
-      conditional: id =>
+          variablesToLog: [],
+        }) satisfies DebuggerLogicNode as LogicNode,
+      'conditional': (id) =>
         ({
           id,
           type: 'logic',
@@ -263,9 +258,9 @@ const useNodeCreation = ({
           outputs: [],
           comparator: '>',
           left: { source: 'literal', value: 0 },
-          right: { source: 'literal', value: 0 }
-        } satisfies ConditionalLogicNode),
-      random: id =>
+          right: { source: 'literal', value: 0 },
+        }) satisfies ConditionalLogicNode,
+      'random': (id) =>
         ({
           id,
           type: 'logic',
@@ -275,9 +270,9 @@ const useNodeCreation = ({
           mode: 'random-integer',
           min: { source: 'literal', value: 0 },
           max: { source: 'literal', value: 1 },
-          assignTo: ''
-        } satisfies RandomLogicNode as LogicNode),
-      'shuffle-lights': id =>
+          assignTo: '',
+        }) satisfies RandomLogicNode as LogicNode,
+      'shuffle-lights': (id) =>
         ({
           id,
           type: 'logic',
@@ -285,9 +280,9 @@ const useNodeCreation = ({
           label: 'shuffle-lights',
           outputs: [],
           sourceVariable: '',
-          assignTo: ''
-        } satisfies ShuffleLightsLogicNode as LogicNode),
-      'for-each-light': id =>
+          assignTo: '',
+        }) satisfies ShuffleLightsLogicNode as LogicNode,
+      'for-each-light': (id) =>
         ({
           id,
           type: 'logic',
@@ -296,28 +291,28 @@ const useNodeCreation = ({
           outputs: [],
           sourceVariable: '',
           currentLightVariable: '',
-          currentIndexVariable: ''
-        } satisfies ForEachLightLogicNode as LogicNode)
+          currentIndexVariable: '',
+        }) satisfies ForEachLightLogicNode as LogicNode,
     }),
-    []
-  );
+    [],
+  )
 
   const addEventNode = useCallback(
     (
       option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
-      position?: { x: number; y: number }
+      position?: { x: number; y: number },
     ) => {
-      const nodeMode = activeMode;
-      const newEventId = `event-${createId()}`;
-      const defaultOption = option ?? getDefaultEventOption(nodeMode);
-      const nodeWidth = 150;
-      const nodeHeight = 80;
+      const nodeMode = activeMode
+      const newEventId = `event-${createId()}`
+      const defaultOption = option ?? getDefaultEventOption(nodeMode)
+      const nodeWidth = 150
+      const nodeHeight = 80
       const centeredPosition = position
         ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined;
+        : undefined
       const pos = centeredPosition
         ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(120, 80);
+        : findAvailablePosition(120, 80)
       const newNode: EditorNode = {
         id: newEventId,
         type: 'event',
@@ -330,37 +325,37 @@ const useNodeCreation = ({
               ? {
                   id: newEventId,
                   type: 'event',
-                  eventType: defaultOption.value as YargEventNode['eventType']
+                  eventType: defaultOption.value as YargEventNode['eventType'],
                 }
               : {
                   id: newEventId,
                   type: 'event',
                   eventType: defaultOption.value as AudioEventNode['eventType'],
                   threshold: 0.5,
-                  triggerMode: 'edge'
-                }
-        }
-      };
-      setNodes(nds => [...nds, newNode]);
-      setIsDirty(true);
+                  triggerMode: 'edge',
+                },
+        },
+      }
+      setNodes((nds) => [...nds, newNode])
+      setIsDirty(true)
     },
-    [activeMode, findAvailablePosition, setIsDirty, setNodes]
-  );
+    [activeMode, findAvailablePosition, setIsDirty, setNodes],
+  )
 
   const addActionNode = useCallback(
     (effectType: NodeEffectType, position?: { x: number; y: number }) => {
-      const action = { ...buildDefaultAction(), id: `action-${createId()}`, effectType };
+      const action = { ...buildDefaultAction(), id: `action-${createId()}`, effectType }
       if (effectType === 'chase') {
-        action.config = { ...action.config, perLightOffsetMs: 50, order: 'linear' };
+        action.config = { ...action.config, perLightOffsetMs: 50, order: 'linear' }
       }
-      const nodeWidth = 150;
-      const nodeHeight = 80;
+      const nodeWidth = 150
+      const nodeHeight = 80
       const centeredPosition = position
         ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined;
+        : undefined
       const pos = centeredPosition
         ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(480, 160);
+        : findAvailablePosition(480, 160)
       const newNode: EditorNode = {
         id: action.id,
         type: 'action',
@@ -368,28 +363,28 @@ const useNodeCreation = ({
         data: {
           kind: 'action',
           label: effectType,
-          payload: action
-        }
-      };
-      setNodes(nds => [...nds, newNode]);
-      setIsDirty(true);
+          payload: action,
+        },
+      }
+      setNodes((nds) => [...nds, newNode])
+      setIsDirty(true)
     },
-    [findAvailablePosition, setIsDirty, setNodes]
-  );
+    [findAvailablePosition, setIsDirty, setNodes],
+  )
 
   const addLogicNode = useCallback(
     (logicType: LogicNode['logicType'], position?: { x: number; y: number }) => {
-      const id = `logic-${createId()}`;
-      const payload = logicNodeFactories[logicType](id);
+      const id = `logic-${createId()}`
+      const payload = logicNodeFactories[logicType](id)
 
-      const nodeWidth = 150;
-      const nodeHeight = 80;
+      const nodeWidth = 150
+      const nodeHeight = 80
       const centeredPosition = position
         ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined;
+        : undefined
       const pos = centeredPosition
         ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(320, 120);
+        : findAvailablePosition(320, 120)
       const newNode: EditorNode = {
         id,
         type: 'logic',
@@ -397,36 +392,36 @@ const useNodeCreation = ({
         data: {
           kind: 'logic',
           label: logicType,
-          payload
-        }
-      };
+          payload,
+        },
+      }
 
-      setNodes(nds => [...nds, newNode]);
-      setIsDirty(true);
+      setNodes((nds) => [...nds, newNode])
+      setIsDirty(true)
     },
-    [findAvailablePosition, logicNodeFactories, setIsDirty, setNodes]
-  );
+    [findAvailablePosition, logicNodeFactories, setIsDirty, setNodes],
+  )
 
   const addEventRaiserNode = useCallback(
     (position?: { x: number; y: number }) => {
-      const id = `event-raiser-${createId()}`;
+      const id = `event-raiser-${createId()}`
       const payload: EventRaiserNode = {
         id,
         type: 'event-raiser',
         eventName: '',
         label: 'Raise Event',
         inputs: [],
-        outputs: []
-      };
+        outputs: [],
+      }
 
-      const nodeWidth = 150;
-      const nodeHeight = 80;
+      const nodeWidth = 150
+      const nodeHeight = 80
       const centeredPosition = position
         ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined;
+        : undefined
       const pos = centeredPosition
         ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(320, 200);
+        : findAvailablePosition(320, 200)
       const newNode: EditorNode = {
         id,
         type: 'event-raiser',
@@ -434,35 +429,35 @@ const useNodeCreation = ({
         data: {
           kind: 'event-raiser',
           label: 'Raise Event',
-          payload
-        }
-      };
+          payload,
+        },
+      }
 
-      setNodes(nds => [...nds, newNode]);
-      setIsDirty(true);
+      setNodes((nds) => [...nds, newNode])
+      setIsDirty(true)
     },
-    [findAvailablePosition, setIsDirty, setNodes]
-  );
+    [findAvailablePosition, setIsDirty, setNodes],
+  )
 
   const addEventListenerNode = useCallback(
     (position?: { x: number; y: number }) => {
-      const id = `event-listener-${createId()}`;
+      const id = `event-listener-${createId()}`
       const payload: EventListenerNode = {
         id,
         type: 'event-listener',
         eventName: '',
         label: 'Listen Event',
-        outputs: []
-      };
+        outputs: [],
+      }
 
-      const nodeWidth = 150;
-      const nodeHeight = 80;
+      const nodeWidth = 150
+      const nodeHeight = 80
       const centeredPosition = position
         ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined;
+        : undefined
       const pos = centeredPosition
         ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(120, 280);
+        : findAvailablePosition(120, 280)
       const newNode: EditorNode = {
         id,
         type: 'event-listener',
@@ -470,35 +465,35 @@ const useNodeCreation = ({
         data: {
           kind: 'event-listener',
           label: 'Listen Event',
-          payload
-        }
-      };
+          payload,
+        },
+      }
 
-      setNodes(nds => [...nds, newNode]);
-      setIsDirty(true);
+      setNodes((nds) => [...nds, newNode])
+      setIsDirty(true)
     },
-    [findAvailablePosition, setIsDirty, setNodes]
-  );
+    [findAvailablePosition, setIsDirty, setNodes],
+  )
 
   const addEffectRaiserNode = useCallback(
     (position?: { x: number; y: number }) => {
-      const id = `effect-raiser-${createId()}`;
+      const id = `effect-raiser-${createId()}`
       const payload: EffectRaiserNode = {
         id,
         type: 'effect-raiser',
         effectId: '',
         label: 'Raise Effect',
-        outputs: []
-      };
+        outputs: [],
+      }
 
-      const nodeWidth = 150;
-      const nodeHeight = 80;
+      const nodeWidth = 150
+      const nodeHeight = 80
       const centeredPosition = position
         ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined;
+        : undefined
       const pos = centeredPosition
         ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(120, 280);
+        : findAvailablePosition(120, 280)
       const newNode: EditorNode = {
         id,
         type: 'effect-raiser',
@@ -506,34 +501,34 @@ const useNodeCreation = ({
         data: {
           kind: 'effect-raiser',
           label: 'Raise Effect',
-          payload
-        }
-      };
+          payload,
+        },
+      }
 
-      setNodes(nds => [...nds, newNode]);
-      setIsDirty(true);
+      setNodes((nds) => [...nds, newNode])
+      setIsDirty(true)
     },
-    [findAvailablePosition, setIsDirty, setNodes]
-  );
+    [findAvailablePosition, setIsDirty, setNodes],
+  )
 
   const addEffectListenerNode = useCallback(
     (position?: { x: number; y: number }) => {
-      const id = `effect-listener-${createId()}`;
+      const id = `effect-listener-${createId()}`
       const payload: EffectEventListenerNode = {
         id,
         type: 'effect-listener',
         label: 'Effect Entry',
-        outputs: []
-      };
+        outputs: [],
+      }
 
-      const nodeWidth = 150;
-      const nodeHeight = 80;
+      const nodeWidth = 150
+      const nodeHeight = 80
       const centeredPosition = position
         ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined;
+        : undefined
       const pos = centeredPosition
         ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(120, 80);
+        : findAvailablePosition(120, 80)
       const newNode: EditorNode = {
         id,
         type: 'effect-listener',
@@ -541,42 +536,42 @@ const useNodeCreation = ({
         data: {
           kind: 'effect-listener',
           label: 'Effect Entry',
-          payload
-        }
-      };
+          payload,
+        },
+      }
 
-      setNodes(nds => [...nds, newNode]);
-      setIsDirty(true);
+      setNodes((nds) => [...nds, newNode])
+      setIsDirty(true)
     },
-    [findAvailablePosition, setIsDirty, setNodes]
-  );
+    [findAvailablePosition, setIsDirty, setNodes],
+  )
 
   const addNotesNode = useCallback(
     (variant: NotesVariant = 'notes', position?: { x: number; y: number }) => {
-      const normalizedVariant = variant.toLowerCase() as NotesVariant;
+      const normalizedVariant = variant.toLowerCase() as NotesVariant
       const label =
         normalizedVariant === 'info'
           ? 'Info'
           : normalizedVariant === 'important'
             ? 'Important'
-            : 'Notes';
-      const id = `notes-${createId()}`;
+            : 'Notes'
+      const id = `notes-${createId()}`
       const payload: NotesNode = {
         id,
         type: 'notes',
         label,
         note: '',
-        style: normalizedVariant
-      };
+        style: normalizedVariant,
+      }
 
-      const nodeWidth = 240;
-      const nodeHeight = 80;
+      const nodeWidth = 240
+      const nodeHeight = 80
       const centeredPosition = position
         ? { x: position.x - nodeWidth / 2, y: position.y - nodeHeight / 2 }
-        : undefined;
+        : undefined
       const pos = centeredPosition
         ? findAvailablePosition(centeredPosition.x, centeredPosition.y, nodeWidth, nodeHeight, true)
-        : findAvailablePosition(320, 240);
+        : findAvailablePosition(320, 240)
       const newNode: EditorNode = {
         id,
         type: 'notes',
@@ -584,15 +579,15 @@ const useNodeCreation = ({
         data: {
           kind: 'notes',
           label,
-          payload
-        }
-      };
+          payload,
+        },
+      }
 
-      setNodes(nds => [...nds, newNode]);
-      setIsDirty(true);
+      setNodes((nds) => [...nds, newNode])
+      setIsDirty(true)
     },
-    [findAvailablePosition, setIsDirty, setNodes]
-  );
+    [findAvailablePosition, setIsDirty, setNodes],
+  )
 
   return {
     findAvailablePosition,
@@ -603,8 +598,8 @@ const useNodeCreation = ({
     addEventListenerNode,
     addEffectRaiserNode,
     addEffectListenerNode,
-    addNotesNode
-  };
-};
+    addNotesNode,
+  }
+}
 
-export { useNodeCreation };
+export { useNodeCreation }

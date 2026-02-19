@@ -1,17 +1,17 @@
-import { Pages } from '../types';
-import Status from '../pages/Status';
-import MyLights from '../pages/MyLights';
-import LightsLayout from '../pages/LightsLayout';
-import NetworkDebug from '../pages/NetworkDebug';
-import DmxPreview from '../pages/DmxPreview';
-import CueSimulation from '../pages/CueSimulation';
-import About from '../pages/About';
-import Preferences from '../pages/Preferences';
-import AudioSettings from '../pages/AudioSettings';
-import { openCueEditorWindow } from '../ipcApi';
+import { Pages } from '../types'
+import Status from '../pages/Status'
+import MyLights from '../pages/MyLights'
+import LightsLayout from '../pages/LightsLayout'
+import NetworkDebug from '../pages/NetworkDebug'
+import DmxPreview from '../pages/DmxPreview'
+import CueSimulation from '../pages/CueSimulation'
+import About from '../pages/About'
+import Preferences from '../pages/Preferences'
+import AudioSettings from '../pages/AudioSettings'
+import { openCueEditorWindow } from '../ipcApi'
 
 interface AppPageRouterProps {
-  currentPage: Pages;
+  currentPage: Pages
 }
 
 /**
@@ -21,40 +21,41 @@ interface AppPageRouterProps {
 export function AppPageRouter({ currentPage }: AppPageRouterProps): JSX.Element {
   switch (currentPage) {
     case Pages.Status:
-      return <Status />;
+      return <Status />
     case Pages.MyLights:
-      return <MyLights />;
+      return <MyLights />
     case Pages.LightLayout:
-      return <LightsLayout />;
+      return <LightsLayout />
     case Pages.CuePreview:
-      return <DmxPreview />;
+      return <DmxPreview />
     case Pages.CueSimulation:
-      return <CueSimulation />;
+      return <CueSimulation />
     case Pages.CueSequencer:
     case Pages.CueEditor:
       return (
         <div className="p-6">
-          <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Cue Editor</h2>
+          <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">
+            Cue Editor
+          </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             The Cue Editor opens in a separate window.
           </p>
           <button
             className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-500"
-            onClick={() => openCueEditorWindow()}
-          >
+            onClick={() => openCueEditorWindow()}>
             Open Cue Editor
           </button>
         </div>
-      );
+      )
     case Pages.NetworkDebug:
-      return <NetworkDebug />;
+      return <NetworkDebug />
     case Pages.Preferences:
-      return <Preferences />;
+      return <Preferences />
     case Pages.AudioSettings:
-      return <AudioSettings />;
+      return <AudioSettings />
     case Pages.About:
-      return <About />;
+      return <About />
     default:
-      return <Status />;
+      return <Status />
   }
 }

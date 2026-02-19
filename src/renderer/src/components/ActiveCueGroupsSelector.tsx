@@ -1,122 +1,131 @@
-import  { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { useAtom } from 'jotai';
-import { yargListenerEnabledAtom } from '../atoms';
-import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
-import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels';
+import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react'
+import { useAtom } from 'jotai'
+import { yargListenerEnabledAtom } from '../atoms'
+import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 interface CueGroup {
-  id: string;
-  name: string;
-  description: string;
-  cueTypes: string[];
+  id: string
+  name: string
+  description: string
+  cueTypes: string[]
 }
 
 interface ActiveGroupsSelectorProps {
-  className?: string;
+  className?: string
 }
 
 export interface ActiveGroupsSelectorRef {
-  refreshActiveGroups: () => Promise<void>;
+  refreshActiveGroups: () => Promise<void>
 }
 
 const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSelectorProps>(
   ({ className = '' }, ref) => {
-    const [enabledGroups, setEnabledGroups] = useState<CueGroup[]>([]);
-    const [activeGroupIds, setActiveGroupIds] = useState<string[]>([]);
-    const [stageKitPriority, setStageKitPriority] = useState<string>('prefer-for-tracked');
-    const [loading, setLoading] = useState(true);
-    const [yargListenerEnabled] = useAtom(yargListenerEnabledAtom);
+    const [enabledGroups, setEnabledGroups] = useState<CueGroup[]>([])
+    const [activeGroupIds, setActiveGroupIds] = useState<string[]>([])
+    const [stageKitPriority, setStageKitPriority] = useState<string>('prefer-for-tracked')
+    const [loading, setLoading] = useState(true)
+    const [yargListenerEnabled] = useAtom(yargListenerEnabledAtom)
 
     const fetchActiveGroups = useCallback(async () => {
       try {
         const [active, priority] = await Promise.all([
           window.electron.ipcRenderer.invoke(LIGHT.GET_ACTIVE_CUE_GROUPS),
-          window.electron.ipcRenderer.invoke(CONFIG.GET_STAGE_KIT_PRIORITY)
-        ]);
-        const newActiveGroupIds = active.map((g: CueGroup) => g.id);
-        
-        setActiveGroupIds(prevActive => {
+          window.electron.ipcRenderer.invoke(CONFIG.GET_STAGE_KIT_PRIORITY),
+        ])
+        const newActiveGroupIds = active.map((g: CueGroup) => g.id)
+
+        setActiveGroupIds((prevActive) => {
           // Only update if actually different to avoid unnecessary re-renders
           if (JSON.stringify(prevActive.sort()) !== JSON.stringify(newActiveGroupIds.sort())) {
-            return newActiveGroupIds;
+            return newActiveGroupIds
           }
-          return prevActive;
-        });
-        
-        setStageKitPriority(priority || 'prefer-for-tracked');
+          return prevActive
+        })
+
+        setStageKitPriority(priority || 'prefer-for-tracked')
       } catch (error) {
-        console.error('Error fetching active groups:', error);
+        console.error('Error fetching active groups:', error)
       }
-    }, []);
+    }, [])
 
     const fetchData = useCallback(async () => {
       try {
-        setLoading(true);
+        setLoading(true)
         const [enabled, active, priority] = await Promise.all([
           window.electron.ipcRenderer.invoke(CONFIG.GET_ENABLED_CUE_GROUPS),
           window.electron.ipcRenderer.invoke(LIGHT.GET_ACTIVE_CUE_GROUPS),
-          window.electron.ipcRenderer.invoke(CONFIG.GET_STAGE_KIT_PRIORITY)
-        ]);
-        
+          window.electron.ipcRenderer.invoke(CONFIG.GET_STAGE_KIT_PRIORITY),
+        ])
+
         // Get full group details for enabled groups
-        const enabledGroupIds = Array.isArray(enabled) ? enabled : [];
-        const allGroups = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS);
-        const enabledGroupDetails = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id));
-        
-        setEnabledGroups(enabledGroupDetails);
-        setActiveGroupIds(active.map((g: CueGroup) => g.id));
-        setStageKitPriority(priority || 'prefer-for-tracked');
+        const enabledGroupIds = Array.isArray(enabled) ? enabled : []
+        const allGroups = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS)
+        const enabledGroupDetails = allGroups.filter((g: CueGroup) =>
+          enabledGroupIds.includes(g.id),
+        )
+
+        setEnabledGroups(enabledGroupDetails)
+        setActiveGroupIds(active.map((g: CueGroup) => g.id))
+        setStageKitPriority(priority || 'prefer-for-tracked')
       } catch (error) {
-        console.error('Error fetching group data:', error);
+        console.error('Error fetching group data:', error)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    }, []);
+    }, [])
 
     // Expose refresh method to parent component
-    useImperativeHandle(ref, () => ({
-      refreshActiveGroups: fetchActiveGroups
-    }), [fetchActiveGroups]);
+    useImperativeHandle(
+      ref,
+      () => ({
+        refreshActiveGroups: fetchActiveGroups,
+      }),
+      [fetchActiveGroups],
+    )
 
     useEffect(() => {
-      fetchData();
-    }, [fetchData]);
+      fetchData()
+    }, [fetchData])
 
     useEffect(() => {
       const handleNodeCuesChanged = () => {
-        fetchData();
-      };
-      addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged);
+        fetchData()
+      }
+      addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged)
       return () => {
-        removeIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged);
-      };
-    }, [fetchData]);
+        removeIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged)
+      }
+    }, [fetchData])
 
     const handleGroupToggle = async (groupId: string, isActive: boolean) => {
       try {
-        let updatedActiveGroupIds: string[];
-        
+        let updatedActiveGroupIds: string[]
+
         if (isActive) {
           // Add to active groups
-          updatedActiveGroupIds = [...new Set([...activeGroupIds, groupId])];
+          updatedActiveGroupIds = [...new Set([...activeGroupIds, groupId])]
         } else {
           // Remove from active groups
-          updatedActiveGroupIds = activeGroupIds.filter(id => id !== groupId);
+          updatedActiveGroupIds = activeGroupIds.filter((id) => id !== groupId)
         }
-        
+
         // Update backend
-        const result = await window.electron.ipcRenderer.invoke(LIGHT.SET_ACTIVE_CUE_GROUPS, updatedActiveGroupIds);
-        
+        const result = await window.electron.ipcRenderer.invoke(
+          LIGHT.SET_ACTIVE_CUE_GROUPS,
+          updatedActiveGroupIds,
+        )
+
         if (result.success) {
-          setActiveGroupIds(updatedActiveGroupIds);
+          setActiveGroupIds(updatedActiveGroupIds)
         } else {
-          console.error('Failed to update active groups:', result.error);
+          console.error('Failed to update active groups:', result.error)
           // Could show a toast notification here
         }
       } catch (error) {
-        console.error('Error updating active groups:', error);
+        console.error('Error updating active groups:', error)
       }
-    };
+    }
 
     if (loading) {
       return (
@@ -126,12 +135,12 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
             <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
           </div>
         </div>
-      );
+      )
     }
 
     // Only show this component when YARG is enabled
     if (!yargListenerEnabled) {
-      return null;
+      return null
     }
 
     if (enabledGroups.length === 0) {
@@ -139,7 +148,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
         <div className={`p-4 bg-gray-50 dark:bg-gray-700 rounded-lg ${className}`}>
           <p className="text-gray-600 dark:text-gray-400">No enabled cue groups found.</p>
         </div>
-      );
+      )
     }
 
     return (
@@ -150,67 +159,71 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
         {/* Show cue group selector and stage kit priority when YARG is enabled */}
         <>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              By default all enabled cue groups are active. To disable a group entirely, disable it in the Preferences menu. 
-              Disabling it here is temporary.
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              If the active groups are missing a cue the system will fallback to the Stage Kit group, even if it is disabled.
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              If Stage Kit Priority Mode is set to <span className="font-bold">Prefer for Tracked</span>, <span className="font-bold">only</span> the Stage Kit group will be used if the song has tracked lighting data.
-            </p>
-            <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg mb-3">
-              <div className="flex items-center justify-start gap-3">
-                <span className="font-medium text-gray-900 dark:text-gray-100">
-                  Stage Kit Priority Mode:
-                </span>
-                <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                  {stageKitPriority.replace(/-/g, ' ')}
-                </span>
-              </div>
+            By default all enabled cue groups are active. To disable a group entirely, disable it in
+            the Preferences menu. Disabling it here is temporary.
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            If the active groups are missing a cue the system will fallback to the Stage Kit group,
+            even if it is disabled.
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            If Stage Kit Priority Mode is set to{' '}
+            <span className="font-bold">Prefer for Tracked</span>,{' '}
+            <span className="font-bold">only</span> the Stage Kit group will be used if the song has
+            tracked lighting data.
+          </p>
+          <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg mb-3">
+            <div className="flex items-center justify-start gap-3">
+              <span className="font-medium text-gray-900 dark:text-gray-100">
+                Stage Kit Priority Mode:
+              </span>
+              <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                {stageKitPriority.replace(/-/g, ' ')}
+              </span>
             </div>
-            
-            <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
-              <div className="space-y-2">
-                {enabledGroups.map((group) => (
-                  <div
-                    key={group.id}
-                    className="flex items-center justify-between pl-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <input
-                        type="checkbox"
-                        className="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600"
-                        checked={activeGroupIds.includes(group.id)}
-                        onChange={(e) => handleGroupToggle(group.id, e.target.checked)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium text-gray-900 dark:text-gray-100">
-                          {group.name}
-                        </span>
-                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                          ({group.cueTypes.length} cues)
-                        </span>
-                      </div>
+          </div>
+
+          <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
+            <div className="space-y-2">
+              {enabledGroups.map((group) => (
+                <div
+                  key={group.id}
+                  className="flex items-center justify-between pl-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors">
+                  <div className="flex items-center gap-3 flex-1">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600"
+                      checked={activeGroupIds.includes(group.id)}
+                      onChange={(e) => handleGroupToggle(group.id, e.target.checked)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        {group.name}
+                      </span>
+                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                        ({group.cueTypes.length} cues)
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
+          </div>
         </>
-        
+
         {activeGroupIds.length === 0 && (
           <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
             <p className="text-yellow-800 dark:text-yellow-200">
-              <strong>Warning:</strong> No active groups selected. Cue resolution will only use the default group as fallback.
+              <strong>Warning:</strong> No active groups selected. Cue resolution will only use the
+              default group as fallback.
             </p>
           </div>
         )}
       </div>
-    );
-  }
-);
+    )
+  },
+)
 
-ActiveGroupsSelector.displayName = 'ActiveGroupsSelector';
+ActiveGroupsSelector.displayName = 'ActiveGroupsSelector'
 
-export default ActiveGroupsSelector; 
+export default ActiveGroupsSelector

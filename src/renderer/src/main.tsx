@@ -1,24 +1,21 @@
-import './styles/app.css';
-import * as React from 'react';
+import './styles/app.css'
+import * as React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
-import { DarkModeProvider } from './DarkModeProvider';
-import CueEditorWindow from './windows/CueEditorWindow';
+import { DarkModeProvider } from './DarkModeProvider'
+import CueEditorWindow from './windows/CueEditorWindow'
 
 const getRootComponent = () => {
-  const params = new URLSearchParams(window.location.search);
-  const windowType = params.get('window');
+  const params = new URLSearchParams(window.location.search)
+  const windowType = params.get('window')
   if (windowType === 'cue-editor') {
-    return <CueEditorWindow />;
+    return <CueEditorWindow />
   }
-  return <App />;
-};
+  return <App />
+}
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <DarkModeProvider>
-      {getRootComponent()}
-    </DarkModeProvider>
-
-  </React.StrictMode>
+    <DarkModeProvider>{getRootComponent()}</DarkModeProvider>
+  </React.StrictMode>,
 )

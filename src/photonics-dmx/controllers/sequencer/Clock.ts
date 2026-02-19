@@ -6,18 +6,18 @@
  * configurable interval that notifies all registered components.
  */
 export class Clock {
-  private intervalId: NodeJS.Timeout | null = null;
-  private startTime: number;
-  private lastUpdateTime: number;
-  private updateCallbacks: Array<(deltaTime: number) => void> = [];
-  private isRunning: boolean = false;
-  private tickCount: number = 0;
-  private intervalMs: number;
+  private intervalId: NodeJS.Timeout | null = null
+  private startTime: number
+  private lastUpdateTime: number
+  private updateCallbacks: Array<(deltaTime: number) => void> = []
+  private isRunning: boolean = false
+  private tickCount: number = 0
+  private intervalMs: number
 
   constructor(intervalMs: number = 5) {
-    this.intervalMs = Math.max(1, Math.min(100, intervalMs)); // Clamp between 1-100ms
-    this.startTime = this.getCurrentTime();
-    this.lastUpdateTime = this.startTime;
+    this.intervalMs = Math.max(1, Math.min(100, intervalMs)) // Clamp between 1-100ms
+    this.startTime = this.getCurrentTime()
+    this.lastUpdateTime = this.startTime
   }
 
   /**
@@ -25,7 +25,7 @@ export class Clock {
    * @param callback Function to call with delta time in milliseconds
    */
   onTick(callback: (deltaTime: number) => void): void {
-    this.updateCallbacks.push(callback);
+    this.updateCallbacks.push(callback)
   }
 
   /**
@@ -33,9 +33,9 @@ export class Clock {
    * @param callback The callback to remove
    */
   offTick(callback: (deltaTime: number) => void): void {
-    const index = this.updateCallbacks.indexOf(callback);
+    const index = this.updateCallbacks.indexOf(callback)
     if (index > -1) {
-      this.updateCallbacks.splice(index, 1);
+      this.updateCallbacks.splice(index, 1)
     }
   }
 
@@ -43,24 +43,24 @@ export class Clock {
    * Start the timing system
    */
   start(): void {
-    if (this.isRunning) return;
+    if (this.isRunning) return
 
-    this.isRunning = true;
+    this.isRunning = true
     this.intervalId = setInterval(() => {
-      this.update();
-    }, this.intervalMs);
+      this.update()
+    }, this.intervalMs)
   }
 
   /**
    * Stop the timing system
    */
   stop(): void {
-    if (!this.isRunning) return;
-    
-    this.isRunning = false;
+    if (!this.isRunning) return
+
+    this.isRunning = false
     if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
+      clearInterval(this.intervalId)
+      this.intervalId = null
     }
   }
 
@@ -68,66 +68,66 @@ export class Clock {
    * Check if the timing system is currently running
    */
   isActive(): boolean {
-    return this.isRunning;
+    return this.isRunning
   }
 
   /**
    * Get the current time in milliseconds since the clock started
    */
   getCurrentTimeMs(): number {
-    return this.getCurrentTime() - this.startTime;
+    return this.getCurrentTime() - this.startTime
   }
 
   /**
    * Get the current absolute time in milliseconds
    */
   getAbsoluteTimeMs(): number {
-    return this.getCurrentTime();
+    return this.getCurrentTime()
   }
 
   /**
    * Get the current tick count (useful for testing)
    */
   getTickCount(): number {
-    return this.tickCount;
+    return this.tickCount
   }
 
   /**
    * Internal method to get current time with fallback for test environments
    */
   private getCurrentTime(): number {
-    const perfTime = performance.now();
+    const perfTime = performance.now()
     // If performance.now() returns 0 (test environment), use tick count as fallback
     if (perfTime === 0) {
-      return this.tickCount;
+      return this.tickCount
     }
-    return perfTime;
+    return perfTime
   }
 
   /**
    * Internal update method that notifies all registered callbacks
    */
   private update(): void {
-    this.tickCount++;
-    const currentTime = this.getCurrentTime();
-    const deltaTime = currentTime - this.lastUpdateTime;
-    this.lastUpdateTime = currentTime;
-    
+    this.tickCount++
+    const currentTime = this.getCurrentTime()
+    const deltaTime = currentTime - this.lastUpdateTime
+    this.lastUpdateTime = currentTime
+
     // Notify all registered callbacks
-    this.updateCallbacks.forEach(callback => {
+    this.updateCallbacks.forEach((callback) => {
       try {
-        callback(deltaTime);
+        callback(deltaTime)
       } catch (error) {
-        console.error('Error in timing update callback:', error);
+        console.error('Error in timing update callback:', error)
       }
-    });
+    })
   }
 
   /**
    * Clean up all resources
    */
   destroy(): void {
-    this.stop();
-    this.updateCallbacks.length = 0;
+    this.stop()
+    this.updateCallbacks.length = 0
   }
 }

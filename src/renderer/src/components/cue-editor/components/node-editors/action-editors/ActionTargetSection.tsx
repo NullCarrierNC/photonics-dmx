@@ -1,29 +1,29 @@
-import React from 'react';
-import type { ActionNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import { LIGHT_TARGET_OPTIONS } from '../../../../../../../photonics-dmx/constants/options';
-import ValueSourceEditor from '../../shared/ValueSourceEditor';
-import TargetGroupsMultiSelectEditor from '../../shared/TargetGroupsMultiSelectEditor';
+import React from 'react'
+import type { ActionNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { LIGHT_TARGET_OPTIONS } from '../../../../../../../photonics-dmx/constants/options'
+import ValueSourceEditor from '../../shared/ValueSourceEditor'
+import TargetGroupsMultiSelectEditor from '../../shared/TargetGroupsMultiSelectEditor'
 
 type ActionTargetSectionProps = {
-  node: ActionNode;
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
-  updateNode: (updates: Partial<ActionNode>) => void;
-};
+  node: ActionNode
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  updateNode: (updates: Partial<ActionNode>) => void
+}
 
 const ActionTargetSection: React.FC<ActionTargetSectionProps> = ({
   node,
   availableVariables,
-  updateNode
+  updateNode,
 }) => {
-  if (node.effectType === 'blackout') return null;
+  if (node.effectType === 'blackout') return null
   return (
     <>
       <TargetGroupsMultiSelectEditor
         label="Target Groups"
         value={node.target.groups}
-        onChange={next =>
+        onChange={(next) =>
           updateNode({
-            target: { ...node.target, groups: next }
+            target: { ...node.target, groups: next },
           })
         }
         availableVariables={availableVariables}
@@ -31,9 +31,9 @@ const ActionTargetSection: React.FC<ActionTargetSectionProps> = ({
       <ValueSourceEditor
         label="Target Filter"
         value={node.target.filter}
-        onChange={next =>
+        onChange={(next) =>
           updateNode({
-            target: { ...node.target, filter: next }
+            target: { ...node.target, filter: next },
           })
         }
         expected="string"
@@ -41,7 +41,7 @@ const ActionTargetSection: React.FC<ActionTargetSectionProps> = ({
         availableVariables={availableVariables}
       />
     </>
-  );
-};
+  )
+}
 
-export default ActionTargetSection;
+export default ActionTargetSection

@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'
 import type {
   LogicNode,
   VariableLogicNode,
@@ -15,38 +15,38 @@ import type {
   DelayLogicNode,
   RandomLogicNode,
   ShuffleLightsLogicNode,
-  ForEachLightLogicNode
-} from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+  ForEachLightLogicNode,
+} from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
-import VariableLogicEditor from './logic/VariableLogicEditor';
-import MathLogicEditor from './logic/MathLogicEditor';
-import CueDataLogicEditor from './logic/CueDataLogicEditor';
-import ConfigDataLogicEditor from './logic/ConfigDataLogicEditor';
-import ConditionalLogicEditor from './logic/ConditionalLogicEditor';
-import LightsFromIndexLogicEditor from './logic/LightsFromIndexLogicEditor';
-import ArrayLengthLogicEditor from './logic/ArrayLengthLogicEditor';
-import ReverseLightsLogicEditor from './logic/ReverseLightsLogicEditor';
-import CreatePairsLogicEditor from './logic/CreatePairsLogicEditor';
-import ConcatLightsLogicEditor from './logic/ConcatLightsLogicEditor';
-import DelayLogicEditor from './logic/DelayLogicEditor';
-import RandomLogicEditor from './logic/RandomLogicEditor';
-import ShuffleLightsLogicEditor from './logic/ShuffleLightsLogicEditor';
-import ForEachLightLogicEditor from './logic/ForEachLightLogicEditor';
-import DebuggerLogicEditor from './logic/DebuggerLogicEditor';
+import VariableLogicEditor from './logic/VariableLogicEditor'
+import MathLogicEditor from './logic/MathLogicEditor'
+import CueDataLogicEditor from './logic/CueDataLogicEditor'
+import ConfigDataLogicEditor from './logic/ConfigDataLogicEditor'
+import ConditionalLogicEditor from './logic/ConditionalLogicEditor'
+import LightsFromIndexLogicEditor from './logic/LightsFromIndexLogicEditor'
+import ArrayLengthLogicEditor from './logic/ArrayLengthLogicEditor'
+import ReverseLightsLogicEditor from './logic/ReverseLightsLogicEditor'
+import CreatePairsLogicEditor from './logic/CreatePairsLogicEditor'
+import ConcatLightsLogicEditor from './logic/ConcatLightsLogicEditor'
+import DelayLogicEditor from './logic/DelayLogicEditor'
+import RandomLogicEditor from './logic/RandomLogicEditor'
+import ShuffleLightsLogicEditor from './logic/ShuffleLightsLogicEditor'
+import ForEachLightLogicEditor from './logic/ForEachLightLogicEditor'
+import DebuggerLogicEditor from './logic/DebuggerLogicEditor'
 
 export interface LogicNodeEditorProps {
-  node: LogicNode;
-  activeMode: NodeCueMode;
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
-  updateNode: (updates: Partial<LogicNode>) => void;
+  node: LogicNode
+  activeMode: NodeCueMode
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  updateNode: (updates: Partial<LogicNode>) => void
 }
 
 const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
   node,
   activeMode,
   availableVariables,
-  updateNode
+  updateNode,
 }) => {
   if (node.logicType === 'variable') {
     return (
@@ -55,7 +55,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'math') {
@@ -65,7 +65,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'cue-data') {
@@ -76,7 +76,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'config-data') {
@@ -86,7 +86,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'lights-from-index') {
@@ -96,7 +96,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'conditional') {
@@ -106,7 +106,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'array-length') {
@@ -116,7 +116,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'reverse-lights') {
@@ -126,7 +126,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'create-pairs') {
@@ -136,7 +136,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'concat-lights') {
@@ -146,7 +146,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'delay') {
@@ -156,7 +156,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'random') {
@@ -166,7 +166,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'shuffle-lights') {
@@ -176,7 +176,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'for-each-light') {
@@ -186,7 +186,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
   if (node.logicType === 'debugger') {
@@ -196,10 +196,10 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
-    );
+    )
   }
 
-  return <div className="text-xs text-gray-500">Unknown logic node type</div>;
-};
+  return <div className="text-xs text-gray-500">Unknown logic node type</div>
+}
 
-export default LogicNodeEditor;
+export default LogicNodeEditor

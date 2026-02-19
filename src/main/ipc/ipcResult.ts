@@ -3,9 +3,9 @@
  */
 
 export type IpcErrorResult = {
-  success: false;
-  error: string;
-};
+  success: false
+  error: string
+}
 
 /**
  * Build a standard failure payload for IPC responses.
@@ -14,6 +14,6 @@ export type IpcErrorResult = {
 export function ipcError(error: unknown): IpcErrorResult {
   return {
     success: false,
-    error: error instanceof Error ? error.message : String(error)
-  };
+    error: error instanceof Error ? error.message : String(error),
+  }
 }

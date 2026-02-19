@@ -1,36 +1,34 @@
-import { EventEmitter } from 'events';
-import { RGBIO } from '../../types';
+import { EventEmitter } from 'events'
+import { RGBIO } from '../../types'
 
 /**
  * The LightStateManager stores the current state of each light.
- * State is published for handling by external listeners. 
+ * State is published for handling by external listeners.
  */
 class LightStateManager extends EventEmitter {
-  private _finalStates: Map<string, RGBIO>;
+  private _finalStates: Map<string, RGBIO>
 
   constructor() {
-    super();
-    this._finalStates = new Map();
+    super()
+    this._finalStates = new Map()
   }
-
 
   /**
    * Sets the light state immediately.
-   * @param lightId 
-   * @param finalColor 
+   * @param lightId
+   * @param finalColor
    */
   public setLightState(lightId: string, finalColor: RGBIO): void {
-    this._finalStates.set(lightId, finalColor);
+    this._finalStates.set(lightId, finalColor)
   }
-
 
   /**
    * Gets the lights state
-   * @param lightId 
-   * @returns 
+   * @param lightId
+   * @returns
    */
   public getLightState(lightId: string): RGBIO | null {
-    return this._finalStates.get(lightId) || null;
+    return this._finalStates.get(lightId) || null
   }
 
   /**
@@ -38,23 +36,23 @@ class LightStateManager extends EventEmitter {
    * or check which lights exist, etc.
    */
   public getTrackedLightIds(): string[] {
-    return Array.from(this._finalStates.keys());
+    return Array.from(this._finalStates.keys())
   }
 
   /**
-   * Publishes the final states via an event. 
+   * Publishes the final states via an event.
    */
   public publishLightStates(): void {
-    this.emit('LightStatesUpdated', this._finalStates);
+    this.emit('LightStatesUpdated', this._finalStates)
   }
 
   /**
-   * Clears all internal data. 
+   * Clears all internal data.
    */
   public shutdown(): void {
-    this.removeAllListeners();
-    this._finalStates.clear();
+    this.removeAllListeners()
+    this._finalStates.clear()
   }
 }
 
-export { LightStateManager };
+export { LightStateManager }

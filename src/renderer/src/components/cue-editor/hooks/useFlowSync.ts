@@ -1,34 +1,37 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import type { ReactFlowInstance } from 'reactflow';
-import type { VariableDefinition, ValueSource } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { EffectDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { EditorNodeData } from '../lib/types';
-import { cueToFlow, effectToFlow } from '../lib/cueTransforms';
+import React, { useCallback, useEffect, useState } from 'react'
+import type { ReactFlowInstance } from 'reactflow'
+import type {
+  VariableDefinition,
+  ValueSource,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { EffectDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { EditorNodeData } from '../lib/types'
+import { cueToFlow, effectToFlow } from '../lib/cueTransforms'
 import type {
   YargNodeCueDefinition,
   AudioNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
-  EffectRaiserNode
-} from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+  EffectRaiserNode,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 export type UseFlowSyncParams = {
-  setNodes: React.Dispatch<React.SetStateAction<import('reactflow').Node<EditorNodeData>[]>>;
-  setEdges: React.Dispatch<React.SetStateAction<import('reactflow').Edge[]>>;
-  effectDefinitions?: Map<string, EffectDefinition>;
-  onCueLoaded?: () => void;
-};
+  setNodes: React.Dispatch<React.SetStateAction<import('reactflow').Node<EditorNodeData>[]>>
+  setEdges: React.Dispatch<React.SetStateAction<import('reactflow').Edge[]>>
+  effectDefinitions?: Map<string, EffectDefinition>
+  onCueLoaded?: () => void
+}
 
 const areParameterDefinitionsEqual = (
   left?: VariableDefinition[],
-  right?: VariableDefinition[]
+  right?: VariableDefinition[],
 ): boolean => {
-  if (left === right) return true;
-  if (!left || !right) return false;
-  if (left.length !== right.length) return false;
+  if (left === right) return true
+  if (!left || !right) return false
+  if (left.length !== right.length) return false
   return left.every((leftDef, index) => {
-    const rightDef = right[index];
-    if (!rightDef) return false;
+    const rightDef = right[index]
+    if (!rightDef) return false
     return (
       leftDef.name === rightDef.name &&
       leftDef.type === rightDef.type &&
@@ -36,66 +39,72 @@ const areParameterDefinitionsEqual = (
       leftDef.isParameter === rightDef.isParameter &&
       leftDef.description === rightDef.description &&
       leftDef.initialValue === rightDef.initialValue
-    );
-  });
-};
+    )
+  })
+}
 
 const buildDefaultValueSource = (def: VariableDefinition): ValueSource => ({
   source: 'literal',
-  value: def.initialValue
-});
+  value: def.initialValue,
+})
 
 export function useFlowSync({
   setNodes,
   setEdges,
   effectDefinitions,
-  onCueLoaded
+  onCueLoaded,
 }: UseFlowSyncParams) {
-  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
 
   useEffect(() => {
-    if (!effectDefinitions || effectDefinitions.size === 0) return;
+    if (!effectDefinitions || effectDefinitions.size === 0) return
 
-    setNodes(prevNodes => {
-      let didChange = false;
-      const nextNodes = prevNodes.map(node => {
-        if (node.data.kind !== 'effect-raiser') return node;
-        const raiser = node.data.payload as EffectRaiserNode;
-        if (!raiser.effectId) return node;
+    setNodes((prevNodes) => {
+      let didChange = false
+      const nextNodes = prevNodes.map((node) => {
+        if (node.data.kind !== 'effect-raiser') return node
+        const raiser = node.data.payload as EffectRaiserNode
+        if (!raiser.effectId) return node
 
-        const effectDef = effectDefinitions.get(raiser.effectId);
-        if (!effectDef) return node;
+        const effectDef = effectDefinitions.get(raiser.effectId)
+        if (!effectDef) return node
 
-        const parameterDefinitions = effectDef.variables?.filter(v => v.isParameter) ?? [];
-        const existingDefinitions = (node.data as EditorNodeData & { parameterDefinitions?: VariableDefinition[] }).parameterDefinitions;
-        const definitionsChanged = !areParameterDefinitionsEqual(existingDefinitions, parameterDefinitions);
+        const parameterDefinitions = effectDef.variables?.filter((v) => v.isParameter) ?? []
+        const existingDefinitions = (
+          node.data as EditorNodeData & { parameterDefinitions?: VariableDefinition[] }
+        ).parameterDefinitions
+        const definitionsChanged = !areParameterDefinitionsEqual(
+          existingDefinitions,
+          parameterDefinitions,
+        )
 
-        const parameterNames = new Set(parameterDefinitions.map(def => def.name));
-        const nextParameterValues: Record<string, ValueSource> = {};
-        let valuesChanged = false;
+        const parameterNames = new Set(parameterDefinitions.map((def) => def.name))
+        const nextParameterValues: Record<string, ValueSource> = {}
+        let valuesChanged = false
         for (const [paramName, paramValue] of Object.entries(raiser.parameterValues ?? {})) {
           if (parameterNames.has(paramName)) {
-            nextParameterValues[paramName] = paramValue;
+            nextParameterValues[paramName] = paramValue
           } else {
-            valuesChanged = true;
+            valuesChanged = true
           }
         }
         for (const paramDef of parameterDefinitions) {
           if (nextParameterValues[paramDef.name] === undefined) {
-            nextParameterValues[paramDef.name] = buildDefaultValueSource(paramDef);
-            valuesChanged = true;
+            nextParameterValues[paramDef.name] = buildDefaultValueSource(paramDef)
+            valuesChanged = true
           }
         }
 
-        const nodeDataWithExtras = node.data as EditorNodeData & { effectName?: string };
-        const nextEffectName = effectDef.name || nodeDataWithExtras.effectName || raiser.effectId || 'none';
-        const effectNameChanged = nextEffectName !== nodeDataWithExtras.effectName;
+        const nodeDataWithExtras = node.data as EditorNodeData & { effectName?: string }
+        const nextEffectName =
+          effectDef.name || nodeDataWithExtras.effectName || raiser.effectId || 'none'
+        const effectNameChanged = nextEffectName !== nodeDataWithExtras.effectName
 
         if (!definitionsChanged && !valuesChanged && !effectNameChanged) {
-          return node;
+          return node
         }
 
-        didChange = true;
+        didChange = true
         return {
           ...node,
           data: {
@@ -103,29 +112,39 @@ export function useFlowSync({
             label: `Effect: ${nextEffectName}`,
             payload: valuesChanged ? { ...raiser, parameterValues: nextParameterValues } : raiser,
             effectName: nextEffectName,
-            parameterDefinitions
-          } as EditorNodeData & { effectName?: string; parameterDefinitions?: VariableDefinition[] }
-        };
-      });
+            parameterDefinitions,
+          } as EditorNodeData & {
+            effectName?: string
+            parameterDefinitions?: VariableDefinition[]
+          },
+        }
+      })
 
-      return didChange ? nextNodes : prevNodes;
-    });
-  }, [effectDefinitions, setNodes]);
+      return didChange ? nextNodes : prevNodes
+    })
+  }, [effectDefinitions, setNodes])
 
-  const loadCueIntoFlow = useCallback((cue: YargNodeCueDefinition | AudioNodeCueDefinition | YargEffectDefinition | AudioEffectDefinition | null) => {
-    const isEffect = cue && cue.nodes && (
-      'effectListeners' in cue.nodes ||
-      'parameters' in cue
-    );
+  const loadCueIntoFlow = useCallback(
+    (
+      cue:
+        | YargNodeCueDefinition
+        | AudioNodeCueDefinition
+        | YargEffectDefinition
+        | AudioEffectDefinition
+        | null,
+    ) => {
+      const isEffect = cue && cue.nodes && ('effectListeners' in cue.nodes || 'parameters' in cue)
 
-    const { nodes: flowNodes, edges: flowEdges } = isEffect
-      ? effectToFlow(cue as YargEffectDefinition | AudioEffectDefinition)
-      : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null, effectDefinitions);
+      const { nodes: flowNodes, edges: flowEdges } = isEffect
+        ? effectToFlow(cue as YargEffectDefinition | AudioEffectDefinition)
+        : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null, effectDefinitions)
 
-    setNodes(flowNodes);
-    setEdges(flowEdges);
-    onCueLoaded?.();
-  }, [setEdges, setNodes, effectDefinitions, onCueLoaded]);
+      setNodes(flowNodes)
+      setEdges(flowEdges)
+      onCueLoaded?.()
+    },
+    [setEdges, setNodes, effectDefinitions, onCueLoaded],
+  )
 
-  return { loadCueIntoFlow, reactFlowInstance, setReactFlowInstance };
+  return { loadCueIntoFlow, reactFlowInstance, setReactFlowInstance }
 }

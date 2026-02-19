@@ -1,105 +1,108 @@
-import React from 'react';
-import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import { isVariableSource } from './nodeEditorUtils';
+import React from 'react'
+import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { isVariableSource } from './nodeEditorUtils'
 
 interface TargetGroupsMultiSelectEditorProps {
-  label: string;
-  value: ValueSource | undefined;
-  onChange: (next: ValueSource) => void;
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
+  label: string
+  value: ValueSource | undefined
+  onChange: (next: ValueSource) => void
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
 }
 
-const TARGET_GROUPS: Array<'front' | 'back'> = ['front', 'back'];
-const FALLBACK_GROUPS: Array<'front' | 'back'> = ['front', 'back'];
+const TARGET_GROUPS: Array<'front' | 'back'> = ['front', 'back']
+const FALLBACK_GROUPS: Array<'front' | 'back'> = ['front', 'back']
 
 const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps> = ({
   label,
   value,
   onChange,
-  availableVariables
+  availableVariables,
 }) => {
-  const source = value ?? { 
-    source: 'literal', 
-    value: 'front'
-  };
-  const isLiteral = source.source === 'literal';
+  const source = value ?? {
+    source: 'literal',
+    value: 'front',
+  }
+  const isLiteral = source.source === 'literal'
 
   // Parse comma-separated string to array
-  const selectedGroups = isLiteral && typeof source.value === 'string'
-    ? source.value.split(',').map(g => g.trim()).filter(g => TARGET_GROUPS.includes(g as typeof TARGET_GROUPS[number]))
-    : [];
+  const selectedGroups =
+    isLiteral && typeof source.value === 'string'
+      ? source.value
+          .split(',')
+          .map((g) => g.trim())
+          .filter((g) => TARGET_GROUPS.includes(g as (typeof TARGET_GROUPS)[number]))
+      : []
 
   // Check if group is selected
-  const isSelected = (group: 'front' | 'back') => 
-    selectedGroups.includes(group);
+  const isSelected = (group: 'front' | 'back') => selectedGroups.includes(group)
 
   // Parse fallback comma-separated string to array (only front/back allowed)
-  const fallbackGroups = isVariableSource(source) && typeof source.fallback === 'string'
-    ? source.fallback.split(',').map(g => g.trim()).filter(g => FALLBACK_GROUPS.includes(g as typeof FALLBACK_GROUPS[number]))
-    : [];
+  const fallbackGroups =
+    isVariableSource(source) && typeof source.fallback === 'string'
+      ? source.fallback
+          .split(',')
+          .map((g) => g.trim())
+          .filter((g) => FALLBACK_GROUPS.includes(g as (typeof FALLBACK_GROUPS)[number]))
+      : []
 
   // Check if fallback group is selected
-  const isFallbackSelected = (group: 'front' | 'back') => 
-    fallbackGroups.includes(group);
+  const isFallbackSelected = (group: 'front' | 'back') => fallbackGroups.includes(group)
 
   // Handle group toggle
   const handleGroupToggle = (group: 'front' | 'back', checked: boolean) => {
-    const updated = checked 
-      ? [...selectedGroups.filter(g => g !== group), group]
-      : selectedGroups.filter(g => g !== group);
-    
+    const updated = checked
+      ? [...selectedGroups.filter((g) => g !== group), group]
+      : selectedGroups.filter((g) => g !== group)
+
     // Ensure at least one group is selected
     if (updated.length === 0) {
-      updated.push('front');
+      updated.push('front')
     }
-    
-    onChange({ source: 'literal', value: updated.join(',') });
-  };
+
+    onChange({ source: 'literal', value: updated.join(',') })
+  }
 
   // Handle fallback group toggle
   const handleFallbackToggle = (group: 'front' | 'back', checked: boolean) => {
-    const updated = checked 
-      ? [...fallbackGroups.filter(g => g !== group), group]
-      : fallbackGroups.filter(g => g !== group);
-    
+    const updated = checked
+      ? [...fallbackGroups.filter((g) => g !== group), group]
+      : fallbackGroups.filter((g) => g !== group)
+
     // Ensure at least one group is selected
     if (updated.length === 0) {
-      updated.push('front');
+      updated.push('front')
     }
-    
-    onChange({ 
-      source: 'variable', 
-      name: isVariableSource(source) ? source.name : 'var1', 
-      fallback: updated.join(',')
-    });
-  };
+
+    onChange({
+      source: 'variable',
+      name: isVariableSource(source) ? source.name : 'var1',
+      fallback: updated.join(','),
+    })
+  }
 
   // Handle switch toggle
   const handleToggleVar = (checked: boolean) => {
     if (checked) {
       // Switch to variable mode - default fallback to "front,back" if not set
-      const fallbackValue = isVariableSource(source) && typeof source.fallback === 'string'
-        ? source.fallback
-        : 'front,back';
-      onChange({ 
-        source: 'variable', 
-        name: isVariableSource(source) ? (source.name ?? 'var1') : 'var1', 
-        fallback: fallbackValue
-      });
+      const fallbackValue =
+        isVariableSource(source) && typeof source.fallback === 'string'
+          ? source.fallback
+          : 'front,back'
+      onChange({
+        source: 'variable',
+        name: isVariableSource(source) ? source.name ?? 'var1' : 'var1',
+        fallback: fallbackValue,
+      })
     } else {
       // Switch to literal mode - use current selection or default to front
-      const currentValue = isLiteral && typeof source.value === 'string' 
-        ? source.value 
-        : 'front';
-      onChange({ source: 'literal', value: currentValue });
+      const currentValue = isLiteral && typeof source.value === 'string' ? source.value : 'front'
+      onChange({ source: 'literal', value: currentValue })
     }
-  };
+  }
 
   return (
     <div className="space-y-1">
-      <label className="flex flex-col font-medium text-xs">
-        {label}
-      </label>
+      <label className="flex flex-col font-medium text-xs">{label}</label>
       {isLiteral ? (
         // Literal mode: switch and checkboxes on same line
         <div className="space-y-2 mt-1">
@@ -143,22 +146,22 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
               Variable
               <select
                 className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={isVariableSource(source) ? (source.name ?? '') : ''}
-                onChange={event => {
-                  const currentFallback = isVariableSource(source) && typeof source.fallback === 'string'
-                    ? source.fallback
-                    : 'front,back';
-                  onChange({ 
-                    source: 'variable', 
-                    name: event.target.value || 'var1', 
-                    fallback: currentFallback
-                  });
-                }}
-              >
+                value={isVariableSource(source) ? source.name ?? '' : ''}
+                onChange={(event) => {
+                  const currentFallback =
+                    isVariableSource(source) && typeof source.fallback === 'string'
+                      ? source.fallback
+                      : 'front,back'
+                  onChange({
+                    source: 'variable',
+                    name: event.target.value || 'var1',
+                    fallback: currentFallback,
+                  })
+                }}>
                 <option value="">-- Select --</option>
                 {availableVariables
-                  .filter(v => v.type === 'string' || v.type === 'light-array')
-                  .map(v => (
+                  .filter((v) => v.type === 'string' || v.type === 'light-array')
+                  .map((v) => (
                     <option key={v.name} value={v.name}>
                       {v.name} ({v.type})
                     </option>
@@ -176,7 +179,9 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
                       onChange={(e) => handleFallbackToggle(group, e.target.checked)}
                       className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-600 dark:bg-gray-700"
                     />
-                    <span className="text-xs text-gray-700 dark:text-gray-300 capitalize">{group}</span>
+                    <span className="text-xs text-gray-700 dark:text-gray-300 capitalize">
+                      {group}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -185,7 +190,7 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default TargetGroupsMultiSelectEditor;
+export default TargetGroupsMultiSelectEditor

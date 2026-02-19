@@ -1,26 +1,30 @@
-import { INetCue, CueStyle } from '../../../interfaces/INetCue';
-import { CueData, CueType } from '../../../types/cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { Effect, EffectTransition } from '../../../../types';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { Effect, EffectTransition } from '../../../../types'
 
 /**
  * StageKit Silhouettes Cue - All green lights for silhouette effect
  * Creates silhouette lighting effect with green lights
  */
 export class StageKitSilhouettesCue implements INetCue {
-  id = 'stagekit-silhouettes';
-  cueId = CueType.Silhouettes;
-  description = 'Solid green on all lights.';
-  style = CueStyle.Primary;
+  id = 'stagekit-silhouettes'
+  cueId = CueType.Silhouettes
+  description = 'Solid green on all lights.'
+  style = CueStyle.Primary
 
-  private isFirstExecution: boolean = true;
+  private isFirstExecution: boolean = true
 
-  async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const allLights = lightManager.getLights(['front', 'back'], ['all']);
-    const greenColor = getColor('green', 'medium');
-    
+  async execute(
+    _cueData: CueData,
+    controller: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const allLights = lightManager.getLights(['front', 'back'], ['all'])
+    const greenColor = getColor('green', 'medium')
+
     const transitions: EffectTransition[] = [
       {
         lights: allLights,
@@ -32,27 +36,27 @@ export class StageKitSilhouettesCue implements INetCue {
         transform: {
           color: greenColor,
           easing: 'linear',
-          duration: 0 // Instant
-        }
-      }
-    ];
-    
+          duration: 0, // Instant
+        },
+      },
+    ]
+
     const silhouettesEffect: Effect = {
       id: 'stagekit-silhouettes',
       description: 'Green silhouette lighting effect',
-      transitions: transitions
-    };
-    
+      transitions: transitions,
+    }
+
     if (this.isFirstExecution) {
-      controller.setEffect('stagekit-silhouettes', silhouettesEffect);
-      this.isFirstExecution = false;
+      controller.setEffect('stagekit-silhouettes', silhouettesEffect)
+      this.isFirstExecution = false
     } else {
-      controller.addEffect('stagekit-silhouettes', silhouettesEffect);
+      controller.addEffect('stagekit-silhouettes', silhouettesEffect)
     }
   }
 
   onStop(): void {
-    this.isFirstExecution = true;
+    this.isFirstExecution = true
   }
 
   onPause(): void {
@@ -62,4 +66,4 @@ export class StageKitSilhouettesCue implements INetCue {
   onDestroy(): void {
     // Cleanup handled by effect system
   }
-} 
+}

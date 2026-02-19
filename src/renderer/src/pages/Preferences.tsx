@@ -1,12 +1,12 @@
-import React from 'react';
-import YargEnabledCueGroups from '../components/YargEnabledCueGroups';
-import AudioEnabledCueGroups from '../components/AudioEnabledCueGroups';
-import CueConsistencySettings from '../components/CueConsistencySettings';
-import DmxOutputSettings from '../components/DmxOutputSettings';
-import StageKitModeSettings from '../components/StageKitModeSettings';
-import BrightnessSettings from '../components/BrightnessSettings';
-import ClockRateSettings from '../components/ClockRateSettings';
-import ActiveRigsSettings from '../components/ActiveRigsSettings';
+import React from 'react'
+import YargEnabledCueGroups from '../components/YargEnabledCueGroups'
+import AudioEnabledCueGroups from '../components/AudioEnabledCueGroups'
+import CueConsistencySettings from '../components/CueConsistencySettings'
+import DmxOutputSettings from '../components/DmxOutputSettings'
+import StageKitModeSettings from '../components/StageKitModeSettings'
+import BrightnessSettings from '../components/BrightnessSettings'
+import ClockRateSettings from '../components/ClockRateSettings'
+import ActiveRigsSettings from '../components/ActiveRigsSettings'
 
 const Preferences: React.FC = () => {
   return (
@@ -15,14 +15,14 @@ const Preferences: React.FC = () => {
       <ActiveRigsSettings />
       <DmxOutputSettings />
       <BrightnessSettings />
-     
-      <YargEnabledCueGroups/>
-      <AudioEnabledCueGroups/>
+
+      <YargEnabledCueGroups />
+      <AudioEnabledCueGroups />
       <StageKitModeSettings />
       <CueConsistencySettings />
       <ClockRateSettings />
     </div>
-  );
-};
+  )
+}
 
-export default Preferences; 
+export default Preferences

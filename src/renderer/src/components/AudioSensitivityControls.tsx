@@ -1,83 +1,82 @@
-import React, { useState, useEffect } from 'react';
-import { CONFIG } from '../../../shared/ipcChannels';
+import React, { useState, useEffect } from 'react'
+import { CONFIG } from '../../../shared/ipcChannels'
 
 const AudioSensitivityControls: React.FC = () => {
-  const [sensitivity, setSensitivity] = useState(1.0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [sensitivity, setSensitivity] = useState(1.0)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
-        setSensitivity(config?.sensitivity ?? 1.0);
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+        setSensitivity(config?.sensitivity ?? 1.0)
       } catch (error) {
-        console.error('Failed to load audio sensitivity:', error);
+        console.error('Failed to load audio sensitivity:', error)
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    loadConfig();
-  }, []);
+    loadConfig()
+  }, [])
 
   const handleSensitivityChange = async (value: number) => {
-    if (isSaving) return;
+    if (isSaving) return
 
-    const newValue = Math.max(0.1, Math.min(5.0, value));
-    setSensitivity(newValue);
+    const newValue = Math.max(0.1, Math.min(5.0, value))
+    setSensitivity(newValue)
 
     try {
-      setIsSaving(true);
+      setIsSaving(true)
       const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
-        sensitivity: newValue
-      });
+        sensitivity: newValue,
+      })
       if (!result.success) {
-        console.error('Failed to save audio sensitivity:', result.error);
+        console.error('Failed to save audio sensitivity:', result.error)
         // Revert on failure
-        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
-        setSensitivity(config?.sensitivity ?? 1.0);
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+        setSensitivity(config?.sensitivity ?? 1.0)
       }
     } catch (error) {
-      console.error('Failed to save audio sensitivity:', error);
+      console.error('Failed to save audio sensitivity:', error)
       // Revert on failure
-      const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG);
-      setSensitivity(config?.sensitivity ?? 1.0);
+      const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+      setSensitivity(config?.sensitivity ?? 1.0)
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    setSensitivity(value);
-  };
+    const value = parseFloat(e.target.value)
+    setSensitivity(value)
+  }
 
   const handleSliderBlur = () => {
-    handleSensitivityChange(sensitivity);
-  };
+    handleSensitivityChange(sensitivity)
+  }
 
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-    <div>
+        <div>
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-        Sensitivity
-      </label>
+            Sensitivity
+          </label>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Adjust the sensitivity/gain multiplier for audio input. Higher values make the lights more reactive.
+            Adjust the sensitivity/gain multiplier for audio input. Higher values make the lights
+            more reactive.
           </p>
         </div>
         <div className="flex items-center space-x-2">
           <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
             {sensitivity.toFixed(1)}
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            / 5.0
-          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">/ 5.0</span>
         </div>
       </div>
-      
+
       <div className="flex items-center space-x-4">
         <input
           type="range"
@@ -90,10 +89,10 @@ const AudioSensitivityControls: React.FC = () => {
           disabled={isLoading || isSaving}
           className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
           style={{
-            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb 100%)`
+            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb 100%)`,
           }}
         />
-        
+
         <input
           type="number"
           min="0.1"
@@ -101,8 +100,8 @@ const AudioSensitivityControls: React.FC = () => {
           step="0.1"
           value={sensitivity}
           onChange={(e) => {
-            const value = parseFloat(e.target.value) || 0.1;
-            setSensitivity(Math.max(0.1, Math.min(5.0, value)));
+            const value = parseFloat(e.target.value) || 0.1
+            setSensitivity(Math.max(0.1, Math.min(5.0, value)))
           }}
           onBlur={() => handleSensitivityChange(sensitivity)}
           disabled={isLoading || isSaving}
@@ -110,8 +109,7 @@ const AudioSensitivityControls: React.FC = () => {
         />
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default AudioSensitivityControls;
-
+export default AudioSensitivityControls

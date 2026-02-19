@@ -15,7 +15,7 @@ export const NODE_CUES = {
   GET_CUE_TYPES: 'node-cues:get-cue-types',
   IMPORT: 'node-cues:import',
   EXPORT: 'node-cues:export',
-} as const;
+} as const
 
 // ---- Effects ----
 export const EFFECTS = {
@@ -27,18 +27,18 @@ export const EFFECTS = {
   VALIDATE: 'effects:validate',
   IMPORT: 'effects:import',
   EXPORT: 'effects:export',
-} as const;
+} as const
 
 // ---- Window ----
 export const WINDOW = {
   OPEN_CUE_EDITOR: 'open-cue-editor-window',
-} as const;
+} as const
 
 // ---- Shell ----
 export const SHELL = {
   SHOW_ITEM_IN_FOLDER: 'shell:showItemInFolder',
   OPEN_PATH: 'shell:openPath',
-} as const;
+} as const
 
 // ---- Cue / listeners ----
 export const CUE = {
@@ -57,7 +57,7 @@ export const CUE = {
   CUE_STYLE: 'cue-style',
   UPDATE_EFFECT_DEBOUNCE: 'update-effect-debounce',
   GET_EFFECT_DEBOUNCE: 'get-effect-debounce',
-} as const;
+} as const
 
 // ---- Light / senders / simulation ----
 export const LIGHT = {
@@ -86,7 +86,7 @@ export const LIGHT = {
   GET_CUE_CONSISTENCY_WINDOW: 'get-cue-consistency-window',
   GET_CONSISTENCY_STATUS: 'get-consistency-status',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
-} as const;
+} as const
 
 // ---- Config ----
 export const CONFIG = {
@@ -117,7 +117,7 @@ export const CONFIG = {
   SET_ACTIVE_AUDIO_CUE: 'set-active-audio-cue',
   GET_STAGE_KIT_PRIORITY: 'get-stage-kit-priority',
   SET_STAGE_KIT_PRIORITY: 'set-stage-kit-priority',
-} as const;
+} as const
 
 /** All handle/invoke channel names in one object for lookup. */
 export const CHANNELS = {
@@ -128,9 +128,9 @@ export const CHANNELS = {
   ...CUE,
   ...LIGHT,
   ...CONFIG,
-} as const;
+} as const
 
-export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
+export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS]
 
 /** Main process -> renderer (one-way send). Use when main calls webContents.send(). */
 export const RENDERER_RECEIVE = {
@@ -147,9 +147,9 @@ export const RENDERER_RECEIVE = {
   NODE_CUES_CHANGED: 'node-cues:changed',
   EFFECTS_CHANGED: 'effects:changed',
   DEBUG_LOG: 'node-cues:debug-log',
-} as const;
+} as const
 
 /** Renderer -> main (main process listens). Use when main calls ipcMain.on(). */
 export const RENDERER_SEND = {
   AUDIO_DATA: 'audio:data',
-} as const;
+} as const

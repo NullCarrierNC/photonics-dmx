@@ -1,33 +1,32 @@
-import { YargCueRegistry } from '../registries/YargCueRegistry';
-import { CueType } from '../types/cueTypes';
-import { ICueGroup } from '../interfaces/INetCueGroup';
-import { INetCue } from '../interfaces/INetCue';
+import { YargCueRegistry } from '../registries/YargCueRegistry'
+import { CueType } from '../types/cueTypes'
+import { ICueGroup } from '../interfaces/INetCueGroup'
+import { INetCue } from '../interfaces/INetCue'
 
 // Import StageKit group cues
-import { StageKitMenuCue } from './handlers/stagekit/StageKitMenuCue';
-import { StageKitScoreCue } from './handlers/stagekit/StageKitScoreCue';
-import { StageKitDefaultCue } from './handlers/stagekit/StageKitDefaultCue';
-import { StageKitStompCue } from './handlers/stagekit/StageKitStompCue';
-import { StageKitDischordCue } from './handlers/stagekit/StageKitDischordCue';
-import { StageKitIntroCue } from './handlers/stagekit/StageKitIntroCue';
-import { StageKitHarmonyCue } from './handlers/stagekit/StageKitHarmonyCue';
-import { StageKitSweepCue } from './handlers/stagekit/StageKitSweepCue';
-import { StageKitFrenzyCue } from './handlers/stagekit/StageKitFrenzyCue';
-import { StageKitSearchlightsCue } from './handlers/stagekit/StageKitSearchlightsCue';
-import { StageKitSilhouettesCue } from './handlers/stagekit/StageKitSilhouettesCue';
-import { StageKitSilhouettesSpotlightCue } from './handlers/stagekit/StageKitSilhouettesSpotlightCue';
-import { StageKitFlareFastCue } from './handlers/stagekit/StageKitFlareFastCue';
-import { StageKitFlareSlowCue } from './handlers/stagekit/StageKitFlareSlowCue';
-import { StageKitWarmManualCue } from './handlers/stagekit/StageKitWarmManualCue';
-import { StageKitCoolAutoCue } from './handlers/stagekit/StageKitCoolAutoCue';
-import { StageKitCoolManualCue } from './handlers/stagekit/StageKitCoolManualCue';
-import { StageKitWarmAutoCue } from './handlers/stagekit/StageKitWarmAutoCue';
-import { StrobeFastCue } from './handlers/stagekit/StrobeFastCue';
-import { StrobeFastestCue } from './handlers/stagekit/StrobeFastestCue';
-import { StrobeMediumCue } from './handlers/stagekit/StrobeMediumCue';
-import { StrobeOffCue } from './handlers/stagekit/StrobeOffCue';
-import { StrobeSlowCue } from './handlers/stagekit/StrobeSlowCue';
-
+import { StageKitMenuCue } from './handlers/stagekit/StageKitMenuCue'
+import { StageKitScoreCue } from './handlers/stagekit/StageKitScoreCue'
+import { StageKitDefaultCue } from './handlers/stagekit/StageKitDefaultCue'
+import { StageKitStompCue } from './handlers/stagekit/StageKitStompCue'
+import { StageKitDischordCue } from './handlers/stagekit/StageKitDischordCue'
+import { StageKitIntroCue } from './handlers/stagekit/StageKitIntroCue'
+import { StageKitHarmonyCue } from './handlers/stagekit/StageKitHarmonyCue'
+import { StageKitSweepCue } from './handlers/stagekit/StageKitSweepCue'
+import { StageKitFrenzyCue } from './handlers/stagekit/StageKitFrenzyCue'
+import { StageKitSearchlightsCue } from './handlers/stagekit/StageKitSearchlightsCue'
+import { StageKitSilhouettesCue } from './handlers/stagekit/StageKitSilhouettesCue'
+import { StageKitSilhouettesSpotlightCue } from './handlers/stagekit/StageKitSilhouettesSpotlightCue'
+import { StageKitFlareFastCue } from './handlers/stagekit/StageKitFlareFastCue'
+import { StageKitFlareSlowCue } from './handlers/stagekit/StageKitFlareSlowCue'
+import { StageKitWarmManualCue } from './handlers/stagekit/StageKitWarmManualCue'
+import { StageKitCoolAutoCue } from './handlers/stagekit/StageKitCoolAutoCue'
+import { StageKitCoolManualCue } from './handlers/stagekit/StageKitCoolManualCue'
+import { StageKitWarmAutoCue } from './handlers/stagekit/StageKitWarmAutoCue'
+import { StrobeFastCue } from './handlers/stagekit/StrobeFastCue'
+import { StrobeFastestCue } from './handlers/stagekit/StrobeFastestCue'
+import { StrobeMediumCue } from './handlers/stagekit/StrobeMediumCue'
+import { StrobeOffCue } from './handlers/stagekit/StrobeOffCue'
+import { StrobeSlowCue } from './handlers/stagekit/StrobeSlowCue'
 
 /**
  * Create and register the StageKit default cue group.
@@ -37,7 +36,8 @@ import { StrobeSlowCue } from './handlers/stagekit/StrobeSlowCue';
 const stagekitGroup: ICueGroup = {
   id: 'stagekit',
   name: 'Stage Kit',
-  description: 'Stage Kit cues that mimic the original Stage Kit visual effects. There is some variation to account for mapping to a smaller number of lights.',
+  description:
+    'Stage Kit cues that mimic the original Stage Kit visual effects. There is some variation to account for mapping to a smaller number of lights.',
   cues: new Map<CueType, INetCue>([
     [CueType.Menu, new StageKitMenuCue()],
     [CueType.Score, new StageKitScoreCue()],
@@ -63,13 +63,13 @@ const stagekitGroup: ICueGroup = {
     [CueType.Strobe_Fastest, new StrobeFastestCue()],
     [CueType.Strobe_Medium, new StrobeMediumCue()],
     [CueType.Strobe_Off, new StrobeOffCue()],
-    [CueType.Strobe_Slow, new StrobeSlowCue()]
+    [CueType.Strobe_Slow, new StrobeSlowCue()],
   ]),
-};
+}
 
 // Get the registry instance and register the StageKit group
-const registry = YargCueRegistry.getInstance();
-registry.registerGroup(stagekitGroup); 
-registry.setStageKitGroup(stagekitGroup.id);
-registry.setDefaultGroup(stagekitGroup.id);
-registry.activateGroup(stagekitGroup.id);
+const registry = YargCueRegistry.getInstance()
+registry.registerGroup(stagekitGroup)
+registry.setStageKitGroup(stagekitGroup.id)
+registry.setDefaultGroup(stagekitGroup.id)
+registry.activateGroup(stagekitGroup.id)

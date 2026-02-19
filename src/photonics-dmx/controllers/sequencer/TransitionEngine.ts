@@ -1,43 +1,39 @@
-import { performance } from 'perf_hooks';
-import { EffectTransition, RGBIO } from '../../types';
-import { LightTransitionController } from './LightTransitionController';
-import { FrameContext, LightEffectState, ILayerManager, ITransitionEngine } from './interfaces';
-import { IEffectManager } from './interfaces';
+import { performance } from 'perf_hooks'
+import { EffectTransition, RGBIO } from '../../types'
+import { LightTransitionController } from './LightTransitionController'
+import { FrameContext, LightEffectState, ILayerManager, ITransitionEngine } from './interfaces'
+import { IEffectManager } from './interfaces'
 
 /**
  * @class TransitionEngine
  * @description Handles moving effect transitions through their states.
- * 
+ *
  */
 export class TransitionEngine implements ITransitionEngine {
-  private lightTransitionController: LightTransitionController;
-  private layerManager: ILayerManager;
-  private effectManager!: IEffectManager;
-  
+  private lightTransitionController: LightTransitionController
+  private layerManager: ILayerManager
+  private effectManager!: IEffectManager
+
   /**
    * @constructor
    * @param lightTransitionController The underlying transition controller
    * @param layerManager The layer manager instance
    */
-  constructor(
-    lightTransitionController: LightTransitionController,
-    layerManager: ILayerManager
-  ) {
-    this.lightTransitionController = lightTransitionController;
-    this.layerManager = layerManager;
+  constructor(lightTransitionController: LightTransitionController, layerManager: ILayerManager) {
+    this.lightTransitionController = lightTransitionController
+    this.layerManager = layerManager
   }
-
 
   /**
    * Gets the current time using performance.now() for absolute time
    * @returns The current time in milliseconds
    */
   private getCurrentTime(): number {
-    return performance.now();
+    return performance.now()
   }
 
   public advanceFrame(frame: FrameContext): void {
-    this.updateTransitions(frame);
+    this.updateTransitions(frame)
   }
 
   /**
@@ -46,7 +42,7 @@ export class TransitionEngine implements ITransitionEngine {
    * @param effectManager The effect manager instance
    */
   public setEffectManager(effectManager: IEffectManager): void {
-    this.effectManager = effectManager;
+    this.effectManager = effectManager
   }
 
   /**
@@ -56,9 +52,12 @@ export class TransitionEngine implements ITransitionEngine {
   private ensureLastEndState(effect: LightEffectState): void {
     if (!effect.lastEndState) {
       // Get the current state for this light on this layer
-      const currentState = this.lightTransitionController.getLightState(effect.lightId, effect.layer);
+      const currentState = this.lightTransitionController.getLightState(
+        effect.lightId,
+        effect.layer,
+      )
       if (currentState) {
-        effect.lastEndState = { ...currentState };
+        effect.lastEndState = { ...currentState }
       } else {
         // Default black state if no current state exists
         effect.lastEndState = {
@@ -67,202 +66,216 @@ export class TransitionEngine implements ITransitionEngine {
           blue: 0,
           intensity: 0,
           opacity: 1.0,
-          blendMode: 'replace'
-        };
+          blendMode: 'replace',
+        }
       }
     }
   }
-
-
 
   /**
    * Gets the underlying light transition controller
    * @returns The light transition controller
    */
   public getLightTransitionController(): LightTransitionController {
-    return this.lightTransitionController;
+    return this.lightTransitionController
   }
 
   /**
    * Updates all active transitions using a single timestamp for atomic calculations.
    * This method is called by the Clock system to advance transitions incrementally.
-   * 
+   *
    * @param deltaTime The time elapsed since last update in milliseconds (unused)
    */
   public updateTransitions(frame?: FrameContext): void {
-    const currentTime = frame?.frameStartTime ?? this.getCurrentTime();
+    const currentTime = frame?.frameStartTime ?? this.getCurrentTime()
 
-    const effectsToRemove: Array<{layer: number, lightId: string}> = [];
+    const effectsToRemove: Array<{ layer: number; lightId: string }> = []
 
     // Process ALL light effects using the SAME currentTime
     this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
-      this.layerManager.setLayerLastUsed(layer, currentTime);
-      
+      this.layerManager.setLayerLastUsed(layer, currentTime)
+
       layerMap.forEach((lightEffect, lightId) => {
         if (lightEffect.currentTransitionIndex >= lightEffect.transitions.length) {
-          effectsToRemove.push({layer, lightId});
-          return;
+          effectsToRemove.push({ layer, lightId })
+          return
         }
 
-        const currentTransition = lightEffect.transitions[lightEffect.currentTransitionIndex];
-        
+        const currentTransition = lightEffect.transitions[lightEffect.currentTransitionIndex]
+
         // Process state machine - all use the same currentTime
         switch (lightEffect.state) {
           case 'idle':
-            this.prepareTransition(lightEffect, currentTransition, currentTime);
-            break;
+            this.prepareTransition(lightEffect, currentTransition, currentTime)
+            break
           case 'waitingFor':
-            this.handleWaitingFor(lightEffect, currentTransition, currentTime);
-            break;
+            this.handleWaitingFor(lightEffect, currentTransition, currentTime)
+            break
           case 'transitioning':
-            this.handleTransitioning(lightEffect, currentTransition, currentTime);
-            break;
+            this.handleTransitioning(lightEffect, currentTransition, currentTime)
+            break
           case 'waitingUntil':
-            this.handleWaitingUntil(lightEffect, currentTransition, currentTime);
-            break;
+            this.handleWaitingUntil(lightEffect, currentTransition, currentTime)
+            break
           default:
-            console.warn(`Unknown state "${lightEffect.state}" for effect "${lightEffect.effect.id}".`);
+            console.warn(
+              `Unknown state "${lightEffect.state}" for effect "${lightEffect.effect.id}".`,
+            )
         }
-      });
-    });
+      })
+    })
 
     // Process completed effects
-    for (const {layer, lightId} of effectsToRemove) {
-      const justFinishedEffect = this.layerManager.getActiveEffect(layer, lightId);
-      if (!justFinishedEffect) continue;
+    for (const { layer, lightId } of effectsToRemove) {
+      const justFinishedEffect = this.layerManager.getActiveEffect(layer, lightId)
+      if (!justFinishedEffect) continue
 
       // Remove the effect from active effects
-      this.layerManager.removeActiveEffect(layer, lightId);
+      this.layerManager.removeActiveEffect(layer, lightId)
 
       if (this.effectManager && typeof this.effectManager.onLightEffectComplete === 'function') {
-        this.effectManager.onLightEffectComplete(justFinishedEffect);
+        this.effectManager.onLightEffectComplete(justFinishedEffect)
       }
 
-      let startedQueuedEffect = false;
+      let startedQueuedEffect = false
       if (this.effectManager) {
-        startedQueuedEffect = this.effectManager.startNextEffectInQueue(layer, lightId);
+        startedQueuedEffect = this.effectManager.startNextEffectInQueue(layer, lightId)
       } else {
-        const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId);
+        const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId)
         if (nextQueuedEffect) {
-          console.warn(`Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`);
-          this.layerManager.removeQueuedEffect(layer, lightId);
-          startedQueuedEffect = true;
+          console.warn(
+            `Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`,
+          )
+          this.layerManager.removeQueuedEffect(layer, lightId)
+          startedQueuedEffect = true
         }
       }
 
       if (!startedQueuedEffect) {
         // Only if there's no next effect, remove transitions for non-base layers
         if (layer > 0) {
-          this.lightTransitionController.removeLightLayer(lightId, layer);
-          this.layerManager.clearLayerStates(layer);
+          this.lightTransitionController.removeLightLayer(lightId, layer)
+          this.layerManager.clearLayerStates(layer)
         }
       }
     }
 
     // Clean up unused layers
-    this.layerManager.cleanupUnusedLayers(currentTime);
+    this.layerManager.cleanupUnusedLayers(currentTime)
   }
 
   /**
    * Prepares the transition by setting it to the 'waitingFor' state.
    * If no wait is needed, the transition starts immediately.
-   * 
+   *
    * @param activeEffect The active effect record
    * @param transition The current transition to prepare
    * @param currentTime The current timestamp (shared across all calculations)
    */
-  public prepareTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
-    activeEffect.state = 'waitingFor';
+  public prepareTransition(
+    activeEffect: LightEffectState,
+    transition: EffectTransition,
+    currentTime: number,
+  ): void {
+    activeEffect.state = 'waitingFor'
     if (transition.waitForCondition === 'none') {
-      this.startTransition(activeEffect, transition, currentTime);
+      this.startTransition(activeEffect, transition, currentTime)
     } else {
-      activeEffect.transitionStartTime = currentTime;
+      activeEffect.transitionStartTime = currentTime
       if (transition.waitForCondition === 'delay') {
-        activeEffect.waitEndTime = currentTime + transition.waitForTime;
+        activeEffect.waitEndTime = currentTime + transition.waitForTime
       } else {
-        activeEffect.waitEndTime = currentTime;
+        activeEffect.waitEndTime = currentTime
       }
     }
   }
 
-    /**
+  /**
    * Checks if the transition can start now if we're waiting on a delay or immediate start.
-   * 
+   *
    * @param activeEffect The active effect record
    * @param transition The current transition being waited on
    * @param currentTime The current timestamp (shared across all calculations)
    */
-  public handleWaitingFor(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
+  public handleWaitingFor(
+    activeEffect: LightEffectState,
+    transition: EffectTransition,
+    currentTime: number,
+  ): void {
     if (transition.waitForCondition === 'delay') {
       if (currentTime >= activeEffect.waitEndTime) {
-        this.startTransition(activeEffect, transition, currentTime);
+        this.startTransition(activeEffect, transition, currentTime)
       }
     } else if (transition.waitForCondition === 'none') {
-      this.startTransition(activeEffect, transition, currentTime);
+      this.startTransition(activeEffect, transition, currentTime)
     }
   }
 
   /**
    * Starts a transition and configures the LightTransitionController
-   * 
+   *
    * @param activeEffect The active effect record
    * @param transition The current transition to execute
    * @param currentTime The current timestamp (shared across all calculations)
    */
-  public startTransition(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
+  public startTransition(
+    activeEffect: LightEffectState,
+    transition: EffectTransition,
+    currentTime: number,
+  ): void {
     if (transition.timingOnly) {
-      activeEffect.state = 'waitingUntil';
-      activeEffect.transitionStartTime = currentTime;
+      activeEffect.state = 'waitingUntil'
+      activeEffect.transitionStartTime = currentTime
       if (transition.waitUntilCondition === 'delay') {
-        activeEffect.waitEndTime = currentTime + transition.waitUntilTime;
+        activeEffect.waitEndTime = currentTime + transition.waitUntilTime
       } else {
-        activeEffect.waitEndTime = currentTime;
+        activeEffect.waitEndTime = currentTime
       }
-      return;
+      return
     }
 
-    this.ensureLastEndState(activeEffect);
-    
+    this.ensureLastEndState(activeEffect)
+
     // Since this is a per-light effect, we work with the single light in the transition
-    const light = transition.lights[0];
-    
+    const light = transition.lights[0]
+
     // First check if there's a saved state in the effect's lastEndState
-    let startState: RGBIO | undefined = undefined;
-    
+    let startState: RGBIO | undefined = undefined
+
     if (activeEffect.lastEndState) {
       // Use the effect's stored state if available - this is crucial for smooth transitions
-      startState = activeEffect.lastEndState;
+      startState = activeEffect.lastEndState
     }
-    
+
     // If no state in the effect, check the layer manager for stored state
     if (!startState) {
-      startState = this.layerManager.getLightState(transition.layer, light.id);
+      startState = this.layerManager.getLightState(transition.layer, light.id)
     }
-    
+
     // If still no state, check the current light state in the controller
     if (!startState) {
-      startState = this.lightTransitionController.getLightState(light.id, transition.layer);
+      startState = this.lightTransitionController.getLightState(light.id, transition.layer)
     }
-    
+
     // If all else fails, use a transparent state so new effects fade in cleanly
     if (!startState) {
-      startState = { 
+      startState = {
         red: 0,
         green: 0,
         blue: 0,
         intensity: 0,
         opacity: 0,
-        blendMode: 'replace'
-      };
+        blendMode: 'replace',
+      }
     }
 
-    let color = { ...transition.transform.color };
+    const color = { ...transition.transform.color }
     if (light.config) {
       if (color.pan === undefined) {
-        color.pan = light.config.panHome;
+        color.pan = light.config.panHome
       }
       if (color.tilt === undefined) {
-        color.tilt = light.config.tiltHome;
+        color.tilt = light.config.tiltHome
       }
     }
 
@@ -272,57 +285,65 @@ export class TransitionEngine implements ITransitionEngine {
       startState,
       color,
       transition.transform.duration,
-      transition.transform.easing
-    );
+      transition.transform.easing,
+    )
 
-    activeEffect.state = 'transitioning';
-    activeEffect.transitionStartTime = currentTime;
-    activeEffect.waitEndTime = currentTime + transition.transform.duration;
+    activeEffect.state = 'transitioning'
+    activeEffect.transitionStartTime = currentTime
+    activeEffect.waitEndTime = currentTime + transition.transform.duration
   }
 
   /**
    * Handles the transitioning state and wait conditions. Checks if the transition is done.
-   * 
+   *
    * @param activeEffect The active effect record
    * @param transition The current transition being processed
    * @param currentTime The current timestamp (shared across all calculations)
    */
-  public handleTransitioning(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
-    this.ensureLastEndState(activeEffect);
-    
+  public handleTransitioning(
+    activeEffect: LightEffectState,
+    transition: EffectTransition,
+    currentTime: number,
+  ): void {
+    this.ensureLastEndState(activeEffect)
+
     if (currentTime >= activeEffect.waitEndTime) {
       // Since this is a per-light effect, we just update the lastEndState directly
-      activeEffect.lastEndState = transition.transform.color;
-      activeEffect.state = 'waitingUntil';
+      activeEffect.lastEndState = transition.transform.color
+      activeEffect.state = 'waitingUntil'
       if (transition.waitUntilCondition === 'none') {
-        activeEffect.currentTransitionIndex += 1;
-        activeEffect.state = 'idle';
+        activeEffect.currentTransitionIndex += 1
+        activeEffect.state = 'idle'
       } else if (transition.waitUntilCondition === 'delay') {
-        activeEffect.transitionStartTime = currentTime;
-        activeEffect.waitEndTime = currentTime + transition.waitUntilTime;
+        activeEffect.transitionStartTime = currentTime
+        activeEffect.waitEndTime = currentTime + transition.waitUntilTime
       } else {
-        activeEffect.transitionStartTime = currentTime;
-        activeEffect.waitEndTime = currentTime;
+        activeEffect.transitionStartTime = currentTime
+        activeEffect.waitEndTime = currentTime
       }
     }
   }
 
   /**
    * Handles the 'waitingUntil' state, checking if we can move to next transition.
-   * 
+   *
    * @param activeEffect The active effect record
    * @param transition The current transition being processed
    * @param currentTime The current timestamp (shared across all calculations)
    */
-  public handleWaitingUntil(activeEffect: LightEffectState, transition: EffectTransition, currentTime: number): void {
+  public handleWaitingUntil(
+    activeEffect: LightEffectState,
+    transition: EffectTransition,
+    currentTime: number,
+  ): void {
     if (transition.waitUntilCondition === 'delay') {
       if (currentTime >= activeEffect.waitEndTime) {
-        activeEffect.currentTransitionIndex += 1;
-        activeEffect.state = 'idle';
+        activeEffect.currentTransitionIndex += 1
+        activeEffect.state = 'idle'
       }
     } else if (transition.waitUntilCondition === 'none') {
-      activeEffect.currentTransitionIndex += 1;
-      activeEffect.state = 'idle';
+      activeEffect.currentTransitionIndex += 1
+      activeEffect.state = 'idle'
     }
   }
 
@@ -333,7 +354,7 @@ export class TransitionEngine implements ITransitionEngine {
    * @returns The final state of the light on that layer, or undefined if not found
    */
   public getFinalState(lightId: string, layer: number): RGBIO | undefined {
-    return this.layerManager.getLightState(layer, lightId);
+    return this.layerManager.getLightState(layer, lightId)
   }
 
   /**
@@ -342,6 +363,6 @@ export class TransitionEngine implements ITransitionEngine {
    */
   public clearFinalStates(layer: number): void {
     // Delegate to layer manager
-    this.layerManager.clearLayerStates(layer);
+    this.layerManager.clearLayerStates(layer)
   }
 }

@@ -1,90 +1,91 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
-import { CONFIG, LIGHT } from '../../../shared/ipcChannels';
+import React, { useState, useEffect, useCallback } from 'react'
+import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
+import { CONFIG, LIGHT } from '../../../shared/ipcChannels'
 
 interface AudioCueInfo {
-  id: string;
-  description: string;
-  groupName?: string;
+  id: string
+  description: string
+  groupName?: string
 }
 
 interface AudioCueGroupDetails {
-  id: string;
-  name: string;
-  description: string;
-  cues: AudioCueInfo[];
-  isExpanded: boolean;
+  id: string
+  name: string
+  description: string
+  cues: AudioCueInfo[]
+  isExpanded: boolean
 }
 
 const AudioEnabledCueGroups: React.FC = () => {
-  const [allGroups, setAllGroups] = useState<AudioCueGroupDetails[]>([]);
-  const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allGroups, setAllGroups] = useState<AudioCueGroupDetails[]>([])
+  const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   const fetchGroups = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(true)
       const [groups, enabled] = await Promise.all([
         window.electron.ipcRenderer.invoke(LIGHT.GET_AUDIO_CUE_GROUPS),
         window.electron.ipcRenderer.invoke(CONFIG.GET_ENABLED_AUDIO_CUE_GROUPS),
-      ]);
+      ])
 
-      const mappedGroups: AudioCueGroupDetails[] = groups.map((group: { id: string; name: string; description: string }) => ({
-        ...group,
-        cues: [],
-        isExpanded: false,
-      }));
+      const mappedGroups: AudioCueGroupDetails[] = groups.map(
+        (group: { id: string; name: string; description: string }) => ({
+          ...group,
+          cues: [],
+          isExpanded: false,
+        }),
+      )
 
-      setAllGroups(mappedGroups);
-      setEnabledGroupIds(enabled);
+      setAllGroups(mappedGroups)
+      setEnabledGroupIds(enabled)
     } catch (error) {
-      console.error('Failed to fetch audio cue groups:', error);
+      console.error('Failed to fetch audio cue groups:', error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+    fetchGroups()
+  }, [fetchGroups])
 
   const handleGroupToggle = (groupId: string, isEnabled: boolean) => {
-    let updatedEnabledIds: string[];
+    let updatedEnabledIds: string[]
 
     if (isEnabled) {
-      updatedEnabledIds = [...new Set([...enabledGroupIds, groupId])];
+      updatedEnabledIds = [...new Set([...enabledGroupIds, groupId])]
     } else {
-      updatedEnabledIds = enabledGroupIds.filter((id) => id !== groupId);
+      updatedEnabledIds = enabledGroupIds.filter((id) => id !== groupId)
     }
 
-    setEnabledGroupIds(updatedEnabledIds);
-    window.electron.ipcRenderer.invoke(CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS, updatedEnabledIds);
-  };
+    setEnabledGroupIds(updatedEnabledIds)
+    window.electron.ipcRenderer.invoke(CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS, updatedEnabledIds)
+  }
 
   const handleAccordionToggle = async (groupId: string) => {
-    const group = allGroups.find((g) => g.id === groupId);
-    if (!group) return;
+    const group = allGroups.find((g) => g.id === groupId)
+    if (!group) return
 
     if (!group.isExpanded && group.cues.length === 0) {
       try {
-        const cueDetails = await window.electron.ipcRenderer.invoke(LIGHT.GET_AVAILABLE_AUDIO_CUES, groupId);
+        const cueDetails = await window.electron.ipcRenderer.invoke(
+          LIGHT.GET_AVAILABLE_AUDIO_CUES,
+          groupId,
+        )
         setAllGroups((prev) =>
-          prev.map((g) =>
-            g.id === groupId ? { ...g, cues: cueDetails, isExpanded: true } : g,
-          ),
-        );
-        return;
+          prev.map((g) => (g.id === groupId ? { ...g, cues: cueDetails, isExpanded: true } : g)),
+        )
+        return
       } catch (error) {
-        console.error('Error fetching audio cue details:', error);
+        console.error('Error fetching audio cue details:', error)
       }
     }
 
     setAllGroups((prev) =>
-      prev.map((g) =>
-        g.id === groupId ? { ...g, isExpanded: !g.isExpanded } : g,
-      ),
-    );
-  };
+      prev.map((g) => (g.id === groupId ? { ...g, isExpanded: !g.isExpanded } : g)),
+    )
+  }
 
   if (loading) {
     return (
@@ -92,7 +93,7 @@ const AudioEnabledCueGroups: React.FC = () => {
         <h2 className="text-xl font-semibold mb-4 border-b pb-2">Audio Cue Groups</h2>
         <p>Loading audio cue groups...</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -101,15 +102,15 @@ const AudioEnabledCueGroups: React.FC = () => {
         Audio Cue Groups
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        Audio cue groups contain different implementations of the audio-reactive effects. Enable the groups you want available when Audio Reactive mode is running.
+        Audio cue groups contain different implementations of the audio-reactive effects. Enable the
+        groups you want available when Audio Reactive mode is running.
       </p>
       <div className="space-y-4">
         {allGroups.map((group) => (
           <div key={group.id} className="border rounded-lg border-gray-200 dark:border-gray-600">
             <div
               className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              onClick={() => handleAccordionToggle(group.id)}
-            >
+              onClick={() => handleAccordionToggle(group.id)}>
               <div className="flex items-center flex-1">
                 <div className="mr-3 text-gray-600 dark:text-gray-400">
                   {group.isExpanded ? (
@@ -148,7 +149,10 @@ const AudioEnabledCueGroups: React.FC = () => {
                       .map((cue) => (
                         <div key={cue.id} className="pl-4">
                           <p className="text-xs text-gray-600 dark:text-gray-400">
-                            <span className="font-medium text-gray-800 dark:text-gray-200">{cue.id}:</span> {cue.description}
+                            <span className="font-medium text-gray-800 dark:text-gray-200">
+                              {cue.id}:
+                            </span>{' '}
+                            {cue.description}
                           </p>
                         </div>
                       ))}
@@ -160,8 +164,7 @@ const AudioEnabledCueGroups: React.FC = () => {
         ))}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default AudioEnabledCueGroups;
-
+export default AudioEnabledCueGroups

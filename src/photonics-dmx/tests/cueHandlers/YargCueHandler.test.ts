@@ -1,23 +1,29 @@
-import { YargCueHandler } from '../../cueHandlers/YargCueHandler';
-import { DmxLightManager } from '../../controllers/DmxLightManager';
-import { ILightingController } from '../../controllers/sequencer/interfaces';
-import { CueData, CueType } from '../../cues/types/cueTypes';
-import { beforeEach, describe, jest, it, expect } from '@jest/globals';
-import { YargCueRegistry } from '../../cues/registries/YargCueRegistry';
-import { ICueGroup } from '../../cues/interfaces/INetCueGroup';
-import { INetCue, CueStyle } from '../../cues/interfaces/INetCue';
+import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
+import { DmxLightManager } from '../../controllers/DmxLightManager'
+import { ILightingController } from '../../controllers/sequencer/interfaces'
+import { CueData, CueType } from '../../cues/types/cueTypes'
+import { beforeEach, describe, jest, it, expect } from '@jest/globals'
+import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
+import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
+import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
 
-// Mock implementation for the test  
+// Mock implementation for the test
 class MockCueImplementation implements INetCue {
-  private _id: string;
+  private _id: string
   constructor(private _name: string) {
-    this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`;
+    this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`
   }
-  get cueId(): string { return this._name; }
-  get id(): string { return this._id; }
-  description = 'Mock cue for testing';
-  style = CueStyle.Primary;
-  async execute(): Promise<void> { /* no-op */ }
+  get cueId(): string {
+    return this._name
+  }
+  get id(): string {
+    return this._id
+  }
+  description = 'Mock cue for testing'
+  style = CueStyle.Primary
+  async execute(): Promise<void> {
+    /* no-op */
+  }
 
   onStop(): void {
     // Mock lifecycle method
@@ -33,15 +39,15 @@ class MockCueImplementation implements INetCue {
 }
 
 describe('YargCueHandler', () => {
-  let cueHandler: YargCueHandler;
-  let mockLightManager: jest.Mocked<DmxLightManager>;
-  let mockSequencer: jest.Mocked<ILightingController>;
-  let registry: YargCueRegistry;
+  let cueHandler: YargCueHandler
+  let mockLightManager: jest.Mocked<DmxLightManager>
+  let mockSequencer: jest.Mocked<ILightingController>
+  let registry: YargCueRegistry
 
   beforeEach(() => {
     // Get and reset the YargCueRegistry
-    registry = YargCueRegistry.getInstance();
-    registry.reset();
+    registry = YargCueRegistry.getInstance()
+    registry.reset()
 
     // Define and register a minimal mock default group for this test suite
     const mockDefaultGroup: ICueGroup = {
@@ -53,10 +59,10 @@ describe('YargCueHandler', () => {
         [CueType.Default, new MockCueImplementation('Default')],
         [CueType.Unknown, new MockCueImplementation('Unknown')], // Handle the unknown cue test
       ]),
-    };
-    registry.registerGroup(mockDefaultGroup);
-    registry.setDefaultGroup(mockDefaultGroup.id);
-    registry.activateGroup(mockDefaultGroup.id);
+    }
+    registry.registerGroup(mockDefaultGroup)
+    registry.setDefaultGroup(mockDefaultGroup.id)
+    registry.activateGroup(mockDefaultGroup.id)
 
     // Create mock light manager
     mockLightManager = {
@@ -66,7 +72,7 @@ describe('YargCueHandler', () => {
       getDmxLight: jest.fn(),
       setConfiguration: jest.fn(),
       shutdown: jest.fn(),
-    } as any;
+    } as any
 
     // Create mock sequencer
     mockSequencer = {
@@ -88,26 +94,26 @@ describe('YargCueHandler', () => {
       getActiveEffectsForLight: jest.fn(),
       isLayerFreeForLight: jest.fn(),
       shutdown: jest.fn(),
-    } as any;
+    } as any
 
     // Use a shorter debounce period for testing
-    cueHandler = new YargCueHandler(mockLightManager, mockSequencer, 10);
-  });
+    cueHandler = new YargCueHandler(mockLightManager, mockSequencer, 10)
+  })
 
   describe('handleBeat', () => {
     it('should call onBeat on the sequencer', () => {
-      cueHandler.handleBeat();
-      expect(mockSequencer.onBeat).toHaveBeenCalledTimes(1);
-    });
-  });
+      cueHandler.handleBeat()
+      expect(mockSequencer.onBeat).toHaveBeenCalledTimes(1)
+    })
+  })
 
   describe('handleMeasure', () => {
     it('should call onBeat and onMeasure on the sequencer', () => {
-      cueHandler.handleMeasure();
-      expect(mockSequencer.onBeat).toHaveBeenCalledTimes(1);
-      expect(mockSequencer.onMeasure).toHaveBeenCalledTimes(1);
-    });
-  });
+      cueHandler.handleMeasure()
+      expect(mockSequencer.onBeat).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.onMeasure).toHaveBeenCalledTimes(1)
+    })
+  })
 
   describe('handleCue', () => {
     const mockCueData: CueData = {
@@ -139,86 +145,97 @@ describe('YargCueHandler', () => {
       executionCount: 1,
       cueStartTime: Date.now(),
       timeSinceLastCue: 0,
-    };
+    }
 
     it('should emit cueHandled event for special cases', async () => {
-      jest.useFakeTimers();
-      const cueHandledListener = jest.fn();
-      cueHandler.on('cueHandled', cueHandledListener);
+      jest.useFakeTimers()
+      const cueHandledListener = jest.fn()
+      cueHandler.on('cueHandled', cueHandledListener)
 
       // Test Blackout_Fast
-      await cueHandler.handleCue(CueType.Blackout_Fast, mockCueData);
+      await cueHandler.handleCue(CueType.Blackout_Fast, mockCueData)
       // Exclude runtime-generated properties from comparison
-      const { cueStartTime, timeSinceLastCue, ...expectedCoreData } = mockCueData;
-      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData));
-      expect(mockSequencer.blackout).toHaveBeenCalledWith(0);
+      const {
+        cueStartTime: _cueStartTime,
+        timeSinceLastCue: _timeSinceLastCue,
+        ...expectedCoreData
+      } = mockCueData
+      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData))
+      expect(mockSequencer.blackout).toHaveBeenCalledWith(0)
 
       // Reset mock calls and advance timers
-      mockSequencer.blackout.mockClear();
-      cueHandledListener.mockClear();
-      cueHandler.resetCueHistory(); // Reset history to prevent accumulation
-      jest.advanceTimersByTime(20);
+      mockSequencer.blackout.mockClear()
+      cueHandledListener.mockClear()
+      cueHandler.resetCueHistory() // Reset history to prevent accumulation
+      jest.advanceTimersByTime(20)
 
       // Test Blackout_Slow
-      await cueHandler.handleCue(CueType.Blackout_Slow, mockCueData);
+      await cueHandler.handleCue(CueType.Blackout_Slow, mockCueData)
       // Exclude runtime-generated properties from comparison
-      const { cueStartTime: cst2, timeSinceLastCue: tslc2, ...expectedCoreData2 } = mockCueData;
-      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData2));
-      expect(mockSequencer.blackout).toHaveBeenCalledWith(500);
+      const { cueStartTime: _cst2, timeSinceLastCue: _tslc2, ...expectedCoreData2 } = mockCueData
+      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData2))
+      expect(mockSequencer.blackout).toHaveBeenCalledWith(500)
 
       // Reset mock calls and advance timers
-      mockSequencer.blackout.mockClear();
-      cueHandledListener.mockClear();
-      jest.advanceTimersByTime(20);
+      mockSequencer.blackout.mockClear()
+      cueHandledListener.mockClear()
+      jest.advanceTimersByTime(20)
 
-
-      jest.useRealTimers();
-    });
+      jest.useRealTimers()
+    })
 
     it('should emit cueHandled event for regular cues', async () => {
-      const cueHandledListener = jest.fn();
-      cueHandler.on('cueHandled', cueHandledListener);
+      const cueHandledListener = jest.fn()
+      cueHandler.on('cueHandled', cueHandledListener)
 
       // Test with a regular cue
-      await cueHandler.handleCue(CueType.Default, mockCueData);
+      await cueHandler.handleCue(CueType.Default, mockCueData)
       // Exclude runtime-generated properties from comparison
-      const { cueStartTime, timeSinceLastCue, ...expectedCoreData } = mockCueData;
-      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData));
-    });
+      const {
+        cueStartTime: _cueStartTime2,
+        timeSinceLastCue: _timeSinceLastCue2,
+        ...expectedCoreData
+      } = mockCueData
+      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData))
+    })
 
     it('should emit cueHandled event even when no implementation is found', async () => {
-      const cueHandledListener = jest.fn();
-      cueHandler.on('cueHandled', cueHandledListener);
+      const cueHandledListener = jest.fn()
+      cueHandler.on('cueHandled', cueHandledListener)
 
       // Test with an unknown cue type
-      await cueHandler.handleCue(CueType.Unknown, mockCueData);
+      await cueHandler.handleCue(CueType.Unknown, mockCueData)
       // Exclude runtime-generated properties from comparison
-      const { cueStartTime, timeSinceLastCue, ...expectedCoreData } = mockCueData;
-      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData));
-    });
+      const {
+        cueStartTime: _cueStartTime3,
+        timeSinceLastCue: _timeSinceLastCue3,
+        ...expectedCoreData
+      } = mockCueData
+      expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData))
+    })
 
     it('should respect debounce period', async () => {
-      jest.useFakeTimers();
-      const cueHandledListener = jest.fn();
-      cueHandler.on('cueHandled', cueHandledListener);
+      jest.useFakeTimers()
+      const cueHandledListener = jest.fn()
+      cueHandler.on('cueHandled', cueHandledListener)
 
       // Call handleCue twice within debounce period
-      await cueHandler.handleCue(CueType.Default, mockCueData);
-      await cueHandler.handleCue(CueType.Default, mockCueData);
+      await cueHandler.handleCue(CueType.Default, mockCueData)
+      await cueHandler.handleCue(CueType.Default, mockCueData)
 
       // Should only emit once due to debounce
-      expect(cueHandledListener).toHaveBeenCalledTimes(1);
+      expect(cueHandledListener).toHaveBeenCalledTimes(1)
 
       // Advance timers past debounce period
-      jest.advanceTimersByTime(20);
+      jest.advanceTimersByTime(20)
 
       // Call handleCue again after debounce period
-      await cueHandler.handleCue(CueType.Default, mockCueData);
+      await cueHandler.handleCue(CueType.Default, mockCueData)
 
       // Should emit again after debounce period
-      expect(cueHandledListener).toHaveBeenCalledTimes(2);
+      expect(cueHandledListener).toHaveBeenCalledTimes(2)
 
-      jest.useRealTimers();
-    });
-  });
-}); 
+      jest.useRealTimers()
+    })
+  })
+})

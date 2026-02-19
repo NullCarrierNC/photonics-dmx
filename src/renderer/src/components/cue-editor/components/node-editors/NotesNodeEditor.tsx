@@ -1,15 +1,12 @@
-import React from 'react';
-import type { NotesNode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
+import React from 'react'
+import type { NotesNode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 interface NotesNodeEditorProps {
-  node: NotesNode;
-  updateNode: (updates: Partial<NotesNode>) => void;
+  node: NotesNode
+  updateNode: (updates: Partial<NotesNode>) => void
 }
 
-const NotesNodeEditor: React.FC<NotesNodeEditorProps> = ({
-  node,
-  updateNode
-}) => {
+const NotesNodeEditor: React.FC<NotesNodeEditorProps> = ({ node, updateNode }) => {
   return (
     <div className="space-y-2 text-xs">
       <label className="flex flex-col font-medium">
@@ -17,8 +14,9 @@ const NotesNodeEditor: React.FC<NotesNodeEditorProps> = ({
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.style ?? 'notes'}
-          onChange={event => updateNode({ style: event.target.value as 'notes' | 'info' | 'important' })}
-        >
+          onChange={(event) =>
+            updateNode({ style: event.target.value as 'notes' | 'info' | 'important' })
+          }>
           <option value="info">Info</option>
           <option value="notes">Notes</option>
           <option value="important">Important</option>
@@ -30,7 +28,7 @@ const NotesNodeEditor: React.FC<NotesNodeEditorProps> = ({
           type="text"
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.title || ''}
-          onChange={event => updateNode({ title: event.target.value })}
+          onChange={(event) => updateNode({ title: event.target.value })}
           placeholder="Optional title..."
         />
       </label>
@@ -39,7 +37,7 @@ const NotesNodeEditor: React.FC<NotesNodeEditorProps> = ({
         <textarea
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 resize-y min-h-[100px]"
           value={node.note || ''}
-          onChange={event => updateNode({ note: event.target.value })}
+          onChange={(event) => updateNode({ note: event.target.value })}
           placeholder="Enter your note here..."
         />
       </label>
@@ -47,8 +45,7 @@ const NotesNodeEditor: React.FC<NotesNodeEditorProps> = ({
         Notes are for documentation only and do not affect cue execution.
       </p>
     </div>
-  );
-};
+  )
+}
 
-export default NotesNodeEditor;
-
+export default NotesNodeEditor

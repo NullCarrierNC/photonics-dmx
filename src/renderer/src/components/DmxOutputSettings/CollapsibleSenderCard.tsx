@@ -1,17 +1,17 @@
-import React from 'react';
+import React from 'react'
 
 interface CollapsibleSenderCardProps {
-  title: string;
-  expanded: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  title: string
+  expanded: boolean
+  onToggle: () => void
+  children: React.ReactNode
 }
 
 const CollapsibleSenderCard: React.FC<CollapsibleSenderCardProps> = ({
   title,
   expanded,
   onToggle,
-  children
+  children,
 }) => (
   <div className="border rounded-lg border-gray-200 dark:border-gray-600">
     <div
@@ -20,13 +20,17 @@ const CollapsibleSenderCard: React.FC<CollapsibleSenderCardProps> = ({
       onKeyDown={(e) => e.key === 'Enter' && onToggle()}
       role="button"
       tabIndex={0}
-      aria-expanded={expanded}
-    >
+      aria-expanded={expanded}>
       <div className="flex items-center flex-1">
         <div className="mr-3 text-gray-600 dark:text-gray-400">
           {expanded ? (
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
             </svg>
           ) : (
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,6 +47,6 @@ const CollapsibleSenderCard: React.FC<CollapsibleSenderCardProps> = ({
       </div>
     )}
   </div>
-);
+)
 
-export default CollapsibleSenderCard;
+export default CollapsibleSenderCard

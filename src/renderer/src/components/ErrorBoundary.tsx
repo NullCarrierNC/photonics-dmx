@@ -1,16 +1,16 @@
-import React from 'react';
+import React from 'react'
 
 interface ErrorBoundaryProps {
-  children: React.ReactNode;
+  children: React.ReactNode
   /** Fallback UI when an error is caught. Receives error and reset function. */
-  fallback?: (error: Error, reset: () => void) => React.ReactNode;
+  fallback?: (error: Error, reset: () => void) => React.ReactNode
   /** Optional label for logging (e.g. "App", "CueEditor") */
-  name?: string;
+  name?: string
 }
 
 interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
+  hasError: boolean
+  error: Error | null
 }
 
 /**
@@ -19,27 +19,27 @@ interface ErrorBoundaryState {
  */
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
+    super(props)
+    this.state = { hasError: false, error: null }
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+    return { hasError: true, error }
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    const name = this.props.name ?? 'ErrorBoundary';
-    console.error(`[${name}] Caught error:`, error, errorInfo);
+    const name = this.props.name ?? 'ErrorBoundary'
+    console.error(`[${name}] Caught error:`, error, errorInfo)
   }
 
   reset = (): void => {
-    this.setState({ hasError: false, error: null });
-  };
+    this.setState({ hasError: false, error: null })
+  }
 
   render(): React.ReactNode {
     if (this.state.hasError && this.state.error) {
       if (this.props.fallback) {
-        return this.props.fallback(this.state.error, this.reset);
+        return this.props.fallback(this.state.error, this.reset)
       }
       return (
         <div className="p-6 rounded-lg bg-red-900/20 border border-red-500/50 text-red-200">
@@ -48,15 +48,14 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           <button
             type="button"
             onClick={this.reset}
-            className="px-3 py-1.5 rounded bg-red-700 hover:bg-red-600 text-white text-sm"
-          >
+            className="px-3 py-1.5 rounded bg-red-700 hover:bg-red-600 text-white text-sm">
             Try again
           </button>
         </div>
-      );
+      )
     }
-    return this.props.children;
+    return this.props.children
   }
 }
 
-export default ErrorBoundary;
+export default ErrorBoundary

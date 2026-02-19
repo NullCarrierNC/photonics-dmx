@@ -1,16 +1,16 @@
-import { EffectExecutionEngine } from '../../../../cues/node/runtime/EffectExecutionEngine';
-import { EffectCompiler } from '../../../../cues/node/compiler/EffectCompiler';
-import type { YargEffectDefinition } from '../../../../cues/types/nodeCueTypes';
-import type { CueData } from '../../../../cues/types/cueTypes';
-import type { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import type { DmxLightManager } from '../../../../controllers/DmxLightManager';
+import { EffectExecutionEngine } from '../../../../cues/node/runtime/EffectExecutionEngine'
+import { EffectCompiler } from '../../../../cues/node/compiler/EffectCompiler'
+import type { YargEffectDefinition } from '../../../../cues/types/nodeCueTypes'
+import type { CueData } from '../../../../cues/types/cueTypes'
+import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 
-jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
 
 describe('EffectExecutionEngine', () => {
-  let mockSequencer: jest.Mocked<ILightingController>;
-  let mockLightManager: jest.Mocked<DmxLightManager>;
-  
+  let mockSequencer: jest.Mocked<ILightingController>
+  let mockLightManager: jest.Mocked<DmxLightManager>
+
   // Helper to create minimal CueData
   const createCueData = (): CueData => ({
     datagramVersion: 1,
@@ -35,24 +35,24 @@ describe('EffectExecutionEngine', () => {
     performer: 0,
     keyframe: '',
     bonusEffect: false,
-    beat: 'Strong' as any
-  });
+    beat: 'Strong' as any,
+  })
 
   beforeEach(() => {
     mockSequencer = {
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        setTimeout(() => callback(), 0);
+        setTimeout(() => callback(), 0)
       }),
-      removeEffect: jest.fn()
-    } as any;
+      removeEffect: jest.fn(),
+    } as any
 
     mockLightManager = {
       getLights: jest.fn(() => [
         { id: 'light1', group: 'front', location: 'left' },
-        { id: 'light2', group: 'front', location: 'right' }
-      ])
-    } as any;
-  });
+        { id: 'light2', group: 'front', location: 'right' },
+      ]),
+    } as any
+  })
 
   describe('Parameter Passing', () => {
     it('should map parameters to effect variables via Effect Listener', async () => {
@@ -63,7 +63,7 @@ describe('EffectExecutionEngine', () => {
         description: '',
         variables: [
           { name: 'speed', type: 'number', scope: 'cue', initialValue: 100, isParameter: true },
-          { name: 'color', type: 'string', scope: 'cue', initialValue: 'white', isParameter: true }
+          { name: 'color', type: 'string', scope: 'cue', initialValue: 'white', isParameter: true },
         ],
         nodes: {
           events: [],
@@ -72,26 +72,26 @@ describe('EffectExecutionEngine', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'set-color',
-              target: { 
-                groups: { source: 'literal', value: 'front' }, 
-                filter: { source: 'literal', value: 'all' } 
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
               },
-              color: { 
-                name: { source: 'literal', value: 'white' }, 
-                brightness: { source: 'literal', value: 'medium' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
+              color: {
+                name: { source: 'literal', value: 'white' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
               },
-              timing: { 
+              timing: {
                 waitForCondition: 'none',
                 waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 100 }, 
+                duration: { source: 'literal', value: 100 },
                 waitUntilCondition: 'none',
                 waitUntilTime: { source: 'literal', value: 0 },
-                easing: 'linear', 
-                level: { source: 'literal', value: 1 } 
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
               },
-              layer: { source: 'literal', value: 0 }
-            }
+              layer: { source: 'literal', value: 0 },
+            },
           ],
           logic: [],
           eventRaisers: [],
@@ -101,37 +101,35 @@ describe('EffectExecutionEngine', () => {
               id: 'listener-1',
               type: 'effect-listener',
               label: 'Entry',
-              outputs: ['action-1']
-            }
-          ]
+              outputs: ['action-1'],
+            },
+          ],
         },
-        connections: [
-          { from: 'listener-1', to: 'action-1' }
-        ],
-        layout: { nodePositions: {} }
-      };
+        connections: [{ from: 'listener-1', to: 'action-1' }],
+        layout: { nodePositions: {} },
+      }
 
-      const compiledEffect = EffectCompiler.compile(effect);
+      const compiledEffect = EffectCompiler.compile(effect)
       const parameterValues = {
         speed: 150,
-        color: 'blue'
-      };
+        color: 'blue',
+      }
 
       const engine = new EffectExecutionEngine(
         compiledEffect,
         mockSequencer,
         mockLightManager,
         parameterValues,
-        createCueData()
-      );
+        createCueData(),
+      )
 
-      await engine.triggerEffect(createCueData());
+      await engine.triggerEffect(createCueData())
 
       // Verify effect variables were set
-      const varStore = (engine as any).effectVarStore;
-      expect(varStore.get('speed')).toEqual({ type: 'number', value: 150 });
-      expect(varStore.get('color')).toEqual({ type: 'string', value: 'blue' });
-    });
+      const varStore = (engine as any).effectVarStore
+      expect(varStore.get('speed')).toEqual({ type: 'number', value: 150 })
+      expect(varStore.get('color')).toEqual({ type: 'string', value: 'blue' })
+    })
 
     it('should use default values when parameters not provided', async () => {
       const effect: YargEffectDefinition = {
@@ -140,7 +138,13 @@ describe('EffectExecutionEngine', () => {
         name: 'Test',
         description: '',
         variables: [
-          { name: 'localSpeed', type: 'number', scope: 'cue', initialValue: 100, isParameter: true }
+          {
+            name: 'localSpeed',
+            type: 'number',
+            scope: 'cue',
+            initialValue: 100,
+            isParameter: true,
+          },
         ],
         nodes: {
           events: [],
@@ -153,8 +157,8 @@ describe('EffectExecutionEngine', () => {
               eventName: 'test-event',
               label: 'Raise Event',
               inputs: [],
-              outputs: []
-            }
+              outputs: [],
+            },
           ],
           eventListeners: [],
           effectListeners: [
@@ -162,34 +166,30 @@ describe('EffectExecutionEngine', () => {
               id: 'listener-1',
               type: 'effect-listener',
               label: 'Entry',
-              outputs: ['raiser-1']
-            }
-          ]
+              outputs: ['raiser-1'],
+            },
+          ],
         },
-        events: [
-          { name: 'test-event', description: '' }
-        ],
-        connections: [
-          { from: 'listener-1', to: 'raiser-1' }
-        ],
-        layout: { nodePositions: {} }
-      };
+        events: [{ name: 'test-event', description: '' }],
+        connections: [{ from: 'listener-1', to: 'raiser-1' }],
+        layout: { nodePositions: {} },
+      }
 
-      const compiledEffect = EffectCompiler.compile(effect);
-      const parameterValues = {}; // Missing 'speed'
+      const compiledEffect = EffectCompiler.compile(effect)
+      const parameterValues = {} // Missing 'speed'
 
       const engine = new EffectExecutionEngine(
         compiledEffect,
         mockSequencer,
         mockLightManager,
         parameterValues,
-        createCueData()
-      );
+        createCueData(),
+      )
 
       // Should not throw
-      expect(() => engine.triggerEffect(createCueData())).not.toThrow();
-    });
-  });
+      expect(() => engine.triggerEffect(createCueData())).not.toThrow()
+    })
+  })
 
   describe('Variable Isolation', () => {
     it('should have isolated variable scope', async () => {
@@ -198,9 +198,7 @@ describe('EffectExecutionEngine', () => {
         mode: 'yarg',
         name: 'Test',
         description: '',
-        variables: [
-          { name: 'effectVar', type: 'number', scope: 'cue', initialValue: 0 }
-        ],
+        variables: [{ name: 'effectVar', type: 'number', scope: 'cue', initialValue: 0 }],
         nodes: {
           events: [],
           actions: [
@@ -208,26 +206,26 @@ describe('EffectExecutionEngine', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'set-color',
-              target: { 
-                groups: { source: 'literal', value: 'front' }, 
-                filter: { source: 'literal', value: 'all' } 
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
               },
-              color: { 
-                name: { source: 'literal', value: 'white' }, 
-                brightness: { source: 'literal', value: 'medium' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
+              color: {
+                name: { source: 'literal', value: 'white' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
               },
-              timing: { 
+              timing: {
                 waitForCondition: 'none',
                 waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 100 }, 
+                duration: { source: 'literal', value: 100 },
                 waitUntilCondition: 'none',
                 waitUntilTime: { source: 'literal', value: 0 },
-                easing: 'linear', 
-                level: { source: 'literal', value: 1 } 
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
               },
-              layer: { source: 'literal', value: 0 }
-            }
+              layer: { source: 'literal', value: 0 },
+            },
           ],
           logic: [
             {
@@ -239,8 +237,8 @@ describe('EffectExecutionEngine', () => {
               mode: 'set',
               varName: 'effectVar',
               valueType: 'number',
-              value: { source: 'literal', value: 42 }
-            }
+              value: { source: 'literal', value: 42 },
+            },
           ],
           eventRaisers: [],
           eventListeners: [],
@@ -249,36 +247,36 @@ describe('EffectExecutionEngine', () => {
               id: 'listener-1',
               type: 'effect-listener',
               label: 'Entry',
-              outputs: ['logic-1', 'action-1']
-            }
-          ]
+              outputs: ['logic-1', 'action-1'],
+            },
+          ],
         },
         connections: [
           { from: 'listener-1', to: 'logic-1' },
-          { from: 'listener-1', to: 'action-1' }
+          { from: 'listener-1', to: 'action-1' },
         ],
-        layout: { nodePositions: {} }
-      };
+        layout: { nodePositions: {} },
+      }
 
-      const compiledEffect = EffectCompiler.compile(effect);
+      const compiledEffect = EffectCompiler.compile(effect)
 
       const engine = new EffectExecutionEngine(
         compiledEffect,
         mockSequencer,
         mockLightManager,
         {},
-        createCueData()
-      );
+        createCueData(),
+      )
 
-      await engine.triggerEffect(createCueData());
+      await engine.triggerEffect(createCueData())
 
       // Verify variable is in effect's scope
-      const varStore = (engine as any).effectVarStore;
-      expect(varStore.get('effectVar')).toEqual({ type: 'number', value: 42 });
-      
+      const varStore = (engine as any).effectVarStore
+      expect(varStore.get('effectVar')).toEqual({ type: 'number', value: 42 })
+
       // Verify it's not accessible externally (would need cue context to test fully)
-    });
-  });
+    })
+  })
 
   describe('Internal Events', () => {
     it('should support EventRaiser and EventListener within effect', async () => {
@@ -290,8 +288,8 @@ describe('EffectExecutionEngine', () => {
         events: [
           {
             name: 'internal-event',
-            description: ''
-          }
+            description: '',
+          },
         ],
         nodes: {
           events: [],
@@ -300,26 +298,26 @@ describe('EffectExecutionEngine', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'set-color',
-              target: { 
-                groups: { source: 'literal', value: 'front' }, 
-                filter: { source: 'literal', value: 'all' } 
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
               },
-              color: { 
-                name: { source: 'literal', value: 'red' }, 
-                brightness: { source: 'literal', value: 'high' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
+              color: {
+                name: { source: 'literal', value: 'red' },
+                brightness: { source: 'literal', value: 'high' },
+                blendMode: { source: 'literal', value: 'replace' },
               },
-              timing: { 
+              timing: {
                 waitForCondition: 'none',
                 waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 100 }, 
+                duration: { source: 'literal', value: 100 },
                 waitUntilCondition: 'none',
                 waitUntilTime: { source: 'literal', value: 0 },
-                easing: 'linear', 
-                level: { source: 'literal', value: 1 } 
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
               },
-              layer: { source: 'literal', value: 0 }
-            }
+              layer: { source: 'literal', value: 0 },
+            },
           ],
           logic: [],
           eventRaisers: [
@@ -329,8 +327,8 @@ describe('EffectExecutionEngine', () => {
               eventName: 'internal-event',
               label: 'Raise',
               inputs: [],
-              outputs: []
-            }
+              outputs: [],
+            },
           ],
           eventListeners: [
             {
@@ -338,41 +336,41 @@ describe('EffectExecutionEngine', () => {
               type: 'event-listener',
               eventName: 'internal-event',
               label: 'Listen',
-              outputs: ['action-1']
-            }
+              outputs: ['action-1'],
+            },
           ],
           effectListeners: [
             {
               id: 'listener-1',
               type: 'effect-listener',
               label: 'Entry',
-              outputs: ['raiser-1']
-            }
-          ]
+              outputs: ['raiser-1'],
+            },
+          ],
         },
         connections: [
           { from: 'listener-1', to: 'raiser-1' },
-          { from: 'listener-event-1', to: 'action-1' }
+          { from: 'listener-event-1', to: 'action-1' },
         ],
-        layout: { nodePositions: {} }
-      };
+        layout: { nodePositions: {} },
+      }
 
-      const compiledEffect = EffectCompiler.compile(effect);
+      const compiledEffect = EffectCompiler.compile(effect)
 
       const engine = new EffectExecutionEngine(
         compiledEffect,
         mockSequencer,
         mockLightManager,
         {},
-        createCueData()
-      );
+        createCueData(),
+      )
 
-      await engine.triggerEffect(createCueData());
+      await engine.triggerEffect(createCueData())
 
       // Verify action was executed via internal event
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled();
-    });
-  });
+      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled()
+    })
+  })
 
   describe('Non-blocking Execution', () => {
     it('should execute asynchronously', async () => {
@@ -388,26 +386,26 @@ describe('EffectExecutionEngine', () => {
               id: 'action-1',
               type: 'action',
               effectType: 'set-color',
-              target: { 
-                groups: { source: 'literal', value: 'front' }, 
-                filter: { source: 'literal', value: 'all' } 
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
               },
-              color: { 
-                name: { source: 'literal', value: 'white' }, 
-                brightness: { source: 'literal', value: 'medium' }, 
-                blendMode: { source: 'literal', value: 'replace' } 
+              color: {
+                name: { source: 'literal', value: 'white' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
               },
-              timing: { 
+              timing: {
                 waitForCondition: 'none',
                 waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 1000 }, 
+                duration: { source: 'literal', value: 1000 },
                 waitUntilCondition: 'none',
                 waitUntilTime: { source: 'literal', value: 0 },
-                easing: 'linear', 
-                level: { source: 'literal', value: 1 } 
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
               },
-              layer: { source: 'literal', value: 0 }
-            }
+              layer: { source: 'literal', value: 0 },
+            },
           ],
           logic: [],
           eventRaisers: [],
@@ -417,34 +415,32 @@ describe('EffectExecutionEngine', () => {
               id: 'listener-1',
               type: 'effect-listener',
               label: 'Entry',
-              outputs: ['action-1']
-            }
-          ]
+              outputs: ['action-1'],
+            },
+          ],
         },
-        connections: [
-          { from: 'listener-1', to: 'action-1' }
-        ],
-        layout: { nodePositions: {} }
-      };
+        connections: [{ from: 'listener-1', to: 'action-1' }],
+        layout: { nodePositions: {} },
+      }
 
-      const compiledEffect = EffectCompiler.compile(effect);
+      const compiledEffect = EffectCompiler.compile(effect)
 
       const engine = new EffectExecutionEngine(
         compiledEffect,
         mockSequencer,
         mockLightManager,
         {},
-        createCueData()
-      );
+        createCueData(),
+      )
 
-      const startTime = Date.now();
-      const promise = engine.triggerEffect(createCueData());
-      const callTime = Date.now() - startTime;
+      const startTime = Date.now()
+      const promise = engine.triggerEffect(createCueData())
+      const callTime = Date.now() - startTime
 
       // Should return immediately, not wait for action to complete
-      expect(callTime).toBeLessThan(100);
+      expect(callTime).toBeLessThan(100)
 
-      await promise; // Wait for actual completion
-    });
-  });
-});
+      await promise // Wait for actual completion
+    })
+  })
+})

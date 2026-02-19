@@ -1,5 +1,12 @@
-import { DmxFixture, LightingConfiguration, TrackedLight, RGBIO, FixtureTypes, DmxLight } from '../../types';
-import { ConfigStrobeType } from '../../types';
+import {
+  DmxFixture,
+  LightingConfiguration,
+  TrackedLight,
+  RGBIO,
+  FixtureTypes,
+  DmxLight,
+} from '../../types'
+import { ConfigStrobeType } from '../../types'
 
 export const createMockDmxFixture = (overrides?: Partial<DmxFixture>): DmxFixture => ({
   id: 'test-fixture-1',
@@ -14,26 +21,28 @@ export const createMockDmxFixture = (overrides?: Partial<DmxFixture>): DmxFixtur
     red: 1,
     green: 2,
     blue: 3,
-    masterDimmer: 4
+    masterDimmer: 4,
   },
-  ...overrides
-});
+  ...overrides,
+})
 
 export const createMockDmxLight = (overrides?: Partial<DmxLight>): DmxLight => ({
   ...createMockDmxFixture(),
   fixtureId: 'test-fixture-1',
-  ...overrides
-});
+  ...overrides,
+})
 
-export const createMockLightingConfig = (overrides?: Partial<LightingConfiguration>): LightingConfiguration => ({
+export const createMockLightingConfig = (
+  overrides?: Partial<LightingConfiguration>,
+): LightingConfiguration => ({
   numLights: 4,
   lightLayout: { id: 'front-back', label: 'Front and Back' },
   strobeType: ConfigStrobeType.None,
   frontLights: [createMockDmxLight()],
   backLights: [],
   strobeLights: [],
-  ...overrides
-});
+  ...overrides,
+})
 
 export const createMockTrackedLight = (overrides?: Partial<TrackedLight>): TrackedLight => ({
   id: 'test-light-1',
@@ -45,10 +54,10 @@ export const createMockTrackedLight = (overrides?: Partial<TrackedLight>): Track
     tiltHome: 0,
     tiltMin: 0,
     tiltMax: 255,
-    invert: false
+    invert: false,
   },
-  ...overrides
-});
+  ...overrides,
+})
 
 export const createMockRGBIP = (overrides?: Partial<RGBIO>): RGBIO => ({
   red: 0,
@@ -57,5 +66,5 @@ export const createMockRGBIP = (overrides?: Partial<RGBIO>): RGBIO => ({
   intensity: 255,
   opacity: 1.0,
   blendMode: 'replace',
-  ...overrides
-}); 
+  ...overrides,
+})

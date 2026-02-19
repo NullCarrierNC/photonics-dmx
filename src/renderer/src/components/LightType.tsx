@@ -1,24 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { FixtureTypes, LightTypes } from '../../../photonics-dmx/types';
+import React, { useState, useEffect } from 'react'
+import { FixtureTypes, LightTypes } from '../../../photonics-dmx/types'
 
 interface LightTypeProps {
-  selectedType: FixtureTypes; // Currently selected light type
-  onTypeChange: (type: FixtureTypes) => void; 
+  selectedType: FixtureTypes // Currently selected light type
+  onTypeChange: (type: FixtureTypes) => void
 }
 
 const LightType: React.FC<LightTypeProps> = ({ selectedType, onTypeChange }) => {
-  const [currentType, setCurrentType] = useState<FixtureTypes>(selectedType);
+  const [currentType, setCurrentType] = useState<FixtureTypes>(selectedType)
 
   useEffect(() => {
     // Update local state when the selectedType prop changes
-    setCurrentType(selectedType);
-  }, [selectedType]);
+    setCurrentType(selectedType)
+  }, [selectedType])
 
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newType = e.target.value as FixtureTypes;
-    setCurrentType(newType);
-    onTypeChange(newType);
-  };
+    const newType = e.target.value as FixtureTypes
+    setCurrentType(newType)
+    onTypeChange(newType)
+  }
 
   return (
     <label className="flex flex-col items-start w-full">
@@ -26,8 +26,7 @@ const LightType: React.FC<LightTypeProps> = ({ selectedType, onTypeChange }) => 
       <select
         value={currentType}
         onChange={handleTypeChange}
-        className="p-2 border border-gray-300 rounded w-full text-black"
-      >
+        className="p-2 border border-gray-300 rounded w-full text-black">
         {LightTypes.map((lightType) => (
           <option key={lightType.fixture} value={lightType.fixture}>
             {lightType.label}
@@ -35,7 +34,7 @@ const LightType: React.FC<LightTypeProps> = ({ selectedType, onTypeChange }) => 
         ))}
       </select>
     </label>
-  );
-};
+  )
+}
 
-export default LightType;
+export default LightType

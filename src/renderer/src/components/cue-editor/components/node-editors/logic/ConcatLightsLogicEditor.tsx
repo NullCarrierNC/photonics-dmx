@@ -1,30 +1,30 @@
-import React from 'react';
-import type { ConcatLightsLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { LogicEditorCommonProps } from './LogicNodeEditorShared';
+import React from 'react'
+import type { ConcatLightsLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
 export interface ConcatLightsLogicEditorProps extends LogicEditorCommonProps {
-  node: ConcatLightsLogicNode;
+  node: ConcatLightsLogicNode
 }
 
 const ConcatLightsLogicEditor: React.FC<ConcatLightsLogicEditorProps> = ({
   node,
   availableVariables,
-  updateNode
+  updateNode,
 }) => {
-  const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
-  const sourceVariables = node.sourceVariables || [];
+  const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
+  const sourceVariables = node.sourceVariables || []
 
   const addSourceVariable = (varName: string) => {
     if (varName && !sourceVariables.includes(varName)) {
-      updateNode({ sourceVariables: [...sourceVariables, varName] });
+      updateNode({ sourceVariables: [...sourceVariables, varName] })
     }
-  };
+  }
 
   const removeSourceVariable = (index: number) => {
-    const newVars = [...sourceVariables];
-    newVars.splice(index, 1);
-    updateNode({ sourceVariables: newVars });
-  };
+    const newVars = [...sourceVariables]
+    newVars.splice(index, 1)
+    updateNode({ sourceVariables: newVars })
+  }
 
   return (
     <div className="space-y-2 text-xs">
@@ -39,8 +39,7 @@ const ConcatLightsLogicEditor: React.FC<ConcatLightsLogicEditorProps> = ({
               <button
                 type="button"
                 className="text-red-500 hover:text-red-700 px-1"
-                onClick={() => removeSourceVariable(index)}
-              >
+                onClick={() => removeSourceVariable(index)}>
                 ×
               </button>
             </div>
@@ -48,12 +47,11 @@ const ConcatLightsLogicEditor: React.FC<ConcatLightsLogicEditorProps> = ({
           <select
             className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
             value=""
-            onChange={event => addSourceVariable(event.target.value)}
-          >
+            onChange={(event) => addSourceVariable(event.target.value)}>
             <option value="">-- Add light-array --</option>
             {lightArrayVars
-              .filter(v => !sourceVariables.includes(v.name))
-              .map(v => (
+              .filter((v) => !sourceVariables.includes(v.name))
+              .map((v) => (
                 <option key={v.name} value={v.name}>
                   {v.name} ({v.scope})
                 </option>
@@ -67,10 +65,9 @@ const ConcatLightsLogicEditor: React.FC<ConcatLightsLogicEditorProps> = ({
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.assignTo}
-          onChange={event => updateNode({ assignTo: event.target.value })}
-        >
+          onChange={(event) => updateNode({ assignTo: event.target.value })}>
           <option value="">-- Select variable --</option>
-          {lightArrayVars.map(v => (
+          {lightArrayVars.map((v) => (
             <option key={v.name} value={v.name}>
               {v.name} ({v.scope})
             </option>
@@ -82,7 +79,7 @@ const ConcatLightsLogicEditor: React.FC<ConcatLightsLogicEditorProps> = ({
         Concatenates multiple light arrays into one. Order matters.
       </p>
     </div>
-  );
-};
+  )
+}
 
-export default ConcatLightsLogicEditor;
+export default ConcatLightsLogicEditor
