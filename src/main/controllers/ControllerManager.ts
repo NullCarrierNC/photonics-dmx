@@ -45,6 +45,7 @@ export class ControllerManager {
   private effectsController: ILightingController | null = null
   private dmxPublisher: DmxPublisher | null = null
   private senderManager: SenderManager | null = null
+  private senderErrorTrackingCallback: ((senderId: string) => void) | null = null
 
   private cueHandler: YargCueHandler | Rb3CueHandler | null = null
   private nodeCueLoader: NodeCueLoader | null = null
@@ -62,7 +63,7 @@ export class ControllerManager {
     this.senderManager = new SenderManager()
     this.senderErrorHandler = createSenderErrorHandler(
       () => this.getSenderManager(),
-      () => BrowserWindow.getFocusedWindow(),
+      () => BrowserWindow.getAllWindows()[0] ?? null,
     )
     this.testEffectRunner = new TestEffectRunner({
       getConfig: () => ({
@@ -86,6 +87,9 @@ export class ControllerManager {
   private ensureSenderManager(): void {
     if (this.senderManager === null) {
       this.senderManager = new SenderManager()
+      if (this.senderErrorTrackingCallback) {
+        this.senderManager.setOnSenderEnabled(this.senderErrorTrackingCallback)
+      }
     }
   }
 
@@ -511,6 +515,7 @@ export class ControllerManager {
    * @param callback Function to call with the sender ID when error tracking should be cleared
    */
   public setSenderErrorTrackingCallback(callback: (senderId: string) => void): void {
+    this.senderErrorTrackingCallback = callback
     this.ensureSenderManager()
     this.senderManager!.setOnSenderEnabled(callback)
   }

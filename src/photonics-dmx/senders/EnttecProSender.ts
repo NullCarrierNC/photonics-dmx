@@ -26,8 +26,7 @@ export class EnttecProSender extends BaseSender {
         new EnttecUSBDMXProDriver(this.port, this.options),
       )
     } catch (err) {
-      const errorEvent = new SenderError(err, { senderId: 'enttecpro' })
-      this.eventEmitter.emit('SenderError', errorEvent)
+      throw err
     }
   }
 

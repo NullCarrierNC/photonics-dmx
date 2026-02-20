@@ -36,7 +36,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
         console.log(`Successfully enabled ${sender} sender`)
       } catch (error) {
         console.error(`Failed to enable ${sender} sender:`, error)
-        const mainWindow = BrowserWindow.getFocusedWindow()
+        const mainWindow = BrowserWindow.getAllWindows()[0] ?? null
         if (mainWindow) {
           mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_START_FAILED, {
             sender: sender,

@@ -37,6 +37,7 @@ export function createSenderErrorHandler(
           error: error.message,
           autoDisabled: true,
         })
+        return
       } catch (err) {
         console.error('Error disabling sender:', err)
       }

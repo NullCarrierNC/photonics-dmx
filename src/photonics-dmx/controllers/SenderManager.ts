@@ -20,6 +20,8 @@ export class SenderManager {
   private eventEmitter: EventEmitter
   private ipcSender: IpcSender | null = null
   private initializingSenders: Set<string> = new Set()
+  private failedDuringInit: Set<string> = new Set()
+  private initializingSenderPorts: Map<string, number | null> = new Map()
   private senderUniverseMap: Map<string, number> = new Map()
   private onSenderEnabledCallback: ((senderId: string) => void) | null = null
 
@@ -35,6 +37,14 @@ export class SenderManager {
    */
   public setOnSenderEnabled(callback: (senderId: string) => void): void {
     this.onSenderEnabledCallback = callback
+  }
+
+  /**
+   * Mark a sender as failed during initialization (e.g. network error during start()).
+   * Used by the uncaught-exception handler so enableSender can abort after start() resolves.
+   */
+  public markInitFailed(senderId: string): void {
+    this.failedDuringInit.add(senderId)
   }
 
   /**
@@ -56,6 +66,12 @@ export class SenderManager {
 
     // Mark this sender as initializing
     this.initializingSenders.add(id)
+
+    // Clear any error tracking for this sender so errors during start() can be handled
+    if (this.onSenderEnabledCallback) {
+      this.onSenderEnabledCallback(id)
+    }
+    this.failedDuringInit.delete(id)
 
     try {
       if (senderType === 'ipc') {
@@ -153,12 +169,27 @@ export class SenderManager {
 
         console.log(`Direct sender created for "${id}"`)
 
+        // Track this sender's port so getSenderIdByPort works during initialization
+        this.initializingSenderPorts.set(id, sender.getConfiguredPort())
+
         // Register error handler before starting
         sender.onSendError(this.handleSenderError)
 
         // Start the sender and wait for it to complete
         console.log(`Starting sender "${id}"...`)
         await sender.start()
+
+        if (this.failedDuringInit.has(id)) {
+          this.failedDuringInit.delete(id)
+          this.initializingSenders.delete(id)
+          this.initializingSenderPorts.delete(id)
+          sender.removeSendError(this.handleSenderError)
+          sender
+            .stop()
+            .catch((err) => console.error(`Error stopping ${id} after init failure:`, err))
+          throw new Error(`Sender "${id}" encountered a network error during initialization`)
+        }
+
         console.log(`Sender "${id}" started successfully`)
 
         // Only add to enabled senders after successful startup
@@ -167,16 +198,13 @@ export class SenderManager {
 
         // Remove from initializing set
         this.initializingSenders.delete(id)
-
-        // Clear any error tracking for this sender (allows re-enabling after network errors)
-        if (this.onSenderEnabledCallback) {
-          this.onSenderEnabledCallback(id)
-        }
+        this.initializingSenderPorts.delete(id)
       }
     } catch (err) {
       console.error(`Error starting sender with ID "${id}":`, err)
       // Remove from initializing set on error
       this.initializingSenders.delete(id)
+      this.initializingSenderPorts.delete(id)
 
       // Re-throw the error so the IPC handler can catch it and send the failure notification
       throw err
@@ -427,6 +455,12 @@ export class SenderManager {
         return id
       }
     }
+    // Also check senders that are still being initialized
+    for (const [id, senderPort] of this.initializingSenderPorts) {
+      if (senderPort === port) {
+        return id
+      }
+    }
     return null
   }
 
@@ -448,5 +482,12 @@ export class SenderManager {
   // Using an arrow function to ensure correct "this" binding.
   private handleSenderError = (senderErr: SenderError): void => {
     this.eventEmitter.emit('SenderError', senderErr)
+  }
+
+  /**
+   * Emit a sender error through the manager (e.g. when error occurs during initializing).
+   */
+  public emitSenderError(error: SenderError): void {
+    this.handleSenderError(error)
   }
 }

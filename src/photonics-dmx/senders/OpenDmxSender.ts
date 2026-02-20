@@ -26,8 +26,7 @@ export class OpenDmxSender extends BaseSender {
         new EnttecOpenUSBDMXDriver(this.port, this.options),
       )
     } catch (err) {
-      const errorEvent = new SenderError(err, { senderId: 'opendmx' })
-      this.eventEmitter.emit('SenderError', errorEvent)
+      throw err
     }
   }
 

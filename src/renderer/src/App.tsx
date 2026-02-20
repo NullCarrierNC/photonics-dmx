@@ -76,19 +76,13 @@ export const App = (): JSX.Element => {
   // Set up our timeout hook for error handling
   const { reset: resetErrorTimeout } = useTimeout(clearErrorState, 6000)
 
-  // Handler for sender errors
+  // Handler for sender errors (non-network; network errors use SENDER_NETWORK_ERROR + toast)
   const handleSenderError = useCallback(
-    (evt: unknown, msg: string): void => {
-      console.error('IPC event:', evt)
-      console.error('IPC message:', msg)
-
-      setIsSenderError(true)
-      setSenderError(msg)
-
-      // Reset the error timeout (clears existing timeout and sets a new one)
-      resetErrorTimeout()
+    (_evt: unknown, msg: string): void => {
+      console.error('Sender error:', msg)
+      showToast(msg, 'error', 5000)
     },
-    [setIsSenderError, setSenderError, resetErrorTimeout],
+    [showToast],
   )
 
   // Handler for cue state updates
@@ -125,10 +119,13 @@ export const App = (): JSX.Element => {
           console.warn(`Unknown sender type in failure notification: ${data.sender}`)
       }
 
-      // Also set sender error state to show the error to the user
-      setIsSenderError(true)
-      setSenderError(`Failed to start ${data.sender} sender: ${data.error}`)
-      resetErrorTimeout()
+      const senderName =
+        data.sender === 'artnet'
+          ? 'ArtNet'
+          : data.sender === 'sacn'
+            ? 'sACN'
+            : data.sender.toUpperCase()
+      showToast(`Failed to start ${senderName} sender: ${data.error}`, 'error', 5000)
     },
     [
       setSacnEnabled,
@@ -136,9 +133,7 @@ export const App = (): JSX.Element => {
       setEnttecProEnabled,
       setOpenDmxEnabled,
       setIpcEnabled,
-      setIsSenderError,
-      setSenderError,
-      resetErrorTimeout,
+      showToast,
     ],
   )
 
@@ -176,22 +171,8 @@ export const App = (): JSX.Element => {
         ? `${senderName} destination unreachable. ${senderName} has been automatically disabled. Error: ${data.error}`
         : `${senderName} network error: ${data.error}`
       showToast(errorMessage, 'error', 5000)
-
-      // Also set sender error state
-      setIsSenderError(true)
-      setSenderError(`Network error for ${data.sender} sender: ${data.error}`)
-      resetErrorTimeout()
     },
-    [
-      setSacnEnabled,
-      setArtNetEnabled,
-      setEnttecProEnabled,
-      setOpenDmxEnabled,
-      setIsSenderError,
-      setSenderError,
-      resetErrorTimeout,
-      showToast,
-    ],
+    [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setOpenDmxEnabled, showToast],
   )
 
   // Handler for audio:enable from main process

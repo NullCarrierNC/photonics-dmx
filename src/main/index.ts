@@ -26,8 +26,6 @@ function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
 
 // Global error handling
 process.on('uncaughtException', (error: unknown) => {
-  console.error('Uncaught exception:', error)
-
   // Check if this is a network sender error (UDP socket error)
   const isNetworkError =
     isNetworkErrorLike(error) &&
@@ -38,6 +36,7 @@ process.on('uncaughtException', (error: unknown) => {
     error.syscall === 'send'
 
   if (!isNetworkError || !applicationInstance) {
+    console.error('Uncaught exception:', error)
     return
   }
 
@@ -51,8 +50,10 @@ process.on('uncaughtException', (error: unknown) => {
         if (error.port != null) {
           senderId = senderManager.getSenderIdByPort(error.port)
         }
-        if (!senderId && error.address) {
-          // Port absent or unmatched — fall back to checking which network sender is enabled
+        if (!senderId && error.port == null && error.address) {
+          // Port absent only — fall back to checking which network sender is enabled.
+          // Do NOT fall back when a port was present but unmatched: that indicates a
+          // cleanup error from a sender already being stopped, not a new fault.
           if (senderManager.isSenderEnabled('artnet')) {
             senderId = 'artnet'
           } else if (senderManager.isSenderEnabled('sacn')) {
@@ -69,12 +70,12 @@ process.on('uncaughtException', (error: unknown) => {
 
     // Debounce: only handle errors for the same sender once per second
     if (now - lastHandled < 1000) {
-      return // Skip if we just handled an error for this sender
+      return
     }
 
     // Check if we've already permanently handled this sender's error
     if (isSenderErrorHandled(senderId)) {
-      return // Already handled, prevent loop
+      return
     }
 
     try {
@@ -85,13 +86,15 @@ process.on('uncaughtException', (error: unknown) => {
           // Mark as handled immediately to prevent loops
           markSenderErrorHandled(senderId, now)
 
-          // IMMEDIATELY remove from enabled senders to stop further send() calls
+          const senderError = new SenderError(error, {
+            senderId: senderId as SenderId,
+            shouldDisable: true,
+          })
+
+          // Remove from enabled senders to stop further send() calls (returns null if still initializing)
           const sender = senderManager.getAndRemoveSenderForEmergency(senderId)
           if (sender) {
-            const senderError = new SenderError(error, {
-              senderId: senderId as SenderId,
-              shouldDisable: true,
-            })
+            console.error(`Network sender error (${senderId}):`, error)
             const senderWithEmit = sender as {
               eventEmitter?: { emit(event: string, payload: SenderError): void }
             }
@@ -101,14 +104,20 @@ process.on('uncaughtException', (error: unknown) => {
             sender.stop().catch((stopErr: unknown) => {
               console.error(`Error stopping ${senderId} sender after network error:`, stopErr)
             })
+          } else {
+            // Sender is still initializing; mark so enableSender aborts, then emit to frontend
+            console.error(`Network sender error (${senderId}):`, error)
+            senderManager.markInitFailed(senderId)
+            senderManager.emitSenderError(senderError)
           }
         }
       }
     } catch (err) {
       console.error(`Error handling ${senderId} uncaught exception:`, err)
-      // Remove from handled set on error so we can retry
       removeSenderErrorHandled(senderId)
     }
+  } else {
+    console.error('Uncaught exception:', error)
   }
 })
 
