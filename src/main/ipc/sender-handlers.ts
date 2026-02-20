@@ -1,5 +1,6 @@
-import { IpcMain, BrowserWindow } from 'electron'
+import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
+import { sendToAllWindows } from '../utils/windowUtils'
 import type { SacnSenderConfig } from '../../photonics-dmx/types'
 import { ipcError } from './ipcResult'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -36,13 +37,10 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
         console.log(`Successfully enabled ${sender} sender`)
       } catch (error) {
         console.error(`Failed to enable ${sender} sender:`, error)
-        const mainWindow = BrowserWindow.getAllWindows()[0] ?? null
-        if (mainWindow) {
-          mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_START_FAILED, {
-            sender: sender,
-            error: ipcError(error).error,
-          })
-        }
+        sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
+          sender: sender,
+          error: ipcError(error).error,
+        })
         throw error
       }
     } catch (error) {

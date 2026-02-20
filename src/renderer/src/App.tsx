@@ -481,6 +481,7 @@ export const App = (): JSX.Element => {
   }, [
     activeConfig,
     handleSenderError,
+    handleYargError,
     handleSenderNetworkError,
     handleCueStateUpdate,
     handleSenderStartFailure,

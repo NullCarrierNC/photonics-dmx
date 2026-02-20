@@ -12,7 +12,7 @@ import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock'
-import { BrowserWindow, app } from 'electron'
+import { app } from 'electron'
 import { sendToAllWindows } from '../utils/windowUtils'
 import * as path from 'path'
 import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
@@ -63,7 +63,7 @@ export class ControllerManager {
     this.senderManager = new SenderManager()
     this.senderErrorHandler = createSenderErrorHandler(
       () => this.getSenderManager(),
-      () => BrowserWindow.getAllWindows()[0] ?? null,
+      sendToAllWindows,
     )
     this.testEffectRunner = new TestEffectRunner({
       getConfig: () => ({
@@ -87,9 +87,9 @@ export class ControllerManager {
         return typeof v === 'number' ? v : 0
       },
       sendSenderError: (message: string) => {
-        const mainWindow = BrowserWindow.getFocusedWindow()
-        if (mainWindow) mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_ERROR, message)
+        sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
       },
+      sendToAllWindows,
       setCueHandlerRef: (h) => {
         this.cueHandler = h
       },

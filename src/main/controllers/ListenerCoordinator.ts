@@ -1,4 +1,3 @@
-import { BrowserWindow } from 'electron'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
 import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetworkListener'
@@ -13,6 +12,7 @@ export interface ListenerCoordinatorDeps {
   getEffectsController: () => ILightingController | null
   getPreference: (key: string) => number
   sendSenderError: (message: string) => void
+  sendToAllWindows: (channel: string, payload: unknown) => void
   setCueHandlerRef: (h: YargCueHandler | Rb3CueHandler | null) => void
 }
 
@@ -61,10 +61,7 @@ export class ListenerCoordinator {
       'yarg-error',
       (errorData: { type: string; message: string; datagramVersion?: number }) => {
         console.error('YARG Listener Error:', errorData)
-        const mainWindow = BrowserWindow.getFocusedWindow()
-        if (mainWindow) {
-          mainWindow.webContents.send(RENDERER_RECEIVE.YARG_ERROR, errorData.message)
-        }
+        this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, errorData.message)
       },
     )
     this.yargListener.start()

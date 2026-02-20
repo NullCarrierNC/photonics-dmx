@@ -1,5 +1,6 @@
-import { IpcMain, BrowserWindow } from 'electron'
+import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
+import { sendToAllWindows } from '../utils/windowUtils'
 import '../../photonics-dmx/cues'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
@@ -62,10 +63,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       await controllerManager.restartControllers()
 
       // Send a notification to the renderer about the restart
-      const mainWindow = require('electron').BrowserWindow.getFocusedWindow()
-      if (mainWindow) {
-        mainWindow.webContents.send(RENDERER_RECEIVE.CONTROLLERS_RESTARTED)
-      }
+      sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
 
       return { success: true }
     } catch (error) {
@@ -124,10 +122,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
         await controllerManager.restartControllers()
 
         // Send a notification to the renderer about the restart
-        const mainWindow = BrowserWindow.getFocusedWindow()
-        if (mainWindow) {
-          mainWindow.webContents.send(RENDERER_RECEIVE.CONTROLLERS_RESTARTED)
-        }
+        sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 
       return { success: true }
@@ -152,10 +147,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
         await controllerManager.restartControllers()
 
         // Send a notification to the renderer about the restart
-        const mainWindow = BrowserWindow.getFocusedWindow()
-        if (mainWindow) {
-          mainWindow.webContents.send(RENDERER_RECEIVE.CONTROLLERS_RESTARTED)
-        }
+        sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 
       return { success: true }
@@ -426,11 +418,8 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
       // Always notify renderer process to update config, even if audio is disabled
       // This ensures the UI stays in sync with saved config
-      const mainWindow = BrowserWindow.getFocusedWindow()
-      if (mainWindow) {
-        mainWindow.webContents.send(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, updatedConfig)
-        console.log('Sent audio:config-update to renderer')
-      }
+      sendToAllWindows(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, updatedConfig)
+      console.log('Sent audio:config-update to renderer')
 
       // If audio is currently enabled, apply config updates immediately
       if (controllerManager.getIsAudioEnabled()) {

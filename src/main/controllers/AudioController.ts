@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { ipcMain } from 'electron'
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
@@ -61,13 +61,8 @@ export class AudioController {
         }
       }
       ipcMain.on(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
-      const mainWindow = BrowserWindow.getFocusedWindow()
-      if (mainWindow) {
-        mainWindow.webContents.send(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)
-        console.log('Sent audio:enable to renderer')
-      } else {
-        console.warn('No focused window to send audio:enable command')
-      }
+      this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)
+      console.log('Sent audio:enable to renderer')
       this.isAudioEnabled = true
       console.log('Audio enabled successfully')
     } catch (error) {
@@ -93,11 +88,8 @@ export class AudioController {
         console.error('Error clearing effects when disabling Audio:', error)
       }
     }
-    const mainWindow = BrowserWindow.getFocusedWindow()
-    if (mainWindow) {
-      mainWindow.webContents.send(RENDERER_RECEIVE.AUDIO_DISABLE)
-      console.log('Sent audio:disable to renderer')
-    }
+    this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
+    console.log('Sent audio:disable to renderer')
     if (this.audioDataHandler) {
       ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.audioDataHandler = null

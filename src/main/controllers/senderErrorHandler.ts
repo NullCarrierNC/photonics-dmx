@@ -1,4 +1,3 @@
-import { BrowserWindow } from 'electron'
 import { SenderError } from '../../photonics-dmx/senders/BaseSender'
 import type { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -9,16 +8,10 @@ import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
  */
 export function createSenderErrorHandler(
   getSenderManager: () => SenderManager,
-  getMainWindow: () => BrowserWindow | null,
+  sendToAllWindows: (channel: string, payload: unknown) => void,
 ): (error: SenderError) => void {
   return (error: SenderError): void => {
     console.error('Sender error:', error)
-
-    const mainWindow = getMainWindow()
-    if (!mainWindow) {
-      console.error('handleSenderError: No main window found')
-      return
-    }
 
     const senderId = error.senderId ?? null
     const shouldDisable = error.shouldDisable
@@ -32,7 +25,7 @@ export function createSenderErrorHandler(
             console.error(`Failed to disable ${senderId} sender:`, disableErr)
           })
         }
-        mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, {
+        sendToAllWindows(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, {
           sender: senderId,
           error: error.message,
           autoDisabled: true,
@@ -43,6 +36,6 @@ export function createSenderErrorHandler(
       }
     }
 
-    mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_ERROR, error.message)
+    sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, error.message)
   }
 }
