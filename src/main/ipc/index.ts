@@ -13,6 +13,10 @@ import { setupWindowHandlers } from './window-handlers'
  * Set up all IPC handlers
  * @param ipcMain The Electron IPC main instance
  * @param controllerManager The controller manager instance
+ * @param windowManager The window manager instance
+ *
+ * Note: setupLightHandlers composes sender, simulation, and cue-group handlers
+ * internally (setupSenderHandlers, setupSimulationHandlers, setupCueGroupHandlers).
  */
 export function setupIpcHandlers(
   ipcMain: IpcMain,

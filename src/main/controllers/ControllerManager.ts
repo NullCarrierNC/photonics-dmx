@@ -28,7 +28,7 @@ import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes'
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import {
   NodeCueLoader,
   NodeCueListSummary,
@@ -53,8 +53,8 @@ export class ControllerManager {
 
   private readonly testEffectRunner: TestEffectRunner
   private readonly senderErrorHandler: (error: SenderError) => void
-  private listenerCoordinator: ListenerCoordinator | null = null
-  private audioController: AudioController | null = null
+  private readonly listenerCoordinator: ListenerCoordinator
+  private readonly audioController: AudioController
 
   private isInitialized = false
 
@@ -78,6 +78,27 @@ export class ControllerManager {
       setCueHandler: (h) => {
         this.cueHandler = h
       },
+    })
+    this.listenerCoordinator = new ListenerCoordinator({
+      getDmxLightManager: () => this.dmxLightManager,
+      getEffectsController: () => this.effectsController,
+      getPreference: (key: string) => {
+        const v = this.config.getPreference(key as keyof AppPreferences)
+        return typeof v === 'number' ? v : 0
+      },
+      sendSenderError: (message: string) => {
+        const mainWindow = BrowserWindow.getFocusedWindow()
+        if (mainWindow) mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_ERROR, message)
+      },
+      setCueHandlerRef: (h) => {
+        this.cueHandler = h
+      },
+    })
+    this.audioController = new AudioController({
+      getDmxLightManager: () => this.dmxLightManager,
+      getEffectsController: () => this.effectsController,
+      config: this.config,
+      sendToAllWindows,
     })
   }
 
@@ -107,28 +128,6 @@ export class ControllerManager {
     await this.initializeEffectLoader() // Initialize effects BEFORE node cues
     await this.initializeNodeCueLoader()
     await this.initializeListeners()
-
-    this.listenerCoordinator = new ListenerCoordinator({
-      getDmxLightManager: () => this.dmxLightManager,
-      getEffectsController: () => this.effectsController,
-      getPreference: (key: string) => {
-        const v = this.config.getPreference(key as keyof AppPreferences)
-        return typeof v === 'number' ? v : 0
-      },
-      sendSenderError: (message: string) => {
-        const mainWindow = BrowserWindow.getFocusedWindow()
-        if (mainWindow) mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_ERROR, message)
-      },
-      setCueHandlerRef: (h) => {
-        this.cueHandler = h
-      },
-    })
-    this.audioController = new AudioController({
-      getDmxLightManager: () => this.dmxLightManager,
-      getEffectsController: () => this.effectsController,
-      config: this.config,
-      sendToAllWindows,
-    })
 
     this.isInitialized = true
   }
@@ -349,49 +348,49 @@ export class ControllerManager {
    * Enable YARG listener
    */
   public enableYarg(): void {
-    this.listenerCoordinator?.enableYarg(this.isInitialized, () => this.init())
+    this.listenerCoordinator.enableYarg(this.isInitialized, () => this.init())
   }
 
   /**
    * Disable YARG listener
    */
   public async disableYarg(): Promise<void> {
-    await this.listenerCoordinator?.disableYarg()
+    await this.listenerCoordinator.disableYarg()
   }
 
   /**
    * Enable Rb3 listener
    */
   public async enableRb3(): Promise<void> {
-    await this.listenerCoordinator?.enableRb3(this.isInitialized, () => this.init())
+    await this.listenerCoordinator.enableRb3(this.isInitialized, () => this.init())
   }
 
   /**
    * Disable Rb3 listener
    */
   public async disableRb3(): Promise<void> {
-    await this.listenerCoordinator?.disableRb3()
+    await this.listenerCoordinator.disableRb3()
   }
 
   /**
    * Switch RB3 processing mode between direct and cue-based
    */
   public async switchRb3Mode(mode: 'direct' | 'cueBased'): Promise<void> {
-    await this.listenerCoordinator?.switchRb3Mode(mode)
+    await this.listenerCoordinator.switchRb3Mode(mode)
   }
 
   /**
    * Get current RB3 processing mode
    */
   public getRb3Mode(): 'direct' | 'cueBased' | 'none' {
-    return this.listenerCoordinator?.getRb3Mode() ?? 'none'
+    return this.listenerCoordinator.getRb3Mode()
   }
 
   /**
    * Get RB3 processor statistics
    */
   public getRb3ProcessorStats(): ReturnType<ProcessorManager['getProcessorStats']> | null {
-    return this.listenerCoordinator?.getRb3ProcessorStats() ?? null
+    return this.listenerCoordinator.getRb3ProcessorStats()
   }
 
   /**
@@ -403,21 +402,21 @@ export class ControllerManager {
     try {
       // Shutdown in reverse order of initialization
       try {
-        await this.listenerCoordinator?.disableYarg()
+        await this.listenerCoordinator.disableYarg()
         console.log('ControllerManager shutdown: YARG disabled')
       } catch (err) {
         console.error('Error disabling YARG:', err)
       }
 
       try {
-        await this.listenerCoordinator?.disableRb3()
+        await this.listenerCoordinator.disableRb3()
         console.log('ControllerManager shutdown: RB3 disabled')
       } catch (err) {
         console.error('Error disabling RB3:', err)
       }
 
       try {
-        await this.audioController?.disableAudio()
+        await this.audioController.disableAudio()
         console.log('ControllerManager shutdown: Audio disabled')
       } catch (err) {
         console.error('Error disabling Audio:', err)
@@ -533,7 +532,7 @@ export class ControllerManager {
   }
 
   public getProcessorManager(): ProcessorManager | null {
-    return this.listenerCoordinator?.getProcessorManager() ?? null
+    return this.listenerCoordinator.getProcessorManager()
   }
 
   public getDmxPublisher(): DmxPublisher | null {
@@ -545,11 +544,11 @@ export class ControllerManager {
   }
 
   public getIsYargEnabled(): boolean {
-    return this.listenerCoordinator?.getIsYargEnabled() ?? false
+    return this.listenerCoordinator.getIsYargEnabled()
   }
 
   public getIsRb3Enabled(): boolean {
-    return this.listenerCoordinator?.getIsRb3Enabled() ?? false
+    return this.listenerCoordinator.getIsRb3Enabled()
   }
 
   /**
@@ -573,8 +572,8 @@ export class ControllerManager {
   public async restartControllers(): Promise<void> {
     console.log('Restarting controllers to apply configuration changes')
 
-    const wasYargEnabled = this.listenerCoordinator?.getIsYargEnabled() ?? false
-    const wasRb3Enabled = this.listenerCoordinator?.getIsRb3Enabled() ?? false
+    const wasYargEnabled = this.listenerCoordinator.getIsYargEnabled()
+    const wasRb3Enabled = this.listenerCoordinator.getIsRb3Enabled()
 
     try {
       if (wasYargEnabled) {
@@ -607,8 +606,6 @@ export class ControllerManager {
       this.dmxPublisher = null
       this.cueHandler = null
       this.senderManager = null
-      this.listenerCoordinator = null
-      this.audioController = null
 
       // Mark as not initialized
       this.isInitialized = false
@@ -640,47 +637,42 @@ export class ControllerManager {
    * Enable audio listener and processor
    */
   public async enableAudio(): Promise<void> {
-    await this.audioController?.enableAudio(this.isInitialized, () => this.init())
+    await this.audioController.enableAudio(this.isInitialized, () => this.init())
   }
 
   /**
    * Disable audio processing
    */
   public async disableAudio(): Promise<void> {
-    await this.audioController?.disableAudio()
+    await this.audioController.disableAudio()
   }
 
   /**
    * Update audio configuration while audio is running
    */
   public updateAudioConfig(config: AudioConfig): void {
-    this.audioController?.updateAudioConfig(config)
+    this.audioController.updateAudioConfig(config)
   }
 
   /**
    * Refresh active audio cue selection when enabled groups change
    */
   public refreshAudioCueSelection(): void {
-    this.audioController?.refreshAudioCueSelection()
+    this.audioController.refreshAudioCueSelection()
   }
 
   /**
    * Get the current audio cue selection
    */
   public getActiveAudioCueType(): AudioCueType {
-    return this.audioController?.getActiveAudioCueType() ?? BuiltInAudioCues.BasicLayered
+    return this.audioController.getActiveAudioCueType()
   }
 
   /**
    * Persist and apply a new audio cue selection
    */
   public setActiveAudioCueType(cueType: AudioCueType): { success: boolean; error?: string } {
-    return (
-      this.audioController?.setActiveAudioCueType(cueType) ?? {
-        success: false,
-        error: 'Audio controller not available',
-      }
-    )
+    return this.audioController.setActiveAudioCueType(cueType)
   }
 
   /**
@@ -694,13 +686,13 @@ export class ControllerManager {
     groupName: string
     groupDescription: string
   }> {
-    return this.audioController?.getAudioCueOptions() ?? []
+    return this.audioController.getAudioCueOptions()
   }
 
   /**
    * Get audio enabled state
    */
   public getIsAudioEnabled(): boolean {
-    return this.audioController?.getIsAudioEnabled() ?? false
+    return this.audioController.getIsAudioEnabled()
   }
 }

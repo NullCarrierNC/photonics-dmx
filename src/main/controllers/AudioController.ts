@@ -15,9 +15,12 @@ export interface AudioControllerDeps {
   sendToAllWindows: (channel: string, ...args: unknown[]) => void
 }
 
+type AudioDataHandler = (event: unknown, data: unknown) => void
+
 export class AudioController {
   private audioProcessor: AudioCueProcessor | null = null
   private isAudioEnabled = false
+  private audioDataHandler: AudioDataHandler | null = null
 
   constructor(private readonly deps: AudioControllerDeps) {}
 
@@ -48,13 +51,16 @@ export class AudioController {
       )
       this.deps.config.setActiveAudioCueType(this.audioProcessor.getCurrentCueType())
       this.audioProcessor.start()
-      ipcMain.removeAllListeners(RENDERER_SEND.AUDIO_DATA)
-      const audioDataHandler = (_: unknown, data: unknown) => {
+      if (this.audioDataHandler) {
+        ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
+        this.audioDataHandler = null
+      }
+      this.audioDataHandler = (_: unknown, data: unknown) => {
         if (this.audioProcessor && this.isAudioEnabled) {
           this.audioProcessor.processAudioData(data as AudioLightingData)
         }
       }
-      ipcMain.on(RENDERER_SEND.AUDIO_DATA, audioDataHandler)
+      ipcMain.on(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       const mainWindow = BrowserWindow.getFocusedWindow()
       if (mainWindow) {
         mainWindow.webContents.send(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)
@@ -92,7 +98,10 @@ export class AudioController {
       mainWindow.webContents.send(RENDERER_RECEIVE.AUDIO_DISABLE)
       console.log('Sent audio:disable to renderer')
     }
-    ipcMain.removeAllListeners(RENDERER_SEND.AUDIO_DATA)
+    if (this.audioDataHandler) {
+      ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
+      this.audioDataHandler = null
+    }
     if (this.audioProcessor) {
       this.audioProcessor.shutdown()
       this.audioProcessor = null

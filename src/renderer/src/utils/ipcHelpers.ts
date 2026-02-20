@@ -67,19 +67,7 @@ export function removeIpcListener<TPayload = unknown>(
     return
   }
 
-  const otherListeners = new Array<[IpcListenerInternal, IpcListenerInternal]>()
-  listeners.forEach((wrapped, original) => {
-    if (original !== internal) {
-      otherListeners.push([original, wrapped])
-    }
-  })
-
-  window.electron.ipcRenderer.removeAllListeners(channel)
-
-  otherListeners.forEach(([_, wrapped]) => {
-    window.electron.ipcRenderer.on(channel, wrapped)
-  })
-
+  window.electron.ipcRenderer.removeListener(channel, wrappedListener)
   listeners.delete(internal)
 
   console.debug(

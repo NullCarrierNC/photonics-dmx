@@ -113,6 +113,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
       const timer = setTimeout(() => setShowBeatPulse(false), 200)
       return () => clearTimeout(timer)
     }
+    return
   }, [audioData?.beatDetected])
 
   const showPulse = Boolean(audioData?.beatDetected || showBeatPulse)

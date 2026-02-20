@@ -85,6 +85,15 @@ export const App = (): JSX.Element => {
     [showToast],
   )
 
+  // Handler for YARG listener errors (protocol/datagram version mismatch, etc.)
+  const handleYargError = useCallback(
+    (_evt: unknown, msg: string): void => {
+      console.error('YARG error:', msg)
+      showToast(`YARG: ${msg}`, 'error', 5000)
+    },
+    [showToast],
+  )
+
   // Handler for cue state updates
   const handleCueStateUpdate = useCallback(
     (_evt: unknown, cueState: CueStateInfo): void => {
@@ -423,6 +432,7 @@ export const App = (): JSX.Element => {
     getPrefs()
 
     addIpcListener<string>(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
+    addIpcListener<string>(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
     addIpcListener<{ sender: string; error: string; autoDisabled: boolean }>(
       RENDERER_RECEIVE.SENDER_NETWORK_ERROR,
       handleSenderNetworkError,
@@ -455,6 +465,7 @@ export const App = (): JSX.Element => {
     // Cleanup function
     return () => {
       removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
+      removeIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
       removeIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError)
       removeIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate)
       removeIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure)

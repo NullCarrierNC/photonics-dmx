@@ -63,7 +63,7 @@ export class ListenerCoordinator {
         console.error('YARG Listener Error:', errorData)
         const mainWindow = BrowserWindow.getFocusedWindow()
         if (mainWindow) {
-          mainWindow.webContents.send(RENDERER_RECEIVE.SENDER_ERROR, errorData.message)
+          mainWindow.webContents.send(RENDERER_RECEIVE.YARG_ERROR, errorData.message)
         }
       },
     )
