@@ -123,7 +123,7 @@ const DmxPreview: React.FC = () => {
       <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
 
       <hr className="my-6 border-gray-200 dark:border-gray-600" />
-  
+
       {selectedRig !== null && rigConfig !== null && (
         <>
           <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />

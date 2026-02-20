@@ -670,8 +670,6 @@ const CueSimulation: React.FC = () => {
 
       <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
-    
-
       {selectedRig !== null && rigConfig !== null && (
         <>
           <LightsDmxChannelsPreview lightingConfig={rigConfig} dmxValues={dmxValues} />

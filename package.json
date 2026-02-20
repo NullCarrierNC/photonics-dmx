@@ -6,6 +6,7 @@
   "author": "Null Carrier",
   "homepage": "https://photonics.rocks",
   "scripts": {
+    "prepare": "husky",
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
@@ -44,14 +45,14 @@
     "@electron-toolkit/eslint-config-prettier": "2.0.0",
     "@electron-toolkit/eslint-config-ts": "2.0.0",
     "@electron-toolkit/tsconfig": "1.0.1",
-    "@typescript-eslint/eslint-plugin": "^7.5.0",
-    "@typescript-eslint/parser": "^7.5.0",
     "@jest/globals": "^27.5.1",
     "@jest/test-sequencer": "^30.2.0",
     "@types/jest": "29.5.14",
     "@types/node": "20.14.8",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.5.0",
+    "@typescript-eslint/parser": "^7.5.0",
     "@vitejs/plugin-react": "4.3.4",
     "autoprefixer": "10.4.20",
     "babel-plugin-istanbul": "^5.2.0",
@@ -65,7 +66,9 @@
     "eslint-plugin-react": "7.34.3",
     "eslint-plugin-react-hooks": "^7.0.1",
     "glob": "10.5.0",
+    "husky": "^9.1.7",
     "jest": "^30.2.0",
+    "lint-staged": "^16.2.7",
     "postcss-loader": "8.1.1",
     "prettier": "3.3.2",
     "react": "18.3.1",
@@ -92,6 +95,10 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,cjs,mjs}": "eslint --fix",
+    "*.{ts,tsx,js,cjs,mjs,json}": "prettier --write"
   },
   "_comments": {
     "eslint": "We're using ESLint 8.57.1 despite it being deprecated because the TypeScript-ESLint packages we use require this version. Upgrading to ESLint 9+ causes peer dependency conflicts.",
