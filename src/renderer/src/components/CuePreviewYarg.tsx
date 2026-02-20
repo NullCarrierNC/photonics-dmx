@@ -358,7 +358,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
   const autoGenStatus = getAutoGenStatus()
   return (
-    <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
+    <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg mt-4 ${className}`}>
       <div className="flex justify-between items-center mb-1">
         <h3 className="text-lg font-semibold">{getTitle()}</h3>
         {autoGenStatus && (

@@ -77,7 +77,7 @@ const CuePreview: React.FC<CuePreviewProps> = ({
 
   // Default state when no platform is detected yet
   return (
-    <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
+    <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg mt-4 ${className}`}>
       <h3 className="text-lg font-semibold mb-1">Cue Preview</h3>
       <p className="text-gray-500 dark:text-gray-400">
         {platform === null ? 'You must enable YARG, RB3E, or Audio' : 'Waiting for data...'}

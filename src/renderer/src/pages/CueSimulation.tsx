@@ -553,6 +553,9 @@ const CueSimulation: React.FC = () => {
 
       <CueSimulationAbout isOpen={isAboutOpen} onToggle={() => setIsAboutOpen(!isAboutOpen)} />
 
+      {/* Rig Selector */}
+      <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+
       <div className="my-6">
         <h2 className="text-xl font-bold mb-2 text-gray-800 dark:text-gray-200">
           Simulation Settings
@@ -567,9 +570,9 @@ const CueSimulation: React.FC = () => {
             <div className="flex flex-wrap gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Game Type
+                  Game Type: YARG
                 </label>
-                <select
+                {/* <select
                   value={selectedRegistryType}
                   onChange={(e) => setSelectedRegistryType(e.target.value as CueRegistryType)}
                   className="p-2 pr-8 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
@@ -578,7 +581,7 @@ const CueSimulation: React.FC = () => {
                   <option value="RB3E" disabled>
                     RB3E (Uses direct)
                   </option>
-                </select>
+                </select> */}
               </div>
             </div>
 
@@ -642,6 +645,12 @@ const CueSimulation: React.FC = () => {
         </>
       )}
 
+      {selectedRig !== null && rigConfig !== null && dmxValues !== null && (
+        <>
+          <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
+        </>
+      )}
+
       <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
       {isAudioReactiveEnabled ? (
@@ -661,12 +670,10 @@ const CueSimulation: React.FC = () => {
 
       <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
-      {/* Rig Selector */}
-      <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+    
 
       {selectedRig !== null && rigConfig !== null && (
         <>
-          <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
           <LightsDmxChannelsPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
         </>
       )}
