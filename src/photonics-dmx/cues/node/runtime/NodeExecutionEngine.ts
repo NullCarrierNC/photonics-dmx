@@ -121,11 +121,10 @@ export class NodeExecutionEngine {
     if (!this.debugEnabled && !NodeExecutionEngine.globalDebugEnabled) return
     // Use console.log (not debug) so it shows up consistently in packaged builds.
     if (data === undefined) {
-      // eslint-disable-next-line no-console
       console.log(`[NodeCue] ${this.cueId} ${message}`)
       return
     }
-    // eslint-disable-next-line no-console
+
     console.log(`[NodeCue] ${this.cueId} ${message}`, this.debugPreview(data))
   }
 

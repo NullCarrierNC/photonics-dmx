@@ -664,7 +664,7 @@ const actionSchema: JSONSchemaType<ActionNode> = {
     },
     config: { ...actionConfigSchema, nullable: true },
   },
-} as any // eslint-disable-line @typescript-eslint/no-explicit-any
+} as any
 
 const yargEventSchema: JSONSchemaType<YargEventNode> = {
   type: 'object',

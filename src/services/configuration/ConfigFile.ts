@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -20,7 +21,6 @@ export class ConfigFile<T> {
   private readonly defaultData: T
 
   constructor(filename: string, defaultData: T, version: number = 1) {
-    const app = require('electron').app || require('@electron/remote').app
     const configDir = path.join(app.getPath('appData'), 'Photonics.rocks')
 
     // Log the storage directory (only once per process)

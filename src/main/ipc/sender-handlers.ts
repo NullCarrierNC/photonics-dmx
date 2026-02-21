@@ -1,4 +1,5 @@
 import { IpcMain } from 'electron'
+import * as os from 'os'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
 import type { SacnSenderConfig } from '../../photonics-dmx/types'
@@ -101,7 +102,6 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
 
   ipcMain.handle(LIGHT.GET_NETWORK_INTERFACES, async () => {
     try {
-      const os = require('os')
       const networkInterfaces = os.networkInterfaces()
       const interfaces: Array<{ name: string; value: string; family: string }> = []
 

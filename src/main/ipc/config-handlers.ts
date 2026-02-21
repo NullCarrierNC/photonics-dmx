@@ -1,4 +1,4 @@
-import { IpcMain } from 'electron'
+import { app, IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
 import '../../photonics-dmx/cues'
@@ -159,7 +159,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
   // Get app version
   ipcMain.handle(CONFIG.GET_APP_VERSION, () => {
-    return require('electron').app.getVersion()
+    return app.getVersion()
   })
 
   // Get app preferences

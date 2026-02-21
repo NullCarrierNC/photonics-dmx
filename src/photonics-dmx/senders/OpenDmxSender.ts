@@ -20,14 +20,10 @@ export class OpenDmxSender extends BaseSender {
   }
 
   public async start(): Promise<void> {
-    try {
-      this.universe = await this.dmx.addUniverse(
-        this.universeName,
-        new EnttecOpenUSBDMXDriver(this.port, this.options),
-      )
-    } catch (err) {
-      throw err
-    }
+    this.universe = await this.dmx.addUniverse(
+      this.universeName,
+      new EnttecOpenUSBDMXDriver(this.port, this.options),
+    )
   }
 
   public async stop(): Promise<void> {

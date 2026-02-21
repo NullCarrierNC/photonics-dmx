@@ -33,7 +33,7 @@ describe('ArtNetSender', () => {
   afterEach(async () => {
     try {
       await artNetSender.stop()
-    } catch (error) {
+    } catch {
       // Ignore errors during cleanup
     }
   })

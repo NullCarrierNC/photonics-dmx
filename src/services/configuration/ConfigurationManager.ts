@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import { ConfigFile } from './ConfigFile'
 import {
   DmxFixture,
@@ -292,8 +293,6 @@ export class ConfigurationManager {
       safeLayout.backLights.length > 0 ||
       safeLayout.strobeLights.length > 0
     ) {
-      const { v4: uuidv4 } = require('uuid')
-
       const defaultRig: DmxRig = {
         id: uuidv4(),
         name: 'Default Rig',

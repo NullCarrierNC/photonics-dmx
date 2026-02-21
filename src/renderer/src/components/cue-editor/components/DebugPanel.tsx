@@ -22,7 +22,7 @@ const formatValue = (value: unknown): string => {
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   try {
     return JSON.stringify(value, null, 2)
-  } catch (error) {
+  } catch {
     return String(value)
   }
 }

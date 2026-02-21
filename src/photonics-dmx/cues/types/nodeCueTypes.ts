@@ -1,5 +1,5 @@
 import { CueType } from './cueTypes'
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 import type { WaitCondition, YargEventType, TrackedLight } from '../../types'
 import {
   ALL_CONFIG_DATA_PROPERTIES,

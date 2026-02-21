@@ -157,7 +157,7 @@ export class EffectLoader extends EventEmitter {
         if (effectFile.group.id === ref.effectFileId) {
           return effectFile
         }
-      } catch (error) {
+      } catch {
         // Skip invalid files
         continue
       }

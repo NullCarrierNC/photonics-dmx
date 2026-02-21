@@ -8,7 +8,7 @@
   "scripts": {
     "prepare": "husky",
     "format": "prettier --write .",
-    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "lint": "eslint . --fix",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
@@ -42,8 +42,8 @@
     "uuid": "11.0.3"
   },
   "devDependencies": {
-    "@electron-toolkit/eslint-config-prettier": "2.0.0",
-    "@electron-toolkit/eslint-config-ts": "2.0.0",
+    "@electron-toolkit/eslint-config-prettier": "3.0.0",
+    "@electron-toolkit/eslint-config-ts": "3.1.0",
     "@electron-toolkit/tsconfig": "1.0.1",
     "@jest/globals": "^27.5.1",
     "@jest/test-sequencer": "^30.2.0",
@@ -51,19 +51,16 @@
     "@types/node": "20.14.8",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
-    "@typescript-eslint/eslint-plugin": "^7.5.0",
-    "@typescript-eslint/parser": "^7.5.0",
     "@vitejs/plugin-react": "4.3.4",
     "autoprefixer": "10.4.20",
     "babel-plugin-istanbul": "^5.2.0",
     "bytenode": "1.5.6",
-    "c8": "^6.0.1",
+    "c8": "^10.0.0",
     "cross-env": "7.0.3",
     "electron": "^39.2.7",
     "electron-builder": "^26.3.6",
     "electron-vite": "3.0.0",
-    "eslint": "8.57.1",
-    "eslint-plugin-react": "7.34.3",
+    "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "glob": "10.5.0",
     "husky": "^9.1.7",
@@ -85,9 +82,6 @@
     "rimraf": "5.0.5",
     "boolean": "4.0.0",
     "inflight": "2.0.0",
-    "@humanwhocodes/config-array": "npm:@eslint/config-array@0.19.2",
-    "@humanwhocodes/object-schema": "npm:@eslint/object-schema@2.1.6",
-    "eslint": "8.57.1",
     "esbuild": "0.25.1"
   },
   "resolutions": {
@@ -99,9 +93,5 @@
   "lint-staged": {
     "*.{ts,tsx,js,cjs,mjs}": "eslint --fix",
     "*.{ts,tsx,js,cjs,mjs,json}": "prettier --write"
-  },
-  "_comments": {
-    "eslint": "We're using ESLint 8.57.1 despite it being deprecated because the TypeScript-ESLint packages we use require this version. Upgrading to ESLint 9+ causes peer dependency conflicts.",
-    "code_coverage": "Using c8 instead of Jest's built-in coverage for Node.js 22+ compatibility"
   }
 }
