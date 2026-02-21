@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
+import * as fsPromises from 'fs/promises'
 
 /**
  * Configuration data with version tracking
@@ -76,8 +77,13 @@ export class ConfigFile<T> {
         // Migrate if needed
         if (version < this.currentVersion) {
           data = this.migrateData(data, version, this.currentVersion)
-          // Save migrated data
-          this.save(data)
+          // Save migrated data (fire-and-forget: we are in constructor, cannot await)
+          this.save(data).catch((err) =>
+            console.error(
+              `[Photonics Config] Failed to save migrated data to ${this.filePath}:`,
+              err,
+            ),
+          )
         }
 
         // Only log on first load per file
@@ -92,12 +98,19 @@ export class ConfigFile<T> {
       } catch (error) {
         console.error(`Error loading configuration from ${this.filePath}:`, error)
         console.log('Using default configuration')
-        this.save(this.defaultData)
+        this.save(this.defaultData).catch((err) =>
+          console.error(
+            `[Photonics Config] Failed to save default config to ${this.filePath}:`,
+            err,
+          ),
+        )
         return this.defaultData
       }
     } else {
       console.log(`Configuration file not found: ${this.filePath}, creating default`)
-      this.save(this.defaultData)
+      this.save(this.defaultData).catch((err) =>
+        console.error(`[Photonics Config] Failed to save default config to ${this.filePath}:`, err),
+      )
       return this.defaultData
     }
   }
@@ -139,16 +152,27 @@ export class ConfigFile<T> {
   }
 
   /**
-   * Saves data to file with version information
+   * Saves data to file with version information.
+   * Uses write-temp-then-rename for atomicity and async I/O to avoid blocking the event loop.
    */
-  private save(data: T): void {
+  private async save(data: T): Promise<void> {
+    const versionedData: ConfigWithVersion<T> = {
+      version: this.currentVersion,
+      data: data,
+    }
+    const content = JSON.stringify(versionedData, null, 2)
+    const dir = path.dirname(this.filePath)
+    const basename = path.basename(this.filePath)
+    const tempPath = path.join(dir, `.${basename}.tmp.${process.pid}`)
     try {
-      const versionedData: ConfigWithVersion<T> = {
-        version: this.currentVersion,
-        data: data,
-      }
-      fs.writeFileSync(this.filePath, JSON.stringify(versionedData, null, 2))
+      await fsPromises.writeFile(tempPath, content, 'utf-8')
+      await fsPromises.rename(tempPath, this.filePath)
     } catch (error) {
+      try {
+        await fsPromises.unlink(tempPath).catch(() => {})
+      } catch {
+        // ignore cleanup failure
+      }
       console.error(`Error saving configuration to ${this.filePath}:`, error)
       throw new Error(`Failed to save configuration: ${error}`)
     }
@@ -164,9 +188,9 @@ export class ConfigFile<T> {
   /**
    * Updates the data and saves to file
    */
-  update(newData: T): void {
+  async update(newData: T): Promise<void> {
     this.data = newData
-    this.save(newData)
+    await this.save(newData)
   }
 
   /**

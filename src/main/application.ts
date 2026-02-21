@@ -75,7 +75,7 @@ export class Application {
 
       // Clear all windows
       if (this.windowManager) {
-        this.windowManager.closeAllWindows()
+        await this.windowManager.closeAllWindows()
       }
 
       console.log('Application shutdown completed successfully')

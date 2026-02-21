@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -11,6 +11,14 @@ export interface Toast {
 
 export const useToast = () => {
   const [toasts, setToasts] = useState<Toast[]>([])
+  const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  useEffect(() => {
+    return () => {
+      timeoutIdsRef.current.forEach(clearTimeout)
+      timeoutIdsRef.current = []
+    }
+  }, [])
 
   const showToast = useCallback((message: string, type: ToastType = 'info', duration = 3000) => {
     const id = `toast-${Date.now()}-${Math.random()}`
@@ -19,9 +27,11 @@ export const useToast = () => {
     setToasts((prev) => [...prev, newToast])
 
     if (duration > 0) {
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id))
+        timeoutIdsRef.current = timeoutIdsRef.current.filter((tid) => tid !== timeoutId)
       }, duration)
+      timeoutIdsRef.current.push(timeoutId)
     }
   }, [])
 

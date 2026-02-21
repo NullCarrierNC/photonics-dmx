@@ -37,7 +37,12 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       console.error('SAVE_MY_LIGHTS: payload must be an array')
       return
     }
-    controllerManager.getConfig().updateUserLights(data as DmxFixture[])
+    controllerManager
+      .getConfig()
+      .updateUserLights(data as DmxFixture[])
+      .catch((err) => {
+        console.error('SAVE_MY_LIGHTS failed:', err)
+      })
   })
 
   // Get light layout
@@ -57,7 +62,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      controllerManager.getConfig().updateLightingLayout(validation.value)
+      await controllerManager.getConfig().updateLightingLayout(validation.value)
 
       // Then restart controllers to pick up the changes
       await controllerManager.restartControllers()
@@ -115,7 +120,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       const previousActiveState = existingRig?.active ?? false
 
       // Save the rig
-      config.saveDmxRig(rig)
+      await config.saveDmxRig(rig)
 
       // If active state changed, restart controllers to update DMX output
       if (existingRig && previousActiveState !== rig.active) {
@@ -140,7 +145,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       const wasActive = rig?.active ?? false
 
       // Delete the rig
-      config.deleteDmxRig(id)
+      await config.deleteDmxRig(id)
 
       // If the deleted rig was active, restart controllers
       if (wasActive) {
@@ -174,7 +179,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       if (!isPlainObject(updates)) {
         return { success: false, error: 'Preferences payload must be an object' }
       }
-      controllerManager.getConfig().updatePreferences(updates)
+      await controllerManager.getConfig().updatePreferences(updates)
 
       // Update global brightness configuration if brightness settings were changed
       if (updates.brightness) {
@@ -201,14 +206,14 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     // If the preference hasn't been set, default to all groups enabled
     if (enabled === undefined) {
       enabled = allGroups
-      controllerManager.getConfig().setEnabledCueGroups(enabled)
+      await controllerManager.getConfig().setEnabledCueGroups(enabled)
       registry.setEnabledGroups(enabled)
     } else {
       // Automatically enable any newly added cue groups so new groups are not hidden by default
       const missingGroups = allGroups.filter((id) => !enabled!.includes(id))
       if (missingGroups.length > 0) {
         enabled = [...enabled, ...missingGroups]
-        controllerManager.getConfig().setEnabledCueGroups(enabled)
+        await controllerManager.getConfig().setEnabledCueGroups(enabled)
         registry.setEnabledGroups(enabled)
       }
     }
@@ -231,7 +236,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      controllerManager.getConfig().setEnabledCueGroups(groupIds)
+      await controllerManager.getConfig().setEnabledCueGroups(groupIds)
 
       // Update the CueRegistry with the new enabled groups
       const registry = YargCueRegistry.getInstance()
@@ -258,7 +263,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     }
 
     const defaults = registry.getEnabledGroups()
-    controllerManager.getConfig().setEnabledAudioCueGroups(defaults)
+    await controllerManager.getConfig().setEnabledAudioCueGroups(defaults)
     return defaults
   })
 
@@ -269,7 +274,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      controllerManager.getConfig().setEnabledAudioCueGroups(groupIds)
+      await controllerManager.getConfig().setEnabledAudioCueGroups(groupIds)
       const registry = AudioCueRegistry.getInstance()
       registry.setEnabledGroups(groupIds)
       controllerManager.refreshAudioCueSelection()
@@ -330,7 +335,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
           return { success: false, error: 'Invalid stage kit priority' }
         }
         // Update the preference in the config
-        controllerManager.getConfig().updatePreferences({
+        await controllerManager.getConfig().updatePreferences({
           stageKitPrefs: { yargPriority: priority },
         })
 
@@ -374,7 +379,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       }
 
       // Update the preference in the config
-      controllerManager.getConfig().setClockRate(clockRate)
+      await controllerManager.getConfig().setClockRate(clockRate)
 
       // Restart controllers to apply the new clock rate
       await controllerManager.restartControllers()
@@ -411,7 +416,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       const deviceChanged = newDeviceId !== undefined && newDeviceId !== currentDeviceId
 
       // Save the config
-      controllerManager.getConfig().updateAudioConfig(updates)
+      await controllerManager.getConfig().updateAudioConfig(updates)
 
       // Get updated config
       const updatedConfig = controllerManager.getConfig().getAudioConfig()

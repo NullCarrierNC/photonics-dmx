@@ -15,7 +15,14 @@ jest.mock('fs', () => ({
   mkdirSync: jest.fn(),
 }))
 
+jest.mock('fs/promises', () => ({
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  rename: jest.fn().mockResolvedValue(undefined),
+  unlink: jest.fn().mockResolvedValue(undefined),
+}))
+
 import * as fs from 'fs'
+import * as fsPromises from 'fs/promises'
 
 describe('ConfigurationManager', () => {
   let configManager: ConfigurationManager
@@ -53,9 +60,9 @@ describe('ConfigurationManager', () => {
       expect(value).toBe(0)
     })
 
-    test('should set preference value', () => {
-      configManager.setPreference('effectDebounce', 100)
-      expect(fs.writeFileSync).toHaveBeenCalled()
+    test('should set preference value', async () => {
+      await configManager.setPreference('effectDebounce', 100)
+      expect(fsPromises.writeFile).toHaveBeenCalled()
     })
 
     test('should get all preferences', () => {
@@ -67,9 +74,9 @@ describe('ConfigurationManager', () => {
       })
     })
 
-    test('should update multiple preferences', () => {
-      configManager.updatePreferences({ effectDebounce: 50, complex: false })
-      expect(fs.writeFileSync).toHaveBeenCalled()
+    test('should update multiple preferences', async () => {
+      await configManager.updatePreferences({ effectDebounce: 50, complex: false })
+      expect(fsPromises.writeFile).toHaveBeenCalled()
     })
   })
 
@@ -79,7 +86,7 @@ describe('ConfigurationManager', () => {
       expect(lights).toEqual([])
     })
 
-    test('should update user lights', () => {
+    test('should update user lights', async () => {
       const mockLights = [
         {
           id: '1',
@@ -91,8 +98,8 @@ describe('ConfigurationManager', () => {
           channels: { red: 1, green: 2, blue: 3, masterDimmer: 4 },
         },
       ]
-      configManager.updateUserLights(mockLights)
-      expect(fs.writeFileSync).toHaveBeenCalled()
+      await configManager.updateUserLights(mockLights)
+      expect(fsPromises.writeFile).toHaveBeenCalled()
     })
 
     test('should get light library (default templates)', () => {
@@ -115,7 +122,7 @@ describe('ConfigurationManager', () => {
       })
     })
 
-    test('should update lighting layout', () => {
+    test('should update lighting layout', async () => {
       const newLayout = {
         numLights: 4,
         lightLayout: { id: 'front', label: 'Front' },
@@ -124,8 +131,8 @@ describe('ConfigurationManager', () => {
         backLights: [],
         strobeLights: [],
       }
-      configManager.updateLightingLayout(newLayout)
-      expect(fs.writeFileSync).toHaveBeenCalled()
+      await configManager.updateLightingLayout(newLayout)
+      expect(fsPromises.writeFile).toHaveBeenCalled()
     })
   })
 
@@ -161,9 +168,11 @@ describe('ConfigurationManager', () => {
       expect(value).toBe(75)
     })
 
-    test('should save in versioned format', () => {
+    test('should save in versioned format', async () => {
       // Reset mocks for this specific test
       jest.clearAllMocks()
+      ;(fsPromises.writeFile as jest.Mock).mockResolvedValue(undefined)
+      ;(fsPromises.rename as jest.Mock).mockResolvedValue(undefined)
 
       // Mock default format for this test
       ;(fs.existsSync as jest.Mock).mockReturnValue(true)
@@ -186,13 +195,14 @@ describe('ConfigurationManager', () => {
       })
 
       const testConfigManager = new ConfigurationManager()
-      testConfigManager.setPreference('effectDebounce', 100)
+      await testConfigManager.setPreference('effectDebounce', 100)
 
-      // Verify the saved data includes version information
-      const calls = (fs.writeFileSync as jest.Mock).mock.calls
-      const writeCall = calls[calls.length - 1]
-      const savedData = JSON.parse(writeCall[1])
-
+      // Verify the saved data includes version information (writeFile is called with temp path and content)
+      const writeCalls = (fsPromises.writeFile as jest.Mock).mock.calls
+      expect(writeCalls.length).toBeGreaterThanOrEqual(1)
+      const lastWriteCall = writeCalls[writeCalls.length - 1]
+      const content = lastWriteCall[1]
+      const savedData = JSON.parse(content)
       expect(savedData).toHaveProperty('version', 3)
       expect(savedData).toHaveProperty('data')
       expect(savedData.data).toHaveProperty('effectDebounce', 100)

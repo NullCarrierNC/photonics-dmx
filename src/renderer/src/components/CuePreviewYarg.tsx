@@ -36,9 +36,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
   // Separate state for primary and secondary cues
   const [primaryCueName, setPrimaryCueName] = useState<string>('')
-  const [, setPrimaryCueCounter] = useState<number>(0)
   const [secondaryCueName, setSecondaryCueName] = useState<string>('')
-  const [, setSecondaryCueCounter] = useState<number>(0)
 
   // State for beat and measure indicators
   const [beatReceived, setBeatReceived] = useState(false)
@@ -114,13 +112,10 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         if (primaryCueName && primaryCueName !== cueState.cueType) {
           // eslint-disable-next-line react-hooks/set-state-in-effect -- sync display from IPC cue state
           setSecondaryCueName('')
-          setSecondaryCueCounter(0)
         }
         setPrimaryCueName(cueState.cueType)
-        setPrimaryCueCounter(cueState.counter)
       } else if (cueState.cueStyle === 'secondary') {
         setSecondaryCueName(cueState.cueType)
-        setSecondaryCueCounter(cueState.counter)
       }
     }
   }, [cueState, primaryCueName])
@@ -181,9 +176,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when listener disabled
       setCurrentCueData(null)
       setPrimaryCueName('')
-      setPrimaryCueCounter(0)
       setSecondaryCueName('')
-      setSecondaryCueCounter(0)
       setBeatReceived(false)
       setMeasureReceived(false)
       setKeyframeReceived(false)

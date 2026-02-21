@@ -26,14 +26,15 @@ import StatusBar from './components/StatusBar'
 import { AppPageRouter } from './components/AppPageRouter'
 import SenderErrorIndicator from './components/SenderErrorIndicator'
 import { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types'
-import { addIpcListener, removeIpcListener } from './utils/ipcHelpers'
 import { useTimeout } from './utils/useTimeout'
+import { useAppIpcListeners } from './hooks/useAppIpcListeners'
 import { AudioCaptureManager } from './services/AudioCaptureManager'
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { useToast } from './hooks/useToast'
 import ToastContainer from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { CONFIG, RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { useDarkMode } from './DarkModeProvider'
+import { CONFIG } from '../../shared/ipcChannels'
 
 /**
  * Main application component
@@ -47,9 +48,8 @@ export const App = (): JSX.Element => {
   const setMyLights = useSetAtom(myDmxLightsAtom)
   const setLightLibrary = useSetAtom(dmxLightsLibraryAtom)
   const [activeConfig, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
-  const [, setIsLibraryLoaded] = useState(false)
   const [currentPage] = useAtom(currentPageAtom)
-  const [isDarkMode, setIsDarkMode] = useState(true)
+  const { isDarkMode, toggleDarkMode } = useDarkMode()
   const [, setPrefs] = useAtom(lightingPrefsAtom)
   const [isLeftMenuCollapsed, setIsLeftMenuCollapsed] = useState(false)
   const setIsSenderError = useSetAtom(isSenderErrorAtom)
@@ -274,11 +274,6 @@ export const App = (): JSX.Element => {
     [setPrefs],
   )
 
-  const toggleDarkMode = (): void => {
-    setIsDarkMode((prevMode) => !prevMode)
-    document.documentElement.classList.toggle('dark', !isDarkMode)
-  }
-
   const handleToggleLeftMenu = async (): Promise<void> => {
     const newCollapsed = !isLeftMenuCollapsed
     setIsLeftMenuCollapsed(newCollapsed)
@@ -299,14 +294,13 @@ export const App = (): JSX.Element => {
           CONFIG.GET_LIGHT_LIBRARY,
         )
         setLightLibrary(data || [])
-        setIsLibraryLoaded(true)
       } catch (error) {
         console.error('Failed to load light library:', error)
       }
     }
 
     loadLightLibrary()
-  }, [setLightLibrary, setIsLibraryLoaded])
+  }, [setLightLibrary])
 
   // Load my lights effect
   useEffect(() => {
@@ -314,14 +308,13 @@ export const App = (): JSX.Element => {
       try {
         const data: DmxFixture[] = await window.electron.ipcRenderer.invoke(CONFIG.GET_MY_LIGHTS)
         setMyLights(data || [])
-        setIsLibraryLoaded(true)
       } catch (error) {
         console.error('Failed to load my lights:', error)
       }
     }
 
     loadMyLights()
-  }, [setMyLights, setIsLibraryLoaded])
+  }, [setMyLights])
 
   // Load light layout effect
   useEffect(() => {
@@ -340,146 +333,13 @@ export const App = (): JSX.Element => {
     loadLightLayout()
   }, [setActiveLightsConfig])
 
-  // Use a ref to track if it's the initial mount
-  const isInitialMount = useRef(true)
-
-  useEffect(() => {
-    const fetchAppVersion = async () => {
-      if (isInitialMount.current) {
-        // Skip saving on the initial mount
-        isInitialMount.current = false
-        try {
-          const ver = await window.electron.ipcRenderer.invoke(CONFIG.GET_APP_VERSION)
-          setAppVer(ver)
-        } catch (error) {
-          console.error('Failed to get app version:', error)
-        }
-        return
-      }
-    }
-
-    const getPrefs = async () => {
-      const prefs = await window.electron.ipcRenderer.invoke(CONFIG.GET_PREFS)
-      console.log('\n Prefs', prefs)
-
-      // Prepare all preference updates in a single object
-      const updatedPrefs = { ...prefs }
-
-      // Initialize DMX output preferences from saved preferences or default values
-      const defaultDmxOutputConfig = {
-        sacnEnabled: false,
-        artNetEnabled: false,
-        enttecProEnabled: false,
-        openDmxEnabled: false,
-      }
-      if (!prefs.dmxOutputConfig) {
-        console.log('No saved DMX output config, using defaults:', defaultDmxOutputConfig)
-        updatedPrefs.dmxOutputConfig = defaultDmxOutputConfig
-      } else {
-        updatedPrefs.dmxOutputConfig = { ...defaultDmxOutputConfig, ...prefs.dmxOutputConfig }
-      }
-
-      const defaultEnttecProConfig = { port: '' }
-      if (!prefs.enttecProConfig) {
-        console.log('No saved Enttec Pro config, using defaults:', defaultEnttecProConfig)
-        updatedPrefs.enttecProConfig = defaultEnttecProConfig
-      } else {
-        updatedPrefs.enttecProConfig = { ...defaultEnttecProConfig, ...prefs.enttecProConfig }
-      }
-      setEnttecProComPort(updatedPrefs.enttecProConfig?.port ?? '')
-
-      const defaultOpenDmxConfig = { port: '', dmxSpeed: 40 }
-      if (!prefs.openDmxConfig) {
-        console.log('No saved OpenDMX config, using defaults:', defaultOpenDmxConfig)
-        updatedPrefs.openDmxConfig = defaultOpenDmxConfig
-      } else {
-        updatedPrefs.openDmxConfig = { ...defaultOpenDmxConfig, ...prefs.openDmxConfig }
-      }
-      setOpenDmxComPort(updatedPrefs.openDmxConfig?.port ?? '')
-
-      // Initialize Stage Kit preferences if not present
-      if (!prefs.stageKitPrefs) {
-        const defaultStageKitPrefs = {
-          yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never',
-        }
-        console.log('No saved Stage Kit preferences, using defaults:', defaultStageKitPrefs)
-        updatedPrefs.stageKitPrefs = defaultStageKitPrefs
-      }
-
-      // Initialize DMX settings preferences if not present
-      const defaultDmxSettingsPrefs = {
-        artNetExpanded: false,
-        enttecProExpanded: false,
-        sacnExpanded: false,
-        openDmxExpanded: false,
-      }
-      if (!prefs.dmxSettingsPrefs) {
-        console.log('No saved DMX settings preferences, using defaults:', defaultDmxSettingsPrefs)
-        updatedPrefs.dmxSettingsPrefs = defaultDmxSettingsPrefs
-      } else {
-        updatedPrefs.dmxSettingsPrefs = { ...defaultDmxSettingsPrefs, ...prefs.dmxSettingsPrefs }
-      }
-
-      setPrefs(updatedPrefs)
-
-      // Load left menu collapsed state
-      if (prefs.leftMenuCollapsed !== undefined) {
-        setIsLeftMenuCollapsed(prefs.leftMenuCollapsed)
-      }
-    }
-
-    fetchAppVersion()
-    getPrefs()
-
-    addIpcListener<string>(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
-    addIpcListener<string>(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
-    addIpcListener<{ sender: string; error: string; autoDisabled: boolean }>(
-      RENDERER_RECEIVE.SENDER_NETWORK_ERROR,
-      handleSenderNetworkError,
-    )
-    addIpcListener<CueStateInfo>(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate)
-    addIpcListener<{ sender: string; error: string }>(
-      RENDERER_RECEIVE.SENDER_START_FAILED,
-      handleSenderStartFailure,
-    )
-    addIpcListener<AudioConfig>(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable)
-    addIpcListener<unknown>(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable)
-    addIpcListener<AudioConfig>(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate)
-
-    const saveLightLayout = async () => {
-      if (activeConfig) {
-        try {
-          await window.electron.ipcRenderer.invoke(
-            CONFIG.SAVE_LIGHT_LAYOUT,
-            'myLayout.json',
-            activeConfig,
-          )
-        } catch (error) {
-          console.error('Failed to save light layout:', error)
-        }
-      }
-    }
-
-    saveLightLayout()
-
-    // Cleanup function
-    return () => {
-      removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
-      removeIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
-      removeIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError)
-      removeIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate)
-      removeIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure)
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable)
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable)
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate)
-
-      // Cleanup audio capture manager on unmount
-      if (audioCaptureManagerRef.current) {
-        audioCaptureManagerRef.current.stop()
-      }
-    }
-  }, [
+  useAppIpcListeners({
     activeConfig,
+    setAppVer,
+    setPrefs: setPrefs as (prefs: LightingPreferences) => void,
+    setEnttecProComPort,
+    setOpenDmxComPort,
+    setIsLeftMenuCollapsed,
     handleSenderError,
     handleYargError,
     handleSenderNetworkError,
@@ -488,10 +348,8 @@ export const App = (): JSX.Element => {
     handleAudioEnable,
     handleAudioDisable,
     handleAudioConfigUpdate,
-    setEnttecProComPort,
-    setOpenDmxComPort,
-    setPrefs,
-  ])
+    audioCaptureManagerRef,
+  })
 
   const sidebarWidth = isLeftMenuCollapsed ? 80 : 208
 

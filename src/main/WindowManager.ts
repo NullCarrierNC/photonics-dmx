@@ -22,10 +22,10 @@ export class WindowManager {
   /**
    * Saves window state to preferences with debouncing
    */
-  private saveWindowState(
+  private async saveWindowState(
     window: BrowserWindow,
     preferenceKey: 'windowState' | 'cueEditorWindowState',
-  ): void {
+  ): Promise<void> {
     if (window.isDestroyed() || !this.controllerManager) {
       return
     }
@@ -39,7 +39,7 @@ export class WindowManager {
     }
 
     try {
-      this.controllerManager.getConfig().updatePreferences({ [preferenceKey]: windowState })
+      await this.controllerManager.getConfig().updatePreferences({ [preferenceKey]: windowState })
     } catch (error) {
       console.error('Failed to save window state:', error)
     }
@@ -325,13 +325,13 @@ export class WindowManager {
   /**
    * Closes all application windows
    */
-  public closeAllWindows(): void {
+  public async closeAllWindows(): Promise<void> {
     // Save window state one final time before closing
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.saveWindowState(this.mainWindow, 'windowState')
+      await this.saveWindowState(this.mainWindow, 'windowState')
     }
     if (this.cueEditorWindow && !this.cueEditorWindow.isDestroyed()) {
-      this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
+      await this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
     }
 
     // Clear any pending timeouts

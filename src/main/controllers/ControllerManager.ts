@@ -18,9 +18,15 @@ import * as path from 'path'
 import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
-import { SenderError } from '../../photonics-dmx/senders/BaseSender'
+import { SenderError, SenderId } from '../../photonics-dmx/senders/BaseSender'
 import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager'
 import { createSenderErrorHandler } from './senderErrorHandler'
+import {
+  isSenderErrorHandled,
+  markSenderErrorHandled,
+  getLastErrorHandledTime,
+  removeSenderErrorHandled,
+} from '../senderErrorTracking'
 import { TestEffectRunner } from './TestEffectRunner'
 import { ListenerCoordinator } from './ListenerCoordinator'
 import { AudioController } from './AudioController'
@@ -35,6 +41,18 @@ import {
 } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
+
+// Type for Node.js network errors (code, syscall, port, address) used in uncaught exception handling
+interface NetworkErrorLike {
+  code?: string
+  syscall?: string
+  port?: number
+  address?: string
+}
+
+function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
+  return err !== null && typeof err === 'object' && 'code' in err && 'syscall' in err
+}
 
 export class ControllerManager {
   private config: ConfigurationManager
@@ -65,6 +83,7 @@ export class ControllerManager {
       () => this.getSenderManager(),
       sendToAllWindows,
     )
+    this.senderManager.onSendError(this.senderErrorHandler)
     this.testEffectRunner = new TestEffectRunner({
       getConfig: () => ({
         getPreference: (key: string) =>
@@ -108,6 +127,7 @@ export class ControllerManager {
   private ensureSenderManager(): void {
     if (this.senderManager === null) {
       this.senderManager = new SenderManager()
+      this.senderManager.onSendError(this.senderErrorHandler)
       if (this.senderErrorTrackingCallback) {
         this.senderManager.setOnSenderEnabled(this.senderErrorTrackingCallback)
       }
@@ -209,9 +229,6 @@ export class ControllerManager {
     if (this.dmxPublisher && activeRigs.length > 0) {
       this.dmxPublisher.updateActiveRigs(activeRigs)
     }
-
-    // Set up error handling
-    this.senderManager!.onSendError(this.senderErrorHandler)
   }
 
   /**
@@ -506,6 +523,83 @@ export class ControllerManager {
   public getSenderManager(): SenderManager {
     this.ensureSenderManager()
     return this.senderManager!
+  }
+
+  /**
+   * Handles uncaught exceptions that are network sender errors.
+   * Resolves senderId, performs emergency removal if needed, and delegates to the same
+   * senderErrorHandler used for normal sender errors so all error handling is unified.
+   * @returns true if the error was handled as a network sender error, false otherwise
+   */
+  public handleUncaughtException(error: unknown): boolean {
+    const isNetworkError =
+      isNetworkErrorLike(error) &&
+      (error.code === 'EHOSTUNREACH' ||
+        error.code === 'EHOSTDOWN' ||
+        error.code === 'ENETUNREACH' ||
+        error.code === 'ETIMEDOUT') &&
+      error.syscall === 'send'
+
+    if (!isNetworkError || !this.senderManager || !this.getIsInitialized()) {
+      return false
+    }
+
+    let senderId: string | null = null
+    if (isNetworkErrorLike(error)) {
+      const senderManager = this.senderManager
+      if (error.port != null) {
+        senderId = senderManager.getSenderIdByPort(error.port)
+      }
+      if (!senderId && error.port == null && error.address) {
+        if (senderManager.isSenderEnabled('artnet')) {
+          senderId = 'artnet'
+        } else if (senderManager.isSenderEnabled('sacn')) {
+          senderId = 'sacn'
+        }
+      }
+    }
+
+    if (!senderId) {
+      return false
+    }
+
+    const now = Date.now()
+    if (now - getLastErrorHandledTime(senderId) < 1000) {
+      return true
+    }
+    if (isSenderErrorHandled(senderId)) {
+      return true
+    }
+
+    try {
+      if (!this.senderManager.isSenderEnabled(senderId)) {
+        return false
+      }
+      markSenderErrorHandled(senderId, now)
+
+      const senderError = new SenderError(error, {
+        senderId: senderId as SenderId,
+        shouldDisable: true,
+      })
+
+      const sender = this.senderManager.getAndRemoveSenderForEmergency(senderId)
+      if (sender) {
+        console.error(`Network sender error (${senderId}):`, error)
+        sender.stop().catch((stopErr: unknown) => {
+          console.error(`Error stopping ${senderId} sender after network error:`, stopErr)
+        })
+        this.senderErrorHandler(senderError)
+      } else {
+        console.error(`Network sender error (${senderId}):`, error)
+        this.senderManager.markInitFailed(senderId)
+        this.senderManager.emitSenderError(senderError)
+      }
+      return true
+    } catch (err) {
+      console.error(`Error handling ${senderId} uncaught exception:`, err)
+      removeSenderErrorHandled(senderId)
+      return false
+    }
   }
 
   /**

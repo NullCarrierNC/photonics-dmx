@@ -100,22 +100,25 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
 
   // Update effect debounce time
   ipcMain.on(CUE.UPDATE_EFFECT_DEBOUNCE, (_, debounceTime: number) => {
-    // Save the debounce time to preferences
-    controllerManager.getConfig().setPreference('effectDebounce', debounceTime)
-
-    // Update the cue handler if it exists
-    const cueHandler = controllerManager.getCueHandler()
-    if (cueHandler) {
-      if ('setEffectDebouncePeriod' in cueHandler) {
-        cueHandler.setEffectDebouncePeriod(debounceTime)
+    void (async () => {
+      try {
+        await controllerManager.getConfig().setPreference('effectDebounce', debounceTime)
+        const cueHandler = controllerManager.getCueHandler()
+        if (cueHandler && 'setEffectDebouncePeriod' in cueHandler) {
+          cueHandler.setEffectDebouncePeriod(debounceTime)
+        }
+      } catch (err) {
+        console.error('Failed to save effect debounce preference:', err)
       }
-    }
+    })()
   })
 
   // Set cue style
   ipcMain.on(CUE.CUE_STYLE, (_, style: 'simple' | 'complex') => {
-    // Save complex cue style preference
-    controllerManager.getConfig().setPreference('complex', style === 'complex')
+    void controllerManager
+      .getConfig()
+      .setPreference('complex', style === 'complex')
+      .catch((err) => console.error('Failed to save cue style preference:', err))
   })
 
   // Get YARG enabled state

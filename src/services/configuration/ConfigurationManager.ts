@@ -217,7 +217,9 @@ export class ConfigurationManager {
     // If legacy format (just an array), migrate
     if (Array.isArray(currentData)) {
       const migratedData: UserLightsConfig = { lights: currentData }
-      this.userLights.update(migratedData)
+      this.userLights
+        .update(migratedData)
+        .catch((err) => console.error('[Photonics Config] Failed to persist migrated lights:', err))
       console.log(`[Photonics Config] Migrated legacy lights format to new format`)
     }
   }
@@ -259,7 +261,11 @@ export class ConfigurationManager {
     }
 
     if (updated) {
-      this.preferences.update(currentPrefs)
+      this.preferences
+        .update(currentPrefs)
+        .catch((err) =>
+          console.error('[Photonics Config] Failed to persist migrated preferences:', err),
+        )
     }
   }
 
@@ -301,7 +307,11 @@ export class ConfigurationManager {
         config: safeLayout,
       }
 
-      this.dmxRigs.update({ rigs: [defaultRig] })
+      this.dmxRigs
+        .update({ rigs: [defaultRig] })
+        .catch((err) =>
+          console.error('[Photonics Config] Failed to persist migrated DMX rigs:', err),
+        )
       console.log('[Photonics Config] Migrated existing layout to default DMX rig')
     }
   }
@@ -333,7 +343,11 @@ export class ConfigurationManager {
     }
 
     if (updated) {
-      this.preferences.update(currentPrefs)
+      this.preferences
+        .update(currentPrefs)
+        .catch((err) =>
+          console.error('[Photonics Config] Failed to persist sender config migration:', err),
+        )
       console.log('[Photonics Config] Migrated sender configs to include universe field')
     }
   }
@@ -350,9 +364,12 @@ export class ConfigurationManager {
   /**
    * Sets a specific preference value
    */
-  setPreference<K extends keyof AppPreferences>(key: K, value: AppPreferences[K]): void {
+  async setPreference<K extends keyof AppPreferences>(
+    key: K,
+    value: AppPreferences[K],
+  ): Promise<void> {
     const current = this.preferences.get()
-    this.preferences.update({ ...current, [key]: value })
+    await this.preferences.update({ ...current, [key]: value })
   }
 
   /**
@@ -365,17 +382,17 @@ export class ConfigurationManager {
   /**
    * Updates multiple preferences at once
    */
-  updatePreferences(updates: Partial<AppPreferences>): void {
+  async updatePreferences(updates: Partial<AppPreferences>): Promise<void> {
     const currentPrefs = this.preferences.get()
     const newPrefs = { ...currentPrefs, ...updates }
-    this.preferences.update(newPrefs)
+    await this.preferences.update(newPrefs)
   }
 
   /**
    * Resets preferences to default values
    */
-  resetPreferencesToDefaults(): void {
-    this.preferences.update(DEFAULT_PREFERENCES)
+  async resetPreferencesToDefaults(): Promise<void> {
+    await this.preferences.update(DEFAULT_PREFERENCES)
   }
 
   // Cue Group Preferences
@@ -391,8 +408,8 @@ export class ConfigurationManager {
   /**
    * Sets the enabled cue groups by their IDs
    */
-  setEnabledCueGroups(groupIds: string[]): void {
-    this.setPreference('enabledCueGroups', groupIds)
+  async setEnabledCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('enabledCueGroups', groupIds)
   }
 
   /**
@@ -405,8 +422,8 @@ export class ConfigurationManager {
   /**
    * Sets the enabled audio cue groups by their IDs
    */
-  setEnabledAudioCueGroups(groupIds: string[]): void {
-    this.setPreference('enabledAudioCueGroups', groupIds)
+  async setEnabledAudioCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('enabledAudioCueGroups', groupIds)
   }
 
   /**
@@ -419,8 +436,8 @@ export class ConfigurationManager {
   /**
    * Persists the preferred audio cue type
    */
-  setActiveAudioCueType(cueType: AudioCueType): void {
-    this.setPreference('activeAudioCueType', cueType)
+  async setActiveAudioCueType(cueType: AudioCueType): Promise<void> {
+    await this.setPreference('activeAudioCueType', cueType)
   }
 
   /**
@@ -433,8 +450,8 @@ export class ConfigurationManager {
   /**
    * Sets the cue consistency window preference
    */
-  setCueConsistencyWindow(windowMs: number): void {
-    this.setPreference('cueConsistencyWindow', windowMs)
+  async setCueConsistencyWindow(windowMs: number): Promise<void> {
+    await this.setPreference('cueConsistencyWindow', windowMs)
   }
 
   /**
@@ -448,9 +465,9 @@ export class ConfigurationManager {
    * Sets the clock rate preference (in milliseconds)
    * @param rate The clock rate in milliseconds (1-100ms)
    */
-  setClockRate(rate: number): void {
+  async setClockRate(rate: number): Promise<void> {
     const clampedRate = Math.max(1, Math.min(100, rate))
-    this.setPreference('clockRate', clampedRate)
+    await this.setPreference('clockRate', clampedRate)
   }
 
   // User Lights Methods
@@ -465,15 +482,15 @@ export class ConfigurationManager {
   /**
    * Updates the user's lights
    */
-  updateUserLights(lights: DmxFixture[]): void {
-    this.userLights.update({ lights })
+  async updateUserLights(lights: DmxFixture[]): Promise<void> {
+    await this.userLights.update({ lights })
   }
 
   /**
    * Resets user's lights to default values (empty)
    */
-  resetUserLightsToDefaults(): void {
-    this.userLights.update(DEFAULT_USER_LIGHTS)
+  async resetUserLightsToDefaults(): Promise<void> {
+    await this.userLights.update(DEFAULT_USER_LIGHTS)
   }
 
   // Light Library Methods (Default Templates)
@@ -497,8 +514,8 @@ export class ConfigurationManager {
   /**
    * Updates the lighting layout configuration
    */
-  updateLightingLayout(layout: LightingConfiguration): void {
-    this.lightingLayout.update(layout)
+  async updateLightingLayout(layout: LightingConfiguration): Promise<void> {
+    await this.lightingLayout.update(layout)
   }
 
   /**
@@ -511,19 +528,19 @@ export class ConfigurationManager {
   /**
    * Updates a specific property in the lighting layout
    */
-  updateLayoutProperty<K extends keyof LightingConfiguration>(
+  async updateLayoutProperty<K extends keyof LightingConfiguration>(
     key: K,
     value: LightingConfiguration[K],
-  ): void {
+  ): Promise<void> {
     const current = this.lightingLayout.get()
-    this.lightingLayout.update({ ...current, [key]: value })
+    await this.lightingLayout.update({ ...current, [key]: value })
   }
 
   /**
    * Resets the lighting layout to default values
    */
-  resetLayoutToDefaults(): void {
-    this.lightingLayout.update(DEFAULT_LIGHTING_LAYOUT)
+  async resetLayoutToDefaults(): Promise<void> {
+    await this.lightingLayout.update(DEFAULT_LIGHTING_LAYOUT)
   }
 
   // Audio Configuration Methods
@@ -542,22 +559,22 @@ export class ConfigurationManager {
   /**
    * Sets audio configuration
    */
-  setAudioConfig(config: AppPreferences['audioConfig']): void {
-    this.setPreference('audioConfig', config)
+  async setAudioConfig(config: AppPreferences['audioConfig']): Promise<void> {
+    await this.setPreference('audioConfig', config)
   }
 
   /**
    * Updates audio configuration (partial update)
    * Note: The 'enabled' field is never persisted (runtime-only state)
    */
-  updateAudioConfig(updates: Partial<AppPreferences['audioConfig']>): void {
+  async updateAudioConfig(updates: Partial<AppPreferences['audioConfig']>): Promise<void> {
     const current = this.getPreference('audioConfig') || {}
     const updated = { ...current, ...updates }
 
     const { enabled: _enabled, ...configToSave } = updated
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stripped audio config shape
-    this.setPreference('audioConfig', configToSave as any)
+    await this.setPreference('audioConfig', configToSave as any)
   }
 
   // DMX Rigs Methods
@@ -580,7 +597,7 @@ export class ConfigurationManager {
   /**
    * Saves or updates a DMX rig
    */
-  saveDmxRig(rig: DmxRig): void {
+  async saveDmxRig(rig: DmxRig): Promise<void> {
     const current = this.dmxRigs.get()
     const rigs = [...current.rigs]
     const existingIndex = rigs.findIndex((r) => r.id === rig.id)
@@ -591,16 +608,16 @@ export class ConfigurationManager {
       rigs.push(rig)
     }
 
-    this.dmxRigs.update({ rigs })
+    await this.dmxRigs.update({ rigs })
   }
 
   /**
    * Deletes a DMX rig by ID
    */
-  deleteDmxRig(id: string): void {
+  async deleteDmxRig(id: string): Promise<void> {
     const current = this.dmxRigs.get()
     const rigs = current.rigs.filter((rig) => rig.id !== id)
-    this.dmxRigs.update({ rigs })
+    await this.dmxRigs.update({ rigs })
   }
 
   /**

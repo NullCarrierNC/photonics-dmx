@@ -1,122 +1,15 @@
 import { app, BrowserWindow } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { Application } from './application'
-import { SenderError, SenderId } from '../photonics-dmx/senders/BaseSender'
-import {
-  isSenderErrorHandled,
-  markSenderErrorHandled,
-  getLastErrorHandledTime,
-  removeSenderErrorHandled,
-} from './senderErrorTracking'
 
 // Global reference to application for error handling
 let applicationInstance: Application | null = null
 
-// Type for Node.js network errors (code, syscall, port, address)
-interface NetworkErrorLike {
-  code?: string
-  syscall?: string
-  port?: number
-  address?: string
-}
-
-function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
-  return err !== null && typeof err === 'object' && 'code' in err && 'syscall' in err
-}
-
-// Global error handling
+// Global error handling: delegate network sender errors to ControllerManager for unified handling
 process.on('uncaughtException', (error: unknown) => {
-  // Check if this is a network sender error (UDP socket error)
-  const isNetworkError =
-    isNetworkErrorLike(error) &&
-    (error.code === 'EHOSTUNREACH' ||
-      error.code === 'EHOSTDOWN' ||
-      error.code === 'ENETUNREACH' ||
-      error.code === 'ETIMEDOUT') &&
-    error.syscall === 'send'
-
-  if (!isNetworkError || !applicationInstance) {
-    console.error('Uncaught exception:', error)
-    return
-  }
-
-  // Determine which sender this error is from (use configured port, then address fallback)
-  let senderId: string | null = null
-  if (isNetworkErrorLike(error)) {
-    const controllerManager = applicationInstance.getControllerManager()
-    if (controllerManager && controllerManager.getIsInitialized()) {
-      const senderManager = controllerManager.getSenderManager()
-      if (senderManager) {
-        if (error.port != null) {
-          senderId = senderManager.getSenderIdByPort(error.port)
-        }
-        if (!senderId && error.port == null && error.address) {
-          // Port absent only — fall back to checking which network sender is enabled.
-          // Do NOT fall back when a port was present but unmatched: that indicates a
-          // cleanup error from a sender already being stopped, not a new fault.
-          if (senderManager.isSenderEnabled('artnet')) {
-            senderId = 'artnet'
-          } else if (senderManager.isSenderEnabled('sacn')) {
-            senderId = 'sacn'
-          }
-        }
-      }
-    }
-  }
-
-  if (senderId && applicationInstance) {
-    const now = Date.now()
-    const lastHandled = getLastErrorHandledTime(senderId)
-
-    // Debounce: only handle errors for the same sender once per second
-    if (now - lastHandled < 1000) {
-      return
-    }
-
-    // Check if we've already permanently handled this sender's error
-    if (isSenderErrorHandled(senderId)) {
-      return
-    }
-
-    try {
-      const controllerManager = applicationInstance.getControllerManager()
-      if (controllerManager && controllerManager.getIsInitialized()) {
-        const senderManager = controllerManager.getSenderManager()
-        if (senderManager && senderManager.isSenderEnabled(senderId)) {
-          // Mark as handled immediately to prevent loops
-          markSenderErrorHandled(senderId, now)
-
-          const senderError = new SenderError(error, {
-            senderId: senderId as SenderId,
-            shouldDisable: true,
-          })
-
-          // Remove from enabled senders to stop further send() calls (returns null if still initializing)
-          const sender = senderManager.getAndRemoveSenderForEmergency(senderId)
-          if (sender) {
-            console.error(`Network sender error (${senderId}):`, error)
-            const senderWithEmit = sender as {
-              eventEmitter?: { emit(event: string, payload: SenderError): void }
-            }
-            if (senderWithEmit.eventEmitter) {
-              senderWithEmit.eventEmitter.emit('SenderError', senderError)
-            }
-            sender.stop().catch((stopErr: unknown) => {
-              console.error(`Error stopping ${senderId} sender after network error:`, stopErr)
-            })
-          } else {
-            // Sender is still initializing; mark so enableSender aborts, then emit to frontend
-            console.error(`Network sender error (${senderId}):`, error)
-            senderManager.markInitFailed(senderId)
-            senderManager.emitSenderError(senderError)
-          }
-        }
-      }
-    } catch (err) {
-      console.error(`Error handling ${senderId} uncaught exception:`, err)
-      removeSenderErrorHandled(senderId)
-    }
-  } else {
+  const handled =
+    applicationInstance?.getControllerManager()?.handleUncaughtException(error) ?? false
+  if (!handled) {
     console.error('Uncaught exception:', error)
   }
 })
