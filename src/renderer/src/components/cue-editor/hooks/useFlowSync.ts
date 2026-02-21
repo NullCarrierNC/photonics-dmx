@@ -70,9 +70,7 @@ export function useFlowSync({
         if (!effectDef) return node
 
         const parameterDefinitions = effectDef.variables?.filter((v) => v.isParameter) ?? []
-        const existingDefinitions = (
-          node.data as EditorNodeData & { parameterDefinitions?: VariableDefinition[] }
-        ).parameterDefinitions
+        const existingDefinitions = node.data.parameterDefinitions
         const definitionsChanged = !areParameterDefinitionsEqual(
           existingDefinitions,
           parameterDefinitions,
@@ -95,10 +93,8 @@ export function useFlowSync({
           }
         }
 
-        const nodeDataWithExtras = node.data as EditorNodeData & { effectName?: string }
-        const nextEffectName =
-          effectDef.name || nodeDataWithExtras.effectName || raiser.effectId || 'none'
-        const effectNameChanged = nextEffectName !== nodeDataWithExtras.effectName
+        const nextEffectName = effectDef.name || node.data.effectName || raiser.effectId || 'none'
+        const effectNameChanged = nextEffectName !== node.data.effectName
 
         if (!definitionsChanged && !valuesChanged && !effectNameChanged) {
           return node
@@ -113,9 +109,6 @@ export function useFlowSync({
             payload: valuesChanged ? { ...raiser, parameterValues: nextParameterValues } : raiser,
             effectName: nextEffectName,
             parameterDefinitions,
-          } as EditorNodeData & {
-            effectName?: string
-            parameterDefinitions?: VariableDefinition[]
           },
         }
       })

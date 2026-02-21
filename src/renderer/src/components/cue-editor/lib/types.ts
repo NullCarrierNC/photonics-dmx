@@ -6,6 +6,7 @@ import type {
   EventListenerNode,
   LogicNode,
   NodeCueFile,
+  VariableDefinition,
   YargEventNode,
   EffectRaiserNode,
   EffectEventListenerNode,
@@ -36,6 +37,8 @@ export type EditorNodeData = {
     | EffectEventListenerNode
     | NotesNode
   label: string
+  effectName?: string
+  parameterDefinitions?: VariableDefinition[]
 }
 
 export type EditorNode = Node<EditorNodeData>

@@ -13,6 +13,8 @@ import {
   isPlainObject,
   validateLightingConfiguration,
   validateOptionalStringArray,
+  validatePreferencesPayload,
+  validateAudioConfigPayload,
 } from './inputValidation'
 
 /**
@@ -173,16 +175,15 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   })
 
   // Save app preferences
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- IPC payload shape varies
-  ipcMain.handle(CONFIG.SAVE_PREFS, async (_, updates: any) => {
+  ipcMain.handle(CONFIG.SAVE_PREFS, async (_, updates: unknown) => {
     try {
-      if (!isPlainObject(updates)) {
-        return { success: false, error: 'Preferences payload must be an object' }
+      const validation = validatePreferencesPayload(updates)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
       }
-      await controllerManager.getConfig().updatePreferences(updates)
+      await controllerManager.getConfig().updatePreferences(validation.value)
 
-      // Update global brightness configuration if brightness settings were changed
-      if (updates.brightness) {
+      if (validation.value.brightness) {
         const brightnessConfig = controllerManager.getConfig().getAllPreferences().brightness
         if (brightnessConfig) {
           setGlobalBrightnessConfig(brightnessConfig)
@@ -401,22 +402,24 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   })
 
   // Save audio configuration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- IPC payload shape varies
-  ipcMain.handle(CONFIG.SAVE_AUDIO_CONFIG, async (_, updates: any) => {
+  ipcMain.handle(CONFIG.SAVE_AUDIO_CONFIG, async (_, updates: unknown) => {
     try {
-      if (!isPlainObject(updates)) {
-        return { success: false, error: 'Audio configuration payload must be an object' }
+      const validation = validateAudioConfigPayload(updates)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
       }
+      const validatedUpdates = validation.value
+
       // Get current config to check if deviceId changed
       const currentConfig = controllerManager.getConfig().getAudioConfig()
       const currentDeviceId = currentConfig?.deviceId
-      const newDeviceId = updates.deviceId
+      const newDeviceId = validatedUpdates.deviceId as string | undefined
 
       // Check if device changed (handle undefined/default case)
       const deviceChanged = newDeviceId !== undefined && newDeviceId !== currentDeviceId
 
       // Save the config
-      await controllerManager.getConfig().updateAudioConfig(updates)
+      await controllerManager.getConfig().updateAudioConfig(validatedUpdates)
 
       // Get updated config
       const updatedConfig = controllerManager.getConfig().getAudioConfig()
@@ -446,8 +449,8 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       }
 
       // If enabled state changed, start/stop audio
-      if (updates.enabled !== undefined) {
-        if (updates.enabled) {
+      if (validatedUpdates.enabled !== undefined) {
+        if (validatedUpdates.enabled) {
           await controllerManager.enableAudio()
         } else {
           await controllerManager.disableAudio()

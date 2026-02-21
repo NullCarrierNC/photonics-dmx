@@ -14,13 +14,8 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selec
   const isActive = activeNodeIds.has(id)
   if (data.kind !== 'effect-raiser') return null
   const raiserPayload = data.payload as EffectRaiserNode
-  // Use effectName from data (looked up in cueTransforms) or fall back to showing placeholder
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- node data shape from flow
-  const effectName = (data as any).effectName || '(select effect)'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- node data shape from flow
-  const parameterDefinitions = (data as any).parameterDefinitions as
-    | VariableDefinition[]
-    | undefined
+  const effectName = data.effectName || '(select effect)'
+  const parameterDefinitions = data.parameterDefinitions
   const selectedStyles = selected
     ? 'shadow-[0_0_18px_16px_rgba(59,130,246,0.8)] ring-[5px] ring-blue-400'
     : ''

@@ -21,10 +21,8 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
   const activeNodeIds = useActiveNodesContext()
   const isActive = activeNodeIds.has(id)
   if (data.kind !== 'logic') return null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- node payload shape
-  const logic = data.payload as LogicNode | any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- node payload shape
-  const logicType = (logic as any)?.logicType as string | undefined
+  const logic = data.payload as LogicNode
+  const logicType = logic.logicType
   if (!logicType) return null
 
   const Mono = ({ children }: { children: React.ReactNode }) => (

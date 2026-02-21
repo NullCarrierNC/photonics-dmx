@@ -10,8 +10,9 @@ import type {
   SerialSenderConfig,
 } from '../../photonics-dmx/types'
 import { ConfigStrobeType } from '../../photonics-dmx/types'
+import type { AppPreferences } from '../../services/configuration/ConfigurationManager'
 
-type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
+export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
 const SENDER_IDS = new Set(['sacn', 'ipc', 'enttecpro', 'artnet', 'opendmx'])
 
@@ -313,4 +314,87 @@ export function validatePathUnderAllowedRoots(
   }
 
   return { ok: true, value: resolvedTarget }
+}
+
+const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
+  'effectDebounce',
+  'complex',
+  'enttecProConfig',
+  'openDmxConfig',
+  'artNetConfig',
+  'sacnConfig',
+  'brightness',
+  'enabledCueGroups',
+  'enabledAudioCueGroups',
+  'cueConsistencyWindow',
+  'clockRate',
+  'dmxOutputConfig',
+  'stageKitPrefs',
+  'dmxSettingsPrefs',
+  'allowMultipleActiveRigs',
+  'audioConfig',
+  'activeAudioCueType',
+  'simulationSettings',
+  'leftMenuCollapsed',
+  'windowState',
+  'cueEditorWindowState',
+])
+
+/**
+ * Validates a preferences update payload, stripping any keys that are not
+ * part of AppPreferences so unexpected data is never persisted.
+ */
+export function validatePreferencesPayload(
+  data: unknown,
+): ValidationResult<Partial<AppPreferences>> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'Preferences payload must be an object' }
+  }
+
+  const cleaned: Record<string, unknown> = {}
+  for (const key of Object.keys(data)) {
+    if (APP_PREFERENCES_KEYS.has(key as keyof AppPreferences)) {
+      cleaned[key] = data[key]
+    }
+  }
+
+  if (Object.keys(cleaned).length === 0) {
+    return { ok: false, error: 'Preferences payload contains no valid preference keys' }
+  }
+
+  return { ok: true, value: cleaned as Partial<AppPreferences> }
+}
+
+const AUDIO_CONFIG_KEYS = new Set([
+  'deviceId',
+  'fftSize',
+  'sensitivity',
+  'beatDetection',
+  'smoothing',
+  'frequencyBands',
+  'enabled',
+])
+
+/**
+ * Validates an audio configuration update payload, stripping unknown keys.
+ */
+export function validateAudioConfigPayload(
+  data: unknown,
+): ValidationResult<Record<string, unknown>> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'Audio configuration payload must be an object' }
+  }
+
+  const cleaned: Record<string, unknown> = {}
+  for (const key of Object.keys(data)) {
+    if (AUDIO_CONFIG_KEYS.has(key)) {
+      cleaned[key] = data[key]
+    }
+  }
+
+  if (Object.keys(cleaned).length === 0) {
+    return { ok: false, error: 'Audio configuration payload contains no valid config keys' }
+  }
+
+  return { ok: true, value: cleaned }
 }
