@@ -61,7 +61,9 @@ describe('SacnSender', () => {
     const listener = jest.fn()
     sender.onSendError(listener)
     await sender.start()
-    mockSend.mockRejectedValueOnce(new Error('Network error'))
+    mockSend.mockRejectedValueOnce(
+      new Error('Network error') as Parameters<jest.Mock['mockRejectedValueOnce']>[0],
+    )
     await sender.send({ 1: 0 }).catch(() => {})
     expect(listener).toHaveBeenCalledWith(expect.any(SenderError))
   })
