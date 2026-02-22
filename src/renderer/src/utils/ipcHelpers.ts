@@ -4,7 +4,7 @@
  * so the multiple components can listen without increasing the subscriber count.
  */
 
-import type { RendererReceiveChannel } from '../../../shared/ipcChannels'
+import { RENDERER_RECEIVE, type RendererReceiveChannel } from '../../../shared/ipcChannels'
 
 export type IpcHandler<TPayload = unknown> = (event: unknown, payload: TPayload) => void
 
@@ -41,7 +41,7 @@ export function addIpcListener<TPayload = unknown>(
     }
     window.electron.ipcRenderer.on(channel, nativeHandler)
     registry.set(channel, { subscribers })
-    if (channel === 'dmxValues') {
+    if (channel === RENDERER_RECEIVE.DMX_VALUES) {
       console.debug('[ipcHelpers] dmxValues: created native listener, subscribers=1')
     }
   }
@@ -54,7 +54,7 @@ export function addIpcListener<TPayload = unknown>(
     return
   }
   state.subscribers.add(listener as IpcHandler)
-  if (channel === 'dmxValues') {
+  if (channel === RENDERER_RECEIVE.DMX_VALUES) {
     console.debug('[ipcHelpers] dmxValues: subscriber added, total=', state.subscribers.size)
   }
 }
@@ -75,7 +75,7 @@ export function removeIpcListener<TPayload = unknown>(
     return
   }
   state.subscribers.delete(listener as IpcHandler)
-  if (channel === 'dmxValues') {
+  if (channel === RENDERER_RECEIVE.DMX_VALUES) {
     console.debug('[ipcHelpers] dmxValues: subscriber removed, remaining=', state.subscribers.size)
   }
 }

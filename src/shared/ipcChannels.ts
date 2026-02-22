@@ -143,7 +143,7 @@ export const RENDERER_RECEIVE = {
   AUDIO_DISABLE: 'audio:disable',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
   CUE_STATE_UPDATE: 'cue-state-update',
-  DMX_VALUES: 'dmxValues',
+  DMX_VALUES: 'dmx-values',
   CUE_HANDLED: 'cue-handled',
   NODE_CUES_CHANGED: 'node-cues:changed',
   EFFECTS_CHANGED: 'effects:changed',
