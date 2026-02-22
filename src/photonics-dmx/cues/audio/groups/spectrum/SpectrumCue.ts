@@ -1,97 +1,93 @@
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { getEffectSingleColor } from '../../../../effects';
-import { getColor, validateColorString } from '../../../../helpers';
-import type { AudioConfig } from '../../../../listeners/Audio/AudioTypes';
-import { AudioCueData, BuiltInAudioCues } from '../../../types/audioCueTypes';
-import { IAudioCue } from '../../../interfaces/IAudioCue';
-import type { TrackedLight, RGBIO } from '../../../../types';
-import { clearCueLayers } from '../../utils/cueLayerUtils';
-import { getIntensityScale, applyIntensityScale } from '../../utils/bandUtils';
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { getEffectSingleColor } from '../../../../effects'
+import { getColor, validateColorString } from '../../../../helpers'
+import type { AudioConfig } from '../../../../listeners/Audio/AudioTypes'
+import { AudioCueData, BuiltInAudioCues } from '../../../types/audioCueTypes'
+import { IAudioCue } from '../../../interfaces/IAudioCue'
+import type { TrackedLight, RGBIO } from '../../../../types'
+import { clearCueLayers } from '../../utils/cueLayerUtils'
+import { getIntensityScale, applyIntensityScale } from '../../utils/bandUtils'
 
-type AudioRangeConfig = AudioConfig['frequencyBands']['ranges'][number];
+type AudioRangeConfig = AudioConfig['frequencyBands']['ranges'][number]
 
 /**
  * SpectrumCue - acts like a spectrum analyzer by spreading frequency bands across lights
  */
 export class SpectrumCue implements IAudioCue {
-  id = 'audio-spectrum';
-  cueType = BuiltInAudioCues.SpectrumCue;
-  description = 'Spectrum analyzer: spreads frequency bands across front and back lights';
-  private readonly layers = [0, 1, 2, 3, 4];
-  private sequencerRef: ILightingController | null = null;
-  private lightManagerRef: DmxLightManager | null = null;
+  id = 'audio-spectrum'
+  cueType = BuiltInAudioCues.SpectrumCue
+  description = 'Spectrum analyzer: spreads frequency bands across front and back lights'
+  private readonly layers = [0, 1, 2, 3, 4]
+  private sequencerRef: ILightingController | null = null
+  private lightManagerRef: DmxLightManager | null = null
 
   async execute(
     data: AudioCueData,
     sequencer: ILightingController,
-    lightManager: DmxLightManager
+    lightManager: DmxLightManager,
   ): Promise<void> {
-    this.sequencerRef = sequencer;
-    this.lightManagerRef = lightManager;
-    const { audioData, config } = data;
-    const { frequencyBands } = audioData;
+    this.sequencerRef = sequencer
+    this.lightManagerRef = lightManager
+    const { audioData, config } = data
+    const { frequencyBands } = audioData
 
-    const ranges = config.frequencyBands?.ranges || [];
+    const ranges = config.frequencyBands?.ranges || []
     if (ranges.length === 0) {
-      return;
+      return
     }
 
-    const configBandCount = config.frequencyBands?.bandCount;
-    const enabledBandCount = data.enabledBandCount ?? configBandCount ?? 4;
+    const configBandCount = config.frequencyBands?.bandCount
+    const enabledBandCount = data.enabledBandCount ?? configBandCount ?? 4
 
     const bandValues = [
       frequencyBands.range1,
       frequencyBands.range2,
       frequencyBands.range3,
       frequencyBands.range4,
-      frequencyBands.range5
-    ];
+      frequencyBands.range5,
+    ]
 
-    const allLights = lightManager.getLights(['front', 'back'], 'all');
+    const allLights = lightManager.getLights(['front', 'back'], 'all')
     if (!allLights || allLights.length === 0) {
-      return;
+      return
     }
 
     const orderedLights = [...allLights].sort((a, b) => {
-      const positionDiff = (a.position ?? 0) - (b.position ?? 0);
+      const positionDiff = (a.position ?? 0) - (b.position ?? 0)
       if (positionDiff !== 0) {
-        return positionDiff;
+        return positionDiff
       }
-      return a.id.localeCompare(b.id);
-    });
+      return a.id.localeCompare(b.id)
+    })
 
     const bandIndices =
-      enabledBandCount >= 5
-        ? [0, 1, 2, 3, 4]
-        : enabledBandCount === 4
-          ? [0, 1, 2, 3]
-          : [0, 2, 4];
-    type ActiveBand = { range: AudioRangeConfig; bandIntensity: number };
+      enabledBandCount >= 5 ? [0, 1, 2, 3, 4] : enabledBandCount === 4 ? [0, 1, 2, 3] : [0, 2, 4]
+    type ActiveBand = { range: AudioRangeConfig; bandIntensity: number }
     const activeBands: ActiveBand[] = bandIndices
       .map((bandIndex) => {
-        const range = ranges[bandIndex];
+        const range = ranges[bandIndex]
         if (!range) {
-          return null;
+          return null
         }
         return {
           range,
-          bandIntensity: bandValues[bandIndex] ?? 0
-        };
+          bandIntensity: bandValues[bandIndex] ?? 0,
+        }
       })
-      .filter((band): band is ActiveBand => band !== null);
+      .filter((band): band is ActiveBand => band !== null)
 
     if (activeBands.length === 0) {
-      return;
+      return
     }
 
     if (enabledBandCount === 4) {
-      const specialMapping = this.mapLightsForFourBandMode(orderedLights);
+      const specialMapping = this.mapLightsForFourBandMode(orderedLights)
       if (specialMapping) {
         specialMapping.forEach((lightsForBand, index) => {
-          const band = activeBands[index];
+          const band = activeBands[index]
           if (!band) {
-            return;
+            return
           }
           this.applyBandToLights({
             lights: lightsForBand,
@@ -99,37 +95,37 @@ export class SpectrumCue implements IAudioCue {
             bandIntensity: band.bandIntensity,
             linearResponse: config.linearResponse !== false,
             layer: index,
-            sequencer
-          });
-        });
-        return;
+            sequencer,
+          })
+        })
+        return
       }
     }
 
-    let startIndex = 0;
-    let remainingLights = orderedLights.length;
-    let remainingBands = activeBands.length;
+    let startIndex = 0
+    let remainingLights = orderedLights.length
+    let remainingBands = activeBands.length
 
-    const linearResponse = config.linearResponse !== false;
+    const linearResponse = config.linearResponse !== false
 
     activeBands.forEach((band, index) => {
       if (remainingBands <= 0) {
-        return;
+        return
       }
 
-      let lightsForBand: TrackedLight[] = [];
+      let lightsForBand: TrackedLight[] = []
       if (remainingLights > 0) {
-        const isLastBand = index === activeBands.length - 1;
+        const isLastBand = index === activeBands.length - 1
         let count = isLastBand
           ? remainingLights
-          : Math.max(1, Math.floor(remainingLights / remainingBands));
-        count = Math.min(count, remainingLights);
-        lightsForBand = orderedLights.slice(startIndex, startIndex + count);
-        startIndex += count;
-        remainingLights -= count;
+          : Math.max(1, Math.floor(remainingLights / remainingBands))
+        count = Math.min(count, remainingLights)
+        lightsForBand = orderedLights.slice(startIndex, startIndex + count)
+        startIndex += count
+        remainingLights -= count
       }
 
-      remainingBands -= 1;
+      remainingBands -= 1
 
       this.applyBandToLights({
         lights: lightsForBand,
@@ -137,9 +133,9 @@ export class SpectrumCue implements IAudioCue {
         bandIntensity: band.bandIntensity,
         linearResponse,
         layer: index,
-        sequencer
-      });
-    });
+        sequencer,
+      })
+    })
   }
 
   private applyBandToLights({
@@ -148,30 +144,30 @@ export class SpectrumCue implements IAudioCue {
     bandIntensity,
     linearResponse,
     layer,
-    sequencer
+    sequencer,
   }: {
-    lights: TrackedLight[] | undefined;
-    range: AudioRangeConfig;
-    bandIntensity: number;
-    linearResponse: boolean;
-    layer: number;
-    sequencer: ILightingController;
+    lights: TrackedLight[] | undefined
+    range: AudioRangeConfig
+    bandIntensity: number
+    linearResponse: boolean
+    layer: number
+    sequencer: ILightingController
   }): void {
     if (!lights || lights.length === 0 || !range) {
-      sequencer.removeEffectByLayer(layer);
-      return;
+      sequencer.removeEffectByLayer(layer)
+      return
     }
 
-    const normalizedIntensity = Math.max(0, Math.min(1, bandIntensity));
+    const normalizedIntensity = Math.max(0, Math.min(1, bandIntensity))
     if (normalizedIntensity < 0.02 || range.sensitivity === 0) {
-      return;
+      return
     }
 
-    const activeLightCount = Math.max(1, Math.round(normalizedIntensity * lights.length));
-    const activeLights = lights.slice(0, activeLightCount);
-    const inactiveLights = lights.slice(activeLightCount);
+    const activeLightCount = Math.max(1, Math.round(normalizedIntensity * lights.length))
+    const activeLights = lights.slice(0, activeLightCount)
+    const inactiveLights = lights.slice(activeLightCount)
 
-    sequencer.removeEffectByLayer(layer);
+    sequencer.removeEffectByLayer(layer)
 
     if (inactiveLights.length > 0) {
       const offColor = {
@@ -180,53 +176,53 @@ export class SpectrumCue implements IAudioCue {
         blue: 0,
         intensity: 0,
         opacity: 0,
-        blendMode: 'replace' as RGBIO['blendMode']
-      };
+        blendMode: 'replace' as RGBIO['blendMode'],
+      }
       const baseEffect = getEffectSingleColor({
         lights: inactiveLights,
         color: offColor,
         duration: 50,
-        layer
-      });
-      sequencer.addEffect(`audio-spectrum-base-${layer}`, baseEffect);
+        layer,
+      })
+      sequencer.addEffect(`audio-spectrum-base-${layer}`, baseEffect)
     }
 
     if (activeLights.length === 0) {
-      return;
+      return
     }
 
-    const color = validateColorString(range.color);
+    const color = validateColorString(range.color)
     if (!color) {
-      console.warn(`Invalid color for range ${range.name}: ${range.color}`);
-      return;
+      console.warn(`Invalid color for range ${range.name}: ${range.color}`)
+      return
     }
 
-    const brightness = range.brightness || 'medium';
-    const rgbColor = getColor(color, brightness, 'replace');
-    const intensityScale = getIntensityScale(normalizedIntensity, linearResponse);
-    applyIntensityScale(rgbColor, intensityScale);
+    const brightness = range.brightness || 'medium'
+    const rgbColor = getColor(color, brightness, 'replace')
+    const intensityScale = getIntensityScale(normalizedIntensity, linearResponse)
+    applyIntensityScale(rgbColor, intensityScale)
 
     const effect = getEffectSingleColor({
       lights: activeLights,
       color: rgbColor,
       duration: 100,
-      layer
-    });
+      layer,
+    })
 
-    sequencer.addEffect(`audio-spectrum-band-${layer}`, effect);
+    sequencer.addEffect(`audio-spectrum-band-${layer}`, effect)
   }
 
   onStop(): void {
-    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef);
+    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef)
   }
 
   onDestroy(): void {
-    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef);
+    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef)
   }
 
   private mapLightsForFourBandMode(lights: TrackedLight[]): TrackedLight[][] | null {
     if (lights.length === 4) {
-      return lights.map((light) => [light]);
+      return lights.map((light) => [light])
     }
 
     if (lights.length === 8) {
@@ -234,11 +230,10 @@ export class SpectrumCue implements IAudioCue {
         [lights[0], lights[7]],
         [lights[1], lights[6]],
         [lights[2], lights[5]],
-        [lights[3], lights[4]]
-      ];
+        [lights[3], lights[4]],
+      ]
     }
 
-    return null;
+    return null
   }
 }
-

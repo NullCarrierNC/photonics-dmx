@@ -1,11 +1,10 @@
-import { AudioCueGroup } from '../../../registries/AudioCueRegistry';
-import { AudioCueType, BuiltInAudioCues } from '../../../types/audioCueTypes';
-import { IAudioCue } from '../../../interfaces/IAudioCue';
-import { BandShellCue } from './BandShellCue';
-import { PrismSweepCue } from './PrismSweepCue';
-import { SubHarmonicWaveCue } from './SubHarmonicWaveCue';
-import { SpectrumStepperCue } from './SpectrumStepperCue';
-
+import { AudioCueGroup } from '../../../registries/AudioCueRegistry'
+import { AudioCueType, BuiltInAudioCues } from '../../../types/audioCueTypes'
+import { IAudioCue } from '../../../interfaces/IAudioCue'
+import { BandShellCue } from './BandShellCue'
+import { PrismSweepCue } from './PrismSweepCue'
+import { SubHarmonicWaveCue } from './SubHarmonicWaveCue'
+import { SpectrumStepperCue } from './SpectrumStepperCue'
 
 export const bandSculptGroup: AudioCueGroup = {
   id: 'audio-band-sculpt',
@@ -15,8 +14,6 @@ export const bandSculptGroup: AudioCueGroup = {
     [BuiltInAudioCues.BandShell, new BandShellCue()],
     [BuiltInAudioCues.PrismSweep, new PrismSweepCue()],
     [BuiltInAudioCues.SubHarmonicWave, new SubHarmonicWaveCue()],
-    [BuiltInAudioCues.SpectrumStepper, new SpectrumStepperCue()]
-  ])
-};
-
-
+    [BuiltInAudioCues.SpectrumStepper, new SpectrumStepperCue()],
+  ]),
+}

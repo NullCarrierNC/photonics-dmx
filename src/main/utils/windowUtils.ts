@@ -1,12 +1,12 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow } from 'electron'
 
 export const sendToAllWindows = (channel: string, payload: unknown): void => {
-  const windows = BrowserWindow.getAllWindows();
+  const windows = BrowserWindow.getAllWindows()
   if (windows.length === 0) {
-    return;
+    return
   }
 
   for (const window of windows) {
-    window.webContents.send(channel, payload);
+    window.webContents.send(channel, payload)
   }
-};
+}

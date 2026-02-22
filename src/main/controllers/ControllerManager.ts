@@ -1,64 +1,124 @@
-import { ConfigurationManager } from '../../services/configuration/ConfigurationManager';
-import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager';
-import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer';
-import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher';
-import { SenderManager } from '../../photonics-dmx/controllers/SenderManager';
-import { LightingConfiguration, ConfigStrobeType } from '../../photonics-dmx/types';
-import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetworkListener';
-import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetworkListener';
-import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler';
-import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler';
-import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager';
-import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor';
-import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes';
-import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock';
-import { BrowserWindow, ipcMain, app } from 'electron';
-import { sendToAllWindows } from '../utils/windowUtils';
-import * as path from 'path';
-import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader';
+import {
+  ConfigurationManager,
+  AppPreferences,
+} from '../../services/configuration/ConfigurationManager'
+import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
+import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer'
+import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
+import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
+import { LightingConfiguration, ConfigStrobeType } from '../../photonics-dmx/types'
+import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
+import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
+import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
+import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock'
+import { app } from 'electron'
+import { sendToAllWindows } from '../utils/windowUtils'
+import * as path from 'path'
+import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 
-import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces';
-import { SenderError } from '../../photonics-dmx/senders/BaseSender';
-import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager';
-import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController';
-import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes';
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry';
-import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry';
-import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes';
-import { NodeCueLoader, NodeCueListSummary } from '../../photonics-dmx/cues/node/loader/NodeCueLoader';
+import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
+import { SenderError, SenderId } from '../../photonics-dmx/senders/BaseSender'
+import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager'
+import { createSenderErrorHandler } from './senderErrorHandler'
+import {
+  isSenderErrorHandled,
+  markSenderErrorHandled,
+  getLastErrorHandledTime,
+  removeSenderErrorHandled,
+} from '../senderErrorTracking'
+import { TestEffectRunner } from './TestEffectRunner'
+import { ListenerCoordinator } from './ListenerCoordinator'
+import { AudioController } from './AudioController'
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController'
+import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
+import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
+import {
+  NodeCueLoader,
+  NodeCueListSummary,
+} from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 // Import all cue sets to register with registry
-import '../../photonics-dmx/cues';
+import '../../photonics-dmx/cues'
+
+// Type for Node.js network errors (code, syscall, port, address) used in uncaught exception handling
+interface NetworkErrorLike {
+  code?: string
+  syscall?: string
+  port?: number
+  address?: string
+}
+
+function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
+  return err !== null && typeof err === 'object' && 'code' in err && 'syscall' in err
+}
 
 export class ControllerManager {
-  private config: ConfigurationManager;
-  private dmxLightManager: DmxLightManager | null = null;
-  private lightStateManager: LightStateManager | null = null;
-  private lightTransitionController: LightTransitionController | null = null;
-  private sequencer: Sequencer | null = null;
-  private effectsController: ILightingController | null = null;
-  private dmxPublisher: DmxPublisher | null = null;
-  private senderManager: SenderManager | null = null;
+  private config: ConfigurationManager
+  private dmxLightManager: DmxLightManager | null = null
+  private lightStateManager: LightStateManager | null = null
+  private lightTransitionController: LightTransitionController | null = null
+  private sequencer: Sequencer | null = null
+  private effectsController: ILightingController | null = null
+  private dmxPublisher: DmxPublisher | null = null
+  private senderManager: SenderManager | null = null
+  private senderErrorTrackingCallback: ((senderId: string) => void) | null = null
 
-  private cueHandler: YargCueHandler | Rb3CueHandler | null = null;
-  private yargListener: YargNetworkListener | null = null;
-  private rb3eListener: Rb3eNetworkListener | null = null;
-  private audioProcessor: AudioCueProcessor | null = null;
-  private processorManager: ProcessorManager | null = null;
-  private nodeCueLoader: NodeCueLoader | null = null;
-  private effectLoader: EffectLoader | null = null;
+  private cueHandler: YargCueHandler | Rb3CueHandler | null = null
+  private nodeCueLoader: NodeCueLoader | null = null
+  private effectLoader: EffectLoader | null = null
 
-  private testEffectInterval: NodeJS.Timeout | null = null;
-  private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large';
-  private testBpm: number = 120;
+  private readonly testEffectRunner: TestEffectRunner
+  private readonly senderErrorHandler: (error: SenderError) => void
+  private readonly listenerCoordinator: ListenerCoordinator
+  private readonly audioController: AudioController
 
-  private isInitialized = false;
-  private isYargEnabled = false;
-  private isRb3Enabled = false;
-  private isAudioEnabled = false;
+  private isInitialized = false
 
   constructor() {
-    this.config = new ConfigurationManager();
-    this.senderManager = new SenderManager();
+    this.config = new ConfigurationManager()
+    this.senderManager = new SenderManager()
+    this.senderErrorHandler = createSenderErrorHandler(
+      () => this.getSenderManager(),
+      sendToAllWindows,
+    )
+    this.senderManager.onSendError(this.senderErrorHandler)
+    this.testEffectRunner = new TestEffectRunner({
+      getConfig: () => ({
+        getPreference: (key: string) =>
+          key === 'effectDebounce' ? this.config.getPreference('effectDebounce') : 0,
+      }),
+      getCueHandler: () => (this.cueHandler instanceof YargCueHandler ? this.cueHandler : null),
+      getEffectsController: () => this.effectsController,
+      getDmxLightManager: () => this.dmxLightManager!,
+      ensureInitialized: () => this.init(),
+      createCueHandler: (dmx, eff, debounce) => new YargCueHandler(dmx, eff, debounce),
+      setCueHandler: (h) => {
+        this.cueHandler = h
+      },
+    })
+    this.listenerCoordinator = new ListenerCoordinator({
+      getDmxLightManager: () => this.dmxLightManager,
+      getEffectsController: () => this.effectsController,
+      getPreference: (key: string) => {
+        const v = this.config.getPreference(key as keyof AppPreferences)
+        return typeof v === 'number' ? v : 0
+      },
+      sendSenderError: (message: string) => {
+        sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
+      },
+      sendToAllWindows,
+      setCueHandlerRef: (h) => {
+        this.cueHandler = h
+      },
+    })
+    this.audioController = new AudioController({
+      getDmxLightManager: () => this.dmxLightManager,
+      getEffectsController: () => this.effectsController,
+      config: this.config,
+      sendToAllWindows,
+    })
   }
 
   /**
@@ -66,28 +126,32 @@ export class ControllerManager {
    */
   private ensureSenderManager(): void {
     if (this.senderManager === null) {
-      this.senderManager = new SenderManager();
+      this.senderManager = new SenderManager()
+      this.senderManager.onSendError(this.senderErrorHandler)
+      if (this.senderErrorTrackingCallback) {
+        this.senderManager.setOnSenderEnabled(this.senderErrorTrackingCallback)
+      }
     }
   }
-  
+
   /**
    * Initialize all controllers and systems
    */
   public async init(): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized) return
 
-    this.ensureSenderManager();
-    await this.initializeDmxManager();
-    await this.initializeSequencer();
-    await this.initializeCueRegistry();
-    await this.initializeAudioCueRegistry();
-    await this.initializeEffectLoader(); // Initialize effects BEFORE node cues
-    await this.initializeNodeCueLoader();
-    await this.initializeListeners();
+    this.ensureSenderManager()
+    await this.initializeDmxManager()
+    await this.initializeSequencer()
+    await this.initializeCueRegistry()
+    await this.initializeAudioCueRegistry()
+    await this.initializeEffectLoader() // Initialize effects BEFORE node cues
+    await this.initializeNodeCueLoader()
+    await this.initializeListeners()
 
-    this.isInitialized = true;
+    this.isInitialized = true
   }
-  
+
   /**
    * Initialize the DMX Light Manager
    * Creates a merged manager from all active rigs for backward compatibility
@@ -95,763 +159,447 @@ export class ControllerManager {
    */
   private async initializeDmxManager(): Promise<void> {
     // Load only active rigs
-    const activeRigs = this.config.getActiveRigs();
-    
+    const activeRigs = this.config.getActiveRigs()
+
     if (activeRigs.length === 0) {
-      console.warn("No active DMX rigs found. DMX output will be disabled.");
+      console.warn('No active DMX rigs found. DMX output will be disabled.')
       // Create empty manager for backward compatibility
       const emptyConfig = {
         numLights: 0,
-        lightLayout: { id: "default-layout", label: "Default Layout" },
+        lightLayout: { id: 'default-layout', label: 'Default Layout' },
         strobeType: ConfigStrobeType.None,
         frontLights: [],
         backLights: [],
-        strobeLights: []
-      };
-      this.dmxLightManager = new DmxLightManager(emptyConfig);
-      return;
+        strobeLights: [],
+      }
+      this.dmxLightManager = new DmxLightManager(emptyConfig)
+      return
     }
-    
-    console.log(`Initializing ${activeRigs.length} active DMX rig(s)`);
-    
+
+    console.log(`Initializing ${activeRigs.length} active DMX rig(s)`)
+
     // Create merged configuration from all active rigs for backward compatibility
     // This allows processors and cue handlers to work with all lights
     const mergedConfig: LightingConfiguration = {
       numLights: 0,
-      lightLayout: { id: "merged", label: "Merged Rigs" },
+      lightLayout: { id: 'merged', label: 'Merged Rigs' },
       strobeType: ConfigStrobeType.None,
       frontLights: [],
       backLights: [],
-      strobeLights: []
-    };
-    
+      strobeLights: [],
+    }
+
     // Merge all lights from all active rigs
     for (const rig of activeRigs) {
-      mergedConfig.frontLights.push(...rig.config.frontLights);
-      mergedConfig.backLights.push(...rig.config.backLights);
-      mergedConfig.strobeLights.push(...rig.config.strobeLights);
-      mergedConfig.numLights += rig.config.numLights;
+      mergedConfig.frontLights.push(...rig.config.frontLights)
+      mergedConfig.backLights.push(...rig.config.backLights)
+      mergedConfig.strobeLights.push(...rig.config.strobeLights)
+      mergedConfig.numLights += rig.config.numLights
     }
-    
-    this.dmxLightManager = new DmxLightManager(mergedConfig);
+
+    this.dmxLightManager = new DmxLightManager(mergedConfig)
   }
-  
+
   /**
    * Initialize the lighting system
    */
   private async initializeSequencer(): Promise<void> {
     // Get clock rate from configuration
-    const clockRate = this.config.getClockRate();
-    
+    const clockRate = this.config.getClockRate()
+
     // Create the shared Clock instance
-    const clock = new Clock(clockRate);
-    
+    const clock = new Clock(clockRate)
+
     // Create the sequencer components with the Clock
-    this.lightStateManager = new LightStateManager();
-    this.lightTransitionController = new LightTransitionController(this.lightStateManager);
-    
+    this.lightStateManager = new LightStateManager()
+    this.lightTransitionController = new LightTransitionController(this.lightStateManager)
+
     // Create the sequencer with all components
-    this.sequencer = new Sequencer(this.lightTransitionController, clock);
-    this.effectsController = this.sequencer;
-    
+    this.sequencer = new Sequencer(this.lightTransitionController, clock)
+    this.effectsController = this.sequencer
+
     // Start the centralized timing system
-    clock.start();
-    
+    clock.start()
+
     // Set up DMX publisher (no longer takes DmxLightManager in constructor)
-    this.dmxPublisher = new DmxPublisher(
-      this.senderManager!,
-      this.lightStateManager
-    );
+    this.dmxPublisher = new DmxPublisher(this.senderManager!, this.lightStateManager)
 
     // Load active rigs and set them up in the publisher
-    const activeRigs = this.config.getActiveRigs();
+    const activeRigs = this.config.getActiveRigs()
     if (this.dmxPublisher && activeRigs.length > 0) {
-      this.dmxPublisher.updateActiveRigs(activeRigs);
+      this.dmxPublisher.updateActiveRigs(activeRigs)
     }
-
-    // Set up error handling
-    this.senderManager!.onSendError(this.handleSenderError);
   }
-  
+
   /**
    * Initialize the CueRegistry with enabled groups from configuration
    */
   private async initializeCueRegistry(): Promise<void> {
-    const registry = YargCueRegistry.getInstance();
-    
+    const registry = YargCueRegistry.getInstance()
+
     // Get enabled groups from configuration
-    const enabledGroupIds = this.config.getEnabledCueGroups();
+    const enabledGroupIds = this.config.getEnabledCueGroups()
     if (enabledGroupIds) {
-      registry.setEnabledGroups(enabledGroupIds);
-      console.log('CueRegistry initialized with enabled groups:', enabledGroupIds);
+      registry.setEnabledGroups(enabledGroupIds)
+      console.log('CueRegistry initialized with enabled groups:', enabledGroupIds)
     } else {
       // If no preference is set, enable all available groups
-      const allGroups = registry.getAllGroups();
-      registry.setEnabledGroups(allGroups);
-      console.log('CueRegistry initialized with all groups (no preference set):', allGroups);
+      const allGroups = registry.getAllGroups()
+      registry.setEnabledGroups(allGroups)
+      console.log('CueRegistry initialized with all groups (no preference set):', allGroups)
     }
-    
+
     // Load cue consistency window from configuration
-    const consistencyWindow = this.config.getCueConsistencyWindow();
-    registry.setCueConsistencyWindow(consistencyWindow);
-    console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms');
+    const consistencyWindow = this.config.getCueConsistencyWindow()
+    registry.setCueConsistencyWindow(consistencyWindow)
+    console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms')
   }
 
   /**
    * Initialize the AudioCueRegistry with enabled groups from configuration
    */
   private async initializeAudioCueRegistry(): Promise<void> {
-    const registry = AudioCueRegistry.getInstance();
+    const registry = AudioCueRegistry.getInstance()
 
-    const enabledGroupIds = this.config.getEnabledAudioCueGroups();
+    const enabledGroupIds = this.config.getEnabledAudioCueGroups()
     if (enabledGroupIds && enabledGroupIds.length > 0) {
-      registry.setEnabledGroups(enabledGroupIds);
-      console.log('AudioCueRegistry initialized with enabled groups:', enabledGroupIds);
+      registry.setEnabledGroups(enabledGroupIds)
+      console.log('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
     } else {
-      const allGroups = registry.getRegisteredGroups();
-      registry.setEnabledGroups(allGroups);
+      const allGroups = registry.getRegisteredGroups()
+      registry.setEnabledGroups(allGroups)
       if (allGroups.length > 0) {
-        this.config.setEnabledAudioCueGroups(allGroups);
+        this.config.setEnabledAudioCueGroups(allGroups)
       }
-      console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups);
+      console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
     }
   }
 
   private async initializeNodeCueLoader(): Promise<void> {
     if (this.nodeCueLoader) {
-      return;
+      return
     }
 
     // Ensure effect loader is initialized first
-    await this.initializeEffectLoader();
+    await this.initializeEffectLoader()
 
-    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks');
+    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
     this.nodeCueLoader = new NodeCueLoader({
       baseDir,
       yargRegistry: YargCueRegistry.getInstance(),
       audioRegistry: AudioCueRegistry.getInstance(),
-      effectLoader: this.effectLoader ?? undefined
-    });
+      effectLoader: this.effectLoader ?? undefined,
+    })
 
-    const summary = await this.nodeCueLoader.loadAll();
-    console.log(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`);
+    const summary = await this.nodeCueLoader.loadAll()
+    console.log(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
     if (summary.failed > 0 && summary.errors.length > 0) {
-      summary.errors.forEach((err) => console.error('[NodeCueLoader]', err));
+      summary.errors.forEach((err) => console.error('[NodeCueLoader]', err))
     }
-    await this.nodeCueLoader.startWatching();
+    await this.nodeCueLoader.startWatching()
 
     this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {
-      sendToAllWindows('node-cues:changed', payload);
-    });
+      sendToAllWindows(RENDERER_RECEIVE.NODE_CUES_CHANGED, payload)
+    })
   }
 
   private async initializeEffectLoader(): Promise<void> {
     if (this.effectLoader) {
-      return;
+      return
     }
 
-    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks');
-    this.effectLoader = new EffectLoader({ baseDir });
+    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
+    this.effectLoader = new EffectLoader({ baseDir })
 
-    const summary = await this.effectLoader.loadAll();
-    console.log(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`);
-    await this.effectLoader.startWatching();
+    const summary = await this.effectLoader.loadAll()
+    console.log(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
+    await this.effectLoader.startWatching()
 
     this.effectLoader.on('changed', async (payload: EffectListSummary) => {
-      sendToAllWindows('effects:changed', payload);
+      sendToAllWindows(RENDERER_RECEIVE.EFFECTS_CHANGED, payload)
       if (this.nodeCueLoader) {
         try {
-          await this.nodeCueLoader.reload();
+          await this.nodeCueLoader.reload()
         } catch (error) {
-          console.error('Failed to reload node cues after effect change:', error);
+          console.error('Failed to reload node cues after effect change:', error)
         }
       }
-    });
+    })
   }
-  
 
   /**
    * Initialize network listeners
    */
   private async initializeListeners(): Promise<void> {
-    if (!this.dmxLightManager || !this.effectsController) return;
+    if (!this.dmxLightManager || !this.effectsController) return
 
-    const debouncePeriod = this.config.getPreference('effectDebounce');
+    const debouncePeriod = this.config.getPreference('effectDebounce')
 
     // Create cue handler (default to YARG)
     this.cueHandler = new YargCueHandler(
       this.dmxLightManager,
       this.effectsController,
-      debouncePeriod
-    );
+      debouncePeriod,
+    )
   }
-  
-  /**
-   * Handle sender errors
-   */
-  private handleSenderError = (error: SenderError): void => {
-    console.error('Sender error:', error);
-    
-    const mainWindow = BrowserWindow.getFocusedWindow();
-    if (!mainWindow) {
-      console.error('handleSenderError: No main window found');
-      return;
-    }
-    
-    // Check if this is a network error that should disable the sender
-    const shouldDisable = (error as any).shouldDisable === true;
-    const errorObj = error.err || error;
-    
-    // Try to determine which sender this error is from by checking error details
-    let senderId: string | null = null;
-    if (errorObj && typeof errorObj === 'object') {
-      const err = errorObj as any;
-      // Check port to determine sender type
-      if (err.port === 6454) {
-        senderId = 'artnet';
-      } else if (err.port === 5568) {
-        senderId = 'sacn';
-      } else if (err.address || err.syscall === 'send') {
-        // Fallback: check which network sender is enabled
-        const senderManager = this.getSenderManager();
-        if (senderManager.isSenderEnabled('artnet')) {
-          senderId = 'artnet';
-        } else if (senderManager.isSenderEnabled('sacn')) {
-          senderId = 'sacn';
-        }
-      }
-    }
-    
-    // If it's a network error that should disable the sender, disable it automatically
-    if (shouldDisable && senderId) {
-      console.log(`Automatically disabling ${senderId} sender due to network error`);
-      try {
-        const senderManager = this.getSenderManager();
-        
-        // Check if sender is still enabled (might have been removed already by uncaughtException handler)
-        if (senderManager.isSenderEnabled(senderId)) {
-          senderManager.disableSender(senderId).catch((disableErr) => {
-            console.error(`Failed to disable ${senderId} sender:`, disableErr);
-          });
-        }
-        
-        // Send a specific notification for network errors that caused auto-disable
-        mainWindow.webContents.send('sender-network-error', {
-          sender: senderId,
-          error: error.err ? (error.err instanceof Error ? error.err.message : String(error.err)) : 'Network unreachable',
-          autoDisabled: true
-        });
-      } catch (err) {
-        console.error('Error disabling sender:', err);
-      }
-    }
-    
-    // Also send the general error notification
-    mainWindow.webContents.send('sender-error', error.err ? error.err.toString() : 'Unknown sender error');
-  };
-  
+
   /**
    * Start a test effect
-   * @param effectId The effect ID to test
-   * @param venueSize The venue size to use for testing
-   * @param bpm The BPM to use for testing
    */
-  public startTestEffect(effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large', bpm?: number): void {
-    console.log(`ControllerManager.startTestEffect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}`);
-    
-    // If an existing test interval is running, clear it
-    if (this.testEffectInterval) {
-      clearInterval(this.testEffectInterval);
-      this.testEffectInterval = null;
-    }
-    
-    // Store the venue size and BPM for use in testCue
-    this.testVenueSize = venueSize || 'Large';
-    this.testBpm = bpm || 120;
-    console.log(`Set testVenueSize to: ${this.testVenueSize}, testBpm to: ${this.testBpm}`);
-    
-    // If system is not initialized, initialize it first
-    if (!this.isInitialized) {
-      console.log("Initializing system before testing effect");
-      this.init().then(() => {
-        this.startTestEffectInternal(effectId);
-      }).catch(error => {
-        console.error("Error during initialization:", error);
-      });
-      return;
-    }
-    
-    this.startTestEffectInternal(effectId);
+  public startTestEffect(
+    effectId: string,
+    venueSize?: 'NoVenue' | 'Small' | 'Large',
+    bpm?: number,
+  ): void {
+    this.testEffectRunner.startTestEffect(effectId, venueSize, bpm)
   }
-  
-  /**
-   * Actually starts the test effect
-   */
-  private startTestEffectInternal(effectId: string): void {
-    // Check if we have the necessary components for testing
-    if (!this.effectsController || !this.dmxLightManager) {
-      console.error("Cannot test effect: lighting system not initialized");
-      return;
-    }
-    
-    // If no cue handler is set up, create one for testing purposes
-    if (!this.cueHandler) {
-      console.log("Creating temporary YARG cue handler for testing");
-      const debouncePeriod = this.config.getPreference('effectDebounce');
-      this.cueHandler = new YargCueHandler(
-        this.dmxLightManager,
-        this.effectsController,
-        debouncePeriod
-      );
-    }
-    
-    // Create a new interval to test the effect
-    this.testEffectInterval = setInterval(() => {
-      this.testCue(effectId);
-    }, 16); // ~60fps
-  }
-  
+
   /**
    * Stop the currently running test effect
    */
   public async stopTestEffect(): Promise<void> {
-    if (this.testEffectInterval) {
-      clearInterval(this.testEffectInterval);
-      this.testEffectInterval = null;
-    }
+    await this.testEffectRunner.stopTestEffect()
+  }
 
-    // Important: stopping the simulation must also stop the active cue.
-    // Otherwise node cues can remain mid-execution (waiting on callbacks),
-    // and restarting the same cue will appear to do nothing.
-    if (this.cueHandler instanceof YargCueHandler) {
-      this.cueHandler.stopActiveCue();
-    }
-    
-    if (this.effectsController) {
-      await this.effectsController.blackout(0);
-    }
-  }
-  
-  /**
-   * Test a specific cue
-   * @param cueId The cue ID to test
-   */
-  private testCue(cueId: string): void {
-    if (!this.cueHandler) {
-      console.error("No cue handler available. Make sure YARG or RB3 is enabled.");
-      return;
-    }
-    
-    const cue = getCueTypeFromId(cueId);
-    
-    let strobe: StrobeState = 'Strobe_Off' as StrobeState;
-    if (cueId.indexOf("Strobe") > -1) {
-      strobe = cueId as StrobeState;
-    }
-    
-    const data: CueData = {
-      datagramVersion: 0,
-      platform: 'Windows',
-      currentScene: 'Gameplay',
-      pauseState: 'Unpaused',
-      venueSize: this.testVenueSize,
-      beatsPerMinute: this.testBpm,
-      songSection: 'Verse',
-      guitarNotes: [],
-      bassNotes: [],
-      drumNotes: [],
-      keysNotes: [],
-      vocalNote: 0,
-      harmony0Note: 0,
-      harmony1Note: 0,
-      harmony2Note: 0,
-      lightingCue: cueId,
-      postProcessing: 'Default',
-      fogState: false,
-      strobeState: strobe,
-      performer: 0,
-      trackMode: 'simulated',
-      beat: 'Off',
-      keyframe: 'Off',
-      bonusEffect: false,
-      ledColor: '',
-    };
-    
-    if (cue !== undefined) {
-      try {
-        this.cueHandler.handleCue(cue, data);
-        
-        // Emit cue-handled event for UI preview components
-        sendToAllWindows('cue-handled', data);
-      } catch (error) {
-        console.error("Error handling cue:", error);
-      }
-    } else {
-      console.error("\n Test Cue Error: no cue for ID ", cueId);
-    }
-  }
-  
   /**
    * Enable YARG listener
    */
   public enableYarg(): void {
-    // Check if the system is initialized, initialize if needed
-    if (!this.isInitialized) {
-      console.log("Initializing system before enabling YARG");
-      this.init().then(() => {
-        // Continue with YARG initialization after system is ready
-        this.enableYargInternal();
-      }).catch(error => {
-        console.error("Error during initialization:", error);
-      });
-      return;
-    }
-    
-    this.enableYargInternal();
+    this.listenerCoordinator.enableYarg(this.isInitialized, () => this.init())
   }
-  
-  /**
-   * Internal method to enable YARG without initialization checks
-   */
-  private enableYargInternal(): void {
-    if (this.isYargEnabled || !this.effectsController || !this.dmxLightManager) {
-      console.log("Cannot enable YARG: already enabled or missing required components");
-      return;
-    }
-    
-    // Disable Rb3 if it's enabled
-    if (this.isRb3Enabled) {
-      this.disableRb3();
-    }
-    
-    // Shutdown existing cue handler to trigger lifecycle methods
-    if (this.cueHandler) {
-      this.cueHandler.shutdown();
-    }
-    
-    const debouncePeriod = this.config.getPreference('effectDebounce');
-    
-    // Create YARG listener
-    this.cueHandler = new YargCueHandler(
-      this.dmxLightManager,
-      this.effectsController,
-      debouncePeriod
-    );
-    
-    // Shut down existing listener if any
-    this.yargListener?.shutdown();
-    
-    // Create new listener
-    this.yargListener = new YargNetworkListener(this.cueHandler);
-    
-    // Set up error handling for YARG listener
-    this.yargListener.on('yarg-error', (errorData: { type: string; message: string; datagramVersion?: number }) => {
-      console.error('YARG Listener Error:', errorData);
-      
-      // Send error to frontend
-      const mainWindow = BrowserWindow.getFocusedWindow();
-      if (mainWindow) {
-        mainWindow.webContents.send('sender-error', errorData.message);
-      }
-    });
-    
-    // Start the listener
-    this.yargListener.start();
-    
-    this.isYargEnabled = true;
-    console.log("YARG listener enabled");
-  }
-  
+
   /**
    * Disable YARG listener
    */
   public async disableYarg(): Promise<void> {
-    if (!this.isYargEnabled) return;
-    
-    // Clear all running effects before shutting down
-    if (this.effectsController) {
-      try {
-        this.effectsController.removeAllEffects();
-        // Use blackout for immediate light shutdown
-        await this.effectsController.blackout(0); // Immediate blackout
-        console.log('ControllerManager: Cleared all running effects and initiated blackout when disabling YARG');
-      } catch (error) {
-        console.error('Error clearing effects when disabling YARG:', error);
-      }
-    }
-    
-    if (this.yargListener) {
-      this.yargListener.shutdown();
-      this.yargListener = null;
-    }
-    
-    // Shutdown cue handler to trigger lifecycle methods
-    if (this.cueHandler) {
-      this.cueHandler.shutdown();
-    }
-    
-    this.isYargEnabled = false;
+    await this.listenerCoordinator.disableYarg()
   }
-  
+
   /**
    * Enable Rb3 listener
    */
   public async enableRb3(): Promise<void> {
-    // Check if the system is initialized, initialize if needed
-    if (!this.isInitialized) {
-      console.log("Initializing system before enabling RB3");
-      this.init().then(() => {
-        // Continue with RB3 initialization after system is ready
-        this.enableRb3Internal();
-      }).catch(error => {
-        console.error("Error during initialization:", error);
-      });
-      return;
-    }
-    
-    await this.enableRb3Internal();
+    await this.listenerCoordinator.enableRb3(this.isInitialized, () => this.init())
   }
-  
-  /**
-   * Internal method to enable RB3 without initialization checks
-   */
-  private async enableRb3Internal(): Promise<void> {
-    if (this.isRb3Enabled || !this.effectsController || !this.dmxLightManager) {
-      console.log("Cannot enable RB3: already enabled or missing required components");
-      return;
-    }
-    
-    // Disable YARG if it's enabled
-    if (this.isYargEnabled) {
-      await this.disableYarg();
-    }
-    
-    // Shutdown existing cue handler to trigger lifecycle methods
-    if (this.cueHandler) {
-      this.cueHandler.shutdown();
-    }
-    
-    const debouncePeriod = this.config.getPreference('effectDebounce');
-    
-    // Create processor manager
-    console.log('ControllerManager: Creating ProcessorManager with mode: direct');
-    this.processorManager = new ProcessorManager(
-      this.dmxLightManager,
-      this.effectsController,
-      { mode: 'direct' }
-    );
-    console.log('ControllerManager: ProcessorManager created successfully');
-    
-    // Create traditional cue handler
-    this.cueHandler = new Rb3CueHandler(
-      this.dmxLightManager,
-      this.effectsController,
-      debouncePeriod
-    );
-    
-    // Set the cue handler in the processor manager
-    this.processorManager.setCueHandler(this.cueHandler);
-    
-    // Create network listener (no cue handler dependency)
-    this.rb3eListener = new Rb3eNetworkListener();
-    
-    // Connect network listener to processor manager
-    this.processorManager.setNetworkListener(this.rb3eListener);
-    
-    // Start listening
-    this.rb3eListener.start();
-    
-    this.isRb3Enabled = true;
-    console.log("RB3 listener enabled in cue-based mode using event-driven architecture");
-  }
-  
+
   /**
    * Disable Rb3 listener
    */
   public async disableRb3(): Promise<void> {
-    if (!this.isRb3Enabled) return;
-    
-    // Clear all running effects before shutting down
-    if (this.effectsController) {
-      try {
-        this.effectsController.removeAllEffects();
-        // Use blackout for immediate light shutdown
-        await this.effectsController.blackout(0); // Immediate blackout
-        console.log('ControllerManager: Cleared all running effects and initiated blackout when disabling RB3');
-      } catch (error) {
-        console.error('Error clearing effects when disabling RB3:', error);
-      }
-    }
-    
-    if (this.rb3eListener) {
-      this.rb3eListener.shutdown();
-      this.rb3eListener = null;
-    }
-    
-    // Shutdown processor manager to clean up event processors
-    if (this.processorManager) {
-      this.processorManager.destroy();
-      this.processorManager = null;
-    }
-    
-    // Shutdown cue handler to trigger lifecycle methods
-    if (this.cueHandler) {
-      this.cueHandler.shutdown();
-    }
-    
-    this.isRb3Enabled = false;
+    await this.listenerCoordinator.disableRb3()
   }
 
   /**
    * Switch RB3 processing mode between direct and cue-based
-   * @param mode The new processing mode ('direct' or 'cueBased')
    */
   public async switchRb3Mode(mode: 'direct' | 'cueBased'): Promise<void> {
-    if (!this.isRb3Enabled || !this.processorManager) {
-      console.log("Cannot switch RB3 mode: RB3 not enabled or processor manager not available");
-      return;
-    }
-
-    console.log(`Switching RB3 mode from ${this.processorManager.getCurrentMode()} to ${mode}`);
-    this.processorManager.switchMode(mode);
-    console.log(`RB3 mode switched to: ${this.processorManager.getCurrentMode()}`);
+    await this.listenerCoordinator.switchRb3Mode(mode)
   }
 
   /**
    * Get current RB3 processing mode
    */
   public getRb3Mode(): 'direct' | 'cueBased' | 'none' {
-    if (!this.isRb3Enabled || !this.processorManager) {
-      return 'none';
-    }
-    return this.processorManager.getCurrentMode();
+    return this.listenerCoordinator.getRb3Mode()
   }
 
   /**
    * Get RB3 processor statistics
    */
-  public getRb3ProcessorStats() {
-    if (!this.isRb3Enabled || !this.processorManager) {
-      return null;
-    }
-    return this.processorManager.getProcessorStats();
+  public getRb3ProcessorStats(): ReturnType<ProcessorManager['getProcessorStats']> | null {
+    return this.listenerCoordinator.getRb3ProcessorStats()
   }
-  
+
   /**
    * Shutdown all controllers and systems
    */
   public async shutdown(): Promise<void> {
-    console.log("ControllerManager shutdown: starting");
-    
-    try {
+    console.log('ControllerManager shutdown: starting')
 
+    try {
       // Shutdown in reverse order of initialization
       try {
-        await this.disableYarg();
-        console.log("ControllerManager shutdown: YARG disabled");
+        await this.listenerCoordinator.disableYarg()
+        console.log('ControllerManager shutdown: YARG disabled')
       } catch (err) {
-        console.error("Error disabling YARG:", err);
+        console.error('Error disabling YARG:', err)
       }
-      
+
       try {
-        await this.disableRb3();
-        console.log("ControllerManager shutdown: RB3 disabled");
+        await this.listenerCoordinator.disableRb3()
+        console.log('ControllerManager shutdown: RB3 disabled')
       } catch (err) {
-        console.error("Error disabling RB3:", err);
+        console.error('Error disabling RB3:', err)
       }
-      
+
       try {
-        await this.disableAudio();
-        console.log("ControllerManager shutdown: Audio disabled");
+        await this.audioController.disableAudio()
+        console.log('ControllerManager shutdown: Audio disabled')
       } catch (err) {
-        console.error("Error disabling Audio:", err);
+        console.error('Error disabling Audio:', err)
       }
 
       if (this.nodeCueLoader) {
         try {
-          await this.nodeCueLoader.dispose();
-          this.nodeCueLoader.removeAllListeners();
-          this.nodeCueLoader = null;
-          console.log("ControllerManager shutdown: node cue loader stopped");
+          await this.nodeCueLoader.dispose()
+          this.nodeCueLoader.removeAllListeners()
+          this.nodeCueLoader = null
+          console.log('ControllerManager shutdown: node cue loader stopped')
         } catch (err) {
-          console.error("Error shutting down node cue loader:", err);
+          console.error('Error shutting down node cue loader:', err)
         }
       }
 
       if (this.effectLoader) {
         try {
-          await this.effectLoader.dispose();
-          this.effectLoader.removeAllListeners();
-          this.effectLoader = null;
-          console.log("ControllerManager shutdown: effect loader stopped");
+          await this.effectLoader.dispose()
+          this.effectLoader.removeAllListeners()
+          this.effectLoader = null
+          console.log('ControllerManager shutdown: effect loader stopped')
         } catch (err) {
-          console.error("Error shutting down effect loader:", err);
+          console.error('Error shutting down effect loader:', err)
         }
       }
-      
+
       // Ensure cue handler is shut down if it still exists
       if (this.cueHandler) {
         try {
-          this.cueHandler.shutdown();
-          this.cueHandler = null;
-          console.log("ControllerManager shutdown: cue handler stopped");
+          this.cueHandler.shutdown()
+          this.cueHandler = null
+          console.log('ControllerManager shutdown: cue handler stopped')
         } catch (err) {
-          console.error("Error shutting down cue handler:", err);
+          console.error('Error shutting down cue handler:', err)
         }
       }
-      
+
       if (this.effectsController) {
         try {
-          await this.effectsController.shutdown();
-          console.log("ControllerManager shutdown: effects controller stopped");
+          await this.effectsController.shutdown()
+          console.log('ControllerManager shutdown: effects controller stopped')
         } catch (err) {
-          console.error("Error shutting down effects controller:", err);
+          console.error('Error shutting down effects controller:', err)
         }
       }
-      
+
       if (this.dmxPublisher) {
         try {
-          await this.dmxPublisher.shutdown();
-          console.log("ControllerManager shutdown: DMX publisher stopped");
+          await this.dmxPublisher.shutdown()
+          console.log('ControllerManager shutdown: DMX publisher stopped')
         } catch (err) {
-          console.error("Error shutting down DMX publisher:", err);
+          console.error('Error shutting down DMX publisher:', err)
         }
       }
-      
+
       if (this.senderManager) {
         try {
-          await this.senderManager.shutdown();
-          console.log("ControllerManager shutdown: sender manager stopped");
+          await this.senderManager.shutdown()
+          console.log('ControllerManager shutdown: sender manager stopped')
         } catch (err) {
-          console.error("Error shutting down sender manager:", err);
+          console.error('Error shutting down sender manager:', err)
         }
       }
 
-
-      this.isInitialized = false;
-      console.log("ControllerManager shutdown: completed");
+      this.isInitialized = false
+      console.log('ControllerManager shutdown: completed')
     } catch (err) {
-      console.error("Error during controller manager shutdown:", err);
-      throw err;
+      console.error('Error during controller manager shutdown:', err)
+      throw err
     }
   }
-  
+
   // Getters for controllers
   public getConfig(): ConfigurationManager {
-    return this.config;
+    return this.config
   }
-  
+
   public getDmxLightManager(): DmxLightManager | null {
-    return this.dmxLightManager;
+    return this.dmxLightManager
   }
-  
+
   public getLightingController(): ILightingController | null {
-    return this.effectsController;
+    return this.effectsController
   }
-  
+
   public getSenderManager(): SenderManager {
-    this.ensureSenderManager();
-    return this.senderManager!;
+    this.ensureSenderManager()
+    return this.senderManager!
+  }
+
+  /**
+   * Handles uncaught exceptions that are network sender errors.
+   * Resolves senderId, performs emergency removal if needed, and delegates to the same
+   * senderErrorHandler used for normal sender errors so all error handling is unified.
+   * @returns true if the error was handled as a network sender error, false otherwise
+   */
+  public handleUncaughtException(error: unknown): boolean {
+    const isNetworkError =
+      isNetworkErrorLike(error) &&
+      (error.code === 'EHOSTUNREACH' ||
+        error.code === 'EHOSTDOWN' ||
+        error.code === 'ENETUNREACH' ||
+        error.code === 'ETIMEDOUT') &&
+      error.syscall === 'send'
+
+    if (!isNetworkError || !this.senderManager || !this.getIsInitialized()) {
+      return false
+    }
+
+    let senderId: string | null = null
+    if (isNetworkErrorLike(error)) {
+      const senderManager = this.senderManager
+      if (error.port != null) {
+        senderId = senderManager.getSenderIdByPort(error.port)
+      }
+      if (!senderId && error.port == null && error.address) {
+        if (senderManager.isSenderEnabled('artnet')) {
+          senderId = 'artnet'
+        } else if (senderManager.isSenderEnabled('sacn')) {
+          senderId = 'sacn'
+        }
+      }
+    }
+
+    if (!senderId) {
+      return false
+    }
+
+    const now = Date.now()
+    if (now - getLastErrorHandledTime(senderId) < 1000) {
+      return true
+    }
+    if (isSenderErrorHandled(senderId)) {
+      return true
+    }
+
+    try {
+      if (!this.senderManager.isSenderEnabled(senderId)) {
+        return false
+      }
+      markSenderErrorHandled(senderId, now)
+
+      const senderError = new SenderError(error, {
+        senderId: senderId as SenderId,
+        shouldDisable: true,
+      })
+
+      const sender = this.senderManager.getAndRemoveSenderForEmergency(senderId)
+      if (sender) {
+        console.error(`Network sender error (${senderId}):`, error)
+        sender.stop().catch((stopErr: unknown) => {
+          console.error(`Error stopping ${senderId} sender after network error:`, stopErr)
+        })
+        this.senderErrorHandler(senderError)
+      } else {
+        console.error(`Network sender error (${senderId}):`, error)
+        this.senderManager.markInitFailed(senderId)
+        this.senderManager.emitSenderError(senderError)
+      }
+      return true
+    } catch (err) {
+      console.error(`Error handling ${senderId} uncaught exception:`, err)
+      removeSenderErrorHandled(senderId)
+      return false
+    }
   }
 
   /**
@@ -860,41 +608,41 @@ export class ControllerManager {
    * @param callback Function to call with the sender ID when error tracking should be cleared
    */
   public setSenderErrorTrackingCallback(callback: (senderId: string) => void): void {
-    this.ensureSenderManager();
-    this.senderManager!.setOnSenderEnabled(callback);
+    this.senderErrorTrackingCallback = callback
+    this.ensureSenderManager()
+    this.senderManager!.setOnSenderEnabled(callback)
   }
 
-
   public getCueHandler(): YargCueHandler | Rb3CueHandler | null {
-    return this.cueHandler;
+    return this.cueHandler
   }
 
   public getNodeCueLoader(): NodeCueLoader | null {
-    return this.nodeCueLoader;
+    return this.nodeCueLoader
   }
 
   public getEffectLoader(): EffectLoader | null {
-    return this.effectLoader;
+    return this.effectLoader
   }
 
-  public getProcessorManager(): any | null {
-    return this.processorManager;
+  public getProcessorManager(): ProcessorManager | null {
+    return this.listenerCoordinator.getProcessorManager()
   }
 
   public getDmxPublisher(): DmxPublisher | null {
-    return this.dmxPublisher;
+    return this.dmxPublisher
   }
-  
+
   public getIsInitialized(): boolean {
-    return this.isInitialized;
+    return this.isInitialized
   }
-  
+
   public getIsYargEnabled(): boolean {
-    return this.isYargEnabled;
+    return this.listenerCoordinator.getIsYargEnabled()
   }
-  
+
   public getIsRb3Enabled(): boolean {
-    return this.isRb3Enabled;
+    return this.listenerCoordinator.getIsRb3Enabled()
   }
 
   /**
@@ -902,13 +650,26 @@ export class ControllerManager {
    * @returns Object containing status of each sender type
    */
   public getSenderStatus(): { sacn: boolean; artnet: boolean; enttecpro: boolean; ipc: boolean } {
-    this.ensureSenderManager();
+    this.ensureSenderManager()
     return {
       sacn: this.senderManager!.isSenderEnabled('sacn'),
       artnet: this.senderManager!.isSenderEnabled('artnet'),
       enttecpro: this.senderManager!.isSenderEnabled('enttecpro'),
-      ipc: this.senderManager!.isSenderEnabled('ipc')
-    };
+      ipc: this.senderManager!.isSenderEnabled('ipc'),
+    }
+  }
+
+  /**
+   * Refresh which rigs are active for DMX output without restarting controllers.
+   * Use this when only the active-rig set changes so senders stay running.
+   */
+  public refreshActiveRigs(): void {
+    if (!this.isInitialized || !this.dmxPublisher) {
+      return
+    }
+    const activeRigs = this.config.getActiveRigs()
+    this.dmxPublisher.updateActiveRigs(activeRigs)
+    console.log('Refreshed active rigs for DMX output:', activeRigs.length, 'rig(s)')
   }
 
   /**
@@ -916,70 +677,66 @@ export class ControllerManager {
    * This shuts down existing controllers and reinitializes them
    */
   public async restartControllers(): Promise<void> {
-    console.log("Restarting controllers to apply configuration changes");
-    
-    // Remember current state to restore after restart
-    const wasYargEnabled = this.isYargEnabled;
-    const wasRb3Enabled = this.isRb3Enabled;
-    
-    // Shutdown all components first
+    console.log('Restarting controllers to apply configuration changes')
+
+    const wasYargEnabled = this.listenerCoordinator.getIsYargEnabled()
+    const wasRb3Enabled = this.listenerCoordinator.getIsRb3Enabled()
+
     try {
-      // First disable any active listeners
-      if (this.isYargEnabled) {
-        await this.disableYarg();
+      if (wasYargEnabled) {
+        await this.disableYarg()
       }
-      
-      if (this.isRb3Enabled) {
-        await this.disableRb3();
+      if (wasRb3Enabled) {
+        await this.disableRb3()
       }
-      
+
       // Then shutdown other components
       if (this.effectsController) {
-        await this.effectsController.shutdown();
+        await this.effectsController.shutdown()
       }
-      
+
       if (this.dmxPublisher) {
-        await this.dmxPublisher.shutdown();
+        await this.dmxPublisher.shutdown()
       }
-      
+
       // Ensure cue handler lifecycle is handled
       if (this.cueHandler) {
-        this.cueHandler.shutdown();
+        this.cueHandler.shutdown()
       }
-      
+
       // Reset component references
-      this.dmxLightManager = null;
-      this.lightStateManager = null;
-      this.lightTransitionController = null;
-      this.sequencer = null;
-      this.effectsController = null;
-      this.dmxPublisher = null;
-      this.cueHandler = null;
-      this.senderManager = null;
+      this.dmxLightManager = null
+      this.lightStateManager = null
+      this.lightTransitionController = null
+      this.sequencer = null
+      this.effectsController = null
+      this.dmxPublisher = null
+      this.cueHandler = null
+      this.senderManager = null
 
       // Mark as not initialized
-      this.isInitialized = false;
-      
-      console.log("Controllers shutdown completed, reinitializing");
+      this.isInitialized = false
+
+      console.log('Controllers shutdown completed, reinitializing')
     } catch (error) {
-      console.error("Error shutting down controllers:", error);
+      console.error('Error shutting down controllers:', error)
     }
-    
+
     // Reinitialize
     try {
-      await this.init();
+      await this.init()
 
       // Restore previously active listeners
       if (wasYargEnabled) {
-        await this.enableYarg();
+        await this.enableYarg()
       } else if (wasRb3Enabled) {
-        await this.enableRb3();
+        await this.enableRb3()
       }
 
-      console.log("Controllers restarted successfully");
+      console.log('Controllers restarted successfully')
     } catch (error) {
-      console.error("Error reinitializing controllers:", error);
-      throw error;
+      console.error('Error reinitializing controllers:', error)
+      throw error
     }
   }
 
@@ -987,245 +744,62 @@ export class ControllerManager {
    * Enable audio listener and processor
    */
   public async enableAudio(): Promise<void> {
-    // Check if the system is initialized, initialize if needed
-    if (!this.isInitialized) {
-      console.log("Initializing system before enabling Audio");
-      await this.init();
-    }
-    
-    await this.enableAudioInternal();
-  }
-
-  /**
-   * Internal method to enable Audio without initialization checks
-   * Uses Web Audio API in renderer process
-   */
-  private async enableAudioInternal(): Promise<void> {
-    if (this.isAudioEnabled || !this.effectsController || !this.dmxLightManager) {
-      console.log("Cannot enable Audio: already enabled or missing required components");
-      return;
-    }
-    
-    const audioConfig = this.config.getAudioConfig();
-    
-    try {
-      console.log('Enabling audio with Web Audio API...');
-      
-      // Create audio processor in main process using cue-based system
-      // getAudioConfig() always returns a valid config (merges with defaults)
-      const preferredCueType = this.config.getActiveAudioCueType();
-      this.audioProcessor = new AudioCueProcessor(
-        this.dmxLightManager,
-        this.effectsController,
-        audioConfig,
-        preferredCueType
-      );
-      this.config.setActiveAudioCueType(this.audioProcessor.getCurrentCueType());
-      
-      // Start the processor
-      this.audioProcessor.start();
-      
-      // Set up IPC handler to receive audio data from renderer
-      // Remove existing listener first to prevent duplicates
-      ipcMain.removeAllListeners('audio:data');
-      
-      const audioDataHandler = (_, data) => {
-        if (this.audioProcessor && this.isAudioEnabled) {
-          this.audioProcessor.processAudioData(data);
-        }
-      };
-      
-      ipcMain.on('audio:data', audioDataHandler);
-      
-      // Tell renderer to start capturing audio
-      const mainWindow = BrowserWindow.getFocusedWindow();
-      if (mainWindow) {
-        mainWindow.webContents.send('audio:enable', audioConfig);
-        console.log('Sent audio:enable to renderer');
-      } else {
-        console.warn('No focused window to send audio:enable command');
-      }
-      
-      this.isAudioEnabled = true;
-      console.log("Audio enabled successfully");
-    } catch (error) {
-      console.error('Failed to enable audio:', error);
-      throw error;
-    }
+    await this.audioController.enableAudio(this.isInitialized, () => this.init())
   }
 
   /**
    * Disable audio processing
    */
   public async disableAudio(): Promise<void> {
-    if (!this.isAudioEnabled) {
-      return;
-    }
-    
-    console.log('Disabling audio...');
-    
-    // Clear all running effects before shutting down
-    if (this.effectsController) {
-      try {
-        this.effectsController.removeAllEffects();
-        await this.effectsController.blackout(0);
-        console.log('ControllerManager: Cleared all running effects and initiated blackout when disabling Audio');
-      } catch (error) {
-        console.error('Error clearing effects when disabling Audio:', error);
-      }
-    }
-    
-    // Tell renderer to stop capturing audio
-    const mainWindow = BrowserWindow.getFocusedWindow();
-    if (mainWindow) {
-      mainWindow.webContents.send('audio:disable');
-      console.log('Sent audio:disable to renderer');
-    }
-    
-    // Remove IPC handler
-    ipcMain.removeAllListeners('audio:data');
-    
-    // Shutdown processor
-    if (this.audioProcessor) {
-      this.audioProcessor.shutdown();
-      this.audioProcessor = null;
-    }
-    
-    this.isAudioEnabled = false;
-    console.log("Audio disabled successfully");
+    await this.audioController.disableAudio()
   }
-  
+
   /**
    * Update audio configuration while audio is running
-   * This is called when config changes while audio is enabled
    */
   public updateAudioConfig(config: AudioConfig): void {
-    if (!this.isAudioEnabled || !this.audioProcessor) {
-      return;
-    }
-    
-    // Update config - merge with existing config to preserve fields not in partial update
-    const currentConfig = this.config.getAudioConfig();
-    const mergedConfig = { ...currentConfig, ...config };
-    this.config.setAudioConfig(mergedConfig);
-    this.audioProcessor.updateConfig(mergedConfig);
-    
-    console.log('AudioCueProcessor configuration updated');
+    this.audioController.updateAudioConfig(config)
   }
 
   /**
    * Refresh active audio cue selection when enabled groups change
    */
   public refreshAudioCueSelection(): void {
-    if (this.audioProcessor) {
-      this.audioProcessor.refreshCueSelection();
-      this.config.setActiveAudioCueType(this.audioProcessor.getCurrentCueType());
-    }
+    this.audioController.refreshAudioCueSelection()
   }
 
   /**
-   * Get the current audio cue selection, preferring the processor state
+   * Get the current audio cue selection
    */
   public getActiveAudioCueType(): AudioCueType {
-    if (this.audioProcessor) {
-      return this.audioProcessor.getCurrentCueType();
-    }
-
-    const saved = this.config.getActiveAudioCueType();
-    if (saved) {
-      return saved;
-    }
-
-    const registry = AudioCueRegistry.getInstance();
-    const enabled = registry.getAvailableCueTypes();
-    if (enabled.length > 0) {
-      return enabled[0];
-    }
-
-    const fallback = registry.getAvailableCueTypes(true);
-    if (fallback.length > 0) {
-      return fallback[0];
-    }
-
-    return BuiltInAudioCues.BasicLayered;
+    return this.audioController.getActiveAudioCueType()
   }
 
   /**
    * Persist and apply a new audio cue selection
    */
   public setActiveAudioCueType(cueType: AudioCueType): { success: boolean; error?: string } {
-    const registry = AudioCueRegistry.getInstance();
-    const available = registry.getAvailableCueTypes();
-
-    if (!available.includes(cueType)) {
-      return {
-        success: false,
-        error: `Cue ${cueType} is not available in enabled groups`
-      };
-    }
-
-    this.config.setActiveAudioCueType(cueType);
-
-    if (this.audioProcessor) {
-      const applied = this.audioProcessor.setActiveCueType(cueType);
-      if (!applied) {
-        return {
-          success: false,
-          error: `Cue ${cueType} could not be activated`
-        };
-      }
-    }
-
-    return { success: true };
+    return this.audioController.setActiveAudioCueType(cueType)
   }
 
   /**
    * Return cue options sourced from enabled audio cue groups
    */
   public getAudioCueOptions(): Array<{
-    id: AudioCueType;
-    label: string;
-    description: string;
-    groupId: string;
-    groupName: string;
-    groupDescription: string;
+    id: AudioCueType
+    label: string
+    description: string
+    groupId: string
+    groupName: string
+    groupDescription: string
   }> {
-    const registry = AudioCueRegistry.getInstance();
-    const enabledGroupIds = registry.getEnabledGroups();
-    const targetGroups = enabledGroupIds.length > 0 ? enabledGroupIds : registry.getRegisteredGroups();
-    const cueMap = new Map<AudioCueType, {
-      id: AudioCueType;
-      label: string;
-      description: string;
-      groupId: string;
-      groupName: string;
-      groupDescription: string;
-    }>();
-
-    for (const groupId of targetGroups) {
-      const group = registry.getGroup(groupId);
-      if (!group) continue;
-
-      group.cues.forEach((cue) => {
-        cueMap.set(cue.cueType, {
-          id: cue.cueType,
-          label: cue.id,
-          description: cue.description,
-          groupId: group.id,
-          groupName: group.name,
-          groupDescription: group.description
-        });
-      });
-    }
-
-    return Array.from(cueMap.values());
+    return this.audioController.getAudioCueOptions()
   }
-
 
   /**
    * Get audio enabled state
    */
   public getIsAudioEnabled(): boolean {
-    return this.isAudioEnabled;
+    return this.audioController.getIsAudioEnabled()
   }
-} 
+}

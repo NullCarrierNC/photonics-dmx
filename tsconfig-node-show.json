@@ -37,7 +37,6 @@
         "./src/main/WindowManager.ts",
         "./src/main/application.ts",
         "./src/main/index.ts",
-        "./src/main/ipc.ts",
         "./src/main/menu.ts",
         "./src/main/controllers/ControllerManager.ts",
         "./src/main/ipc/config-handlers.ts",

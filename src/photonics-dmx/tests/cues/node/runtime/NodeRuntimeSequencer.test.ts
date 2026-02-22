@@ -1,6 +1,6 @@
-import { NodeExecutionEngine } from '../../../../cues/node/runtime/NodeExecutionEngine';
-import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry';
-import type { CompiledYargCue } from '../../../../cues/node/compiler/NodeCueCompiler';
+import { NodeExecutionEngine } from '../../../../cues/node/runtime/NodeExecutionEngine'
+import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
+import type { CompiledYargCue } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type {
   ActionNode,
   Connection,
@@ -8,32 +8,38 @@ import type {
   EventRaiserNode,
   LogicNode,
   YargEventNode,
-  YargNodeCueDefinition
-} from '../../../../cues/types/nodeCueTypes';
-import { CueType, defaultCueData, type CueData, DrumNoteType, InstrumentNoteType } from '../../../../cues';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import * as utils from '../../../../helpers/utils';
-import { createSequencerHarness } from '../../../helpers/sequencerHarness';
+  YargNodeCueDefinition,
+} from '../../../../cues/types/nodeCueTypes'
+import {
+  CueType,
+  defaultCueData,
+  type CueData,
+  DrumNoteType,
+  InstrumentNoteType,
+} from '../../../../cues'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import * as utils from '../../../../helpers/utils'
+import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 
-jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
 
 const createCueData = (overrides: Partial<CueData> = {}): CueData => ({
   ...defaultCueData,
   lightingCue: CueType.Default,
   venueSize: 'Large',
   beatsPerMinute: 120,
-  ...overrides
-});
+  ...overrides,
+})
 
 const buildAdjacency = (connections: Connection[]): Map<string, Connection[]> => {
-  const adjacency = new Map<string, Connection[]>();
+  const adjacency = new Map<string, Connection[]>()
   for (const connection of connections) {
-    const list = adjacency.get(connection.from) ?? [];
-    list.push(connection);
-    adjacency.set(connection.from, list);
+    const list = adjacency.get(connection.from) ?? []
+    list.push(connection)
+    adjacency.set(connection.from, list)
   }
-  return adjacency;
-};
+  return adjacency
+}
 
 const compileCue = (definition: YargNodeCueDefinition): CompiledYargCue => {
   return {
@@ -42,34 +48,36 @@ const compileCue = (definition: YargNodeCueDefinition): CompiledYargCue => {
     actionMap: new Map(definition.nodes.actions.map((node) => [node.id, node])),
     logicMap: new Map((definition.nodes.logic ?? []).map((node) => [node.id, node])),
     eventRaiserMap: new Map((definition.nodes.eventRaisers ?? []).map((node) => [node.id, node])),
-    eventListenerMap: new Map((definition.nodes.eventListeners ?? []).map((node) => [node.id, node])),
+    eventListenerMap: new Map(
+      (definition.nodes.eventListeners ?? []).map((node) => [node.id, node]),
+    ),
     effectRaiserMap: new Map((definition.nodes.effectRaisers ?? []).map((node) => [node.id, node])),
     eventDefinitions: definition.events ?? [],
-    adjacency: buildAdjacency(definition.connections)
-  };
-};
+    adjacency: buildAdjacency(definition.connections),
+  }
+}
 
 describe('Node runtime with real Sequencer', () => {
-  let harness: ReturnType<typeof createSequencerHarness>;
-  let cueLevelVarStore: Map<string, any>;
-  let groupLevelVarStore: Map<string, any>;
+  let harness: ReturnType<typeof createSequencerHarness>
+  let cueLevelVarStore: Map<string, any>
+  let groupLevelVarStore: Map<string, any>
 
   beforeEach(() => {
-    harness = createSequencerHarness({ frontCount: 4, backCount: 2 });
-    cueLevelVarStore = new Map();
-    groupLevelVarStore = new Map();
-  });
+    harness = createSequencerHarness({ frontCount: 4, backCount: 2 })
+    cueLevelVarStore = new Map()
+    groupLevelVarStore = new Map()
+  })
 
   afterEach(() => {
-    harness.cleanup();
-  });
+    harness.cleanup()
+  })
 
   it('chains actions across layers in sequence', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const action1: ActionNode = {
       id: 'action-1',
@@ -77,22 +85,22 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'red' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 30 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
+        waitUntilTime: { source: 'literal', value: 0 },
       },
-      layer: { source: 'literal', value: 1 }
-    };
+      layer: { source: 'literal', value: 1 },
+    }
 
     const action2: ActionNode = {
       id: 'action-2',
@@ -100,22 +108,22 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'blue' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 30 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
+        waitUntilTime: { source: 'literal', value: 0 },
       },
-      layer: { source: 'literal', value: 5 }
-    };
+      layer: { source: 'literal', value: 5 },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'chain-test',
@@ -128,13 +136,13 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'action-1' },
-        { from: 'action-1', to: 'action-2' }
-      ]
-    };
+        { from: 'action-1', to: 'action-2' },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -143,50 +151,50 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const lightId = harness.frontLightIds[0];
-    const earlyLayers = harness.sequencer.getActiveEffectsForLight(lightId);
+    const lightId = harness.frontLightIds[0]
+    const earlyLayers = harness.sequencer.getActiveEffectsForLight(lightId)
     // Fire-and-forget submits both actions; both layers can be active immediately
-    expect(earlyLayers.has(1)).toBe(true);
-    expect(earlyLayers.has(5)).toBe(true);
+    expect(earlyLayers.has(1)).toBe(true)
+    expect(earlyLayers.has(5)).toBe(true)
 
-    let redTick: number | null = null;
-    let blueTick: number | null = null;
+    let redTick: number | null = null
+    let blueTick: number | null = null
     for (let i = 0; i < 40; i += 1) {
-      harness.advanceBy(5);
-      const state = harness.getLightState(lightId);
-      if (!state) continue;
-      const redDominant = state.red > state.green && state.red > state.blue;
-      const blueDominant = state.blue > state.red && state.blue > state.green;
+      harness.advanceBy(5)
+      const state = harness.getLightState(lightId)
+      if (!state) continue
+      const redDominant = state.red > state.green && state.red > state.blue
+      const blueDominant = state.blue > state.red && state.blue > state.green
       if (redTick === null && redDominant) {
-        redTick = i;
+        redTick = i
       }
       if (blueTick === null && blueDominant) {
-        blueTick = i;
+        blueTick = i
       }
       if (redTick !== null && blueTick !== null) {
-        break;
+        break
       }
     }
 
     // Fire-and-forget: both layers active; we should see at least one color; order may vary by layering
-    expect(redTick !== null || blueTick !== null).toBe(true);
+    expect(redTick !== null || blueTick !== null).toBe(true)
     if (redTick !== null && blueTick !== null) {
-      expect((blueTick as number) > (redTick as number)).toBe(true);
+      expect((blueTick as number) > (redTick as number)).toBe(true)
     }
-  });
+  })
 
   it('gates transitions on beat events', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -194,21 +202,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'red' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'beat',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'beat-gate',
@@ -221,10 +229,10 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
-      connections: [{ from: 'event-1', to: 'action-1' }]
-    };
+      connections: [{ from: 'event-1', to: 'action-1' }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -233,51 +241,51 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const lightId = harness.frontLightIds[0];
-    const beforeBeat = harness.getLightState(lightId);
-    expect(beforeBeat?.intensity ?? 0).toBe(0);
+    const lightId = harness.frontLightIds[0]
+    const beforeBeat = harness.getLightState(lightId)
+    expect(beforeBeat?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onBeat();
-    harness.advanceBy(1);
+    harness.sequencer.onBeat()
+    harness.advanceBy(1)
 
-    const afterBeat = harness.getLightState(lightId);
-    const expected = getColor('red', 'high');
+    const afterBeat = harness.getLightState(lightId)
+    const expected = getColor('red', 'high')
     expect(afterBeat).toMatchObject({
       red: expected.red,
       green: expected.green,
       blue: expected.blue,
-      blendMode: expected.blendMode
-    });
-  });
+      blendMode: expected.blendMode,
+    })
+  })
 
   it('uses light-array transforms to target a single light', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const configNode: LogicNode = {
       id: 'config-1',
       type: 'logic',
       logicType: 'config-data',
       dataProperty: 'front-lights-array',
-      assignTo: 'frontLights'
-    };
+      assignTo: 'frontLights',
+    }
 
     const reverseNode: LogicNode = {
       id: 'reverse-1',
       type: 'logic',
       logicType: 'reverse-lights',
       sourceVariable: 'frontLights',
-      assignTo: 'reversedLights'
-    };
+      assignTo: 'reversedLights',
+    }
 
     const indexNode: LogicNode = {
       id: 'index-1',
@@ -285,8 +293,8 @@ describe('Node runtime with real Sequencer', () => {
       logicType: 'lights-from-index',
       sourceVariable: 'reversedLights',
       index: { source: 'literal', value: 0 },
-      assignTo: 'pickedLights'
-    };
+      assignTo: 'pickedLights',
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -294,21 +302,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'variable', name: 'pickedLights' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'green' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'array-target',
@@ -321,20 +329,20 @@ describe('Node runtime with real Sequencer', () => {
         logic: [configNode, reverseNode, indexNode],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'config-1' },
         { from: 'config-1', to: 'reverse-1' },
         { from: 'reverse-1', to: 'index-1' },
-        { from: 'index-1', to: 'action-1' }
+        { from: 'index-1', to: 'action-1' },
       ],
       variables: [
         { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
         { name: 'reversedLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'pickedLights', type: 'light-array', scope: 'cue', initialValue: [] }
-      ]
-    };
+        { name: 'pickedLights', type: 'light-array', scope: 'cue', initialValue: [] },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -344,43 +352,43 @@ describe('Node runtime with real Sequencer', () => {
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
-      definition.variables
-    );
+      definition.variables,
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const expected = getColor('green', 'high');
-    const targetId = harness.frontLightIds[harness.frontLightIds.length - 1];
+    const expected = getColor('green', 'high')
+    const targetId = harness.frontLightIds[harness.frontLightIds.length - 1]
     for (const lightId of harness.frontLightIds) {
-      const state = harness.getLightState(lightId);
+      const state = harness.getLightState(lightId)
       if (lightId === targetId) {
         expect(state).toMatchObject({
           red: expected.red,
           green: expected.green,
           blue: expected.blue,
-          blendMode: expected.blendMode
-        });
+          blendMode: expected.blendMode,
+        })
       } else {
-        expect(state?.intensity ?? 0).toBe(0);
+        expect(state?.intensity ?? 0).toBe(0)
       }
     }
-  });
+  })
 
   it('branches on cue data string comparisons', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const cueDataNode: LogicNode = {
       id: 'cue-data-1',
       type: 'logic',
       logicType: 'cue-data',
       dataProperty: 'venue-size',
-      assignTo: 'venue'
-    };
+      assignTo: 'venue',
+    }
 
     const conditionalNode: LogicNode = {
       id: 'conditional-1',
@@ -388,8 +396,8 @@ describe('Node runtime with real Sequencer', () => {
       logicType: 'conditional',
       comparator: '==',
       left: { source: 'variable', name: 'venue' },
-      right: { source: 'literal', value: 'Large' }
-    };
+      right: { source: 'literal', value: 'Large' },
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -397,21 +405,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'purple' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'string-conditional',
@@ -424,17 +432,15 @@ describe('Node runtime with real Sequencer', () => {
         logic: [cueDataNode, conditionalNode],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'cue-data-1' },
         { from: 'cue-data-1', to: 'conditional-1' },
-        { from: 'conditional-1', to: 'action-1', fromPort: 'true' }
+        { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
       ],
-      variables: [
-        { name: 'venue', type: 'string', scope: 'cue', initialValue: '' }
-      ]
-    };
+      variables: [{ name: 'venue', type: 'string', scope: 'cue', initialValue: '' }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -444,35 +450,35 @@ describe('Node runtime with real Sequencer', () => {
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
-      definition.variables
-    );
+      definition.variables,
+    )
 
-    engine.startExecution(eventNode, createCueData({ venueSize: 'Large' }));
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData({ venueSize: 'Large' }))
+    harness.advanceBy(1)
 
-    const state = harness.getLightState(harness.frontLightIds[0]);
-    const expected = getColor('purple', 'high');
+    const state = harness.getLightState(harness.frontLightIds[0])
+    const expected = getColor('purple', 'high')
     expect(state).toMatchObject({
       red: expected.red,
       green: expected.green,
       blue: expected.blue,
-      blendMode: expected.blendMode
-    });
-  });
+      blendMode: expected.blendMode,
+    })
+  })
 
   it('blocks execution through delay nodes', async () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const delayNode: LogicNode = {
       id: 'delay-1',
       type: 'logic',
       logicType: 'delay',
-      delayTime: { source: 'literal', value: 20 }
-    };
+      delayTime: { source: 'literal', value: 20 },
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -480,21 +486,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'blue' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'delay-test',
@@ -507,13 +513,13 @@ describe('Node runtime with real Sequencer', () => {
         logic: [delayNode],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'delay-1' },
-        { from: 'delay-1', to: 'action-1' }
-      ]
-    };
+        { from: 'delay-1', to: 'action-1' },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -522,35 +528,35 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const lightId = harness.frontLightIds[0];
-    const beforeDelay = harness.getLightState(lightId);
-    expect(beforeDelay?.intensity ?? 0).toBe(0);
+    const lightId = harness.frontLightIds[0]
+    const beforeDelay = harness.getLightState(lightId)
+    expect(beforeDelay?.intensity ?? 0).toBe(0)
 
-    jest.advanceTimersByTime(25);
-    harness.advanceBy(1);
+    jest.advanceTimersByTime(25)
+    harness.advanceBy(1)
 
-    const afterDelay = harness.getLightState(lightId);
-    const expected = getColor('blue', 'high');
+    const afterDelay = harness.getLightState(lightId)
+    const expected = getColor('blue', 'high')
     expect(afterDelay).toMatchObject({
       red: expected.red,
       green: expected.green,
       blue: expected.blue,
-      blendMode: expected.blendMode
-    });
-  });
+      blendMode: expected.blendMode,
+    })
+  })
 
   it('waits until beat to complete action', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -558,21 +564,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'white' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'beat',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'wait-until-beat',
@@ -585,10 +591,10 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
-      connections: [{ from: 'event-1', to: 'action-1' }]
-    };
+      connections: [{ from: 'event-1', to: 'action-1' }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -597,38 +603,38 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const lightId = harness.frontLightIds[0];
-    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true);
+    const lightId = harness.frontLightIds[0]
+    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
 
     for (let i = 0; i < 10; i += 1) {
-      harness.advanceBy(10);
-      expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true);
+      harness.advanceBy(10)
+      expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
     }
 
-    harness.sequencer.onBeat();
-    let cleared = false;
+    harness.sequencer.onBeat()
+    let cleared = false
     for (let i = 0; i < 10; i += 1) {
-      harness.advanceBy(10);
+      harness.advanceBy(10)
       if (!harness.sequencer.getActiveEffectsForLight(lightId).has(0)) {
-        cleared = true;
-        break;
+        cleared = true
+        break
       }
     }
-    expect(cleared).toBe(true);
-  });
+    expect(cleared).toBe(true)
+  })
 
   it('waits until beat count before completing', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -636,12 +642,12 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'white' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
@@ -649,9 +655,9 @@ describe('Node runtime with real Sequencer', () => {
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'beat',
         waitUntilConditionCount: { source: 'literal', value: 2 },
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'wait-until-count',
@@ -664,10 +670,10 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
-      connections: [{ from: 'event-1', to: 'action-1' }]
-    };
+      connections: [{ from: 'event-1', to: 'action-1' }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -676,37 +682,37 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const lightId = harness.frontLightIds[0];
-    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true);
+    const lightId = harness.frontLightIds[0]
+    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
 
-    harness.sequencer.onBeat();
-    harness.advanceBy(1);
-    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true);
+    harness.sequencer.onBeat()
+    harness.advanceBy(1)
+    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
 
-    harness.sequencer.onBeat();
-    let cleared = false;
+    harness.sequencer.onBeat()
+    let cleared = false
     for (let i = 0; i < 10; i += 1) {
-      harness.advanceBy(10);
+      harness.advanceBy(10)
       if (!harness.sequencer.getActiveEffectsForLight(lightId).has(0)) {
-        cleared = true;
-        break;
+        cleared = true
+        break
       }
     }
-    expect(cleared).toBe(true);
-  });
+    expect(cleared).toBe(true)
+  })
 
   it('gates on measure and keyframe events', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const measureAction: ActionNode = {
       id: 'action-measure',
@@ -714,21 +720,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'red' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'measure',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const keyframeAction: ActionNode = {
       id: 'action-keyframe',
@@ -736,21 +742,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'blue' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'keyframe',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'measure-keyframe',
@@ -763,13 +769,13 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'action-measure' },
-        { from: 'event-1', to: 'action-keyframe' }
-      ]
-    };
+        { from: 'event-1', to: 'action-keyframe' },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -778,44 +784,44 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const frontId = harness.frontLightIds[0];
-    const backId = harness.backLightIds[0];
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0);
-    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0);
+    const frontId = harness.frontLightIds[0]
+    const backId = harness.backLightIds[0]
+    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
+    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onMeasure();
-    harness.advanceBy(1);
-    const red = getColor('red', 'high');
+    harness.sequencer.onMeasure()
+    harness.advanceBy(1)
+    const red = getColor('red', 'high')
     expect(harness.getLightState(frontId)).toMatchObject({
       red: red.red,
       green: red.green,
       blue: red.blue,
-      blendMode: red.blendMode
-    });
+      blendMode: red.blendMode,
+    })
 
-    harness.sequencer.onKeyframe();
-    harness.advanceBy(1);
-    const blue = getColor('blue', 'high');
+    harness.sequencer.onKeyframe()
+    harness.advanceBy(1)
+    const blue = getColor('blue', 'high')
     expect(harness.getLightState(backId)).toMatchObject({
       red: blue.red,
       green: blue.green,
       blue: blue.blue,
-      blendMode: blue.blendMode
-    });
-  });
+      blendMode: blue.blendMode,
+    })
+  })
 
   it('gates on measure count and keyframe until count', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const measureAction: ActionNode = {
       id: 'action-measure',
@@ -823,12 +829,12 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'red' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'measure',
@@ -836,9 +842,9 @@ describe('Node runtime with real Sequencer', () => {
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const keyframeAction: ActionNode = {
       id: 'action-keyframe',
@@ -846,12 +852,12 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'blue' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'keyframe',
@@ -859,9 +865,9 @@ describe('Node runtime with real Sequencer', () => {
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'measure-keyframe-count',
@@ -874,13 +880,13 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'action-measure' },
-        { from: 'event-1', to: 'action-keyframe' }
-      ]
-    };
+        { from: 'event-1', to: 'action-keyframe' },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -889,52 +895,52 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const frontId = harness.frontLightIds[0];
-    const backId = harness.backLightIds[0];
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0);
-    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0);
+    const frontId = harness.frontLightIds[0]
+    const backId = harness.backLightIds[0]
+    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
+    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onMeasure();
-    harness.advanceBy(1);
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0);
+    harness.sequencer.onMeasure()
+    harness.advanceBy(1)
+    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onMeasure();
-    harness.advanceBy(1);
-    const red = getColor('red', 'high');
+    harness.sequencer.onMeasure()
+    harness.advanceBy(1)
+    const red = getColor('red', 'high')
     expect(harness.getLightState(frontId)).toMatchObject({
       red: red.red,
       green: red.green,
       blue: red.blue,
-      blendMode: red.blendMode
-    });
+      blendMode: red.blendMode,
+    })
 
-    harness.sequencer.onKeyframe();
-    harness.advanceBy(1);
-    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0);
+    harness.sequencer.onKeyframe()
+    harness.advanceBy(1)
+    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onKeyframe();
-    harness.advanceBy(1);
-    const blue = getColor('blue', 'high');
+    harness.sequencer.onKeyframe()
+    harness.advanceBy(1)
+    const blue = getColor('blue', 'high')
     expect(harness.getLightState(backId)).toMatchObject({
       red: blue.red,
       green: blue.green,
       blue: blue.blue,
-      blendMode: blue.blendMode
-    });
-  });
+      blendMode: blue.blendMode,
+    })
+  })
 
   it('gates on drum and guitar note counts', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const drumAction: ActionNode = {
       id: 'action-drum',
@@ -942,12 +948,12 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'green' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'drum-red',
@@ -955,9 +961,9 @@ describe('Node runtime with real Sequencer', () => {
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const guitarAction: ActionNode = {
       id: 'action-guitar',
@@ -965,12 +971,12 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'yellow' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'guitar-green',
@@ -978,9 +984,9 @@ describe('Node runtime with real Sequencer', () => {
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'note-counts',
@@ -993,13 +999,13 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'action-drum' },
-        { from: 'event-1', to: 'action-guitar' }
-      ]
-    };
+        { from: 'event-1', to: 'action-guitar' },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1008,48 +1014,48 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const frontId = harness.frontLightIds[0];
-    const backId = harness.backLightIds[0];
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0);
-    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0);
+    const frontId = harness.frontLightIds[0]
+    const backId = harness.backLightIds[0]
+    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
+    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onDrumNote(DrumNoteType.RedDrum);
-    harness.advanceBy(1);
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0);
+    harness.sequencer.onDrumNote(DrumNoteType.RedDrum)
+    harness.advanceBy(1)
+    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onDrumNote(DrumNoteType.RedDrum);
-    harness.advanceBy(1);
-    const green = getColor('green', 'high');
+    harness.sequencer.onDrumNote(DrumNoteType.RedDrum)
+    harness.advanceBy(1)
+    const green = getColor('green', 'high')
     expect(harness.getLightState(frontId)).toMatchObject({
       red: green.red,
       green: green.green,
       blue: green.blue,
-      blendMode: green.blendMode
-    });
+      blendMode: green.blendMode,
+    })
 
-    harness.sequencer.onGuitarNote(InstrumentNoteType.Green);
-    harness.advanceBy(1);
-    const yellow = getColor('yellow', 'high');
+    harness.sequencer.onGuitarNote(InstrumentNoteType.Green)
+    harness.advanceBy(1)
+    const yellow = getColor('yellow', 'high')
     expect(harness.getLightState(backId)).toMatchObject({
       red: yellow.red,
       green: yellow.green,
       blue: yellow.blue,
-      blendMode: yellow.blendMode
-    });
-  });
+      blendMode: yellow.blendMode,
+    })
+  })
 
   it('gates on bass and keys note counts', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const bassAction: ActionNode = {
       id: 'action-bass',
@@ -1057,12 +1063,12 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'purple' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'bass-blue',
@@ -1070,9 +1076,9 @@ describe('Node runtime with real Sequencer', () => {
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const keysAction: ActionNode = {
       id: 'action-keys',
@@ -1080,12 +1086,12 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'orange' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'keys-yellow',
@@ -1093,9 +1099,9 @@ describe('Node runtime with real Sequencer', () => {
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'bass-keys-counts',
@@ -1108,13 +1114,13 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'action-bass' },
-        { from: 'event-1', to: 'action-keys' }
-      ]
-    };
+        { from: 'event-1', to: 'action-keys' },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1123,48 +1129,48 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const frontId = harness.frontLightIds[0];
-    const backId = harness.backLightIds[0];
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0);
-    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0);
+    const frontId = harness.frontLightIds[0]
+    const backId = harness.backLightIds[0]
+    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
+    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onBassNote(InstrumentNoteType.Blue);
-    harness.advanceBy(1);
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0);
+    harness.sequencer.onBassNote(InstrumentNoteType.Blue)
+    harness.advanceBy(1)
+    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onBassNote(InstrumentNoteType.Blue);
-    harness.advanceBy(1);
-    const purple = getColor('purple', 'high');
+    harness.sequencer.onBassNote(InstrumentNoteType.Blue)
+    harness.advanceBy(1)
+    const purple = getColor('purple', 'high')
     expect(harness.getLightState(frontId)).toMatchObject({
       red: purple.red,
       green: purple.green,
       blue: purple.blue,
-      blendMode: purple.blendMode
-    });
+      blendMode: purple.blendMode,
+    })
 
-    harness.sequencer.onKeysNote(InstrumentNoteType.Yellow);
-    harness.advanceBy(1);
-    const orange = getColor('orange', 'high');
+    harness.sequencer.onKeysNote(InstrumentNoteType.Yellow)
+    harness.advanceBy(1)
+    const orange = getColor('orange', 'high')
     expect(harness.getLightState(backId)).toMatchObject({
       red: orange.red,
       green: orange.green,
       blue: orange.blue,
-      blendMode: orange.blendMode
-    });
-  });
+      blendMode: orange.blendMode,
+    })
+  })
 
   it('calculates math operators and feeds action duration', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const mathNode: LogicNode = {
       id: 'math-1',
@@ -1173,8 +1179,8 @@ describe('Node runtime with real Sequencer', () => {
       operator: 'multiply',
       left: { source: 'literal', value: 10 },
       right: { source: 'literal', value: 3 },
-      assignTo: 'durationMs'
-    };
+      assignTo: 'durationMs',
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -1182,21 +1188,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'blue' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'variable', name: 'durationMs', fallback: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'math-duration',
@@ -1209,16 +1215,14 @@ describe('Node runtime with real Sequencer', () => {
         logic: [mathNode],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'math-1' },
-        { from: 'math-1', to: 'action-1' }
+        { from: 'math-1', to: 'action-1' },
       ],
-      variables: [
-        { name: 'durationMs', type: 'number', scope: 'cue', initialValue: 0 }
-      ]
-    };
+      variables: [{ name: 'durationMs', type: 'number', scope: 'cue', initialValue: 0 }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1228,34 +1232,34 @@ describe('Node runtime with real Sequencer', () => {
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
-      definition.variables
-    );
+      definition.variables,
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const lightId = harness.frontLightIds[0];
-    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true);
-    harness.advanceBy(20);
-    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true);
-    harness.advanceBy(20);
-    let cleared = false;
+    const lightId = harness.frontLightIds[0]
+    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
+    harness.advanceBy(20)
+    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
+    harness.advanceBy(20)
+    let cleared = false
     for (let i = 0; i < 10; i += 1) {
-      harness.advanceBy(10);
+      harness.advanceBy(10)
       if (!harness.sequencer.getActiveEffectsForLight(lightId).has(0)) {
-        cleared = true;
-        break;
+        cleared = true
+        break
       }
     }
-    expect(cleared).toBe(true);
-  });
+    expect(cleared).toBe(true)
+  })
 
   it('supports all math operators for variable updates', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const addNode: LogicNode = {
       id: 'math-add',
@@ -1264,8 +1268,8 @@ describe('Node runtime with real Sequencer', () => {
       operator: 'add',
       left: { source: 'literal', value: 5 },
       right: { source: 'literal', value: 2 },
-      assignTo: 'addResult'
-    };
+      assignTo: 'addResult',
+    }
 
     const subtractNode: LogicNode = {
       id: 'math-sub',
@@ -1274,8 +1278,8 @@ describe('Node runtime with real Sequencer', () => {
       operator: 'subtract',
       left: { source: 'literal', value: 10 },
       right: { source: 'literal', value: 3 },
-      assignTo: 'subResult'
-    };
+      assignTo: 'subResult',
+    }
 
     const multiplyNode: LogicNode = {
       id: 'math-mul',
@@ -1284,8 +1288,8 @@ describe('Node runtime with real Sequencer', () => {
       operator: 'multiply',
       left: { source: 'literal', value: 3 },
       right: { source: 'literal', value: 4 },
-      assignTo: 'mulResult'
-    };
+      assignTo: 'mulResult',
+    }
 
     const divideNode: LogicNode = {
       id: 'math-div',
@@ -1294,8 +1298,8 @@ describe('Node runtime with real Sequencer', () => {
       operator: 'divide',
       left: { source: 'literal', value: 10 },
       right: { source: 'literal', value: 2 },
-      assignTo: 'divResult'
-    };
+      assignTo: 'divResult',
+    }
 
     const modulusNode: LogicNode = {
       id: 'math-mod',
@@ -1304,8 +1308,8 @@ describe('Node runtime with real Sequencer', () => {
       operator: 'modulus',
       left: { source: 'literal', value: 10 },
       right: { source: 'literal', value: 3 },
-      assignTo: 'modResult'
-    };
+      assignTo: 'modResult',
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'math-ops',
@@ -1318,23 +1322,23 @@ describe('Node runtime with real Sequencer', () => {
         logic: [addNode, subtractNode, multiplyNode, divideNode, modulusNode],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'math-add' },
         { from: 'math-add', to: 'math-sub' },
         { from: 'math-sub', to: 'math-mul' },
         { from: 'math-mul', to: 'math-div' },
-        { from: 'math-div', to: 'math-mod' }
+        { from: 'math-div', to: 'math-mod' },
       ],
       variables: [
         { name: 'addResult', type: 'number', scope: 'cue', initialValue: 0 },
         { name: 'subResult', type: 'number', scope: 'cue', initialValue: 0 },
         { name: 'mulResult', type: 'number', scope: 'cue', initialValue: 0 },
         { name: 'divResult', type: 'number', scope: 'cue', initialValue: 0 },
-        { name: 'modResult', type: 'number', scope: 'cue', initialValue: 0 }
-      ]
-    };
+        { name: 'modResult', type: 'number', scope: 'cue', initialValue: 0 },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1344,25 +1348,25 @@ describe('Node runtime with real Sequencer', () => {
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
-      definition.variables
-    );
+      definition.variables,
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    expect(cueLevelVarStore.get('addResult')?.value).toBe(7);
-    expect(cueLevelVarStore.get('subResult')?.value).toBe(7);
-    expect(cueLevelVarStore.get('mulResult')?.value).toBe(12);
-    expect(cueLevelVarStore.get('divResult')?.value).toBe(5);
-    expect(cueLevelVarStore.get('modResult')?.value).toBe(1);
-  });
+    expect(cueLevelVarStore.get('addResult')?.value).toBe(7)
+    expect(cueLevelVarStore.get('subResult')?.value).toBe(7)
+    expect(cueLevelVarStore.get('mulResult')?.value).toBe(12)
+    expect(cueLevelVarStore.get('divResult')?.value).toBe(5)
+    expect(cueLevelVarStore.get('modResult')?.value).toBe(1)
+  })
 
   it('initializes variables and uses fallback branch', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const initNode: LogicNode = {
       id: 'var-init',
@@ -1371,8 +1375,8 @@ describe('Node runtime with real Sequencer', () => {
       mode: 'init',
       varName: 'flag',
       valueType: 'number',
-      value: { source: 'literal', value: 1 }
-    };
+      value: { source: 'literal', value: 1 },
+    }
 
     const conditionalNode: LogicNode = {
       id: 'conditional-1',
@@ -1380,8 +1384,8 @@ describe('Node runtime with real Sequencer', () => {
       logicType: 'conditional',
       comparator: '==',
       left: { source: 'variable', name: 'missingVar', fallback: 0 },
-      right: { source: 'literal', value: 0 }
-    };
+      right: { source: 'literal', value: 0 },
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -1389,21 +1393,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'yellow' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'init-fallback',
@@ -1416,17 +1420,15 @@ describe('Node runtime with real Sequencer', () => {
         logic: [initNode, conditionalNode],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'var-init' },
         { from: 'var-init', to: 'conditional-1' },
-        { from: 'conditional-1', to: 'action-1', fromPort: 'true' }
+        { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
       ],
-      variables: [
-        { name: 'flag', type: 'number', scope: 'cue', initialValue: 0 }
-      ]
-    };
+      variables: [{ name: 'flag', type: 'number', scope: 'cue', initialValue: 0 }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1436,24 +1438,24 @@ describe('Node runtime with real Sequencer', () => {
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
-      definition.variables
-    );
+      definition.variables,
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const storedValue = cueLevelVarStore.get('flag');
-    expect(storedValue?.value).toBe(1);
-    const lightState = harness.getLightState(harness.frontLightIds[0]);
-    expect(lightState?.intensity ?? 0).toBeGreaterThan(0);
-  });
+    const storedValue = cueLevelVarStore.get('flag')
+    expect(storedValue?.value).toBe(1)
+    const lightState = harness.getLightState(harness.frontLightIds[0])
+    expect(lightState?.intensity ?? 0).toBeGreaterThan(0)
+  })
 
   it('passes through variable get mode without mutation', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const setNode: LogicNode = {
       id: 'var-set',
@@ -1462,8 +1464,8 @@ describe('Node runtime with real Sequencer', () => {
       mode: 'set',
       varName: 'counter',
       valueType: 'number',
-      value: { source: 'literal', value: 2 }
-    };
+      value: { source: 'literal', value: 2 },
+    }
 
     const getNode: LogicNode = {
       id: 'var-get',
@@ -1471,8 +1473,8 @@ describe('Node runtime with real Sequencer', () => {
       logicType: 'variable',
       mode: 'get',
       varName: 'counter',
-      valueType: 'number'
-    };
+      valueType: 'number',
+    }
 
     const conditionalNode: LogicNode = {
       id: 'conditional-1',
@@ -1480,8 +1482,8 @@ describe('Node runtime with real Sequencer', () => {
       logicType: 'conditional',
       comparator: '==',
       left: { source: 'variable', name: 'counter' },
-      right: { source: 'literal', value: 2 }
-    };
+      right: { source: 'literal', value: 2 },
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -1489,21 +1491,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'green' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'variable-get',
@@ -1516,18 +1518,16 @@ describe('Node runtime with real Sequencer', () => {
         logic: [setNode, getNode, conditionalNode],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'var-set' },
         { from: 'var-set', to: 'var-get' },
         { from: 'var-get', to: 'conditional-1' },
-        { from: 'conditional-1', to: 'action-1', fromPort: 'true' }
+        { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
       ],
-      variables: [
-        { name: 'counter', type: 'number', scope: 'cue', initialValue: 0 }
-      ]
-    };
+      variables: [{ name: 'counter', type: 'number', scope: 'cue', initialValue: 0 }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1537,54 +1537,54 @@ describe('Node runtime with real Sequencer', () => {
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
-      definition.variables
-    );
+      definition.variables,
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    expect(cueLevelVarStore.get('counter')?.value).toBe(2);
-    expect(harness.getLightState(harness.frontLightIds[0])?.intensity ?? 0).toBeGreaterThan(0);
-  });
+    expect(cueLevelVarStore.get('counter')?.value).toBe(2)
+    expect(harness.getLightState(harness.frontLightIds[0])?.intensity ?? 0).toBeGreaterThan(0)
+  })
 
   it('uses array-length and concat-lights for targeting', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const frontConfig: LogicNode = {
       id: 'front-1',
       type: 'logic',
       logicType: 'config-data',
       dataProperty: 'front-lights-array',
-      assignTo: 'frontLights'
-    };
+      assignTo: 'frontLights',
+    }
 
     const backConfig: LogicNode = {
       id: 'back-1',
       type: 'logic',
       logicType: 'config-data',
       dataProperty: 'back-lights-array',
-      assignTo: 'backLights'
-    };
+      assignTo: 'backLights',
+    }
 
     const concatNode: LogicNode = {
       id: 'concat-1',
       type: 'logic',
       logicType: 'concat-lights',
       sourceVariables: ['frontLights', 'backLights'],
-      assignTo: 'allLights'
-    };
+      assignTo: 'allLights',
+    }
 
     const lengthNode: LogicNode = {
       id: 'len-1',
       type: 'logic',
       logicType: 'array-length',
       sourceVariable: 'allLights',
-      assignTo: 'lightCount'
-    };
+      assignTo: 'lightCount',
+    }
 
     const conditionalNode: LogicNode = {
       id: 'conditional-1',
@@ -1592,8 +1592,8 @@ describe('Node runtime with real Sequencer', () => {
       logicType: 'conditional',
       comparator: '>=',
       left: { source: 'variable', name: 'lightCount' },
-      right: { source: 'literal', value: 6 }
-    };
+      right: { source: 'literal', value: 6 },
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -1601,21 +1601,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'variable', name: 'allLights' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'green' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'concat-length',
@@ -1628,7 +1628,7 @@ describe('Node runtime with real Sequencer', () => {
         logic: [frontConfig, backConfig, concatNode, lengthNode, conditionalNode],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'front-1' },
@@ -1636,15 +1636,15 @@ describe('Node runtime with real Sequencer', () => {
         { from: 'back-1', to: 'concat-1' },
         { from: 'concat-1', to: 'len-1' },
         { from: 'len-1', to: 'conditional-1' },
-        { from: 'conditional-1', to: 'action-1', fromPort: 'true' }
+        { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
       ],
       variables: [
         { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
         { name: 'backLights', type: 'light-array', scope: 'cue', initialValue: [] },
         { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'lightCount', type: 'number', scope: 'cue', initialValue: 0 }
-      ]
-    };
+        { name: 'lightCount', type: 'number', scope: 'cue', initialValue: 0 },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1654,38 +1654,38 @@ describe('Node runtime with real Sequencer', () => {
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
-      definition.variables
-    );
+      definition.variables,
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const green = getColor('green', 'high');
+    const green = getColor('green', 'high')
     for (const lightId of harness.allLightIds) {
-      const state = harness.getLightState(lightId);
+      const state = harness.getLightState(lightId)
       expect(state).toMatchObject({
         red: green.red,
         green: green.green,
         blue: green.blue,
-        blendMode: green.blendMode
-      });
+        blendMode: green.blendMode,
+      })
     }
-  });
+  })
 
   it('creates pairs in opposite and diagonal patterns', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const configNode: LogicNode = {
       id: 'config-1',
       type: 'logic',
       logicType: 'config-data',
       dataProperty: 'front-lights-array',
-      assignTo: 'frontLights'
-    };
+      assignTo: 'frontLights',
+    }
 
     const oppositeNode: LogicNode = {
       id: 'pairs-opposite',
@@ -1693,8 +1693,8 @@ describe('Node runtime with real Sequencer', () => {
       logicType: 'create-pairs',
       sourceVariable: 'frontLights',
       assignTo: 'oppositePairs',
-      pairType: 'opposite'
-    };
+      pairType: 'opposite',
+    }
 
     const diagonalNode: LogicNode = {
       id: 'pairs-diagonal',
@@ -1702,8 +1702,8 @@ describe('Node runtime with real Sequencer', () => {
       logicType: 'create-pairs',
       sourceVariable: 'frontLights',
       assignTo: 'diagonalPairs',
-      pairType: 'diagonal'
-    };
+      pairType: 'diagonal',
+    }
 
     const pickOpposite: LogicNode = {
       id: 'pick-opposite',
@@ -1711,8 +1711,8 @@ describe('Node runtime with real Sequencer', () => {
       logicType: 'lights-from-index',
       sourceVariable: 'oppositePairs',
       index: { source: 'literal', value: '0,1' },
-      assignTo: 'pairLights'
-    };
+      assignTo: 'pairLights',
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -1720,21 +1720,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'variable', name: 'pairLights' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'blue' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'pairs-test',
@@ -1747,22 +1747,22 @@ describe('Node runtime with real Sequencer', () => {
         logic: [configNode, oppositeNode, diagonalNode, pickOpposite],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'config-1' },
         { from: 'config-1', to: 'pairs-opposite' },
         { from: 'pairs-opposite', to: 'pairs-diagonal' },
         { from: 'pairs-diagonal', to: 'pick-opposite' },
-        { from: 'pick-opposite', to: 'action-1' }
+        { from: 'pick-opposite', to: 'action-1' },
       ],
       variables: [
         { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
         { name: 'oppositePairs', type: 'light-array', scope: 'cue', initialValue: [] },
         { name: 'diagonalPairs', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'pairLights', type: 'light-array', scope: 'cue', initialValue: [] }
-      ]
-    };
+        { name: 'pairLights', type: 'light-array', scope: 'cue', initialValue: [] },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1772,46 +1772,43 @@ describe('Node runtime with real Sequencer', () => {
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
-      definition.variables
-    );
+      definition.variables,
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const blue = getColor('blue', 'high');
-    const expectedIds = [
-      harness.frontLightIds[0],
-      harness.frontLightIds[2]
-    ];
+    const blue = getColor('blue', 'high')
+    const expectedIds = [harness.frontLightIds[0], harness.frontLightIds[2]]
     for (const lightId of harness.frontLightIds) {
-      const state = harness.getLightState(lightId);
+      const state = harness.getLightState(lightId)
       if (expectedIds.includes(lightId)) {
         expect(state).toMatchObject({
           red: blue.red,
           green: blue.green,
           blue: blue.blue,
-          blendMode: blue.blendMode
-        });
+          blendMode: blue.blendMode,
+        })
       } else {
-        expect(state?.intensity ?? 0).toBe(0);
+        expect(state?.intensity ?? 0).toBe(0)
       }
     }
 
-    const diagonalPairs = cueLevelVarStore.get('diagonalPairs');
-    expect(diagonalPairs?.type).toBe('light-array');
-    expect((diagonalPairs?.value as any[])?.length ?? 0).toBeGreaterThan(0);
-  });
+    const diagonalPairs = cueLevelVarStore.get('diagonalPairs')
+    expect(diagonalPairs?.type).toBe('light-array')
+    expect((diagonalPairs?.value as any[])?.length ?? 0).toBeGreaterThan(0)
+  })
 
   it('targets back and strobe groups with filters', () => {
-    const localHarness = createSequencerHarness({ frontCount: 4, backCount: 4, strobeCount: 2 });
-    const localCueStore = new Map();
-    const localGroupStore = new Map();
+    const localHarness = createSequencerHarness({ frontCount: 4, backCount: 4, strobeCount: 2 })
+    const localCueStore = new Map()
+    const localGroupStore = new Map()
 
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const backOddAction: ActionNode = {
       id: 'action-back',
@@ -1819,21 +1816,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'odd' }
+        filter: { source: 'literal', value: 'odd' },
       },
       color: {
         name: { source: 'literal', value: 'red' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const strobeAction: ActionNode = {
       id: 'action-strobe',
@@ -1841,21 +1838,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'strobe' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'blue' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'target-groups',
@@ -1868,13 +1865,13 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'action-back' },
-        { from: 'event-1', to: 'action-strobe' }
-      ]
-    };
+        { from: 'event-1', to: 'action-strobe' },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1883,52 +1880,52 @@ describe('Node runtime with real Sequencer', () => {
       localHarness.lightManager,
       localCueStore,
       localGroupStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    localHarness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    localHarness.advanceBy(1)
 
-    const red = getColor('red', 'high');
-    const blue = getColor('blue', 'high');
-    const backLights = localHarness.lightManager.getLights(['back'], ['all']);
+    const red = getColor('red', 'high')
+    const blue = getColor('blue', 'high')
+    const backLights = localHarness.lightManager.getLights(['back'], ['all'])
     for (const light of backLights) {
-      const state = localHarness.getLightState(light.id);
+      const state = localHarness.getLightState(light.id)
       if (light.position % 2 !== 0) {
         expect(state).toMatchObject({
           red: red.red,
           green: red.green,
           blue: red.blue,
-          blendMode: red.blendMode
-        });
+          blendMode: red.blendMode,
+        })
       } else {
-        expect(state?.intensity ?? 0).toBe(0);
+        expect(state?.intensity ?? 0).toBe(0)
       }
     }
 
-    const strobeLights = localHarness.lightManager.getLights(['strobe'], ['all']);
+    const strobeLights = localHarness.lightManager.getLights(['strobe'], ['all'])
     for (const light of strobeLights) {
-      const state = localHarness.getLightState(light.id);
+      const state = localHarness.getLightState(light.id)
       expect(state).toMatchObject({
         red: blue.red,
         green: blue.green,
         blue: blue.blue,
-        blendMode: blue.blendMode
-      });
+        blendMode: blue.blendMode,
+      })
     }
 
-    localHarness.cleanup();
-  });
+    localHarness.cleanup()
+  })
 
   it('targets random filters deterministically', () => {
-    const randomSpy = jest.spyOn(utils, 'randomBetween');
-    randomSpy.mockReturnValueOnce(0).mockReturnValueOnce(1).mockReturnValueOnce(3);
+    const randomSpy = jest.spyOn(utils, 'randomBetween')
+    randomSpy.mockReturnValueOnce(0).mockReturnValueOnce(1).mockReturnValueOnce(3)
 
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const randomAction: ActionNode = {
       id: 'action-random',
@@ -1936,21 +1933,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'random-3' }
+        filter: { source: 'literal', value: 'random-3' },
       },
       color: {
         name: { source: 'literal', value: 'green' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'random-targets',
@@ -1963,10 +1960,10 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
-      connections: [{ from: 'event-1', to: 'action-random' }]
-    };
+      connections: [{ from: 'event-1', to: 'action-random' }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -1975,45 +1972,45 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const green = getColor('green', 'high');
-    const litIds: string[] = [];
+    const green = getColor('green', 'high')
+    const litIds: string[] = []
     for (const lightId of harness.frontLightIds) {
-      const state = harness.getLightState(lightId);
+      const state = harness.getLightState(lightId)
       if (state) {
         expect(state).toMatchObject({
           red: green.red,
           green: green.green,
           blue: green.blue,
-          blendMode: green.blendMode
-        });
-        litIds.push(lightId);
+          blendMode: green.blendMode,
+        })
+        litIds.push(lightId)
       } else {
-        expect(state).toBeNull();
+        expect(state).toBeNull()
       }
     }
-    const uniqueLit = new Set(litIds);
+    const uniqueLit = new Set(litIds)
     const expectedIds = new Set([
       harness.frontLightIds[0],
       harness.frontLightIds[1],
-      harness.frontLightIds[3]
-    ]);
-    expect(uniqueLit).toEqual(expectedIds);
+      harness.frontLightIds[3],
+    ])
+    expect(uniqueLit).toEqual(expectedIds)
 
-    randomSpy.mockRestore();
-  });
+    randomSpy.mockRestore()
+  })
 
   it('applies per-light chase offsets in linear order', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -2021,25 +2018,25 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'chase',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'green' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
+        waitUntilTime: { source: 'literal', value: 0 },
       },
       config: {
         perLightOffsetMs: 20,
-        order: 'linear'
-      }
-    };
+        order: 'linear',
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'chase-linear',
@@ -2052,10 +2049,10 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
-      connections: [{ from: 'event-1', to: 'action-1' }]
-    };
+      connections: [{ from: 'event-1', to: 'action-1' }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -2064,56 +2061,56 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const green = getColor('green', 'high');
-    const [first, second, third, fourth] = harness.frontLightIds;
+    const green = getColor('green', 'high')
+    const [first, second, third, fourth] = harness.frontLightIds
 
     expect(harness.getLightState(first)).toMatchObject({
       red: green.red,
       green: green.green,
       blue: green.blue,
-      blendMode: green.blendMode
-    });
-    expect(harness.getLightState(second)).toBeNull();
-    expect(harness.getLightState(third)).toBeNull();
-    expect(harness.getLightState(fourth)).toBeNull();
+      blendMode: green.blendMode,
+    })
+    expect(harness.getLightState(second)).toBeNull()
+    expect(harness.getLightState(third)).toBeNull()
+    expect(harness.getLightState(fourth)).toBeNull()
 
-    harness.advanceBy(20);
+    harness.advanceBy(20)
     expect(harness.getLightState(second)).toMatchObject({
       red: green.red,
       green: green.green,
       blue: green.blue,
-      blendMode: green.blendMode
-    });
+      blendMode: green.blendMode,
+    })
 
-    harness.advanceBy(20);
+    harness.advanceBy(20)
     expect(harness.getLightState(third)).toMatchObject({
       red: green.red,
       green: green.green,
       blue: green.blue,
-      blendMode: green.blendMode
-    });
+      blendMode: green.blendMode,
+    })
 
-    harness.advanceBy(20);
+    harness.advanceBy(20)
     expect(harness.getLightState(fourth)).toMatchObject({
       red: green.red,
       green: green.green,
       blue: green.blue,
-      blendMode: green.blendMode
-    });
-  });
+      blendMode: green.blendMode,
+    })
+  })
 
   it('applies per-light chase offsets in inverse order', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const actionNode: ActionNode = {
       id: 'action-1',
@@ -2121,25 +2118,25 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'chase',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'blue' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
+        waitUntilTime: { source: 'literal', value: 0 },
       },
       config: {
         perLightOffsetMs: 15,
-        order: 'inverse-linear'
-      }
-    };
+        order: 'inverse-linear',
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'chase-inverse',
@@ -2152,10 +2149,10 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [],
         eventListeners: [],
-        effectRaisers: []
+        effectRaisers: [],
       },
-      connections: [{ from: 'event-1', to: 'action-1' }]
-    };
+      connections: [{ from: 'event-1', to: 'action-1' }],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -2164,40 +2161,40 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const blue = getColor('blue', 'high');
-    const [first, second, third, fourth] = harness.frontLightIds;
+    const blue = getColor('blue', 'high')
+    const [first, second, third, fourth] = harness.frontLightIds
 
     expect(harness.getLightState(fourth)).toMatchObject({
       red: blue.red,
       green: blue.green,
       blue: blue.blue,
-      blendMode: blue.blendMode
-    });
-    expect(harness.getLightState(first)).toBeNull();
-    expect(harness.getLightState(second)).toBeNull();
-    expect(harness.getLightState(third)).toBeNull();
+      blendMode: blue.blendMode,
+    })
+    expect(harness.getLightState(first)).toBeNull()
+    expect(harness.getLightState(second)).toBeNull()
+    expect(harness.getLightState(third)).toBeNull()
 
-    harness.advanceBy(15);
+    harness.advanceBy(15)
     expect(harness.getLightState(third)).toMatchObject({
       red: blue.red,
       green: blue.green,
       blue: blue.blue,
-      blendMode: blue.blendMode
-    });
-  });
+      blendMode: blue.blendMode,
+    })
+  })
 
   it('raises events to trigger listener actions in a new context', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
-      eventType: 'beat'
-    };
+      eventType: 'beat',
+    }
 
     const raiserNode: EventRaiserNode = {
       id: 'raiser-1',
@@ -2205,16 +2202,16 @@ describe('Node runtime with real Sequencer', () => {
       eventName: 'internal-event',
       label: 'Raise',
       inputs: [],
-      outputs: []
-    };
+      outputs: [],
+    }
 
     const listenerNode: EventListenerNode = {
       id: 'listener-1',
       type: 'event-listener',
       eventName: 'internal-event',
       label: 'Listen',
-      outputs: ['action-listener']
-    };
+      outputs: ['action-listener'],
+    }
 
     const actionPrimary: ActionNode = {
       id: 'action-primary',
@@ -2222,21 +2219,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'red' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const actionListener: ActionNode = {
       id: 'action-listener',
@@ -2244,21 +2241,21 @@ describe('Node runtime with real Sequencer', () => {
       effectType: 'set-color',
       target: {
         groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' }
+        filter: { source: 'literal', value: 'all' },
       },
       color: {
         name: { source: 'literal', value: 'blue' },
         brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' }
+        blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
         waitForCondition: 'none',
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
         waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 }
-      }
-    };
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
 
     const definition: YargNodeCueDefinition = {
       id: 'event-chain',
@@ -2271,14 +2268,14 @@ describe('Node runtime with real Sequencer', () => {
         logic: [],
         eventRaisers: [raiserNode],
         eventListeners: [listenerNode],
-        effectRaisers: []
+        effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'action-primary' },
         { from: 'event-1', to: 'raiser-1' },
-        { from: 'listener-1', to: 'action-listener' }
-      ]
-    };
+        { from: 'listener-1', to: 'action-listener' },
+      ],
+    }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
@@ -2287,27 +2284,27 @@ describe('Node runtime with real Sequencer', () => {
       harness.lightManager,
       cueLevelVarStore,
       groupLevelVarStore,
-      new EffectRegistry()
-    );
+      new EffectRegistry(),
+    )
 
-    engine.startExecution(eventNode, createCueData());
-    harness.advanceBy(1);
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
 
-    const red = getColor('red', 'high');
-    const blue = getColor('blue', 'high');
-    const frontState = harness.getLightState(harness.frontLightIds[0]);
-    const backState = harness.getLightState(harness.backLightIds[0]);
+    const red = getColor('red', 'high')
+    const blue = getColor('blue', 'high')
+    const frontState = harness.getLightState(harness.frontLightIds[0])
+    const backState = harness.getLightState(harness.backLightIds[0])
     expect(frontState).toMatchObject({
       red: red.red,
       green: red.green,
       blue: red.blue,
-      blendMode: red.blendMode
-    });
+      blendMode: red.blendMode,
+    })
     expect(backState).toMatchObject({
       red: blue.red,
       green: blue.green,
       blue: blue.blue,
-      blendMode: blue.blendMode
-    });
-  });
-});
+      blendMode: blue.blendMode,
+    })
+  })
+})

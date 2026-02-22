@@ -1,16 +1,24 @@
-import React from 'react';
-import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import { isVariableSource } from './nodeEditorUtils';
-import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options';
+import React from 'react'
+import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { isVariableSource } from './nodeEditorUtils'
+import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 
 interface ValueSourceEditorProps {
-  label: string;
-  value: ValueSource | undefined;
-  onChange: (next: ValueSource) => void;
-  expected?: 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array' | 'event' | 'either';
-  validLiterals?: string[];
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
-  integerOnly?: boolean; // For number fields that should only accept integers
+  label: string
+  value: ValueSource | undefined
+  onChange: (next: ValueSource) => void
+  expected?:
+    | 'number'
+    | 'boolean'
+    | 'string'
+    | 'color'
+    | 'cue-type'
+    | 'light-array'
+    | 'event'
+    | 'either'
+  validLiterals?: string[]
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  integerOnly?: boolean // For number fields that should only accept integers
 }
 
 const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
@@ -20,24 +28,33 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   expected = 'either',
   validLiterals,
   availableVariables,
-  integerOnly = false
+  integerOnly = false,
 }) => {
-  const isLightArray = expected === 'light-array';
+  const isLightArray = expected === 'light-array'
   // For color type, use COLOR_OPTIONS if validLiterals not provided
-  const effectiveValidLiterals = expected === 'color' && !validLiterals ? COLOR_OPTIONS : validLiterals;
-  
-  const source = value ?? { 
-    source: 'literal', 
-    value: expected === 'boolean' ? false : (expected === 'string' || expected === 'color' || expected === 'event' || expected === 'either') ? '' : 0 
-  };
-  const isLiteral = source.source === 'literal';
-  const isBoolean = expected === 'boolean';
-  const isString = expected === 'string' || expected === 'color' || expected === 'event';
-  const allowTextInput = isString || expected === 'either';
+  const effectiveValidLiterals =
+    expected === 'color' && !validLiterals ? COLOR_OPTIONS : validLiterals
+
+  const source = value ?? {
+    source: 'literal',
+    value:
+      expected === 'boolean'
+        ? false
+        : expected === 'string' ||
+            expected === 'color' ||
+            expected === 'event' ||
+            expected === 'either'
+          ? ''
+          : 0,
+  }
+  const isLiteral = source.source === 'literal'
+  const isBoolean = expected === 'boolean'
+  const isString = expected === 'string' || expected === 'color' || expected === 'event'
+  const allowTextInput = isString || expected === 'either'
 
   if (isLightArray) {
-    const lightArrayVars = availableVariables.filter(v => v.type === 'light-array');
-    const selectedName = isVariableSource(source) ? (source.name ?? '') : '';
+    const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
+    const selectedName = isVariableSource(source) ? source.name ?? '' : ''
 
     return (
       <div className="space-y-1">
@@ -49,51 +66,53 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
           <select
             className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
             value={selectedName}
-            onChange={event => onChange({
-              source: 'variable',
-              name: event.target.value || ''
-            })}
-          >
+            onChange={(event) =>
+              onChange({
+                source: 'variable',
+                name: event.target.value || '',
+              })
+            }>
             <option value="">-- Select light-array --</option>
-            {lightArrayVars.map(v => (
+            {lightArrayVars.map((v) => (
               <option key={v.name} value={v.name}>
                 {v.name} ({v.scope})
               </option>
             ))}
           </select>
         </label>
-        <p className="text-[10px] text-gray-500">
-          Light arrays must be provided by variables.
-        </p>
+        <p className="text-[10px] text-gray-500">Light arrays must be provided by variables.</p>
       </div>
-    );
+    )
   }
 
   // Filter variables by expected type (color and string are compatible, cue-type and string are compatible)
-  const compatibleVariables = expected === 'either' 
-    ? availableVariables 
-    : availableVariables.filter(v => 
-        v.type === expected || 
-        (expected === 'color' && v.type === 'string') ||
-        (expected === 'string' && (v.type === 'color' || v.type === 'cue-type' || v.type === 'event')) ||
-        (expected === 'cue-type' && (v.type === 'string' || v.type === 'cue-type')) ||
-        (expected === 'event' && v.type === 'event')
-      );
+  const compatibleVariables =
+    expected === 'either'
+      ? availableVariables
+      : availableVariables.filter(
+          (v) =>
+            v.type === expected ||
+            (expected === 'color' && v.type === 'string') ||
+            (expected === 'string' &&
+              (v.type === 'color' || v.type === 'cue-type' || v.type === 'event')) ||
+            (expected === 'cue-type' && (v.type === 'string' || v.type === 'cue-type')) ||
+            (expected === 'event' && v.type === 'event'),
+        )
 
   const handleToggleVar = (checked: boolean) => {
     if (checked) {
       // Switch to variable mode
-      onChange({ 
-        source: 'variable', 
-        name: isVariableSource(source) ? (source.name ?? 'var1') : 'var1', 
-        fallback: isVariableSource(source) ? source.fallback : undefined 
-      });
+      onChange({
+        source: 'variable',
+        name: isVariableSource(source) ? source.name ?? 'var1' : 'var1',
+        fallback: isVariableSource(source) ? source.fallback : undefined,
+      })
     } else {
       // Switch to literal mode
-      const defaultValue = isBoolean ? false : isString ? (effectiveValidLiterals?.[0] ?? '') : 0;
-      onChange({ source: 'literal', value: defaultValue });
+      const defaultValue = isBoolean ? false : isString ? effectiveValidLiterals?.[0] ?? '' : 0
+      onChange({ source: 'literal', value: defaultValue })
     }
-  };
+  }
 
   return (
     <div className="space-y-1">
@@ -116,8 +135,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
             <select
               className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={source.value === true ? 'true' : 'false'}
-              onChange={event => onChange({ ...source, value: event.target.value === 'true' })}
-            >
+              onChange={(event) => onChange({ ...source, value: event.target.value === 'true' })}>
               <option value="true">true</option>
               <option value="false">false</option>
             </select>
@@ -126,29 +144,36 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
             <select
               className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={String(source.value)}
-              onChange={event => onChange({ ...source, value: event.target.value })}
-            >
-              {effectiveValidLiterals.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
+              onChange={(event) => onChange({ ...source, value: event.target.value })}>
+              {effectiveValidLiterals.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
               ))}
             </select>
           ) : (
             <input
               type={allowTextInput ? 'text' : 'number'}
-              step={allowTextInput ? undefined : (integerOnly ? "1" : "0.1")}
+              step={allowTextInput ? undefined : integerOnly ? '1' : '0.1'}
               className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={allowTextInput ? String(source.value ?? '') : (typeof source.value === 'number' ? source.value : 0)}
-              onChange={event => {
+              value={
+                allowTextInput
+                  ? String(source.value ?? '')
+                  : typeof source.value === 'number'
+                    ? source.value
+                    : 0
+              }
+              onChange={(event) => {
                 if (allowTextInput) {
                   // For string or either type, store as string (allows comma-separated values)
-                  onChange({ ...source, value: event.target.value });
+                  onChange({ ...source, value: event.target.value })
                 } else {
-                  let newValue = Number(event.target.value);
+                  let newValue = Number(event.target.value)
                   // Round to integer if integerOnly is true
                   if (integerOnly && typeof newValue === 'number') {
-                    newValue = Math.round(newValue);
+                    newValue = Math.round(newValue)
                   }
-                  onChange({ ...source, value: newValue });
+                  onChange({ ...source, value: newValue })
                 }
               }}
             />
@@ -162,15 +187,16 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
               Variable
               <select
                 className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={isVariableSource(source) ? (source.name ?? '') : ''}
-                onChange={event => onChange({ 
-                  source: 'variable', 
-                  name: event.target.value || 'var1', 
-                  fallback: isVariableSource(source) ? source.fallback : undefined 
-                })}
-              >
+                value={isVariableSource(source) ? source.name ?? '' : ''}
+                onChange={(event) =>
+                  onChange({
+                    source: 'variable',
+                    name: event.target.value || 'var1',
+                    fallback: isVariableSource(source) ? source.fallback : undefined,
+                  })
+                }>
                 <option value="">-- Select --</option>
-                {compatibleVariables.map(v => (
+                {compatibleVariables.map((v) => (
                   <option key={v.name} value={v.name}>
                     {v.name} ({v.type})
                   </option>
@@ -183,12 +209,13 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={isVariableSource(source) && source.fallback === true ? 'true' : 'false'}
-                  onChange={event => onChange({ 
-                    source: 'variable', 
-                    name: isVariableSource(source) ? source.name : 'var1', 
-                    fallback: event.target.value === 'true' 
-                  })}
-                >
+                  onChange={(event) =>
+                    onChange({
+                      source: 'variable',
+                      name: isVariableSource(source) ? source.name : 'var1',
+                      fallback: event.target.value === 'true',
+                    })
+                  }>
                   <option value="true">true</option>
                   <option value="false">false</option>
                 </select>
@@ -197,34 +224,41 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={String(isVariableSource(source) ? source.fallback ?? '' : '')}
-                  onChange={event => onChange({ 
-                    source: 'variable', 
-                    name: isVariableSource(source) ? source.name : 'var1', 
-                    fallback: event.target.value 
-                  })}
-                >
+                  onChange={(event) =>
+                    onChange({
+                      source: 'variable',
+                      name: isVariableSource(source) ? source.name : 'var1',
+                      fallback: event.target.value,
+                    })
+                  }>
                   <option value="">-- None --</option>
-                  {effectiveValidLiterals.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
+                  {effectiveValidLiterals.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
                   ))}
                 </select>
               ) : (
                 <input
                   type="number"
-                  step={integerOnly ? "1" : "0.1"}
+                  step={integerOnly ? '1' : '0.1'}
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={isVariableSource(source) && typeof source.fallback === 'number' ? source.fallback : 0}
-                  onChange={event => {
-                    let fallbackValue = Number(event.target.value);
+                  value={
+                    isVariableSource(source) && typeof source.fallback === 'number'
+                      ? source.fallback
+                      : 0
+                  }
+                  onChange={(event) => {
+                    let fallbackValue = Number(event.target.value)
                     // Round to integer if integerOnly is true
                     if (integerOnly) {
-                      fallbackValue = Math.round(fallbackValue);
+                      fallbackValue = Math.round(fallbackValue)
                     }
-                    onChange({ 
-                      source: 'variable', 
-                      name: isVariableSource(source) ? source.name : 'var1', 
-                      fallback: fallbackValue
-                    });
+                    onChange({
+                      source: 'variable',
+                      name: isVariableSource(source) ? source.name : 'var1',
+                      fallback: fallbackValue,
+                    })
                   }}
                 />
               )}
@@ -233,7 +267,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default ValueSourceEditor;
+export default ValueSourceEditor

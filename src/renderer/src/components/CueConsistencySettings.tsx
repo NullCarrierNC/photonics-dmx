@@ -1,62 +1,69 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'
+import { LIGHT } from '../../../shared/ipcChannels'
 
 const CueConsistencySettings: React.FC = () => {
-  const [consistencyWindow, setConsistencyWindow] = useState(60000);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [consistencyWindow, setConsistencyWindow] = useState(60000)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     const loadConsistencyWindow = async () => {
       try {
-        const result = await window.electron.ipcRenderer.invoke('get-cue-consistency-window');
+        const result = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_CONSISTENCY_WINDOW)
         if (result.success) {
-          setConsistencyWindow(result.windowMs);
+          setConsistencyWindow(result.windowMs)
         }
       } catch (error) {
-        console.error('Failed to load consistency window:', error);
+        console.error('Failed to load consistency window:', error)
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
-
-    loadConsistencyWindow();
-  }, []);
-
-  const handleConsistencyWindowChange = useCallback(async (value: number) => {
-    if (isSaving) return;
-    
-    const newValue = Math.max(0, Math.min(300000, value)); // Clamp to 0-300000
-    setConsistencyWindow(newValue);
-    
-    try {
-      setIsSaving(true);
-      const result = await window.electron.ipcRenderer.invoke('set-cue-consistency-window', newValue);
-      if (result.success) {
-        setConsistencyWindow(result.windowMs);
-      } else {
-        console.error('Failed to save consistency window:', result.error);
-        // Revert to previous value on failure
-        setConsistencyWindow(consistencyWindow);
-      }
-    } catch (error) {
-      console.error('Failed to save consistency window:', error);
-      // Revert to previous value on failure
-      setConsistencyWindow(consistencyWindow);
-    } finally {
-      setIsSaving(false);
     }
-  }, [isSaving, consistencyWindow]);
+
+    loadConsistencyWindow()
+  }, [])
+
+  const handleConsistencyWindowChange = useCallback(
+    async (value: number) => {
+      if (isSaving) return
+
+      const newValue = Math.max(0, Math.min(300000, value)) // Clamp to 0-300000
+      setConsistencyWindow(newValue)
+
+      try {
+        setIsSaving(true)
+        const result = await window.electron.ipcRenderer.invoke(
+          LIGHT.SET_CUE_CONSISTENCY_WINDOW,
+          newValue,
+        )
+        if (result.success) {
+          setConsistencyWindow(result.windowMs)
+        } else {
+          console.error('Failed to save consistency window:', result.error)
+          // Revert to previous value on failure
+          setConsistencyWindow(consistencyWindow)
+        }
+      } catch (error) {
+        console.error('Failed to save consistency window:', error)
+        // Revert to previous value on failure
+        setConsistencyWindow(consistencyWindow)
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [isSaving, consistencyWindow],
+  )
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 0;
+    const value = parseInt(e.target.value) || 0
     // Only update the local state immediately, don't save on every keystroke
-    setConsistencyWindow(Math.max(0, Math.min(300000, value)));
-  };
+    setConsistencyWindow(Math.max(0, Math.min(300000, value)))
+  }
 
   const handleInputBlur = () => {
     // Save when the user finishes editing (loses focus)
-    handleConsistencyWindowChange(consistencyWindow);
-  };
+    handleConsistencyWindowChange(consistencyWindow)
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 dark:border-gray-700">
@@ -64,14 +71,17 @@ const CueConsistencySettings: React.FC = () => {
         Cue Consistency Settings
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        Prevents rapid randomization changes when the same cue is called within a short time window. 
-        This helps maintain visual consistency during rapid cue transitions. I.e. if Cue A from Group B was 
-        selected, each time Cue A is called within this window will use the same implementation as the previous call.
+        Prevents rapid randomization changes when the same cue is called within a short time window.
+        This helps maintain visual consistency during rapid cue transitions. I.e. if Cue A from
+        Group B was selected, each time Cue A is called within this window will use the same
+        implementation as the previous call.
       </p>
-      
+
       <div className="space-y-4">
         <div>
-          <label htmlFor="consistency-window" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label
+            htmlFor="consistency-window"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Consistency Window
           </label>
           <div className="flex items-center space-x-4">
@@ -88,18 +98,17 @@ const CueConsistencySettings: React.FC = () => {
               disabled={isLoading || isSaving}
               placeholder="60000"
             />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              milliseconds
-            </span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">milliseconds</span>
           </div>
-          
+
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Set to 0 to disable consistency throttling. Default is 60000ms (60 seconds). Maximum is 300000ms (5 minutes).
+            Set to 0 to disable consistency throttling. Default is 60000ms (60 seconds). Maximum is
+            300000ms (5 minutes).
           </p>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default CueConsistencySettings;
+export default CueConsistencySettings

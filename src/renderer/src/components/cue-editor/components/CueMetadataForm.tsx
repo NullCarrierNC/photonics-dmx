@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
+import React, { useState } from 'react'
+import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
 import type {
   AudioNodeCueDefinition,
   NodeCueMode,
@@ -7,23 +7,25 @@ import type {
   YargNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
-  EffectGroupMeta
-} from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { CueType } from '../../../../../photonics-dmx/cues/types/cueTypes';
-import type { EditorMode } from '../lib/types';
+  EffectGroupMeta,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { CueType } from '../../../../../photonics-dmx/cues/types/cueTypes'
+import type { EditorMode } from '../lib/types'
 
 type Props = {
-  filename: string;
-  group: NodeCueGroupMeta | EffectGroupMeta | null;
-  currentCue: YargNodeCueDefinition | AudioNodeCueDefinition | null;
-  currentEffect?: YargEffectDefinition | AudioEffectDefinition | null;
-  availableCueTypes: string[];
-  activeMode: NodeCueMode;
-  editorMode: EditorMode;
-  onGroupChange: (updates: Partial<NodeCueGroupMeta | EffectGroupMeta>) => void;
-  onCueMetadataChange: (updates: Partial<YargNodeCueDefinition & AudioNodeCueDefinition>) => void;
-  onEffectMetadataChange?: (updates: Partial<YargEffectDefinition> & Partial<AudioEffectDefinition>) => void;
-};
+  filename: string
+  group: NodeCueGroupMeta | EffectGroupMeta | null
+  currentCue: YargNodeCueDefinition | AudioNodeCueDefinition | null
+  currentEffect?: YargEffectDefinition | AudioEffectDefinition | null
+  availableCueTypes: string[]
+  activeMode: NodeCueMode
+  editorMode: EditorMode
+  onGroupChange: (updates: Partial<NodeCueGroupMeta | EffectGroupMeta>) => void
+  onCueMetadataChange: (updates: Partial<YargNodeCueDefinition & AudioNodeCueDefinition>) => void
+  onEffectMetadataChange?: (
+    updates: Partial<YargEffectDefinition> & Partial<AudioEffectDefinition>,
+  ) => void
+}
 
 const CueMetadataForm: React.FC<Props> = ({
   filename,
@@ -35,21 +37,20 @@ const CueMetadataForm: React.FC<Props> = ({
   editorMode,
   onGroupChange,
   onCueMetadataChange,
-  onEffectMetadataChange
+  onEffectMetadataChange,
 }) => {
-  const isEffectMode = editorMode === 'effect';
-  const itemLabel = isEffectMode ? 'Effect' : 'Cue';
-  const currentItem = isEffectMode ? currentEffect : currentCue;
-  const [isGroupMetadataOpen, setIsGroupMetadataOpen] = useState(true);
-  
+  const isEffectMode = editorMode === 'effect'
+  const itemLabel = isEffectMode ? 'Effect' : 'Cue'
+  const currentItem = isEffectMode ? currentEffect : currentCue
+  const [isGroupMetadataOpen, setIsGroupMetadataOpen] = useState(true)
+
   return (
     <div className="p-3 border-b border-gray-200 dark:border-gray-800 space-y-2">
       {/* Group Metadata Accordion */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-700">
         <button
           className="w-full flex items-center justify-between p-2 text-left font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          onClick={() => setIsGroupMetadataOpen(!isGroupMetadataOpen)}
-        >
+          onClick={() => setIsGroupMetadataOpen(!isGroupMetadataOpen)}>
           <span>Group Metadata</span>
           {isGroupMetadataOpen ? (
             <FaChevronDown className="w-4 h-4 text-gray-500" />
@@ -74,7 +75,7 @@ const CueMetadataForm: React.FC<Props> = ({
                 <input
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={group?.id ?? ''}
-                  onChange={event => onGroupChange({ id: event.target.value })}
+                  onChange={(event) => onGroupChange({ id: event.target.value })}
                 />
               </label>
               <label className="flex flex-col text-xs font-medium">
@@ -82,7 +83,7 @@ const CueMetadataForm: React.FC<Props> = ({
                 <input
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={group?.name ?? ''}
-                  onChange={event => onGroupChange({ name: event.target.value })}
+                  onChange={(event) => onGroupChange({ name: event.target.value })}
                 />
               </label>
               <label className="flex flex-col text-xs font-medium">
@@ -90,7 +91,7 @@ const CueMetadataForm: React.FC<Props> = ({
                 <input
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={group?.description ?? ''}
-                  onChange={event => onGroupChange({ description: event.target.value })}
+                  onChange={(event) => onGroupChange({ description: event.target.value })}
                 />
               </label>
             </div>
@@ -105,11 +106,11 @@ const CueMetadataForm: React.FC<Props> = ({
             <input
               className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={currentItem.name}
-              onChange={event => {
+              onChange={(event) => {
                 if (isEffectMode && onEffectMetadataChange) {
-                  onEffectMetadataChange({ name: event.target.value });
+                  onEffectMetadataChange({ name: event.target.value })
                 } else {
-                  onCueMetadataChange({ name: event.target.value });
+                  onCueMetadataChange({ name: event.target.value })
                 }
               }}
             />
@@ -119,11 +120,11 @@ const CueMetadataForm: React.FC<Props> = ({
             <input
               className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={currentItem.description ?? ''}
-              onChange={event => {
+              onChange={(event) => {
                 if (isEffectMode && onEffectMetadataChange) {
-                  onEffectMetadataChange({ description: event.target.value });
+                  onEffectMetadataChange({ description: event.target.value })
                 } else {
-                  onCueMetadataChange({ description: event.target.value });
+                  onCueMetadataChange({ description: event.target.value })
                 }
               }}
             />
@@ -135,10 +136,13 @@ const CueMetadataForm: React.FC<Props> = ({
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={(currentCue as YargNodeCueDefinition).cueType}
-                  onChange={event => onCueMetadataChange({ cueType: event.target.value as CueType })}
-                >
-                  {availableCueTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                  onChange={(event) =>
+                    onCueMetadataChange({ cueType: event.target.value as CueType })
+                  }>
+                  {availableCueTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -147,8 +151,9 @@ const CueMetadataForm: React.FC<Props> = ({
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={(currentCue as YargNodeCueDefinition).style}
-                  onChange={event => onCueMetadataChange({ style: event.target.value as 'primary' | 'secondary' })}
-                >
+                  onChange={(event) =>
+                    onCueMetadataChange({ style: event.target.value as 'primary' | 'secondary' })
+                  }>
                   <option value="primary">Primary</option>
                   <option value="secondary">Secondary</option>
                 </select>
@@ -161,14 +166,14 @@ const CueMetadataForm: React.FC<Props> = ({
               <input
                 className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                 value={(currentCue as AudioNodeCueDefinition).cueTypeId}
-                onChange={event => onCueMetadataChange({ cueTypeId: event.target.value })}
+                onChange={(event) => onCueMetadataChange({ cueTypeId: event.target.value })}
               />
             </label>
           )}
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default CueMetadataForm;
+export default CueMetadataForm

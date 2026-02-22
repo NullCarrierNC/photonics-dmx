@@ -1,4 +1,4 @@
-import { AudioLightingData, AudioConfig } from '../../listeners/Audio/AudioTypes';
+import { AudioLightingData, AudioConfig } from '../../listeners/Audio/AudioTypes'
 
 /**
  * Audio cue types for audio-reactive lighting.
@@ -26,36 +26,37 @@ export enum BuiltInAudioCues {
   SplitLightOrgan = 'SplitLightOrgan',
   StackedLightOrgan = 'StackedLightOrgan',
   DiagonalLightOrgan = 'DiagonalLightOrgan',
-  GatedLightOrgan = 'GatedLightOrgan'
+  GatedLightOrgan = 'GatedLightOrgan',
 }
 
 /**
  * AudioCueType is a free-form string so user-authored cues can
  * register arbitrary identifiers from the node editor.
  */
-export type AudioCueType = string;
+export type AudioCueType = string
 
-export type BuiltInAudioCueType = `${BuiltInAudioCues}`;
+export type BuiltInAudioCueType = `${BuiltInAudioCues}`
 
-export const builtInAudioCueList: BuiltInAudioCueType[] = Object.values(BuiltInAudioCues) as BuiltInAudioCueType[];
+export const builtInAudioCueList: BuiltInAudioCueType[] = Object.values(
+  BuiltInAudioCues,
+) as BuiltInAudioCueType[]
 
 /**
  * Audio cue data structure passed to cue implementations
  */
 export interface AudioCueData {
   /** Audio analysis data */
-  audioData: AudioLightingData;
-  
+  audioData: AudioLightingData
+
   /** Audio configuration */
-  config: AudioConfig;
+  config: AudioConfig
 
   /** Number of enabled bands (3 or 5) currently active */
-  enabledBandCount: number;
-  
-  /** Timestamp of the cue execution */
-  timestamp: number;
-  
-  /** Execution count for this cue */
-  executionCount: number;
-}
+  enabledBandCount: number
 
+  /** Timestamp of the cue execution */
+  timestamp: number
+
+  /** Execution count for this cue */
+  executionCount: number
+}

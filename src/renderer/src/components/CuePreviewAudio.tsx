@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useAtomValue } from 'jotai';
-import { audioDataAtom, audioConfigAtom } from '../atoms';
-import type { Color } from '../../../photonics-dmx/types';
+import React, { useState, useEffect } from 'react'
+import { useAtomValue } from 'jotai'
+import { audioDataAtom, audioConfigAtom } from '../atoms'
+import type { Color } from '../../../photonics-dmx/types'
 
 // Map Color type to RGB values for preview bars (matches AudioColorMapping.tsx)
 const COLOR_TO_RGB: Record<Color, string> = {
@@ -20,46 +20,82 @@ const COLOR_TO_RGB: Record<Color, string> = {
   amber: 'rgb(255, 191, 0)',
   white: 'rgb(255, 255, 255)',
   black: 'rgb(0, 0, 0)',
-  transparent: 'rgb(0, 0, 0)'
-};
-
-interface CuePreviewAudioProps {
-  className?: string;
+  transparent: 'rgb(0, 0, 0)',
 }
 
-const THREE_BAND_IDS = ['range1', 'range3', 'range4'];
-const FOUR_BAND_IDS = ['range1', 'range2', 'range3', 'range4'];
+interface CuePreviewAudioProps {
+  className?: string
+}
+
+const THREE_BAND_IDS = ['range1', 'range3', 'range4']
+const FOUR_BAND_IDS = ['range1', 'range2', 'range3', 'range4']
 
 type PreviewRange = {
-  id: string;
-  name: string;
-  minHz: number;
-  maxHz: number;
-  color: Color;
-  brightness: 'low' | 'medium' | 'high' | 'max';
-};
+  id: string
+  name: string
+  minHz: number
+  maxHz: number
+  color: Color
+  brightness: 'low' | 'medium' | 'high' | 'max'
+}
 
 const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
-  const audioData = useAtomValue(audioDataAtom);
-  const audioConfig = useAtomValue(audioConfigAtom);
-  const [lastBeatTime, setLastBeatTime] = useState(0);
+  const audioData = useAtomValue(audioDataAtom)
+  const audioConfig = useAtomValue(audioConfigAtom)
+  const [showBeatPulse, setShowBeatPulse] = useState(false)
 
   const defaultRanges: PreviewRange[] = [
-    { id: 'range1', name: 'Bass', minHz: 20, maxHz: 220, color: 'red' as Color, brightness: 'medium' as const },
-    { id: 'range2', name: 'Lower-Mids', minHz: 220, maxHz: 800, color: 'blue' as Color, brightness: 'medium' as const },
-    { id: 'range3', name: 'Upper-Mids', minHz: 800, maxHz: 2500, color: 'yellow' as Color, brightness: 'medium' as const },
-    { id: 'range4', name: 'Highs', minHz: 2500, maxHz: 6000, color: 'green' as Color, brightness: 'medium' as const },
-    { id: 'range5', name: 'Air', minHz: 6000, maxHz: 20000, color: 'cyan' as Color, brightness: 'medium' as const }
-  ];
+    {
+      id: 'range1',
+      name: 'Bass',
+      minHz: 20,
+      maxHz: 220,
+      color: 'red' as Color,
+      brightness: 'medium' as const,
+    },
+    {
+      id: 'range2',
+      name: 'Lower-Mids',
+      minHz: 220,
+      maxHz: 800,
+      color: 'blue' as Color,
+      brightness: 'medium' as const,
+    },
+    {
+      id: 'range3',
+      name: 'Upper-Mids',
+      minHz: 800,
+      maxHz: 2500,
+      color: 'yellow' as Color,
+      brightness: 'medium' as const,
+    },
+    {
+      id: 'range4',
+      name: 'Highs',
+      minHz: 2500,
+      maxHz: 6000,
+      color: 'green' as Color,
+      brightness: 'medium' as const,
+    },
+    {
+      id: 'range5',
+      name: 'Air',
+      minHz: 6000,
+      maxHz: 20000,
+      color: 'cyan' as Color,
+      brightness: 'medium' as const,
+    },
+  ]
 
-  const configuredRanges = (audioConfig?.frequencyBands?.ranges as PreviewRange[]) || defaultRanges;
-  const configuredBandCount = audioConfig?.frequencyBands?.bandCount ?? 4;
-  const displayRanges = configuredBandCount === 3
-    ? configuredRanges.filter((range) => THREE_BAND_IDS.includes(range.id))
-    : configuredBandCount === 4
-      ? configuredRanges.filter((range) => FOUR_BAND_IDS.includes(range.id))
-      : configuredRanges;
+  const configuredRanges = (audioConfig?.frequencyBands?.ranges as PreviewRange[]) || defaultRanges
+  const configuredBandCount = audioConfig?.frequencyBands?.bandCount ?? 4
+  const displayRanges =
+    configuredBandCount === 3
+      ? configuredRanges.filter((range) => THREE_BAND_IDS.includes(range.id))
+      : configuredBandCount === 4
+        ? configuredRanges.filter((range) => FOUR_BAND_IDS.includes(range.id))
+        : configuredRanges
 
   const bandValuesById: Record<string, number> = {
     range1: audioData?.frequencyBands?.range1 || 0,
@@ -67,17 +103,20 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
     range3: audioData?.frequencyBands?.range3 || 0,
     range4: audioData?.frequencyBands?.range4 || 0,
     range5: audioData?.frequencyBands?.range5 || 0,
-  };
+  }
 
-  // Track beat detection for pulse animation
+  // Track beat detection for pulse animation (show for 200ms after beat)
   useEffect(() => {
     if (audioData?.beatDetected) {
-      setLastBeatTime(Date.now());
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- pulse visibility for 200ms after beat
+      setShowBeatPulse(true)
+      const timer = setTimeout(() => setShowBeatPulse(false), 200)
+      return () => clearTimeout(timer)
     }
-  }, [audioData?.beatDetected]);
+    return
+  }, [audioData?.beatDetected])
 
-  // Calculate if beat indicator should show (fades after 200ms)
-  const showBeatPulse = audioData?.beatDetected || (Date.now() - lastBeatTime < 200);
+  const showPulse = Boolean(audioData?.beatDetected || showBeatPulse)
 
   if (!audioData) {
     return (
@@ -85,10 +124,10 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
         <h3 className="text-lg font-semibold mb-1">Audio Preview</h3>
         <p className="text-gray-500 dark:text-gray-400">Waiting for audio data...</p>
       </div>
-    );
+    )
   }
 
-  const { energy, bpm } = audioData;
+  const { energy, bpm } = audioData
 
   return (
     <div className={`p-4 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
@@ -104,10 +143,10 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
       {/* Frequency Bars */}
       <div className="space-y-2 mb-4">
         {displayRanges.map((range) => {
-          const bandValue = bandValuesById[range.id] || 0;
-          const colorRgb = COLOR_TO_RGB[range.color as Color] || COLOR_TO_RGB.white;
-          const frequencyLabel = `${range.minHz}-${range.maxHz >= 1000 ? `${(range.maxHz / 1000).toFixed(1)}k` : range.maxHz}Hz`;
-          
+          const bandValue = bandValuesById[range.id] || 0
+          const colorRgb = COLOR_TO_RGB[range.color as Color] || COLOR_TO_RGB.white
+          const frequencyLabel = `${range.minHz}-${range.maxHz >= 1000 ? `${(range.maxHz / 1000).toFixed(1)}k` : range.maxHz}Hz`
+
           return (
             <div key={range.id}>
               <div className="flex justify-between items-center text-xs mb-1">
@@ -125,14 +164,14 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
               <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded overflow-hidden">
                 <div
                   className="h-full transition-all duration-150 ease-out"
-                  style={{ 
+                  style={{
                     width: `${bandValue * 100}%`,
-                    backgroundColor: colorRgb
+                    backgroundColor: colorRgb,
                   }}
                 />
               </div>
             </div>
-          );
+          )
         })}
 
         {/* Overall Energy */}
@@ -155,17 +194,17 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
       {/* Beat Indicator */}
       <div className="flex items-center space-x-2">
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Beat Detected:</span>
-        <div className={`w-16 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-200 ${
-          showBeatPulse
-            ? 'bg-white border-gray-300 text-black' 
-            : 'bg-gray-800 border-gray-600 text-white'
-        }`}>
-          {showBeatPulse ? 'BEAT' : 'OFF'}
+        <div
+          className={`w-16 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-200 ${
+            showPulse
+              ? 'bg-white border-gray-300 text-black'
+              : 'bg-gray-800 border-gray-600 text-white'
+          }`}>
+          {showPulse ? 'BEAT' : 'OFF'}
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default CuePreviewAudio;
-
+export default CuePreviewAudio

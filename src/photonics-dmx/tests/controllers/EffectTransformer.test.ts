@@ -1,42 +1,42 @@
 /*
  * EffectTransformer Test Suite
- * 
+ *
  * This suite tests the functionality of the EffectTransformer.
  * It verifies that the transformer correctly processes and groups transitions.
- * 
+ *
  * Note: The EffectTransformer should be accessed through the Sequencer facade.
  * These tests validate the internal implementation that is used by the Sequencer.
  */
 
-import { EffectTransformer } from '../../controllers/sequencer/EffectTransformer';
-import { createMockRGBIP, createMockTrackedLight } from '../helpers/testFixtures';
-import { beforeEach, describe, expect, it } from '@jest/globals';
-import { EffectTransition, TrackedLight } from '../../types';
+import { EffectTransformer } from '../../controllers/sequencer/EffectTransformer'
+import { createMockRGBIP, createMockTrackedLight } from '../helpers/testFixtures'
+import { beforeEach, describe, expect, it } from '@jest/globals'
+import { EffectTransition, TrackedLight } from '../../types'
 
 describe('EffectTransformer', () => {
-  let transformer: EffectTransformer;
-  let lights: TrackedLight[];
-  
+  let transformer: EffectTransformer
+  let lights: TrackedLight[]
+
   beforeEach(() => {
-    transformer = new EffectTransformer();
-    
+    transformer = new EffectTransformer()
+
     // Create some test lights
     lights = [
-      createMockTrackedLight({ 
+      createMockTrackedLight({
         id: 'light1',
-        position: 1
+        position: 1,
       }),
-      createMockTrackedLight({ 
+      createMockTrackedLight({
         id: 'light2',
-        position: 2
+        position: 2,
       }),
-      createMockTrackedLight({ 
+      createMockTrackedLight({
         id: 'light3',
-        position: 3
-      })
-    ];
-  });
-  
+        position: 3,
+      }),
+    ]
+  })
+
   describe('groupTransitionsByLayer', () => {
     it('should group transitions by their layer property', () => {
       // Create test transitions with different layers
@@ -49,10 +49,10 @@ describe('EffectTransformer', () => {
           transform: {
             color: createMockRGBIP({ red: 255 }),
             easing: 'linear',
-            duration: 1000
+            duration: 1000,
           },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: 0,
         },
         {
           lights: [lights[1]],
@@ -62,10 +62,10 @@ describe('EffectTransformer', () => {
           transform: {
             color: createMockRGBIP({ green: 255 }),
             easing: 'linear',
-            duration: 1000
+            duration: 1000,
           },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: 0,
         },
         {
           lights: [lights[2]],
@@ -75,40 +75,40 @@ describe('EffectTransformer', () => {
           transform: {
             color: createMockRGBIP({ blue: 255 }),
             easing: 'linear',
-            duration: 1000
+            duration: 1000,
           },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
-        }
-      ];
-      
+          waitUntilTime: 0,
+        },
+      ]
+
       // Call the method
-      const result = transformer.groupTransitionsByLayer(transitions);
-      
+      const result = transformer.groupTransitionsByLayer(transitions)
+
       // Verify the result
-      expect(result.size).toBe(2); // Two layers: 1 and 2
-      expect(result.has(1)).toBeTruthy();
-      expect(result.has(2)).toBeTruthy();
-      
+      expect(result.size).toBe(2) // Two layers: 1 and 2
+      expect(result.has(1)).toBeTruthy()
+      expect(result.has(2)).toBeTruthy()
+
       // Layer 1 should have two transitions
-      const layer1Transitions = result.get(1);
-      expect(layer1Transitions).toBeDefined();
-      expect(layer1Transitions!.length).toBe(2);
-      expect(layer1Transitions![0].transform.color.red).toBe(255);
-      expect(layer1Transitions![1].transform.color.blue).toBe(255);
-      
+      const layer1Transitions = result.get(1)
+      expect(layer1Transitions).toBeDefined()
+      expect(layer1Transitions!.length).toBe(2)
+      expect(layer1Transitions![0].transform.color.red).toBe(255)
+      expect(layer1Transitions![1].transform.color.blue).toBe(255)
+
       // Layer 2 should have one transition
-      const layer2Transitions = result.get(2);
-      expect(layer2Transitions).toBeDefined();
-      expect(layer2Transitions!.length).toBe(1);
-      expect(layer2Transitions![0].transform.color.green).toBe(255);
-    });
-    
+      const layer2Transitions = result.get(2)
+      expect(layer2Transitions).toBeDefined()
+      expect(layer2Transitions!.length).toBe(1)
+      expect(layer2Transitions![0].transform.color.green).toBe(255)
+    })
+
     it('should handle empty transitions array', () => {
-      const result = transformer.groupTransitionsByLayer([]);
-      expect(result.size).toBe(0);
-    });
-    
+      const result = transformer.groupTransitionsByLayer([])
+      expect(result.size).toBe(0)
+    })
+
     it('should handle transitions with the same layer', () => {
       const transitions: EffectTransition[] = [
         {
@@ -119,10 +119,10 @@ describe('EffectTransformer', () => {
           transform: {
             color: createMockRGBIP({ red: 255 }),
             easing: 'linear',
-            duration: 1000
+            duration: 1000,
           },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
+          waitUntilTime: 0,
         },
         {
           lights: [lights[1]],
@@ -132,22 +132,22 @@ describe('EffectTransformer', () => {
           transform: {
             color: createMockRGBIP({ green: 255 }),
             easing: 'linear',
-            duration: 1000
+            duration: 1000,
           },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
-        }
-      ];
-      
-      const result = transformer.groupTransitionsByLayer(transitions);
-      
-      expect(result.size).toBe(1); // One layer: 1
-      expect(result.has(1)).toBeTruthy();
-      
+          waitUntilTime: 0,
+        },
+      ]
+
+      const result = transformer.groupTransitionsByLayer(transitions)
+
+      expect(result.size).toBe(1) // One layer: 1
+      expect(result.has(1)).toBeTruthy()
+
       // Layer 1 should have two transitions
-      const layer1Transitions = result.get(1);
-      expect(layer1Transitions).toBeDefined();
-      expect(layer1Transitions!.length).toBe(2);
-    });
-  });
-}); 
+      const layer1Transitions = result.get(1)
+      expect(layer1Transitions).toBeDefined()
+      expect(layer1Transitions!.length).toBe(2)
+    })
+  })
+})

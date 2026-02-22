@@ -1,22 +1,25 @@
-import React from 'react';
-import type { EffectRaiserNode, EffectDefinition } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import ValueSourceEditor from '../shared/ValueSourceEditor';
+import React from 'react'
+import type {
+  EffectRaiserNode,
+  EffectDefinition,
+} from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import ValueSourceEditor from '../shared/ValueSourceEditor'
 
 interface EffectRaiserEditorProps {
-  node: EffectRaiserNode;
-  availableEffects: { id: string; name: string; definition?: EffectDefinition }[];
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[];
-  updateNode: (updates: Partial<EffectRaiserNode>) => void;
+  node: EffectRaiserNode
+  availableEffects: { id: string; name: string; definition?: EffectDefinition }[]
+  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  updateNode: (updates: Partial<EffectRaiserNode>) => void
 }
 
 const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
   node,
   availableEffects,
   availableVariables,
-  updateNode
+  updateNode,
 }) => {
-  const selectedEffect = availableEffects.find(e => e.id === node.effectId);
-  const parameterVars = selectedEffect?.definition?.variables?.filter(v => v.isParameter) ?? [];
+  const selectedEffect = availableEffects.find((e) => e.id === node.effectId)
+  const parameterVars = selectedEffect?.definition?.variables?.filter((v) => v.isParameter) ?? []
 
   return (
     <div className="space-y-2 text-xs">
@@ -25,10 +28,9 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.effectId || ''}
-          onChange={event => updateNode({ effectId: event.target.value })}
-        >
+          onChange={(event) => updateNode({ effectId: event.target.value })}>
           <option value="">-- Choose an effect --</option>
-          {availableEffects.map(effect => (
+          {availableEffects.map((effect) => (
             <option key={effect.id} value={effect.id}>
               {effect.name}
             </option>
@@ -52,20 +54,29 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
       ) : (
         <div className="mt-3 space-y-2 border-t pt-2">
           <div className="font-semibold text-xs">Parameter Values</div>
-          {parameterVars.map(param => {
-            const currentValue = node.parameterValues?.[param.name];
-            const integerOnly = param.type === 'number' && param.name === 'paramLayer';
+          {parameterVars.map((param) => {
+            const currentValue = node.parameterValues?.[param.name]
+            const integerOnly = param.type === 'number' && param.name === 'paramLayer'
             return (
               <div key={param.name} className="space-y-1">
                 <ValueSourceEditor
                   label={`${param.name} (${param.type})`}
                   value={currentValue}
                   onChange={(newValue) => {
-                    const updatedValues = { ...(node.parameterValues ?? {}) };
-                    updatedValues[param.name] = newValue;
-                    updateNode({ parameterValues: updatedValues });
+                    const updatedValues = { ...(node.parameterValues ?? {}) }
+                    updatedValues[param.name] = newValue
+                    updateNode({ parameterValues: updatedValues })
                   }}
-                  expected={param.type as 'number' | 'boolean' | 'string' | 'color' | 'cue-type' | 'light-array' | 'event'}
+                  expected={
+                    param.type as
+                      | 'number'
+                      | 'boolean'
+                      | 'string'
+                      | 'color'
+                      | 'cue-type'
+                      | 'light-array'
+                      | 'event'
+                  }
                   integerOnly={integerOnly}
                   availableVariables={availableVariables}
                 />
@@ -73,12 +84,12 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
                   <div className="text-[10px] text-gray-500 italic">{param.description}</div>
                 )}
               </div>
-            );
+            )
           })}
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default EffectRaiserEditor;
+export default EffectRaiserEditor

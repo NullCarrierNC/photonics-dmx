@@ -1,35 +1,38 @@
-import { CueData, CueType } from '../../../types/cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { getSweepEffect } from '../../../../effects/sweepEffect';
-import { randomBetween } from '../../../../helpers/utils';
-import { getEffectSingleColor } from '../../../../effects';
-import { CueStyle, INetCue } from '../../../interfaces/INetCue';
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { getSweepEffect } from '../../../../effects/sweepEffect'
+import { randomBetween } from '../../../../helpers/utils'
+import { getEffectSingleColor } from '../../../../effects'
+import { CueStyle, INetCue } from '../../../interfaces/INetCue'
 
 export class CoolManualCue implements INetCue {
-  id = 'alt-cool-manual-1';
-  cueId = CueType.Cool_Manual;
-  description = 'Low blue on all lights, green sweep on front on measure.';
-  style = CueStyle.Primary;
+  id = 'alt-cool-manual-1'
+  cueId = CueType.Cool_Manual
+  description = 'Low blue on all lights, green sweep on front on measure.'
+  style = CueStyle.Primary
 
-  async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const blue = getColor('blue', 'medium');
-    const green = getColor('green', 'medium');
-    const blueLow = getColor('blue', 'low');
-    const greenLow = getColor('green', 'low');
-    const transparent = getColor('transparent', 'max');
+  async execute(
+    parameters: CueData,
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const blue = getColor('blue', 'medium')
+    const green = getColor('green', 'medium')
+    const blueLow = getColor('blue', 'low')
+    const greenLow = getColor('green', 'low')
+    const transparent = getColor('transparent', 'max')
 
-    const mainColor = parameters.venueSize == 'Large' ? blueLow : greenLow;
-    const highColor = parameters.venueSize == 'Large' ? green : blue;
+    const mainColor = parameters.venueSize == 'Large' ? blueLow : greenLow
+    const highColor = parameters.venueSize == 'Large' ? green : blue
 
-    const lights = lightManager.getLights(['front', 'back'], 'all');
-    const frontLights = lightManager.getLights(['front'], 'all');
+    const lights = lightManager.getLights(['front', 'back'], 'all')
+    const frontLights = lightManager.getLights(['front'], 'all')
 
-
-    const dir = randomBetween(0, 1);
+    const dir = randomBetween(0, 1)
     if (dir === 1) {
-      lights.reverse();
+      lights.reverse()
     }
 
     const solid = getEffectSingleColor({
@@ -37,9 +40,9 @@ export class CoolManualCue implements INetCue {
       color: mainColor,
       duration: 0,
       layer: 0,
-    });
-   
-    sequencer.setEffect('alt-cool-manual-base', solid);
+    })
+
+    sequencer.setEffect('alt-cool-manual-base', solid)
 
     const sweep = getSweepEffect({
       lights: frontLights,
@@ -51,8 +54,8 @@ export class CoolManualCue implements INetCue {
       lightOverlap: 90,
       layer: 101,
       waitFor: 'measure',
-    });
+    })
 
-    sequencer.addEffectUnblockedName('sweep', sweep);
+    sequencer.addEffectUnblockedName('sweep', sweep)
   }
-} 
+}

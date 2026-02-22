@@ -3,14 +3,14 @@
  * Used by NodeExecutionEngine and EffectExecutionEngine to avoid duplication.
  */
 
-import { ExecutionContext } from './ExecutionContext';
-import { resolveValue, resolveColor, resolveBrightness, resolveBlendMode } from './valueResolver';
-import { ResolvedActionTiming, ResolvedColorSetting } from '../compiler/ActionEffectFactory';
-import { ActionTimingConfig, NodeColorSetting, ValueSource } from '../../types/nodeCueTypes';
+import { ExecutionContext } from './ExecutionContext'
+import { resolveValue, resolveColor, resolveBrightness, resolveBlendMode } from './valueResolver'
+import { ResolvedActionTiming, ResolvedColorSetting } from '../compiler/ActionEffectFactory'
+import { ActionTimingConfig, NodeColorSetting, ValueSource } from '../../types/nodeCueTypes'
 
 export function resolveActionTiming(
   timing: ActionTimingConfig,
-  context: ExecutionContext
+  context: ExecutionContext,
 ): ResolvedActionTiming {
   return {
     ...timing,
@@ -23,29 +23,25 @@ export function resolveActionTiming(
     waitUntilConditionCount: timing.waitUntilConditionCount
       ? Number(resolveValue('number', timing.waitUntilConditionCount, context))
       : undefined,
-    level: timing.level
-      ? Number(resolveValue('number', timing.level, context))
-      : 1
-  };
+    level: timing.level ? Number(resolveValue('number', timing.level, context)) : 1,
+  }
 }
 
 export function resolveActionColor(
   color: NodeColorSetting,
-  context: ExecutionContext
+  context: ExecutionContext,
 ): ResolvedColorSetting {
   return {
     name: resolveColor(color.name, context),
     brightness: resolveBrightness(color.brightness, context),
     blendMode: resolveBlendMode(color.blendMode, context),
-    opacity: color.opacity
-      ? Number(resolveValue('number', color.opacity, context))
-      : undefined
-  };
+    opacity: color.opacity ? Number(resolveValue('number', color.opacity, context)) : undefined,
+  }
 }
 
 export function resolveActionLayer(
   layer: ValueSource | undefined,
-  context: ExecutionContext
+  context: ExecutionContext,
 ): number {
-  return layer ? Number(resolveValue('number', layer, context)) : 0;
+  return layer ? Number(resolveValue('number', layer, context)) : 0
 }

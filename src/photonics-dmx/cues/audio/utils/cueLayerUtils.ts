@@ -1,5 +1,5 @@
-import { ILightingController } from '../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../controllers/DmxLightManager';
+import { ILightingController } from '../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../controllers/DmxLightManager'
 
 /**
  * Clears lighting state for a cue by delegating to Sequencer.removeAllEffects().
@@ -15,10 +15,10 @@ export const clearCueLayers = (
   sequencer: ILightingController | null,
   _layers?: number[],
   _lightManager?: DmxLightManager | null,
-  _transitionDuration = 0
+  _transitionDuration = 0,
 ): void => {
   if (!sequencer) {
-    return;
+    return
   }
-  sequencer.removeAllEffects();
-};
+  sequencer.removeAllEffects()
+}

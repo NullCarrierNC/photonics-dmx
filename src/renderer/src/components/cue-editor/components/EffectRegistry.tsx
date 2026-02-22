@@ -1,191 +1,194 @@
-import React, { useState, useEffect } from 'react';
-import type { EffectReference } from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
-import type { EditorDocument } from '../lib/types';
-import { listEffectFiles, readEffectFile } from '../../../ipcApi';
+import React, { useState, useEffect } from 'react'
+import type { EffectReference } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { EditorDocument } from '../lib/types'
+import { listEffectFiles, readEffectFile } from '../../../ipcApi'
 
 type EffectFileSummary = {
-  path: string;
-  mode: 'yarg' | 'audio';
-  groupId: string;
-  groupName: string;
-  cueCount: number;
-};
+  path: string
+  mode: 'yarg' | 'audio'
+  groupId: string
+  groupName: string
+  cueCount: number
+}
 
 type EffectDefinition = {
-  id: string;
-  name: string;
-  description: string;
-};
+  id: string
+  name: string
+  description: string
+}
 
 type Props = {
-  editorDoc: EditorDocument | null;
-  selectedCueId: string | null;
-  onEffectsChange: (effects: EffectReference[]) => void;
-};
+  editorDoc: EditorDocument | null
+  selectedCueId: string | null
+  onEffectsChange: (effects: EffectReference[]) => void
+}
 
-const EffectRegistry: React.FC<Props> = ({
-  editorDoc,
-  selectedCueId,
-  onEffectsChange
-}) => {
-  const [showDialog, setShowDialog] = useState<boolean>(false);
-  const [editingEffect, setEditingEffect] = useState<EffectReference | null>(null);
+const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsChange }) => {
+  const [showDialog, setShowDialog] = useState<boolean>(false)
+  const [editingEffect, setEditingEffect] = useState<EffectReference | null>(null)
   const [formData, setFormData] = useState<Partial<EffectReference>>({
     effectId: '',
     effectFileId: '',
-    name: ''
-  });
-  const [availableFiles, setAvailableFiles] = useState<EffectFileSummary[]>([]);
-  const [availableEffects, setAvailableEffects] = useState<EffectDefinition[]>([]);
-  const [selectedFile, setSelectedFile] = useState<string>('');
-  const [loadingEffects, setLoadingEffects] = useState(false);
+    name: '',
+  })
+  const [availableFiles, setAvailableFiles] = useState<EffectFileSummary[]>([])
+  const [availableEffects, setAvailableEffects] = useState<EffectDefinition[]>([])
+  const [selectedFile, setSelectedFile] = useState<string>('')
+  const [loadingEffects, setLoadingEffects] = useState(false)
 
   // Load available effect files when dialog opens
   useEffect(() => {
     if (showDialog && !editingEffect) {
-      loadEffectFiles();
+      loadEffectFiles()
     }
-  }, [showDialog, editingEffect]);
+  }, [showDialog, editingEffect])
 
   // Load effects from selected file
   useEffect(() => {
     if (selectedFile) {
-      loadEffectsFromFile(selectedFile);
+      loadEffectsFromFile(selectedFile)
     } else {
-      setAvailableEffects([]);
+      setAvailableEffects([])
     }
-  }, [selectedFile]);
+  }, [selectedFile])
 
   const loadEffectFiles = async () => {
     try {
-      const summary = await listEffectFiles();
-      const allFiles = [...summary.yarg, ...summary.audio];
-      setAvailableFiles(allFiles);
+      const summary = await listEffectFiles()
+      const allFiles = [...summary.yarg, ...summary.audio]
+      setAvailableFiles(allFiles)
     } catch (error) {
-      console.error('Failed to load effect files', error);
+      console.error('Failed to load effect files', error)
     }
-  };
+  }
 
   const loadEffectsFromFile = async (filePath: string) => {
-    setLoadingEffects(true);
+    setLoadingEffects(true)
     try {
-      const file = await readEffectFile(filePath);
-      const effects = file.effects.map(e => ({
+      const file = await readEffectFile(filePath)
+      const effects = file.effects.map((e) => ({
         id: e.id,
         name: e.name,
-        description: e.description
-      }));
-      setAvailableEffects(effects);
+        description: e.description,
+      }))
+      setAvailableEffects(effects)
     } catch (error) {
-      console.error('Failed to load effects from file', error);
-      setAvailableEffects([]);
+      console.error('Failed to load effects from file', error)
+      setAvailableEffects([])
     } finally {
-      setLoadingEffects(false);
+      setLoadingEffects(false)
     }
-  };
+  }
 
   // Effects are only available in cue mode (cues can reference effects)
-  const currentCue = editorDoc?.mode === 'cue' && editorDoc.file
-    ? (editorDoc.file as any).cues?.find((c: any) => c.id === selectedCueId)
-    : null;
-  const cueEffects = currentCue?.effects ?? [];
+  const currentCue =
+    editorDoc?.mode === 'cue' && editorDoc.file
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cue file shape
+        (editorDoc.file as any).cues?.find((c: any) => c.id === selectedCueId)
+      : null
+  const cueEffects = currentCue?.effects ?? []
 
   const openDialog = (existing?: EffectReference) => {
     if (existing) {
-      setFormData({ ...existing });
-      setEditingEffect(existing);
+      setFormData({ ...existing })
+      setEditingEffect(existing)
     } else {
       setFormData({
         effectId: '',
         effectFileId: '',
-        name: ''
-      });
-      setEditingEffect(null);
-      setSelectedFile('');
+        name: '',
+      })
+      setEditingEffect(null)
+      setSelectedFile('')
     }
-    setShowDialog(true);
-  };
+    setShowDialog(true)
+  }
 
   const closeDialog = () => {
-    setShowDialog(false);
-    setEditingEffect(null);
+    setShowDialog(false)
+    setEditingEffect(null)
     setFormData({
       effectId: '',
       effectFileId: '',
-      name: ''
-    });
-    setSelectedFile('');
-    setAvailableEffects([]);
-  };
+      name: '',
+    })
+    setSelectedFile('')
+    setAvailableEffects([])
+  }
 
   const handleFileSelect = (filePath: string) => {
-    setSelectedFile(filePath);
-    const file = availableFiles.find(f => f.path === filePath);
+    setSelectedFile(filePath)
+    const file = availableFiles.find((f) => f.path === filePath)
     if (file) {
       setFormData({
         ...formData,
         effectFileId: file.groupId,
         effectId: '',
-        name: ''
-      });
+        name: '',
+      })
     }
-  };
+  }
 
   const handleEffectSelect = (effectId: string) => {
-    const effect = availableEffects.find(e => e.id === effectId);
+    const effect = availableEffects.find((e) => e.id === effectId)
     if (effect) {
       setFormData({
         ...formData,
         effectId: effect.id, // Use the actual effect ID
-        name: effect.name
-      });
+        name: effect.name,
+      })
     }
-  };
+  }
 
   const handleSave = () => {
     if (!formData.effectId || !formData.effectFileId || !formData.name) {
-      alert('Please fill in all required fields');
-      return;
+      alert('Please fill in all required fields')
+      return
     }
 
     const newEffect: EffectReference = {
       effectId: formData.effectId,
       effectFileId: formData.effectFileId,
-      name: formData.name
-    };
+      name: formData.name,
+    }
 
-    let updatedEffects = [...cueEffects];
+    const updatedEffects = [...cueEffects]
     if (editingEffect) {
-      const index = updatedEffects.findIndex(e => e.effectId === editingEffect.effectId);
-      if (index >= 0) updatedEffects[index] = newEffect;
+      const index = updatedEffects.findIndex((e) => e.effectId === editingEffect.effectId)
+      if (index >= 0) updatedEffects[index] = newEffect
     } else {
       // Check for duplicate IDs
-      if (updatedEffects.some(e => e.effectId === newEffect.effectId)) {
-        alert(`An effect with ID "${newEffect.effectId}" already exists`);
-        return;
+      if (updatedEffects.some((e) => e.effectId === newEffect.effectId)) {
+        alert(`An effect with ID "${newEffect.effectId}" already exists`)
+        return
       }
-      updatedEffects.push(newEffect);
+      updatedEffects.push(newEffect)
     }
 
-    onEffectsChange(updatedEffects);
-    closeDialog();
-  };
+    onEffectsChange(updatedEffects)
+    closeDialog()
+  }
 
   const handleDelete = (effectId: string) => {
-    if (!confirm(`Delete effect reference "${effectId}"? This will not delete the effect file itself.`)) {
-      return;
+    if (
+      !confirm(
+        `Delete effect reference "${effectId}"? This will not delete the effect file itself.`,
+      )
+    ) {
+      return
     }
 
-    const updatedEffects = cueEffects.filter(e => e.effectId !== effectId);
-    onEffectsChange(updatedEffects);
-  };
+    const updatedEffects = cueEffects.filter((e) => e.effectId !== effectId)
+    onEffectsChange(updatedEffects)
+  }
 
   if (editorDoc?.mode !== 'cue') {
     return (
       <div className="p-3 text-xs text-gray-500">
-        Effect references are only available in cue mode. Effects themselves are standalone and do not reference other effects.
+        Effect references are only available in cue mode. Effects themselves are standalone and do
+        not reference other effects.
       </div>
-    );
+    )
   }
 
   return (
@@ -194,8 +197,7 @@ const EffectRegistry: React.FC<Props> = ({
         <h3 className="font-semibold text-sm">Effect References</h3>
         <button
           className="px-2 py-1 text-xs bg-cyan-600 text-white rounded hover:bg-cyan-700"
-          onClick={() => openDialog()}
-        >
+          onClick={() => openDialog()}>
           + Import Effect
         </button>
       </div>
@@ -204,15 +206,12 @@ const EffectRegistry: React.FC<Props> = ({
         {cueEffects.length === 0 ? (
           <p className="text-xs text-gray-500 italic">No effects imported yet</p>
         ) : (
-          cueEffects.map(effect => (
+          cueEffects.map((effect) => (
             <div
               key={effect.effectId}
-              className="flex justify-between items-start p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded text-xs border border-cyan-200 dark:border-cyan-800"
-            >
+              className="flex justify-between items-start p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded text-xs border border-cyan-200 dark:border-cyan-800">
               <div className="flex-1">
-                <div className="font-semibold text-cyan-800 dark:text-cyan-200">
-                  {effect.name}
-                </div>
+                <div className="font-semibold text-cyan-800 dark:text-cyan-200">{effect.name}</div>
                 <div className="text-[10px] text-gray-600 dark:text-gray-400 mt-0.5">
                   From: {effect.effectFileId}
                 </div>
@@ -220,14 +219,12 @@ const EffectRegistry: React.FC<Props> = ({
               <div className="flex gap-1">
                 <button
                   className="px-2 py-0.5 bg-cyan-600 text-white rounded hover:bg-cyan-700"
-                  onClick={() => openDialog(effect)}
-                >
+                  onClick={() => openDialog(effect)}>
                   Edit
                 </button>
                 <button
                   className="px-2 py-0.5 bg-red-600 text-white rounded hover:bg-red-700"
-                  onClick={() => handleDelete(effect.effectId)}
-                >
+                  onClick={() => handleDelete(effect.effectId)}>
                   Delete
                 </button>
               </div>
@@ -237,8 +234,12 @@ const EffectRegistry: React.FC<Props> = ({
       </div>
 
       {showDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeDialog}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={closeDialog}>
+          <div
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-3">
               {editingEffect ? 'Edit Effect Reference' : 'Import Effect'}
             </h3>
@@ -250,10 +251,9 @@ const EffectRegistry: React.FC<Props> = ({
                     <select
                       className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
                       value={selectedFile}
-                      onChange={e => handleFileSelect(e.target.value)}
-                    >
+                      onChange={(e) => handleFileSelect(e.target.value)}>
                       <option value="">-- Choose an effect file --</option>
-                      {availableFiles.map(file => (
+                      {availableFiles.map((file) => (
                         <option key={file.path} value={file.path}>
                           {file.groupName} ({file.mode.toUpperCase()}) - {file.cueCount} effect(s)
                         </option>
@@ -268,14 +268,13 @@ const EffectRegistry: React.FC<Props> = ({
                     Select Effect *
                     <select
                       className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
-                      value={availableEffects.find(e => e.name === formData.name)?.id || ''}
-                      onChange={e => handleEffectSelect(e.target.value)}
-                      disabled={!selectedFile || loadingEffects}
-                    >
+                      value={availableEffects.find((e) => e.name === formData.name)?.id || ''}
+                      onChange={(e) => handleEffectSelect(e.target.value)}
+                      disabled={!selectedFile || loadingEffects}>
                       <option value="">
                         {loadingEffects ? '-- Loading effects...' : '-- Choose an effect --'}
                       </option>
-                      {availableEffects.map(effect => (
+                      {availableEffects.map((effect) => (
                         <option key={effect.id} value={effect.id}>
                           {effect.name} {effect.description && `- ${effect.description}`}
                         </option>
@@ -294,7 +293,7 @@ const EffectRegistry: React.FC<Props> = ({
                   type="text"
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
                   value={formData.effectId || ''}
-                  onChange={e => setFormData({ ...formData, effectId: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, effectId: e.target.value })}
                   placeholder="e.g., strobe-1"
                   disabled={!!editingEffect}
                 />
@@ -309,7 +308,7 @@ const EffectRegistry: React.FC<Props> = ({
                   type="text"
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
                   value={formData.name || ''}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., Strobe Effect"
                 />
                 <span className="text-[10px] text-gray-500 mt-0.5">
@@ -335,14 +334,12 @@ const EffectRegistry: React.FC<Props> = ({
             <div className="flex justify-end gap-2 mt-4">
               <button
                 className="px-3 py-1 text-xs border rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                onClick={closeDialog}
-              >
+                onClick={closeDialog}>
                 Cancel
               </button>
               <button
                 className="px-3 py-1 text-xs bg-cyan-600 text-white rounded hover:bg-cyan-700"
-                onClick={handleSave}
-              >
+                onClick={handleSave}>
                 {editingEffect ? 'Save' : 'Import'}
               </button>
             </div>
@@ -350,7 +347,7 @@ const EffectRegistry: React.FC<Props> = ({
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default EffectRegistry;
+export default EffectRegistry

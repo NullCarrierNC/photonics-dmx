@@ -3,22 +3,22 @@
  */
 export interface StageKitConfig {
   /** Whether StageKit mode is enabled */
-  enabled: boolean;
-  
+  enabled: boolean
+
   /** Number of DMX lights to control (4 or 8) */
-  dmxLightCount: 4 | 8;
-  
+  dmxLightCount: 4 | 8
+
   /** How to map StageKit LEDs to DMX lights */
-  mappingMode: 'direct' | 'scaled' | 'circular';
-  
+  mappingMode: 'direct' | 'scaled' | 'circular'
+
   /** Whether to scale brightness values */
-  brightnessScaling: boolean;
-  
+  brightnessScaling: boolean
+
   /** Whether to apply color correction */
-  colorCorrection: boolean;
-  
+  colorCorrection: boolean
+
   /** Whether to enable debug logging */
-  debug?: boolean;
+  debug?: boolean
 }
 
 /**
@@ -26,25 +26,25 @@ export interface StageKitConfig {
  */
 export interface LightStateChangeEvent {
   /** Left channel value from RB3E */
-  leftChannel: number;
-  
+  leftChannel: number
+
   /** Right channel value from RB3E */
-  rightChannel: number;
-  
+  rightChannel: number
+
   /** Current brightness setting */
-  brightness: 'low' | 'medium' | 'high';
-  
+  brightness: 'low' | 'medium' | 'high'
+
   /** StageKit LED positions being controlled */
-  ledPositions: number[];
-  
+  ledPositions: number[]
+
   /** DMX light indices being updated */
-  dmxLightIndices: number[];
-  
+  dmxLightIndices: number[]
+
   /** Color being applied */
-  color: string;
-  
+  color: string
+
   /** Timestamp of the change */
-  timestamp: number;
+  timestamp: number
 }
 
 /**
@@ -52,13 +52,13 @@ export interface LightStateChangeEvent {
  */
 export interface RB3EPacketData {
   /** Left channel value (LED position control) */
-  leftChannel: number;
-  
+  leftChannel: number
+
   /** Right channel value (color/effect control) */
-  rightChannel: number;
-  
+  rightChannel: number
+
   /** Current brightness setting */
-  brightness: 'low' | 'medium' | 'high';
+  brightness: 'low' | 'medium' | 'high'
 }
 
 /**
@@ -66,13 +66,13 @@ export interface RB3EPacketData {
  */
 export interface StageKitLedMapping {
   /** LED position (0-7) */
-  position: number;
-  
+  position: number
+
   /** Physical location description */
-  location: string;
-  
+  location: string
+
   /** DMX light index to map to */
-  dmxIndex: number;
+  dmxIndex: number
 }
 
 /**
@@ -80,13 +80,13 @@ export interface StageKitLedMapping {
  */
 export interface ColorMapping {
   /** Color name */
-  name: string;
-  
+  name: string
+
   /** RGB values */
-  rgb: { r: number; g: number; b: number };
-  
+  rgb: { r: number; g: number; b: number }
+
   /** RB3E right channel value */
-  rightChannelValue: number;
+  rightChannelValue: number
 }
 
 /**
@@ -98,5 +98,5 @@ export const DEFAULT_STAGEKIT_CONFIG: StageKitConfig = {
   mappingMode: 'direct',
   brightnessScaling: true,
   colorCorrection: true,
-  debug: false
-};
+  debug: false,
+}

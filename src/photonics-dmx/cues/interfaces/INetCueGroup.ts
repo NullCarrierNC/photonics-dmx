@@ -1,7 +1,5 @@
-import { INetCue } from './INetCue';
-import { CueType } from '../types/cueTypes';
-
-
+import { INetCue } from './INetCue'
+import { CueType } from '../types/cueTypes'
 
 /**
  * Interface defining a group of cue implementations.
@@ -10,11 +8,11 @@ import { CueType } from '../types/cueTypes';
  * can be randomly selected for variety.
  */
 export interface ICueGroup {
-  id:string;
+  id: string
   /** The name of the group */
-  name: string;
+  name: string
   /** Description of the cue group */
-  description?: string;
+  description?: string
   /** Map of cue types to their implementations in this group */
-  cues: Map<CueType, INetCue>;
-} 
+  cues: Map<CueType, INetCue>
+}

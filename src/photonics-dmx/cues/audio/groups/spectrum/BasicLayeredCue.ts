@@ -1,11 +1,11 @@
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { getEffectSingleColor } from '../../../../effects';
-import { getColor, validateColorString } from '../../../../helpers';
-import { AudioCueData, BuiltInAudioCues } from '../../../types/audioCueTypes';
-import { IAudioCue } from '../../../interfaces/IAudioCue';
-import { clearCueLayers } from '../../utils/cueLayerUtils';
-import { getIntensityScale, applyIntensityScale } from '../../utils/bandUtils';
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { getEffectSingleColor } from '../../../../effects'
+import { getColor, validateColorString } from '../../../../helpers'
+import { AudioCueData, BuiltInAudioCues } from '../../../types/audioCueTypes'
+import { IAudioCue } from '../../../interfaces/IAudioCue'
+import { clearCueLayers } from '../../utils/cueLayerUtils'
+import { getIntensityScale, applyIntensityScale } from '../../utils/bandUtils'
 
 /**
  * BasicLayered cue - applies each frequency range to its own layer
@@ -17,87 +17,83 @@ import { getIntensityScale, applyIntensityScale } from '../../utils/bandUtils';
  * Each layer uses the configured color and brightness for that range
  */
 export class BasicLayeredCue implements IAudioCue {
-  id = 'audio-basic-layered';
-  cueType = BuiltInAudioCues.BasicLayered;
-  description = 'Applies each frequency range to its own layer, starting with Bass on layer 0';
-  private readonly layers = [0, 1, 2, 3, 4];
-  private sequencerRef: ILightingController | null = null;
-  private lightManagerRef: DmxLightManager | null = null;
+  id = 'audio-basic-layered'
+  cueType = BuiltInAudioCues.BasicLayered
+  description = 'Applies each frequency range to its own layer, starting with Bass on layer 0'
+  private readonly layers = [0, 1, 2, 3, 4]
+  private sequencerRef: ILightingController | null = null
+  private lightManagerRef: DmxLightManager | null = null
 
   async execute(
     data: AudioCueData,
     sequencer: ILightingController,
-    lightManager: DmxLightManager
+    lightManager: DmxLightManager,
   ): Promise<void> {
-    this.sequencerRef = sequencer;
-    this.lightManagerRef = lightManager;
-    const { audioData, config } = data;
-    const { frequencyBands } = audioData;
+    this.sequencerRef = sequencer
+    this.lightManagerRef = lightManager
+    const { audioData, config } = data
+    const { frequencyBands } = audioData
 
-    const allLights = lightManager.getLights(['front', 'back'], 'all');
+    const allLights = lightManager.getLights(['front', 'back'], 'all')
     if (!allLights || allLights.length === 0) {
-      return;
+      return
     }
 
-    const ranges = config.frequencyBands?.ranges || [];
+    const ranges = config.frequencyBands?.ranges || []
     if (ranges.length === 0) {
-      return;
+      return
     }
 
-    const configBandCount = config.frequencyBands?.bandCount;
-    const enabledBandCount = data.enabledBandCount ?? configBandCount ?? 4;
+    const configBandCount = config.frequencyBands?.bandCount
+    const enabledBandCount = data.enabledBandCount ?? configBandCount ?? 4
     const activeRangeIndices =
-      enabledBandCount === 3
-        ? [0, 2, 4]
-        : enabledBandCount === 4
-          ? [0, 1, 2, 3]
-          : [0, 1, 2, 3, 4];
+      enabledBandCount === 3 ? [0, 2, 4] : enabledBandCount === 4 ? [0, 1, 2, 3] : [0, 1, 2, 3, 4]
 
     const bandValues = [
       frequencyBands.range1,
       frequencyBands.range2,
       frequencyBands.range3,
       frequencyBands.range4,
-      frequencyBands.range5
-    ];
+      frequencyBands.range5,
+    ]
 
-    const linearResponse = config.linearResponse !== false;
+    const linearResponse = config.linearResponse !== false
 
     activeRangeIndices.forEach((rangeIndex, orderIndex) => {
-      const range = ranges[rangeIndex];
+      const range = ranges[rangeIndex]
       if (!range) {
-        return;
+        return
       }
 
-      const bandIntensity = bandValues[rangeIndex];
-      const layer = orderIndex;
+      const bandIntensity = bandValues[rangeIndex]
+      const layer = orderIndex
 
       if (bandIntensity < 0.01) {
-        sequencer.removeEffectByLayer(layer);
-        return;
+        sequencer.removeEffectByLayer(layer)
+        return
       }
 
-      const color = validateColorString(range.color);
+      const color = validateColorString(range.color)
       if (!color) {
-        console.warn(`Invalid color for range ${range.name}: ${range.color}`);
-        return;
+        console.warn(`Invalid color for range ${range.name}: ${range.color}`)
+        return
       }
 
-      const brightness = range.brightness || 'medium';
-      const rgbColor = getColor(color, brightness, 'add');
+      const brightness = range.brightness || 'medium'
+      const rgbColor = getColor(color, brightness, 'add')
 
-      const intensityScale = getIntensityScale(bandIntensity, linearResponse);
-      applyIntensityScale(rgbColor, intensityScale);
+      const intensityScale = getIntensityScale(bandIntensity, linearResponse)
+      applyIntensityScale(rgbColor, intensityScale)
 
       const effect = getEffectSingleColor({
         lights: allLights,
         color: rgbColor,
         duration: 100,
-        layer
-      });
+        layer,
+      })
 
-      sequencer.addEffect(`audio-basic-layered-${range.id}`, effect);
-    });
+      sequencer.addEffect(`audio-basic-layered-${range.id}`, effect)
+    })
 
     if (audioData.beatDetected) {
       // Reserved for future beat effect
@@ -105,11 +101,10 @@ export class BasicLayeredCue implements IAudioCue {
   }
 
   onStop(): void {
-    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef);
+    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef)
   }
 
   onDestroy(): void {
-    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef);
+    clearCueLayers(this.sequencerRef, this.layers, this.lightManagerRef)
   }
 }
-

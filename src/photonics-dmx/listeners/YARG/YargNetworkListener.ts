@@ -1,5 +1,5 @@
-import dgram from 'dgram';
-import { EventEmitter } from 'events';
+import dgram from 'dgram'
+import { EventEmitter } from 'events'
 
 import {
   CueData,
@@ -10,11 +10,10 @@ import {
   CueType,
   lightingCueMap,
   InstrumentNoteType,
-  DrumNoteType
-} from '../../cues/types/cueTypes';
+  DrumNoteType,
+} from '../../cues/types/cueTypes'
 
-
-import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler';
+import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler'
 
 enum PlatformByte {
   Unknown = 0,
@@ -99,36 +98,37 @@ enum BeatByte {
   Off = 3,
 }
 
-const PORT = 36107;
-const PACKET_HEADER = 0x59415247; // 'YARG' in hex
-const YARG_DATAGRAM_VERSION = 1;
+const PORT = 36107
+const PACKET_HEADER = 0x59415247 // 'YARG' in hex
+const YARG_DATAGRAM_VERSION = 1
 
 export class YargNetworkListener extends EventEmitter {
-  private server: dgram.Socket | null = null;
-  private cueHandler: BaseCueHandler;
+  private server: dgram.Socket | null = null
+  private cueHandler: BaseCueHandler
 
   //private logFilePath = path.join(app.getPath('documents'), 'yargLog.json');
-  private listening = false;
+  private listening = false
 
   // Batch logging
-//  private logBuffer: Record<string, any>[] = [];
-//  private flushThreshold = 50; // Flush after every 50 messages
- // private flushIntervalMs = 5000; // Also flush every 5 seconds
-  private flushTimer: NodeJS.Timeout | null = null;
+  //  private logBuffer: Record<string, any>[] = [];
+  //  private flushThreshold = 50; // Flush after every 50 messages
+  // private flushIntervalMs = 5000; // Also flush every 5 seconds
+  private flushTimer: NodeJS.Timeout | null = null
 
   // To store the last processed data for change detection (excluding timestamp)
-  private lastData: CueData | null = null;
+  private lastData: CueData | null = null
 
-  private lastLogData: Record<string, any> | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- log payload shape varies
+  private lastLogData: Record<string, any> | null = null
 
   // Track the last scene to detect transitions
-  private lastScene: "Unknown" | "Menu" | "Gameplay" | "Score" | "Calibration" | null = null;
+  private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | null = null
 
   constructor(cueHandler: BaseCueHandler) {
-    super(); // Initialize EventEmitter
-    this.cueHandler = cueHandler;
+    super() // Initialize EventEmitter
+    this.cueHandler = cueHandler
 
-    console.log('YargNetworkListener initialized.');
+    console.log('YargNetworkListener initialized.')
 
     /*
     // Initialize the flush timer
@@ -153,69 +153,69 @@ export class YargNetworkListener extends EventEmitter {
 
   public start() {
     if (this.listening) {
-      console.warn("YargNetworkListener is already running.");
-      return;
+      console.warn('YargNetworkListener is already running.')
+      return
     }
 
     if (!this.server) {
-      this.server = dgram.createSocket('udp4');
-      this.setupServerEvents();
+      this.server = dgram.createSocket('udp4')
+      this.setupServerEvents()
     }
 
     this.server.bind(PORT, () => {
-      this.listening = true;
-      console.log(`YargNetworkListener started and listening on port ${PORT}`);
-    });
+      this.listening = true
+      console.log(`YargNetworkListener started and listening on port ${PORT}`)
+    })
   }
 
   public stop() {
     if (!this.listening) {
-      console.warn("YargNetworkListener is not running.");
-      return;
+      console.warn('YargNetworkListener is not running.')
+      return
     }
 
     if (this.server) {
       this.server.close(() => {
-        console.log("YargNetworkListener server closed.");
-        this.listening = false;
-        this.server = null;
-      });
+        console.log('YargNetworkListener server closed.')
+        this.listening = false
+        this.server = null
+      })
     }
   }
 
   public shutdown() {
-    this.stop();
+    this.stop()
   }
 
   private setupServerEvents() {
-    if (!this.server) return;
+    if (!this.server) return
 
     this.server.on('error', (err) => {
-      console.error(`Server error:\n${err.stack}`);
-      this.server?.close();
-      this.listening = false;
-    });
+      console.error(`Server error:\n${err.stack}`)
+      this.server?.close()
+      this.listening = false
+    })
 
     this.server.on('listening', () => {
-      const address = this.server?.address();
+      const address = this.server?.address()
       if (address) {
-        console.log(`Listening for YARG events on ${address.address}:${address.port}`);
+        console.log(`Listening for YARG events on ${address.address}:${address.port}`)
       }
-    });
+    })
 
     this.server.on('message', (msg) => {
       try {
         // console.log(`Received message of ${msg.length} bytes: ${msg.toString('hex')}`);
-        this.deserializePacket(msg);
+        this.deserializePacket(msg)
       } catch (error) {
-        console.error('Failed to parse message:', error);
+        console.error('Failed to parse message:', error)
       }
-    });
+    })
   }
 
   private deserializePacket(buffer: Buffer) {
     try {
-      let offset = 0;
+      let offset = 0
 
       // Ensure buffer has at least the minimum required length (longer packets are allowed for forward compatibility)
       const expectedLength =
@@ -244,65 +244,90 @@ export class YargNetworkListener extends EventEmitter {
         1 + // Bonus Effect
         1 + // AutoGen Track
         1 + // Spotlight
-        1; // Singalong
+        1 // Singalong
 
       if (buffer.length < expectedLength) {
-        throw new Error(`Received packet is too short: ${buffer.length} bytes, expected at least ${expectedLength} bytes`);
+        throw new Error(
+          `Received packet is too short: ${buffer.length} bytes, expected at least ${expectedLength} bytes`,
+        )
       }
 
       // Header (little-endian)
-      const header = buffer.readUInt32LE(offset); offset += 4;
+      const header = buffer.readUInt32LE(offset)
+      offset += 4
       if (header !== PACKET_HEADER) {
-        console.warn(`Invalid packet header: 0x${header.toString(16)}`);
-        return;
+        console.warn(`Invalid packet header: 0x${header.toString(16)}`)
+        return
       }
 
-      const datagramVersion = buffer.readUInt8(offset); offset += 1;
-      const platformByte = buffer.readUInt8(offset); offset += 1;
-      const sceneByte = buffer.readUInt8(offset); offset += 1;
-      const pauseStateByte = buffer.readUInt8(offset); offset += 1;
-      const venueSizeByte = buffer.readUInt8(offset); offset += 1;
-      const beatsPerMinute = buffer.readFloatLE(offset); offset += 4;
-      const songSectionByte = buffer.readUInt8(offset); offset += 1;
-      const guitarNotesByte = buffer.readUInt8(offset); offset += 1;
-      const bassNotesByte = buffer.readUInt8(offset); offset += 1;
-      const drumNotesByte = buffer.readUInt8(offset); offset += 1;
-      const keysNotesByte = buffer.readUInt8(offset); offset += 1;
-      const vocalNote = buffer.readFloatLE(offset); offset += 4;
-      const harmony0Note = buffer.readFloatLE(offset); offset += 4;
-      const harmony1Note = buffer.readFloatLE(offset); offset += 4;
-      const harmony2Note = buffer.readFloatLE(offset); offset += 4;
-      const lightingCueValue = buffer.readUInt8(offset); offset += 1;
-      const postProcessingByte = buffer.readUInt8(offset); offset += 1;
-      const fogState = buffer.readUInt8(offset) === 1;
-      offset += 1;
-      const strobeStateValue = buffer.readUInt8(offset); offset += 1;
-      const beatValue = buffer.readUInt8(offset); offset += 1;
-      const keyframeValue = buffer.readUInt8(offset); offset += 1;
-      const bonusEffect = buffer.readUInt8(offset) === 1;
-      offset += 1;
-      const autoGenTrack = buffer.readUInt8(offset) === 1;
-      offset += 1;
-      
+      const datagramVersion = buffer.readUInt8(offset)
+      offset += 1
+      const platformByte = buffer.readUInt8(offset)
+      offset += 1
+      const sceneByte = buffer.readUInt8(offset)
+      offset += 1
+      const pauseStateByte = buffer.readUInt8(offset)
+      offset += 1
+      const venueSizeByte = buffer.readUInt8(offset)
+      offset += 1
+      const beatsPerMinute = buffer.readFloatLE(offset)
+      offset += 4
+      const songSectionByte = buffer.readUInt8(offset)
+      offset += 1
+      const guitarNotesByte = buffer.readUInt8(offset)
+      offset += 1
+      const bassNotesByte = buffer.readUInt8(offset)
+      offset += 1
+      const drumNotesByte = buffer.readUInt8(offset)
+      offset += 1
+      const keysNotesByte = buffer.readUInt8(offset)
+      offset += 1
+      const vocalNote = buffer.readFloatLE(offset)
+      offset += 4
+      const harmony0Note = buffer.readFloatLE(offset)
+      offset += 4
+      const harmony1Note = buffer.readFloatLE(offset)
+      offset += 4
+      const harmony2Note = buffer.readFloatLE(offset)
+      offset += 4
+      const lightingCueValue = buffer.readUInt8(offset)
+      offset += 1
+      const postProcessingByte = buffer.readUInt8(offset)
+      offset += 1
+      const fogState = buffer.readUInt8(offset) === 1
+      offset += 1
+      const strobeStateValue = buffer.readUInt8(offset)
+      offset += 1
+      const beatValue = buffer.readUInt8(offset)
+      offset += 1
+      const keyframeValue = buffer.readUInt8(offset)
+      offset += 1
+      const bonusEffect = buffer.readUInt8(offset) === 1
+      offset += 1
+      const autoGenTrack = buffer.readUInt8(offset) === 1
+      offset += 1
+
       if (datagramVersion < YARG_DATAGRAM_VERSION) {
-        console.error(`Unsupported datagram version: ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`);
-        const errorMessage = `YARG Datagram Version too old: received version ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`;
-        
+        console.error(
+          `Unsupported datagram version: ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`,
+        )
+        const errorMessage = `YARG Datagram Version too old: received version ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`
+
         // Emit error event for the controller to handle
         this.emit('yarg-error', {
           type: 'datagram-version-mismatch',
           message: errorMessage,
-          datagramVersion: datagramVersion
-        });
-        
-        throw new Error(errorMessage);
-      }
-      
-      // Added missing fields
-    //  const spotlight = buffer.readUInt8(offset); offset += 1;
-   //   const singalong = buffer.readUInt8(offset); offset += 1;
+          datagramVersion: datagramVersion,
+        })
 
-      const lightingCue = lightingCueMap[lightingCueValue] || `Unknown (${lightingCueValue})`;
+        throw new Error(errorMessage)
+      }
+
+      // Added missing fields
+      //  const spotlight = buffer.readUInt8(offset); offset += 1;
+      //   const singalong = buffer.readUInt8(offset); offset += 1;
+
+      const lightingCue = lightingCueMap[lightingCueValue] || `Unknown (${lightingCueValue})`
 
       const YargCueData: CueData = {
         datagramVersion,
@@ -324,21 +349,21 @@ export class YargNetworkListener extends EventEmitter {
         postProcessing: this.getPostProcessing(postProcessingByte),
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
-        performer: 0,//No longer in the network data?
+        performer: 0, //No longer in the network data?
         trackMode: autoGenTrack ? 'autogen' : 'tracked',
         beat: this.getBeatDescription(beatValue),
         keyframe: this.getKeyframeDescription(keyframeValue),
         bonusEffect,
-      };
-//console.log("Keyframe:", YargCueData.keyframe);
+      }
+      //console.log("Keyframe:", YargCueData.keyframe);
       // Change Detection: Compare with lastData (excluding timestamp)
       if (this.lastData && this.isDataEqual(this.lastData, YargCueData)) {
         // console.log("Received identical packet, skipping processing.");
-        return;
+        return
       }
 
       // Check for scene transitions and handle Menu -> Gameplay transition
-      this.handleSceneTransition(YargCueData.currentScene);
+      this.handleSceneTransition(YargCueData.currentScene)
 
       const logData = {
         currentScene: YargCueData.currentScene,
@@ -355,112 +380,110 @@ export class YargNetworkListener extends EventEmitter {
         keyframe: YargCueData.keyframe,
         performer: YargCueData.performer,
         strobeState: YargCueData.strobeState,
-      };
+      }
 
       // console.log("Listener Data:", logData);
       if (this.lastLogData && !this.isDataEqual(this.lastLogData, logData)) {
-        this.lastLogData = logData;
+        this.lastLogData = logData
         // console.log("\n", logData , ",")
       }
 
-      this.lastLogData = logData;
+      this.lastLogData = logData
       // Add to batch log buffer
       // this.logBuffer.push(dataWithTimestamp);
 
       // Track the beat:
       switch (YargCueData.beat) {
-        case "Strong":
-         // this.emit('handleBeat');
-         this.cueHandler.handleBeat();
-          break;
-        case "Measure":
-        //  this.emit('handleMeasure');
-        this.cueHandler.handleMeasure();
-          break;
+        case 'Strong':
+          // this.emit('handleBeat');
+          this.cueHandler.handleBeat()
+          break
+        case 'Measure':
+          //  this.emit('handleMeasure');
+          this.cueHandler.handleMeasure()
+          break
       }
 
       // Handle keyframe events
       switch (YargCueData.keyframe) {
-        case "First":
-        case "Next":
-        case "Previous":
-          this.cueHandler.handleKeyframe();
-          break;
+        case 'First':
+        case 'Next':
+        case 'Previous':
+          this.cueHandler.handleKeyframe()
+          break
       }
 
       // Handle known lighting cue by emitting an event
-      const cueType = lightingCue; //lightingCueMap[lightingCueValue];
+      const cueType = lightingCue //lightingCueMap[lightingCueValue];
       if (cueType) {
         //this.emit('handleCue', cueType, YargCueData);
         this.cueHandler.handleCue(cueType, YargCueData)
       } else {
-        console.warn(`Unknown lighting cue value received: ${lightingCue}`);
+        console.warn(`Unknown lighting cue value received: ${lightingCue}`)
       }
 
       // Handle strobe state changes
-      if (YargCueData.strobeState && YargCueData.strobeState !== "Strobe_Off") {
+      if (YargCueData.strobeState && YargCueData.strobeState !== 'Strobe_Off') {
         // Convert strobe state to cue type and handle it
-        let strobeCueType: CueType;
+        let strobeCueType: CueType
         switch (YargCueData.strobeState) {
-          case "Strobe_Slow":
-            strobeCueType = CueType.Strobe_Slow;
-            break;
-          case "Strobe_Medium":
-            strobeCueType = CueType.Strobe_Medium;
-            break;
-          case "Strobe_Fast":
-            strobeCueType = CueType.Strobe_Fast;
-            break;
-          case "Strobe_Fastest":
-            strobeCueType = CueType.Strobe_Fastest;
-            break;
+          case 'Strobe_Slow':
+            strobeCueType = CueType.Strobe_Slow
+            break
+          case 'Strobe_Medium':
+            strobeCueType = CueType.Strobe_Medium
+            break
+          case 'Strobe_Fast':
+            strobeCueType = CueType.Strobe_Fast
+            break
+          case 'Strobe_Fastest':
+            strobeCueType = CueType.Strobe_Fastest
+            break
           default:
-            return; // Unknown strobe state
+            return // Unknown strobe state
         }
-        this.cueHandler.handleCue(strobeCueType, YargCueData);
+        this.cueHandler.handleCue(strobeCueType, YargCueData)
       }
 
       // Handle individual drum notes
-      YargCueData.drumNotes.forEach(note => {
+      YargCueData.drumNotes.forEach((note) => {
         if (note !== DrumNoteType.None) {
-          this.cueHandler.handleDrumNote(note, YargCueData);
+          this.cueHandler.handleDrumNote(note, YargCueData)
         }
-      });
+      })
 
       // Handle individual guitar notes
-      YargCueData.guitarNotes.forEach(note => {
+      YargCueData.guitarNotes.forEach((note) => {
         if (note !== InstrumentNoteType.None) {
-          this.cueHandler.handleGuitarNote(note, YargCueData);
+          this.cueHandler.handleGuitarNote(note, YargCueData)
         }
-      });
+      })
 
       // Handle individual bass notes
-      YargCueData.bassNotes.forEach(note => {
+      YargCueData.bassNotes.forEach((note) => {
         if (note !== InstrumentNoteType.None) {
-          this.cueHandler.handleBassNote(note, YargCueData);
+          this.cueHandler.handleBassNote(note, YargCueData)
         }
-      });
+      })
 
       // Handle individual keys notes
-      YargCueData.keysNotes.forEach(note => {
+      YargCueData.keysNotes.forEach((note) => {
         if (note !== InstrumentNoteType.None) {
-          this.cueHandler.handleKeysNote(note, YargCueData);
+          this.cueHandler.handleKeysNote(note, YargCueData)
         }
-      });
+      })
 
-      
       // Update lastData (exclude timestamp)
-      this.lastData = YargCueData;
+      this.lastData = YargCueData
 
       // Flush to disk periodically
-     /*
+      /*
       if (this.logBuffer.length >= this.flushThreshold) {
         this.flushLogBuffer();
       }
         */
-
     } catch (error) {
-      console.error('YARG Listener: Error during packet deserialization:', error);
+      console.error('YARG Listener: Error during packet deserialization:', error)
     }
   }
 
@@ -470,16 +493,16 @@ export class YargNetworkListener extends EventEmitter {
    * @returns A string literal of the platform
    * @private
    */
-  private getPlatform(byteValue: number): "Unknown" | "Windows" | "Linux" | "Mac" {
+  private getPlatform(byteValue: number): 'Unknown' | 'Windows' | 'Linux' | 'Mac' {
     switch (byteValue) {
       case PlatformByte.Windows:
-        return "Windows";
+        return 'Windows'
       case PlatformByte.Linux:
-        return "Linux";
+        return 'Linux'
       case PlatformByte.Mac:
-        return "Mac";
+        return 'Mac'
       default:
-        return "Unknown";
+        return 'Unknown'
     }
   }
 
@@ -489,18 +512,20 @@ export class YargNetworkListener extends EventEmitter {
    * @returns A string literal of the scene
    * @private
    */
-  private getCurrentScene(byteValue: number): "Unknown" | "Menu" | "Gameplay" | "Score" | "Calibration" {
+  private getCurrentScene(
+    byteValue: number,
+  ): 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' {
     switch (byteValue) {
       case SceneIndexByte.Menu:
-        return "Menu";
+        return 'Menu'
       case SceneIndexByte.Gameplay:
-        return "Gameplay";
+        return 'Gameplay'
       case SceneIndexByte.Score:
-        return "Score";
+        return 'Score'
       case SceneIndexByte.Calibration:
-        return "Calibration";
+        return 'Calibration'
       default:
-        return "Unknown";
+        return 'Unknown'
     }
   }
 
@@ -510,16 +535,16 @@ export class YargNetworkListener extends EventEmitter {
    * @returns A string literal of the pause state
    * @private
    */
-  private getPauseState(byteValue: number): "AtMenu" | "Unpaused" | "Paused" {
+  private getPauseState(byteValue: number): 'AtMenu' | 'Unpaused' | 'Paused' {
     switch (byteValue) {
       case PauseStateByte.AtMenu:
-        return "AtMenu";
+        return 'AtMenu'
       case PauseStateByte.Unpaused:
-        return "Unpaused";
+        return 'Unpaused'
       case PauseStateByte.Paused:
-        return "Paused";
+        return 'Paused'
       default:
-        return "AtMenu"; // Default to "AtMenu" if unknown
+        return 'AtMenu' // Default to "AtMenu" if unknown
     }
   }
 
@@ -529,15 +554,15 @@ export class YargNetworkListener extends EventEmitter {
    * @returns A string literal of the venue size
    * @private
    */
-  private getVenueSize(byteValue: number): "NoVenue" | "Small" | "Large" {
+  private getVenueSize(byteValue: number): 'NoVenue' | 'Small' | 'Large' {
     switch (byteValue) {
       case VenueSizeByte.Small:
-        return "Small";
+        return 'Small'
       case VenueSizeByte.Large:
-        return "Large";
+        return 'Large'
       case VenueSizeByte.NoVenue:
       default:
-        return "NoVenue";
+        return 'NoVenue'
     }
   }
 
@@ -550,13 +575,13 @@ export class YargNetworkListener extends EventEmitter {
   private getSongSection(byteValue: number): SongSection {
     switch (byteValue) {
       case SongSectionByte.None:
-        return "None";
+        return 'None'
       case SongSectionByte.Chorus:
-        return "Chorus";
+        return 'Chorus'
       case SongSectionByte.Verse:
-        return "Verse";
+        return 'Verse'
       default:
-        return "Unknown";
+        return 'Unknown'
     }
   }
 
@@ -569,29 +594,29 @@ export class YargNetworkListener extends EventEmitter {
   private getPostProcessing(byteValue: number): PostProcessing {
     switch (byteValue) {
       case PostProcessingByte.Default:
-        return "Default";
+        return 'Default'
       case PostProcessingByte.Bloom:
-        return "Bloom";
+        return 'Bloom'
       case PostProcessingByte.Bright:
-        return "Bright";
+        return 'Bright'
       case PostProcessingByte.Saturation:
-        return "Saturation";
+        return 'Saturation'
       case PostProcessingByte.Contrast:
-        return "Contrast";
+        return 'Contrast'
       case PostProcessingByte.Sharpness:
-        return "Sharpness";
+        return 'Sharpness'
       case PostProcessingByte.Vignette:
-        return "Vignette";
+        return 'Vignette'
       case PostProcessingByte.ChromaticAberration:
-        return "ChromaticAberration";
+        return 'ChromaticAberration'
       case PostProcessingByte.MotionBlur:
-        return "MotionBlur";
+        return 'MotionBlur'
       case PostProcessingByte.DepthOfField:
-        return "DepthOfField";
+        return 'DepthOfField'
       case PostProcessingByte.AmbientOcclusion:
-        return "AmbientOcclusion";
+        return 'AmbientOcclusion'
       default:
-        return "Unknown";
+        return 'Unknown'
     }
   }
 
@@ -603,31 +628,31 @@ export class YargNetworkListener extends EventEmitter {
    */
   private getInstrumentNotes(byteValue: number): InstrumentNoteType[] {
     if (byteValue === GuitarBassKeyboardNotesByte.None) {
-      return [];
+      return []
     }
 
-    const notes: InstrumentNoteType[] = [];
+    const notes: InstrumentNoteType[] = []
 
     if ((byteValue & GuitarBassKeyboardNotesByte.Open) === GuitarBassKeyboardNotesByte.Open) {
-      notes.push(InstrumentNoteType.Open);
+      notes.push(InstrumentNoteType.Open)
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Green) === GuitarBassKeyboardNotesByte.Green) {
-      notes.push(InstrumentNoteType.Green);
+      notes.push(InstrumentNoteType.Green)
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Red) === GuitarBassKeyboardNotesByte.Red) {
-      notes.push(InstrumentNoteType.Red);
+      notes.push(InstrumentNoteType.Red)
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Yellow) === GuitarBassKeyboardNotesByte.Yellow) {
-      notes.push(InstrumentNoteType.Yellow);
+      notes.push(InstrumentNoteType.Yellow)
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Blue) === GuitarBassKeyboardNotesByte.Blue) {
-      notes.push(InstrumentNoteType.Blue);
+      notes.push(InstrumentNoteType.Blue)
     }
     if ((byteValue & GuitarBassKeyboardNotesByte.Orange) === GuitarBassKeyboardNotesByte.Orange) {
-      notes.push(InstrumentNoteType.Orange);
+      notes.push(InstrumentNoteType.Orange)
     }
 
-    return notes;
+    return notes
   }
 
   /**
@@ -638,37 +663,37 @@ export class YargNetworkListener extends EventEmitter {
    */
   private getDrumNotes(byteValue: number): DrumNoteType[] {
     if (byteValue === DrumNotesByte.None) {
-      return [];
+      return []
     }
 
-    const notes: DrumNoteType[] = [];
+    const notes: DrumNoteType[] = []
 
     if ((byteValue & DrumNotesByte.Kick) === DrumNotesByte.Kick) {
-      notes.push(DrumNoteType.Kick);
+      notes.push(DrumNoteType.Kick)
     }
     if ((byteValue & DrumNotesByte.RedDrum) === DrumNotesByte.RedDrum) {
-      notes.push(DrumNoteType.RedDrum);
+      notes.push(DrumNoteType.RedDrum)
     }
     if ((byteValue & DrumNotesByte.YellowDrum) === DrumNotesByte.YellowDrum) {
-      notes.push(DrumNoteType.YellowDrum);
+      notes.push(DrumNoteType.YellowDrum)
     }
     if ((byteValue & DrumNotesByte.BlueDrum) === DrumNotesByte.BlueDrum) {
-      notes.push(DrumNoteType.BlueDrum);
+      notes.push(DrumNoteType.BlueDrum)
     }
     if ((byteValue & DrumNotesByte.GreenDrum) === DrumNotesByte.GreenDrum) {
-      notes.push(DrumNoteType.GreenDrum);
+      notes.push(DrumNoteType.GreenDrum)
     }
     if ((byteValue & DrumNotesByte.YellowCymbal) === DrumNotesByte.YellowCymbal) {
-      notes.push(DrumNoteType.YellowCymbal);
+      notes.push(DrumNoteType.YellowCymbal)
     }
     if ((byteValue & DrumNotesByte.BlueCymbal) === DrumNotesByte.BlueCymbal) {
-      notes.push(DrumNoteType.BlueCymbal);
+      notes.push(DrumNoteType.BlueCymbal)
     }
     if ((byteValue & DrumNotesByte.GreenCymbal) === DrumNotesByte.GreenCymbal) {
-      notes.push(DrumNoteType.GreenCymbal);
+      notes.push(DrumNoteType.GreenCymbal)
     }
 
-    return notes;
+    return notes
   }
 
   /**
@@ -680,15 +705,15 @@ export class YargNetworkListener extends EventEmitter {
   private getBeatDescription(byteValue: number): Beat {
     switch (byteValue) {
       case BeatByte.Measure:
-        return "Measure";
+        return 'Measure'
       case BeatByte.Strong:
-        return "Strong";
+        return 'Strong'
       case BeatByte.Weak:
-        return "Weak";
+        return 'Weak'
       case BeatByte.Off:
-        return "Off";
+        return 'Off'
       default:
-        return "Unknown";
+        return 'Unknown'
     }
   }
 
@@ -701,17 +726,17 @@ export class YargNetworkListener extends EventEmitter {
   private getStrobeState(byteValue: number): StrobeState {
     switch (byteValue) {
       case 20:
-        return "Strobe_Fastest";
+        return 'Strobe_Fastest'
       case 21:
-        return "Strobe_Fast";
+        return 'Strobe_Fast'
       case 22:
-        return "Strobe_Medium";
+        return 'Strobe_Medium'
       case 23:
-        return "Strobe_Slow";
+        return 'Strobe_Slow'
       case 24:
-        return "Strobe_Off";
+        return 'Strobe_Off'
       default:
-        return "Unknown";
+        return 'Unknown'
     }
   }
 
@@ -724,15 +749,15 @@ export class YargNetworkListener extends EventEmitter {
   private getKeyframeDescription(byteValue: number): string {
     switch (byteValue) {
       case KeyFrameByte.Off:
-        return "Off";
+        return 'Off'
       case KeyFrameByte.KeyframeFirst:
-        return "First";
+        return 'First'
       case KeyFrameByte.KeyframeNext:
-        return "Next";
+        return 'Next'
       case KeyFrameByte.KeyframePrevious:
-        return "Previous";
+        return 'Previous'
       default:
-        return "Unknown";
+        return 'Unknown'
     }
   }
 
@@ -744,28 +769,29 @@ export class YargNetworkListener extends EventEmitter {
    * @param data2 Second data object.
    * @returns True if all properties (excluding 'timestamp') are equal, false otherwise.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic log comparison
   private isDataEqual(data1: Record<string, any>, data2: Record<string, any>): boolean {
-    const keys1 = Object.keys(data1);
-    const keys2 = Object.keys(data2);
+    const keys1 = Object.keys(data1)
+    const keys2 = Object.keys(data2)
 
-    if (keys1.length !== keys2.length) return false;
+    if (keys1.length !== keys2.length) return false
 
     for (const key of keys1) {
       // For array comparisons, perform a shallow comparison
       if (Array.isArray(data1[key]) && Array.isArray(data2[key])) {
-        if (data1[key].length !== data2[key].length) return false;
+        if (data1[key].length !== data2[key].length) return false
         for (let i = 0; i < data1[key].length; i++) {
           if (data1[key][i] !== data2[key][i]) {
-            return false;
+            return false
           }
         }
       } else {
         if (data1[key] !== data2[key]) {
-          return false;
+          return false
         }
       }
     }
-    return true;
+    return true
   }
 
   /**
@@ -811,23 +837,25 @@ export class YargNetworkListener extends EventEmitter {
    * Handle scene transitions, particularly Menu -> Gameplay to clear menu lighting
    * @param currentScene The current scene from the YARG packet
    */
-  private handleSceneTransition(currentScene: "Unknown" | "Menu" | "Gameplay" | "Score" | "Calibration"): void {
+  private handleSceneTransition(
+    currentScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration',
+  ): void {
     // Check if we have a scene change
     if (this.lastScene !== null && this.lastScene !== currentScene) {
-      console.log(`YARG: Scene transition detected: ${this.lastScene} -> ${currentScene}`);
-      
+      console.log(`YARG: Scene transition detected: ${this.lastScene} -> ${currentScene}`)
+
       // Handle Menu -> Gameplay transition (song start)
-      if (this.lastScene === "Menu" && currentScene === "Gameplay") {
-        console.log("YARG: Song starting - triggering blackout to clear menu lighting");
+      if (this.lastScene === 'Menu' && currentScene === 'Gameplay') {
+        console.log('YARG: Song starting - triggering blackout to clear menu lighting')
         // Trigger a fast blackout to clear any menu lighting
         this.cueHandler.handleCue(CueType.Blackout_Fast, {
           datagramVersion: 0,
-          platform: "Unknown",
+          platform: 'Unknown',
           currentScene: currentScene,
-          pauseState: "Unpaused",
-          venueSize: "NoVenue",
+          pauseState: 'Unpaused',
+          venueSize: 'NoVenue',
           beatsPerMinute: 0,
-          songSection: "None",
+          songSection: 'None',
           guitarNotes: [],
           bassNotes: [],
           drumNotes: [],
@@ -836,29 +864,29 @@ export class YargNetworkListener extends EventEmitter {
           harmony0Note: 0,
           harmony1Note: 0,
           harmony2Note: 0,
-          lightingCue: "Blackout_Fast",
-          postProcessing: "Default",
+          lightingCue: 'Blackout_Fast',
+          postProcessing: 'Default',
           fogState: false,
-          strobeState: "Strobe_Off",
+          strobeState: 'Strobe_Off',
           performer: 0,
-          trackMode: "tracked",
-          beat: "Off",
-          keyframe: "Off",
-          bonusEffect: false
-        });
+          trackMode: 'tracked',
+          beat: 'Off',
+          keyframe: 'Off',
+          bonusEffect: false,
+        })
       }
     }
-    
+
     // Update the last scene
-    this.lastScene = currentScene;
+    this.lastScene = currentScene
   }
 
   public destroy() {
     if (this.flushTimer) {
-      clearInterval(this.flushTimer);
-      this.flushTimer = null;
+      clearInterval(this.flushTimer)
+      this.flushTimer = null
     }
-    this.stop();
+    this.stop()
   }
 }
 /*

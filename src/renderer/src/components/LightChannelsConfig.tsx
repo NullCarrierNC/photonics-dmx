@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
   DmxFixture,
   DmxLight,
@@ -8,30 +8,30 @@ import {
   RgbwDmxChannels,
   StrobeDmxChannels,
   FixtureConfig,
-} from '../../../photonics-dmx/types';
-import { LightIcon } from './LightIcon';
-import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers';
-import { BsLightningFill } from 'react-icons/bs';
+} from '../../../photonics-dmx/types'
+import { LightIcon } from './LightIcon'
+import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
+import { BsLightningFill } from 'react-icons/bs'
 
 interface LightChannelsConfigProps {
-  light: DmxLight | null;
-  onChange: (updatedLight: DmxLight) => void;
-  onClick: () => void;
-  isHighlighted: boolean;
-  myLights: DmxFixture[]; // Light templates
+  light: DmxLight | null
+  onChange: (updatedLight: DmxLight) => void
+  onClick: () => void
+  isHighlighted: boolean
+  myLights: DmxFixture[] // Light templates
 }
 
-const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSpeed'];
+const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSpeed']
 
 const getDisplayName = (channelName: string) => {
-  if (channelName === 'masterDimmer') return 'Master Dimmer';
+  if (channelName === 'masterDimmer') return 'Master Dimmer'
   // For other keys, simply capitalize the first letter.
-  return channelName.charAt(0).toUpperCase() + channelName.slice(1);
-};
+  return channelName.charAt(0).toUpperCase() + channelName.slice(1)
+}
 
 /**
  * LightChannelsConfig Component
- * 
+ *
  * This component allows configuring DMX channels for a selected light.
  * It handles updating channel values, changing light types, toggling strobe mode,
  * and now also updates config values.
@@ -45,101 +45,105 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 }) => {
   const [localChannels, setLocalChannels] = useState<
     RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels | StrobeDmxChannels | null
-  >(null);
+  >(null)
 
   // State for the light's config (if available)
-  const [localConfig, setLocalConfig] = useState<FixtureConfig | null>(null);
+  const [localConfig, setLocalConfig] = useState<FixtureConfig | null>(null)
 
   useEffect(() => {
     if (light) {
-      const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId);
+      const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
 
       if (!fixtureTemplate) {
-        console.warn(`fixtureId (${light.fixtureId}) not found in myLights.`);
-        setLocalChannels(null);
-        setLocalConfig(null);
-        return;
+        console.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when fixture not found
+        setLocalChannels(null)
+        setLocalConfig(null)
+        return
       }
 
       // Handle Main Channels
-      const templateChannels = fixtureTemplate.channels;
+      const templateChannels = fixtureTemplate.channels
       // Calculate offsets based on masterDimmer for main channels
-      const offsets: { [key: string]: number } = {};
+      const offsets: { [key: string]: number } = {}
       Object.entries(templateChannels).forEach(([channelName, value]) => {
         if (channelName !== 'masterDimmer') {
-          offsets[channelName] = value - templateChannels.masterDimmer;
+          offsets[channelName] = value - templateChannels.masterDimmer
         }
-      });
+      })
 
-      const existingMasterDimmer = light.channels.masterDimmer;
-      const recalculatedChannels: { [key: string]: number } = {};
+      const existingMasterDimmer = light.channels.masterDimmer
+      const recalculatedChannels: { [key: string]: number } = {}
       Object.entries(templateChannels).forEach(([channelName, _]) => {
         if (channelName === 'masterDimmer') {
-          recalculatedChannels[channelName] = existingMasterDimmer;
+          recalculatedChannels[channelName] = existingMasterDimmer
         } else {
-          recalculatedChannels[channelName] = existingMasterDimmer + (offsets[channelName] || 0);
+          recalculatedChannels[channelName] = existingMasterDimmer + (offsets[channelName] || 0)
         }
-      });
+      })
 
-      const castChannels = castToChannelType(fixtureTemplate.fixture, recalculatedChannels);
-      setLocalChannels(castChannels);
+      const castChannels = castToChannelType(fixtureTemplate.fixture, recalculatedChannels)
+      setLocalChannels(castChannels)
 
       // Handle Config
       // Copy the config from the light (no master dimmer logic here)
       if (light.config) {
-        setLocalConfig(light.config);
+        setLocalConfig(light.config)
       } else {
-        setLocalConfig(null);
+        setLocalConfig(null)
       }
     } else {
-      setLocalChannels(null);
-      setLocalConfig(null);
+      setLocalChannels(null)
+      setLocalConfig(null)
     }
-  }, [light, myLights]);
+  }, [light, myLights])
 
   /**
    * Handles changes to the main Master Dimmer channel.
    */
   const handleMasterDimmerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (light && localChannels) {
-      const newMasterValue = Number(e.target.value);
-      
+      let newMasterValue = Number(e.target.value)
+      // DMX channels are 1-based; reject values less than 1
+      if (!Number.isFinite(newMasterValue) || newMasterValue < 1) {
+        newMasterValue = 1
+      }
       // Find the fixture template to get the original offsets
-      const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId);
+      const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
       if (!fixtureTemplate) {
-        console.warn(`fixtureId (${light.fixtureId}) not found in myLights.`);
-        return;
+        console.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
+        return
       }
 
       // Calculate offsets from the fixture template (not the current light)
-      const templateChannels = fixtureTemplate.channels;
-      const offsets: { [key: string]: number } = {};
+      const templateChannels = fixtureTemplate.channels
+      const offsets: { [key: string]: number } = {}
       Object.entries(templateChannels).forEach(([channelName, value]) => {
         if (channelName !== 'masterDimmer') {
-          offsets[channelName] = value - templateChannels.masterDimmer;
+          offsets[channelName] = value - templateChannels.masterDimmer
         }
-      });
+      })
 
       // Apply the new master dimmer value and recalculate all channels using template offsets
-      const updatedChannels: { [key: string]: number } = {};
+      const updatedChannels: { [key: string]: number } = {}
       Object.entries(templateChannels).forEach(([channelName, _]) => {
         if (channelName === 'masterDimmer') {
-          updatedChannels[channelName] = newMasterValue;
+          updatedChannels[channelName] = newMasterValue
         } else {
-          updatedChannels[channelName] = newMasterValue + (offsets[channelName] || 0);
+          updatedChannels[channelName] = newMasterValue + (offsets[channelName] || 0)
         }
-      });
+      })
 
-      const castChannels = castToChannelType(fixtureTemplate.fixture, updatedChannels);
-      setLocalChannels({ ...castChannels });
+      const castChannels = castToChannelType(fixtureTemplate.fixture, updatedChannels)
+      setLocalChannels({ ...castChannels })
 
       const updatedLight: DmxLight = {
         ...light,
         channels: { ...castChannels },
-      };
-      onChange(updatedLight);
+      }
+      onChange(updatedLight)
     }
-  };
+  }
 
   /**
    * Handles updates for any property in the config.
@@ -148,48 +152,49 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
    */
   const handleConfigChange = (key: keyof FixtureConfig, value: string | boolean) => {
     if (light && localConfig) {
-      let updatedValue: any = value;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- config value can be number or string
+      let updatedValue: any = value
       if (key !== 'invert') {
-        updatedValue = Number(value);
+        updatedValue = Number(value)
       }
-      const updatedConfig = { ...localConfig, [key]: updatedValue };
-      setLocalConfig(updatedConfig);
-      const updatedLight: DmxLight = { ...light, config: updatedConfig };
-      onChange(updatedLight);
+      const updatedConfig = { ...localConfig, [key]: updatedValue }
+      setLocalConfig(updatedConfig)
+      const updatedLight: DmxLight = { ...light, config: updatedConfig }
+      onChange(updatedLight)
     }
-  };
+  }
 
   /**
    * Handles changes to the light type via the select dropdown.
    */
   const handleLightTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedFixtureId = e.target.value;
-    if (!selectedFixtureId) return;
+    const selectedFixtureId = e.target.value
+    if (!selectedFixtureId) return
 
-    const selectedFixture = myLights.find((fixture) => fixture.id === selectedFixtureId);
-    if (!selectedFixture || !light) return;
+    const selectedFixture = myLights.find((fixture) => fixture.id === selectedFixtureId)
+    if (!selectedFixture || !light) return
 
-    const existingMasterDimmer = light.channels.masterDimmer;
-    const templateChannels = selectedFixture.channels;
+    const existingMasterDimmer = light.channels.masterDimmer
+    const templateChannels = selectedFixture.channels
 
-    const offsets: { [key: string]: number } = {};
+    const offsets: { [key: string]: number } = {}
     Object.entries(templateChannels).forEach(([channelName, value]) => {
       if (channelName !== 'masterDimmer') {
-        offsets[channelName] = value - templateChannels.masterDimmer;
+        offsets[channelName] = value - templateChannels.masterDimmer
       }
-    });
+    })
 
-    const recalculatedChannels: { [key: string]: number } = {};
+    const recalculatedChannels: { [key: string]: number } = {}
     Object.entries(templateChannels).forEach(([channelName, _]) => {
       if (channelName === 'masterDimmer') {
-        recalculatedChannels[channelName] = existingMasterDimmer;
+        recalculatedChannels[channelName] = existingMasterDimmer
       } else {
-        recalculatedChannels[channelName] = existingMasterDimmer + (offsets[channelName] || 0);
+        recalculatedChannels[channelName] = existingMasterDimmer + (offsets[channelName] || 0)
       }
-    });
+    })
 
-    const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels);
-    setLocalChannels({ ...castChannels });
+    const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
+    setLocalChannels({ ...castChannels })
 
     const updatedLight: DmxLight = {
       ...light,
@@ -199,19 +204,19 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       name: selectedFixture.name,
       isStrobeEnabled: selectedFixture.isStrobeEnabled,
       channels: { ...castChannels },
-    };
+    }
 
     // For config, if the new fixture has a config template, use it.
     if (selectedFixture.config) {
-      setLocalConfig(selectedFixture.config);
-      updatedLight.config = { ...selectedFixture.config };
+      setLocalConfig(selectedFixture.config)
+      updatedLight.config = { ...selectedFixture.config }
     } else {
-      setLocalConfig(null);
-      updatedLight.config = undefined;
+      setLocalConfig(null)
+      updatedLight.config = undefined
     }
 
-    onChange(updatedLight);
-  };
+    onChange(updatedLight)
+  }
 
   /**
    * Handles toggling the strobe mode.
@@ -221,12 +226,12 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       const updatedLight: DmxLight = {
         ...light,
         isStrobeEnabled: e.target.checked,
-      };
-      onChange(updatedLight);
+      }
+      onChange(updatedLight)
     }
-  };
+  }
 
-  const isFixtureInMyLights = myLights.some((fixture) => fixture.id === light?.fixtureId);
+  const isFixtureInMyLights = myLights.some((fixture) => fixture.id === light?.fixtureId)
 
   return (
     <div
@@ -237,14 +242,12 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                     isHighlighted
                       ? 'bg-yellow-500 dark:bg-yellow-600'
                       : 'bg-gray-300 dark:bg-[#303548] hover:bg-gray-200 dark:hover:bg-[#40465a]'
-                  }`}
-    >
+                  }`}>
       {/* Light Type Selector */}
       <select
         value={isFixtureInMyLights ? light?.fixtureId : myLights[0]?.id || ''}
         onChange={handleLightTypeChange}
-        className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700"
-      >
+        className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700">
         {myLights.map((availableFixture) => (
           <option key={availableFixture.id!} value={availableFixture.id!}>
             {availableFixture.name}
@@ -274,12 +277,12 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
           <ul className="text-sm space-y-1">
             {Object.entries(localChannels)
               .sort(([keyA], [keyB]) => {
-                const indexA = channelOrder.indexOf(keyA);
-                const indexB = channelOrder.indexOf(keyB);
-                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-                if (indexA !== -1) return -1;
-                if (indexB !== -1) return 1;
-                return keyA.localeCompare(keyB);
+                const indexA = channelOrder.indexOf(keyA)
+                const indexB = channelOrder.indexOf(keyB)
+                if (indexA !== -1 && indexB !== -1) return indexA - indexB
+                if (indexA !== -1) return -1
+                if (indexB !== -1) return 1
+                return keyA.localeCompare(keyB)
               })
               .map(([channelName, value]) => (
                 <li key={channelName} className="flex justify-between items-center">
@@ -287,7 +290,8 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                   {channelName === 'masterDimmer' ? (
                     <input
                       type="number"
-                      value={value || 0}
+                      min={1}
+                      value={value || 1}
                       onChange={handleMasterDimmerChange}
                       className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
                     />
@@ -307,7 +311,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
           <ul className="text-sm space-y-1">
             {Object.entries(localConfig).map(([key, value]) => {
               // Determine input type based on value type.
-              const inputType = typeof value === 'boolean' ? 'checkbox' : 'number';
+              const inputType = typeof value === 'boolean' ? 'checkbox' : 'number'
               return (
                 <li key={key} className="flex justify-between items-center">
                   <span className="capitalize">{getDisplayName(key)}</span>
@@ -331,14 +335,16 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                     />
                   )}
                 </li>
-              );
+              )
             })}
           </ul>
         </div>
       )}
 
       {/* Separator for moving head fixtures if present */}
-      {light?.fixture === FixtureTypes.RGBMH || light?.fixture === FixtureTypes.RGBWMH ? <hr /> : null}
+      {light?.fixture === FixtureTypes.RGBMH || light?.fixture === FixtureTypes.RGBWMH ? (
+        <hr />
+      ) : null}
 
       {/* Strobe Toggle */}
       {light && (
@@ -353,7 +359,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
         </label>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default LightChannelsConfig;
+export default LightChannelsConfig

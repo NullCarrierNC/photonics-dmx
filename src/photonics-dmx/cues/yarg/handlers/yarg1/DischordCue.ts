@@ -1,14 +1,14 @@
-import { CueData, CueType } from '../../../types/cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { INetCue, CueStyle } from '../../../interfaces/INetCue';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { 
-  getEffectFlashColor, 
-  getEffectClockwiseRotation, 
-  getEffectDualModeRotation, 
-  getEffectAlternatingPatterns 
-} from '../../../../effects';
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import {
+  getEffectFlashColor,
+  getEffectClockwiseRotation,
+  getEffectDualModeRotation,
+  getEffectAlternatingPatterns,
+} from '../../../../effects'
 
 /**
  * Dischord Cue - Stage Kit Implementation
@@ -18,19 +18,24 @@ import {
  * Red LEDs: Flash all lights on red drum hits
  */
 export class DischordCue implements INetCue {
-  id = 'default-dischord';
-  cueId = CueType.Dischord;
-  description = 'Yellow clockwise rotation on beat, green dual-mode (spinning/solid) on measure, blue alternating patterns on keyframe, red flash on red drum';
-  style = CueStyle.Primary;
-  private isFirstExecution = true;
+  id = 'default-dischord'
+  cueId = CueType.Dischord
+  description =
+    'Yellow clockwise rotation on beat, green dual-mode (spinning/solid) on measure, blue alternating patterns on keyframe, red flash on red drum'
+  style = CueStyle.Primary
+  private isFirstExecution = true
 
-  async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const allLights = lightManager.getLights(['front', 'back'], 'all');
-    const yellowColor = getColor('yellow', 'medium', 'add');
-    const greenColor = getColor('green', 'medium', 'add');
-    const blueColor = getColor('blue', 'medium', 'replace');
-    const transparentColor = getColor('transparent', 'medium');
-    const redColor = getColor('red', 'medium', 'replace');
+  async execute(
+    parameters: CueData,
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const allLights = lightManager.getLights(['front', 'back'], 'all')
+    const yellowColor = getColor('yellow', 'medium', 'add')
+    const greenColor = getColor('green', 'medium', 'add')
+    const blueColor = getColor('blue', 'medium', 'replace')
+    const transparentColor = getColor('transparent', 'medium')
+    const redColor = getColor('red', 'medium', 'replace')
 
     // Yellow: Clockwise rotation on beat (0→1→2→3→4→5→6→7)
     const yellowEffect = getEffectClockwiseRotation({
@@ -40,7 +45,7 @@ export class DischordCue implements INetCue {
       layer: 2,
       waitUntilCondition: 'beat',
       beatsPerCycle: 1,
-    });
+    })
 
     // Green: Dual behavior - spinning counter-clockwise OR solid on, toggles on measure (large venues only)
     const greenEffect = getEffectDualModeRotation({
@@ -53,11 +58,11 @@ export class DischordCue implements INetCue {
       waitUntilCondition: 'beat',
       beatsPerCycle: 2, // 0.5 cycles per beat = 2 beats per cycle
       modeSwitchCondition: 'measure',
-    });
+    })
 
     // Blue: Two alternating patterns on keyframe events
-    const bluePatternA = lightManager.getLights(['front', 'back'], 'third-2');
-    const bluePatternB = lightManager.getLights(['front', 'back'], 'even');
+    const bluePatternA = lightManager.getLights(['front', 'back'], 'third-2')
+    const bluePatternB = lightManager.getLights(['front', 'back'], 'even')
     const blueEffect = getEffectAlternatingPatterns({
       patternALights: bluePatternA,
       patternBLights: bluePatternB,
@@ -66,7 +71,7 @@ export class DischordCue implements INetCue {
       layer: 0,
       switchCondition: 'keyframe',
       completeCondition: 'beat',
-    });
+    })
 
     // Red: Flash all lights on red drum hits
     const redFlash = getEffectFlashColor({
@@ -77,28 +82,27 @@ export class DischordCue implements INetCue {
       holdTime: 120,
       durationOut: 150,
       layer: 101,
-    });
+    })
 
     // Apply the effects
     if (this.isFirstExecution) {
       // First time: use setEffect to clear any existing effects and start fresh
-      sequencer.setEffect('dischord-yellow', yellowEffect);
-      sequencer.addEffect('dischord-green', greenEffect);
-      sequencer.addEffect('dischord-blue', blueEffect);
-      sequencer.addEffect('dischord-red', redFlash);
-      this.isFirstExecution = false;
+      sequencer.setEffect('dischord-yellow', yellowEffect)
+      sequencer.addEffect('dischord-green', greenEffect)
+      sequencer.addEffect('dischord-blue', blueEffect)
+      sequencer.addEffect('dischord-red', redFlash)
+      this.isFirstExecution = false
     } else {
       // Repeat call: use addEffect to add to existing effects
-      sequencer.addEffect('dischord-yellow', yellowEffect);
-      sequencer.addEffect('dischord-green', greenEffect);
-      sequencer.addEffect('dischord-blue', blueEffect);
-      sequencer.addEffect('dischord-red', redFlash);
+      sequencer.addEffect('dischord-yellow', yellowEffect)
+      sequencer.addEffect('dischord-green', greenEffect)
+      sequencer.addEffect('dischord-blue', blueEffect)
+      sequencer.addEffect('dischord-red', redFlash)
     }
   }
 
-
   onStop(): void {
     // Reset the first execution flag so next time this cue runs it will use setEffect
-    this.isFirstExecution = true;
+    this.isFirstExecution = true
   }
-} 
+}

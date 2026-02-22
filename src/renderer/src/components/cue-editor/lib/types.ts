@@ -1,4 +1,4 @@
-import type { Node } from 'reactflow';
+import type { Node } from 'reactflow'
 import type {
   ActionNode,
   AudioEventNode,
@@ -6,35 +6,52 @@ import type {
   EventListenerNode,
   LogicNode,
   NodeCueFile,
+  VariableDefinition,
   YargEventNode,
   EffectRaiserNode,
   EffectEventListenerNode,
   NotesNode,
-  EffectFile
-} from '../../../../../photonics-dmx/cues/types/nodeCueTypes';
+  EffectFile,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
-export type EditorMode = 'cue' | 'effect';
+export type EditorMode = 'cue' | 'effect'
 
 export type EditorNodeData = {
-  kind: 'event' | 'action' | 'logic' | 'event-raiser' | 'event-listener' 
-        | 'effect-raiser' | 'effect-listener' | 'notes';
-  payload: YargEventNode | AudioEventNode | ActionNode | LogicNode 
-           | EventRaiserNode | EventListenerNode 
-           | EffectRaiserNode | EffectEventListenerNode | NotesNode;
-  label: string;
-};
+  kind:
+    | 'event'
+    | 'action'
+    | 'logic'
+    | 'event-raiser'
+    | 'event-listener'
+    | 'effect-raiser'
+    | 'effect-listener'
+    | 'notes'
+  payload:
+    | YargEventNode
+    | AudioEventNode
+    | ActionNode
+    | LogicNode
+    | EventRaiserNode
+    | EventListenerNode
+    | EffectRaiserNode
+    | EffectEventListenerNode
+    | NotesNode
+  label: string
+  effectName?: string
+  parameterDefinitions?: VariableDefinition[]
+}
 
-export type EditorNode = Node<EditorNodeData>;
+export type EditorNode = Node<EditorNodeData>
 
 export type EditorDocument = {
-  mode: EditorMode;
-  file: NodeCueFile | EffectFile;
-  path: string | null;
-};
+  mode: EditorMode
+  file: NodeCueFile | EffectFile
+  path: string | null
+}
 
 export type EventOption<T extends string> = {
-  value: T;
-  label: string;
-};
+  value: T
+  label: string
+}
 
-export type NotesVariant = 'notes' | 'info' | 'important';
+export type NotesVariant = 'notes' | 'info' | 'important'

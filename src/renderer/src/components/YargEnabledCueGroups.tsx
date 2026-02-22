@@ -1,104 +1,102 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { CueGroup } from 'src/photonics-dmx/types';
-import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
+import React, { useState, useEffect, useCallback } from 'react'
+import { CueGroup } from 'src/photonics-dmx/types'
+import { CONFIG, LIGHT } from '../../../shared/ipcChannels'
+import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
 
 interface CueInfo {
-  id: string;
-  yargDescription: string;
-  rb3Description: string;
-  groupName?: string;
+  id: string
+  yargDescription: string
+  rb3Description: string
+  groupName?: string
 }
 
 interface GroupCueDetails extends CueGroup {
-  cues: CueInfo[];
-  isExpanded: boolean;
+  cues: CueInfo[]
+  isExpanded: boolean
 }
 
 const YargEnabledCueGroups: React.FC = () => {
-  const [allGroups, setAllGroups] = useState<GroupCueDetails[]>([]);
-  const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allGroups, setAllGroups] = useState<GroupCueDetails[]>([])
+  const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   const fetchGroups = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(true)
       const [all, enabled] = await Promise.all([
-        window.electron.ipcRenderer.invoke('get-cue-groups'),
-        window.electron.ipcRenderer.invoke('get-enabled-cue-groups')
-      ]);
-      
+        window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS),
+        window.electron.ipcRenderer.invoke(CONFIG.GET_ENABLED_CUE_GROUPS),
+      ])
+
       // Transform groups and add expanded state
       const groupsWithDetails: GroupCueDetails[] = all.map((group: CueGroup) => ({
         ...group,
         cues: [],
-        isExpanded: false
-      }));
-      
-      setAllGroups(groupsWithDetails);
-      setEnabledGroupIds(enabled); 
+        isExpanded: false,
+      }))
+
+      setAllGroups(groupsWithDetails)
+      setEnabledGroupIds(enabled)
     } catch (e) {
       if (e instanceof Error) {
-        console.error("Failed to fetch cue groups:", e.message);
+        console.error('Failed to fetch cue groups:', e.message)
       } else {
-        console.error("An unknown error occurred:", e);
+        console.error('An unknown error occurred:', e)
       }
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+    fetchGroups()
+  }, [fetchGroups])
 
   const handleGroupToggle = (groupName: string, isEnabled: boolean) => {
-    const group = allGroups.find(g => g.name === groupName);
-    if (!group) return;
-    
-    let updatedEnabledGroupIds: string[];
-  
+    const group = allGroups.find((g) => g.name === groupName)
+    if (!group) return
+
+    let updatedEnabledGroupIds: string[]
+
     if (isEnabled) {
-      updatedEnabledGroupIds = [...new Set([...enabledGroupIds, group.id])];
+      updatedEnabledGroupIds = [...new Set([...enabledGroupIds, group.id])]
     } else {
-      updatedEnabledGroupIds = enabledGroupIds.filter(id => id !== group.id);
+      updatedEnabledGroupIds = enabledGroupIds.filter((id) => id !== group.id)
     }
-    
-    setEnabledGroupIds(updatedEnabledGroupIds);
-    window.electron.ipcRenderer.invoke('set-enabled-cue-groups', updatedEnabledGroupIds);
-  };
+
+    setEnabledGroupIds(updatedEnabledGroupIds)
+    window.electron.ipcRenderer.invoke(CONFIG.SET_ENABLED_CUE_GROUPS, updatedEnabledGroupIds)
+  }
 
   const handleAccordionToggle = async (groupName: string) => {
-    const group = allGroups.find(g => g.name === groupName);
-    if (!group) return;
+    const group = allGroups.find((g) => g.name === groupName)
+    if (!group) return
 
     // If expanding and cues haven't been loaded, fetch them
     if (!group.isExpanded && group.cues.length === 0) {
       try {
-        const cueDetails = await window.electron.ipcRenderer.invoke('get-available-cues', group.id);
-        
+        const cueDetails = await window.electron.ipcRenderer.invoke(
+          LIGHT.GET_AVAILABLE_CUES,
+          group.id,
+        )
+
         // Update the group with cue details
-        setAllGroups(prevGroups => 
-          prevGroups.map(g => 
-            g.name === groupName 
-              ? { ...g, cues: cueDetails, isExpanded: true }
-              : g
-          )
-        );
-        return;
+        setAllGroups((prevGroups) =>
+          prevGroups.map((g) =>
+            g.name === groupName ? { ...g, cues: cueDetails, isExpanded: true } : g,
+          ),
+        )
+        return
       } catch (error) {
-        console.error('Error fetching cue details:', error);
+        console.error('Error fetching cue details:', error)
       }
     }
 
     // Toggle expanded state
-    setAllGroups(prevGroups => 
-      prevGroups.map(g => 
-        g.name === groupName 
-          ? { ...g, isExpanded: !g.isExpanded }
-          : g
-      )
-    );
-  };
+    setAllGroups((prevGroups) =>
+      prevGroups.map((g) => (g.name === groupName ? { ...g, isExpanded: !g.isExpanded } : g)),
+    )
+  }
 
   if (loading) {
     return (
@@ -106,25 +104,26 @@ const YargEnabledCueGroups: React.FC = () => {
         <h2 className="text-xl font-semibold mb-4 border-b pb-2">YARG Cue Groups</h2>
         <p>Loading cue groups...</p>
       </div>
-    );
+    )
   }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">YARG Cue Groups</h2>
+      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
+        YARG Cue Groups
+      </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        Cue groups contain different implementations of the same cue triggered by YARG. Having multiple groups enabled allows for a wider range of visual 
-        effects during gameplay. The Stage Kit group is used as a fallback if no other group contains the necessary cue. 
-        
+        Cue groups contain different implementations of the same cue triggered by YARG. Having
+        multiple groups enabled allows for a wider range of visual effects during gameplay. The
+        Stage Kit group is used as a fallback if no other group contains the necessary cue.
       </p>
       <div className="space-y-4">
         {allGroups.map((group) => (
           <div key={group.name} className="border rounded-lg border-gray-200 dark:border-gray-600">
             {/* Group Header */}
-            <div 
+            <div
               className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              onClick={() => handleAccordionToggle(group.name)}
-            >
+              onClick={() => handleAccordionToggle(group.name)}>
               <div className="flex items-center flex-1">
                 <div className="mr-3 text-gray-600 dark:text-gray-400">
                   {group.isExpanded ? (
@@ -159,13 +158,18 @@ const YargEnabledCueGroups: React.FC = () => {
                     <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 ">
                       Cues in this group ({group.cues.length}):
                     </h4>
-                                                              {group.cues.sort((a, b) => a.id.localeCompare(b.id)).map((cue) => (
+                    {group.cues
+                      .sort((a, b) => a.id.localeCompare(b.id))
+                      .map((cue) => (
                         <div key={cue.id} className="pl-4">
                           <p className="text-xs text-gray-600 dark:text-gray-400">
-                            <span className="font-medium text-gray-800 dark:text-gray-200">{cue.id}:</span> {cue.yargDescription}
+                            <span className="font-medium text-gray-800 dark:text-gray-200">
+                              {cue.id}:
+                            </span>{' '}
+                            {cue.yargDescription}
                           </p>
                         </div>
-                     ))}
+                      ))}
                   </div>
                 )}
               </div>
@@ -174,7 +178,7 @@ const YargEnabledCueGroups: React.FC = () => {
         ))}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default YargEnabledCueGroups;
+export default YargEnabledCueGroups

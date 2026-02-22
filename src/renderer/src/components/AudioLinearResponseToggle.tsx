@@ -1,58 +1,62 @@
-import React, { useEffect, useState } from 'react';
-import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers';
+import React, { useEffect, useState } from 'react'
+import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 const AudioLinearResponseToggle: React.FC = () => {
-  const [linearResponse, setLinearResponse] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [linearResponse, setLinearResponse] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke('get-audio-config');
-        setLinearResponse(config?.linearResponse !== false);
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+        setLinearResponse(config?.linearResponse !== false)
       } catch (error) {
-        console.error('Failed to load audio linear response setting:', error);
+        console.error('Failed to load audio linear response setting:', error)
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    loadConfig();
+    loadConfig()
 
     const handleUpdate = (_event: unknown, config: { linearResponse?: boolean }) => {
-      setLinearResponse(config?.linearResponse !== false);
-    };
+      setLinearResponse(config?.linearResponse !== false)
+    }
 
-    addIpcListener('audio:config-update', handleUpdate as any);
-    return () => removeIpcListener('audio:config-update', handleUpdate as any);
-  }, []);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- IPC handler signature
+    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleUpdate as any)
+    return () =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- IPC handler signature
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleUpdate as any)
+  }, [])
 
   const handleToggle = async () => {
-    if (isSaving) return;
+    if (isSaving) return
 
-    const nextValue = !linearResponse;
-    setLinearResponse(nextValue);
+    const nextValue = !linearResponse
+    setLinearResponse(nextValue)
 
     try {
-      setIsSaving(true);
-      const result = await window.electron.ipcRenderer.invoke('save-audio-config', {
-        linearResponse: nextValue
-      });
+      setIsSaving(true)
+      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
+        linearResponse: nextValue,
+      })
 
       if (!result?.success) {
-        console.error('Failed to save linear response setting:', result?.error);
-        const config = await window.electron.ipcRenderer.invoke('get-audio-config');
-        setLinearResponse(config?.linearResponse !== false);
+        console.error('Failed to save linear response setting:', result?.error)
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+        setLinearResponse(config?.linearResponse !== false)
       }
     } catch (error) {
-      console.error('Failed to save linear response setting:', error);
-      const config = await window.electron.ipcRenderer.invoke('get-audio-config');
-      setLinearResponse(config?.linearResponse !== false);
+      console.error('Failed to save linear response setting:', error)
+      const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+      setLinearResponse(config?.linearResponse !== false)
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   return (
     <div className="flex items-start justify-between">
@@ -74,8 +78,7 @@ const AudioLinearResponseToggle: React.FC = () => {
         />
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default AudioLinearResponseToggle;
-
+export default AudioLinearResponseToggle

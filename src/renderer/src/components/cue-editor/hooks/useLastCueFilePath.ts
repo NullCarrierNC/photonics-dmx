@@ -1,46 +1,46 @@
-const LAST_FILE_STORAGE_KEY = 'photonics.nodeCueEditor.lastFilePath';
+const LAST_FILE_STORAGE_KEY = 'photonics.nodeCueEditor.lastFilePath'
 
 const getStorage = (): Storage | null => {
   if (typeof window === 'undefined' || !window.localStorage) {
-    return null;
+    return null
   }
-  return window.localStorage;
-};
+  return window.localStorage
+}
 
 const getStoredLastFilePath = (): string | null => {
-  const storage = getStorage();
+  const storage = getStorage()
   if (!storage) {
-    return null;
+    return null
   }
   try {
-    return storage.getItem(LAST_FILE_STORAGE_KEY);
+    return storage.getItem(LAST_FILE_STORAGE_KEY)
   } catch {
-    return null;
+    return null
   }
-};
+}
 
 const setStoredLastFilePath = (path: string): void => {
-  const storage = getStorage();
+  const storage = getStorage()
   if (!storage) {
-    return;
+    return
   }
   try {
-    storage.setItem(LAST_FILE_STORAGE_KEY, path);
+    storage.setItem(LAST_FILE_STORAGE_KEY, path)
   } catch {
     // Storage might be unavailable (e.g., privacy mode)
   }
-};
+}
 
 const clearStoredLastFilePath = (): void => {
-  const storage = getStorage();
+  const storage = getStorage()
   if (!storage) {
-    return;
+    return
   }
   try {
-    storage.removeItem(LAST_FILE_STORAGE_KEY);
+    storage.removeItem(LAST_FILE_STORAGE_KEY)
   } catch {
     // Storage might be unavailable
   }
-};
+}
 
-export { clearStoredLastFilePath, getStoredLastFilePath, setStoredLastFilePath };
+export { clearStoredLastFilePath, getStoredLastFilePath, setStoredLastFilePath }

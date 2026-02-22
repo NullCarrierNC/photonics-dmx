@@ -1,35 +1,40 @@
-import { CueData, CueType } from '../../../types/cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { INetCue, CueStyle } from '../../../interfaces/INetCue';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
-import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
-import { TimingPresets } from '../../../../helpers/bpmUtils';
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { getEffectSingleColor } from '../../../../effects/effectSingleColor'
+import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors'
+import { TimingPresets } from '../../../../helpers/bpmUtils'
 
 export class WarmManualCue implements INetCue {
-  id = 'default-warm-manual';
-  cueId = CueType.Warm_Manual;
-  description = 'Alternates between red and yellow on even/odd front lights triggered by measure events';
-  style = CueStyle.Primary;
+  id = 'default-warm-manual'
+  cueId = CueType.Warm_Manual
+  description =
+    'Alternates between red and yellow on even/odd front lights triggered by measure events'
+  style = CueStyle.Primary
 
-  private isFirstExecution: boolean = true;
+  private isFirstExecution: boolean = true
 
-  async execute(parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const even = lightManager.getLights(['front', 'back'], 'even');
-    const odd = lightManager.getLights(['front', 'back'], 'odd');
-    const all = lightManager.getLights(['front', 'back'], 'all');
+  async execute(
+    parameters: CueData,
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const even = lightManager.getLights(['front', 'back'], 'even')
+    const odd = lightManager.getLights(['front', 'back'], 'odd')
+    const all = lightManager.getLights(['front', 'back'], 'all')
 
-    const red = getColor('red', 'medium');
-    const yellow = getColor('yellow', 'medium');
+    const red = getColor('red', 'medium')
+    const yellow = getColor('yellow', 'medium')
 
-    const duration = TimingPresets.beat(parameters.beatsPerMinute);
+    const duration = TimingPresets.beat(parameters.beatsPerMinute)
 
     const baseLayer = getEffectSingleColor({
       lights: all,
       color: red,
       duration: 100,
-    });
+    })
 
     const crossFadeEven = getEffectCrossFadeColors({
       startColor: red,
@@ -40,7 +45,7 @@ export class WarmManualCue implements INetCue {
       duration: duration,
       lights: even,
       layer: 1,
-    });
+    })
     const crossFadeOdd = getEffectCrossFadeColors({
       startColor: yellow,
       crossFadeTrigger: 'measure',
@@ -50,20 +55,20 @@ export class WarmManualCue implements INetCue {
       duration: duration,
       lights: odd,
       layer: 2,
-    });
+    })
     if (this.isFirstExecution) {
-      sequencer.setEffect('warm_manual-base', baseLayer);
-      this.isFirstExecution = false;
+      sequencer.setEffect('warm_manual-base', baseLayer)
+      this.isFirstExecution = false
     } else {
-      sequencer.addEffect('warm_manual-base', baseLayer);
+      sequencer.addEffect('warm_manual-base', baseLayer)
     }
-    
-    sequencer.addEffect('warm_manual-e', crossFadeEven);
-    sequencer.addEffect('warm_manual-o', crossFadeOdd);
+
+    sequencer.addEffect('warm_manual-e', crossFadeEven)
+    sequencer.addEffect('warm_manual-o', crossFadeOdd)
   }
 
   onStop(): void {
-    this.isFirstExecution = true;
+    this.isFirstExecution = true
   }
 
   onPause(): void {
@@ -73,4 +78,4 @@ export class WarmManualCue implements INetCue {
   onDestroy(): void {
     // Cleanup handled by effect system
   }
-} 
+}

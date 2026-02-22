@@ -1,60 +1,86 @@
-import { cubicIn, cubicInOut, cubicOut, EasingFunction, linear, quadraticIn, quadraticInOut, quadraticOut, sinIn, sinInOut, sinOut } from "./easing";
+import {
+  cubicIn,
+  cubicInOut,
+  cubicOut,
+  EasingFunction,
+  linear,
+  quadraticIn,
+  quadraticInOut,
+  quadraticOut,
+  sinIn,
+  sinInOut,
+  sinOut,
+} from './easing'
 
 /**
  * Represents available colors in the lighting system
  */
-export type Color =  'red' | 'blue' | 'yellow' | 'green' | 'cyan' | 'orange' | 'purple' |
-'chartreuse' | 'teal' | 'violet' | 'magenta' | 'vermilion' | 'amber' |
-'white' | 'black' | 'transparent';
+export type Color =
+  | 'red'
+  | 'blue'
+  | 'yellow'
+  | 'green'
+  | 'cyan'
+  | 'orange'
+  | 'purple'
+  | 'chartreuse'
+  | 'teal'
+  | 'violet'
+  | 'magenta'
+  | 'vermilion'
+  | 'amber'
+  | 'white'
+  | 'black'
+  | 'transparent'
 
 /**
  * Represents how a color should blend with colors on lower layers
  */
-export type BlendMode = 'replace' | 'add' | 'multiply' | 'overlay';
+export type BlendMode = 'replace' | 'add' | 'multiply' | 'overlay'
 
 /**
  * Represents brightness levels for lights
  */
-export type Brightness = 'low' | 'medium' | 'high' | 'max';
+export type Brightness = 'low' | 'medium' | 'high' | 'max'
 
 /**
  * Interface representing RGB, Intensity, Pan/Tilt values for a light
  */
 export interface RGBIO {
-  red: number; // 0-255
-  green: number; // 0-255
-  blue: number; // 0-255
-  intensity: number; // 0-255
+  red: number // 0-255
+  green: number // 0-255
+  blue: number // 0-255
+  intensity: number // 0-255
 
-  pan?: number;
-  tilt?: number;
-  
-  opacity: number; // 0.0 to 1.0, controls overall contribution strength
-  blendMode: BlendMode; // How this color should blend with lower layers
+  pan?: number
+  tilt?: number
+
+  opacity: number // 0.0 to 1.0, controls overall contribution strength
+  blendMode: BlendMode // How this color should blend with lower layers
 }
 
 /**
  * Interface representing a layer of a light with its RGBIP values
  */
 export interface LightLayer {
-  layer: number;
-  value: RGBIO;
+  layer: number
+  value: RGBIO
 }
 
 /**
  * Interface representing a virtual light with multiple layers
  */
 export interface VirtualLight {
-  id: string;
-  layers: LightLayer[];
+  id: string
+  layers: LightLayer[]
 }
 
 /**
  * Interface representing the current state of a light
  */
 export interface LightState {
-  id: string;
-  value: RGBIO;
+  id: string
+  value: RGBIO
 }
 
 /**
@@ -62,20 +88,20 @@ export interface LightState {
  */
 export interface Transition {
   transform: {
-    color: RGBIO;
-    easing: string; // e.g., "sin.in"
-    duration: number; // in milliseconds
-  };
-  layer: number;
+    color: RGBIO
+    easing: string // e.g., "sin.in"
+    duration: number // in milliseconds
+  }
+  layer: number
 }
 
 /**
  * Interface representing a lighting effect with transitions
  */
 export interface Effect {
-  id: string;
-  description: string;
-  transitions: EffectTransition[];
+  id: string
+  description: string
+  transitions: EffectTransition[]
 }
 
 /**
@@ -83,14 +109,14 @@ export interface Effect {
  * These are NOT song events and should NOT be used in action timing.
  */
 export const NODE_SYSTEM_EVENTS = [
-  'cue-started',  // Fires once per cue lifecycle (first YARG call after creation)
-  'cue-called'    // Fires every YARG call (for repeated work)
-] as const;
+  'cue-started', // Fires once per cue lifecycle (first YARG call after creation)
+  'cue-called', // Fires every YARG call (for repeated work)
+] as const
 
 /**
  * Represents node system lifecycle events
  */
-export type NodeSystemEvent = typeof NODE_SYSTEM_EVENTS[number];
+export type NodeSystemEvent = (typeof NODE_SYSTEM_EVENTS)[number]
 
 /**
  * Song wait conditions - events from YARG song data, handled by the sequencer.
@@ -104,55 +130,76 @@ export const WAIT_CONDITIONS = [
   'half-beat',
   'keyframe',
   // Guitar events
-  'guitar-open', 'guitar-green', 'guitar-red', 'guitar-yellow', 'guitar-blue', 'guitar-orange',
+  'guitar-open',
+  'guitar-green',
+  'guitar-red',
+  'guitar-yellow',
+  'guitar-blue',
+  'guitar-orange',
   // Bass events
-  'bass-open', 'bass-green', 'bass-red', 'bass-yellow', 'bass-blue', 'bass-orange',
+  'bass-open',
+  'bass-green',
+  'bass-red',
+  'bass-yellow',
+  'bass-blue',
+  'bass-orange',
   // Keys events
-  'keys-open', 'keys-green', 'keys-red', 'keys-yellow', 'keys-blue', 'keys-orange',
+  'keys-open',
+  'keys-green',
+  'keys-red',
+  'keys-yellow',
+  'keys-blue',
+  'keys-orange',
   // Drum events
-  'drum-kick', 'drum-red', 'drum-yellow', 'drum-blue', 'drum-green',
-  'drum-yellow-cymbal', 'drum-blue-cymbal', 'drum-green-cymbal'
-] as const;
+  'drum-kick',
+  'drum-red',
+  'drum-yellow',
+  'drum-blue',
+  'drum-green',
+  'drum-yellow-cymbal',
+  'drum-blue-cymbal',
+  'drum-green-cymbal',
+] as const
 
 /**
  * Represents song-based wait conditions for action timing - derived from WAIT_CONDITIONS
  */
-export type WaitCondition = typeof WAIT_CONDITIONS[number];
+export type WaitCondition = (typeof WAIT_CONDITIONS)[number]
 
 /**
  * Combined event types for YARG event nodes.
  * Includes both system events and song events.
  */
-export const YARG_EVENT_TYPES = [...NODE_SYSTEM_EVENTS, ...WAIT_CONDITIONS] as const;
+export const YARG_EVENT_TYPES = [...NODE_SYSTEM_EVENTS, ...WAIT_CONDITIONS] as const
 
 /**
  * Represents all valid event types for YARG event nodes
  */
-export type YargEventType = typeof YARG_EVENT_TYPES[number];
+export type YargEventType = (typeof YARG_EVENT_TYPES)[number]
 
 /**
  * Interface defining a transition within an effect
  */
 export interface EffectTransition {
-  lights: TrackedLight[];
-  layer: number;
+  lights: TrackedLight[]
+  layer: number
 
-  waitForCondition: WaitCondition;
-  waitForTime: number; // in milliseconds
-  waitForConditionCount?: number;
+  waitForCondition: WaitCondition
+  waitForTime: number // in milliseconds
+  waitForConditionCount?: number
   /**
    * When true, this transition is used purely for timing (no light changes).
    * TransitionEngine skips applying any light transforms for timing-only steps.
    */
-  timingOnly?: boolean;
+  timingOnly?: boolean
   transform: {
-    color: RGBIO;
-    easing: string;
-    duration: number; // in milliseconds
-  };
-  waitUntilCondition: WaitCondition;
-  waitUntilTime: number; // in milliseconds
-  waitUntilConditionCount?: number; 
+    color: RGBIO
+    easing: string
+    duration: number // in milliseconds
+  }
+  waitUntilCondition: WaitCondition
+  waitUntilTime: number // in milliseconds
+  waitUntilConditionCount?: number
 }
 
 /**
@@ -172,77 +219,85 @@ export enum FixtureTypes {
  * DMX-related types
  */
 export type DmxChannel = {
-  universe: number;
-  channel: number;
-  value: number; // 0-255
-};
+  universe: number
+  channel: number
+  value: number // 0-255
+}
 
 export interface BaseDmxFixture {
-  masterDimmer: number;
+  masterDimmer: number
 }
 
 export interface RgbDmxChannels extends BaseDmxFixture {
-  red: number;
-  green: number;
-  blue: number;
+  red: number
+  green: number
+  blue: number
 }
 
 export interface RgbStrobeDmxChannels extends RgbDmxChannels {
-  strobeSpeed: number;
+  strobeSpeed: number
 }
 
 export interface RgbwDmxChannels extends RgbDmxChannels {
-  white: number;
+  white: number
 }
 
 export interface RgbwStrobeDmxCannels extends RgbwDmxChannels {
-  strobeSpeed: number;
+  strobeSpeed: number
 }
 
 export interface MovingHeadDmxChannels {
-  pan: number;
-  tilt: number;
+  pan: number
+  tilt: number
 }
 
 export interface FixtureConfig {
-  panHome: number;
-  panMin: number;
-  panMax: number;
-  tiltHome: number;
-  tiltMin: number;
-  tiltMax: number;
-  invert: boolean;
+  panHome: number
+  panMin: number
+  panMax: number
+  tiltHome: number
+  tiltMin: number
+  tiltMax: number
+  invert: boolean
 }
 
-export interface RgbMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbDmxChannels { }
+export interface RgbMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbDmxChannels {}
 
-export interface RgbwMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbwDmxChannels { }
+export interface RgbwMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbwDmxChannels {}
 
 export interface StrobeDmxChannels extends BaseDmxFixture {
-  strobeSpeed: number;
+  strobeSpeed: number
 }
 
 export type TrackedLight = {
-  id: string;
-  position: number,
-  config?: FixtureConfig;
-};
+  id: string
+  position: number
+  config?: FixtureConfig
+}
 
-export interface DmxFixture { // The physical light
-  id: string | null;
-  position: number;
-  fixture: FixtureTypes;
-  label: string;
-  name: string;
-  isStrobeEnabled: boolean;
-  group?: string;
-  channels: RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels | RgbwStrobeDmxCannels | StrobeDmxChannels | RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels;
-  config?: FixtureConfig;
-  universe?: number;
+export interface DmxFixture {
+  // The physical light
+  id: string | null
+  position: number
+  fixture: FixtureTypes
+  label: string
+  name: string
+  isStrobeEnabled: boolean
+  group?: string
+  channels:
+    | RgbDmxChannels
+    | RgbStrobeDmxChannels
+    | RgbwDmxChannels
+    | RgbwStrobeDmxCannels
+    | StrobeDmxChannels
+    | RgbMovingHeadDmxChannels
+    | RgbwMovingHeadDmxChannels
+  config?: FixtureConfig
+  universe?: number
 }
 
 export interface DmxLight extends DmxFixture {
-  fixtureId: string;
+  fixtureId: string
 }
 
 /**
@@ -253,8 +308,8 @@ export const LightTypes: DmxFixture[] = [
     id: null,
     position: 0,
     fixture: FixtureTypes.RGB,
-    label: "RGB",
-    name: "RGB",
+    label: 'RGB',
+    name: 'RGB',
     isStrobeEnabled: false,
     group: '',
     channels: {
@@ -269,8 +324,8 @@ export const LightTypes: DmxFixture[] = [
     id: null,
     position: 0,
     fixture: FixtureTypes.RGBW,
-    label: "RGBW",
-    name: "RGBW",
+    label: 'RGBW',
+    name: 'RGBW',
     isStrobeEnabled: false,
     group: '',
     channels: {
@@ -286,8 +341,8 @@ export const LightTypes: DmxFixture[] = [
     id: null,
     position: 0,
     fixture: FixtureTypes.RGBMH,
-    label: "RGB/MH",
-    name: "RGB/MH",
+    label: 'RGB/MH',
+    name: 'RGB/MH',
     isStrobeEnabled: false,
     group: '',
     channels: {
@@ -313,8 +368,8 @@ export const LightTypes: DmxFixture[] = [
     id: null,
     position: 0,
     fixture: FixtureTypes.RGBWMH,
-    label: "RGBW/MH",
-    name: "RGBW/MH",
+    label: 'RGBW/MH',
+    name: 'RGBW/MH',
     isStrobeEnabled: false,
     group: '',
     channels: {
@@ -341,8 +396,8 @@ export const LightTypes: DmxFixture[] = [
     id: null,
     position: 0,
     fixture: FixtureTypes.STROBE,
-    label: "Strobe",
-    name: "Strobe",
+    label: 'Strobe',
+    name: 'Strobe',
     isStrobeEnabled: false,
     group: '',
     channels: {
@@ -351,7 +406,7 @@ export const LightTypes: DmxFixture[] = [
     },
     universe: 1,
   },
-];
+]
 
 export enum ConfigStrobeType {
   None = 'None',
@@ -360,46 +415,46 @@ export enum ConfigStrobeType {
 }
 
 export interface ConfigLightLayoutType {
-  id: string;
-  label: string;
+  id: string
+  label: string
 }
 
 /**
  * Lighting Configuration Interface
  */
 export interface LightingConfiguration {
-  numLights: number;
-  lightLayout: ConfigLightLayoutType;
-  strobeType: ConfigStrobeType;
+  numLights: number
+  lightLayout: ConfigLightLayoutType
+  strobeType: ConfigStrobeType
 
-  frontLights: DmxLight[];
-  backLights: DmxLight[];
-  strobeLights: DmxLight[];
+  frontLights: DmxLight[]
+  backLights: DmxLight[]
+  strobeLights: DmxLight[]
 }
 
 /**
  * DMX Rig Interface
- * Represents a complete DMX configuration with its own universe and active state
+ * Represents a complete DMX configuration with its own active state.
+ * Universe is configured at the sender/adapter level.
  */
 export interface DmxRig {
-  id: string; // UUID
-  name: string;
-  universe: number; // Default 1
-  active: boolean; // Default true
-  config: LightingConfiguration;
+  id: string // UUID
+  name: string
+  active: boolean // Default true
+  config: LightingConfiguration
 }
 
 /**
  * DMX Rigs Configuration Interface
  */
 export interface DmxRigsConfig {
-  rigs: DmxRig[];
+  rigs: DmxRig[]
 }
 
 /**
  * Defines the location a light can be placed.
  */
-export type LocationGroup = 'front' | 'back' | 'strobe';
+export type LocationGroup = 'front' | 'back' | 'strobe'
 
 /**
  * Within a location group, which sets of lights we should target for an effect.
@@ -438,17 +493,17 @@ export type LightTarget =
   | 'random-1'
   | 'random-2'
   | 'random-3'
-  | 'random-4';
+  | 'random-4'
 
 /**
  * A cue is a group of effects with their own triggers
  */
 export type Cue = {
-  id: string;
-  description: string;
-  effects: [Effect];
-  trigger: WaitCondition;
-};
+  id: string
+  description: string
+  effects: [Effect]
+  trigger: WaitCondition
+}
 
 /**
  * Variables scoped to groups or targets
@@ -459,7 +514,7 @@ export type Cue = {
  * }
  */
 export interface GroupedColorVariables {
-  [targetGroup: string]: ResolvableColor;
+  [targetGroup: string]: ResolvableColor
 }
 
 /**
@@ -467,20 +522,20 @@ export interface GroupedColorVariables {
  * e.g. { "colorsByGroup": { "even": {...}, "odd": {...} } }
  */
 export interface EffectVariables {
-  [varName: string]: ResolvableValue;
+  [varName: string]: ResolvableValue
 }
 
 /**
  * Represents a range for random selection.
  */
-export type RandomRange = { start: number; end: number };
+export type RandomRange = { start: number; end: number }
 
 /**
  * Defines a random target selection.
  */
 export interface RandomTarget {
-  type: 'random';
-  count: number;
+  type: 'random'
+  count: number
 }
 
 /**
@@ -493,36 +548,36 @@ export type ResolvableValue =
   | ResolvableColor
   | GroupedColorVariables
   | RandomTarget
-  | { [key: string]: ResolvableValue };
+  | { [key: string]: ResolvableValue }
 
 /**
  * Colors can reference random values or be fixed.
  */
 export interface ResolvableColor {
-  r?: ResolvableValue;
-  g?: ResolvableValue;
-  b?: ResolvableValue;
-  i?: ResolvableValue;
-  w?: ResolvableValue;
+  r?: ResolvableValue
+  g?: ResolvableValue
+  b?: ResolvableValue
+  i?: ResolvableValue
+  w?: ResolvableValue
 }
 
 export type EffectSelector = {
-  id: string;
-  yargDescription: string;
-  rb3Description: string;
-  groupName?: string;
-};
+  id: string
+  yargDescription: string
+  rb3Description: string
+  groupName?: string
+}
 
 export interface CueGroup {
-  id: string;
-  name: string;
-  description: string;
+  id: string
+  name: string
+  description: string
 }
 
 export type Easing = {
-  name: string;
-  f: EasingFunction;
-};
+  name: string
+  f: EasingFunction
+}
 
 // Mapping of easing names to easing functions
 export const easingFunctions: { [key: string]: EasingFunction } = {
@@ -536,22 +591,46 @@ export const easingFunctions: { [key: string]: EasingFunction } = {
   'cubic.in': cubicIn,
   'cubic.out': cubicOut,
   'cubic.inout': cubicInOut,
-};
+}
 
-export type Senders = 'sacn' | 'ipc' | 'enttecpro' | 'artnet' | 'opendmx';
-export interface SenderConfig {
+export type Senders = 'sacn' | 'ipc' | 'enttecpro' | 'artnet' | 'opendmx'
+
+interface BaseSenderConfig {
   sender: Senders
-  port?: string
-  devicePath?: string
-  dmxSpeed?: number
+}
+
+export interface ArtNetSenderConfig extends BaseSenderConfig {
+  sender: 'artnet'
   host?: string
   universe?: number
   net?: number
   subnet?: number
   subuni?: number
-  artNetPort?: number
+  port?: number
+  base_refresh_interval?: number
+}
+
+export interface SacnSenderConfig extends BaseSenderConfig {
+  sender: 'sacn'
+  universe?: number
   networkInterface?: string
   useUnicast?: boolean
   unicastDestination?: string
 }
 
+export interface SerialSenderConfig extends BaseSenderConfig {
+  sender: 'enttecpro' | 'opendmx'
+  devicePath?: string
+  universe?: number
+  dmxSpeed?: number
+}
+
+export interface IpcSenderConfig extends BaseSenderConfig {
+  sender: 'ipc'
+}
+
+export type SenderConfig =
+  | ArtNetSenderConfig
+  | SacnSenderConfig
+  | SerialSenderConfig
+  | IpcSenderConfig

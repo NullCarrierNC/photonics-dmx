@@ -1,60 +1,61 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
+import { CONFIG } from '../../../shared/ipcChannels'
 
 const AudioSmoothingSettings: React.FC = () => {
-  const [enabled, setEnabled] = useState(true);
-  const [alpha, setAlpha] = useState(0.7);
-  const [isSaving, setIsSaving] = useState(false);
+  const [enabled, setEnabled] = useState(true)
+  const [alpha, setAlpha] = useState(0.7)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke('get-audio-config');
+        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
         if (config?.smoothing) {
-          setEnabled(config.smoothing.enabled !== undefined ? config.smoothing.enabled : true);
-          setAlpha(config.smoothing.alpha || 0.7);
+          setEnabled(config.smoothing.enabled !== undefined ? config.smoothing.enabled : true)
+          setAlpha(config.smoothing.alpha || 0.7)
         }
       } catch (error) {
-        console.error('Failed to load smoothing settings:', error);
+        console.error('Failed to load smoothing settings:', error)
       }
-    };
+    }
 
-    loadSettings();
-  }, []);
+    loadSettings()
+  }, [])
 
   const handleToggle = async () => {
-    const newEnabled = !enabled;
-    setEnabled(newEnabled);
-    setIsSaving(true);
+    const newEnabled = !enabled
+    setEnabled(newEnabled)
+    setIsSaving(true)
 
     try {
-      await window.electron.ipcRenderer.invoke('save-audio-config', {
-        smoothing: { enabled: newEnabled, alpha }
-      });
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
+        smoothing: { enabled: newEnabled, alpha },
+      })
     } catch (error) {
-      console.error('Failed to save smoothing enabled state:', error);
-      setEnabled(!newEnabled); // Revert on error
+      console.error('Failed to save smoothing enabled state:', error)
+      setEnabled(!newEnabled) // Revert on error
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   const handleAlphaChange = async (newAlpha: number) => {
-    setAlpha(newAlpha);
-  };
+    setAlpha(newAlpha)
+  }
 
   const handleAlphaSave = async () => {
-    setIsSaving(true);
+    setIsSaving(true)
 
     try {
-      await window.electron.ipcRenderer.invoke('save-audio-config', {
-        smoothing: { enabled, alpha }
-      });
+      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
+        smoothing: { enabled, alpha },
+      })
     } catch (error) {
-      console.error('Failed to save smoothing alpha:', error);
+      console.error('Failed to save smoothing alpha:', error)
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -72,13 +73,11 @@ const AudioSmoothingSettings: React.FC = () => {
             enabled ? 'bg-green-500' : 'bg-gray-400'
           } relative focus:outline-none ${
             isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-          }`}
-        >
+          }`}>
           <div
             className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
               enabled ? 'translate-x-6' : 'translate-x-0'
-            }`}
-          ></div>
+            }`}></div>
         </button>
       </div>
 
@@ -90,19 +89,18 @@ const AudioSmoothingSettings: React.FC = () => {
                 Smoothing Factor (Alpha)
               </label>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Higher values = less smoothing (more responsive), lower values = more smoothing (less flicker)
+                Higher values = less smoothing (more responsive), lower values = more smoothing
+                (less flicker)
               </p>
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
                 {alpha.toFixed(2)}
               </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                / 0.95
-              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">/ 0.95</span>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <input
               type="range"
@@ -115,10 +113,10 @@ const AudioSmoothingSettings: React.FC = () => {
               onTouchEnd={handleAlphaSave}
               className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
               style={{
-                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((alpha - 0.1) / (0.95 - 0.1)) * 100}%, #e5e7eb ${((alpha - 0.1) / (0.95 - 0.1)) * 100}%, #e5e7eb 100%)`
+                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((alpha - 0.1) / (0.95 - 0.1)) * 100}%, #e5e7eb ${((alpha - 0.1) / (0.95 - 0.1)) * 100}%, #e5e7eb 100%)`,
               }}
             />
-            
+
             <input
               type="number"
               min="0.1"
@@ -126,8 +124,8 @@ const AudioSmoothingSettings: React.FC = () => {
               step="0.05"
               value={alpha}
               onChange={(e) => {
-                const value = parseFloat(e.target.value) || 0.1;
-                handleAlphaChange(Math.max(0.1, Math.min(0.95, value)));
+                const value = parseFloat(e.target.value) || 0.1
+                handleAlphaChange(Math.max(0.1, Math.min(0.95, value)))
               }}
               onBlur={handleAlphaSave}
               className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
@@ -136,12 +134,9 @@ const AudioSmoothingSettings: React.FC = () => {
         </div>
       )}
 
-      {isSaving && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">Saving...</p>
-      )}
+      {isSaving && <p className="text-xs text-gray-500 dark:text-gray-400">Saving...</p>}
     </div>
-  );
-};
+  )
+}
 
-export default AudioSmoothingSettings;
-
+export default AudioSmoothingSettings

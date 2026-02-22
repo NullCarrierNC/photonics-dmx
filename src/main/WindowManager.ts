@@ -1,44 +1,47 @@
-import { BrowserWindow, shell, screen } from 'electron';
-import { join } from 'path';
-import { is } from '@electron-toolkit/utils';
-import type { ControllerManager } from './controllers/ControllerManager';
+import { BrowserWindow, shell, screen } from 'electron'
+import { join } from 'path'
+import { is } from '@electron-toolkit/utils'
+import type { ControllerManager } from './controllers/ControllerManager'
 
 export class WindowManager {
-  private mainWindow: BrowserWindow | null = null;
-  private cueEditorWindow: BrowserWindow | null = null;
-  private controllerManager: ControllerManager | null = null;
-  private resizeTimeout: NodeJS.Timeout | null = null;
-  private moveTimeout: NodeJS.Timeout | null = null;
-  private cueEditorResizeTimeout: NodeJS.Timeout | null = null;
-  private cueEditorMoveTimeout: NodeJS.Timeout | null = null;
-  
+  private mainWindow: BrowserWindow | null = null
+  private cueEditorWindow: BrowserWindow | null = null
+  private controllerManager: ControllerManager | null = null
+  private resizeTimeout: NodeJS.Timeout | null = null
+  private moveTimeout: NodeJS.Timeout | null = null
+  private cueEditorResizeTimeout: NodeJS.Timeout | null = null
+  private cueEditorMoveTimeout: NodeJS.Timeout | null = null
+
   /**
    * Sets the controller manager for accessing preferences
    */
   public setControllerManager(controllerManager: ControllerManager): void {
-    this.controllerManager = controllerManager;
+    this.controllerManager = controllerManager
   }
 
   /**
    * Saves window state to preferences with debouncing
    */
-  private saveWindowState(window: BrowserWindow, preferenceKey: 'windowState' | 'cueEditorWindowState'): void {
+  private async saveWindowState(
+    window: BrowserWindow,
+    preferenceKey: 'windowState' | 'cueEditorWindowState',
+  ): Promise<void> {
     if (window.isDestroyed() || !this.controllerManager) {
-      return;
+      return
     }
 
-    const bounds = window.getBounds();
+    const bounds = window.getBounds()
     const windowState = {
       width: bounds.width,
       height: bounds.height,
       x: bounds.x,
-      y: bounds.y
-    };
+      y: bounds.y,
+    }
 
     try {
-      this.controllerManager.getConfig().updatePreferences({ [preferenceKey]: windowState });
+      await this.controllerManager.getConfig().updatePreferences({ [preferenceKey]: windowState })
     } catch (error) {
-      console.error('Failed to save window state:', error);
+      console.error('Failed to save window state:', error)
     }
   }
 
@@ -47,13 +50,13 @@ export class WindowManager {
    */
   private debouncedSaveMainResize(): void {
     if (this.resizeTimeout) {
-      clearTimeout(this.resizeTimeout);
+      clearTimeout(this.resizeTimeout)
     }
     this.resizeTimeout = setTimeout(() => {
       if (this.mainWindow) {
-        this.saveWindowState(this.mainWindow, 'windowState');
+        this.saveWindowState(this.mainWindow, 'windowState')
       }
-    }, 500);
+    }, 500)
   }
 
   /**
@@ -61,13 +64,13 @@ export class WindowManager {
    */
   private debouncedSaveMainMove(): void {
     if (this.moveTimeout) {
-      clearTimeout(this.moveTimeout);
+      clearTimeout(this.moveTimeout)
     }
     this.moveTimeout = setTimeout(() => {
       if (this.mainWindow) {
-        this.saveWindowState(this.mainWindow, 'windowState');
+        this.saveWindowState(this.mainWindow, 'windowState')
       }
-    }, 500);
+    }, 500)
   }
 
   /**
@@ -75,13 +78,13 @@ export class WindowManager {
    */
   private debouncedSaveCueEditorResize(): void {
     if (this.cueEditorResizeTimeout) {
-      clearTimeout(this.cueEditorResizeTimeout);
+      clearTimeout(this.cueEditorResizeTimeout)
     }
     this.cueEditorResizeTimeout = setTimeout(() => {
       if (this.cueEditorWindow) {
-        this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState');
+        this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
       }
-    }, 500);
+    }, 500)
   }
 
   /**
@@ -89,51 +92,56 @@ export class WindowManager {
    */
   private debouncedSaveCueEditorMove(): void {
     if (this.cueEditorMoveTimeout) {
-      clearTimeout(this.cueEditorMoveTimeout);
+      clearTimeout(this.cueEditorMoveTimeout)
     }
     this.cueEditorMoveTimeout = setTimeout(() => {
       if (this.cueEditorWindow) {
-        this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState');
+        this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
       }
-    }, 500);
+    }, 500)
   }
 
   /**
    * Validates window bounds to ensure window is visible on screen
    */
-  private validateWindowBounds(bounds: { width: number; height: number; x: number; y: number }): { width: number; height: number; x: number; y: number } {
-    const displays = screen.getAllDisplays();
-    let isValid = false;
+  private validateWindowBounds(bounds: { width: number; height: number; x: number; y: number }): {
+    width: number
+    height: number
+    x: number
+    y: number
+  } {
+    const displays = screen.getAllDisplays()
+    let isValid = false
 
     // Check if window is visible on any display
     for (const display of displays) {
-      const { x, y, width, height } = display.bounds;
+      const { x, y, width, height } = display.bounds
       if (
         bounds.x >= x &&
         bounds.y >= y &&
         bounds.x + bounds.width <= x + width &&
         bounds.y + bounds.height <= y + height
       ) {
-        isValid = true;
-        break;
+        isValid = true
+        break
       }
     }
 
     // If not valid, center on primary display
     if (!isValid) {
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+      const primaryDisplay = screen.getPrimaryDisplay()
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
       return {
         width: Math.min(bounds.width, screenWidth),
         height: Math.min(bounds.height, screenHeight),
         x: Math.floor((screenWidth - Math.min(bounds.width, screenWidth)) / 2),
-        y: Math.floor((screenHeight - Math.min(bounds.height, screenHeight)) / 2)
-      };
+        y: Math.floor((screenHeight - Math.min(bounds.height, screenHeight)) / 2),
+      }
     }
 
-    return bounds;
+    return bounds
   }
-  
+
   /**
    * Creates the main application window
    */
@@ -143,18 +151,18 @@ export class WindowManager {
       width: 1280,
       height: 1000,
       x: undefined as number | undefined,
-      y: undefined as number | undefined
-    };
+      y: undefined as number | undefined,
+    }
 
     if (this.controllerManager) {
-      const savedState = this.controllerManager.getConfig().getPreference('windowState');
+      const savedState = this.controllerManager.getConfig().getPreference('windowState')
       if (savedState) {
         windowState = {
           width: savedState.width || 1280,
           height: savedState.height || 1000,
           x: savedState.x,
-          y: savedState.y
-        };
+          y: savedState.y,
+        }
       }
     }
 
@@ -163,8 +171,8 @@ export class WindowManager {
       width: windowState.width,
       height: windowState.height,
       x: windowState.x ?? 0,
-      y: windowState.y ?? 0
-    });
+      y: windowState.y ?? 0,
+    })
 
     // Create the browser window
     this.mainWindow = new BrowserWindow({
@@ -178,36 +186,36 @@ export class WindowManager {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: false,
         contextIsolation: true,
-        nodeIntegration: false
-      }
-    });
+        nodeIntegration: false,
+      },
+    })
 
     // Set up event listeners for window state persistence
     this.mainWindow.on('resized', () => {
-      this.debouncedSaveMainResize();
-    });
+      this.debouncedSaveMainResize()
+    })
 
     this.mainWindow.on('moved', () => {
-      this.debouncedSaveMainMove();
-    });
+      this.debouncedSaveMainMove()
+    })
 
     this.mainWindow.on('ready-to-show', () => {
-      this.mainWindow?.show();
-    });
+      this.mainWindow?.show()
+    })
 
     this.mainWindow.webContents.setWindowOpenHandler((details) => {
-      shell.openExternal(details.url);
-      return { action: 'deny' };
-    });
+      shell.openExternal(details.url)
+      return { action: 'deny' }
+    })
 
     // Load the renderer
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
+      this.mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
     } else {
-      this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+      this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
     }
 
-    return this.mainWindow;
+    return this.mainWindow
   }
 
   /**
@@ -218,18 +226,18 @@ export class WindowManager {
       width: 1200,
       height: 900,
       x: undefined as number | undefined,
-      y: undefined as number | undefined
-    };
+      y: undefined as number | undefined,
+    }
 
     if (this.controllerManager) {
-      const savedState = this.controllerManager.getConfig().getPreference('cueEditorWindowState');
+      const savedState = this.controllerManager.getConfig().getPreference('cueEditorWindowState')
       if (savedState) {
         windowState = {
           width: savedState.width || 1200,
           height: savedState.height || 900,
           x: savedState.x,
-          y: savedState.y
-        };
+          y: savedState.y,
+        }
       }
     }
 
@@ -237,8 +245,8 @@ export class WindowManager {
       width: windowState.width,
       height: windowState.height,
       x: windowState.x ?? 0,
-      y: windowState.y ?? 0
-    });
+      y: windowState.y ?? 0,
+    })
 
     this.cueEditorWindow = new BrowserWindow({
       width: validatedBounds.width,
@@ -252,40 +260,40 @@ export class WindowManager {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: false,
         contextIsolation: true,
-        nodeIntegration: false
-      }
-    });
+        nodeIntegration: false,
+      },
+    })
 
     this.cueEditorWindow.on('resized', () => {
-      this.debouncedSaveCueEditorResize();
-    });
+      this.debouncedSaveCueEditorResize()
+    })
 
     this.cueEditorWindow.on('moved', () => {
-      this.debouncedSaveCueEditorMove();
-    });
+      this.debouncedSaveCueEditorMove()
+    })
 
     this.cueEditorWindow.on('ready-to-show', () => {
-      this.cueEditorWindow?.show();
-    });
+      this.cueEditorWindow?.show()
+    })
 
     this.cueEditorWindow.on('closed', () => {
-      this.cueEditorWindow = null;
-    });
+      this.cueEditorWindow = null
+    })
 
     this.cueEditorWindow.webContents.setWindowOpenHandler((details) => {
-      shell.openExternal(details.url);
-      return { action: 'deny' };
-    });
+      shell.openExternal(details.url)
+      return { action: 'deny' }
+    })
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.cueEditorWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}?window=cue-editor`);
+      this.cueEditorWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}?window=cue-editor`)
     } else {
       this.cueEditorWindow.loadFile(join(__dirname, '../renderer/index.html'), {
-        query: { window: 'cue-editor' }
-      });
+        query: { window: 'cue-editor' },
+      })
     }
 
-    return this.cueEditorWindow;
+    return this.cueEditorWindow
   }
 
   /**
@@ -293,65 +301,65 @@ export class WindowManager {
    */
   public openCueEditorWindow(): BrowserWindow {
     if (this.cueEditorWindow && !this.cueEditorWindow.isDestroyed()) {
-      this.cueEditorWindow.focus();
-      return this.cueEditorWindow;
+      this.cueEditorWindow.focus()
+      return this.cueEditorWindow
     }
 
-    return this.createCueEditorWindow();
+    return this.createCueEditorWindow()
   }
 
   /**
    * Checks if there are any open windows
    */
   public hasWindows(): boolean {
-    return BrowserWindow.getAllWindows().length > 0;
+    return BrowserWindow.getAllWindows().length > 0
   }
 
   /**
    * Gets the main window instance
    */
   public getMainWindow(): BrowserWindow | null {
-    return this.mainWindow;
+    return this.mainWindow
   }
 
   /**
    * Closes all application windows
    */
-  public closeAllWindows(): void {
+  public async closeAllWindows(): Promise<void> {
     // Save window state one final time before closing
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.saveWindowState(this.mainWindow, 'windowState');
+      await this.saveWindowState(this.mainWindow, 'windowState')
     }
     if (this.cueEditorWindow && !this.cueEditorWindow.isDestroyed()) {
-      this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState');
+      await this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
     }
 
     // Clear any pending timeouts
     if (this.resizeTimeout) {
-      clearTimeout(this.resizeTimeout);
-      this.resizeTimeout = null;
+      clearTimeout(this.resizeTimeout)
+      this.resizeTimeout = null
     }
     if (this.moveTimeout) {
-      clearTimeout(this.moveTimeout);
-      this.moveTimeout = null;
+      clearTimeout(this.moveTimeout)
+      this.moveTimeout = null
     }
     if (this.cueEditorResizeTimeout) {
-      clearTimeout(this.cueEditorResizeTimeout);
-      this.cueEditorResizeTimeout = null;
+      clearTimeout(this.cueEditorResizeTimeout)
+      this.cueEditorResizeTimeout = null
     }
     if (this.cueEditorMoveTimeout) {
-      clearTimeout(this.cueEditorMoveTimeout);
-      this.cueEditorMoveTimeout = null;
+      clearTimeout(this.cueEditorMoveTimeout)
+      this.cueEditorMoveTimeout = null
     }
 
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.close();
+      this.mainWindow.close()
     }
-    this.mainWindow = null;
+    this.mainWindow = null
 
     if (this.cueEditorWindow && !this.cueEditorWindow.isDestroyed()) {
-      this.cueEditorWindow.close();
+      this.cueEditorWindow.close()
     }
-    this.cueEditorWindow = null;
+    this.cueEditorWindow = null
   }
-} 
+}

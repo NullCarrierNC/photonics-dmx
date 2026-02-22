@@ -1,5 +1,5 @@
-import { RGBIO, TrackedLight, WaitCondition } from "../../types";
-import { EasingType } from "../../easing";
+import { RGBIO, TrackedLight, WaitCondition } from '../../types'
+import { EasingType } from '../../easing'
 
 /**
  * The base interface for all lighting effects.
@@ -8,31 +8,31 @@ import { EasingType } from "../../easing";
  */
 export interface IEffect {
   /** The condition that triggers the start of the effect */
-  waitFor?: WaitCondition;
-  
+  waitFor?: WaitCondition
+
   /** Time to wait before starting the effect (in ms) */
-  forTime?: number;
-  
+  forTime?: number
+
   /** The colour configuration for the effect. Optional as some effects may use
    * multiple colours (e.g. start/end colours) or may not use a single colour value. */
-  color?: RGBIO;
-  
+  color?: RGBIO
+
   /** Duration of the effect (in ms). Optional as some effects may have multiple durations
    * (e.g. fade in/out durations) or may not use a single duration value. */
-  duration?: number;
-  
+  duration?: number
+
   /** The condition that triggers the end of the effect */
-  waitUntil?: WaitCondition;
-  
+  waitUntil?: WaitCondition
+
   /** Time to wait before ending the effect (in ms) */
-  untilTime?: number;
-  
+  untilTime?: number
+
   /** The lights affected by this effect */
-  lights: TrackedLight[];
-  
+  lights: TrackedLight[]
+
   /** The layer to apply the effect on (for layered lighting) */
-  layer?: number;
-  
+  layer?: number
+
   /** The easing function to use for the effect */
-  easing?: EasingType | string;
+  easing?: EasingType | string
 }

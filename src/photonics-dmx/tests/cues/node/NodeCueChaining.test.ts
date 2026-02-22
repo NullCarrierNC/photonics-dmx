@@ -1,17 +1,17 @@
-import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler';
-import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue';
-import { ActionEffectFactory } from '../../../cues/node/compiler/ActionEffectFactory';
-import { YargNodeCueDefinition } from '../../../cues/types/nodeCueTypes';
-import { ILightingController } from '../../../controllers/sequencer/interfaces';
-import { CueType } from '../../../cues/types/cueTypes';
-import { Effect, TrackedLight } from '../../../types';
+import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
+import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
+import { ActionEffectFactory } from '../../../cues/node/compiler/ActionEffectFactory'
+import { YargNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
+import { ILightingController } from '../../../controllers/sequencer/interfaces'
+import { CueType } from '../../../cues/types/cueTypes'
+import { Effect, TrackedLight } from '../../../types'
 
-jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }));
+jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
 
 describe('Node cue chaining', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
-  });
+    jest.restoreAllMocks()
+  })
 
   it('executes actions sequentially with execution engine', async () => {
     const definition: YargNodeCueDefinition = {
@@ -21,22 +21,20 @@ describe('Node cue chaining', () => {
       cueType: CueType.Cool_Automatic,
       style: 'primary',
       nodes: {
-        events: [
-          { id: 'e1', type: 'event', eventType: 'beat' }
-        ],
+        events: [{ id: 'e1', type: 'event', eventType: 'beat' }],
         actions: [
           {
             id: 'a1',
             type: 'action',
             effectType: 'set-color',
-            target: { 
-              groups: { source: 'literal', value: 'front' }, 
-              filter: { source: 'literal', value: 'all' } 
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
             },
-            color: { 
-              name: { source: 'literal', value: 'red' }, 
-              brightness: { source: 'literal', value: 'medium' }, 
-              blendMode: { source: 'literal', value: 'replace' } 
+            color: {
+              name: { source: 'literal', value: 'red' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
               waitForCondition: 'none',
@@ -45,22 +43,22 @@ describe('Node cue chaining', () => {
               waitUntilCondition: 'delay',
               waitUntilTime: { source: 'literal', value: 0 },
               easing: 'linear',
-              level: { source: 'literal', value: 1 }
+              level: { source: 'literal', value: 1 },
             },
-            layer: { source: 'literal', value: 10 }
+            layer: { source: 'literal', value: 10 },
           },
           {
             id: 'a2',
             type: 'action',
             effectType: 'set-color',
-            target: { 
-              groups: { source: 'literal', value: 'back' }, 
-              filter: { source: 'literal', value: 'all' } 
+            target: {
+              groups: { source: 'literal', value: 'back' },
+              filter: { source: 'literal', value: 'all' },
             },
-            color: { 
-              name: { source: 'literal', value: 'blue' }, 
-              brightness: { source: 'literal', value: 'medium' }, 
-              blendMode: { source: 'literal', value: 'replace' } 
+            color: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
               waitForCondition: 'none',
@@ -69,42 +67,46 @@ describe('Node cue chaining', () => {
               waitUntilCondition: 'delay',
               waitUntilTime: { source: 'literal', value: 0 },
               easing: 'linear',
-              level: { source: 'literal', value: 1 }
+              level: { source: 'literal', value: 1 },
             },
-            layer: { source: 'literal', value: 10 }
-          }
-        ]
+            layer: { source: 'literal', value: 10 },
+          },
+        ],
       },
       connections: [
         { from: 'e1', to: 'a1' },
-        { from: 'a1', to: 'a2' }
-      ]
-    };
+        { from: 'a1', to: 'a2' },
+      ],
+    }
 
-    const compiled = NodeCueCompiler.compileYargCue(definition);
-    const cue = new YargNodeCue('group-1', compiled);
+    const compiled = NodeCueCompiler.compileYargCue(definition)
+    const cue = new YargNodeCue('group-1', compiled)
 
-    const frontLight: TrackedLight = { id: 'front-1', position: 0 };
-    const backLight: TrackedLight = { id: 'back-1', position: 1 };
+    const frontLight: TrackedLight = { id: 'front-1', position: 0 }
+    const backLight: TrackedLight = { id: 'back-1', position: 1 }
 
     jest.spyOn(ActionEffectFactory, 'resolveLights').mockImplementation((_lm, target) => {
       // Handle ValueSource structure - target.groups is { source: 'literal', value: 'front' }
-      const groupsValue = target.groups?.source === 'literal' ? target.groups.value : '';
-      return groupsValue.includes('front') ? [frontLight] : [backLight];
-    });
+      const groupsValue = target.groups?.source === 'literal' ? target.groups.value : ''
+      return groupsValue.includes('front') ? [frontLight] : [backLight]
+    })
 
-    const callOrder: string[] = [];
+    const callOrder: string[] = []
     const sequencerMock: Partial<ILightingController> = {
       addEffect: (name: string, _effect: Effect) => {
-        callOrder.push(name);
-      }
-    };
+        callOrder.push(name)
+      },
+      addEffectWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+        callOrder.push(name)
+        callback()
+      },
+    }
 
-    await cue.execute({ beat: 'Strong' } as any, sequencerMock as ILightingController, null as any);
+    await cue.execute({ beat: 'Strong' } as any, sequencerMock as ILightingController, null as any)
 
-    // With different layers (10 and 1) chain is not composed; each action submitted (fire-and-forget)
-    expect(callOrder.length).toBe(2);
-    expect(callOrder[0]).toContain('a1');
-    expect(callOrder[1]).toContain('a2');
-  });
-});
+    // a1 and a2 target different lights so the chain is not composed; each action submitted individually
+    expect(callOrder.length).toBe(2)
+    expect(callOrder[0]).toContain('a1')
+    expect(callOrder[1]).toContain('a2')
+  })
+})

@@ -1,40 +1,40 @@
-import { YargCueRegistry } from '../registries/YargCueRegistry';
-import { CueType } from '../types/cueTypes';
-import { ICueGroup } from '../interfaces/INetCueGroup';
+import { YargCueRegistry } from '../registries/YargCueRegistry'
+import { CueType } from '../types/cueTypes'
+import { ICueGroup } from '../interfaces/INetCueGroup'
 
 // Import default group cues
-import { DefaultCue } from './handlers/yarg1/DefaultCue';
-import { DischordCue } from './handlers/yarg1/DischordCue';
-import { ChorusCue } from './handlers/yarg1/ChorusCue';
-import { CoolManualCue } from './handlers/yarg1/CoolManualCue';
-import { StompCue } from './handlers/yarg1/StompCue';
-import { VerseCue } from './handlers/yarg1/VerseCue';
-import { WarmManualCue } from './handlers/yarg1/WarmManualCue';
-import { BigRockEndingCue } from './handlers/yarg1/BigRockEndingCue';
-import { CoolAutomaticCue } from './handlers/yarg1/CoolAutomaticCue';
-import { FlareFastCue } from './handlers/yarg1/FlareFastCue';
-import { FlareSlowCue } from './handlers/yarg1/FlareSlowCue';
-import { FrenzyCue } from './handlers/yarg1/FrenzyCue';
-import { IntroCue } from './handlers/yarg1/IntroCue';
-import { HarmonyCue } from './handlers/yarg1/HarmonyCue';
-import { SilhouettesCue } from './handlers/yarg1/SilhouettesCue';
-import { SilhouettesSpotlightCue } from './handlers/yarg1/SilhouettesSpotlightCue';
-import { SweepCue } from './handlers/yarg1/SweepCue';
-import { WarmAutomaticCue } from './handlers/yarg1/WarmAutomaticCue';
-import { ScoreCue } from './handlers/yarg1/ScoreCue';
-import { StrobeFastCue } from './handlers/stagekit/StrobeFastCue';
-import { StrobeFastestCue } from './handlers/stagekit/StrobeFastestCue';
-import { StrobeMediumCue } from './handlers/stagekit/StrobeMediumCue';
-import { StrobeOffCue } from './handlers/stagekit/StrobeOffCue';
-import { StrobeSlowCue } from './handlers/stagekit/StrobeSlowCue';
-import { MenuCue } from './handlers/yarg1/MenuCue';
-import { SearchlightsCue } from './handlers/yarg1/SearchlightsCue';
-
+import { DefaultCue } from './handlers/yarg1/DefaultCue'
+import { DischordCue } from './handlers/yarg1/DischordCue'
+import { ChorusCue } from './handlers/yarg1/ChorusCue'
+import { CoolManualCue } from './handlers/yarg1/CoolManualCue'
+import { StompCue } from './handlers/yarg1/StompCue'
+import { VerseCue } from './handlers/yarg1/VerseCue'
+import { WarmManualCue } from './handlers/yarg1/WarmManualCue'
+import { BigRockEndingCue } from './handlers/yarg1/BigRockEndingCue'
+import { CoolAutomaticCue } from './handlers/yarg1/CoolAutomaticCue'
+import { FlareFastCue } from './handlers/yarg1/FlareFastCue'
+import { FlareSlowCue } from './handlers/yarg1/FlareSlowCue'
+import { FrenzyCue } from './handlers/yarg1/FrenzyCue'
+import { IntroCue } from './handlers/yarg1/IntroCue'
+import { HarmonyCue } from './handlers/yarg1/HarmonyCue'
+import { SilhouettesCue } from './handlers/yarg1/SilhouettesCue'
+import { SilhouettesSpotlightCue } from './handlers/yarg1/SilhouettesSpotlightCue'
+import { SweepCue } from './handlers/yarg1/SweepCue'
+import { WarmAutomaticCue } from './handlers/yarg1/WarmAutomaticCue'
+import { ScoreCue } from './handlers/yarg1/ScoreCue'
+import { StrobeFastCue } from './handlers/stagekit/StrobeFastCue'
+import { StrobeFastestCue } from './handlers/stagekit/StrobeFastestCue'
+import { StrobeMediumCue } from './handlers/stagekit/StrobeMediumCue'
+import { StrobeOffCue } from './handlers/stagekit/StrobeOffCue'
+import { StrobeSlowCue } from './handlers/stagekit/StrobeSlowCue'
+import { MenuCue } from './handlers/yarg1/MenuCue'
+import { SearchlightsCue } from './handlers/yarg1/SearchlightsCue'
 
 const defaultGroup: ICueGroup = {
   id: 'yarg1',
   name: 'YARG Alternative Set 1',
-  description: 'An alternatiive set of YARG cues largely inspired by, but not matching, the original Stage Kit.',
+  description:
+    'An alternatiive set of YARG cues largely inspired by, but not matching, the original Stage Kit.',
   cues: new Map([
     [CueType.Default, new DefaultCue()],
     [CueType.Dischord, new DischordCue()],
@@ -63,8 +63,8 @@ const defaultGroup: ICueGroup = {
     [CueType.Menu, new MenuCue()],
     [CueType.Searchlights, new SearchlightsCue()],
   ]),
-};
+}
 
 // Get the registry instance and register the default group
-const registry = YargCueRegistry.getInstance();
-registry.registerGroup(defaultGroup); 
+const registry = YargCueRegistry.getInstance()
+registry.registerGroup(defaultGroup)

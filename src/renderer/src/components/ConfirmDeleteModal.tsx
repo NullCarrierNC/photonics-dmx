@@ -1,8 +1,8 @@
-import React from 'react';
+import React from 'react'
 
 interface ConfirmDeleteModalProps {
-  onConfirm: () => void;
-  onCancel: () => void;
+  onConfirm: () => void
+  onCancel: () => void
 }
 
 const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ onConfirm, onCancel }) => {
@@ -14,20 +14,18 @@ const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ onConfirm, onCa
         <div className="flex justify-center space-x-4">
           <button
             onClick={onConfirm}
-            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-          >
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
             Delete
           </button>
           <button
             onClick={onCancel}
-            className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
-          >
+            className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500">
             Cancel
           </button>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default ConfirmDeleteModal;
+export default ConfirmDeleteModal
