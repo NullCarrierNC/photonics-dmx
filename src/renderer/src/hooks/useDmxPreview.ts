@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useAtomValue } from 'jotai'
-import { previewRigIdAtom } from '@renderer/atoms'
+import { useAtom, useAtomValue } from 'jotai'
+import { dmxValuesByUniverseAtom, previewRigIdAtom } from '@renderer/atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import type { DmxRig, LightingConfiguration } from '../../../photonics-dmx/types'
@@ -18,9 +18,7 @@ export function useDmxPreview(): {
   const selectedRigId = useAtomValue(previewRigIdAtom)
   const [selectedRig, setSelectedRig] = useState<DmxRig | null>(null)
   const [rigConfig, setRigConfig] = useState<LightingConfiguration | null>(null)
-  const [dmxValuesByUniverse, setDmxValuesByUniverse] = useState<
-    Map<number, Record<number, number>>
-  >(new Map())
+  const [dmxValuesByUniverse, setDmxValuesByUniverse] = useAtom(dmxValuesByUniverseAtom)
 
   // Load rig and manage IPC sender: enable when rig loads (cleanup only cancels async work)
   useEffect(() => {

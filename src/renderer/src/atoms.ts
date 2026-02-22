@@ -76,6 +76,12 @@ export const activeRigIdAtom = atom<string | null>(null)
  */
 export const previewRigIdAtom = atom<string | null>(null)
 
+/**
+ * Atom for last-known DMX values per universe.
+ * Persists across page navigation so persistent cues (e.g. YARG menu) remain visible in preview.
+ */
+export const dmxValuesByUniverseAtom = atom<Map<number, Record<number, number>>>(new Map())
+
 export const senderSacnEnabledAtom = atom<boolean>(false)
 
 export const senderIpcEnabledAtom = atom<boolean>(false)

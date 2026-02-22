@@ -60,6 +60,10 @@ export class TestEffectRunner {
   }
 
   public async stopTestEffect(): Promise<void> {
+    if (!this.testEffectInterval && !this.effectId) {
+      return
+    }
+
     if (this.testEffectInterval) {
       clearInterval(this.testEffectInterval)
       this.testEffectInterval = null
