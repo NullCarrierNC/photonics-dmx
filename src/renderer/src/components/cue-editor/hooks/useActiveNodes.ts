@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers'
 
-const NODE_EXECUTION_CHANNEL = 'node-cues:node-execution'
 const MIN_HIGHLIGHT_MS = 300
 
 type NodeExecutionPayload = {
@@ -71,8 +71,8 @@ export function useActiveNodes(currentGraphId: string | null): Set<string> {
   )
 
   useEffect(() => {
-    addIpcListener<NodeExecutionPayload>(NODE_EXECUTION_CHANNEL, handleNodeExecution)
-    return () => removeIpcListener(NODE_EXECUTION_CHANNEL, handleNodeExecution)
+    addIpcListener<NodeExecutionPayload>(RENDERER_RECEIVE.NODE_EXECUTION, handleNodeExecution)
+    return () => removeIpcListener(RENDERER_RECEIVE.NODE_EXECUTION, handleNodeExecution)
   }, [handleNodeExecution])
 
   useEffect(() => {

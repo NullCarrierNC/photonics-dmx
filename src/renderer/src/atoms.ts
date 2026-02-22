@@ -70,6 +70,12 @@ export const dmxRigsAtom = atom<DmxRig[]>([])
  */
 export const activeRigIdAtom = atom<string | null>(null)
 
+/**
+ * Atom for the selected rig ID on DMX Preview / Cue Simulation pages.
+ * Shared across pages so selection persists when navigating between them.
+ */
+export const previewRigIdAtom = atom<string | null>(null)
+
 export const senderSacnEnabledAtom = atom<boolean>(false)
 
 export const senderIpcEnabledAtom = atom<boolean>(false)

@@ -48,7 +48,7 @@ const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ selectedRigId, onRigCha
   return (
     <div className="mb-6">
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-        DMX Rig:
+        Preview DMX Rig:
       </label>
       <select
         value={selectedRigId ?? ''}
@@ -65,7 +65,7 @@ const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ selectedRigId, onRigCha
         })}
       </select>
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-        Select a rig to preview its DMX configuration and channel mappings.
+        For actual DMX output set the target rig(s) in Preferences.
       </p>
     </div>
   )

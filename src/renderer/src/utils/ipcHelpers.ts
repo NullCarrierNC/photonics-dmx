@@ -4,12 +4,13 @@
  * so the multiple components can listen without increasing the subscriber count.
  */
 
+import type { RendererReceiveChannel } from '../../../shared/ipcChannels'
+
 export type IpcHandler<TPayload = unknown> = (event: unknown, payload: TPayload) => void
 
 type NativeHandler = (event: unknown, ...args: unknown[]) => void
 
 interface ChannelState {
-  nativeHandler: NativeHandler
   subscribers: Set<IpcHandler>
 }
 
@@ -23,7 +24,7 @@ const registry = new Map<string, ChannelState>()
  * @param listener The listener function (event, payload)
  */
 export function addIpcListener<TPayload = unknown>(
-  channel: string,
+  channel: RendererReceiveChannel,
   listener: IpcHandler<TPayload>,
 ): void {
   if (!registry.has(channel)) {
@@ -39,7 +40,10 @@ export function addIpcListener<TPayload = unknown>(
       })
     }
     window.electron.ipcRenderer.on(channel, nativeHandler)
-    registry.set(channel, { nativeHandler, subscribers })
+    registry.set(channel, { subscribers })
+    if (channel === 'dmxValues') {
+      console.debug('[ipcHelpers] dmxValues: created native listener, subscribers=1')
+    }
   }
 
   const state = registry.get(channel)!
@@ -50,29 +54,29 @@ export function addIpcListener<TPayload = unknown>(
     return
   }
   state.subscribers.add(listener as IpcHandler)
+  if (channel === 'dmxValues') {
+    console.debug('[ipcHelpers] dmxValues: subscriber added, total=', state.subscribers.size)
+  }
 }
 
 /**
  * Remove an IPC event listener and update tracking.
- * When the last subscriber is removed, the native ipcRenderer listener is removed.
+ * Native listeners are kept registered; only the subscriber is removed from the fan-out Set.
  *
  * @param channel The IPC channel to remove the listener from
  * @param listener The listener function to remove
  */
 export function removeIpcListener<TPayload = unknown>(
-  channel: string,
+  channel: RendererReceiveChannel,
   listener: IpcHandler<TPayload>,
 ): void {
   const state = registry.get(channel)
   if (!state) {
     return
   }
-
   state.subscribers.delete(listener as IpcHandler)
-
-  if (state.subscribers.size === 0) {
-    window.electron.ipcRenderer.removeListener(channel, state.nativeHandler)
-    registry.delete(channel)
+  if (channel === 'dmxValues') {
+    console.debug('[ipcHelpers] dmxValues: subscriber removed, remaining=', state.subscribers.size)
   }
 }
 
@@ -85,7 +89,7 @@ export function removeIpcListener<TPayload = unknown>(
  * @returns A cleanup function to be returned from useEffect
  */
 export function registerIpcListener<TPayload = unknown>(
-  channel: string,
+  channel: RendererReceiveChannel,
   listener: IpcHandler<TPayload>,
 ): () => void {
   addIpcListener(channel, listener)

@@ -39,6 +39,7 @@ import { EffectExecutionEngine } from './EffectExecutionEngine'
 import { resolveValue, resolveLocationGroups, resolveLightTarget } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
+import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { sendToAllWindows } from '../../../../main/utils/windowUtils'
 
 type ChainStep = {
@@ -284,15 +285,13 @@ export class NodeExecutionEngine {
     }
   }
 
-  private static readonly NODE_EXECUTION_CHANNEL = 'node-cues:node-execution'
-
   private emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
     if (type === 'activated') {
       this.pendingActivations.add(nodeId)
     } else {
       this.pendingActivations.delete(nodeId)
     }
-    sendToAllWindows(NodeExecutionEngine.NODE_EXECUTION_CHANNEL, {
+    sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
       type,
       cueId: this.cueId,
       nodeId,
@@ -1051,7 +1050,7 @@ export class NodeExecutionEngine {
    */
   public cancelAll(): void {
     for (const nodeId of this.pendingActivations) {
-      sendToAllWindows(NodeExecutionEngine.NODE_EXECUTION_CHANNEL, {
+      sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
         type: 'deactivated',
         cueId: this.cueId,
         nodeId,

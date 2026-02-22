@@ -148,7 +148,10 @@ export const RENDERER_RECEIVE = {
   NODE_CUES_CHANGED: 'node-cues:changed',
   EFFECTS_CHANGED: 'effects:changed',
   DEBUG_LOG: 'node-cues:debug-log',
+  NODE_EXECUTION: 'node-cues:node-execution',
 } as const
+
+export type RendererReceiveChannel = (typeof RENDERER_RECEIVE)[keyof typeof RENDERER_RECEIVE]
 
 /** Renderer -> main (main process listens). Use when main calls ipcMain.on(). */
 export const RENDERER_SEND = {

@@ -24,9 +24,8 @@ import { VariableValue } from './executionTypes'
 import { resolveValue } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
+import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { sendToAllWindows } from '../../../../main/utils/windowUtils'
-
-const NODE_EXECUTION_CHANNEL = 'node-cues:node-execution'
 
 export class EffectExecutionEngine {
   private compiledEffect: CompiledEffect<BaseEventNode>
@@ -43,7 +42,7 @@ export class EffectExecutionEngine {
   private submittedEffects: Map<string, number> = new Map()
 
   private emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
-    sendToAllWindows(NODE_EXECUTION_CHANNEL, {
+    sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
       type,
       cueId: this.compiledEffect.definition.id,
       nodeId,

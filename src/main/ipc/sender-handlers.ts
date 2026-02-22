@@ -28,7 +28,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       const senderManager = controllerManager.getSenderManager()
 
       if (senderManager.isSenderEnabled(sender)) {
-        console.log(`Sender "${sender}" is already enabled`)
+        console.debug(`Sender "${sender}" is already enabled`)
         return
       }
 
