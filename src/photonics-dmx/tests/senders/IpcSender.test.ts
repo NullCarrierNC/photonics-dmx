@@ -26,17 +26,16 @@ describe('IpcSender', () => {
 
   it('start enables sender', async () => {
     await sender.start()
-    await sender.sendWithUniverse({ 1: 255 }, 1)
+    await sender.send({ 1: 255 })
     expect(mockSendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.DMX_VALUES, {
       universeBuffer: { 1: 255 },
-      universe: 1,
     })
   })
 
   it('stop disables sender', async () => {
     await sender.start()
     await sender.stop()
-    await sender.sendWithUniverse({ 1: 255 }, 1)
+    await sender.send({ 1: 255 })
     expect(mockSendToAllWindows).not.toHaveBeenCalled()
   })
 
@@ -45,7 +44,6 @@ describe('IpcSender', () => {
     await sender.send({ 1: 100, 2: 200 })
     expect(mockSendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.DMX_VALUES, {
       universeBuffer: { 1: 100, 2: 200 },
-      universe: -1,
     })
   })
 

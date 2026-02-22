@@ -21,12 +21,10 @@ export interface AppPreferences {
   complex: boolean
   enttecProConfig?: {
     port: string
-    universe: number
   }
   openDmxConfig?: {
     port: string
     dmxSpeed: number
-    universe: number
   }
   artNetConfig?: {
     host: string
@@ -131,12 +129,10 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   },
   enttecProConfig: {
     port: '',
-    universe: 0,
   },
   openDmxConfig: {
     port: '',
     dmxSpeed: 40,
-    universe: 0,
   },
   sacnConfig: {
     universe: 1,
@@ -200,7 +196,6 @@ export class ConfigurationManager {
     this.migrateLegacyLightsFormat()
     this.migrateLegacyPreferences()
     this.migrateToDmxRigs()
-    this.migrateSenderUniverseConfigs()
   }
 
   /**
@@ -235,7 +230,7 @@ export class ConfigurationManager {
     const currentPrefs = { ...this.preferences.get() } as any
     let updated = false
 
-    const defaultEnttecConfig = { port: '', universe: 0 }
+    const defaultEnttecConfig = { port: '' }
 
     // v2 -> v3: migrate legacy enttecProPort into enttecProConfig
     if (!currentPrefs.enttecProConfig) {
@@ -302,7 +297,6 @@ export class ConfigurationManager {
       const defaultRig: DmxRig = {
         id: uuidv4(),
         name: 'Default Rig',
-        universe: 1,
         active: true,
         config: safeLayout,
       }
@@ -313,42 +307,6 @@ export class ConfigurationManager {
           console.error('[Photonics Config] Failed to persist migrated DMX rigs:', err),
         )
       console.log('[Photonics Config] Migrated existing layout to default DMX rig')
-    }
-  }
-
-  /**
-   * Migrates sender configs to include universe field
-   */
-  private migrateSenderUniverseConfigs(): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- prefs shape for partial merge
-    const currentPrefs = { ...this.preferences.get() } as any
-    let updated = false
-
-    // Add universe to enttecProConfig if missing
-    if (currentPrefs.enttecProConfig && typeof currentPrefs.enttecProConfig.universe !== 'number') {
-      currentPrefs.enttecProConfig = {
-        ...currentPrefs.enttecProConfig,
-        universe: 0,
-      }
-      updated = true
-    }
-
-    // Add universe to openDmxConfig if missing
-    if (currentPrefs.openDmxConfig && typeof currentPrefs.openDmxConfig.universe !== 'number') {
-      currentPrefs.openDmxConfig = {
-        ...currentPrefs.openDmxConfig,
-        universe: 0,
-      }
-      updated = true
-    }
-
-    if (updated) {
-      this.preferences
-        .update(currentPrefs)
-        .catch((err) =>
-          console.error('[Photonics Config] Failed to persist sender config migration:', err),
-        )
-      console.log('[Photonics Config] Migrated sender configs to include universe field')
     }
   }
 

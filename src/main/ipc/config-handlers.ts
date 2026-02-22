@@ -124,11 +124,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       // Save the rig
       await config.saveDmxRig(rig)
 
-      // If active state changed, restart controllers to update DMX output
+      // If active state changed, refresh active rigs so DMX output picks up the change (senders stay running)
       if (existingRig && previousActiveState !== rig.active) {
-        await controllerManager.restartControllers()
-
-        // Send a notification to the renderer about the restart
+        controllerManager.refreshActiveRigs()
         sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 
@@ -149,11 +147,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       // Delete the rig
       await config.deleteDmxRig(id)
 
-      // If the deleted rig was active, restart controllers
+      // If the deleted rig was active, refresh active rigs so DMX output picks up the change
       if (wasActive) {
-        await controllerManager.restartControllers()
-
-        // Send a notification to the renderer about the restart
+        controllerManager.refreshActiveRigs()
         sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 

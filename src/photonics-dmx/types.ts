@@ -434,12 +434,12 @@ export interface LightingConfiguration {
 
 /**
  * DMX Rig Interface
- * Represents a complete DMX configuration with its own universe and active state
+ * Represents a complete DMX configuration with its own active state.
+ * Universe is configured at the sender/adapter level.
  */
 export interface DmxRig {
   id: string // UUID
   name: string
-  universe: number // Default 1
   active: boolean // Default true
   config: LightingConfiguration
 }

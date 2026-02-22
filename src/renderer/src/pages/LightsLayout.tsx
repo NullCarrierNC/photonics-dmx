@@ -42,7 +42,6 @@ const LightsLayout = () => {
   const [activeRigId, setActiveRigId] = useAtom(activeRigIdAtom)
 
   const [rigName, setRigName] = useState<string>('')
-  const [rigUniverse, setRigUniverse] = useState<number>(1)
 
   const [selectedCount, setSelectedCount] = useState<number | null>(() => {
     if (activeConfig?.numLights === 0) return null
@@ -86,7 +85,6 @@ const LightsLayout = () => {
           const defaultRig: DmxRig = {
             id: uuidv4(),
             name: 'Default Rig',
-            universe: 1,
             active: true,
             config: {
               numLights: 0,
@@ -119,7 +117,6 @@ const LightsLayout = () => {
         const rig = await window.electron.ipcRenderer.invoke(CONFIG.GET_DMX_RIG, activeRigId)
         if (rig) {
           setRigName(rig.name)
-          setRigUniverse(rig.universe || 1)
           setActiveLightsConfig(rig.config)
         }
       } catch (error) {
@@ -552,7 +549,6 @@ const LightsLayout = () => {
         const updatedRig: DmxRig = {
           ...currentRig,
           name: rigName,
-          universe: rigUniverse || 1, // Ensure minimum is 1
           config: updatedConfig,
         }
         await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, updatedRig)
@@ -602,8 +598,6 @@ const LightsLayout = () => {
             setActiveRigId={setActiveRigId}
             rigName={rigName}
             setRigName={setRigName}
-            rigUniverse={rigUniverse}
-            setRigUniverse={setRigUniverse}
             onRigsChange={setRigs}
           />
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAtom, useAtomValue } from 'jotai'
-import { dmxValuesByUniverseAtom, previewRigIdAtom } from '@renderer/atoms'
+import { dmxValuesAtom, previewRigIdAtom } from '@renderer/atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import type { DmxRig, LightingConfiguration } from '../../../photonics-dmx/types'
@@ -18,7 +18,7 @@ export function useDmxPreview(): {
   const selectedRigId = useAtomValue(previewRigIdAtom)
   const [selectedRig, setSelectedRig] = useState<DmxRig | null>(null)
   const [rigConfig, setRigConfig] = useState<LightingConfiguration | null>(null)
-  const [dmxValuesByUniverse, setDmxValuesByUniverse] = useAtom(dmxValuesByUniverseAtom)
+  const [dmxValues, setDmxValues] = useAtom(dmxValuesAtom)
 
   // Load rig and manage IPC sender: enable when rig loads (cleanup only cancels async work)
   useEffect(() => {
@@ -61,40 +61,24 @@ export function useDmxPreview(): {
   useEffect(() => {
     const handleDmxValues = (
       _: unknown,
-      data: { universeBuffer: Record<number, number>; universe: number } | Record<number, number>,
+      data: { universeBuffer?: Record<number, number> } | Record<number, number>,
     ) => {
-      let universeBuffer: Record<number, number>
-      let universe: number
-
-      if (
-        'universeBuffer' in data &&
-        'universe' in data &&
+      const universeBuffer =
+        data !== null &&
         typeof data === 'object' &&
-        data !== null
-      ) {
-        universeBuffer = data.universeBuffer || {}
-        universe = data.universe
-      } else {
-        universeBuffer = data as Record<number, number>
-        universe = 1
-      }
-
-      setDmxValuesByUniverse((prev) => {
-        const newMap = new Map(prev)
-        newMap.set(universe, universeBuffer)
-        return newMap
-      })
+        'universeBuffer' in data &&
+        data.universeBuffer != null
+          ? data.universeBuffer
+          : (data as Record<number, number>)
+      setDmxValues(
+        typeof universeBuffer === 'object' && universeBuffer !== null ? universeBuffer : {},
+      )
     }
 
-    type DmxPayload =
-      | { universeBuffer: Record<number, number>; universe: number }
-      | Record<number, number>
-    return registerIpcListener<DmxPayload>(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues)
-  }, [])
+    return registerIpcListener(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues)
+  }, [setDmxValues])
 
-  const rigUniverse =
-    selectedRig?.universe !== undefined && selectedRig?.universe !== null ? selectedRig.universe : 1
-  const dmxValues = selectedRig !== null ? dmxValuesByUniverse.get(rigUniverse) || {} : {}
+  const dmxValuesForPreview = selectedRig !== null ? dmxValues : {}
 
-  return { selectedRig, rigConfig, dmxValues }
+  return { selectedRig, rigConfig, dmxValues: dmxValuesForPreview }
 }

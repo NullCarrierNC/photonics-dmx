@@ -128,16 +128,11 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
       if (!isNonEmptyString(port)) {
         return { ok: false, error: 'Port (device path) is required for EnttecPro sender' }
       }
-      const universeNum =
-        data.universe !== undefined && data.universe !== null ? Number(data.universe) : 0
-      const universeValidation = validateNumberInRange(universeNum, 0, 63999, 'EnttecPro universe')
-      if (!universeValidation.ok) {
-        return universeValidation
-      }
+      // We're treating USB adapters as single-universe; always use universe 0
       const config: SerialSenderConfig = {
         sender: 'enttecpro',
         devicePath: port,
-        universe: universeValidation.value,
+        universe: 0,
       }
       return { ok: true, value: config }
     }
@@ -147,18 +142,13 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
       if (!isNonEmptyString(port)) {
         return { ok: false, error: 'Port (device path) is required for OpenDMX sender' }
       }
-      const universeNum =
-        data.universe !== undefined && data.universe !== null ? Number(data.universe) : 0
-      const universeValidation = validateNumberInRange(universeNum, 0, 63999, 'OpenDMX universe')
-      if (!universeValidation.ok) {
-        return universeValidation
-      }
       const dmxSpeed =
         typeof data.dmxSpeed === 'number' && data.dmxSpeed > 0 ? data.dmxSpeed : undefined
+      // We're treating USB adapters as single-universe; always use universe 0
       const config: SerialSenderConfig = {
         sender: 'opendmx',
         devicePath: port,
-        universe: universeValidation.value,
+        universe: 0,
         dmxSpeed,
       }
       return { ok: true, value: config }

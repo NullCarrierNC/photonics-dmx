@@ -77,10 +77,10 @@ export const activeRigIdAtom = atom<string | null>(null)
 export const previewRigIdAtom = atom<string | null>(null)
 
 /**
- * Atom for last-known DMX values per universe.
+ * Atom for last-known DMX values (channel -> value).
  * Persists across page navigation so persistent cues (e.g. YARG menu) remain visible in preview.
  */
-export const dmxValuesByUniverseAtom = atom<Map<number, Record<number, number>>>(new Map())
+export const dmxValuesAtom = atom<Record<number, number>>({})
 
 export const senderSacnEnabledAtom = atom<boolean>(false)
 
@@ -145,12 +145,10 @@ export interface LightingPreferences {
   complex?: boolean
   enttecProConfig?: {
     port: string
-    universe: number
   }
   openDmxConfig?: {
     port: string
     dmxSpeed: number
-    universe: number
   }
   artNetConfig?: {
     host: string

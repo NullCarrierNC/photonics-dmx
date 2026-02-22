@@ -10,8 +10,6 @@ interface LightsLayoutRigSectionProps {
   setActiveRigId: (id: string) => void
   rigName: string
   setRigName: (name: string) => void
-  rigUniverse: number
-  setRigUniverse: (n: number) => void
   onRigsChange: (rigs: DmxRig[]) => void
 }
 
@@ -21,8 +19,6 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
   setActiveRigId,
   rigName,
   setRigName,
-  rigUniverse,
-  setRigUniverse,
   onRigsChange,
 }) => (
   <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -46,7 +42,6 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
           const newRig: DmxRig = {
             id: uuidv4(),
             name: `Rig ${rigs.length + 1}`,
-            universe: 1,
             active: true,
             config: {
               numLights: 0,
@@ -62,7 +57,6 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
             onRigsChange([...rigs, newRig])
             setActiveRigId(newRig.id)
             setRigName(newRig.name)
-            setRigUniverse(newRig.universe)
           } catch (error) {
             console.error('Failed to create new rig:', error)
           }
@@ -79,17 +73,6 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
           onChange={(e) => setRigName(e.target.value)}
           className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[150px]"
           placeholder="Rig Name"
-        />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Universe:</label>
-        <input
-          type="number"
-          value={rigUniverse}
-          onChange={(e) => setRigUniverse(parseInt(e.target.value) || 1)}
-          min={1}
-          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-20"
         />
       </div>
     </div>

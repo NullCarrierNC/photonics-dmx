@@ -71,7 +71,7 @@ export class DmxPublisher {
           existing.manager.setConfiguration(rig.config)
           existing.rig = rig
         } else {
-          // Just update rig metadata (universe, active, name)
+          // Just update rig metadata (active, name)
           existing.rig = rig
         }
       } else {
@@ -85,27 +85,23 @@ export class DmxPublisher {
   /**
    * Contains the logic for converting light states
    * to DMX channels and sending them.
-   * Only processes lights from active rigs and sends to their respective universes.
+   * Merges all active rigs into one buffer and sends to all enabled senders.
    */
   private publishNow(lights: Map<string, RGBIO>): void {
-    // Process each active rig separately
+    const mergedBuffer: Record<number, number> = {}
+
+    // Sort light IDs for consistent processing order
+    const sortedLightIds = Array.from(lights.keys()).sort((a, b) => a.localeCompare(b))
+
     for (const [_rigId, { manager, rig }] of this._rigManagers) {
-      // Only process active rigs
       if (!rig.active) {
         continue
       }
-
-      // Build universe buffer for this rig
-      const universeBuffer: Record<number, number> = {}
-
-      // Sort light IDs for consistent processing order
-      const sortedLightIds = Array.from(lights.keys()).sort((a, b) => a.localeCompare(b))
 
       for (const lightId of sortedLightIds) {
         const lightValue = lights.get(lightId)!
         const dmxLight = manager.getDmxLight(lightId)
         if (!dmxLight) {
-          // Light doesn't belong to this rig, skip it
           continue
         }
 
@@ -127,7 +123,6 @@ export class DmxPublisher {
           continue
         }
 
-        // Write directly to universe buffer
         for (const [channelName, channelNumber] of Object.entries(dmxLight.channels)) {
           let value: number = 0
 
@@ -160,25 +155,19 @@ export class DmxPublisher {
               value = (dmxChannelData as MovingHeadDmxChannels).tilt
               break
             default:
-              // If the channel is not handled, continue to the next.
               continue
           }
 
-          // Ensure the DMX value is within [0, 255] and write directly to buffer
-          universeBuffer[channelNumber] = Math.max(0, Math.min(255, value))
+          mergedBuffer[channelNumber] = Math.max(0, Math.min(255, value))
         }
       }
+    }
 
-      // Send universe buffer to senders configured for this rig's universe
-      if (Object.keys(universeBuffer).length > 0) {
-        try {
-          this._sender.send(universeBuffer, rig.universe)
-        } catch (error) {
-          console.error(
-            `Failed to send DMX data for rig ${rig.name} (universe ${rig.universe}):`,
-            error,
-          )
-        }
+    if (Object.keys(mergedBuffer).length > 0) {
+      try {
+        this._sender.send(mergedBuffer)
+      } catch (error) {
+        console.error('Failed to send DMX data:', error)
       }
     }
   }
@@ -188,21 +177,10 @@ export class DmxPublisher {
       // Remove all event listeners
       this._lightStateManager.removeAllListeners()
 
-      // Send a blackout signal to all DMX channels for each active rig's universe
+      // Send a blackout signal to all DMX channels
       if (this._sender) {
         try {
-          // Get unique universes from active rigs
-          const universes = new Set<number>()
-          for (const { rig } of this._rigManagers.values()) {
-            if (rig.active) {
-              universes.add(rig.universe)
-            }
-          }
-
-          // Send blackout to each universe
-          for (const universe of universes) {
-            await this._sender.send(this._immediateBlackoutData, universe)
-          }
+          this._sender.send(this._immediateBlackoutData)
           console.log('DmxPublisher sent final blackout signal')
         } catch (err) {
           console.error('Error sending final blackout signal:', err)

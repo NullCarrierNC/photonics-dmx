@@ -9,7 +9,6 @@ interface DmxRigSelectorProps {
 
 /**
  * Component for selecting a DMX rig to preview.
- * Shows rig name and universe in the dropdown.
  */
 const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ selectedRigId, onRigChange }) => {
   const [availableRigs, setAvailableRigs] = useState<DmxRig[]>([])
@@ -54,15 +53,11 @@ const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ selectedRigId, onRigCha
         value={selectedRigId ?? ''}
         onChange={(e) => onRigChange(e.target.value || null)}
         className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[200px]">
-        {availableRigs.map((rig) => {
-          // Handle universe 0 correctly (0 is a valid universe, only default to 1 if undefined/null)
-          const universe = rig.universe !== undefined && rig.universe !== null ? rig.universe : 1
-          return (
-            <option key={rig.id} value={rig.id}>
-              {rig.name} (Universe {universe})
-            </option>
-          )
-        })}
+        {availableRigs.map((rig) => (
+          <option key={rig.id} value={rig.id}>
+            {rig.name}
+          </option>
+        ))}
       </select>
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
         For actual DMX output set the target rig(s) in Preferences.

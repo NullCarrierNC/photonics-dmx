@@ -660,6 +660,19 @@ export class ControllerManager {
   }
 
   /**
+   * Refresh which rigs are active for DMX output without restarting controllers.
+   * Use this when only the active-rig set changes so senders stay running.
+   */
+  public refreshActiveRigs(): void {
+    if (!this.isInitialized || !this.dmxPublisher) {
+      return
+    }
+    const activeRigs = this.config.getActiveRigs()
+    this.dmxPublisher.updateActiveRigs(activeRigs)
+    console.log('Refreshed active rigs for DMX output:', activeRigs.length, 'rig(s)')
+  }
+
+  /**
    * Restart controllers to pick up configuration changes
    * This shuts down existing controllers and reinitializes them
    */

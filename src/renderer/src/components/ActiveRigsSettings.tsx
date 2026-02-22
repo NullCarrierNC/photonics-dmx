@@ -7,8 +7,6 @@ import { CONFIG } from '../../../shared/ipcChannels'
 const ActiveRigsSettings: React.FC = () => {
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
-  const [editingRig, setEditingRig] = useState<string | null>(null)
-  const [editingUniverse, setEditingUniverse] = useState<number>(1)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
 
   const allowMultipleActiveRigs = prefs.allowMultipleActiveRigs ?? false
@@ -26,23 +24,6 @@ const ActiveRigsSettings: React.FC = () => {
 
     loadRigs()
   }, [setRigs])
-
-  const handleUniverseChange = async (rigId: string, newUniverse: number) => {
-    try {
-      const rig = rigs.find((r) => r.id === rigId)
-      if (rig) {
-        const updatedRig: DmxRig = {
-          ...rig,
-          universe: newUniverse || 1, // Ensure minimum is 1
-        }
-        await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, updatedRig)
-        setRigs((prev) => prev.map((r) => (r.id === rigId ? updatedRig : r)))
-        setEditingRig(null)
-      }
-    } catch (error) {
-      console.error('Failed to update rig universe:', error)
-    }
-  }
 
   const handleActiveToggle = async (rigId: string, newActive: boolean) => {
     try {
@@ -141,26 +122,13 @@ const ActiveRigsSettings: React.FC = () => {
     }
   }
 
-  const startEditingUniverse = (rig: DmxRig) => {
-    setEditingRig(rig.id)
-    setEditingUniverse(rig.universe || 1)
-  }
-
-  const cancelEditing = () => {
-    setEditingRig(null)
-  }
-
-  const saveUniverse = (rigId: string) => {
-    handleUniverseChange(rigId, editingUniverse)
-  }
-
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
         Active Rigs
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Manage your DMX rigs. Only active rigs will output DMX data to their configured universes.
+        Manage your DMX rigs. Only active rigs will output DMX data.
       </p>
 
       <div className="mb-4">
@@ -181,6 +149,9 @@ const ActiveRigsSettings: React.FC = () => {
         <p className="text-xs text-gray-500 dark:text-gray-400 ml-6">
           When multiple rigs are active DMX data will be published to all active rigs
           simultaneously.
+          <br />
+          <b>CAUTION:</b> all active rig DMX channels are passed to all active senders. This means
+          you can have channel overlap if you're expecting universe isolation. (Forthcoming)
         </p>
       </div>
 
@@ -197,9 +168,6 @@ const ActiveRigsSettings: React.FC = () => {
                   Rig Name
                 </th>
                 <th className="text-left p-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Universe
-                </th>
-                <th className="text-left p-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                   Active
                 </th>
                 <th className="text-left p-2 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -213,36 +181,6 @@ const ActiveRigsSettings: React.FC = () => {
                   key={rig.id}
                   className="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="p-2 text-gray-800 dark:text-gray-200">{rig.name}</td>
-                  <td className="p-2">
-                    {editingRig === rig.id ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          value={editingUniverse}
-                          onChange={(e) => setEditingUniverse(parseInt(e.target.value) || 1)}
-                          min={1}
-                          className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => saveUniverse(rig.id)}
-                          className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs">
-                          Save
-                        </button>
-                        <button
-                          onClick={cancelEditing}
-                          className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs">
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => startEditingUniverse(rig)}
-                        className="text-blue-600 dark:text-blue-400 hover:underline">
-                        {rig.universe || 1}
-                      </button>
-                    )}
-                  </td>
                   <td className="p-2">
                     {allowMultipleActiveRigs ? (
                       <input

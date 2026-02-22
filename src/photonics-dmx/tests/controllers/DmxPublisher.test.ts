@@ -22,9 +22,9 @@ describe('DmxPublisher', () => {
     )
   })
 
-  it('publish calls sender send with universe when rigs are active', () => {
+  it('publish calls sender send with merged buffer when rigs are active', () => {
     const config = createMockLightingConfig()
-    const rig: DmxRig = { id: 'rig1', name: 'Rig 1', active: true, universe: 1, config }
+    const rig: DmxRig = { id: 'rig1', name: 'Rig 1', active: true, config }
     publisher.updateActiveRigs([rig])
 
     const lights = new Map<string, import('../../types').RGBIO>()
@@ -32,14 +32,13 @@ describe('DmxPublisher', () => {
     publisher.publish(lights)
 
     expect(mockSenderManager.send).toHaveBeenCalled()
-    const [buffer, universe] = jest.mocked(mockSenderManager.send).mock.calls[0]
-    expect(universe).toBe(1)
+    const [buffer] = jest.mocked(mockSenderManager.send).mock.calls[0]
     expect(typeof buffer).toBe('object')
   })
 
   it('updateActiveRigs changes rig configuration', () => {
     const config = createMockLightingConfig()
-    publisher.updateActiveRigs([{ id: 'r1', name: 'R1', active: true, universe: 2, config }])
+    publisher.updateActiveRigs([{ id: 'r1', name: 'R1', active: true, config }])
     const lights = new Map<string, import('../../types').RGBIO>()
     lights.set('test-fixture-1', createMockRGBIP())
     publisher.publish(lights)
@@ -48,7 +47,7 @@ describe('DmxPublisher', () => {
 
   it('handles empty light map gracefully', () => {
     const config = createMockLightingConfig()
-    publisher.updateActiveRigs([{ id: 'r1', name: 'R1', active: true, universe: 1, config }])
+    publisher.updateActiveRigs([{ id: 'r1', name: 'R1', active: true, config }])
     publisher.publish(new Map())
     expect(() => publisher.publish(new Map())).not.toThrow()
   })

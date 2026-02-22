@@ -4,10 +4,8 @@ import CollapsibleSenderCard from './CollapsibleSenderCard'
 interface OpenDmxConfigCardProps {
   comPort: string
   refreshRate: number
-  universe: number
   onComPortChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   onRefreshRateChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  onUniverseChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   expanded: boolean
   onToggle: () => void
 }
@@ -15,10 +13,8 @@ interface OpenDmxConfigCardProps {
 export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
   comPort,
   refreshRate,
-  universe,
   onComPortChange,
   onRefreshRateChange,
-  onUniverseChange,
   expanded,
   onToggle,
 }) => (
@@ -66,21 +62,6 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
           max={44}
           className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         />
-      </div>
-      <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
-          Universe:
-        </label>
-        <input
-          type="number"
-          value={universe}
-          onChange={onUniverseChange}
-          min={0}
-          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-        />
-        <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-          (OpenDMX universes start at 0)
-        </p>
       </div>
       <p className="text-xs text-gray-600 dark:text-gray-400">
         Default is 40 Hz. Higher values reduce latency but can increase flicker on lower-quality

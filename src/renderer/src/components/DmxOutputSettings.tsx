@@ -29,8 +29,6 @@ const DmxOutputSettings: React.FC = () => {
   const [openDmxComPort, setOpenDmxComPort] = useAtom(openDmxComPortAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
   const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? 40
-  const enttecProUniverse = prefs.enttecProConfig?.universe ?? 0
-  const openDmxUniverse = prefs.openDmxConfig?.universe ?? 0
 
   const [artNetExpanded, setArtNetExpanded] = useState(false)
   const [sacnExpanded, setSacnExpanded] = useState(false)
@@ -235,7 +233,6 @@ const DmxOutputSettings: React.FC = () => {
       window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
         sender: 'enttecpro',
         port: comPort,
-        universe: enttecProUniverse,
       })
       setIsEnttecProEnabled(true) // Turn on the toggle state
     }
@@ -284,7 +281,6 @@ const DmxOutputSettings: React.FC = () => {
         sender: 'opendmx',
         port: openDmxComPort,
         dmxSpeed: openDmxSpeed,
-        universe: openDmxUniverse,
       })
       setIsOpenDmxEnabled(true)
     }
@@ -334,7 +330,7 @@ const DmxOutputSettings: React.FC = () => {
     setComPort(newPort)
 
     const newConfig = {
-      ...(prefs.enttecProConfig ?? { port: '', universe: 0 }),
+      ...(prefs.enttecProConfig ?? { port: '' }),
       port: newPort,
     }
 
@@ -358,7 +354,7 @@ const DmxOutputSettings: React.FC = () => {
     setOpenDmxComPort(newPort)
 
     const newConfig = {
-      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40, universe: 0 }),
+      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40 }),
       port: newPort,
     }
 
@@ -381,7 +377,7 @@ const DmxOutputSettings: React.FC = () => {
     const sanitized = Number.isFinite(parsed) && parsed > 0 ? Math.min(44, Math.max(1, parsed)) : 40
 
     const newConfig = {
-      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40, universe: 0 }),
+      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40 }),
       dmxSpeed: sanitized,
     }
 
@@ -396,48 +392,6 @@ const DmxOutputSettings: React.FC = () => {
       }))
     } catch (error) {
       console.error('Failed to save OpenDMX speed configuration:', error)
-    }
-  }
-
-  const handleEnttecProUniverseChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newUniverse = parseInt(e.target.value) || 0
-    const newConfig = {
-      ...(prefs.enttecProConfig ?? { port: '', universe: 0 }),
-      universe: newUniverse,
-    }
-
-    try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        enttecProConfig: newConfig,
-      })
-
-      setPrefs((prev) => ({
-        ...prev,
-        enttecProConfig: newConfig,
-      }))
-    } catch (error) {
-      console.error('Failed to save EnttecPro universe configuration:', error)
-    }
-  }
-
-  const handleOpenDmxUniverseChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newUniverse = parseInt(e.target.value) || 0
-    const newConfig = {
-      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40, universe: 0 }),
-      universe: newUniverse,
-    }
-
-    try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        openDmxConfig: newConfig,
-      })
-
-      setPrefs((prev) => ({
-        ...prev,
-        openDmxConfig: newConfig,
-      }))
-    } catch (error) {
-      console.error('Failed to save OpenDMX universe configuration:', error)
     }
   }
 
@@ -561,9 +515,7 @@ const DmxOutputSettings: React.FC = () => {
         <div>
           <EnttecProConfigCard
             comPort={comPort}
-            universe={enttecProUniverse}
             onComPortChange={handleComPortChange}
-            onUniverseChange={handleEnttecProUniverseChange}
             expanded={enttecProExpanded}
             onToggle={() => {
               const newEnttecProExpanded = !enttecProExpanded
@@ -584,10 +536,8 @@ const DmxOutputSettings: React.FC = () => {
           <OpenDmxConfigCard
             comPort={openDmxComPort}
             refreshRate={openDmxSpeed}
-            universe={openDmxUniverse}
             onComPortChange={handleOpenDmxComPortChange}
             onRefreshRateChange={handleOpenDmxSpeedChange}
-            onUniverseChange={handleOpenDmxUniverseChange}
             expanded={openDmxExpanded}
             onToggle={() => {
               const newOpenDmxExpanded = !openDmxExpanded
