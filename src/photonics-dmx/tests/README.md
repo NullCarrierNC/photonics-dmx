@@ -1,6 +1,41 @@
+# Photonics DMX Tests
+
+This directory contains the core photonics-dmx test suite. Additional tests live in `src/main/tests/` (IPC handlers)
+and `src/services/configuration/tests/` (ConfigurationManager, ConfigFile).
+
+## Test Layout
+
+| Location | Scope |
+|----------|-------|
+| `controllers/` | Sequencer, EffectManager, LayerManager, LightTransitionController, TransitionEngine, Clock, etc. |
+| `cues/` | Cue registry, lifecycle, node compiler/runtime, validation |
+| `senders/` | IpcSender, ArtNetSender, SacnSender |
+| `listeners/` | YargNetworkListener |
+| `processors/` | ProcessorManager |
+| `integration/` | End-to-end sequencer behavior and lighting integration |
+| `helpers/` | sequencerHarness (createSequencerHarness, ManualTestClock), dmxHelpers |
+
+The `sequencerHarness.ts` helper provides an integration test harness for spinning up a Sequencer with mock
+components. Use it when testing cue dispatch, effect lifecycle, or layer behavior.
+
+## Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Watch mode (re-run on file changes)
+npm run test:watch
+
+# With coverage
+npm run test:coverage
+```
+
+---
+
 # Color Blending Tests
 
-This directory contains tests to validate color blending behavior with layers in the photonics DMX system.
+This section documents the color blending tests that validate layer blending behavior.
 
 ## Test Files
 
@@ -32,7 +67,7 @@ This will show you:
 - Step-by-step blending process
 
 ### Full Test Suite
-Run the complete test suite:
+Run the complete test suite (see "Running Tests" above):
 ```bash
 npm test
 ```

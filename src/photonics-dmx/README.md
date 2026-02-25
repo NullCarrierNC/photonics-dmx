@@ -24,6 +24,25 @@ If you see the term `light` this is the virtual representation used within the l
 
 Configuration is handled by the `ConfigurationManager` and related services, which manage user preferences and fixture setup.
 
+## Node-Based Cue System
+
+Photonics includes a node-based cue system that will eventually replace code-based cues. Cues and reusable effects
+are defined as JSON files with a graph of nodes (event listeners, logic, actions, event raisers) and executed at runtime.
+
+**Flow:** JSON file → Loader (validation) → Compiler → Registry → ExecutionEngine → Sequencer
+
+| Component | Role |
+|-----------|------|
+| `NodeCueLoader` / `EffectLoader` | Loads JSON cue/effect files from disk, validates with AJV schema, watches for changes (chokidar) |
+| `NodeCueCompiler` / `EffectCompiler` | Compiles JSON node graph to `CompiledYargCue` / `CompiledAudioCue` |
+| `YargCueRegistry` / `EffectRegistry` | Registers compiled cues for dispatch when game events arrive |
+| `NodeExecutionEngine` / `EffectExecutionEngine` | Executes node graph at runtime: evaluates logic, resolves values, dispatches actions |
+| `YargNodeCue` / `AudioNodeCue` | Runtime cue instance that receives events and drives effects via the sequencer |
+
+Node types include: event listeners (YARG cues, effect triggers), logic (variables, math, conditionals, loops), actions
+(light effects with timing), event raisers, effect raisers/listeners. The visual cue editor (in the renderer) provides a
+ReactFlow-based UI for authoring these JSON files. See [cues/node/README.md](cues/node/README.md) for details.
+
 ## Processing Architecture
 
 Photonics uses different processing approaches for YARG and RB3E:
@@ -36,7 +55,7 @@ YARG uses **cue-based processing** where network cue events are directly convert
 RB3E uses a **Processor Manager** that can switch between two processing modes:
 
 #### Direct Mode (Default)
-The `StageKitDirectProcessor` provides direct DMX control by:
+The `Rb3StageKitDirectProcessor` provides direct DMX control by:
 - Receiving StageKit light data (4 color banks: Blue, Green, Yellow, Red with 8 positions each)
 - Mapping StageKit positions directly to DMX lights
 - Supporting color blending and accumulation
@@ -44,8 +63,8 @@ The `StageKitDirectProcessor` provides direct DMX control by:
 
 
 #### Cue-Based Mode
-The `CueBasedProcessor` provides cue-based lighting by converting RB3E events to lighting cues.
-This is NOT current accessible. RB3E currently only implements the StageKit direct processing.
+The `Rb3CueBasedProcessor` provides cue-based lighting by converting RB3E events to lighting cues.
+This is NOT currently accessible. RB3E currently only implements the StageKit direct processing.
 
 
 ### Processor Selection
@@ -74,9 +93,9 @@ The `Clock` provides a single source of truth for all timing operations in the s
 ### Processing Components
 
 - `ProcessorManager`: Manages switching between direct DMX control and cue-based processing for RB3E.
-- `StageKitDirectProcessor`: Provides direct StageKit-to-DMX mapping for real-time lighting control.
+- `Rb3StageKitDirectProcessor`: Provides direct StageKit-to-DMX mapping for real-time lighting control.
 - `StageKitLightMapper`: Maps StageKit light positions to DMX light configurations.
-- `CueBasedProcessor`: Handles cue-based lighting for RB3E.
+- `Rb3CueBasedProcessor`: Handles cue-based lighting for RB3E.
 
 
 
