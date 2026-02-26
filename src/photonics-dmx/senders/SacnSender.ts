@@ -4,22 +4,31 @@ import { BaseSender, SenderError } from './BaseSender'
 import { Sender } from 'sacn'
 import * as os from 'os'
 
+/** Default sACN output rate in Hz. */
+export const SACN_DEFAULT_MAX_OUTPUT_RATE = 44
+
 export interface SacnConfig {
   universe?: number
   networkInterface?: string
   useUnicast?: boolean
   unicastDestination?: string
+  /** Max packets per second (Hz). 0 = no limit. Default 44. */
+  maxOutputRate?: number
 }
 
 export class SacnSender extends BaseSender {
   private sender: Sender | undefined
   private eventEmitter: EventEmitter
   private config: SacnConfig
+  private lastSendTimeMs: number = 0
+  private minIntervalMs: number = 0
 
   constructor(config: SacnConfig = {}) {
     super()
     this.eventEmitter = new EventEmitter()
     this.config = config
+    const rate = config.maxOutputRate ?? SACN_DEFAULT_MAX_OUTPUT_RATE
+    this.minIntervalMs = rate > 0 ? 1000 / rate : 0
   }
 
   public async start(): Promise<void> {
@@ -103,6 +112,7 @@ export class SacnSender extends BaseSender {
     }
 
     try {
+      this.lastSendTimeMs = 0
       const zeroBuffer: Record<number, number> = {}
       for (let i = 1; i <= 512; i++) {
         zeroBuffer[i] = 0
@@ -119,6 +129,16 @@ export class SacnSender extends BaseSender {
   public async send(universeBuffer: Record<number, number>): Promise<void> {
     try {
       this.verifySenderStarted()
+
+      if (this.minIntervalMs > 0) {
+        const now = performance.now()
+        const elapsed = now - this.lastSendTimeMs
+        if (elapsed < this.minIntervalMs && this.lastSendTimeMs !== 0) {
+          return
+        }
+        this.lastSendTimeMs = now
+      }
+
       await this.sender!.send({ payload: universeBuffer })
     } catch (err: unknown) {
       console.error('SacnSender error:', err)

@@ -103,6 +103,7 @@ export class SenderManager {
               subuni: config.subuni ?? 0,
               port: config.port ?? 6454,
               base_refresh_interval: config.base_refresh_interval ?? 1000,
+              maxOutputRate: config.maxOutputRate,
             }
             sender = new ArtNetSender(host, artnetOptions)
             break
@@ -114,6 +115,7 @@ export class SenderManager {
               networkInterface: config.networkInterface,
               useUnicast: config.useUnicast,
               unicastDestination: config.unicastDestination,
+              maxOutputRate: config.maxOutputRate,
             })
             break
           }

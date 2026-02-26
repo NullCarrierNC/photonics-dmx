@@ -75,6 +75,10 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
         }
         universe = universeValidation.value
       }
+      const maxOutputRate =
+        typeof config.maxOutputRate === 'number' && config.maxOutputRate >= 0
+          ? Math.min(200, config.maxOutputRate)
+          : undefined
       const sacnConfig: SacnSenderConfig = {
         sender: 'sacn',
         universe,
@@ -85,6 +89,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
         useUnicast: Boolean(config.useUnicast),
         unicastDestination:
           typeof config.unicastDestination === 'string' ? config.unicastDestination : undefined,
+        maxOutputRate,
       }
       const senderManager = controllerManager.getSenderManager()
       if (senderManager.getEnabledSenders().includes('sacn')) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { getClockRate, setClockRate as saveClockRateToBackend } from '../ipcApi'
 
 const ClockRateSettings: React.FC = () => {
-  const [clockRateValue, setClockRateValue] = useState(5)
+  const [clockRateValue, setClockRateValue] = useState(10)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -92,14 +92,14 @@ const ClockRateSettings: React.FC = () => {
               onBlur={handleInputBlur}
               className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || isSaving}
-              placeholder="5"
+              placeholder="10"
             />
             <span className="text-sm text-gray-600 dark:text-gray-400">milliseconds</span>
           </div>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Default is 5ms. Increase for better performance on slower systems. Range: 1-100ms but
-            you probably should't go higher than 20ms.
+            Default is 10ms. Increase for better performance on slower systems. Range: 1-100ms but
+            you probably should't go higher than 40ms.
           </p>
         </div>
       </div>

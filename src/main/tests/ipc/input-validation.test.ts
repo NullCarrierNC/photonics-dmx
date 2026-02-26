@@ -102,10 +102,36 @@ describe('inputValidation', () => {
       if (result.ok) expect(result.value.sender).toBe('artnet')
     })
 
+    it('accepts artnet payload with maxOutputRate and clamps to 200', () => {
+      const result = validateSenderEnablePayload({
+        sender: 'artnet',
+        host: '127.0.0.1',
+        maxOutputRate: 300,
+      })
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value.sender).toBe('artnet')
+        expect((result.value as { maxOutputRate?: number }).maxOutputRate).toBe(200)
+      }
+    })
+
     it('accepts valid sacn payload', () => {
       const result = validateSenderEnablePayload({ sender: 'sacn', universe: 1 })
       expect(result.ok).toBe(true)
       if (result.ok) expect(result.value.sender).toBe('sacn')
+    })
+
+    it('accepts sacn payload with maxOutputRate and clamps to 200', () => {
+      const result = validateSenderEnablePayload({
+        sender: 'sacn',
+        universe: 1,
+        maxOutputRate: 300,
+      })
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value.sender).toBe('sacn')
+        expect((result.value as { maxOutputRate?: number }).maxOutputRate).toBe(200)
+      }
     })
 
     it('accepts valid ipc payload', () => {

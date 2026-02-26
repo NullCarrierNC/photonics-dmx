@@ -2,24 +2,43 @@ import { DMX, ArtnetDriver, IUniverseDriver } from 'dmx-ts'
 import { EventEmitter } from 'events'
 import { BaseSender, SenderError } from './BaseSender'
 
+/** Default Art-Net output rate in Hz. */
+export const ARTNET_DEFAULT_MAX_OUTPUT_RATE = 44
+
+export interface ArtNetSenderOptions {
+  universe?: number
+  net?: number
+  subnet?: number
+  subuni?: number
+  port?: number
+  base_refresh_interval?: number
+  /** Max packets per second (Hz). 0 = no limit. */
+  maxOutputRate?: number
+}
+
 export class ArtNetSender extends BaseSender {
   private dmx: DMX = new DMX()
   private universe?: IUniverseDriver
   private eventEmitter: EventEmitter
+  private lastSendTimeMs: number = 0
+  private minIntervalMs: number = 0
 
   constructor(
     private host: string = '127.0.0.1',
-    private options = {
+    private options: ArtNetSenderOptions = {
       universe: 1,
       net: 0,
       subnet: 0,
       subuni: 0,
       port: 6454,
-      base_refresh_interval: 1000, // 1 second refresh interval for unchanged frames
+      base_refresh_interval: 1000,
+      maxOutputRate: ARTNET_DEFAULT_MAX_OUTPUT_RATE,
     },
   ) {
     super()
     this.eventEmitter = new EventEmitter()
+    const rate = this.options.maxOutputRate ?? ARTNET_DEFAULT_MAX_OUTPUT_RATE
+    this.minIntervalMs = rate > 0 ? 1000 / rate : 0
   }
 
   public async start(): Promise<void> {
@@ -63,6 +82,7 @@ export class ArtNetSender extends BaseSender {
     console.log(`Stopping ArtNet sender on host ${this.host}...`)
 
     try {
+      this.lastSendTimeMs = 0
       // First set all channels to zero (blackout)
       const zeroPayload: Record<number, number> = {}
       for (let channel = 1; channel <= 255; channel++) {
@@ -123,6 +143,15 @@ export class ArtNetSender extends BaseSender {
     try {
       this.verifySenderStarted()
 
+      if (this.minIntervalMs > 0) {
+        const now = performance.now()
+        const elapsed = now - this.lastSendTimeMs
+        if (elapsed < this.minIntervalMs && this.lastSendTimeMs !== 0) {
+          return
+        }
+        this.lastSendTimeMs = now
+      }
+
       // Convert from 1-based DMX indexing to 0-based ArtNet indexing
       const convertedBuffer: Record<number, number> = {}
       for (const channelStr in universeBuffer) {
@@ -170,6 +199,6 @@ export class ArtNetSender extends BaseSender {
   }
 
   public getConfiguredPort(): number {
-    return this.options.port
+    return this.options.port ?? 6454
   }
 }
