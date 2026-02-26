@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
-import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { getEnabledCueGroups, getCueGroups } from '../ipcApi'
 
 type CueRegistryType = 'YARG' | 'RB3E'
 
@@ -53,10 +54,8 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     try {
       console.log('Fetching enabled cue groups...')
 
-      const enabledGroupIds = await window.electron.ipcRenderer.invoke(
-        CONFIG.GET_ENABLED_CUE_GROUPS,
-      )
-      const allGroups = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS)
+      const enabledGroupIds = await getEnabledCueGroups()
+      const allGroups = await getCueGroups()
 
       const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id))
 

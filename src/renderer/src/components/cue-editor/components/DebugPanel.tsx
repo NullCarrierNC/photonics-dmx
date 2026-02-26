@@ -1,17 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import type { IpcEventMap } from '../../../../../shared/ipcTypes'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers'
 
-type DebugVariableEntry = {
-  name: string
-  value: unknown
-}
-
-type DebugLogEntry = {
-  message: string
-  variables: DebugVariableEntry[]
-  timestamp: number
-}
+type DebugLogEntry = IpcEventMap['node-cues:debug-log']
 
 const MAX_ENTRIES = 200
 
@@ -35,7 +27,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [entries, setEntries] = useState<DebugLogEntry[]>([])
 
-  const handleDebugLog = useCallback((_: unknown, payload: DebugLogEntry) => {
+  const handleDebugLog = useCallback((payload: DebugLogEntry) => {
     if (!payload) return
     setEntries((prev) => {
       const next = [...prev, payload]
@@ -47,7 +39,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
   }, [])
 
   useEffect(() => {
-    addIpcListener<DebugLogEntry>(RENDERER_RECEIVE.DEBUG_LOG, handleDebugLog)
+    addIpcListener(RENDERER_RECEIVE.DEBUG_LOG, handleDebugLog)
     return () => removeIpcListener(RENDERER_RECEIVE.DEBUG_LOG, handleDebugLog)
   }, [handleDebugLog])
 

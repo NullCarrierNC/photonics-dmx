@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CONFIG } from '../../../shared/ipcChannels'
+import { getAudioConfig, setAudioEnabled } from '../ipcApi'
 
 interface AudioEnableToggleProps {
   disabled?: boolean
@@ -13,7 +13,7 @@ const AudioEnableToggle: React.FC<AudioEnableToggleProps> = ({ disabled = false 
   useEffect(() => {
     const loadEnabled = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+        const config = await getAudioConfig()
         setEnabled(config?.enabled || false)
       } catch (error) {
         console.error('Failed to load audio enabled state:', error)
@@ -33,7 +33,7 @@ const AudioEnableToggle: React.FC<AudioEnableToggleProps> = ({ disabled = false 
 
     try {
       setIsSaving(true)
-      const result = await window.electron.ipcRenderer.invoke(CONFIG.SET_AUDIO_ENABLED, newValue)
+      const result = await setAudioEnabled(newValue)
       if (!result.success) {
         console.error('Failed to save audio enabled state:', result.error)
         setEnabled(!newValue) // Revert on failure

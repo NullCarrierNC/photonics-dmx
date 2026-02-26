@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react'
 import { CueData } from 'src/photonics-dmx/cues/types/cueTypes'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
 import { registerIpcListener } from '@renderer/utils/ipcHelpers'
-import { CUE, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { setListenCueData, getYargEnabled, getRb3Enabled } from '../ipcApi'
 
 const NetworkDebug = () => {
   // Local state for latest cue data from IPC events.
@@ -31,10 +32,10 @@ const NetworkDebug = () => {
     setHandledCount(0)
 
     // Tell the main process to start sending cue data
-    window.electron.ipcRenderer.send(CUE.SET_LISTEN_CUE_DATA, true)
+    setListenCueData(true)
 
     // Handler for the cue-handled event.
-    const handleCueHandled = (_event: unknown, cueData: CueData) => {
+    const handleCueHandled = (cueData: CueData) => {
       // Get the LED color from the cue data
       const currentLedColorValue = cueData.ledColor || ''
 
@@ -58,15 +59,12 @@ const NetworkDebug = () => {
       setHandledCount((prev) => prev + 1)
     }
 
-    const cleanupHandled = registerIpcListener<CueData>(
-      RENDERER_RECEIVE.CUE_HANDLED,
-      handleCueHandled,
-    )
+    const cleanupHandled = registerIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueHandled)
 
     return () => {
       console.log('NetworkDebug unmounting, cleaning up listeners')
       // First disable the data listening on the main process
-      window.electron.ipcRenderer.send(CUE.SET_LISTEN_CUE_DATA, false)
+      setListenCueData(false)
 
       // Clean up our event listeners
       cleanupHandled()
@@ -77,8 +75,8 @@ const NetworkDebug = () => {
   useEffect(() => {
     const checkEnabledState = async () => {
       try {
-        const yargState = await window.electron.ipcRenderer.invoke(CUE.GET_YARG_ENABLED)
-        const rb3State = await window.electron.ipcRenderer.invoke(CUE.GET_RB3_ENABLED)
+        const yargState = await getYargEnabled()
+        const rb3State = await getRb3Enabled()
 
         const yargWasEnabled = yargEnabled
         const rb3WasEnabled = rb3Enabled
@@ -89,7 +87,7 @@ const NetworkDebug = () => {
         // If listeners were enabled while we were already mounted, re-register
         if ((yargState && !yargWasEnabled) || (rb3State && !rb3WasEnabled)) {
           console.log('Listener state changed, re-registering cue data listeners')
-          window.electron.ipcRenderer.send(CUE.SET_LISTEN_CUE_DATA, true)
+          setListenCueData(true)
         }
       } catch (error) {
         console.error('Error checking listener state:', error)

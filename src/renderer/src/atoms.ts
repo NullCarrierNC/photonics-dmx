@@ -192,10 +192,10 @@ export interface LightingPreferences {
     openDmxExpanded: boolean
   }
   audioConfig?: {
-    deviceId?: number
-    sampleRate: number
+    deviceId?: number | string
+    sampleRate?: number
     fftSize: number
-    updateIntervalMs: number
+    updateIntervalMs?: number
     sensitivity: number
     beatDetection: {
       threshold: number

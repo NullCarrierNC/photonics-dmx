@@ -135,20 +135,20 @@ export function useCueFileIO({
     const updatedFile = getUpdatedDocument()
     if (!updatedFile) return
 
-    const payload = {
-      mode: updatedFile.mode,
-      filename,
-      content: updatedFile,
-    }
-
     if (editorDoc.mode === 'effect') {
-      const validation = await validateEffect({ content: updatedFile })
+      const effectContent = updatedFile as EffectFile
+      const validation = await validateEffect({ content: effectContent })
       if (!validation.valid) {
         setValidationErrors(validation.errors)
         return
       }
       try {
-        const response = await saveEffectFile(payload)
+        const response = await saveEffectFile({
+          mode: effectContent.mode,
+          filename,
+          content: effectContent,
+        })
+        if (!response.success) return
         setEditorDoc({ mode: 'effect', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])
@@ -159,13 +159,19 @@ export function useCueFileIO({
         console.error('Failed to save effect file', error)
       }
     } else {
-      const validation = await validateNodeCue({ content: updatedFile })
+      const cueContent = updatedFile as NodeCueFile
+      const validation = await validateNodeCue({ content: cueContent })
       if (!validation.valid) {
         setValidationErrors(validation.errors)
         return
       }
       try {
-        const response = await saveNodeCueFile(payload)
+        const response = await saveNodeCueFile({
+          mode: cueContent.mode,
+          filename,
+          content: cueContent,
+        })
+        if (!response.success) return
         setEditorDoc({ mode: 'cue', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])

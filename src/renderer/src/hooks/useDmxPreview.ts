@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { useAtom, useAtomValue } from 'jotai'
 import { dmxValuesAtom, previewRigIdAtom } from '@renderer/atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
-import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import type { DmxRig, LightingConfiguration } from '../../../photonics-dmx/types'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { getDmxRig, enableSender } from '../ipcApi'
+import type { DmxRig, LightingConfiguration, IpcSenderConfig } from '../../../photonics-dmx/types'
 
 /**
  * Shared hook for DMX preview: rig loading, IPC sender lifecycle, and DMX value listening.
@@ -31,16 +32,13 @@ export function useDmxPreview(): {
       }
 
       try {
-        const rig: DmxRig = await window.electron.ipcRenderer.invoke(
-          CONFIG.GET_DMX_RIG,
-          selectedRigId,
-        )
+        const rig = await getDmxRig(selectedRigId)
 
         if (cancelled) return
         if (rig) {
           setSelectedRig(rig)
           setRigConfig(rig.config)
-          window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, { sender: 'ipc' })
+          enableSender({ sender: 'ipc' } as IpcSenderConfig)
         }
       } catch (error) {
         console.error('Failed to load rig configuration:', error)
@@ -59,19 +57,11 @@ export function useDmxPreview(): {
 
   // Listen for DMX values (one native listener per channel; subscribers fan out)
   useEffect(() => {
-    const handleDmxValues = (
-      _: unknown,
-      data: { universeBuffer?: Record<number, number> } | Record<number, number>,
-    ) => {
-      const universeBuffer =
-        data !== null &&
-        typeof data === 'object' &&
-        'universeBuffer' in data &&
-        data.universeBuffer != null
-          ? data.universeBuffer
-          : (data as Record<number, number>)
+    const handleDmxValues = (data: { universeBuffer: Record<number, number> }) => {
       setDmxValues(
-        typeof universeBuffer === 'object' && universeBuffer !== null ? universeBuffer : {},
+        typeof data.universeBuffer === 'object' && data.universeBuffer !== null
+          ? data.universeBuffer
+          : {},
       )
     }
 

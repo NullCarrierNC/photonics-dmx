@@ -16,7 +16,13 @@ import SacnConfigCard from './DmxOutputSettings/SacnConfigCard'
 import ArtNetConfigCard from './DmxOutputSettings/ArtNetConfigCard'
 import EnttecProConfigCard from './DmxOutputSettings/EnttecProConfigCard'
 import OpenDmxConfigCard from './DmxOutputSettings/OpenDmxConfigCard'
-import { LIGHT, CONFIG } from '../../../shared/ipcChannels'
+import {
+  getNetworkInterfaces,
+  enableSender,
+  disableSender,
+  savePrefs,
+  updateSacnConfig,
+} from '../ipcApi'
 
 const DmxOutputSettings: React.FC = () => {
   const [isArtNetEnabled, setIsArtNetEnabled] = useAtom(senderArtNetEnabledAtom)
@@ -60,7 +66,7 @@ const DmxOutputSettings: React.FC = () => {
   useEffect(() => {
     const loadNetworkInterfaces = async () => {
       try {
-        const result = await window.electron.ipcRenderer.invoke(LIGHT.GET_NETWORK_INTERFACES)
+        const result = await getNetworkInterfaces()
         if (result.success) {
           setNetworkInterfaces(result.interfaces)
         } else {
@@ -99,13 +105,9 @@ const DmxOutputSettings: React.FC = () => {
         dmxOutputConfig: initialConfig,
       }))
 
-      window.electron.ipcRenderer
-        .invoke(CONFIG.SAVE_PREFS, {
-          dmxOutputConfig: initialConfig,
-        })
-        .catch((error) => {
-          console.error('Failed to save initial DMX output configuration:', error)
-        })
+      savePrefs({ dmxOutputConfig: initialConfig }).catch((error) => {
+        console.error('Failed to save initial DMX output configuration:', error)
+      })
     }
   }, [
     prefs.dmxOutputConfig,
@@ -136,24 +138,19 @@ const DmxOutputSettings: React.FC = () => {
 
     // If enabling sACN, start the sender
     if (newState && !isSacnEnabled) {
-      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
-        sender: 'sacn',
-        ...sacnConfig,
-      })
+      enableSender({ sender: 'sacn', ...sacnConfig })
       setIsSacnEnabled(true) // Turn on the toggle state
     }
 
     // If disabling sACN, stop the sender if it's running and turn off the toggle
     if (!newState && isSacnEnabled) {
       console.log('Disabling sACN checkbox - stopping sACN sender and turning off toggle')
-      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'sacn' })
+      disableSender({ sender: 'sacn' })
       setIsSacnEnabled(false) // Turn off the toggle state
     }
 
     try {
-      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        dmxOutputConfig: newConfig,
-      })
+      const result = await savePrefs({ dmxOutputConfig: newConfig })
       console.log('Save result:', result)
     } catch (error) {
       console.error('Failed to save DMX output configuration:', error)
@@ -183,24 +180,19 @@ const DmxOutputSettings: React.FC = () => {
     // If enabling ArtNet, start the sender
     if (newState && !isArtNetEnabled) {
       console.log('Enabling ArtNet checkbox - starting ArtNet sender')
-      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
-        sender: 'artnet',
-        ...artNetConfig,
-      })
+      enableSender({ sender: 'artnet', ...artNetConfig })
       setIsArtNetEnabled(true) // Turn on the toggle state
     }
 
     // If disabling ArtNet, stop the sender if it's running and turn off the toggle
     if (!newState && isArtNetEnabled) {
       console.log('Disabling ArtNet checkbox - stopping ArtNet sender and turning off toggle')
-      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'artnet' })
+      disableSender({ sender: 'artnet' })
       setIsArtNetEnabled(false) // Turn off the toggle state
     }
 
     try {
-      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        dmxOutputConfig: newConfig,
-      })
+      const result = await savePrefs({ dmxOutputConfig: newConfig })
       console.log('Save result:', result)
     } catch (error) {
       console.error('Failed to save DMX output configuration:', error)
@@ -230,10 +222,7 @@ const DmxOutputSettings: React.FC = () => {
     // If enabling Enttec Pro, start the sender
     if (newState && !isEnttecProEnabled) {
       console.log('Enabling Enttec Pro checkbox - starting Enttec Pro sender')
-      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
-        sender: 'enttecpro',
-        port: comPort,
-      })
+      enableSender({ sender: 'enttecpro', devicePath: comPort })
       setIsEnttecProEnabled(true) // Turn on the toggle state
     }
 
@@ -242,14 +231,12 @@ const DmxOutputSettings: React.FC = () => {
       console.log(
         'Disabling Enttec Pro checkbox - stopping Enttec Pro sender and turning off toggle',
       )
-      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'enttecpro' })
+      disableSender({ sender: 'enttecpro' })
       setIsEnttecProEnabled(false) // Turn off the toggle state
     }
 
     try {
-      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        dmxOutputConfig: newConfig,
-      })
+      const result = await savePrefs({ dmxOutputConfig: newConfig })
       console.log('Save result:', result)
     } catch (error) {
       console.error('Failed to save DMX output configuration:', error)
@@ -277,24 +264,18 @@ const DmxOutputSettings: React.FC = () => {
 
     if (newState && !isOpenDmxEnabled) {
       console.log('Enabling OpenDMX checkbox - starting OpenDMX sender')
-      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
-        sender: 'opendmx',
-        port: openDmxComPort,
-        dmxSpeed: openDmxSpeed,
-      })
+      enableSender({ sender: 'opendmx', devicePath: openDmxComPort, dmxSpeed: openDmxSpeed })
       setIsOpenDmxEnabled(true)
     }
 
     if (!newState && isOpenDmxEnabled) {
       console.log('Disabling OpenDMX checkbox - stopping OpenDMX sender and turning off toggle')
-      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'opendmx' })
+      disableSender({ sender: 'opendmx' })
       setIsOpenDmxEnabled(false)
     }
 
     try {
-      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        dmxOutputConfig: newConfig,
-      })
+      const result = await savePrefs({ dmxOutputConfig: newConfig })
       console.log('Save result:', result)
     } catch (error) {
       console.error('Failed to save DMX output configuration:', error)
@@ -311,9 +292,7 @@ const DmxOutputSettings: React.FC = () => {
     }
 
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        artNetConfig: newConfig,
-      })
+      await savePrefs({ artNetConfig: newConfig })
 
       // Update the preferences atom to reflect the change
       setPrefs((prev) => ({
@@ -335,9 +314,7 @@ const DmxOutputSettings: React.FC = () => {
     }
 
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        enttecProConfig: newConfig,
-      })
+      await savePrefs({ enttecProConfig: newConfig })
 
       // Update the preferences atom to reflect the change
       setPrefs((prev) => ({
@@ -359,9 +336,7 @@ const DmxOutputSettings: React.FC = () => {
     }
 
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        openDmxConfig: newConfig,
-      })
+      await savePrefs({ openDmxConfig: newConfig })
 
       setPrefs((prev) => ({
         ...prev,
@@ -382,9 +357,7 @@ const DmxOutputSettings: React.FC = () => {
     }
 
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        openDmxConfig: newConfig,
-      })
+      await savePrefs({ openDmxConfig: newConfig })
 
       setPrefs((prev) => ({
         ...prev,
@@ -406,9 +379,7 @@ const DmxOutputSettings: React.FC = () => {
 
     try {
       // Save to preferences
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        sacnConfig: newConfig,
-      })
+      await savePrefs({ sacnConfig: newConfig })
 
       // Update the preferences atom to reflect the change
       setPrefs((prev) => ({
@@ -418,7 +389,7 @@ const DmxOutputSettings: React.FC = () => {
 
       // Update the running sender if sACN is enabled
       if (isSacnEnabled) {
-        await window.electron.ipcRenderer.invoke(LIGHT.UPDATE_SACN_CONFIG, newConfig)
+        await updateSacnConfig(newConfig)
       }
     } catch (error) {
       console.error('Failed to save sACN configuration:', error)
@@ -440,9 +411,7 @@ const DmxOutputSettings: React.FC = () => {
     }
 
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        dmxSettingsPrefs: newDmxSettingsPrefs,
-      })
+      await savePrefs({ dmxSettingsPrefs: newDmxSettingsPrefs })
 
       setPrefs((prev) => ({
         ...prev,

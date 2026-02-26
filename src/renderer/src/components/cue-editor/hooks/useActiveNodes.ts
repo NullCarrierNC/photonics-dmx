@@ -41,7 +41,7 @@ export function useActiveNodes(currentGraphId: string | null): Set<string> {
   }, [])
 
   const handleNodeExecution = useCallback(
-    (_: unknown, payload: NodeExecutionPayload) => {
+    (payload: NodeExecutionPayload) => {
       if (!payload || payload.cueId !== currentGraphId) return
 
       const { type, nodeId } = payload
@@ -71,7 +71,7 @@ export function useActiveNodes(currentGraphId: string | null): Set<string> {
   )
 
   useEffect(() => {
-    addIpcListener<NodeExecutionPayload>(RENDERER_RECEIVE.NODE_EXECUTION, handleNodeExecution)
+    addIpcListener(RENDERER_RECEIVE.NODE_EXECUTION, handleNodeExecution)
     return () => removeIpcListener(RENDERER_RECEIVE.NODE_EXECUTION, handleNodeExecution)
   }, [handleNodeExecution])
 

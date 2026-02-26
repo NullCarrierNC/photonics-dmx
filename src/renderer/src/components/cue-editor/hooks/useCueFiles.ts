@@ -35,9 +35,15 @@ type UseCueFilesParams = {
   ) => void
   getUpdatedDocument: () => NodeCueFile | EffectFile | null
   onSaveSuccess?: (message: string) => void
+  onError?: (message: string) => void
 }
 
-const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: UseCueFilesParams) => {
+const useCueFiles = ({
+  loadCueIntoFlow,
+  getUpdatedDocument,
+  onSaveSuccess,
+  onError,
+}: UseCueFilesParams) => {
   const [initialDoc] = useState<EditorDocument>(() => ({
     mode: 'cue' as const,
     file: createDefaultFile('yarg'),
@@ -123,6 +129,7 @@ const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: Use
     loadCueIntoFlow,
     refreshFiles: fileIO.refreshFiles,
     refreshEffectFiles: fileIO.refreshEffectFiles,
+    onError,
   })
 
   const metadata = useCueMetadata({
@@ -167,16 +174,10 @@ const useCueFiles = ({ loadCueIntoFlow, getUpdatedDocument, onSaveSuccess }: Use
   useEffect(() => {
     fileIO.refreshFiles()
     fileIO.refreshEffectFiles()
-    const handler = (
-      _: unknown,
-      payload: { yarg: NodeCueFileSummary[]; audio: NodeCueFileSummary[] },
-    ) => {
+    const handler = (payload: { yarg: NodeCueFileSummary[]; audio: NodeCueFileSummary[] }) => {
       setFiles([...payload.yarg, ...payload.audio])
     }
-    const effectHandler = (
-      _: unknown,
-      payload: { yarg: EffectFileSummary[]; audio: EffectFileSummary[] },
-    ) => {
+    const effectHandler = (payload: { yarg: EffectFileSummary[]; audio: EffectFileSummary[] }) => {
       setEffectFiles([...payload.yarg, ...payload.audio])
     }
     addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handler)

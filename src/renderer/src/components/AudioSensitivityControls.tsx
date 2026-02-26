@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CONFIG } from '../../../shared/ipcChannels'
+import { getAudioConfig, saveAudioConfig } from '../ipcApi'
 
 const AudioSensitivityControls: React.FC = () => {
   const [sensitivity, setSensitivity] = useState(1.0)
@@ -9,7 +9,7 @@ const AudioSensitivityControls: React.FC = () => {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+        const config = await getAudioConfig()
         setSensitivity(config?.sensitivity ?? 1.0)
       } catch (error) {
         console.error('Failed to load audio sensitivity:', error)
@@ -29,19 +29,17 @@ const AudioSensitivityControls: React.FC = () => {
 
     try {
       setIsSaving(true)
-      const result = await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
-        sensitivity: newValue,
-      })
+      const result = await saveAudioConfig({ sensitivity: newValue })
       if (!result.success) {
         console.error('Failed to save audio sensitivity:', result.error)
         // Revert on failure
-        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+        const config = await getAudioConfig()
         setSensitivity(config?.sensitivity ?? 1.0)
       }
     } catch (error) {
       console.error('Failed to save audio sensitivity:', error)
       // Revert on failure
-      const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+      const config = await getAudioConfig()
       setSensitivity(config?.sensitivity ?? 1.0)
     } finally {
       setIsSaving(false)

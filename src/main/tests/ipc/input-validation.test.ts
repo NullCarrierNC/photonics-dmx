@@ -114,8 +114,11 @@ describe('inputValidation', () => {
       if (result.ok) expect(result.value.sender).toBe('ipc')
     })
 
-    it('accepts valid enttecpro payload with port', () => {
-      const result = validateSenderEnablePayload({ sender: 'enttecpro', port: '/dev/ttyUSB0' })
+    it('accepts valid enttecpro payload with devicePath', () => {
+      const result = validateSenderEnablePayload({
+        sender: 'enttecpro',
+        devicePath: '/dev/ttyUSB0',
+      })
       expect(result.ok).toBe(true)
       if (result.ok) expect(result.value.sender).toBe('enttecpro')
     })
@@ -123,7 +126,7 @@ describe('inputValidation', () => {
     it('accepts valid opendmx payload', () => {
       const result = validateSenderEnablePayload({
         sender: 'opendmx',
-        port: 'COM3',
+        devicePath: 'COM3',
         dmxSpeed: 40,
       })
       expect(result.ok).toBe(true)
@@ -140,7 +143,7 @@ describe('inputValidation', () => {
       expect(result.ok).toBe(false)
     })
 
-    it('rejects enttecpro without port', () => {
+    it('rejects enttecpro without devicePath', () => {
       const result = validateSenderEnablePayload({ sender: 'enttecpro' })
       expect(result.ok).toBe(false)
     })

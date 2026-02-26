@@ -1,6 +1,6 @@
 import { useAtom } from 'jotai'
 import { senderSacnEnabledAtom, lightingPrefsAtom } from '../atoms'
-import { LIGHT } from '../../../shared/ipcChannels'
+import { enableSender, disableSender } from '../ipcApi'
 
 interface SacnToggleProps {
   disabled?: boolean
@@ -24,13 +24,10 @@ const SacnToggle = ({ disabled = false }: SacnToggleProps) => {
         useUnicast: prefs.sacnConfig?.useUnicast || false,
       }
 
-      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
-        sender: 'sacn',
-        ...currentSacnConfig,
-      })
+      enableSender({ sender: 'sacn', ...currentSacnConfig })
       console.log('sACN enabled with config:', currentSacnConfig)
     } else {
-      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'sacn' })
+      disableSender({ sender: 'sacn' })
       console.log('sACN disabled')
     }
   }

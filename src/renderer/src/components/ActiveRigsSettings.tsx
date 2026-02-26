@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
 import { dmxRigsAtom, lightingPrefsAtom } from '../atoms'
 import { DmxRig } from '../../../photonics-dmx/types'
-import { CONFIG } from '../../../shared/ipcChannels'
+import { getDmxRigs, saveDmxRig, deleteDmxRig, savePrefs } from '../ipcApi'
 
 const ActiveRigsSettings: React.FC = () => {
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
@@ -15,7 +15,7 @@ const ActiveRigsSettings: React.FC = () => {
   useEffect(() => {
     const loadRigs = async () => {
       try {
-        const loadedRigs = await window.electron.ipcRenderer.invoke(CONFIG.GET_DMX_RIGS)
+        const loadedRigs = await getDmxRigs()
         setRigs(loadedRigs || [])
       } catch (error) {
         console.error('Failed to load DMX rigs:', error)
@@ -40,7 +40,7 @@ const ActiveRigsSettings: React.FC = () => {
             ...otherRig,
             active: false,
           }
-          await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, deactivatedRig)
+          await saveDmxRig(deactivatedRig)
         }
       }
 
@@ -49,7 +49,7 @@ const ActiveRigsSettings: React.FC = () => {
         ...rig,
         active: newActive,
       }
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, updatedRig)
+      await saveDmxRig(updatedRig)
 
       // Update local state
       setRigs((prev) =>
@@ -71,9 +71,7 @@ const ActiveRigsSettings: React.FC = () => {
 
   const handleAllowMultipleActiveRigsChange = async (enabled: boolean) => {
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        allowMultipleActiveRigs: enabled,
-      })
+      await savePrefs({ allowMultipleActiveRigs: enabled })
       setPrefs((prev) => ({
         ...prev,
         allowMultipleActiveRigs: enabled,
@@ -92,7 +90,7 @@ const ActiveRigsSettings: React.FC = () => {
               ...otherRig,
               active: false,
             }
-            await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, deactivatedRig)
+            await saveDmxRig(deactivatedRig)
           }
 
           // Update local state
@@ -114,7 +112,7 @@ const ActiveRigsSettings: React.FC = () => {
 
   const handleDelete = async (rigId: string) => {
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.DELETE_DMX_RIG, rigId)
+      await deleteDmxRig(rigId)
       setRigs((prev) => prev.filter((r) => r.id !== rigId))
       setShowDeleteConfirm(null)
     } catch (error) {

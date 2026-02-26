@@ -1,6 +1,6 @@
 import { useAtom } from 'jotai'
 import { enttecProComPortAtom, senderEnttecProEnabledAtom, lightingPrefsAtom } from '../atoms'
-import { LIGHT } from '../../../shared/ipcChannels'
+import { enableSender, disableSender } from '../ipcApi'
 
 interface EnttecProToggleProps {
   disabled?: boolean
@@ -16,10 +16,10 @@ const EnttecProToggle = ({ disabled = false }: EnttecProToggleProps) => {
     setIsEnttecProEnabled(newState)
 
     if (newState) {
-      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, { sender: 'enttecpro', port: comPort })
+      enableSender({ sender: 'enttecpro', devicePath: comPort })
       console.log('EnttecPro enabled')
     } else {
-      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'enttecpro' })
+      disableSender({ sender: 'enttecpro' })
       console.log('EnttecPro disabled')
     }
   }

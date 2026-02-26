@@ -6,7 +6,8 @@ import {
   audioListenerEnabledAtom,
 } from '../atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
-import { CONFIG, CUE, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { getAudioEnabled, setAudioEnabled, disableYarg, disableRb3 } from '../ipcApi'
 
 interface AudioToggleProps {
   disabled?: boolean
@@ -22,7 +23,7 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
     // Initialize toggle state from runtime enabled state (not config)
     const initializeState = async () => {
       try {
-        const enabled = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_ENABLED)
+        const enabled = await getAudioEnabled()
         setIsAudioEnabled(enabled)
       } catch (error) {
         console.error('Error initializing Audio toggle state:', error)
@@ -54,7 +55,7 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
 
     try {
       setIsSaving(true)
-      const result = await window.electron.ipcRenderer.invoke(CONFIG.SET_AUDIO_ENABLED, newState)
+      const result = await setAudioEnabled(newState)
       if (!result.success) {
         console.error('Failed to save audio enabled state:', result.error)
         setIsAudioEnabled(!newState) // Revert on failure
@@ -63,11 +64,11 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
         if (newState) {
           if (isYargEnabled) {
             setIsYargEnabled(false)
-            window.electron.ipcRenderer.send(CUE.YARG_LISTENER_DISABLED)
+            disableYarg()
           }
           if (isRb3Enabled) {
             setIsRb3Enabled(false)
-            window.electron.ipcRenderer.send(CUE.RB3E_LISTENER_DISABLED)
+            disableRb3()
           }
         }
       }

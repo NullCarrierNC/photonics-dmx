@@ -1,164 +1,363 @@
 /**
- * IPC API utility for renderer process
+ * Typed IPC API for the renderer process.
+ *
+ * All IPC calls go through this module — components and hooks import
+ * named functions from here rather than calling window.api directly.
  */
 
-import { NODE_CUES, EFFECTS, WINDOW, LIGHT, CONFIG, CUE } from '../../shared/ipcChannels'
+import {
+  NODE_CUES,
+  EFFECTS,
+  WINDOW,
+  LIGHT,
+  CONFIG,
+  CUE,
+  SHELL,
+  RENDERER_SEND,
+} from '../../shared/ipcChannels'
+import type {
+  NodeCueFile,
+  NodeCueMode,
+  EffectFile,
+  EffectMode,
+  DmxRig,
+  LightingConfiguration,
+  SenderConfig,
+  AudioCueType,
+  AppPreferences,
+  AudioConfig,
+  AudioLightingData,
+} from '../../shared/ipcTypes'
 
-// Cue consistency window management
+// ---------------------------------------------------------------------------
+// Cue consistency window
+// ---------------------------------------------------------------------------
+
 export const setCueConsistencyWindow = (windowMs: number) =>
-  window.electron.ipcRenderer.invoke(LIGHT.SET_CUE_CONSISTENCY_WINDOW, windowMs)
+  window.api.invoke(LIGHT.SET_CUE_CONSISTENCY_WINDOW, windowMs)
 
 export const getCueConsistencyWindow = () =>
-  window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_CONSISTENCY_WINDOW)
+  window.api.invoke(LIGHT.GET_CUE_CONSISTENCY_WINDOW, undefined)
 
-export const getConsistencyStatus = () =>
-  window.electron.ipcRenderer.invoke(LIGHT.GET_CONSISTENCY_STATUS)
+export const getConsistencyStatus = () => window.api.invoke(LIGHT.GET_CONSISTENCY_STATUS, undefined)
 
-// Cue groups management
-export const getCueGroups = () => window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS)
+// ---------------------------------------------------------------------------
+// Cue groups
+// ---------------------------------------------------------------------------
 
-export const getEnabledCueGroups = () =>
-  window.electron.ipcRenderer.invoke(CONFIG.GET_ENABLED_CUE_GROUPS)
+export const getCueGroups = () => window.api.invoke(LIGHT.GET_CUE_GROUPS, undefined)
+
+export const getEnabledCueGroups = () => window.api.invoke(CONFIG.GET_ENABLED_CUE_GROUPS, undefined)
 
 export const setEnabledCueGroups = (groupIds: string[]) =>
-  window.electron.ipcRenderer.invoke(CONFIG.SET_ENABLED_CUE_GROUPS, groupIds)
+  window.api.invoke(CONFIG.SET_ENABLED_CUE_GROUPS, groupIds)
 
-export const getActiveCueGroups = () =>
-  window.electron.ipcRenderer.invoke(LIGHT.GET_ACTIVE_CUE_GROUPS)
+export const getActiveCueGroups = () => window.api.invoke(LIGHT.GET_ACTIVE_CUE_GROUPS, undefined)
 
 export const setActiveCueGroups = (groupIds: string[]) =>
-  window.electron.ipcRenderer.invoke(LIGHT.SET_ACTIVE_CUE_GROUPS, groupIds)
+  window.api.invoke(LIGHT.SET_ACTIVE_CUE_GROUPS, groupIds)
 
-// Cue source group information
+export const activateCueGroup = (groupId: string) =>
+  window.api.invoke(LIGHT.ACTIVATE_CUE_GROUP, groupId)
+
+export const deactivateCueGroup = (groupId: string) =>
+  window.api.invoke(LIGHT.DEACTIVATE_CUE_GROUP, groupId)
+
+export const enableCueGroup = (groupId: string) =>
+  window.api.invoke(LIGHT.ENABLE_CUE_GROUP, groupId)
+
+export const disableCueGroup = (groupId: string) =>
+  window.api.invoke(LIGHT.DISABLE_CUE_GROUP, groupId)
+
 export const getCueSourceGroup = (cueType: string) =>
-  window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_SOURCE_GROUP, cueType)
+  window.api.invoke(LIGHT.GET_CUE_SOURCE_GROUP, cueType)
 
-// Available cues
-export const getAvailableCues = (groupId: string) =>
-  window.electron.ipcRenderer.invoke(LIGHT.GET_AVAILABLE_CUES, groupId)
+export const getAvailableCues = (groupId: string | undefined) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_CUES, groupId)
 
+export const getAudioCueGroups = () => window.api.invoke(LIGHT.GET_AUDIO_CUE_GROUPS, undefined)
+
+export const getAvailableAudioCues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_CUES, groupId)
+
+// ---------------------------------------------------------------------------
 // Light management
-export const getLightLibrary = () => window.electron.ipcRenderer.invoke(CONFIG.GET_LIGHT_LIBRARY)
+// ---------------------------------------------------------------------------
 
-export const getMyLights = () => window.electron.ipcRenderer.invoke(CONFIG.GET_MY_LIGHTS)
+export const getLightLibrary = () => window.api.invoke(CONFIG.GET_LIGHT_LIBRARY, undefined)
 
-export const saveMyLights = (data: unknown) =>
-  window.electron.ipcRenderer.send(CONFIG.SAVE_MY_LIGHTS, data)
+export const getMyLights = () => window.api.invoke(CONFIG.GET_MY_LIGHTS, undefined)
+
+export const saveMyLights = (data: import('../../shared/ipcTypes').DmxFixture[]) =>
+  window.api.send(CONFIG.SAVE_MY_LIGHTS, data)
 
 export const getLightLayout = (filename: string) =>
-  window.electron.ipcRenderer.invoke(CONFIG.GET_LIGHT_LAYOUT, filename)
+  window.api.invoke(CONFIG.GET_LIGHT_LAYOUT, filename)
 
-export const saveLightLayout = (filename: string, data: unknown) =>
-  window.electron.ipcRenderer.invoke(CONFIG.SAVE_LIGHT_LAYOUT, filename, data)
+export const saveLightLayout = (data: LightingConfiguration) =>
+  window.api.invoke(CONFIG.SAVE_LIGHT_LAYOUT, data)
 
+// ---------------------------------------------------------------------------
 // Preferences
-export const getPrefs = () => window.electron.ipcRenderer.invoke(CONFIG.GET_PREFS)
+// ---------------------------------------------------------------------------
 
-export const savePrefs = (updates: unknown) =>
-  window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, updates)
+export const getPrefs = () => window.api.invoke(CONFIG.GET_PREFS, undefined)
 
+export const savePrefs = (updates: Partial<AppPreferences>) =>
+  window.api.invoke(CONFIG.SAVE_PREFS, updates)
+
+// ---------------------------------------------------------------------------
+// DMX rigs
+// ---------------------------------------------------------------------------
+
+export const getDmxRigs = () => window.api.invoke(CONFIG.GET_DMX_RIGS, undefined)
+
+export const getDmxRig = (id: string) => window.api.invoke(CONFIG.GET_DMX_RIG, id)
+
+export const getActiveRigs = () => window.api.invoke(CONFIG.GET_ACTIVE_RIGS, undefined)
+
+export const saveDmxRig = (rig: DmxRig) => window.api.invoke(CONFIG.SAVE_DMX_RIG, rig)
+
+export const deleteDmxRig = (id: string) => window.api.invoke(CONFIG.DELETE_DMX_RIG, id)
+
+// ---------------------------------------------------------------------------
+// Audio configuration
+// ---------------------------------------------------------------------------
+
+export const getAudioConfig = () => window.api.invoke(CONFIG.GET_AUDIO_CONFIG, undefined)
+
+export const saveAudioConfig = (updates: Partial<AudioConfig>) =>
+  window.api.invoke(CONFIG.SAVE_AUDIO_CONFIG, updates)
+
+export const getAudioEnabled = () => window.api.invoke(CONFIG.GET_AUDIO_ENABLED, undefined)
+
+export const setAudioEnabled = (enabled: boolean) =>
+  window.api.invoke(CONFIG.SET_AUDIO_ENABLED, enabled)
+
+export const getEnabledAudioCueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_AUDIO_CUE_GROUPS, undefined)
+
+export const setEnabledAudioCueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS, groupIds)
+
+export const getAudioReactiveCues = () =>
+  window.api.invoke(CONFIG.GET_AUDIO_REACTIVE_CUES, undefined)
+
+export const setActiveAudioCue = (cueType: AudioCueType) =>
+  window.api.invoke(CONFIG.SET_ACTIVE_AUDIO_CUE, cueType)
+
+// ---------------------------------------------------------------------------
+// Stage kit
+// ---------------------------------------------------------------------------
+
+export const getStageKitPriority = () => window.api.invoke(CONFIG.GET_STAGE_KIT_PRIORITY, undefined)
+
+export const setStageKitPriority = (priority: 'prefer-for-tracked' | 'random' | 'never') =>
+  window.api.invoke(CONFIG.SET_STAGE_KIT_PRIORITY, priority)
+
+// ---------------------------------------------------------------------------
+// Clock rate
+// ---------------------------------------------------------------------------
+
+export const getClockRate = () => window.api.invoke(CONFIG.GET_CLOCK_RATE, undefined)
+
+export const setClockRate = (clockRate: number) =>
+  window.api.invoke(CONFIG.SET_CLOCK_RATE, clockRate)
+
+// ---------------------------------------------------------------------------
 // Window management
-export const openCueEditorWindow = () => window.electron.ipcRenderer.invoke(WINDOW.OPEN_CUE_EDITOR)
+// ---------------------------------------------------------------------------
 
+export const openCueEditorWindow = () => window.api.invoke(WINDOW.OPEN_CUE_EDITOR, undefined)
+
+// ---------------------------------------------------------------------------
 // App information
-export const getAppVersion = () => window.electron.ipcRenderer.invoke(CONFIG.GET_APP_VERSION)
+// ---------------------------------------------------------------------------
 
+export const getAppVersion = () => window.api.invoke(CONFIG.GET_APP_VERSION, undefined)
+
+// ---------------------------------------------------------------------------
 // System status
-export const getSystemStatus = () => window.electron.ipcRenderer.invoke(LIGHT.GET_SYSTEM_STATUS)
+// ---------------------------------------------------------------------------
 
-// RB3 specific
-export const getRb3Mode = () => window.electron.ipcRenderer.invoke(CUE.RB3E_GET_MODE)
+export const getSystemStatus = () => window.api.invoke(LIGHT.GET_SYSTEM_STATUS, undefined)
 
-export const getRb3Stats = () => window.electron.ipcRenderer.invoke(CUE.RB3E_GET_STATS)
+// ---------------------------------------------------------------------------
+// Network
+// ---------------------------------------------------------------------------
 
+export const getNetworkInterfaces = () => window.api.invoke(LIGHT.GET_NETWORK_INTERFACES, undefined)
+
+export const updateSacnConfig = (config: {
+  universe?: number
+  networkInterface?: string
+  useUnicast?: boolean
+  unicastDestination?: string
+}) => window.api.invoke(LIGHT.UPDATE_SACN_CONFIG, config)
+
+// ---------------------------------------------------------------------------
+// RB3E
+// ---------------------------------------------------------------------------
+
+export const getRb3Mode = () => window.api.invoke(CUE.RB3E_GET_MODE, undefined)
+
+export const getRb3Stats = () => window.api.invoke(CUE.RB3E_GET_STATS, undefined)
+
+// ---------------------------------------------------------------------------
 // Sender management
-export const enableSender = (config: unknown) =>
-  window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, config)
+// ---------------------------------------------------------------------------
+
+export const enableSender = (config: SenderConfig) => window.api.send(LIGHT.SENDER_ENABLE, config)
 
 export const disableSender = (config: { sender: string }) =>
-  window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, config)
+  window.api.send(LIGHT.SENDER_DISABLE, config)
 
+// ---------------------------------------------------------------------------
 // Listener management
-export const enableYarg = () => window.electron.ipcRenderer.send(CUE.YARG_LISTENER_ENABLED)
+// ---------------------------------------------------------------------------
 
-export const disableYarg = () => window.electron.ipcRenderer.send(CUE.YARG_LISTENER_DISABLED)
+export const enableYarg = () => window.api.send(CUE.YARG_LISTENER_ENABLED, undefined)
 
-export const enableRb3 = () => window.electron.ipcRenderer.send(CUE.RB3E_LISTENER_ENABLED)
+export const disableYarg = () => window.api.send(CUE.YARG_LISTENER_DISABLED, undefined)
 
-export const disableRb3 = () => window.electron.ipcRenderer.send(CUE.RB3E_LISTENER_DISABLED)
+export const enableRb3 = () => window.api.send(CUE.RB3E_LISTENER_ENABLED, undefined)
+
+export const disableRb3 = () => window.api.send(CUE.RB3E_LISTENER_DISABLED, undefined)
 
 export const switchRb3Mode = (mode: 'direct' | 'cueBased') =>
-  window.electron.ipcRenderer.send(CUE.RB3E_SWITCH_MODE, mode)
+  window.api.send(CUE.RB3E_SWITCH_MODE, mode)
 
-// Effect management
-export const getEffectDebounce = () => window.electron.ipcRenderer.invoke(CUE.GET_EFFECT_DEBOUNCE)
+export const getYargEnabled = () => window.api.invoke(CUE.GET_YARG_ENABLED, undefined)
+
+export const getRb3Enabled = () => window.api.invoke(CUE.GET_RB3_ENABLED, undefined)
+
+export const setListenCueData = (shouldListen: boolean) =>
+  window.api.send(CUE.SET_LISTEN_CUE_DATA, shouldListen)
+
+export const setCueStyle = (style: 'simple' | 'complex') => window.api.send(CUE.CUE_STYLE, style)
+
+// ---------------------------------------------------------------------------
+// Effect debounce
+// ---------------------------------------------------------------------------
+
+export const getEffectDebounce = () => window.api.invoke(CUE.GET_EFFECT_DEBOUNCE, undefined)
 
 export const updateEffectDebounce = (value: number) =>
-  window.electron.ipcRenderer.send(CUE.UPDATE_EFFECT_DEBOUNCE, value)
+  window.api.send(CUE.UPDATE_EFFECT_DEBOUNCE, value)
 
-// Test effects
+// ---------------------------------------------------------------------------
+// Test effects and simulation
+// ---------------------------------------------------------------------------
+
 export const startTestEffect = (
   effectId: string,
   venueSize?: 'NoVenue' | 'Small' | 'Large',
   bpm?: number,
-) => window.electron.ipcRenderer.invoke(LIGHT.START_TEST_EFFECT, effectId, venueSize, bpm)
+) => window.api.invoke(LIGHT.START_TEST_EFFECT, { effectId, venueSize, bpm })
 
-export const stopTestEffect = () => window.electron.ipcRenderer.invoke(LIGHT.STOP_TEST_EFFECT)
+export const stopTestEffect = () => window.api.invoke(LIGHT.STOP_TEST_EFFECT, undefined)
 
-export const setNodeCueDebug = (enabled: boolean) =>
-  window.electron.ipcRenderer.invoke(NODE_CUES.SET_DEBUG, enabled)
+export const simulateBeat = (data?: {
+  venueSize?: 'NoVenue' | 'Small' | 'Large'
+  bpm?: number
+  cueGroup?: string
+  effectId?: string | null
+}) => window.api.invoke(LIGHT.SIMULATE_BEAT, data)
 
+export const simulateKeyframe = (data?: {
+  venueSize?: 'NoVenue' | 'Small' | 'Large'
+  bpm?: number
+  cueGroup?: string
+  effectId?: string | null
+}) => window.api.invoke(LIGHT.SIMULATE_KEYFRAME, data)
+
+export const simulateMeasure = (data?: {
+  venueSize?: 'NoVenue' | 'Small' | 'Large'
+  bpm?: number
+  cueGroup?: string
+  effectId?: string | null
+}) => window.api.invoke(LIGHT.SIMULATE_MEASURE, data)
+
+export const simulateInstrumentNote = (data: {
+  instrument: string
+  noteType: string
+  venueSize?: 'NoVenue' | 'Small' | 'Large'
+  bpm?: number
+  cueGroup?: string
+  effectId?: string | null
+}) => window.api.invoke(LIGHT.SIMULATE_INSTRUMENT_NOTE, data)
+
+// ---------------------------------------------------------------------------
+// Shell
+// ---------------------------------------------------------------------------
+
+export const showItemInFolder = (filePath: string) =>
+  window.api.invoke(SHELL.SHOW_ITEM_IN_FOLDER, filePath)
+
+export const openPath = (filePath: string) => window.api.invoke(SHELL.OPEN_PATH, filePath)
+
+// ---------------------------------------------------------------------------
+// Node cue debug
+// ---------------------------------------------------------------------------
+
+export const setNodeCueDebug = (enabled: boolean) => window.api.invoke(NODE_CUES.SET_DEBUG, enabled)
+
+// ---------------------------------------------------------------------------
 // Node cue management
-export const listNodeCueFiles = () => window.electron.ipcRenderer.invoke(NODE_CUES.LIST)
+// ---------------------------------------------------------------------------
 
-export const reloadNodeCueFiles = () => window.electron.ipcRenderer.invoke(NODE_CUES.RELOAD)
+export const listNodeCueFiles = () => window.api.invoke(NODE_CUES.LIST, undefined)
 
-export const readNodeCueFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke(NODE_CUES.READ, filePath)
+export const reloadNodeCueFiles = () => window.api.invoke(NODE_CUES.RELOAD, undefined)
+
+export const readNodeCueFile = (filePath: string) => window.api.invoke(NODE_CUES.READ, filePath)
 
 export const saveNodeCueFile = (payload: {
-  mode: 'yarg' | 'audio'
+  mode: NodeCueMode
   filename: string
-  content: unknown
-}) => window.electron.ipcRenderer.invoke(NODE_CUES.SAVE, payload)
+  content: NodeCueFile
+}) => window.api.invoke(NODE_CUES.SAVE, payload)
 
-export const deleteNodeCueFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke(NODE_CUES.DELETE, filePath)
+export const deleteNodeCueFile = (filePath: string) => window.api.invoke(NODE_CUES.DELETE, filePath)
 
-export const validateNodeCue = (payload: { path?: string; content?: unknown }) =>
-  window.electron.ipcRenderer.invoke(NODE_CUES.VALIDATE, payload)
+export const validateNodeCue = (payload: { path?: string; content?: NodeCueFile }) =>
+  window.api.invoke(NODE_CUES.VALIDATE, payload)
 
-export const getNodeCueTypes = (mode: 'yarg' | 'audio') =>
-  window.electron.ipcRenderer.invoke(NODE_CUES.GET_CUE_TYPES, mode)
+export const getNodeCueTypes = (mode: NodeCueMode) =>
+  window.api.invoke(NODE_CUES.GET_CUE_TYPES, mode)
 
-export const importNodeCueFile = (mode?: 'yarg' | 'audio') =>
-  window.electron.ipcRenderer.invoke(NODE_CUES.IMPORT, mode)
+export const importNodeCueFile = (mode?: NodeCueMode) => window.api.invoke(NODE_CUES.IMPORT, mode)
 
-export const exportNodeCueFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke(NODE_CUES.EXPORT, filePath)
+export const exportNodeCueFile = (filePath: string) => window.api.invoke(NODE_CUES.EXPORT, filePath)
 
+// ---------------------------------------------------------------------------
 // Effect file management
-export const listEffectFiles = () => window.electron.ipcRenderer.invoke(EFFECTS.LIST)
+// ---------------------------------------------------------------------------
 
-export const reloadEffectFiles = () => window.electron.ipcRenderer.invoke(EFFECTS.RELOAD)
+export const listEffectFiles = () => window.api.invoke(EFFECTS.LIST, undefined)
 
-export const readEffectFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke(EFFECTS.READ, filePath)
+export const reloadEffectFiles = () => window.api.invoke(EFFECTS.RELOAD, undefined)
+
+export const readEffectFile = (filePath: string) => window.api.invoke(EFFECTS.READ, filePath)
 
 export const saveEffectFile = (payload: {
-  mode: 'yarg' | 'audio'
+  mode: EffectMode
   filename: string
-  content: unknown
-}) => window.electron.ipcRenderer.invoke(EFFECTS.SAVE, payload)
+  content: EffectFile
+}) => window.api.invoke(EFFECTS.SAVE, payload)
 
-export const deleteEffectFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke(EFFECTS.DELETE, filePath)
+export const deleteEffectFile = (filePath: string) => window.api.invoke(EFFECTS.DELETE, filePath)
 
-export const validateEffect = (payload: { path?: string; content?: unknown }) =>
-  window.electron.ipcRenderer.invoke(EFFECTS.VALIDATE, payload)
+export const validateEffect = (payload: { path?: string; content?: EffectFile }) =>
+  window.api.invoke(EFFECTS.VALIDATE, payload)
 
-export const importEffectFile = (mode?: 'yarg' | 'audio') =>
-  window.electron.ipcRenderer.invoke(EFFECTS.IMPORT, mode)
+export const importEffectFile = (mode?: EffectMode) => window.api.invoke(EFFECTS.IMPORT, mode)
 
-export const exportEffectFile = (filePath: string) =>
-  window.electron.ipcRenderer.invoke(EFFECTS.EXPORT, filePath)
+export const exportEffectFile = (filePath: string) => window.api.invoke(EFFECTS.EXPORT, filePath)
+
+// ---------------------------------------------------------------------------
+// Audio data streaming (renderer → main)
+// ---------------------------------------------------------------------------
+
+export const sendAudioData = (data: AudioLightingData) =>
+  window.api.sendToMain(RENDERER_SEND.AUDIO_DATA, data)

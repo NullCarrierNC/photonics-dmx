@@ -15,8 +15,19 @@ import { ActiveGroupsSelectorRef } from '../components/ActiveCueGroupsSelector'
 import CueSimulationAbout from './CueSimulation/CueSimulationAbout'
 import CueSimulationActions from './CueSimulation/CueSimulationActions'
 import CueSimulationInstrument from './CueSimulation/CueSimulationInstrument'
-import { CONFIG, LIGHT } from '../../../shared/ipcChannels'
-import { startTestEffect, stopTestEffect } from '../ipcApi'
+import {
+  startTestEffect,
+  stopTestEffect,
+  getPrefs,
+  savePrefs,
+  getCueGroups,
+  setActiveCueGroups,
+  getAvailableCues,
+  simulateBeat,
+  simulateKeyframe,
+  simulateMeasure,
+  simulateInstrumentNote,
+} from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
 import AudioCueSelectorPanel from '@renderer/components/AudioCueSelectorPanel'
 
@@ -78,7 +89,7 @@ const CueSimulation: React.FC = () => {
   useEffect(() => {
     return () => {
       // Stop any running test effects when leaving the page
-      window.electron.ipcRenderer.invoke(LIGHT.STOP_TEST_EFFECT).catch((error) => {
+      stopTestEffect().catch((error) => {
         console.error('Error stopping test effect on unmount:', error)
       })
       // Clear any pending save timeout
@@ -93,7 +104,7 @@ const CueSimulation: React.FC = () => {
     const loadSettings = async () => {
       try {
         isLoadingFromPrefs.current = true
-        const prefs = await window.electron.ipcRenderer.invoke(CONFIG.GET_PREFS)
+        const prefs = await getPrefs()
         const savedSettings = prefs.simulationSettings
 
         if (savedSettings) {
@@ -119,7 +130,7 @@ const CueSimulation: React.FC = () => {
             setSelectedGroupId(savedSettings.groupId)
             // Get group display name
             try {
-              const allGroups = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS)
+              const allGroups = await getCueGroups()
               const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId)
               if (group) {
                 setSelectedGroup(group.name)
@@ -153,7 +164,7 @@ const CueSimulation: React.FC = () => {
     // Debounce the save operation
     saveTimeoutRef.current = setTimeout(async () => {
       try {
-        await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
+        await savePrefs({
           simulationSettings: {
             registryType: selectedRegistryType,
             groupId: selectedGroupId,
@@ -194,10 +205,7 @@ const CueSimulation: React.FC = () => {
       // Wait for effects to be loaded by EffectsDropdown
       const checkForEffects = async (retries = 10) => {
         try {
-          const availableEffects = await window.electron.ipcRenderer.invoke(
-            LIGHT.GET_AVAILABLE_CUES,
-            selectedGroupId,
-          )
+          const availableEffects = await getAvailableCues(selectedGroupId)
           if (availableEffects && availableEffects.length > 0) {
             const savedEffect = availableEffects.find(
               (e: EffectSelector) => e.id === savedEffectIdRef.current,
@@ -245,8 +253,7 @@ const CueSimulation: React.FC = () => {
   useEffect(() => {
     if (selectedGroupId && !isSettingActiveGroup.current) {
       isSettingActiveGroup.current = true
-      window.electron.ipcRenderer
-        .invoke(LIGHT.SET_ACTIVE_CUE_GROUPS, [selectedGroupId])
+      setActiveCueGroups([selectedGroupId])
         .then((result) => {
           if (result.success) {
             activeGroupsSelectorRef.current?.refreshActiveGroups()
@@ -275,9 +282,7 @@ const CueSimulation: React.FC = () => {
     if (selectedGroupId && isFullyInitialized.current && !isSettingActiveGroup.current) {
       try {
         isSettingActiveGroup.current = true
-        const result = await window.electron.ipcRenderer.invoke(LIGHT.SET_ACTIVE_CUE_GROUPS, [
-          selectedGroupId,
-        ])
+        const result = await setActiveCueGroups([selectedGroupId])
         if (result.success) {
           activeGroupsSelectorRef.current?.refreshActiveGroups()
           console.log(`Set active group to match selected group: ${selectedGroupId}`)
@@ -329,49 +334,45 @@ const CueSimulation: React.FC = () => {
   }
 
   const handleSimulateBeat = async () => {
-    await window.electron.ipcRenderer.invoke(LIGHT.SIMULATE_BEAT, {
+    await simulateBeat({
       venueSize: selectedVenueSize,
       bpm: selectedBpm,
       cueGroup: selectedGroupId,
       effectId: selectedEffect?.id || null,
-      trackMode: 'simulated',
     })
     // Simply turn on the indicator, the useTimeoutEffect will reset it
     setShowBeatIndicator(true)
   }
 
   const handleSimulateKeyframe = async () => {
-    await window.electron.ipcRenderer.invoke(LIGHT.SIMULATE_KEYFRAME, {
+    await simulateKeyframe({
       venueSize: selectedVenueSize,
       bpm: selectedBpm,
       cueGroup: selectedGroupId,
       effectId: selectedEffect?.id || null,
-      trackMode: 'simulated',
     })
     setShowKeyframeIndicator(true)
   }
 
   const handleSimulateMeasure = async () => {
-    await window.electron.ipcRenderer.invoke(LIGHT.SIMULATE_MEASURE, {
+    await simulateMeasure({
       venueSize: selectedVenueSize,
       bpm: selectedBpm,
       cueGroup: selectedGroupId,
       effectId: selectedEffect?.id || null,
-      trackMode: 'simulated',
     })
     setShowMeasureIndicator(true)
   }
 
   const handleSimulateInstrumentNote = async (noteType: string) => {
     try {
-      await window.electron.ipcRenderer.invoke(LIGHT.SIMULATE_INSTRUMENT_NOTE, {
+      await simulateInstrumentNote({
         instrument: selectedInstrument,
         noteType: noteType,
         venueSize: selectedVenueSize,
         bpm: selectedBpm,
         cueGroup: selectedGroupId,
         effectId: selectedEffect?.id || null,
-        trackMode: 'simulated',
       })
     } catch (error) {
       console.error('Error simulating instrument note:', error)
@@ -395,7 +396,7 @@ const CueSimulation: React.FC = () => {
 
         // Get group details to determine display name
         try {
-          const allGroups = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS)
+          const allGroups = await getCueGroups()
           const group = allGroups.find((g: CueGroup) => g.id === groupId)
           const displayName = group ? group.name : groupId
 
@@ -436,7 +437,7 @@ const CueSimulation: React.FC = () => {
           setSelectedEffect(null) // Clear selected effect when no group is selected
         } else {
           // Single group selection
-          const groups = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS)
+          const groups = await getCueGroups()
           const group = groups.find((g: CueGroup) => g.id === selectedGroupId)
           if (group) {
             setCurrentGroup(group)

@@ -124,7 +124,7 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
     }
 
     case 'enttecpro': {
-      const port = data.port
+      const port = data.devicePath
       if (!isNonEmptyString(port)) {
         return { ok: false, error: 'Port (device path) is required for EnttecPro sender' }
       }
@@ -138,7 +138,7 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
     }
 
     case 'opendmx': {
-      const port = data.port
+      const port = data.devicePath
       if (!isNonEmptyString(port)) {
         return { ok: false, error: 'Port (device path) is required for OpenDMX sender' }
       }

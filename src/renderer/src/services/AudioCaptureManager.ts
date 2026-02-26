@@ -12,7 +12,7 @@
 import { AudioLightingData, AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { getDefaultStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
-import { RENDERER_SEND } from '../../../shared/ipcChannels'
+import { sendAudioData } from '../ipcApi'
 
 const store = getDefaultStore()
 
@@ -340,7 +340,7 @@ export class AudioCaptureManager {
     const audioData = this.calculateFrequencyBands(dataArray)
 
     // Always send to main process via IPC (full frame rate)
-    window.electron.ipcRenderer.send(RENDERER_SEND.AUDIO_DATA, audioData)
+    sendAudioData(audioData)
 
     // Throttle UI updates
     this.uiUpdateCounter++

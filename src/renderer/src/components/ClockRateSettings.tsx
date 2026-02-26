@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { CONFIG } from '../../../shared/ipcChannels'
+import { getClockRate, setClockRate as saveClockRateToBackend } from '../ipcApi'
 
 const ClockRateSettings: React.FC = () => {
-  const [clockRate, setClockRate] = useState(5)
+  const [clockRateValue, setClockRateValue] = useState(5)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     const loadClockRate = async () => {
       try {
-        const result = await window.electron.ipcRenderer.invoke(CONFIG.GET_CLOCK_RATE)
+        const result = await getClockRate()
         if (result.success) {
-          setClockRate(result.clockRate)
+          setClockRateValue(result.clockRate)
         }
       } catch (error) {
         console.error('Failed to load clock rate:', error)
@@ -28,13 +28,13 @@ const ClockRateSettings: React.FC = () => {
       if (isSaving) return
 
       const newValue = Math.max(1, Math.min(100, value)) // Clamp to 1-100
-      setClockRate(newValue)
+      setClockRateValue(newValue)
 
       try {
         setIsSaving(true)
-        const result = await window.electron.ipcRenderer.invoke(CONFIG.SET_CLOCK_RATE, newValue)
+        const result = await saveClockRateToBackend(newValue)
         if (result.success) {
-          setClockRate(newValue)
+          setClockRateValue(newValue)
         } else {
           console.error('Failed to save clock rate:', result.error)
           // Revert to previous value on failure (it will be re-fetched from backend)
@@ -54,12 +54,12 @@ const ClockRateSettings: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value) || 1
     // Only update the local state immediately, don't save on every keystroke
-    setClockRate(Math.max(1, Math.min(100, value)))
+    setClockRateValue(Math.max(1, Math.min(100, value)))
   }
 
   const handleInputBlur = () => {
     // Save when the user finishes editing (loses focus)
-    handleClockRateChange(clockRate)
+    handleClockRateChange(clockRateValue)
   }
 
   return (
@@ -87,7 +87,7 @@ const ClockRateSettings: React.FC = () => {
               min="1"
               max="100"
               step="1"
-              value={clockRate}
+              value={clockRateValue}
               onChange={handleInputChange}
               onBlur={handleInputBlur}
               className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"

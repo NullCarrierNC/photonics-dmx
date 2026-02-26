@@ -1,15 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type { EffectReference } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { listEffectFiles, readEffectFile } from '../../../ipcApi'
-
-type EffectFileSummary = {
-  path: string
-  mode: 'yarg' | 'audio'
-  groupId: string
-  groupName: string
-  cueCount: number
-}
 
 type EffectDefinition = {
   id: string
@@ -255,7 +248,8 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
                       <option value="">-- Choose an effect file --</option>
                       {availableFiles.map((file) => (
                         <option key={file.path} value={file.path}>
-                          {file.groupName} ({file.mode.toUpperCase()}) - {file.cueCount} effect(s)
+                          {file.groupName} ({file.mode.toUpperCase()}) - {file.effectCount}{' '}
+                          effect(s)
                         </option>
                       ))}
                     </select>

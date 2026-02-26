@@ -2,7 +2,14 @@ import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } fro
 import { useAtom } from 'jotai'
 import { yargListenerEnabledAtom } from '../atoms'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
-import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import {
+  getActiveCueGroups,
+  getStageKitPriority,
+  getEnabledCueGroups,
+  getCueGroups,
+  setActiveCueGroups,
+} from '../ipcApi'
 
 interface CueGroup {
   id: string
@@ -29,10 +36,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
 
     const fetchActiveGroups = useCallback(async () => {
       try {
-        const [active, priority] = await Promise.all([
-          window.electron.ipcRenderer.invoke(LIGHT.GET_ACTIVE_CUE_GROUPS),
-          window.electron.ipcRenderer.invoke(CONFIG.GET_STAGE_KIT_PRIORITY),
-        ])
+        const [active, priority] = await Promise.all([getActiveCueGroups(), getStageKitPriority()])
         const newActiveGroupIds = active.map((g: CueGroup) => g.id)
 
         setActiveGroupIds((prevActive) => {
@@ -53,14 +57,14 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
       try {
         setLoading(true)
         const [enabled, active, priority] = await Promise.all([
-          window.electron.ipcRenderer.invoke(CONFIG.GET_ENABLED_CUE_GROUPS),
-          window.electron.ipcRenderer.invoke(LIGHT.GET_ACTIVE_CUE_GROUPS),
-          window.electron.ipcRenderer.invoke(CONFIG.GET_STAGE_KIT_PRIORITY),
+          getEnabledCueGroups(),
+          getActiveCueGroups(),
+          getStageKitPriority(),
         ])
 
         // Get full group details for enabled groups
         const enabledGroupIds = Array.isArray(enabled) ? enabled : []
-        const allGroups = await window.electron.ipcRenderer.invoke(LIGHT.GET_CUE_GROUPS)
+        const allGroups = await getCueGroups()
         const enabledGroupDetails = allGroups.filter((g: CueGroup) =>
           enabledGroupIds.includes(g.id),
         )
@@ -111,10 +115,7 @@ const ActiveGroupsSelector = forwardRef<ActiveGroupsSelectorRef, ActiveGroupsSel
         }
 
         // Update backend
-        const result = await window.electron.ipcRenderer.invoke(
-          LIGHT.SET_ACTIVE_CUE_GROUPS,
-          updatedActiveGroupIds,
-        )
+        const result = await setActiveCueGroups(updatedActiveGroupIds)
 
         if (result.success) {
           setActiveGroupIds(updatedActiveGroupIds)
