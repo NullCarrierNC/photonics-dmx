@@ -109,6 +109,10 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
       if (!universeValidation.ok) {
         return universeValidation
       }
+      const maxOutputRate =
+        typeof data.maxOutputRate === 'number' && data.maxOutputRate >= 0
+          ? Math.min(200, data.maxOutputRate)
+          : undefined
       const config: SacnSenderConfig = {
         sender: 'sacn',
         universe: universeValidation.value,
@@ -119,6 +123,7 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
         useUnicast: Boolean(data.useUnicast),
         unicastDestination:
           typeof data.unicastDestination === 'string' ? data.unicastDestination : undefined,
+        maxOutputRate,
       }
       return { ok: true, value: config }
     }
@@ -207,6 +212,10 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
       if (!portValidation.ok) {
         return portValidation
       }
+      const maxOutputRate =
+        typeof data.maxOutputRate === 'number' && data.maxOutputRate >= 0
+          ? Math.min(200, data.maxOutputRate)
+          : undefined
       const config: ArtNetSenderConfig = {
         sender: 'artnet',
         host: hostValidation.value,
@@ -216,6 +225,7 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
         subuni: subuniValidation.value,
         port: portValidation.value,
         base_refresh_interval: 1000,
+        maxOutputRate,
       }
       return { ok: true, value: config }
     }

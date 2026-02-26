@@ -23,6 +23,8 @@ export class DmxPublisher {
   private _sender: SenderManager
   private _lightStateManager: LightStateManager
   private _immediateBlackoutData: Record<number, number> = {}
+  /** Reused each frame to reduce GC */
+  private _mergedBuffer: Record<number, number> = {}
 
   constructor(senderManager: SenderManager, lightStateManager: LightStateManager) {
     this._sender = senderManager
@@ -86,9 +88,12 @@ export class DmxPublisher {
    * Contains the logic for converting light states
    * to DMX channels and sending them.
    * Merges all active rigs into one buffer and sends to all enabled senders.
+   * Uses a persistent _mergedBuffer to avoid per-frame allocations.
    */
   private publishNow(lights: Map<string, RGBIO>): void {
-    const mergedBuffer: Record<number, number> = {}
+    for (const key of Object.keys(this._mergedBuffer)) {
+      delete this._mergedBuffer[Number(key)]
+    }
 
     // Sort light IDs for consistent processing order
     const sortedLightIds = Array.from(lights.keys()).sort((a, b) => a.localeCompare(b))
@@ -158,14 +163,14 @@ export class DmxPublisher {
               continue
           }
 
-          mergedBuffer[channelNumber] = Math.max(0, Math.min(255, value))
+          this._mergedBuffer[channelNumber] = Math.max(0, Math.min(255, value))
         }
       }
     }
 
-    if (Object.keys(mergedBuffer).length > 0) {
+    if (Object.keys(this._mergedBuffer).length > 0) {
       try {
-        this._sender.send(mergedBuffer)
+        this._sender.send(this._mergedBuffer)
       } catch (error) {
         console.error('Failed to send DMX data:', error)
       }

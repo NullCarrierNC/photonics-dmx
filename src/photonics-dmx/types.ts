@@ -608,6 +608,8 @@ export interface ArtNetSenderConfig extends BaseSenderConfig {
   subuni?: number
   port?: number
   base_refresh_interval?: number
+  /** Max output rate in Hz (0 = no limit). */
+  maxOutputRate?: number
 }
 
 export interface SacnSenderConfig extends BaseSenderConfig {
@@ -616,6 +618,8 @@ export interface SacnSenderConfig extends BaseSenderConfig {
   networkInterface?: string
   useUnicast?: boolean
   unicastDestination?: string
+  /** Max output rate in Hz (0 = no limit) */
+  maxOutputRate?: number
 }
 
 export interface SerialSenderConfig extends BaseSenderConfig {
