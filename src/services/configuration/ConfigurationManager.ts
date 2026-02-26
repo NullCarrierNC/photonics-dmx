@@ -109,7 +109,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledCueGroups: ['stagekit'],
   enabledAudioCueGroups: ['audio-spectrum'],
   cueConsistencyWindow: 60000,
-  clockRate: 5, // 5ms interval for smooth animations
+  clockRate: 10, // 10ms (100 Hz) for smooth animations and strobe cues
   activeAudioCueType: BuiltInAudioCues.BasicLayered,
 
   // Brightness configuration defaults

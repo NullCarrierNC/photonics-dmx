@@ -2,19 +2,20 @@
  * @class Clock
  * @description Centralized timing source for the lighting sequencer system.
  *
- * Provides a single source of truth for timing by using a
- * configurable interval that notifies all registered components.
+ * Uses a self-correcting setTimeout loop instead of setInterval to reduce
+ * cumulative drift and jitter.
  */
 export class Clock {
-  private intervalId: NodeJS.Timeout | null = null
+  private timeoutId: NodeJS.Timeout | null = null
   private startTime: number
   private lastUpdateTime: number
+  private nextTargetTime: number = 0
   private updateCallbacks: Array<(deltaTime: number) => void> = []
   private isRunning: boolean = false
   private tickCount: number = 0
   private intervalMs: number
 
-  constructor(intervalMs: number = 5) {
+  constructor(intervalMs: number = 10) {
     this.intervalMs = Math.max(1, Math.min(100, intervalMs)) // Clamp between 1-100ms
     this.startTime = this.getCurrentTime()
     this.lastUpdateTime = this.startTime
@@ -46,9 +47,8 @@ export class Clock {
     if (this.isRunning) return
 
     this.isRunning = true
-    this.intervalId = setInterval(() => {
-      this.update()
-    }, this.intervalMs)
+    this.nextTargetTime = this.getCurrentTime() + this.intervalMs
+    this.scheduleNext()
   }
 
   /**
@@ -58,10 +58,28 @@ export class Clock {
     if (!this.isRunning) return
 
     this.isRunning = false
-    if (this.intervalId) {
-      clearInterval(this.intervalId)
-      this.intervalId = null
+    if (this.timeoutId !== null) {
+      clearTimeout(this.timeoutId)
+      this.timeoutId = null
     }
+  }
+
+  /**
+   * Schedule the next tick with drift correction
+   */
+  private scheduleNext(): void {
+    if (!this.isRunning) return
+
+    const now = this.getCurrentTime()
+    const drift = now - this.nextTargetTime
+    const delay = Math.max(0, this.intervalMs - drift)
+
+    this.timeoutId = setTimeout(() => {
+      this.timeoutId = null
+      this.nextTargetTime += this.intervalMs
+      this.update()
+      this.scheduleNext()
+    }, delay)
   }
 
   /**
