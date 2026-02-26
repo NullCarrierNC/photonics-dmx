@@ -12,8 +12,15 @@ const About = () => {
 
         <h2 className="text-xl font-bold mb-4 mt-4 text-orange-400">Development Status</h2>
         <p className="mb-4 text-orange-400">
-          This is the second Alpha build of Photonics, and as such is not feature complete. We'd
-          appreciate any feedback you can provide!
+          Photonics is still in its Alpha stages, and as such is not feature complete. We'd
+          appreciate any feedback you can provide! You can read more about the project status on the{' '}
+          <a
+            href="https://photonics.rocks/project-status/"
+            target="_blank"
+            className="text-blue-600 dark:text-blue-500 hover:underline">
+            Project Status
+          </a>{' '}
+          page.
         </p>
 
         <h2 className="text-xl font-bold mb-4 mt-4 text-gray-800 dark:text-gray-200">
@@ -94,7 +101,16 @@ const About = () => {
               className="text-blue-600 dark:text-blue-500 hover:underline">
               dmx-ts
             </a>
-            : ArtNet and Enttec Pro USB Support
+            : ArtNet and Enttec Pro USB support
+          </li>
+          <li className="text-left text-sm text-gray-600 dark:text-gray-400">
+            <a
+              href="https://github.com/moritzruth/node-enttec-open-dmx-usb"
+              target="_blank"
+              className="text-blue-600 dark:text-blue-500 hover:underline">
+              enttec-open-dmx-usb
+            </a>
+            : OpenDMX USB support
           </li>
         </ul>
 

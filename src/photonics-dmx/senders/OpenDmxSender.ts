@@ -1,83 +1,184 @@
-import { DMX, EnttecOpenUSBDMXDriver, IUniverseDriver } from 'dmx-ts'
+/**
+ * OpenDMX USB sender using enttec-open-dmx-usb.
+ *
+ * dmxSpeed (Hz) is mapped to send interval (ms) as: interval = 1000 / dmxSpeed.
+ * Optional usleep: On some systems Node's setTimeout is too imprecise for DMX
+ * break/MAB timing; pass a microsecond sleep (e.g. easy-sleep) as options.usleep
+ * to reduce flicker / timing issues.
+ *
+ * NOTE: usleep is part of the underling enttec-open-dmx-usb library, but is not
+ * implemented in the rest of the Photonics system. It's included here in case
+ * we add it down the road.
+ */
+
 import { EventEmitter } from 'events'
+import { EnttecOpenDMXUSBDevice } from 'enttec-open-dmx-usb'
 import { BaseSender, SenderError } from './BaseSender'
 
+/** Function that blocks for n microseconds (used for precise DMX break timing). */
+type UsleepFn = (microSeconds: number) => unknown
+
+interface OpenDmxDeviceOptions {
+  dmxSpeed?: number
+  onError?: (err: Error) => void
+  usleep?: UsleepFn | null
+}
+
+const DEFAULT_DMX_SPEED_HZ = 40
+
+/**
+ * Converts dmxSpeed (Hz) to send interval in ms for enttec-open-dmx-usb.
+ * interval = 1000 / dmxSpeed; e.g. 40 Hz -> 25 ms.
+ */
+function dmxSpeedToIntervalMs(dmxSpeed: number): number {
+  if (dmxSpeed <= 0 || !Number.isFinite(dmxSpeed)) {
+    return 1000 / DEFAULT_DMX_SPEED_HZ
+  }
+  return Math.max(1, Math.round(1000 / dmxSpeed))
+}
+
+/** Minimal device interface used by OpenDmxSender (and by tests for injection). */
+interface IOpenDmxDeviceAdapter {
+  start(): Promise<void>
+  writeChannels(buffer: Record<number, number>): void
+  stop(): Promise<void>
+}
+
+/** Internal adapter wrapping enttec-open-dmx-usb for lifecycle and channel writes. */
+class OpenDmxDeviceAdapter implements IOpenDmxDeviceAdapter {
+  private device: EnttecOpenDMXUSBDevice | null = null
+  private readonly path: string
+  private readonly intervalMs: number
+  private readonly onError?: (err: Error) => void
+  private readonly usleep?: UsleepFn | null
+
+  constructor(path: string, options: OpenDmxDeviceOptions = {}) {
+    this.path = path
+    this.onError = options.onError
+    this.usleep = options.usleep
+    const dmxSpeed = options.dmxSpeed ?? DEFAULT_DMX_SPEED_HZ
+    this.intervalMs = dmxSpeedToIntervalMs(dmxSpeed)
+  }
+
+  start(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.device = new EnttecOpenDMXUSBDevice(this.path, false, this.usleep ?? undefined)
+      if (this.onError) {
+        this.device.on('error', this.onError)
+      }
+      const onReady = (): void => {
+        this.device!.off('ready', onReady)
+        this.device!.off('error', onError)
+        try {
+          this.device!.startSending(this.intervalMs)
+          resolve()
+        } catch (err) {
+          reject(err)
+        }
+      }
+      const onError = (err: Error): void => {
+        this.device?.off('ready', onReady)
+        this.device?.off('error', onError)
+        reject(err)
+      }
+      this.device.once('ready', onReady)
+      this.device.once('error', onError)
+    })
+  }
+
+  writeChannels(buffer: Record<number, number>): void {
+    if (this.device) {
+      this.device.setChannels(buffer)
+    }
+  }
+
+  async stop(): Promise<void> {
+    if (!this.device) {
+      return
+    }
+    if (this.onError) {
+      this.device.off('error', this.onError)
+    }
+    const zeroPayload: Record<number, number> = {}
+    for (let ch = 1; ch <= 512; ch++) {
+      zeroPayload[ch] = 0
+    }
+    this.device.setChannels(zeroPayload, true)
+    this.device.stopSending()
+    this.device = null
+  }
+}
+
 export class OpenDmxSender extends BaseSender {
-  private dmx: DMX = new DMX()
-  private universe?: IUniverseDriver
+  private device: IOpenDmxDeviceAdapter | undefined
   private eventEmitter: EventEmitter
   private dmxUniverse: number
+  private readonly deviceFactory?: (
+    path: string,
+    options: OpenDmxDeviceOptions,
+  ) => IOpenDmxDeviceAdapter
 
   constructor(
     private port: string,
-    private options: { dmxSpeed?: number } = { dmxSpeed: 40 },
-    private universeName: string = 'uni1',
+    private options: OpenDmxDeviceOptions = { dmxSpeed: 40 },
+    _universeName: string = 'uni1', // All OpenDMX devices are single-universe
     universe: number = 0,
+    deviceFactory?: (path: string, options: OpenDmxDeviceOptions) => IOpenDmxDeviceAdapter,
   ) {
     super()
     this.eventEmitter = new EventEmitter()
     this.dmxUniverse = universe
+    this.deviceFactory = deviceFactory
   }
 
   public async start(): Promise<void> {
-    this.universe = await this.dmx.addUniverse(
-      this.universeName,
-      new EnttecOpenUSBDMXDriver(this.port, this.options),
-    )
+    const adapter = this.deviceFactory
+      ? this.deviceFactory(this.port, {
+          dmxSpeed: this.options.dmxSpeed,
+          onError: (err) => {
+            const errorEvent = new SenderError(err, { senderId: 'opendmx' })
+            this.eventEmitter.emit('SenderError', errorEvent)
+          },
+        })
+      : new OpenDmxDeviceAdapter(this.port, {
+          dmxSpeed: this.options.dmxSpeed,
+          onError: (err) => {
+            const errorEvent = new SenderError(err, { senderId: 'opendmx' })
+            this.eventEmitter.emit('SenderError', errorEvent)
+          },
+        })
+    try {
+      await adapter.start()
+      this.device = adapter
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      throw new Error(
+        `OpenDMX device failed to start on port "${this.port}": ${msg}. Check that the port exists and is not in use by another process.`,
+      )
+    }
   }
 
   public async stop(): Promise<void> {
-    if (!this.universe) {
+    if (!this.device) {
       return
     }
 
     console.log(`Stopping OpenDMX sender on port ${this.port}...`)
 
     try {
-      const zeroPayload: Record<number, number> = {}
-      for (let channel = 1; channel <= 255; channel++) {
-        zeroPayload[channel] = 0
-      }
-
       try {
-        if (this.universe) {
-          this.universe.update(zeroPayload)
-          console.log('Sent zero values to all DMX channels')
-        }
+        await this.device.stop()
+        console.log('Sent zero values to all DMX channels and stopped sending')
       } catch (err) {
-        console.error('Failed to send zero values before stopping:', err)
+        console.error('Failed to stop OpenDMX device:', err)
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
-      try {
-        this.eventEmitter.removeAllListeners()
-        if (this.dmx) {
-          this.dmx.removeAllListeners()
-        }
-        console.log('Removed all event listeners')
-      } catch (err) {
-        console.error('Error removing event listeners:', err)
-      }
-
-      try {
-        if (this.dmx) {
-          await this.dmx.close()
-          console.log('DMX connection closed')
-        }
-      } catch (err) {
-        console.error('Error during DMX close:', err)
-        try {
-          this.universe = undefined
-          await new Promise((resolve) => setTimeout(resolve, 100))
-        } catch (innerErr) {
-          console.error('Error during failsafe cleanup:', innerErr)
-        }
-      }
+      this.eventEmitter.removeAllListeners()
+      console.log('Removed all event listeners')
     } catch (outerErr) {
       console.error('Unhandled error during OpenDmxSender stop:', outerErr)
     } finally {
-      this.universe = undefined
+      this.device = undefined
       console.log('OpenDmxSender cleanup completed')
     }
   }
@@ -85,7 +186,7 @@ export class OpenDmxSender extends BaseSender {
   public async send(universeBuffer: Record<number, number>): Promise<void> {
     try {
       this.verifySenderStarted()
-      this.universe!.update(universeBuffer)
+      this.device!.writeChannels(universeBuffer)
     } catch (err) {
       console.error('OpenDmxSender error:', err)
       const errorEvent = new SenderError(err, { senderId: 'opendmx' })
@@ -94,7 +195,7 @@ export class OpenDmxSender extends BaseSender {
   }
 
   protected verifySenderStarted(): void {
-    if (!this.universe) {
+    if (!this.device) {
       throw new Error("OpenDmxSender isn't started.")
     }
   }
