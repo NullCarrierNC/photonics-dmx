@@ -1,7 +1,7 @@
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom, useComplexCuesAtom } from '../atoms'
-import { CUE } from '../../../shared/ipcChannels'
 import { useEffect } from 'react'
+import { setCueStyle } from '../ipcApi'
 
 const CueStyleToggle = () => {
   const [lightingPrefs, setLightingPrefs] = useAtom(lightingPrefsAtom)
@@ -16,10 +16,10 @@ const CueStyleToggle = () => {
     }))
 
     if (newState) {
-      window.electron.ipcRenderer.send(CUE.CUE_STYLE, 'complex')
+      setCueStyle('complex')
       console.log('Complex')
     } else {
-      window.electron.ipcRenderer.send(CUE.CUE_STYLE, 'simple')
+      setCueStyle('simple')
       console.log('Simple')
     }
   }

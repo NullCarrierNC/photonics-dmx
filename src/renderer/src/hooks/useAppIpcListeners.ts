@@ -4,9 +4,10 @@ import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import type { LightingConfiguration } from '../../../photonics-dmx/types'
 import type { LightingPreferences } from '../atoms'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
-import type { CueStateInfo } from '../atoms'
 import type { AudioCaptureManager } from '../services/AudioCaptureManager'
-import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { getAppVersion, getPrefs, saveLightLayout } from '../ipcApi'
+import type { CueStateUpdatePayload } from '../../../shared/ipcTypes'
 
 export interface UseAppIpcListenersParams {
   activeConfig: LightingConfiguration | null
@@ -15,17 +16,14 @@ export interface UseAppIpcListenersParams {
   setEnttecProComPort: (port: string) => void
   setOpenDmxComPort: (port: string) => void
   setIsLeftMenuCollapsed: (collapsed: boolean) => void
-  handleSenderError: (evt: unknown, msg: string) => void
-  handleYargError: (evt: unknown, msg: string) => void
-  handleSenderNetworkError: (
-    evt: unknown,
-    data: { sender: string; error: string; autoDisabled: boolean },
-  ) => void
-  handleCueStateUpdate: (evt: unknown, cueState: CueStateInfo) => void
-  handleSenderStartFailure: (evt: unknown, data: { sender: string; error: string }) => void
-  handleAudioEnable: (evt: unknown, config: AudioConfig) => void | Promise<void>
-  handleAudioDisable: (evt: unknown) => void
-  handleAudioConfigUpdate: (evt: unknown, config: AudioConfig) => void
+  handleSenderError: (msg: string) => void
+  handleYargError: (msg: string) => void
+  handleSenderNetworkError: (data: { sender: string; error: string; autoDisabled: boolean }) => void
+  handleCueStateUpdate: (cueState: CueStateUpdatePayload) => void
+  handleSenderStartFailure: (data: { sender: string; error: string }) => void
+  handleAudioEnable: (config: AudioConfig) => void | Promise<void>
+  handleAudioDisable: (payload: undefined) => void
+  handleAudioConfigUpdate: (config: AudioConfig | undefined) => void
   audioCaptureManagerRef: React.RefObject<AudioCaptureManager | null>
 }
 
@@ -55,11 +53,12 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
   const isInitialMount = useRef(true)
 
   useEffect(() => {
+    const audioCaptureManager = audioCaptureManagerRef.current
     const fetchAppVersion = async () => {
       if (isInitialMount.current) {
         isInitialMount.current = false
         try {
-          const ver = await window.electron.ipcRenderer.invoke(CONFIG.GET_APP_VERSION)
+          const ver = await getAppVersion()
           setAppVer(ver)
         } catch (error) {
           console.error('Failed to get app version:', error)
@@ -68,8 +67,8 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
       }
     }
 
-    const getPrefs = async () => {
-      const prefs = await window.electron.ipcRenderer.invoke(CONFIG.GET_PREFS)
+    const loadPrefs = async () => {
+      const prefs = await getPrefs()
       console.log('\n Prefs', prefs)
 
       const updatedPrefs = { ...prefs }
@@ -134,38 +133,28 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     }
 
     fetchAppVersion()
-    getPrefs()
+    loadPrefs()
 
-    addIpcListener<string>(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
-    addIpcListener<string>(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
-    addIpcListener<{ sender: string; error: string; autoDisabled: boolean }>(
-      RENDERER_RECEIVE.SENDER_NETWORK_ERROR,
-      handleSenderNetworkError,
-    )
-    addIpcListener<CueStateInfo>(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate)
-    addIpcListener<{ sender: string; error: string }>(
-      RENDERER_RECEIVE.SENDER_START_FAILED,
-      handleSenderStartFailure,
-    )
-    addIpcListener<AudioConfig>(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable)
-    addIpcListener<unknown>(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable)
-    addIpcListener<AudioConfig>(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate)
+    addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
+    addIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
+    addIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError)
+    addIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate)
+    addIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate)
 
-    const saveLightLayout = async () => {
+    const saveLayout = async () => {
       if (activeConfig) {
         try {
-          await window.electron.ipcRenderer.invoke(
-            CONFIG.SAVE_LIGHT_LAYOUT,
-            'myLayout.json',
-            activeConfig,
-          )
+          await saveLightLayout(activeConfig)
         } catch (error) {
           console.error('Failed to save light layout:', error)
         }
       }
     }
 
-    saveLightLayout()
+    saveLayout()
 
     return () => {
       removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
@@ -177,8 +166,8 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate)
 
-      if (audioCaptureManagerRef.current) {
-        audioCaptureManagerRef.current.stop()
+      if (audioCaptureManager) {
+        audioCaptureManager.stop()
       }
     }
   }, [

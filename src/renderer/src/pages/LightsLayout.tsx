@@ -18,7 +18,7 @@ import {
   dmxRigsAtom,
   activeRigIdAtom,
 } from '@renderer/atoms'
-import { CONFIG } from '../../../shared/ipcChannels'
+import { getDmxRigs, getDmxRig, saveDmxRig } from '../ipcApi'
 
 import LightsLayoutRigSection from './LightsLayout/LightsLayoutRigSection'
 import LightsLayoutForm from './LightsLayout/LightsLayoutForm'
@@ -74,7 +74,7 @@ const LightsLayout = () => {
   useEffect(() => {
     const loadRigs = async () => {
       try {
-        const loadedRigs = await window.electron.ipcRenderer.invoke(CONFIG.GET_DMX_RIGS)
+        const loadedRigs = await getDmxRigs()
         setRigs(loadedRigs || [])
 
         // If no active rig selected, select first rig or create default
@@ -95,7 +95,7 @@ const LightsLayout = () => {
               strobeLights: [],
             },
           }
-          await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, defaultRig)
+          await saveDmxRig(defaultRig)
           setRigs([defaultRig])
           setActiveRigId(defaultRig.id)
         }
@@ -114,7 +114,7 @@ const LightsLayout = () => {
       if (!activeRigId) return
 
       try {
-        const rig = await window.electron.ipcRenderer.invoke(CONFIG.GET_DMX_RIG, activeRigId)
+        const rig = await getDmxRig(activeRigId)
         if (rig) {
           setRigName(rig.name)
           setActiveLightsConfig(rig.config)
@@ -551,7 +551,7 @@ const LightsLayout = () => {
           name: rigName,
           config: updatedConfig,
         }
-        await window.electron.ipcRenderer.invoke(CONFIG.SAVE_DMX_RIG, updatedRig)
+        await saveDmxRig(updatedRig)
 
         // Update local rigs state
         setRigs((prev) => prev.map((r) => (r.id === activeRigId ? updatedRig : r)))

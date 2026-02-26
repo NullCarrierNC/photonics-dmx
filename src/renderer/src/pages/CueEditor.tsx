@@ -49,7 +49,7 @@ type EditorCueOrEffect =
   | YargEffectDefinition
   | AudioEffectDefinition
   | null
-import { EFFECTS, SHELL } from '../../../shared/ipcChannels'
+import { readEffectFile, showItemInFolder } from '../ipcApi'
 
 const CueEditor: React.FC = () => {
   const [registryTab, setRegistryTab] = useState<'variables' | 'events' | 'effects'>('variables')
@@ -103,6 +103,7 @@ const CueEditor: React.FC = () => {
     loadCueIntoFlow: loadCueIntoFlowProxy,
     getUpdatedDocument: getUpdatedDocumentProxy,
     onSaveSuccess: (message) => showToast(message, 'success'),
+    onError: (message) => showToast(message, 'error'),
   })
 
   // Compute the current dropdown value based on editor mode
@@ -491,10 +492,7 @@ const CueEditor: React.FC = () => {
           const fileEntry = effectFile.find((f) => f.groupId === effectRef.effectFileId)
 
           if (fileEntry) {
-            const effectFileData = (await window.electron.ipcRenderer.invoke(
-              EFFECTS.READ,
-              fileEntry.path,
-            )) as EffectFile
+            const effectFileData = (await readEffectFile(fileEntry.path)) as EffectFile
             const effectDef = effectFileData.effects.find((e) => e.id === effectRef.effectId)
             if (effectDef) {
               newDefinitions.set(effectRef.effectId, effectDef)
@@ -658,9 +656,9 @@ const CueEditor: React.FC = () => {
         {editorDoc?.path ? (
           <button
             className="hover:text-blue-600 hover:underline text-left"
-            onClick={() =>
-              window.electron.ipcRenderer.invoke(SHELL.SHOW_ITEM_IN_FOLDER, editorDoc.path)
-            }
+            onClick={() => {
+              if (editorDoc?.path) showItemInFolder(editorDoc.path)
+            }}
             title="Click to reveal in file explorer">
             {editorDoc.path}
           </button>

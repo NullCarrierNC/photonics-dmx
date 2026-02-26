@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CONFIG } from '../../../shared/ipcChannels'
+import { getAudioConfig, saveAudioConfig } from '../ipcApi'
 
 const AudioSmoothingSettings: React.FC = () => {
   const [enabled, setEnabled] = useState(true)
@@ -9,7 +9,7 @@ const AudioSmoothingSettings: React.FC = () => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+        const config = await getAudioConfig()
         if (config?.smoothing) {
           setEnabled(config.smoothing.enabled !== undefined ? config.smoothing.enabled : true)
           setAlpha(config.smoothing.alpha || 0.7)
@@ -28,9 +28,7 @@ const AudioSmoothingSettings: React.FC = () => {
     setIsSaving(true)
 
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
-        smoothing: { enabled: newEnabled, alpha },
-      })
+      await saveAudioConfig({ smoothing: { enabled: newEnabled, alpha } })
     } catch (error) {
       console.error('Failed to save smoothing enabled state:', error)
       setEnabled(!newEnabled) // Revert on error
@@ -47,9 +45,7 @@ const AudioSmoothingSettings: React.FC = () => {
     setIsSaving(true)
 
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
-        smoothing: { enabled, alpha },
-      })
+      await saveAudioConfig({ smoothing: { enabled, alpha } })
     } catch (error) {
       console.error('Failed to save smoothing alpha:', error)
     } finally {

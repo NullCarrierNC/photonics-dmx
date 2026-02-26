@@ -76,7 +76,11 @@ export function setupSimulationHandlers(
 
   ipcMain.handle(
     LIGHT.START_TEST_EFFECT,
-    async (_, effectId: string, venueSize?: 'NoVenue' | 'Small' | 'Large', bpm?: number) => {
+    async (
+      _,
+      data: { effectId: string; venueSize?: 'NoVenue' | 'Small' | 'Large'; bpm?: number },
+    ) => {
+      const { effectId, venueSize, bpm } = data ?? {}
       console.log(
         `IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}`,
       )

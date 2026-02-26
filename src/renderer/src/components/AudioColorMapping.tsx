@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { Color, Brightness } from '../../../photonics-dmx/types'
-import { CONFIG } from '../../../shared/ipcChannels'
 import FrequencyRangeSlider from './FrequencyRangeSlider'
+import { getAudioConfig, saveAudioConfig } from '../ipcApi'
 
 // Colors suitable for audio-reactive lighting (excludes black, and colors that don't make sense for lighting)
 // Transparent is included to allow ranges to be disabled while seeing effects from other ranges
@@ -165,7 +165,7 @@ const AudioColorMapping: React.FC = () => {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const config = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_CONFIG)
+        const config = await getAudioConfig()
         if (
           config?.frequencyBands?.ranges &&
           Array.isArray(config.frequencyBands.ranges) &&
@@ -200,7 +200,7 @@ const AudioColorMapping: React.FC = () => {
 
       setIsSaving(true)
       try {
-        await window.electron.ipcRenderer.invoke(CONFIG.SAVE_AUDIO_CONFIG, {
+        await saveAudioConfig({
           frequencyBands: {
             bandCount: overrideBandCount ?? bandCount,
             ranges: updatedRanges,

@@ -1,6 +1,6 @@
 import { useAtom } from 'jotai'
 import { openDmxComPortAtom, senderOpenDmxEnabledAtom, lightingPrefsAtom } from '../atoms'
-import { LIGHT } from '../../../shared/ipcChannels'
+import { enableSender, disableSender } from '../ipcApi'
 
 interface OpenDmxToggleProps {
   disabled?: boolean
@@ -17,14 +17,10 @@ const OpenDmxToggle = ({ disabled = false }: OpenDmxToggleProps) => {
     setIsOpenDmxEnabled(newState)
 
     if (newState) {
-      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
-        sender: 'opendmx',
-        port: comPort,
-        dmxSpeed: openDmxSpeed,
-      })
+      enableSender({ sender: 'opendmx', devicePath: comPort, dmxSpeed: openDmxSpeed })
       console.log('OpenDMX enabled')
     } else {
-      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'opendmx' })
+      disableSender({ sender: 'opendmx' })
       console.log('OpenDMX disabled')
     }
   }

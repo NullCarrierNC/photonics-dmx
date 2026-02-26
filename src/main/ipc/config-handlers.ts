@@ -58,7 +58,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   })
 
   // Save light layout
-  ipcMain.handle(CONFIG.SAVE_LIGHT_LAYOUT, async (_, filename: string, data: unknown) => {
+  ipcMain.handle(CONFIG.SAVE_LIGHT_LAYOUT, async (_, data: unknown) => {
     try {
       const validation = validateLightingConfiguration(data)
       if (!validation.ok) {
@@ -74,7 +74,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
       return { success: true }
     } catch (error) {
-      console.error(`Error saving light layout ${filename}:`, error)
+      console.error('Error saving light layout:', error)
       return ipcError(error)
     }
   })

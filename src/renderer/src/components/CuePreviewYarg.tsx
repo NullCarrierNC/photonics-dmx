@@ -5,7 +5,8 @@ import {
   DrumNoteType,
 } from '../../../photonics-dmx/cues/types/cueTypes'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
-import { CUE, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { setListenCueData } from '../ipcApi'
 import { useAtom } from 'jotai'
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms'
 
@@ -188,10 +189,10 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
     // Only tell the main process to start sending cue data if not in simulation mode
     if (!simulationMode) {
-      window?.electron?.ipcRenderer?.send(CUE.SET_LISTEN_CUE_DATA, true)
+      setListenCueData(true)
     }
 
-    const handleCueData = (_: unknown, cueData: CueData) => {
+    const handleCueData = (cueData: CueData) => {
       // Beat detection - check for beat values in the beat property
       if (cueData.beat && cueData.beat !== 'Unknown') {
         if (cueData.beat !== prevBeatRef.current) {
@@ -324,10 +325,10 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
       setCurrentCueData(cueData)
     }
-    addIpcListener<CueData>(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
+    addIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
 
     return () => {
-      window?.electron?.ipcRenderer?.send(CUE.SET_LISTEN_CUE_DATA, false)
+      setListenCueData(false)
       removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
     }
   }, [yargListenerEnabled, simulationMode])

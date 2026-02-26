@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
-import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { getAudioEnabled, getAudioReactiveCues, setActiveAudioCue } from '../ipcApi'
 
 interface AudioCueOption {
   id: string
@@ -39,7 +40,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       if (!silent) {
         setLoading(true)
       }
-      const enabled = await window.electron.ipcRenderer.invoke(CONFIG.GET_AUDIO_ENABLED)
+      const enabled = await getAudioEnabled()
       setAudioEnabled(enabled)
 
       if (!enabled) {
@@ -51,9 +52,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         return
       }
 
-      const response: CueStateResponse = await window.electron.ipcRenderer.invoke(
-        CONFIG.GET_AUDIO_REACTIVE_CUES,
-      )
+      const response: CueStateResponse = await getAudioReactiveCues()
       if (response?.success) {
         const sortedCues = (response.cues ?? []).sort((a, b) => {
           if (a.groupName === b.groupName) {
@@ -168,10 +167,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
 
     setSaving(true)
     try {
-      const result: { success: boolean; error?: string } = await window.electron.ipcRenderer.invoke(
-        CONFIG.SET_ACTIVE_AUDIO_CUE,
-        cueId,
-      )
+      const result: { success: boolean; error?: string } = await setActiveAudioCue(cueId)
       if (result?.success) {
         setActiveCue(cueId)
         setError(null)

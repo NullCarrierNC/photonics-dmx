@@ -1,6 +1,6 @@
 import { useAtom } from 'jotai'
 import { senderArtNetEnabledAtom, artNetConfigAtom, lightingPrefsAtom } from '../atoms'
-import { LIGHT } from '../../../shared/ipcChannels'
+import { enableSender, disableSender } from '../ipcApi'
 
 interface ArtNetToggleProps {
   disabled?: boolean
@@ -16,13 +16,10 @@ const ArtNetToggle = ({ disabled = false }: ArtNetToggleProps) => {
     setIsArtNetEnabled(newState)
 
     if (newState) {
-      window.electron.ipcRenderer.send(LIGHT.SENDER_ENABLE, {
-        sender: 'artnet',
-        ...artNetConfig,
-      })
+      enableSender({ sender: 'artnet', ...artNetConfig })
       console.log('ArtNet enabled')
     } else {
-      window.electron.ipcRenderer.send(LIGHT.SENDER_DISABLE, { sender: 'artnet' })
+      disableSender({ sender: 'artnet' })
       console.log('ArtNet disabled')
     }
   }

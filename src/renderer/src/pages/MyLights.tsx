@@ -6,7 +6,7 @@ import LightChannelsPreview from '../components/LightChannelsPreview'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import { DmxFixture, FixtureTypes } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
-import { CONFIG } from '../../../shared/ipcChannels'
+import { saveMyLights } from '../ipcApi'
 import { v4 as uuidv4 } from 'uuid'
 
 const MyLights = () => {
@@ -41,11 +41,11 @@ const MyLights = () => {
         if (existingIndex >= 0) {
           const updatedLibrary = [...prev]
           updatedLibrary[existingIndex] = lightToSave
-          window.electron.ipcRenderer.send(CONFIG.SAVE_MY_LIGHTS, updatedLibrary)
+          saveMyLights(updatedLibrary)
           return updatedLibrary
         }
         const newLibrary = [...prev, lightToSave]
-        window.electron.ipcRenderer.send(CONFIG.SAVE_MY_LIGHTS, newLibrary)
+        saveMyLights(newLibrary)
         return newLibrary
       })
 
@@ -58,7 +58,7 @@ const MyLights = () => {
       const updatedMyLights = myLights.filter((light) => light.id !== currentLight.id)
 
       setMyLights(updatedMyLights)
-      window.electron.ipcRenderer.send(CONFIG.SAVE_MY_LIGHTS, updatedMyLights)
+      saveMyLights(updatedMyLights)
 
       setCurrentLight(null)
       setShowDeleteModal(false)

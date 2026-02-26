@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
-import { CONFIG } from '../../../shared/ipcChannels'
+import { savePrefs } from '../ipcApi'
 
 const BrightnessSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
@@ -30,9 +30,7 @@ const BrightnessSettings: React.FC = () => {
     setLocalBrightness(newBrightness)
 
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        brightness: newBrightness,
-      })
+      await savePrefs({ brightness: newBrightness })
 
       // Update the preferences atom to reflect the change
       setPrefs((prev) => ({
@@ -55,9 +53,7 @@ const BrightnessSettings: React.FC = () => {
     setLocalBrightness(defaultBrightness)
 
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        brightness: defaultBrightness,
-      })
+      await savePrefs({ brightness: defaultBrightness })
 
       // Update the preferences atom to reflect the change
       setPrefs((prev) => ({

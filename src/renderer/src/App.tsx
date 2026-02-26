@@ -9,7 +9,6 @@ import {
   myDmxLightsAtom,
   senderErrorAtom,
   currentCueStateAtom,
-  CueStateInfo,
   enttecProComPortAtom,
   senderSacnEnabledAtom,
   senderArtNetEnabledAtom,
@@ -25,7 +24,6 @@ import HeaderProjects from './components/Header'
 import StatusBar from './components/StatusBar'
 import { AppPageRouter } from './components/AppPageRouter'
 import SenderErrorIndicator from './components/SenderErrorIndicator'
-import { DmxFixture, LightingConfiguration } from '../../photonics-dmx/types'
 import { useTimeout } from './utils/useTimeout'
 import { useAppIpcListeners } from './hooks/useAppIpcListeners'
 import { AudioCaptureManager } from './services/AudioCaptureManager'
@@ -34,7 +32,8 @@ import { useToast } from './hooks/useToast'
 import ToastContainer from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
-import { CONFIG } from '../../shared/ipcChannels'
+import type { CueStateUpdatePayload } from '../../shared/ipcTypes'
+import { setAudioEnabled, savePrefs, getLightLibrary, getMyLights, getLightLayout } from './ipcApi'
 
 /**
  * Main application component
@@ -78,7 +77,7 @@ export const App = (): JSX.Element => {
 
   // Handler for sender errors (non-network; network errors use SENDER_NETWORK_ERROR + toast)
   const handleSenderError = useCallback(
-    (_evt: unknown, msg: string): void => {
+    (msg: string): void => {
       console.error('Sender error:', msg)
       showToast(msg, 'error', 5000)
     },
@@ -87,7 +86,7 @@ export const App = (): JSX.Element => {
 
   // Handler for YARG listener errors (protocol/datagram version mismatch, etc.)
   const handleYargError = useCallback(
-    (_evt: unknown, msg: string): void => {
+    (msg: string): void => {
       console.error('YARG error:', msg)
       showToast(`YARG: ${msg}`, 'error', 5000)
     },
@@ -96,7 +95,7 @@ export const App = (): JSX.Element => {
 
   // Handler for cue state updates
   const handleCueStateUpdate = useCallback(
-    (_evt: unknown, cueState: CueStateInfo): void => {
+    (cueState: CueStateUpdatePayload): void => {
       setCueState(cueState)
     },
     [setCueState],
@@ -104,7 +103,7 @@ export const App = (): JSX.Element => {
 
   // Handler for sender start failures
   const handleSenderStartFailure = useCallback(
-    (_evt: unknown, data: { sender: string; error: string }): void => {
+    (data: { sender: string; error: string }): void => {
       console.error(`Sender "${data.sender}" failed to start:`, data.error)
 
       // Update the UI state to reflect that the sender is not running
@@ -148,7 +147,7 @@ export const App = (): JSX.Element => {
 
   // Handler for sender network errors (invalid destinations, etc.)
   const handleSenderNetworkError = useCallback(
-    (_evt: unknown, data: { sender: string; error: string; autoDisabled: boolean }): void => {
+    (data: { sender: string; error: string; autoDisabled: boolean }): void => {
       console.error(`Sender "${data.sender}" network error:`, data.error)
 
       // Update the UI state to reflect that the sender is not running
@@ -186,7 +185,7 @@ export const App = (): JSX.Element => {
 
   // Handler for audio:enable from main process
   const handleAudioEnable = useCallback(
-    async (_evt: unknown, config: AudioConfig): Promise<void> => {
+    async (config: AudioConfig): Promise<void> => {
       console.log('Received audio:enable from main process', config)
 
       try {
@@ -217,7 +216,7 @@ export const App = (): JSX.Element => {
 
         // Automatically disable audio in main process since it failed to start
         try {
-          await window.electron.ipcRenderer.invoke(CONFIG.SET_AUDIO_ENABLED, false)
+          await setAudioEnabled(false)
           console.log('Audio automatically disabled due to capture failure')
         } catch (disableError) {
           console.error('Failed to disable audio after capture failure:', disableError)
@@ -239,14 +238,16 @@ export const App = (): JSX.Element => {
 
   // Handler for audio:config-update from main process
   const handleAudioConfigUpdate = useCallback(
-    (_evt: unknown, config: AudioConfig): void => {
+    (config: AudioConfig | undefined): void => {
       console.log('Received audio:config-update from main process', config)
 
-      // Update AudioCaptureManager if it exists
-      if (audioCaptureManagerRef.current) {
+      // Update AudioCaptureManager if it exists (only when config is defined; updateConfig expects Partial<AudioConfig>)
+      if (config && audioCaptureManagerRef.current) {
         audioCaptureManagerRef.current.updateConfig(config)
         console.log('AudioCaptureManager configuration updated')
       }
+
+      if (!config) return
 
       // Update lightingPrefsAtom so preview components can react to color changes
       // Merge with existing audioConfig to preserve fields like sampleRate and updateIntervalMs
@@ -278,9 +279,7 @@ export const App = (): JSX.Element => {
     const newCollapsed = !isLeftMenuCollapsed
     setIsLeftMenuCollapsed(newCollapsed)
     try {
-      await window.electron.ipcRenderer.invoke(CONFIG.SAVE_PREFS, {
-        leftMenuCollapsed: newCollapsed,
-      })
+      await savePrefs({ leftMenuCollapsed: newCollapsed })
     } catch (error) {
       console.error('Failed to save left menu collapsed state:', error)
     }
@@ -290,9 +289,7 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     const loadLightLibrary = async (): Promise<void> => {
       try {
-        const data: DmxFixture[] = await window.electron.ipcRenderer.invoke(
-          CONFIG.GET_LIGHT_LIBRARY,
-        )
+        const data = await getLightLibrary()
         setLightLibrary(data || [])
       } catch (error) {
         console.error('Failed to load light library:', error)
@@ -306,7 +303,7 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     const loadMyLights = async (): Promise<void> => {
       try {
-        const data: DmxFixture[] = await window.electron.ipcRenderer.invoke(CONFIG.GET_MY_LIGHTS)
+        const data = await getMyLights()
         setMyLights(data || [])
       } catch (error) {
         console.error('Failed to load my lights:', error)
@@ -320,10 +317,7 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     const loadLightLayout = async (): Promise<void> => {
       try {
-        const data: LightingConfiguration = await window.electron.ipcRenderer.invoke(
-          CONFIG.GET_LIGHT_LAYOUT,
-          'myLayout.json',
-        )
+        const data = await getLightLayout('myLayout.json')
         setActiveLightsConfig(data || null)
       } catch (error) {
         console.error('Failed to load light layout:', error)

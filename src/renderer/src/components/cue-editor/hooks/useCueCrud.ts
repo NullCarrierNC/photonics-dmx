@@ -41,6 +41,7 @@ export type UseCueCrudParams = {
   ) => void
   refreshFiles: () => Promise<void>
   refreshEffectFiles: () => Promise<void>
+  onError?: (message: string) => void
 }
 
 export function useCueCrud({
@@ -55,6 +56,7 @@ export function useCueCrud({
   loadCueIntoFlow,
   refreshFiles,
   refreshEffectFiles,
+  onError,
 }: UseCueCrudParams) {
   const handleNewFile = useCallback(() => {}, [])
 
@@ -81,12 +83,16 @@ export function useCueCrud({
         const validation = await validateEffect({ content: file })
         if (!validation.valid) {
           setValidationErrors(validation.errors)
-          alert('Failed to create effect file: ' + validation.errors.join(', '))
+          onError?.('Failed to create effect file: ' + validation.errors.join(', '))
           return
         }
 
         try {
           const response = await saveEffectFile({ mode: file.mode, filename, content: file })
+          if (!response.success) {
+            onError?.('Failed to save: ' + response.error)
+            return
+          }
           setEditorDoc({ mode: 'effect', file, path: response.path })
           setSelectedCueId(file.effects[0]?.id ?? null)
           setFilename(filename)
@@ -96,7 +102,7 @@ export function useCueCrud({
           refreshEffectFiles()
         } catch (error) {
           console.error('Failed to save effect file', error)
-          alert('Failed to save effect file: ' + error)
+          onError?.('Failed to save effect file: ' + error)
         }
       } else {
         const file = createDefaultFile(mode)
@@ -111,12 +117,16 @@ export function useCueCrud({
         const validation = await validateNodeCue({ content: file })
         if (!validation.valid) {
           setValidationErrors(validation.errors)
-          alert('Failed to create cue file: ' + validation.errors.join(', '))
+          onError?.('Failed to create cue file: ' + validation.errors.join(', '))
           return
         }
 
         try {
           const response = await saveNodeCueFile({ mode: file.mode, filename, content: file })
+          if (!response.success) {
+            onError?.('Failed to save: ' + response.error)
+            return
+          }
           setEditorDoc({ mode: 'cue', file, path: response.path })
           setSelectedCueId(file.cues[0]?.id ?? null)
           setFilename(filename)
@@ -126,13 +136,14 @@ export function useCueCrud({
           refreshFiles()
         } catch (error) {
           console.error('Failed to save cue file', error)
-          alert('Failed to save cue file: ' + error)
+          onError?.('Failed to save cue file: ' + error)
         }
       }
     },
     [
       editorDoc?.mode,
       mode,
+      onError,
       loadCueIntoFlow,
       refreshFiles,
       refreshEffectFiles,
