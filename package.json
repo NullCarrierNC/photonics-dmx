@@ -79,11 +79,7 @@
     "vite": "^5.4.19"
   },
   "overrides": {
-    "boolean": "4.0.0",
-    "esbuild": "0.25.1"
-  },
-  "resolutions": {
-    "boolean": "4.0.0"
+    "esbuild": "0.25.12"
   },
   "engines": {
     "node": ">=20.0.0"
