@@ -95,3 +95,38 @@ describe('OpenDmxSender', () => {
     expect((listener.mock.calls[0][0] as SenderError).senderId).toBe('opendmx')
   })
 })
+
+describe('OpenDmxSender stop() and port close', () => {
+  it('stop() triggers adapter stop which closes fake serial port and resolves', async () => {
+    const portCloseMock = jest.fn<(cb: (err?: Error | null) => void) => void>((cb) => cb())
+    const adapterStopMock = jest.fn().mockImplementation(async () => {
+      await new Promise<void>((res) => portCloseMock(() => res()))
+    })
+    const factory = () => ({
+      start: jest.fn() as () => Promise<void>,
+      writeChannels: jest.fn(),
+      stop: adapterStopMock as () => Promise<void>,
+    })
+    const s = new OpenDmxSender('/dev/ttyUSB0', { dmxSpeed: 40 }, 'uni1', 0, factory)
+    await s.start()
+    portCloseMock.mockClear()
+    await s.stop()
+    expect(adapterStopMock).toHaveBeenCalled()
+    expect(portCloseMock).toHaveBeenCalled()
+  })
+
+  it('repeated stop() is safe (idempotent)', async () => {
+    const mockStopIdempotent = jest.fn() as () => Promise<void>
+    const factory = () => ({
+      start: jest.fn() as () => Promise<void>,
+      writeChannels: jest.fn(),
+      stop: mockStopIdempotent,
+    })
+    const s = new OpenDmxSender('/dev/ttyUSB0', { dmxSpeed: 40 }, 'uni1', 0, factory)
+    await s.start()
+    await s.stop()
+    await s.stop()
+    await s.stop()
+    expect(mockStopIdempotent).toHaveBeenCalledTimes(1)
+  })
+})

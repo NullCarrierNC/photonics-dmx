@@ -10,7 +10,7 @@ const OpenDmxToggle = ({ disabled = false }: OpenDmxToggleProps) => {
   const [isOpenDmxEnabled, setIsOpenDmxEnabled] = useAtom(senderOpenDmxEnabledAtom)
   const [comPort] = useAtom(openDmxComPortAtom)
   const [prefs] = useAtom(lightingPrefsAtom)
-  const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? 40
+  const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? 22
 
   const handleToggle = () => {
     const newState = !isOpenDmxEnabled
@@ -54,8 +54,7 @@ const OpenDmxToggle = ({ disabled = false }: OpenDmxToggleProps) => {
       </div>
       {isOpenDmxEnabled && (
         <p className="text-xs text-gray-600 dark:text-gray-400">
-          *OpenDMX USB adapters are very poor quality. You may experience flickering or other
-          issues.
+          *OpenDMX USB adapters aren't recommended. You may experience flickering or other issues.
         </p>
       )}
     </div>

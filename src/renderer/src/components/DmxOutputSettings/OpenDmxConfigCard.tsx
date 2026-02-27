@@ -21,7 +21,8 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
   <CollapsibleSenderCard title="OpenDMX USB Configuration" expanded={expanded} onToggle={onToggle}>
     <div className="space-y-3">
       <p className="text-sm text-red-600 dark:text-red-500">
-        OpenDMX USB adapters are very poor quality - we <b>HIGHLY</b> recommend against using them!
+        OpenDMX USB adapters rely on your PC for timing, this can cause flickering or other issues
+        on some systems.
       </p>
       <p className="text-sm text-red-600 dark:text-red-500">
         If you want to use one, please be aware that:
@@ -31,12 +32,7 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
             could damage your computer.
           </li>
           <li>
-            You will likely experience DMX drop-outs or other timing issues which will cause
-            flickering.
-          </li>
-          <li>Do NOT use with Moving Heads - drop-outs can cause thrashing of the motors.</li>
-          <li>
-            <b>These are fundamental issues with the hardware and not something we can fix.</b>
+            You may experience DMX drop-outs or other timing issues which can cause flickering.
           </li>
         </ul>
       </p>
@@ -65,7 +61,9 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
       </div>
       <p className="text-xs text-gray-600 dark:text-gray-400">
         Default is 40 Hz. Higher values reduce latency but can increase flicker on lower-quality
-        adapters.
+        adapters. If you experience flickering, try lowering the value.
+        <br />
+        Strobes may not work as expected if the value is too low.
       </p>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 mt-4">
         Enter the COM port of your OpenDMX USB interface.
