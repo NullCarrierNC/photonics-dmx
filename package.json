@@ -80,8 +80,7 @@
   },
   "overrides": {
     "boolean": "4.0.0",
-    "esbuild": "0.25.1",
-    "minimatch": "10.2.2"
+    "esbuild": "0.25.1"
   },
   "resolutions": {
     "boolean": "4.0.0"
