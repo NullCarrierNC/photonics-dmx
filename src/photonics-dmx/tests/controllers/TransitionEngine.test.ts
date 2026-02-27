@@ -12,7 +12,11 @@
 import { TransitionEngine } from '../../controllers/sequencer/TransitionEngine'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { LayerManager } from '../../controllers/sequencer/LayerManager'
-import { FrameContext, LightEffectState } from '../../controllers/sequencer/interfaces'
+import {
+  FrameContext,
+  IEffectManager,
+  LightEffectState,
+} from '../../controllers/sequencer/interfaces'
 import { createMockRGBIP, createMockTrackedLight } from '../helpers/testFixtures'
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals'
 import { EffectTransition } from '../../types'
@@ -147,6 +151,71 @@ describe('TransitionEngine', () => {
 
       // Verify the effect was removed since it completed all transitions
       expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1, 'test-light-1')
+    })
+
+    it('should not remove layer for last light when completion callback synchronously starts a new effect', () => {
+      // Simulates the JSON strobe cue: multiple lights complete on the same tick;
+      // the completion callback (for the last-processed light) synchronously adds
+      // a new effect for that light. Cleanup must not destroy the just-started effect.
+      const layer = 255
+      const light1Effect = createMockActiveEffect({
+        lightId: 'light1',
+        layer,
+        currentTransitionIndex: 1,
+        transitions: [createMockEffectTransition()],
+      })
+      const light2Effect = createMockActiveEffect({
+        lightId: 'light2',
+        layer,
+        currentTransitionIndex: 1,
+        transitions: [createMockEffectTransition()],
+      })
+      const light3Effect = createMockActiveEffect({
+        lightId: 'light3',
+        layer,
+        currentTransitionIndex: 1,
+        transitions: [createMockEffectTransition()],
+      })
+      const newEffectForLight3 = createMockActiveEffect({
+        name: 'follow-up-effect',
+        lightId: 'light3',
+        layer,
+        currentTransitionIndex: 0,
+        state: 'idle',
+        transitions: [createMockEffectTransition()],
+      })
+
+      const activeEffectsMap = new Map<number, Map<string, LightEffectState>>()
+      const layer255Map = new Map<string, LightEffectState>()
+      layer255Map.set('light1', light1Effect)
+      layer255Map.set('light2', light2Effect)
+      layer255Map.set('light3', light3Effect)
+      activeEffectsMap.set(layer, layer255Map)
+
+      layerManager.getActiveEffects.mockReturnValue(activeEffectsMap)
+      layerManager.getActiveEffect.mockImplementation((l: number, lightId: string) =>
+        activeEffectsMap.get(l)?.get(lightId),
+      )
+      layerManager.removeActiveEffect.mockImplementation((l: number, lightId: string) => {
+        activeEffectsMap.get(l)?.delete(lightId)
+      })
+      layerManager.getQueuedEffect.mockReturnValue(undefined)
+
+      const mockEffectManager = {
+        onLightEffectComplete: jest.fn((effect: LightEffectState) => {
+          if (effect.lightId === 'light3') {
+            layer255Map.set('light3', newEffectForLight3)
+          }
+        }),
+        startNextEffectInQueue: jest.fn().mockReturnValue(false),
+      } as unknown as IEffectManager
+
+      transitionEngine.setEffectManager(mockEffectManager)
+      transitionEngine.updateTransitions()
+
+      expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith('light1', layer)
+      expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith('light2', layer)
+      expect(lightTransitionController.removeLightLayer).not.toHaveBeenCalledWith('light3', layer)
     })
   })
 

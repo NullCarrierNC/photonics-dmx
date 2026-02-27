@@ -137,10 +137,14 @@ export class TransitionEngine implements ITransitionEngine {
         this.effectManager.onLightEffectComplete(justFinishedEffect)
       }
 
+      // After callback, check if a new effect was started for this light
+      // (callbacks can synchronously add new effects via addEffect)
+      const newEffectStarted = this.layerManager.getActiveEffect(layer, lightId) !== undefined
+
       let startedQueuedEffect = false
-      if (this.effectManager) {
+      if (!newEffectStarted && this.effectManager) {
         startedQueuedEffect = this.effectManager.startNextEffectInQueue(layer, lightId)
-      } else {
+      } else if (!newEffectStarted) {
         const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId)
         if (nextQueuedEffect) {
           console.warn(
@@ -151,7 +155,7 @@ export class TransitionEngine implements ITransitionEngine {
         }
       }
 
-      if (!startedQueuedEffect) {
+      if (!startedQueuedEffect && !newEffectStarted) {
         // Only if there's no next effect, remove transitions for non-base layers
         if (layer > 0) {
           this.lightTransitionController.removeLightLayer(lightId, layer)

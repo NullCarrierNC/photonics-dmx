@@ -96,15 +96,42 @@ class OpenDmxDeviceAdapter implements IOpenDmxDeviceAdapter {
     if (!this.device) {
       return
     }
+    const device = this.device
+
     if (this.onError) {
-      this.device.off('error', this.onError)
+      device.off('error', this.onError)
     }
     const zeroPayload: Record<number, number> = {}
     for (let ch = 1; ch <= 512; ch++) {
       zeroPayload[ch] = 0
     }
-    this.device.setChannels(zeroPayload, true)
-    this.device.stopSending()
+    device.setChannels(zeroPayload, true)
+    device.stopSending()
+
+    type PortWithClose = {
+      isOpen: boolean
+      close: (cb: (err?: Error | null) => void) => void
+      drain?: (cb: (err?: Error | null) => void) => void
+    }
+    const port = (device as unknown as { port?: PortWithClose }).port
+    if (port && port.isOpen) {
+      if (typeof port.drain === 'function') {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            port.drain!((err?: Error | null) => (err ? reject(err) : resolve()))
+          })
+        } catch {
+          // Best effort; continue to close
+        }
+      }
+      try {
+        await new Promise<void>((resolve, reject) => {
+          port.close((err?: Error | null) => (err ? reject(err) : resolve()))
+        })
+      } catch (err) {
+        console.error('OpenDMX serial port close failed (port may already be closed):', err)
+      }
+    }
     this.device = null
   }
 }
