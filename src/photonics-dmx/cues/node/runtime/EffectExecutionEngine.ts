@@ -131,6 +131,9 @@ export class EffectExecutionEngine {
 
     this.activeContexts.set(context.id, context)
 
+    this.emitNodeExecution('activated', effectListener.id)
+    this.emitNodeExecution('deactivated', effectListener.id)
+
     // Get outgoing edges from effect listener and start execution
     const { adjacency } = this.compiledEffect
     const outgoing = adjacency.get(effectListener.id) ?? []
@@ -410,6 +413,9 @@ export class EffectExecutionEngine {
     })
 
     this.activeContexts.set(context.id, context)
+
+    this.emitNodeExecution('activated', listener.id)
+    this.emitNodeExecution('deactivated', listener.id)
 
     const { adjacency } = this.compiledEffect
     const outgoing = adjacency.get(listener.id) ?? []
