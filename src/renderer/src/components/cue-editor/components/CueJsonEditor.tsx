@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { defaultKeymap } from '@codemirror/commands'
-import { json } from '@codemirror/lang-json'
+import { json, jsonParseLinter } from '@codemirror/lang-json'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { linter, lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint'
+import { ensureSyntaxTree } from '@codemirror/language'
 import type {
   AudioNodeCueDefinition,
   NodeCueFile,
@@ -11,6 +13,67 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { validateNodeCue } from '../../../ipcApi'
+
+/**
+ * Resolve a JSON Pointer path (e.g. ["nodes", "events", "0", "type"]) to character
+ * positions in the editor by walking the tree.
+ */
+function resolveJsonPath(
+  state: EditorState,
+  segments: string[],
+): { from: number; to: number } | null {
+  const tree = ensureSyntaxTree(state, state.doc.length)
+  if (!tree) return null
+
+  const cur = tree.cursor()
+  if (cur.name !== 'JsonText') return null
+  if (!cur.firstChild()) return null
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    const name = cur.name as string
+
+    if (name === 'Object') {
+      if (!cur.firstChild()) return null
+      while ((cur.name as string) === '{' || (cur.name as string) === '}') {
+        if (!cur.nextSibling()) return null
+      }
+      let found = false
+      while ((cur.name as string) === 'Property') {
+        if (!cur.firstChild()) return null
+        const key = state.doc.sliceString(cur.from, cur.to).replace(/^"|"$/g, '')
+        if (!cur.parent()) return null
+        if (key === seg) {
+          cur.firstChild()
+          cur.nextSibling()
+          cur.nextSibling()
+          found = true
+          break
+        }
+        if (!cur.nextSibling()) return null
+        while ((cur.name as string) === ',') {
+          if (!cur.nextSibling()) return null
+        }
+      }
+      if (!found) return null
+    } else if (name === 'Array') {
+      const index = parseInt(seg, 10)
+      if (Number.isNaN(index) || index < 0) return null
+      if (!cur.firstChild()) return null
+      if ((cur.name as string) === '[' && !cur.nextSibling()) return null
+      for (let j = 0; j < index; j++) {
+        if (!cur.nextSibling() || (cur.name as string) !== ',') return null
+        if (!cur.nextSibling()) return null
+      }
+    } else {
+      return null
+    }
+
+    if (i === segments.length - 1) return { from: cur.from, to: cur.to }
+  }
+
+  return { from: cur.from, to: cur.to }
+}
 
 type CueJsonEditorProps = {
   cueDefinition: YargNodeCueDefinition | AudioNodeCueDefinition
@@ -64,6 +127,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
 
     const raw = view.state.doc.toString()
     setValidationErrors([])
+    view.dispatch(setDiagnostics(view.state, []))
 
     let parsed: unknown
     try {
@@ -81,13 +145,38 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
     if (!result.valid) {
       setValidationErrors(result.errors ?? ['Validation failed'])
       setValidationPassed(false)
+      const structured =
+        (result as { structuredErrors?: { instancePath: string; message: string }[] })
+          .structuredErrors ?? []
+      const cueIndex = fileWithCue.cues.findIndex((c) => c.id === selectedCueId)
+      const cuePrefix = cueIndex >= 0 ? `/cues/${cueIndex}/` : ''
+      const diagnostics: Diagnostic[] = []
+      for (const err of structured) {
+        const pathRelative =
+          cuePrefix && err.instancePath.startsWith(cuePrefix)
+            ? err.instancePath.slice(cuePrefix.length)
+            : err.instancePath
+        const segments = pathRelative.split('/').filter(Boolean)
+        const pos = resolveJsonPath(view.state, segments)
+        if (pos) {
+          diagnostics.push({
+            from: pos.from,
+            to: pos.to,
+            severity: 'error',
+            message: err.message,
+            source: 'schema',
+          })
+        }
+      }
+      view.dispatch(setDiagnostics(view.state, diagnostics))
       return
     }
 
+    view.dispatch(setDiagnostics(view.state, []))
     setValidationErrors([])
     setValidationPassed(true)
     setContentChangedAfterValidation(false)
-  }, [buildFileWithCue])
+  }, [buildFileWithCue, selectedCueId])
 
   const handleSave = useCallback(() => {
     const view = viewRef.current
@@ -109,12 +198,15 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
       json(),
       oneDark,
       keymap.of(defaultKeymap),
+      lintGutter(),
+      linter(jsonParseLinter()),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           setHasEdits(true)
           if (validationPassedRef.current) {
             setContentChangedAfterValidation(true)
           }
+          update.view.dispatch(setDiagnostics(update.state, []))
         }
       }),
     ]

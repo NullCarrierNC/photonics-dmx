@@ -988,9 +988,15 @@ export interface NodeCueValidationSuccess<T extends NodeCueFile> {
   mode: NodeCueMode
 }
 
+export interface StructuredValidationError {
+  instancePath: string
+  message: string
+}
+
 export interface NodeCueValidationFailure {
   valid: false
   errors: string[]
+  structuredErrors?: StructuredValidationError[]
 }
 
 export type NodeCueValidationResult<T extends NodeCueFile = NodeCueFile> =
@@ -1010,6 +1016,16 @@ const formatErrors = (errors: DefinedError[] | null | undefined): string[] => {
     }
     return `${instancePath}: ${message}`
   })
+}
+
+const extractStructuredErrors = (
+  errors: DefinedError[] | null | undefined,
+): StructuredValidationError[] => {
+  if (!errors?.length) return []
+  return errors.map((err) => ({
+    instancePath: err.instancePath || '',
+    message: err.message || 'Invalid value',
+  }))
 }
 
 /**
@@ -1079,6 +1095,7 @@ export const validateYargNodeCueFile = (
     return {
       valid: false,
       errors: formatErrors(validateYargSchema.errors as DefinedError[]),
+      structuredErrors: extractStructuredErrors(validateYargSchema.errors as DefinedError[]),
     }
   }
 
@@ -1137,6 +1154,7 @@ export const validateAudioNodeCueFile = (
     return {
       valid: false,
       errors: formatErrors(validateAudioSchema.errors as DefinedError[]),
+      structuredErrors: extractStructuredErrors(validateAudioSchema.errors as DefinedError[]),
     }
   }
 
