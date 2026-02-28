@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import 'reactflow/dist/style.css'
 import CueFlowCanvas from '../components/cue-editor/components/CueFlowCanvas'
+import CueJsonEditor from '../components/cue-editor/components/CueJsonEditor'
 import CueFileSidebar from '../components/cue-editor/components/CueFileSidebar'
 import CueMetadataForm from '../components/cue-editor/components/CueMetadataForm'
 import NodeSidebar from '../components/cue-editor/components/NodeSidebar'
@@ -54,6 +55,9 @@ import { readEffectFile, showItemInFolder } from '../ipcApi'
 const CueEditor: React.FC = () => {
   const [registryTab, setRegistryTab] = useState<'variables' | 'events' | 'effects'>('variables')
   const [showNewFileModal, setShowNewFileModal] = useState(false)
+  const [showJsonEditor, setShowJsonEditor] = useState(false)
+  const [jsonEditorDirty, setJsonEditorDirty] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null)
   const [loadedEffectDefinitions, setLoadedEffectDefinitions] = useState<
     Map<string, EffectDefinition>
   >(new Map())
@@ -82,6 +86,7 @@ const CueEditor: React.FC = () => {
     currentCueDefinition,
     currentEffectDefinition,
     setSelectedCueId,
+    setEditorDoc,
     setIsDirty,
     handleModeChange,
     handleCreateNewFile,
@@ -129,7 +134,6 @@ const CueEditor: React.FC = () => {
     selectedActionHasEventParent,
     contextMenu,
     paneContextMenu,
-    chainDuration,
     addEventNode,
     addActionNode,
     addLogicNode,
@@ -509,6 +513,47 @@ const CueEditor: React.FC = () => {
     loadEffects()
   }, [editorDoc, selectedCueId, mode, groupedEffectFiles])
 
+  const handleJsonEditorSave = useCallback(
+    (updatedCue: YargNodeCueDefinition | AudioNodeCueDefinition) => {
+      if (!editorDoc || editorDoc.mode !== 'cue' || !selectedCueId) return
+      const file = editorDoc.file as NodeCueFile
+      const updatedFile: NodeCueFile = {
+        ...file,
+        cues: file.cues.map((c) => (c.id === selectedCueId ? updatedCue : c)),
+      }
+      setEditorDoc({ mode: 'cue', file: updatedFile, path: editorDoc.path })
+      loadCueIntoFlow(updatedCue)
+      setShowJsonEditor(false)
+      setJsonEditorDirty(false)
+      setIsDirty(true)
+    },
+    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setIsDirty],
+  )
+
+  const guardJsonEditorNavigation = useCallback(
+    (action: () => void) => {
+      const jsonDirty = showJsonEditor && jsonEditorDirty
+      if (jsonDirty || isDirty) {
+        setPendingNavigation(() => action)
+      } else {
+        setShowJsonEditor(false)
+        setJsonEditorDirty(false)
+        action()
+      }
+    },
+    [showJsonEditor, jsonEditorDirty, isDirty],
+  )
+
+  const handleDiscardNavigation = useCallback(() => {
+    if (pendingNavigation) {
+      pendingNavigation()
+      setPendingNavigation(null)
+      setShowJsonEditor(false)
+      setJsonEditorDirty(false)
+      setIsDirty(false)
+    }
+  }, [pendingNavigation, setIsDirty])
+
   const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio
   const effectFiles = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
 
@@ -551,17 +596,21 @@ const CueEditor: React.FC = () => {
             effectFileList={effectFiles}
             editorDoc={editorDoc}
             selectedCueId={selectedCueId}
-            onSelectFile={selectFile}
-            onSelectEffectFile={selectEffectFile}
+            onSelectFile={(fileSummary) => guardJsonEditorNavigation(() => selectFile(fileSummary))}
+            onSelectEffectFile={(fileSummary) =>
+              guardJsonEditorNavigation(() => selectEffectFile(fileSummary))
+            }
             onReload={handleReload}
             onAddCue={handleAddCue}
             onAddEffect={handleAddEffect}
             onRemoveCue={removeCue}
             onRemoveEffect={removeEffect}
-            onSelectCue={(cue) => {
-              setSelectedCueId(cue?.id ?? null)
-              loadCueIntoFlow(cue as EditorCueOrEffect)
-            }}
+            onSelectCue={(cue) =>
+              guardJsonEditorNavigation(() => {
+                setSelectedCueId(cue?.id ?? null)
+                loadCueIntoFlow(cue as EditorCueOrEffect)
+              })
+            }
           />
 
           <CueEditorRegistryPanel
@@ -580,7 +629,7 @@ const CueEditor: React.FC = () => {
         </div>
 
         <section
-          className={`flex flex-col bg-white dark:bg-gray-900 rounded-lg shadow-inner ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
+          className={`flex flex-col min-h-0 overflow-hidden bg-white dark:bg-gray-900 rounded-lg shadow-inner ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
           <CueMetadataForm
             filename={filename}
             group={editorDoc?.file.group ?? null}
@@ -594,39 +643,53 @@ const CueEditor: React.FC = () => {
             onEffectMetadataChange={updateEffectMetadata}
           />
 
-          <ActiveNodesContext.Provider value={activeNodeIds}>
-            <CueFlowCanvas
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              chainDuration={chainDuration}
-              selectedCueName={currentCueDefinition?.name}
-              contextMenu={contextMenu}
-              paneContextMenu={paneContextMenu}
-              flowWrapperRef={flowWrapperRef}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onSelectionChange={handleNodeSelection}
-              onNodeContextMenu={handleNodeContextMenu}
-              onEdgeContextMenu={onEdgeContextMenu}
-              onPaneClick={closeContextMenu}
-              onPaneContextMenu={handlePaneContextMenu}
-              onRemoveNode={handleRemoveNode}
-              setReactFlowInstance={setReactFlowInstance}
-              isValidConnection={isValidConnection}
-              activeMode={activeMode}
-              editorMode={editorDoc?.mode ?? 'cue'}
-              addEventNode={addEventNode}
-              addActionNode={addActionNode}
-              addLogicNode={addLogicNode}
-              addEventRaiserNode={addEventRaiserNode}
-              addEventListenerNode={addEventListenerNode}
-              addEffectRaiserNode={addEffectRaiserNode}
-              addEffectListenerNode={addEffectListenerNode}
-              addNotesNode={addNotesNode}
+          {showJsonEditor && editorDoc?.mode === 'cue' && selectedCueId && currentCueDefinition ? (
+            <CueJsonEditor
+              cueDefinition={currentCueDefinition}
+              editorDoc={editorDoc}
+              selectedCueId={selectedCueId}
+              onSave={handleJsonEditorSave}
+              onCancel={() => {
+                setShowJsonEditor(false)
+                setJsonEditorDirty(false)
+              }}
+              onDirtyChange={setJsonEditorDirty}
             />
-          </ActiveNodesContext.Provider>
+          ) : (
+            <ActiveNodesContext.Provider value={activeNodeIds}>
+              <CueFlowCanvas
+                nodes={nodes}
+                edges={edges}
+                nodeTypes={nodeTypes}
+                selectedCueName={currentCueDefinition?.name}
+                contextMenu={contextMenu}
+                paneContextMenu={paneContextMenu}
+                flowWrapperRef={flowWrapperRef}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onSelectionChange={handleNodeSelection}
+                onNodeContextMenu={handleNodeContextMenu}
+                onEdgeContextMenu={onEdgeContextMenu}
+                onPaneClick={closeContextMenu}
+                onPaneContextMenu={handlePaneContextMenu}
+                onRemoveNode={handleRemoveNode}
+                setReactFlowInstance={setReactFlowInstance}
+                isValidConnection={isValidConnection}
+                activeMode={activeMode}
+                editorMode={editorDoc?.mode ?? 'cue'}
+                addEventNode={addEventNode}
+                addActionNode={addActionNode}
+                addLogicNode={addLogicNode}
+                addEventRaiserNode={addEventRaiserNode}
+                addEventListenerNode={addEventListenerNode}
+                addEffectRaiserNode={addEffectRaiserNode}
+                addEffectListenerNode={addEffectListenerNode}
+                addNotesNode={addNotesNode}
+                onJsonToggle={() => setShowJsonEditor(true)}
+              />
+            </ActiveNodesContext.Provider>
+          )}
           <CueEditorValidationErrors errors={validationErrors} />
         </section>
 
@@ -678,6 +741,32 @@ const CueEditor: React.FC = () => {
           setShowNewFileModal(false)
         }}
       />
+
+      {pendingNavigation && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="unsaved-title">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 max-w-sm text-sm space-y-3">
+            <p id="unsaved-title">You have unsaved changes. Discard them?</p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleDiscardNavigation}
+                className="px-3 py-1.5 text-sm font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingNavigation(null)}
+                className="px-3 py-1.5 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ToastContainer toasts={toasts} onDismiss={hideToast} />
     </div>

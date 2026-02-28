@@ -27,11 +27,16 @@
     "test:color-analysis": "npx ts-node src/photonics-dmx/tests/runColorAnalysis.ts"
   },
   "dependencies": {
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/state": "^6.5.4",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@codemirror/view": "^6.39.15",
     "@electron-toolkit/preload": "3.0.1",
     "@electron-toolkit/utils": "3.0.0",
     "ajv": "8.18.0",
     "ajv-formats": "3.0.1",
     "chokidar": "3.6.0",
+    "codemirror": "^6.0.2",
     "date-fns": "4.1.0",
     "dmx-ts": "0.4.0",
     "electron-updater": "^6.3.9",

@@ -87,7 +87,6 @@ const useCueFlow = ({
     selectedActionHasEventParent: selection.selectedActionHasEventParent,
     contextMenu: selection.contextMenu,
     paneContextMenu: selection.paneContextMenu,
-    chainDuration: selection.chainDuration,
     addEventNode: nodeCreation.addEventNode,
     addActionNode: nodeCreation.addActionNode,
     addLogicNode: nodeCreation.addLogicNode,

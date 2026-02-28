@@ -242,6 +242,7 @@ const useCueFiles = ({
     currentEffectDefinition,
     setFilename,
     setSelectedCueId,
+    setEditorDoc,
     setIsDirty,
     setValidationErrors,
     handleModeChange: metadata.handleModeChange,
