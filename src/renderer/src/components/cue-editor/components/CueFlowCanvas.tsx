@@ -13,7 +13,6 @@ import ReactFlow, {
   type ReactFlowInstance,
 } from 'reactflow'
 import type { EditorNode, NotesVariant } from '../lib/types'
-import { formatDuration } from '../lib/cueUtils'
 import { NODE_EFFECT_TYPES } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
 import type { LogicNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -22,7 +21,6 @@ type Props = {
   nodes: EditorNode[]
   edges: Edge[]
   nodeTypes: NodeTypes
-  chainDuration: number
   selectedCueName?: string
   contextMenu: { x: number; y: number; nodeId: string } | null
   paneContextMenu: { x: number; y: number; flowX: number; flowY: number } | null
@@ -51,13 +49,13 @@ type Props = {
   addEffectRaiserNode?: (position?: { x: number; y: number }) => void
   addEffectListenerNode?: (position?: { x: number; y: number }) => void
   addNotesNode?: (variant: NotesVariant, position?: { x: number; y: number }) => void
+  onJsonToggle?: () => void
 }
 
 const CueFlowCanvas: React.FC<Props> = ({
   nodes,
   edges,
   nodeTypes,
-  chainDuration,
   selectedCueName,
   contextMenu,
   paneContextMenu,
@@ -83,6 +81,7 @@ const CueFlowCanvas: React.FC<Props> = ({
   addEffectRaiserNode,
   addEffectListenerNode,
   addNotesNode,
+  onJsonToggle,
 }) => {
   const handlePaneMenuClick = (action: () => void) => {
     action()
@@ -154,12 +153,18 @@ const CueFlowCanvas: React.FC<Props> = ({
         proOptions={{ hideAttribution: true }}>
         <Panel
           position="top-left"
-          className="bg-white/80 dark:bg-gray-900/80 px-2 py-1 text-[11px] rounded shadow">
-          <div>{selectedCueName ? `Cue: ${selectedCueName}` : 'Select or add a cue'}</div>
-          {chainDuration > 0 && (
-            <div className="text-gray-600 dark:text-gray-400">
-              Chain duration: {formatDuration(chainDuration)}
-            </div>
+          className="w-full max-w-full bg-white/80 dark:bg-gray-900/80 pl-2 pr-6 py-1 text-[11px] rounded shadow flex items-center justify-between gap-4 box-border">
+          <div className="min-w-0 truncate">
+            {selectedCueName ? `Cue: ${selectedCueName}` : 'Select or add a cue'}
+          </div>
+          {editorMode === 'cue' && onJsonToggle && (
+            <button
+              type="button"
+              onClick={onJsonToggle}
+              className="shrink-0 ml-auto px-2 py-0.5 rounded border border-gray-400 dark:border-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+              title="Edit cue JSON">
+              JSON
+            </button>
           )}
         </Panel>
         <MiniMap

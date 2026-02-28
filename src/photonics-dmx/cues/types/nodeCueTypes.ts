@@ -398,6 +398,8 @@ export interface NodeActionConfig {
   holdTime?: number
   flashDurationIn?: number
   flashDurationOut?: number
+  /** Flash: delay after hold before next cycle (ms), e.g. for strobes */
+  endWait?: number
   /** Cycle: transition duration (ms), step trigger (WaitCondition), base color for inactive lights */
   cycleTransitionDuration?: number
   cycleStepTrigger?: WaitCondition

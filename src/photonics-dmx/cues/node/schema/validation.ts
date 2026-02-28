@@ -164,6 +164,7 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
     holdTime: { type: 'number', nullable: true, minimum: 0 },
     flashDurationIn: { type: 'number', nullable: true, minimum: 0 },
     flashDurationOut: { type: 'number', nullable: true, minimum: 0 },
+    endWait: { type: 'number', nullable: true, minimum: 0 },
     cycleTransitionDuration: { type: 'number', nullable: true, minimum: 0 },
     cycleStepTrigger: { type: 'string', nullable: true },
     cycleBaseColor: { type: 'string', nullable: true },

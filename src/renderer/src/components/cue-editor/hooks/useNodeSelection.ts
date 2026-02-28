@@ -14,7 +14,6 @@ import type {
   EffectEventListenerNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorNode } from '../lib/types'
-import { calculateChainDuration } from '../lib/cueUtils'
 
 export type UseNodeSelectionParams = {
   nodes: EditorNode[]
@@ -61,8 +60,6 @@ export function useNodeSelection({
         nodes.find((n) => n.id === edge.source)?.data.kind === 'event',
     )
   }, [edges, nodes, selectedNode])
-
-  const chainDuration = useMemo(() => calculateChainDuration(nodes, edges), [nodes, edges])
 
   const handleNodeSelection = useCallback(({ nodes: selected }: { nodes: EditorNode[] }) => {
     setSelectedNodeId(selected[0]?.id ?? null)
@@ -185,6 +182,5 @@ export function useNodeSelection({
     updateSelectedNode,
     selectedNode,
     selectedActionHasEventParent,
-    chainDuration,
   }
 }

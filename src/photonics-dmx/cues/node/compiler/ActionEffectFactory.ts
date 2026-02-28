@@ -451,6 +451,7 @@ export class ActionEffectFactory {
         const holdTime = typeof cfg.holdTime === 'number' ? cfg.holdTime : 100
         const durationIn = typeof cfg.flashDurationIn === 'number' ? cfg.flashDurationIn : 50
         const durationOut = typeof cfg.flashDurationOut === 'number' ? cfg.flashDurationOut : 100
+        const endWait = typeof cfg.endWait === 'number' ? cfg.endWait : 0
         effect = getEffectFlashColor({
           lights,
           layer,
@@ -458,7 +459,7 @@ export class ActionEffectFactory {
           startTrigger: waitFor,
           startWait: waitForTime,
           endTrigger: 'delay',
-          endWait: 0,
+          endWait,
           holdTime,
           durationIn,
           durationOut,
