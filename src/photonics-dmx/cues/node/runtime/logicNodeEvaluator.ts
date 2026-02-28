@@ -115,8 +115,17 @@ export function evaluateLogicNode(
         return 'number'
       }
 
-      const leftType = resolveType(logicNode.left)
-      const rightType = resolveType(logicNode.right)
+      let leftType = resolveType(logicNode.left)
+      let rightType = resolveType(logicNode.right)
+
+      // When one side is a variable (strongly typed) and the other is a literal,
+      // coerce the literal's effective type to match -- prevents JSON serialisation
+      // artefacts (e.g. "1" instead of 1) from changing comparison semantics.
+      if (logicNode.left?.source === 'variable' && logicNode.right?.source === 'literal') {
+        rightType = leftType
+      } else if (logicNode.left?.source === 'literal' && logicNode.right?.source === 'variable') {
+        leftType = rightType
+      }
 
       const useStringCompare =
         leftType === 'string' ||
@@ -168,12 +177,7 @@ export function evaluateLogicNode(
 
       const branch = outcome ? 'true' : 'false'
       const targeted = edges.filter((edge) => edge.fromPort === branch)
-
-      if (targeted.length > 0) {
-        return targeted.map((edge) => edge.to)
-      }
-
-      return edges.map((edge) => edge.to)
+      return targeted.map((edge) => edge.to)
     }
 
     case 'cue-data': {

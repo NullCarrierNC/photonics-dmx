@@ -375,10 +375,7 @@ export class AudioNodeCue implements IAudioCue {
         }
         const branch = outcome ? 'true' : 'false'
         const targeted = edges.filter((edge) => edge.fromPort === branch)
-        if (targeted.length > 0) {
-          return targeted.map((edge) => edge.to)
-        }
-        return edges.map((edge) => edge.to)
+        return targeted.map((edge) => edge.to)
       }
     }
 
