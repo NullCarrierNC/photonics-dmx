@@ -29,6 +29,7 @@ import {
   VariableDefinition,
   ValueSource,
 } from '../../types/nodeCueTypes'
+import type { Connection } from '../../types/nodeCueTypes'
 import { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { ExecutionState, VariableValue } from './executionTypes'
@@ -36,7 +37,12 @@ import { EffectRegistry } from './EffectRegistry'
 import { EffectExecutionEngine } from './EffectExecutionEngine'
 
 // Import refactored modules
-import { resolveValue, resolveLocationGroups, resolveLightTarget } from './valueResolver'
+import {
+  resolveValue,
+  resolveLocationGroups,
+  resolveLightTarget,
+  getVariableStore,
+} from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -310,17 +316,11 @@ export class NodeExecutionEngine {
     const { actionMap, logicMap, eventRaiserMap, effectRaiserMap } = this.compiledCue
 
     // Prevent re-execution of any node within the same context (avoids infinite loops from cycles)
-    // Exception: for-each-light is not marked visited when returning "each" so the loop can re-enter
-    const logicNodeForVisit = logicMap.get(nodeId)
-    const isForEachLight = logicNodeForVisit?.logicType === 'for-each-light'
     if (context.hasVisited(nodeId)) {
       this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`)
       return
     }
-
-    if (!isForEachLight) {
-      context.markVisited(nodeId)
-    }
+    context.markVisited(nodeId)
     this.emitNodeExecution('activated', nodeId)
 
     // Check if it's an action node
@@ -554,8 +554,13 @@ export class NodeExecutionEngine {
           return
         }
 
-        // Stable effect name so repeated submissions (e.g. cue-called) queue in the sequencer
-        const effectName = `${this.cueId}:${actionNode.id}`
+        // Stable effect name so repeated submissions (e.g. cue-called) queue in the sequencer.
+        // Inside for-each-light, append iteration index for unique per-light effect names.
+        const iterIdx = context.getForEachIterationIndex()
+        const effectName =
+          iterIdx >= 0
+            ? `${this.cueId}:${actionNode.id}:${iterIdx}`
+            : `${this.cueId}:${actionNode.id}`
 
         this.debugLog(`submit effect nodeId=${actionNode.id} ctx=${context.id}`, {
           effectName,
@@ -659,7 +664,11 @@ export class NodeExecutionEngine {
         return
       }
 
-      const chainEffectName = `${this.cueId}:chain:${actionChain[0].id}`
+      const iterIdx = context.getForEachIterationIndex()
+      const chainEffectName =
+        iterIdx >= 0
+          ? `${this.cueId}:chain:${actionChain[0].id}:${iterIdx}`
+          : `${this.cueId}:chain:${actionChain[0].id}`
       this.debugLog(`submit action-chain ctx=${context.id}`, {
         effectName: chainEffectName,
         layer: chainData.baseLayer,
@@ -744,6 +753,12 @@ export class NodeExecutionEngine {
         return
       }
 
+      // Handle for-each-light in the engine
+      if (logicNode.logicType === 'for-each-light') {
+        this.executeForEachLight(logicNode, nodeId, context)
+        return
+      }
+
       const { adjacency } = this.compiledCue
       const edges = adjacency.get(nodeId) ?? []
 
@@ -760,15 +775,7 @@ export class NodeExecutionEngine {
 
       const nextNodes = evaluateLogicNode(logicNode, nodeId, edges, context, evaluatorContext)
 
-      // for-each-light: only mark visited when we took the "done" branch (state cleared), so loop can re-enter
-      if (
-        logicNode.logicType === 'for-each-light' &&
-        context.getForEachLightState(nodeId) === undefined
-      ) {
-        context.markVisited(nodeId)
-      } else if (logicNode.logicType !== 'for-each-light') {
-        context.markVisited(nodeId)
-      }
+      context.markVisited(nodeId)
 
       // Logic nodes execute immediately - continue to next nodes without waiting
       if (nextNodes.length > 0) {
@@ -1020,6 +1027,108 @@ export class NodeExecutionEngine {
 
     // Check if context is now complete
     if (context.tryComplete()) {
+      context.dispose()
+    }
+  }
+
+  /**
+   * Collect all node IDs reachable from startNodeIds via the adjacency graph, excluding excludeNodeId.
+   * Used to find for-each-light body nodes so they can be unmarked between iterations.
+   */
+  private collectReachableNodes(
+    adjacency: Map<string, Connection[]>,
+    startNodeIds: string[],
+    excludeNodeId: string,
+  ): Set<string> {
+    const result = new Set<string>()
+    const queue = [...startNodeIds]
+    while (queue.length > 0) {
+      const id = queue.shift()!
+      if (id === excludeNodeId) continue
+      if (result.has(id)) continue
+      result.add(id)
+      const outgoing = adjacency.get(id) ?? []
+      for (const conn of outgoing) {
+        queue.push(conn.to)
+      }
+    }
+    return result
+  }
+
+  /**
+   * Execute a for-each-light node by eagerly iterating all lights, running the body for each.
+   * Prevents premature context completion and ensures unique effect names per iteration.
+   */
+  private executeForEachLight(
+    logicNode: LogicNode & { logicType: 'for-each-light' },
+    nodeId: string,
+    context: ExecutionContext,
+  ): void {
+    const { adjacency } = this.compiledCue
+    const edges = adjacency.get(nodeId) ?? []
+    const eachEdges = edges.filter((e) => e.fromPort === 'each')
+    const doneEdges = edges.filter((e) => e.fromPort === 'done')
+    const eachTargets = eachEdges.length > 0 ? eachEdges.map((e) => e.to) : []
+    const doneTargets = doneEdges.length > 0 ? doneEdges.map((e) => e.to) : []
+
+    const getVarStore = (varName: string) =>
+      getVariableStore(
+        varName,
+        this.variableDefinitions,
+        this.cueLevelVarStore,
+        this.groupLevelVarStore,
+      )
+
+    const sourceVar = getVarStore(logicNode.sourceVariable).get(logicNode.sourceVariable)
+    if (!sourceVar || sourceVar.type !== 'light-array') {
+      this.debugLog(
+        `for-each-light ${nodeId}: source "${logicNode.sourceVariable}" is not a light-array`,
+        {
+          sourceVar: sourceVar ?? null,
+        },
+      )
+      context.markVisited(nodeId)
+      if (doneTargets.length > 0) {
+        this.continueExecution(doneTargets, context)
+      } else if (context.tryComplete()) {
+        context.dispose()
+      }
+      this.emitNodeExecution('deactivated', nodeId)
+      return
+    }
+
+    const lightsArray = sourceVar.value as TrackedLight[]
+    const length = lightsArray.length
+
+    const bodyNodeIds = this.collectReachableNodes(adjacency, eachTargets, nodeId)
+    context.setForEachLightState(nodeId, { index: 0, length })
+
+    for (let i = 0; i < length; i++) {
+      const currentLight = lightsArray[i]
+      const currentLightArray = currentLight ? [currentLight] : []
+      getVarStore(logicNode.currentLightVariable).set(logicNode.currentLightVariable, {
+        type: 'light-array',
+        value: currentLightArray,
+      })
+      getVarStore(logicNode.currentIndexVariable).set(logicNode.currentIndexVariable, {
+        type: 'number',
+        value: i,
+      })
+      context.setForEachIterationIndex(i)
+      for (const bodyId of bodyNodeIds) {
+        context.unmarkVisited(bodyId)
+      }
+      this.continueExecution(eachTargets, context)
+    }
+
+    context.clearForEachLightState(nodeId)
+    context.setForEachIterationIndex(-1)
+    context.markVisited(nodeId)
+
+    this.emitNodeExecution('deactivated', nodeId)
+    if (doneTargets.length > 0) {
+      this.continueExecution(doneTargets, context)
+    } else if (context.tryComplete()) {
       context.dispose()
     }
   }
