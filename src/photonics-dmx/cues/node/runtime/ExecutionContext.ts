@@ -18,6 +18,8 @@ export class ExecutionContext {
   private activeNodes: Map<string, ActionNode> = new Map() // Nodes waiting for completion
   /** Per-node state for for-each-light iteration (index for next iteration, length). */
   private forEachLightState: Map<string, { index: number; length: number }> = new Map()
+  /** Current iteration index when inside a for-each-light body (for unique effect naming). */
+  private forEachIterationIndex: number = -1
   private completed = false
   private activeTimers: Set<ReturnType<typeof setTimeout>> = new Set()
 
@@ -75,6 +77,13 @@ export class ExecutionContext {
   }
 
   /**
+   * Clear a node from the visited set so it can be re-executed (e.g. for-each-light body nodes each iteration).
+   */
+  public unmarkVisited(nodeId: string): void {
+    this.visitedNodes.delete(nodeId)
+  }
+
+  /**
    * Get iteration state for a for-each-light node. Returns undefined if not yet started.
    */
   public getForEachLightState(nodeId: string): { index: number; length: number } | undefined {
@@ -93,6 +102,20 @@ export class ExecutionContext {
    */
   public clearForEachLightState(nodeId: string): void {
     this.forEachLightState.delete(nodeId)
+  }
+
+  /**
+   * Get the current for-each-light iteration index (-1 when not inside a for-each body).
+   */
+  public getForEachIterationIndex(): number {
+    return this.forEachIterationIndex
+  }
+
+  /**
+   * Set the current for-each-light iteration index (used for unique effect naming).
+   */
+  public setForEachIterationIndex(index: number): void {
+    this.forEachIterationIndex = index
   }
 
   /**
@@ -160,10 +183,11 @@ export class ExecutionContext {
   /**
    * If execution is complete, fire the context-complete callback once and return true.
    * Safe to call multiple times; callback fires at most once.
-   * Returns false while there are active actions, even if completed was set earlier.
+   * Returns false while there are active actions or a for-each-light loop is in progress.
    */
   public tryComplete(): boolean {
     if (this.hasActiveActions()) return false
+    if (this.forEachLightState.size > 0) return false
     if (this.completed) return true
     this.completed = true
     if (this.onContextCompleteCallback) {
@@ -198,6 +222,7 @@ export class ExecutionContext {
     this.phase = 0
     this.activeNodes.clear()
     this.forEachLightState.clear()
+    this.forEachIterationIndex = -1
     this.onNodeCompleteCallback = undefined
     this.onContextCompleteCallback = undefined
   }
