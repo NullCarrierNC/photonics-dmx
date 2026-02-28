@@ -264,6 +264,9 @@ export class NodeExecutionEngine {
 
       this.activeContexts.set(context.id, context)
 
+      this.emitNodeExecution('activated', eventNode.id)
+      this.emitNodeExecution('deactivated', eventNode.id)
+
       // Get outgoing edges from event node and start execution
       const { adjacency } = this.compiledCue
       const outgoing = adjacency.get(eventNode.id) ?? []
@@ -980,6 +983,9 @@ export class NodeExecutionEngine {
       })
 
       this.activeContexts.set(context.id, context)
+
+      this.emitNodeExecution('activated', listenerNode.id)
+      this.emitNodeExecution('deactivated', listenerNode.id)
 
       // Get listener's outgoing edges and start execution
       const { adjacency } = this.compiledCue
