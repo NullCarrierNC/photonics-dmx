@@ -27,8 +27,22 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected })
   const duration = action.timing?.duration
   const durationValue = duration?.source === 'literal' ? Number(duration.value) : 0
 
-  const waitFor = getConditionLabel(action.timing?.waitForCondition ?? 'none', waitForTime)
-  const waitUntil = getConditionLabel(action.timing?.waitUntilCondition ?? 'none', waitUntilTime)
+  const waitForCond = action.timing?.waitForCondition
+  const waitForCondStr =
+    waitForCond?.source === 'literal'
+      ? String(waitForCond.value)
+      : waitForCond?.source === 'variable'
+        ? waitForCond.name
+        : 'none'
+  const waitUntilCond = action.timing?.waitUntilCondition
+  const waitUntilCondStr =
+    waitUntilCond?.source === 'literal'
+      ? String(waitUntilCond.value)
+      : waitUntilCond?.source === 'variable'
+        ? waitUntilCond.name
+        : 'none'
+  const waitFor = getConditionLabel(waitForCondStr, waitForTime)
+  const waitUntil = getConditionLabel(waitUntilCondStr, waitUntilTime)
 
   // Handle brightness, target groups, and filter which are now ValueSource
   const brightnessValue = action.color?.brightness

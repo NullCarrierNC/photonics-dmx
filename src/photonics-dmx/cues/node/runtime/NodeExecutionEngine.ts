@@ -45,6 +45,7 @@ import {
 } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
+import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { sendToAllWindows } from '../../../../main/utils/windowUtils'
 
@@ -826,10 +827,10 @@ export class NodeExecutionEngine {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 0 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -896,8 +897,13 @@ export class NodeExecutionEngine {
         return
       }
 
+      // Inside a for-each-light loop each iteration must get its own engine instance.
+      // Outside loops the iteration index is -1, so the key reduces to raiserNode.id.
+      const iterIdx = context.getForEachIterationIndex()
+      const engineKey = iterIdx >= 0 ? `${raiserNode.id}:${iterIdx}` : raiserNode.id
+
       // Check if this effect raiser already has an active execution
-      const existingEngine = this.activeEffectEngines.get(raiserNode.id)
+      const existingEngine = this.activeEffectEngines.get(engineKey)
       if (existingEngine) {
         // If the existing engine still has active contexts, block re-triggering
         if (existingEngine.hasActiveContexts()) {
@@ -908,7 +914,7 @@ export class NodeExecutionEngine {
         } else {
           // Engine exists but no active contexts - clean it up and allow new trigger
           this.debugLog(`Effect raiser ${raiserNode.id} cleaning up completed engine`)
-          this.activeEffectEngines.delete(raiserNode.id)
+          this.activeEffectEngines.delete(engineKey)
         }
       }
 
@@ -946,11 +952,11 @@ export class NodeExecutionEngine {
       // Set up completion callback to remove from tracking when effect becomes idle
       effectEngine.setOnIdle(() => {
         this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`)
-        this.activeEffectEngines.delete(raiserNode.id)
+        this.activeEffectEngines.delete(engineKey)
       })
 
       // Store the engine in active tracking
-      this.activeEffectEngines.set(raiserNode.id, effectEngine)
+      this.activeEffectEngines.set(engineKey, effectEngine)
 
       // Trigger effect (blocking for this raiser node, but non-blocking for cue execution)
       effectEngine.triggerEffect(context.cueData)
@@ -1032,27 +1038,15 @@ export class NodeExecutionEngine {
   }
 
   /**
-   * Collect all node IDs reachable from startNodeIds via the adjacency graph, excluding excludeNodeId.
-   * Used to find for-each-light body nodes so they can be unmarked between iterations.
+   * Collect all node IDs reachable from startNodeIds, excluding excludeNodeId.
+   * Delegates to shared engineUtils for de-duplication.
    */
   private collectReachableNodes(
     adjacency: Map<string, Connection[]>,
     startNodeIds: string[],
     excludeNodeId: string,
   ): Set<string> {
-    const result = new Set<string>()
-    const queue = [...startNodeIds]
-    while (queue.length > 0) {
-      const id = queue.shift()!
-      if (id === excludeNodeId) continue
-      if (result.has(id)) continue
-      result.add(id)
-      const outgoing = adjacency.get(id) ?? []
-      for (const conn of outgoing) {
-        queue.push(conn.to)
-      }
-    }
-    return result
+    return collectReachableNodes(adjacency, startNodeIds, excludeNodeId)
   }
 
   /**

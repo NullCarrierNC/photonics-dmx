@@ -310,6 +310,20 @@ export class ActionEffectFactory {
       if (varValue?.type === 'light-array') {
         return varValue.value as TrackedLight[]
       }
+
+      // If it's a string variable, treat as group name(s) and resolve with filter
+      if (varValue && typeof varValue.value === 'string') {
+        const groupsStr = varValue.value || 'front'
+        const groups = groupsStr.split(',').map((g) => g.trim()) as LocationGroup[]
+        let filter: LightTarget = 'all'
+        if (target.filter?.source === 'variable' && variableResolver) {
+          const filterVar = variableResolver(target.filter.name)
+          if (filterVar?.value) filter = String(filterVar.value) as LightTarget
+        } else if (target.filter?.source === 'literal') {
+          filter = String(target.filter.value) as LightTarget
+        }
+        return lightManager.getLights(groups, filter)
+      }
     }
 
     // Standard group/filter resolution

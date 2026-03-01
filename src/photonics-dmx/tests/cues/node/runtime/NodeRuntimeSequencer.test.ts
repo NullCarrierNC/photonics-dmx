@@ -93,10 +93,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 30 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
       layer: { source: 'literal', value: 1 },
@@ -116,10 +116,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 30 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
       layer: { source: 'literal', value: 5 },
@@ -210,10 +210,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'beat',
+        waitForCondition: { source: 'literal', value: 'beat' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -310,10 +310,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -413,10 +413,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -494,10 +494,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -572,10 +572,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'beat',
+        waitUntilCondition: { source: 'literal', value: 'beat' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -650,10 +650,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'beat',
+        waitUntilCondition: { source: 'literal', value: 'beat' },
         waitUntilConditionCount: { source: 'literal', value: 2 },
         waitUntilTime: { source: 'literal', value: 0 },
       },
@@ -728,10 +728,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'measure',
+        waitForCondition: { source: 'literal', value: 'measure' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -750,10 +750,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'keyframe',
+        waitForCondition: { source: 'literal', value: 'keyframe' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -837,11 +837,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'measure',
+        waitForCondition: { source: 'literal', value: 'measure' },
         waitForConditionCount: { source: 'literal', value: 2 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -860,11 +860,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'keyframe',
+        waitForCondition: { source: 'literal', value: 'keyframe' },
         waitForConditionCount: { source: 'literal', value: 2 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -956,11 +956,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'drum-red',
+        waitForCondition: { source: 'literal', value: 'drum-red' },
         waitForConditionCount: { source: 'literal', value: 2 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -979,11 +979,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'guitar-green',
+        waitForCondition: { source: 'literal', value: 'guitar-green' },
         waitForConditionCount: { source: 'literal', value: 1 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1071,11 +1071,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'bass-blue',
+        waitForCondition: { source: 'literal', value: 'bass-blue' },
         waitForConditionCount: { source: 'literal', value: 2 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1094,11 +1094,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'keys-yellow',
+        waitForCondition: { source: 'literal', value: 'keys-yellow' },
         waitForConditionCount: { source: 'literal', value: 1 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1196,10 +1196,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'variable', name: 'durationMs', fallback: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1401,10 +1401,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1499,10 +1499,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1609,10 +1609,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1728,10 +1728,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1824,10 +1824,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1846,10 +1846,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1941,10 +1941,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -2026,10 +2026,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
       config: {
@@ -2126,10 +2126,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
       config: {
@@ -2227,10 +2227,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -2249,10 +2249,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }

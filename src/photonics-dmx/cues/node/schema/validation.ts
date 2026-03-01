@@ -39,18 +39,8 @@ import {
   YargNodeCueDefinition,
   YargNodeCueFile,
 } from '../../types/nodeCueTypes'
-import {
-  WaitCondition,
-  YargEventType,
-  YARG_EVENT_TYPES as YARG_EVENT_TYPES_SOURCE,
-} from '../../../types'
-import {
-  WAIT_CONDITIONS_WITH_NONE_DELAY,
-  AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY,
-} from '../../../constants/options'
-
-// Song-based wait conditions for action timing (excludes system events)
-const WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY]
+import { YargEventType, YARG_EVENT_TYPES as YARG_EVENT_TYPES_SOURCE } from '../../../types'
+import { AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY } from '../../../constants/options'
 
 // All event types for YARG event nodes (includes system events + song events)
 const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENT_TYPES_SOURCE]
@@ -130,11 +120,11 @@ const timingSchema: JSONSchemaType<ActionTimingConfig> = {
   required: ['waitForCondition', 'waitForTime', 'duration', 'waitUntilCondition', 'waitUntilTime'],
   additionalProperties: false,
   properties: {
-    waitForCondition: { type: 'string', enum: WAIT_CONDITIONS },
+    waitForCondition: valueSourceSchema,
     waitForTime: valueSourceSchema,
     waitForConditionCount: { ...valueSourceSchema, nullable: true },
     duration: valueSourceSchema,
-    waitUntilCondition: { type: 'string', enum: WAIT_CONDITIONS },
+    waitUntilCondition: valueSourceSchema,
     waitUntilTime: valueSourceSchema,
     waitUntilConditionCount: { ...valueSourceSchema, nullable: true },
     easing: { type: 'string', nullable: true },

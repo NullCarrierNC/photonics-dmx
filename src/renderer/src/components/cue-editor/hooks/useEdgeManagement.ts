@@ -79,7 +79,7 @@ export function useEdgeManagement({
             targetAction.timing = {
               ...createDefaultActionTiming(),
               ...(targetAction.timing ?? {}),
-              waitForCondition: inheritedWaitForCondition,
+              waitForCondition: { source: 'literal', value: inheritedWaitForCondition },
               waitForTime: { source: 'literal', value: 0 },
             }
           } else if (sourceNode.data.kind === 'action') {

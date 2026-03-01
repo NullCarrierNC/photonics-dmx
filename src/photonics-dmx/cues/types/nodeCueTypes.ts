@@ -363,11 +363,11 @@ export interface NodeColorSetting {
 }
 
 export interface ActionTimingConfig {
-  waitForCondition: WaitCondition
+  waitForCondition: ValueSource
   waitForTime: ValueSource
   waitForConditionCount?: ValueSource
   duration: ValueSource
-  waitUntilCondition: WaitCondition
+  waitUntilCondition: ValueSource
   waitUntilTime: ValueSource
   waitUntilConditionCount?: ValueSource
   easing?: string
@@ -418,10 +418,10 @@ export interface NodeActionConfig {
 }
 
 export const createDefaultActionTiming = (): ActionTimingConfig => ({
-  waitForCondition: 'none',
+  waitForCondition: { source: 'literal', value: 'none' },
   waitForTime: { source: 'literal', value: 0 },
   duration: { source: 'literal', value: 200 },
-  waitUntilCondition: 'none',
+  waitUntilCondition: { source: 'literal', value: 'none' },
   waitUntilTime: { source: 'literal', value: 0 },
   easing: 'linear',
   level: { source: 'literal', value: 1 },
