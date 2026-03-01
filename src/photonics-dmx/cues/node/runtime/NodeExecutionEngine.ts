@@ -838,7 +838,9 @@ export class NodeExecutionEngine {
 
       const timerId = setTimeout(() => {
         context.removeTimer(timerId)
-        if (context.hasVisited(nodeId)) {
+        // Guard on isActionActive rather: other blocking nodes (e.g. from a
+        // for-each-light body) can advance the execution phase while the delay waits
+        if (context.isActionActive(nodeId)) {
           this.debugLog(`delay complete nodeId=${nodeId} ctx=${context.id}`)
           this.emitNodeExecution('deactivated', nodeId)
           context.completeAction(nodeId)
@@ -908,8 +910,6 @@ export class NodeExecutionEngine {
         // If the existing engine still has active contexts, block re-triggering
         if (existingEngine.hasActiveContexts()) {
           this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`)
-          // Continue to next nodes (don't block the cue execution, just skip this trigger)
-          this.continueToNextNodes(raiserNode.id, context)
           return
         } else {
           // Engine exists but no active contexts - clean it up and allow new trigger
@@ -949,10 +949,16 @@ export class NodeExecutionEngine {
         context.cueData, // Pass caller's cue data
       )
 
-      // Set up completion callback to remove from tracking when effect becomes idle
+      // Set up completion callback: for persistent raisers, re-trigger immediately on idle.
+      // For non-persistent raisers, remove from tracking so the next cue-called can start fresh.
       effectEngine.setOnIdle(() => {
-        this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`)
-        this.activeEffectEngines.delete(engineKey)
+        if (raiserNode.isPersistent && this.activeEffectEngines.has(engineKey)) {
+          this.debugLog(`Effect raiser ${raiserNode.id} persistent: re-triggering`)
+          effectEngine.triggerEffect(context.cueData)
+        } else {
+          this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`)
+          this.activeEffectEngines.delete(engineKey)
+        }
       })
 
       // Store the engine in active tracking
@@ -1147,10 +1153,21 @@ export class NodeExecutionEngine {
 
   /**
    * Continue execution to the next nodes.
+   *
+   * Wraps the dispatch loop with beginBatch/endBatch so that a dead-end branch
+   * encountered partway through the batch cannot prematurely dispose the context
+   * before sibling branches have had a chance to register blocking nodes (e.g. delays).
    */
   private continueExecution(nodeIds: string[], context: ExecutionContext): void {
+    context.beginBatch()
     for (const nodeId of nodeIds) {
       this.executeNode(nodeId, context)
+    }
+    context.endBatch()
+    // After the batch completes, check whether the context is now done.
+    // This handles pure-logic flows where no blocking node was registered.
+    if (context.tryComplete()) {
+      context.dispose()
     }
   }
 

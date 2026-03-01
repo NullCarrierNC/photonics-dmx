@@ -160,9 +160,7 @@ export class EffectExecutionEngine {
     const nextNodes = outgoing.map((conn) => conn.to)
 
     if (nextNodes.length > 0) {
-      for (const nodeId of nextNodes) {
-        this.executeNode(nodeId, context)
-      }
+      this.continueExecution(nextNodes, context)
     } else {
       // No children - context completes immediately
       this.activeContexts.delete(context.id)
@@ -503,13 +501,7 @@ export class EffectExecutionEngine {
     )
     if (!sourceVar || sourceVar.type !== 'light-array') {
       context.markVisited(nodeId)
-      if (doneTargets.length > 0) {
-        for (const targetId of doneTargets) {
-          this.executeNode(targetId, context)
-        }
-      } else if (context.tryComplete()) {
-        context.dispose()
-      }
+      this.continueExecution(doneTargets, context)
       this.emitNodeExecution('deactivated', nodeId)
       return
     }
@@ -535,9 +527,7 @@ export class EffectExecutionEngine {
       for (const bodyId of bodyNodeIds) {
         context.unmarkVisited(bodyId)
       }
-      for (const targetId of eachTargets) {
-        this.executeNode(targetId, context)
-      }
+      this.continueExecution(eachTargets, context)
     }
 
     context.clearForEachLightState(nodeId)
@@ -545,13 +535,7 @@ export class EffectExecutionEngine {
     context.markVisited(nodeId)
 
     this.emitNodeExecution('deactivated', nodeId)
-    if (doneTargets.length > 0) {
-      for (const targetId of doneTargets) {
-        this.executeNode(targetId, context)
-      }
-    } else if (context.tryComplete()) {
-      context.dispose()
-    }
+    this.continueExecution(doneTargets, context)
   }
 
   /**
@@ -588,16 +572,7 @@ export class EffectExecutionEngine {
       const nextNodes = evaluateLogicNode(logic, logic.id, edges, context, evaluatorContext)
 
       // Logic nodes execute immediately - continue to next nodes without waiting
-      if (nextNodes.length > 0) {
-        for (const nextNodeId of nextNodes) {
-          this.executeNode(nextNodeId, context)
-        }
-      } else {
-        // No more nodes, check if context is complete
-        if (context.tryComplete()) {
-          context.dispose()
-        }
-      }
+      this.continueExecution(nextNodes, context)
       this.emitNodeExecution('deactivated', logic.id)
     } catch (error) {
       console.error(`Error executing logic node ${logic.id}:`, error)
@@ -643,7 +618,9 @@ export class EffectExecutionEngine {
 
       const timerId = setTimeout(() => {
         context.removeTimer(timerId)
-        if (context.hasVisited(delayNode.id)) {
+        // Guard on isActionActive other blocking nodes (e.g. from
+        // a for-each-light body) can advance the execution phase while the delay waits
+        if (context.isActionActive(delayNode.id)) {
           this.emitNodeExecution('deactivated', delayNode.id)
           context.advancePhase()
           context.completeAction(delayNode.id)
@@ -701,9 +678,27 @@ export class EffectExecutionEngine {
 
     const { adjacency } = this.compiledEffect
     const outgoing = adjacency.get(listener.id) ?? []
+    this.continueExecution(
+      outgoing.map((conn) => conn.to),
+      context,
+    )
+  }
 
-    for (const conn of outgoing) {
-      this.executeNode(conn.to, context)
+  /**
+   * Dispatch execution to a list of node IDs, guarded by a batch-depth counter.
+   *
+   * Incrementing batchDepth before the loop prevents a dead-end branch inside the
+   * batch from prematurely completing/disposing the context before sibling branches
+   * have had a chance to register blocking nodes (e.g. delays).
+   */
+  private continueExecution(nodeIds: string[], context: ExecutionContext): void {
+    context.beginBatch()
+    for (const nodeId of nodeIds) {
+      this.executeNode(nodeId, context)
+    }
+    context.endBatch()
+    if (context.tryComplete()) {
+      context.dispose()
     }
   }
 
@@ -713,15 +708,10 @@ export class EffectExecutionEngine {
   private continueToNextNodes(nodeId: string, context: ExecutionContext): void {
     const { adjacency } = this.compiledEffect
     const outgoing = adjacency.get(nodeId) ?? []
-
-    for (const conn of outgoing) {
-      this.executeNode(conn.to, context)
-    }
-
-    // Check if context is complete (callback already ran inside tryComplete)
-    if (context.tryComplete()) {
-      context.dispose()
-    }
+    this.continueExecution(
+      outgoing.map((conn) => conn.to),
+      context,
+    )
   }
 
   /**

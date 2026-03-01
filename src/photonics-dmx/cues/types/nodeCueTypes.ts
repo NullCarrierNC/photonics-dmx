@@ -237,6 +237,9 @@ export interface EffectRaiserNode {
   inputs?: string[]
   outputs?: string[]
   parameterValues?: Record<string, ValueSource> // Parameter name -> value
+  /** When true, the effect automatically re-triggers when it completes, creating a continuous loop.
+   *  Used for effects like sweeps or cross-fades that should run indefinitely until the cue stops. */
+  isPersistent?: boolean
 }
 
 export type NotesStyle = 'notes' | 'info' | 'important'
