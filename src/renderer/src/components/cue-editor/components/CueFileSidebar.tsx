@@ -60,14 +60,14 @@ const CueFileSidebar: React.FC<Props> = ({
   const displayFileList = isEffectMode ? effectFileList : fileList
 
   return (
-    <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between mb-3">
+    <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-hidden flex flex-col flex-1 min-h-0">
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <h3 className="font-semibold">Files ({mode.toUpperCase()})</h3>
         <button className="text-xs text-blue-500 hover:underline" onClick={onReload}>
           Reload
         </button>
       </div>
-      <div className="space-y-2 overflow-y-auto max-h-[180px]">
+      <div className="space-y-2 overflow-y-auto flex-1 min-h-0">
         {displayFileList.length === 0 && (
           <p className="text-xs text-gray-500">No files found. Create one to get started.</p>
         )}
@@ -88,8 +88,8 @@ const CueFileSidebar: React.FC<Props> = ({
           </button>
         ))}
       </div>
-      <div className="mt-4 border-t border-gray-200 dark:border-gray-800 pt-4 flex-1 overflow-y-auto">
-        <div className="flex justify-between items-center mb-2">
+      <div className="mt-4 border-t border-gray-200 dark:border-gray-800 pt-4 flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex justify-between items-center mb-2 flex-shrink-0">
           <h3 className="font-semibold text-sm">{listLabel}</h3>
           <button
             className="text-blue-500 text-xs hover:underline"
@@ -97,7 +97,7 @@ const CueFileSidebar: React.FC<Props> = ({
             {addLabel}
           </button>
         </div>
-        <div className="space-y-1 text-xs">
+        <div className="space-y-1 text-xs overflow-y-auto flex-1 min-h-0">
           {items.map((item) => (
             <div key={item.id} className="flex items-center gap-2">
               <button

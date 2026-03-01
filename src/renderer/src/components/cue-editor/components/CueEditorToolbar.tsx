@@ -1,10 +1,12 @@
 import React from 'react'
 
-export type EditorDropdownMode = 'yarg' | 'audio' | 'yarg-effect' | 'audio-effect'
+export type CueTypeMode = 'yarg' | 'audio'
 
 type CueEditorToolbarProps = {
-  dropdownValue: EditorDropdownMode
-  onModeChange: (value: EditorDropdownMode) => void
+  cueMode: CueTypeMode
+  isEffectMode: boolean
+  onCueModeChange: (mode: CueTypeMode) => void
+  onEffectToggle: (isEffect: boolean) => void
   onNewFile: () => void
   onSave: () => void
   onImport: () => void
@@ -23,9 +25,18 @@ const secondaryButton =
   'px-3 py-1 text-xs rounded bg-gray-200 dark:bg-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-700'
 const dangerButton = 'px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-500'
 
+const segmentActive =
+  'px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium'
+const segmentInactive =
+  'px-3 py-1 text-xs border border-l-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+const segmentLeft = 'rounded-l'
+const segmentRight = 'rounded-r'
+
 const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
-  dropdownValue,
-  onModeChange,
+  cueMode,
+  isEffectMode,
+  onCueModeChange,
+  onEffectToggle,
   onNewFile,
   onSave,
   onImport,
@@ -38,22 +49,46 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
   exportLabel,
   deleteLabel,
 }) => (
-  <div className="flex justify-between items-center gap-4">
-    <div className="flex items-center gap-2">
-      <label className="font-semibold text-base">Mode</label>
-      <select
-        value={dropdownValue}
-        onChange={(event) => onModeChange(event.target.value as EditorDropdownMode)}
-        className="rounded border border-gray-300 px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-600">
-        <optgroup label="Cues">
-          <option value="yarg">YARG Node Cues</option>
-          <option value="audio">Audio Node Cues</option>
-        </optgroup>
-        <optgroup label="Effects">
-          <option value="yarg-effect">YARG Effects</option>
-          <option value="audio-effect">Audio Effects</option>
-        </optgroup>
-      </select>
+  <div className="flex justify-between items-center gap-4 flex-wrap">
+    <div className="flex items-center gap-4">
+      <div className="flex items-center gap-0">
+        <button
+          type="button"
+          className={`${cueMode === 'yarg' ? segmentActive : segmentInactive} ${segmentLeft}`}
+          onClick={() => onCueModeChange('yarg')}>
+          YARG
+        </button>
+        <button
+          type="button"
+          className={`${cueMode === 'audio' ? segmentActive : segmentInactive} ${segmentRight}`}
+          onClick={() => onCueModeChange('audio')}>
+          Audio
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <span
+          className={`text-xs font-medium ${!isEffectMode ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+          Cues
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isEffectMode}
+          onClick={() => onEffectToggle(!isEffectMode)}
+          className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+            isEffectMode ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+          }`}>
+          <span
+            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${
+              isEffectMode ? 'translate-x-4' : 'translate-x-0.5'
+            }`}
+          />
+        </button>
+        <span
+          className={`text-xs font-medium ${isEffectMode ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+          Effects
+        </span>
+      </div>
     </div>
     <div className="flex gap-2">
       <button className={secondaryButton} onClick={onNewFile}>

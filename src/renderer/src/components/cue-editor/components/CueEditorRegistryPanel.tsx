@@ -43,7 +43,7 @@ const CueEditorRegistryPanel: React.FC<CueEditorRegistryPanelProps> = ({
   onEffectsChange,
 }) => (
   <div
-    className={`bg-white dark:bg-gray-900 rounded-lg shadow-inner overflow-hidden flex flex-col ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
+    className={`bg-white dark:bg-gray-900 rounded-lg shadow-inner overflow-hidden flex flex-col flex-1 min-h-0 ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
     <div className="flex border-b border-gray-200 dark:border-gray-700">
       <button
         className={`flex-1 px-3 py-2 text-xs font-medium ${

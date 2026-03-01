@@ -1,4 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
+import { Group, Panel, Separator } from 'react-resizable-panels'
+import type { Layout } from 'react-resizable-panels'
 import 'reactflow/dist/style.css'
 import CueFlowCanvas from '../components/cue-editor/components/CueFlowCanvas'
 import CueJsonEditor from '../components/cue-editor/components/CueJsonEditor'
@@ -52,8 +54,53 @@ type EditorCueOrEffect =
   | null
 import { readEffectFile, showItemInFolder } from '../ipcApi'
 
+const SIDEBAR_LAYOUT_KEY = 'photonics.nodeCueEditor.sidebarLayout'
+// Original grid was minmax(260px,300px) | 2fr | minmax(260px,400px) — approximate as %
+const DEFAULT_SIDEBAR_LAYOUT: Layout = { left: 25, center: 42, right: 33 }
+
+function getStoredSidebarLayout(): Layout | null {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null
+    const raw = window.localStorage.getItem(SIDEBAR_LAYOUT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Layout
+    if (!parsed || typeof parsed !== 'object') return null
+    const left = Number(parsed.left)
+    const center = Number(parsed.center)
+    const right = Number(parsed.right)
+    const sum = left + center + right
+    if (
+      Number.isNaN(left) ||
+      Number.isNaN(center) ||
+      Number.isNaN(right) ||
+      left < 15 ||
+      right < 15 ||
+      center < 25 ||
+      sum < 99 ||
+      sum > 101
+    ) {
+      return null
+    }
+    return { left, center, right }
+  } catch {
+    return null
+  }
+}
+
+function setStoredSidebarLayout(layout: Layout): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return
+    window.localStorage.setItem(SIDEBAR_LAYOUT_KEY, JSON.stringify(layout))
+  } catch {
+    // Storage might be unavailable
+  }
+}
+
 const CueEditor: React.FC = () => {
   const [registryTab, setRegistryTab] = useState<'variables' | 'events' | 'effects'>('variables')
+  const [sidebarLayout] = useState<Layout>(
+    () => getStoredSidebarLayout() ?? { ...DEFAULT_SIDEBAR_LAYOUT },
+  )
   const [showNewFileModal, setShowNewFileModal] = useState(false)
   const [showJsonEditor, setShowJsonEditor] = useState(false)
   const [jsonEditorDirty, setJsonEditorDirty] = useState(false)
@@ -111,13 +158,23 @@ const CueEditor: React.FC = () => {
     onError: (message) => showToast(message, 'error'),
   })
 
-  // Compute the current dropdown value based on editor mode
-  const dropdownValue =
-    editorDoc?.mode === 'effect'
-      ? activeMode === 'yarg'
-        ? 'yarg-effect'
-        : 'audio-effect'
-      : activeMode
+  const cueMode = mode
+  const isEffectMode = editorDoc?.mode === 'effect'
+
+  const handleCueModeChange = useCallback(
+    (mode: 'yarg' | 'audio') => {
+      handleModeChange(isEffectMode ? (mode === 'yarg' ? 'yarg-effect' : 'audio-effect') : mode)
+    },
+    [handleModeChange, isEffectMode],
+  )
+  const handleEffectToggle = useCallback(
+    (isEffect: boolean) => {
+      handleModeChange(
+        isEffect ? (activeMode === 'yarg' ? 'yarg-effect' : 'audio-effect') : activeMode,
+      )
+    },
+    [handleModeChange, activeMode],
+  )
 
   const {
     nodes,
@@ -557,8 +614,6 @@ const CueEditor: React.FC = () => {
   const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio
   const effectFiles = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
 
-  // Determine if we're in effect mode
-  const isEffectMode = editorDoc?.mode === 'effect'
   const hasFile = !!editorDoc?.path
 
   const newFileLabel = isEffectMode ? 'New Effect File' : 'New Cue File'
@@ -569,8 +624,10 @@ const CueEditor: React.FC = () => {
   return (
     <div className="p-4 space-y-4 text-sm h-full flex flex-col">
       <CueEditorToolbar
-        dropdownValue={dropdownValue}
-        onModeChange={handleModeChange}
+        cueMode={cueMode}
+        isEffectMode={isEffectMode}
+        onCueModeChange={handleCueModeChange}
+        onEffectToggle={handleEffectToggle}
         onNewFile={() => setShowNewFileModal(true)}
         onSave={handleSave}
         onImport={handleImport}
@@ -584,12 +641,17 @@ const CueEditor: React.FC = () => {
         deleteLabel={deleteLabel}
       />
 
-      <div
-        className="grid gap-4 flex-1 min-h-0"
-        style={{
-          gridTemplateColumns: 'minmax(260px, 300px) minmax(50%, 2fr) minmax(260px, 400px)',
-        }}>
-        <div className="flex flex-col gap-4 overflow-hidden">
+      <Group
+        className="flex-1 min-h-0"
+        orientation="horizontal"
+        defaultLayout={sidebarLayout}
+        onLayoutChanged={setStoredSidebarLayout}
+        resizeTargetMinimumSize={{ fine: 8, coarse: 24 }}>
+        <Panel
+          id="left"
+          minSize="15%"
+          maxSize="50%"
+          className="flex flex-col gap-4 overflow-hidden min-h-0">
           <CueFileSidebar
             mode={mode}
             fileList={fileList}
@@ -626,95 +688,102 @@ const CueEditor: React.FC = () => {
             getEventReferences={getEventReferences}
             onEffectsChange={handleEffectsChange}
           />
-        </div>
-
-        <section
-          className={`flex flex-col min-h-0 overflow-hidden bg-white dark:bg-gray-900 rounded-lg shadow-inner ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
-          <CueMetadataForm
-            filename={filename}
-            group={editorDoc?.file.group ?? null}
-            currentCue={currentCueDefinition}
-            currentEffect={currentEffectDefinition}
-            availableCueTypes={availableCueTypes}
-            activeMode={activeMode}
-            editorMode={editorDoc?.mode ?? 'cue'}
-            onGroupChange={updateGroupMeta}
-            onCueMetadataChange={updateCueMetadata}
-            onEffectMetadataChange={updateEffectMetadata}
-          />
-
-          {showJsonEditor && editorDoc?.mode === 'cue' && selectedCueId && currentCueDefinition ? (
-            <CueJsonEditor
-              cueDefinition={currentCueDefinition}
-              editorDoc={editorDoc}
-              selectedCueId={selectedCueId}
-              onSave={handleJsonEditorSave}
-              onCancel={() => {
-                setShowJsonEditor(false)
-                setJsonEditorDirty(false)
-              }}
-              onDirtyChange={setJsonEditorDirty}
+        </Panel>
+        <Separator className="w-2 shrink-0 rounded bg-gray-200 dark:bg-gray-700 hover:bg-blue-400 transition-colors data-[resize-handle-active]:bg-blue-500 cursor-col-resize min-w-2" />
+        <Panel id="center" minSize="30%" className="flex flex-col min-h-0 overflow-hidden">
+          <section
+            className={`flex flex-col flex-1 min-h-0 overflow-hidden bg-white dark:bg-gray-900 rounded-lg shadow-inner ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
+            <CueMetadataForm
+              filename={filename}
+              group={editorDoc?.file.group ?? null}
+              currentCue={currentCueDefinition}
+              currentEffect={currentEffectDefinition}
+              availableCueTypes={availableCueTypes}
+              activeMode={activeMode}
+              editorMode={editorDoc?.mode ?? 'cue'}
+              onGroupChange={updateGroupMeta}
+              onCueMetadataChange={updateCueMetadata}
+              onEffectMetadataChange={updateEffectMetadata}
             />
-          ) : (
-            <ActiveNodesContext.Provider value={activeNodeIds}>
-              <CueFlowCanvas
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={nodeTypes}
-                selectedCueName={currentCueDefinition?.name}
-                contextMenu={contextMenu}
-                paneContextMenu={paneContextMenu}
-                flowWrapperRef={flowWrapperRef}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onSelectionChange={handleNodeSelection}
-                onNodeContextMenu={handleNodeContextMenu}
-                onEdgeContextMenu={onEdgeContextMenu}
-                onPaneClick={closeContextMenu}
-                onPaneContextMenu={handlePaneContextMenu}
-                onRemoveNode={handleRemoveNode}
-                setReactFlowInstance={setReactFlowInstance}
-                isValidConnection={isValidConnection}
-                activeMode={activeMode}
-                editorMode={editorDoc?.mode ?? 'cue'}
-                addEventNode={addEventNode}
-                addActionNode={addActionNode}
-                addLogicNode={addLogicNode}
-                addEventRaiserNode={addEventRaiserNode}
-                addEventListenerNode={addEventListenerNode}
-                addEffectRaiserNode={addEffectRaiserNode}
-                addEffectListenerNode={addEffectListenerNode}
-                addNotesNode={addNotesNode}
-                onJsonToggle={() => setShowJsonEditor(true)}
-              />
-            </ActiveNodesContext.Provider>
-          )}
-          <CueEditorValidationErrors errors={validationErrors} />
-        </section>
 
-        <div className={`overflow-hidden ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
-          <NodeSidebar
-            activeMode={activeMode}
-            editorMode={editorDoc?.mode ?? 'cue'}
-            selectedNode={selectedNode}
-            selectedActionHasEventParent={selectedActionHasEventParent}
-            availableVariables={availableVariables}
-            availableEvents={availableEvents}
-            availableEffects={availableEffects}
-            currentEffect={currentEffectDefinition}
-            addEventNode={addEventNode}
-            addActionNode={addActionNode}
-            addLogicNode={addLogicNode}
-            addEventRaiserNode={addEventRaiserNode}
-            addEventListenerNode={addEventListenerNode}
-            addEffectRaiserNode={addEffectRaiserNode}
-            addEffectListenerNode={addEffectListenerNode}
-            addNotesNode={addNotesNode}
-            updateSelectedNode={updateSelectedNode}
-          />
-        </div>
-      </div>
+            {showJsonEditor &&
+            editorDoc?.mode === 'cue' &&
+            selectedCueId &&
+            currentCueDefinition ? (
+              <CueJsonEditor
+                cueDefinition={currentCueDefinition}
+                editorDoc={editorDoc}
+                selectedCueId={selectedCueId}
+                onSave={handleJsonEditorSave}
+                onCancel={() => {
+                  setShowJsonEditor(false)
+                  setJsonEditorDirty(false)
+                }}
+                onDirtyChange={setJsonEditorDirty}
+              />
+            ) : (
+              <ActiveNodesContext.Provider value={activeNodeIds}>
+                <CueFlowCanvas
+                  nodes={nodes}
+                  edges={edges}
+                  nodeTypes={nodeTypes}
+                  selectedCueName={currentCueDefinition?.name}
+                  contextMenu={contextMenu}
+                  paneContextMenu={paneContextMenu}
+                  flowWrapperRef={flowWrapperRef}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  onConnect={onConnect}
+                  onSelectionChange={handleNodeSelection}
+                  onNodeContextMenu={handleNodeContextMenu}
+                  onEdgeContextMenu={onEdgeContextMenu}
+                  onPaneClick={closeContextMenu}
+                  onPaneContextMenu={handlePaneContextMenu}
+                  onRemoveNode={handleRemoveNode}
+                  setReactFlowInstance={setReactFlowInstance}
+                  isValidConnection={isValidConnection}
+                  activeMode={activeMode}
+                  editorMode={editorDoc?.mode ?? 'cue'}
+                  addEventNode={addEventNode}
+                  addActionNode={addActionNode}
+                  addLogicNode={addLogicNode}
+                  addEventRaiserNode={addEventRaiserNode}
+                  addEventListenerNode={addEventListenerNode}
+                  addEffectRaiserNode={addEffectRaiserNode}
+                  addEffectListenerNode={addEffectListenerNode}
+                  addNotesNode={addNotesNode}
+                  onJsonToggle={() => setShowJsonEditor(true)}
+                />
+              </ActiveNodesContext.Provider>
+            )}
+            <CueEditorValidationErrors errors={validationErrors} />
+          </section>
+        </Panel>
+        <Separator className="w-2 shrink-0 rounded bg-gray-200 dark:bg-gray-700 hover:bg-blue-400 transition-colors data-[resize-handle-active]:bg-blue-500 cursor-col-resize min-w-2" />
+        <Panel id="right" minSize="15%" maxSize="50%" className="overflow-hidden">
+          <div className={`h-full ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
+            <NodeSidebar
+              activeMode={activeMode}
+              editorMode={editorDoc?.mode ?? 'cue'}
+              selectedNode={selectedNode}
+              selectedActionHasEventParent={selectedActionHasEventParent}
+              availableVariables={availableVariables}
+              availableEvents={availableEvents}
+              availableEffects={availableEffects}
+              currentEffect={currentEffectDefinition}
+              addEventNode={addEventNode}
+              addActionNode={addActionNode}
+              addLogicNode={addLogicNode}
+              addEventRaiserNode={addEventRaiserNode}
+              addEventListenerNode={addEventListenerNode}
+              addEffectRaiserNode={addEffectRaiserNode}
+              addEffectListenerNode={addEffectListenerNode}
+              addNotesNode={addNotesNode}
+              updateSelectedNode={updateSelectedNode}
+            />
+          </div>
+        </Panel>
+      </Group>
       <div className="text-xs text-gray-500 flex justify-between">
         {editorDoc?.path ? (
           <button
