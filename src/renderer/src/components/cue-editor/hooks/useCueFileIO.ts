@@ -11,7 +11,11 @@ import type {
 import type { EditorDocument } from '../lib/types'
 import { firstByName } from '../lib/cueUtils'
 import type { EditorModeKey } from './useLastCueFilePath'
-import { setLastActiveMode, setLastFilePathForMode } from './useLastCueFilePath'
+import {
+  clearLastFilePathForMode,
+  setLastActiveMode,
+  setLastFilePathForMode,
+} from './useLastCueFilePath'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import {
   readNodeCueFile,
@@ -154,17 +158,17 @@ export function useCueFileIO({
     ],
   )
 
-  const handleSave = useCallback(async () => {
-    if (!editorDoc) return
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (!editorDoc) return false
     const updatedFile = getUpdatedDocument()
-    if (!updatedFile) return
+    if (!updatedFile) return false
 
     if (editorDoc.mode === 'effect') {
       const effectContent = updatedFile as EffectFile
       const validation = await validateEffect({ content: effectContent })
       if (!validation.valid) {
         setValidationErrors(validation.errors)
-        return
+        return false
       }
       try {
         const response = await saveEffectFile({
@@ -174,7 +178,7 @@ export function useCueFileIO({
         })
         if (!response.success) {
           onSaveError?.(`Failed to save effect: ${filename}`)
-          return
+          return false
         }
         setEditorDoc({ mode: 'effect', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
@@ -182,16 +186,18 @@ export function useCueFileIO({
         setIsDirty(false)
         refreshEffectFiles()
         onSaveSuccess?.(`Effect saved: ${filename}`)
+        return true
       } catch (error) {
         console.error('Failed to save effect file', error)
         onSaveError?.(formatSaveError(error))
+        return false
       }
     } else {
       const cueContent = updatedFile as NodeCueFile
       const validation = await validateNodeCue({ content: cueContent })
       if (!validation.valid) {
         setValidationErrors(validation.errors)
-        return
+        return false
       }
       try {
         const response = await saveNodeCueFile({
@@ -201,7 +207,7 @@ export function useCueFileIO({
         })
         if (!response.success) {
           onSaveError?.(`Failed to save cue: ${filename}`)
-          return
+          return false
         }
         setEditorDoc({ mode: 'cue', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
@@ -209,9 +215,11 @@ export function useCueFileIO({
         setIsDirty(false)
         refreshFiles()
         onSaveSuccess?.(`Cue saved: ${filename}`)
+        return true
       } catch (error) {
         console.error('Failed to save node cue file', error)
         onSaveError?.(formatSaveError(error))
+        return false
       }
     }
   }, [
@@ -246,6 +254,16 @@ export function useCueFileIO({
     if (editorDoc.path === lastStoredFilePathRef.current) {
       clearLastFilePath()
     }
+    const fileMode = editorDoc.file.mode
+    const modeKey: EditorModeKey =
+      editorDoc.mode === 'effect'
+        ? fileMode === 'yarg'
+          ? 'yarg-effect'
+          : 'audio-effect'
+        : fileMode === 'yarg'
+          ? 'yarg-cue'
+          : 'audio-cue'
+    clearLastFilePathForMode(modeKey)
     setEditorDoc(null)
     setSelectedCueId(null)
     setFilename('untitled.json')
@@ -259,6 +277,7 @@ export function useCueFileIO({
     }
   }, [
     clearLastFilePath,
+    clearLastFilePathForMode,
     editorDoc,
     loadCueIntoFlow,
     onSaveError,

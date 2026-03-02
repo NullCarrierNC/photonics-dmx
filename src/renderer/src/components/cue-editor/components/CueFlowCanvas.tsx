@@ -284,6 +284,9 @@ const CueFlowCanvas: React.FC<Props> = ({
               'concat-lights',
               'delay',
               'debugger',
+              'random',
+              'shuffle-lights',
+              'for-each-light',
             ] as LogicNode['logicType'][]
           )
             .sort()

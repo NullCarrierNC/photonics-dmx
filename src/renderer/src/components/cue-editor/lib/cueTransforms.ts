@@ -122,8 +122,8 @@ const cueToFlow = (
     })),
   ]
 
-  const edges: Edge[] = cue.connections.map((connection) => ({
-    id: `${connection.from}-${connection.to}-${connection.fromPort ?? 'any'}`,
+  const edges: Edge[] = cue.connections.map((connection, index) => ({
+    id: `${connection.from}-${connection.to}-${connection.fromPort ?? 'any'}-${index}`,
     source: connection.from,
     sourceHandle: connection.fromPort ?? undefined,
     target: connection.to,
@@ -317,8 +317,8 @@ const effectToFlow = (effect: EffectDefinition | null): { nodes: EditorNode[]; e
     })),
   ]
 
-  const edges: Edge[] = effect.connections.map((connection) => ({
-    id: `${connection.from}-${connection.to}-${connection.fromPort ?? 'any'}`,
+  const edges: Edge[] = effect.connections.map((connection, index) => ({
+    id: `${connection.from}-${connection.to}-${connection.fromPort ?? 'any'}-${index}`,
     source: connection.from,
     sourceHandle: connection.fromPort ?? undefined,
     target: connection.to,

@@ -625,7 +625,10 @@ const CueEditor: React.FC = () => {
 
   const handleGraphPrettify = useCallback(async () => {
     if (!editorDoc?.path || !selectedCueId) return
-    if (isDirty) await handleSave()
+    if (isDirty) {
+      const saved = await handleSave()
+      if (!saved) return
+    }
     await runNodeScript({
       scriptName: 'node-graph-prettier.mjs',
       args: ['--file', editorDoc.path, '--id', selectedCueId],
