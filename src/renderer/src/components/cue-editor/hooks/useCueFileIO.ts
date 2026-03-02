@@ -10,6 +10,8 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { firstByName } from '../lib/cueUtils'
+import type { EditorModeKey } from './useLastCueFilePath'
+import { setLastActiveMode, setLastFilePathForMode } from './useLastCueFilePath'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import {
   readNodeCueFile,
@@ -83,21 +85,25 @@ export function useCueFileIO({
   lastStoredFilePathRef,
 }: UseCueFileIOParams) {
   const selectFile = useCallback(
-    async (fileSummary: NodeCueFileSummary) => {
+    async (fileSummary: NodeCueFileSummary, preferredItemId?: string) => {
       try {
         const file = await readNodeCueFile(fileSummary.path)
         setEditorDoc({ mode: 'cue', file, path: fileSummary.path })
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
         const cueFile = file as NodeCueFile
-        const firstCue = firstByName(
-          cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[],
-        )
-        const cueId = firstCue?.id ?? null
+        const cues = cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[]
+        const preferredCue =
+          preferredItemId != null ? cues.find((c) => c.id === preferredItemId) : null
+        const cueToLoad = preferredCue ?? firstByName(cues)
+        const cueId = cueToLoad?.id ?? null
         setSelectedCueId(cueId)
         setIsDirty(false)
-        loadCueIntoFlow(firstCue ?? null)
+        loadCueIntoFlow(cueToLoad ?? null)
         rememberLastFilePath(fileSummary.path)
+        const modeKey: EditorModeKey = file.mode === 'yarg' ? 'yarg-cue' : 'audio-cue'
+        setLastFilePathForMode(modeKey, fileSummary.path)
+        setLastActiveMode(modeKey)
       } catch (error) {
         console.error('Failed to open node cue file', error)
       }
@@ -114,21 +120,25 @@ export function useCueFileIO({
   )
 
   const selectEffectFile = useCallback(
-    async (fileSummary: EffectFileSummary) => {
+    async (fileSummary: EffectFileSummary, preferredItemId?: string) => {
       try {
         const file = await readEffectFile(fileSummary.path)
         setEditorDoc({ mode: 'effect', file, path: fileSummary.path })
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
         const effectFile = file as EffectFile
-        const firstEffect = firstByName(
-          effectFile.effects as (YargEffectDefinition | AudioEffectDefinition)[],
-        )
-        const effectId = firstEffect?.id ?? null
+        const effects = effectFile.effects as (YargEffectDefinition | AudioEffectDefinition)[]
+        const preferredEffect =
+          preferredItemId != null ? effects.find((e) => e.id === preferredItemId) : null
+        const effectToLoad = preferredEffect ?? firstByName(effects)
+        const effectId = effectToLoad?.id ?? null
         setSelectedCueId(effectId)
         setIsDirty(false)
-        loadCueIntoFlow(firstEffect ?? null)
+        loadCueIntoFlow(effectToLoad ?? null)
         rememberLastFilePath(fileSummary.path)
+        const modeKey: EditorModeKey = file.mode === 'yarg' ? 'yarg-effect' : 'audio-effect'
+        setLastFilePathForMode(modeKey, fileSummary.path)
+        setLastActiveMode(modeKey)
       } catch (error) {
         console.error('Failed to open effect file', error)
       }

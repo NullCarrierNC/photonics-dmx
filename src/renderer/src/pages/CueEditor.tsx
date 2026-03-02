@@ -124,6 +124,7 @@ const CueEditor: React.FC = () => {
   const {
     mode,
     activeMode,
+    editorMode,
     groupedFiles,
     groupedEffectFiles,
     editorDoc,
@@ -161,7 +162,7 @@ const CueEditor: React.FC = () => {
   })
 
   const cueMode = mode
-  const isEffectMode = editorDoc?.mode === 'effect'
+  const isEffectMode = editorMode === 'effect'
 
   const handleCueModeChange = useCallback(
     (mode: 'yarg' | 'audio') => {
@@ -666,8 +667,8 @@ const CueEditor: React.FC = () => {
       <CueEditorToolbar
         cueMode={cueMode}
         isEffectMode={isEffectMode}
-        onCueModeChange={handleCueModeChange}
-        onEffectToggle={handleEffectToggle}
+        onCueModeChange={(m) => guardJsonEditorNavigation(() => handleCueModeChange(m))}
+        onEffectToggle={(e) => guardJsonEditorNavigation(() => handleEffectToggle(e))}
         onNewFile={() => setShowNewFileModal(true)}
         onSave={handleSave}
         onImport={handleImport}
@@ -694,6 +695,7 @@ const CueEditor: React.FC = () => {
           className="flex flex-col gap-4 overflow-hidden min-h-0">
           <CueFileSidebar
             mode={mode}
+            isEffectMode={isEffectMode}
             fileList={fileList}
             effectFileList={effectFiles}
             editorDoc={editorDoc}
@@ -741,15 +743,16 @@ const CueEditor: React.FC = () => {
               availableCueTypes={availableCueTypes}
               usedCueTypes={usedCueTypes}
               activeMode={activeMode}
-              editorMode={editorDoc?.mode ?? 'cue'}
+              editorMode={editorMode}
               onGroupChange={updateGroupMeta}
               onCueMetadataChange={updateCueMetadata}
               onEffectMetadataChange={updateEffectMetadata}
             />
 
             {showJsonEditor &&
-            editorDoc?.mode === 'effect' &&
+            editorMode === 'effect' &&
             selectedCueId &&
+            editorDoc &&
             currentEffectDefinition ? (
               <EffectJsonEditor
                 effectDefinition={currentEffectDefinition}
@@ -763,8 +766,9 @@ const CueEditor: React.FC = () => {
                 onDirtyChange={setJsonEditorDirty}
               />
             ) : showJsonEditor &&
-              editorDoc?.mode === 'cue' &&
+              editorMode === 'cue' &&
               selectedCueId &&
+              editorDoc &&
               currentCueDefinition ? (
               <CueJsonEditor
                 cueDefinition={currentCueDefinition}
@@ -784,7 +788,7 @@ const CueEditor: React.FC = () => {
                   edges={edges}
                   nodeTypes={nodeTypes}
                   selectedCueName={
-                    editorDoc?.mode === 'effect'
+                    editorMode === 'effect'
                       ? currentEffectDefinition?.name
                       : currentCueDefinition?.name
                   }
@@ -803,7 +807,7 @@ const CueEditor: React.FC = () => {
                   setReactFlowInstance={setReactFlowInstance}
                   isValidConnection={isValidConnection}
                   activeMode={activeMode}
-                  editorMode={editorDoc?.mode ?? 'cue'}
+                  editorMode={editorMode}
                   addEventNode={addEventNode}
                   addActionNode={addActionNode}
                   addLogicNode={addLogicNode}
@@ -825,7 +829,7 @@ const CueEditor: React.FC = () => {
           <div className={`h-full ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
             <NodeSidebar
               activeMode={activeMode}
-              editorMode={editorDoc?.mode ?? 'cue'}
+              editorMode={editorMode}
               selectedNode={selectedNode}
               selectedActionHasEventParent={selectedActionHasEventParent}
               availableVariables={availableVariables}

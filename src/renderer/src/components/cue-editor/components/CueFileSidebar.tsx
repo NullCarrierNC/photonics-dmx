@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { FaTrash } from 'react-icons/fa'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type {
@@ -12,6 +13,7 @@ import type { EditorDocument } from '../lib/types'
 
 type Props = {
   mode: NodeCueMode
+  isEffectMode: boolean
   fileList: NodeCueFileSummary[]
   effectFileList: EffectFileSummary[]
   editorDoc: EditorDocument | null
@@ -28,6 +30,7 @@ type Props = {
 
 const CueFileSidebar: React.FC<Props> = ({
   mode,
+  isEffectMode,
   fileList,
   effectFileList,
   editorDoc,
@@ -43,14 +46,13 @@ const CueFileSidebar: React.FC<Props> = ({
 }) => {
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
 
-  const isEffectMode = editorDoc?.mode === 'effect'
   const listLabel = isEffectMode ? 'Effect List' : 'Cue List'
   const addLabel = isEffectMode ? '+ Add Effect' : '+ Add Cue'
   const itemCountLabel = isEffectMode ? 'effect(s)' : 'cue(s)'
 
-  // Get the items list based on mode, sorted alphabetically by name
+  // Get the items list based on the loaded document type, sorted alphabetically by name
   const rawItems = editorDoc
-    ? isEffectMode
+    ? editorDoc.mode === 'effect'
       ? (editorDoc.file as EffectFile).effects
       : (editorDoc.file as NodeCueFile).cues
     : []
@@ -118,7 +120,7 @@ const CueFileSidebar: React.FC<Props> = ({
                 {item.name}
               </button>
               <button
-                className="text-[11px] text-red-500 hover:underline disabled:text-gray-400"
+                className="text-red-500 hover:text-red-700 disabled:text-gray-300 dark:disabled:text-gray-600 p-1"
                 onClick={() => setPendingRemoveId(item.id)}
                 disabled={items.length <= 1}
                 title={
@@ -126,7 +128,7 @@ const CueFileSidebar: React.FC<Props> = ({
                     ? `At least one ${isEffectMode ? 'effect' : 'cue'} is required`
                     : `Remove ${isEffectMode ? 'effect' : 'cue'}`
                 }>
-                Remove
+                <FaTrash className="w-3 h-3" />
               </button>
             </div>
           ))}

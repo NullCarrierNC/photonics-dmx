@@ -14,10 +14,16 @@ import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import {
   clearStoredLastFilePath,
+  getLastActiveMode,
+  getLastFilePathForMode,
+  getLastItemIdForMode,
   getStoredLastFilePath,
+  setLastActiveMode,
+  setLastItemIdForMode,
   setStoredLastFilePath,
 } from './useLastCueFilePath'
-import type { EditorDocument } from '../lib/types'
+import type { EditorModeKey } from './useLastCueFilePath'
+import type { EditorDocument, EditorMode } from '../lib/types'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import { useCueFileIO } from './useCueFileIO'
 import { useCueCrud } from './useCueCrud'
@@ -46,7 +52,16 @@ const useCueFiles = ({
 }: UseCueFilesParams) => {
   const [files, setFiles] = useState<NodeCueFileSummary[]>([])
   const [effectFiles, setEffectFiles] = useState<EffectFileSummary[]>([])
-  const [mode, setMode] = useState<NodeCueMode>('yarg')
+  const [mode, setMode] = useState<NodeCueMode>(() => {
+    const stored = getLastActiveMode()
+    if (stored) return stored.startsWith('yarg') ? 'yarg' : 'audio'
+    return 'yarg'
+  })
+  const [editorMode, setEditorMode] = useState<EditorMode>(() => {
+    const stored = getLastActiveMode()
+    if (stored) return stored.endsWith('-effect') ? 'effect' : 'cue'
+    return 'cue'
+  })
   const [editorDoc, setEditorDoc] = useState<EditorDocument | null>(null)
   const [selectedCueId, setSelectedCueId] = useState<string | null>(null)
   const [filename, setFilename] = useState<string>('untitled.json')
@@ -128,11 +143,7 @@ const useCueFiles = ({
     editorDoc,
     setEditorDoc,
     selectedCueId,
-    setSelectedCueId,
-    setMode,
-    setFilename,
     setIsDirty,
-    loadCueIntoFlow,
   })
 
   const currentCueDefinition = useMemo(() => {
@@ -163,6 +174,63 @@ const useCueFiles = ({
     [effectFiles],
   )
 
+  const handleModeChange = useCallback(
+    (nextMode: string) => {
+      const isEffect = nextMode === 'yarg-effect' || nextMode === 'audio-effect'
+      const cueMode: NodeCueMode =
+        nextMode === 'yarg-effect' || nextMode === 'yarg' ? 'yarg' : 'audio'
+      const modeKey: EditorModeKey = isEffect
+        ? cueMode === 'yarg'
+          ? 'yarg-effect'
+          : 'audio-effect'
+        : cueMode === 'yarg'
+          ? 'yarg-cue'
+          : 'audio-cue'
+
+      setMode(cueMode)
+      setEditorMode(isEffect ? 'effect' : 'cue')
+      setLastActiveMode(modeKey)
+
+      const storedPath = getLastFilePathForMode(modeKey)
+      const preferredItemId = getLastItemIdForMode(modeKey) ?? undefined
+
+      if (isEffect) {
+        const summary = effectFiles.find((f) => f.path === storedPath)
+        if (summary) {
+          fileIO.selectEffectFile(summary, preferredItemId)
+        } else {
+          setEditorDoc(null)
+          setSelectedCueId(null)
+          setFilename('untitled.json')
+          loadCueIntoFlow(null)
+          setIsDirty(false)
+        }
+      } else {
+        const summary = files.find((f) => f.path === storedPath)
+        if (summary) {
+          fileIO.selectFile(summary, preferredItemId)
+        } else {
+          setEditorDoc(null)
+          setSelectedCueId(null)
+          setFilename('untitled.json')
+          loadCueIntoFlow(null)
+          setIsDirty(false)
+        }
+      }
+    },
+    [
+      effectFiles,
+      files,
+      fileIO,
+      loadCueIntoFlow,
+      setEditorDoc,
+      setFilename,
+      setMode,
+      setSelectedCueId,
+      setIsDirty,
+    ],
+  )
+
   useEffect(() => {
     fileIO.refreshFiles()
     fileIO.refreshEffectFiles()
@@ -188,30 +256,55 @@ const useCueFiles = ({
   }, [mode])
 
   useEffect(() => {
-    if (restoredLastFileRef.current) return
-    if (files.length === 0) return
+    if (!selectedCueId || !editorDoc) return
+    const isEffect = editorDoc.mode === 'effect'
+    const cueMode = editorDoc.file.mode
+    const modeKey: EditorModeKey = isEffect
+      ? cueMode === 'yarg'
+        ? 'yarg-effect'
+        : 'audio-effect'
+      : cueMode === 'yarg'
+        ? 'yarg-cue'
+        : 'audio-cue'
+    setLastItemIdForMode(modeKey, selectedCueId)
+  }, [selectedCueId, editorDoc])
 
-    const storedPath = lastStoredFilePathRef.current
+  useEffect(() => {
+    if (restoredLastFileRef.current) return
+
+    const modeKey = getLastActiveMode()
+    if (!modeKey) {
+      restoredLastFileRef.current = true
+      return
+    }
+
+    const isEffect = modeKey === 'yarg-effect' || modeKey === 'audio-effect'
+    const storedPath = getLastFilePathForMode(modeKey)
     if (!storedPath) {
       restoredLastFileRef.current = true
       return
     }
 
-    const summary = files.find((file) => file.path === storedPath)
-    restoredLastFileRef.current = true
+    const preferredItemId = getLastItemIdForMode(modeKey) ?? undefined
 
-    if (!summary) {
-      clearLastFilePath()
-      return
+    if (isEffect) {
+      if (effectFiles.length === 0) return
+      const summary = effectFiles.find((f) => f.path === storedPath)
+      restoredLastFileRef.current = true
+      if (summary) fileIO.selectEffectFile(summary, preferredItemId)
+    } else {
+      if (files.length === 0) return
+      const summary = files.find((f) => f.path === storedPath)
+      restoredLastFileRef.current = true
+      if (summary) fileIO.selectFile(summary, preferredItemId)
     }
-
-    fileIO.selectFile(summary)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: fileIO.selectFile only
-  }, [clearLastFilePath, files, fileIO.selectFile])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: one-shot restore
+  }, [files, effectFiles, fileIO.selectFile, fileIO.selectEffectFile])
 
   return {
     mode,
     activeMode,
+    editorMode,
     files,
     effectFiles,
     groupedFiles,
@@ -229,7 +322,7 @@ const useCueFiles = ({
     setEditorDoc,
     setIsDirty,
     setValidationErrors,
-    handleModeChange: metadata.handleModeChange,
+    handleModeChange,
     handleNewFile: crud.handleNewFile,
     handleCreateNewFile: crud.handleCreateNewFile,
     updateGroupMeta: metadata.updateGroupMeta,
