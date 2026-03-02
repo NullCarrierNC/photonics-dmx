@@ -51,7 +51,7 @@ describe('Effect runtime with real Sequencer', () => {
               filter: { source: 'literal', value: 'all' },
             },
             color: {
-              name: { source: 'variable', name: 'colorParam', fallback: 'red' },
+              name: { source: 'variable', name: 'colorParam' },
               brightness: { source: 'literal', value: 'high' },
               blendMode: { source: 'literal', value: 'replace' },
             },
@@ -129,7 +129,7 @@ describe('Effect runtime with real Sequencer', () => {
             },
             timing: {
               waitForCondition: { source: 'literal', value: 'none' },
-              waitForTime: { source: 'variable', name: 'startDelay', fallback: 0 },
+              waitForTime: { source: 'variable', name: 'startDelay' },
               duration: { source: 'literal', value: 0 },
               waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
@@ -207,7 +207,7 @@ describe('Effect runtime with real Sequencer', () => {
             timing: {
               waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
-              duration: { source: 'variable', name: 'fadeDuration', fallback: 0 },
+              duration: { source: 'variable', name: 'fadeDuration' },
               waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
             },
@@ -556,9 +556,9 @@ describe('Effect runtime with real Sequencer', () => {
               filter: { source: 'literal', value: 'all' },
             },
             color: {
-              name: { source: 'variable', name: 'colorName', fallback: 'red' },
-              brightness: { source: 'variable', name: 'brightness', fallback: 'high' },
-              blendMode: { source: 'variable', name: 'blendMode', fallback: 'replace' },
+              name: { source: 'variable', name: 'colorName' },
+              brightness: { source: 'variable', name: 'brightness' },
+              blendMode: { source: 'variable', name: 'blendMode' },
             },
             timing: {
               waitForCondition: { source: 'literal', value: 'none' },

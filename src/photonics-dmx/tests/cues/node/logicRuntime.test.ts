@@ -147,7 +147,7 @@ describe('Node cue logic runtime', () => {
             type: 'logic',
             logicType: 'conditional',
             comparator: '==',
-            left: { source: 'variable', name: 'calc', fallback: 0 },
+            left: { source: 'variable', name: 'calc' },
             right: { source: 'literal', value: 0 },
           },
         ],

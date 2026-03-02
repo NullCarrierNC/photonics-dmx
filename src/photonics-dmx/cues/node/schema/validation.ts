@@ -67,6 +67,7 @@ const valueSourceSchema: JSONSchemaType<ValueSource> = {
     source: { type: 'string', enum: ['literal', 'variable'] },
     value: { type: ['number', 'boolean', 'string'], nullable: true },
     name: { type: 'string', nullable: true },
+    // fallback accepted for backwards compatibility with existing cue files; ignored at runtime
     fallback: { type: ['number', 'boolean', 'string'], nullable: true },
   },
   allOf: [

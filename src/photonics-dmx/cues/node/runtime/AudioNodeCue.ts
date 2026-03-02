@@ -10,7 +10,10 @@ import {
   ValueSource,
   AudioNodeCueDefinition,
 } from '../../types/nodeCueTypes'
+import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
+import { sendToAllWindows } from '../../../../main/utils/windowUtils'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
+import { UninitializedVariableError } from './valueResolver'
 import { VariableValue } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 
@@ -121,7 +124,16 @@ export class AudioNodeCue implements IAudioCue {
         this.executionEngine.startExecution(event, cueData)
       } else {
         // Level-triggered events use continuous state management
-        const actionStep = this.findFirstAction(event.id)
+        let actionStep: { actionId: string; delay: number } | null = null
+        try {
+          actionStep = this.findFirstAction(event.id)
+        } catch (error) {
+          if (error instanceof UninitializedVariableError) {
+            sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+          }
+          console.error(`Error in findFirstAction for event ${event.id}:`, error)
+          continue
+        }
         if (!actionStep) {
           continue
         }
@@ -434,21 +446,7 @@ export class AudioNodeCue implements IAudioCue {
       return existing.value === true || existing.value === 'true'
     }
 
-    // Use fallback
-    if (expectedType === 'string' || expectedType === 'event') {
-      return source.fallback !== undefined ? String(source.fallback) : ''
-    }
-    if (expectedType === 'number') {
-      if (typeof source.fallback === 'number') return source.fallback
-      if (typeof source.fallback === 'boolean') return source.fallback ? 1 : 0
-      if (typeof source.fallback === 'string') {
-        const parsed = parseFloat(source.fallback)
-        return isNaN(parsed) ? 0 : parsed
-      }
-      return 0
-    }
-
-    return source.fallback === true || source.fallback === 'true'
+    throw new UninitializedVariableError(source.name)
   }
 
   private findFirstAction(eventId: string): { actionId: string; delay: number } | null {

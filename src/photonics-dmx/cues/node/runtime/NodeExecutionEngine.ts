@@ -41,6 +41,7 @@ import {
   resolveLocationGroups,
   resolveLightTarget,
   getVariableStore,
+  UninitializedVariableError,
 } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
@@ -266,6 +267,9 @@ export class NodeExecutionEngine {
         }
       }
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error starting execution for event ${eventNode.id}:`, error)
     }
   }
@@ -681,6 +685,9 @@ export class NodeExecutionEngine {
         this.continueToNextNodes(lastChainNode.id, context)
       }
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing action node ${actionNode.id}:`, error)
       // Continue execution despite error
       this.continueToNextNodes(actionNode.id, context)
@@ -735,6 +742,9 @@ export class NodeExecutionEngine {
       }
       this.emitNodeExecution('deactivated', nodeId)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing logic node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
       // Continue to all outgoing edges despite error
@@ -794,6 +804,9 @@ export class NodeExecutionEngine {
       }, actualDelay)
       context.addTimer(timerId)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing delay node ${nodeId}:`, error)
       // Continue to all outgoing edges despite error
       this.continueToNextNodes(nodeId, context)
@@ -825,6 +838,9 @@ export class NodeExecutionEngine {
       // Continue immediately to raiser's child (non-blocking)
       this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing event raiser node ${raiserNode.id}:`, error)
       // Continue execution despite error
       this.continueToNextNodes(raiserNode.id, context)
@@ -917,6 +933,9 @@ export class NodeExecutionEngine {
       // Continue immediately (non-blocking like EventRaiserNode)
       this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing effect raiser node ${raiserNode.id}:`, error)
       this.emitNodeExecution('deactivated', raiserNode.id)
       // Continue execution despite error
@@ -965,6 +984,9 @@ export class NodeExecutionEngine {
         this.activeContexts.delete(context.id)
       }
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error starting listener execution for ${listenerNode.id}:`, error)
     }
   }

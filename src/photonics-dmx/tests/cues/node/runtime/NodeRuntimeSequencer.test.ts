@@ -1198,7 +1198,7 @@ describe('Node runtime with real Sequencer', () => {
       timing: {
         waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'variable', name: 'durationMs', fallback: 0 },
+        duration: { source: 'variable', name: 'durationMs' },
         waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
@@ -1361,7 +1361,7 @@ describe('Node runtime with real Sequencer', () => {
     expect(cueLevelVarStore.get('modResult')?.value).toBe(1)
   })
 
-  it('initializes variables and uses fallback branch', () => {
+  it('initializes variables and uses conditional branch', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
       type: 'event',
@@ -1378,12 +1378,22 @@ describe('Node runtime with real Sequencer', () => {
       value: { source: 'literal', value: 1 },
     }
 
+    const initMissingVarNode: LogicNode = {
+      id: 'init-missing',
+      type: 'logic',
+      logicType: 'variable',
+      mode: 'init',
+      varName: 'missingVar',
+      valueType: 'number',
+      value: { source: 'literal', value: 0 },
+    }
+
     const conditionalNode: LogicNode = {
       id: 'conditional-1',
       type: 'logic',
       logicType: 'conditional',
       comparator: '==',
-      left: { source: 'variable', name: 'missingVar', fallback: 0 },
+      left: { source: 'variable', name: 'missingVar' },
       right: { source: 'literal', value: 0 },
     }
 
@@ -1411,23 +1421,27 @@ describe('Node runtime with real Sequencer', () => {
 
     const definition: YargNodeCueDefinition = {
       id: 'init-fallback',
-      name: 'Init/Fallback',
+      name: 'Init/Conditional',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
         events: [eventNode],
         actions: [actionNode],
-        logic: [initNode, conditionalNode],
+        logic: [initNode, initMissingVarNode, conditionalNode],
         eventRaisers: [],
         eventListeners: [],
         effectRaisers: [],
       },
       connections: [
         { from: 'event-1', to: 'var-init' },
-        { from: 'var-init', to: 'conditional-1' },
+        { from: 'var-init', to: 'init-missing' },
+        { from: 'init-missing', to: 'conditional-1' },
         { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
       ],
-      variables: [{ name: 'flag', type: 'number', scope: 'cue', initialValue: 0 }],
+      variables: [
+        { name: 'flag', type: 'number', scope: 'cue', initialValue: 0 },
+        { name: 'missingVar', type: 'number', scope: 'cue', initialValue: 0 },
+      ],
     }
 
     const engine = new NodeExecutionEngine(

@@ -26,7 +26,7 @@ import {
 import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue } from './executionTypes'
-import { resolveValue, getVariableStore } from './valueResolver'
+import { resolveValue, getVariableStore, UninitializedVariableError } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
@@ -539,6 +539,9 @@ export class EffectExecutionEngine {
       this.continueExecution(nextNodes, context)
       this.emitNodeExecution('deactivated', logic.id)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing logic node ${logic.id}:`, error)
       this.emitNodeExecution('deactivated', logic.id)
       // Continue to all outgoing edges despite error
@@ -593,6 +596,9 @@ export class EffectExecutionEngine {
       }, actualDelay)
       context.addTimer(timerId)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing delay node ${delayNode.id}:`, error)
       this.emitNodeExecution('deactivated', delayNode.id)
       this.continueToNextNodes(delayNode.id, context)
@@ -658,7 +664,14 @@ export class EffectExecutionEngine {
   private continueExecution(nodeIds: string[], context: ExecutionContext): void {
     context.beginBatch()
     for (const nodeId of nodeIds) {
-      this.executeNode(nodeId, context)
+      try {
+        this.executeNode(nodeId, context)
+      } catch (error) {
+        if (error instanceof UninitializedVariableError) {
+          sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        }
+        console.error(`Error executing node ${nodeId}:`, error)
+      }
     }
     context.endBatch()
     if (context.tryComplete()) {

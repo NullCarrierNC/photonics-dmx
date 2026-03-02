@@ -13,8 +13,7 @@ const formatValueSource = (value?: ValueSource): string => {
   if (value.source === 'literal') {
     return `${value.value}`
   }
-  const fallback = value.fallback !== undefined ? ` ?? ${value.fallback}` : ''
-  return `${value.name}${fallback}`
+  return `${value.name}`
 }
 
 const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) => {

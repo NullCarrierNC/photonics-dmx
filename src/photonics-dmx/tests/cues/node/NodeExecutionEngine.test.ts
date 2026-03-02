@@ -15,6 +15,8 @@ import { VariableValue } from '../../../cues/node/runtime/executionTypes'
 import type { CompiledEffect } from '../../../cues/node/runtime/EffectRegistry'
 import type { TrackedLight } from '../../../types'
 import type { FixtureConfig } from '../../../types'
+import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
+import { sendToAllWindows } from '../../../../main/utils/windowUtils'
 
 /** Minimal fixture config for test TrackedLight objects */
 type MinimalLightConfig = Partial<FixtureConfig>
@@ -1609,7 +1611,7 @@ describe('NodeExecutionEngine', () => {
           filter: { source: 'literal', value: 'all' },
         },
         color: {
-          name: { source: 'variable', name: 'myColor', fallback: 'blue' },
+          name: { source: 'variable', name: 'myColor' },
           brightness: { source: 'literal', value: 'medium' },
           blendMode: { source: 'literal', value: 'replace' },
         },
@@ -1699,7 +1701,7 @@ describe('NodeExecutionEngine', () => {
         type: 'action',
         effectType: 'set-color',
         target: {
-          groups: { source: 'variable', name: 'targetGroups', fallback: 'front' },
+          groups: { source: 'variable', name: 'targetGroups' },
           filter: { source: 'literal', value: 'all' },
         },
         color: {
@@ -1768,8 +1770,8 @@ describe('NodeExecutionEngine', () => {
       // Groups should be resolved to ['front', 'back']
     })
 
-    it('should use fallback when variable not found', () => {
-      // Action references non-existent variable, should use fallback
+    it('should report runtime error when variable not found', () => {
+      // Action references non-existent variable; runtime reports error via IPC
       const eventNode: YargEventNode = {
         id: 'event1',
         type: 'event',
@@ -1786,7 +1788,7 @@ describe('NodeExecutionEngine', () => {
           filter: { source: 'literal', value: 'all' },
         },
         color: {
-          name: { source: 'variable', name: 'nonExistentColor', fallback: 'green' },
+          name: { source: 'variable', name: 'nonExistentColor' },
           brightness: { source: 'literal', value: 'medium' },
           blendMode: { source: 'literal', value: 'replace' },
         },
@@ -1841,8 +1843,10 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
-      // Should use fallback color 'green'
+      expect(sendToAllWindows).toHaveBeenCalledWith(
+        RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+        expect.stringContaining('nonExistentColor'),
+      )
     })
 
     it('should resolve variable for duration', () => {
@@ -1890,7 +1894,7 @@ describe('NodeExecutionEngine', () => {
         timing: {
           waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'variable', name: 'calculatedDuration', fallback: 200 },
+          duration: { source: 'variable', name: 'calculatedDuration' },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
           easing: 'sinInOut',

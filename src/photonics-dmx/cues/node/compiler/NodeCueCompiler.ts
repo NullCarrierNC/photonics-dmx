@@ -52,11 +52,11 @@ const getActionTiming = (action: ActionNode): ActionTimingConfig => ({
 export const calculateActionDuration = (action: ActionNode): number => {
   const timing = getActionTiming(action)
 
-  // Extract numeric values from ValueSource (use literal value or fallback to 0)
+  // Extract numeric values from ValueSource (use literal value; variable source uses default at compile time)
   const extractNumber = (vs: ValueSource | undefined, defaultValue: number): number => {
     if (!vs) return defaultValue
     if (vs.source === 'literal') return Number(vs.value) || defaultValue
-    return Number(vs.fallback) || defaultValue
+    return defaultValue
   }
 
   return (

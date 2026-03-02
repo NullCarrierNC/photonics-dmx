@@ -42,7 +42,7 @@ export type VariableType =
 
 export type ValueSource =
   | { source: 'literal'; value: number | boolean | string | TrackedLight[] }
-  | { source: 'variable'; name: string; fallback?: number | boolean | string | TrackedLight[] }
+  | { source: 'variable'; name: string }
 
 export interface VariableDefinition {
   name: string
