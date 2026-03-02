@@ -69,10 +69,7 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected })
     return brightnessMap[brightnessStr] || 'brightness(1.0)'
   }
 
-  const layerValue =
-    action.effectType === 'set-color' || action.effectType === 'chase'
-      ? displayValueSource(action.layer, '0')
-      : null
+  const layerValue = action.effectType !== 'blackout' ? displayValueSource(action.layer, '0') : null
   const baseLabel = data.label
   const selectedStyles = selected
     ? 'shadow-[0_0_18px_16px_rgba(59,130,246,0.8)] ring-[5px] ring-blue-400'

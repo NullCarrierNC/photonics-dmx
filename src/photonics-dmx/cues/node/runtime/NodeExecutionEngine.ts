@@ -25,7 +25,6 @@ import {
   EventListenerNode,
   EffectRaiserNode,
   LogicNode,
-  NodeActionConfig,
   VariableDefinition,
   ValueSource,
 } from '../../types/nodeCueTypes'
@@ -180,30 +179,6 @@ export class NodeExecutionEngine {
 
   private getVariableValue(name: string, context: ExecutionContext): VariableValue | undefined {
     return context.cueLevelVarStore.get(name) ?? context.groupLevelVarStore.get(name)
-  }
-
-  /**
-   * Resolve config values that may be ValueSource (e.g. startOffset for rotation).
-   * Returns a copy of config with resolved numbers; non-ValueSource fields are passed through.
-   */
-  private resolveConfigValues(
-    config: NodeActionConfig | undefined,
-    context: ExecutionContext,
-  ): NodeActionConfig | undefined {
-    if (!config) return undefined
-    const out: NodeActionConfig = { ...config }
-    if (
-      config.startOffset !== undefined &&
-      typeof config.startOffset === 'object' &&
-      config.startOffset !== null &&
-      'source' in config.startOffset
-    ) {
-      const resolved = Number(
-        resolveValue('number', config.startOffset, context, this.variableDefinitions),
-      )
-      out.startOffset = Math.max(0, resolved)
-    }
-    return out
   }
 
   /**
@@ -472,21 +447,17 @@ export class NodeExecutionEngine {
 
       const actionChain = buildActionChain()
 
-      const resolvedConfig = this.resolveConfigValues(actionNode.config, context)
-
       const resolvedAction = {
         ...actionNode,
         target: resolvedTarget,
         color: resolvedColor,
         timing: resolvedTiming,
         layer: resolvedLayer,
-        config: resolvedConfig,
       } as ActionNode & {
         target: ResolvedActionTarget
         color: ResolvedColorSetting
         timing: ResolvedActionTiming
         layer: number
-        config?: NodeActionConfig
       }
 
       const lights = ActionEffectFactory.resolveLights(
@@ -521,21 +492,6 @@ export class NodeExecutionEngine {
         return
       }
 
-      const getVar = (varName: string) => {
-        const cueVar = context.cueLevelVarStore.get(varName)
-        const groupVar = context.groupLevelVarStore.get(varName)
-        return cueVar ?? groupVar
-      }
-      let patternBLights: TrackedLight[] | undefined
-      if (actionNode.effectType === 'alternating-pattern' && actionNode.config?.patternBTarget) {
-        patternBLights =
-          ActionEffectFactory.resolveLights(
-            this.lightManager,
-            actionNode.config.patternBTarget,
-            getVar,
-          ) ?? []
-      }
-
       const submitSingleAction = (): void => {
         const effect = ActionEffectFactory.buildEffect({
           action: resolvedAction,
@@ -546,7 +502,6 @@ export class NodeExecutionEngine {
           resolvedColor,
           resolvedTiming,
           resolvedLayer,
-          patternBLights,
         })
 
         if (!effect) {
@@ -596,16 +551,7 @@ export class NodeExecutionEngine {
       }
 
       const resolveChainStep = (a: ActionNode): ChainStep | null => {
-        if (
-          a.effectType === 'blackout' ||
-          a.effectType === 'chase' ||
-          a.effectType === 'sweep' ||
-          a.effectType === 'rotation' ||
-          a.effectType === 'flash' ||
-          a.effectType === 'cycle' ||
-          a.effectType === 'dual-mode-rotation' ||
-          a.effectType === 'alternating-pattern'
-        ) {
+        if (a.effectType === 'blackout') {
           return null
         }
 

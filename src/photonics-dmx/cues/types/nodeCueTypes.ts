@@ -1,6 +1,6 @@
 import { CueType } from './cueTypes'
 
-import type { WaitCondition, YargEventType, TrackedLight } from '../../types'
+import type { YargEventType, TrackedLight } from '../../types'
 import {
   ALL_CONFIG_DATA_PROPERTIES,
   YARG_CUE_DATA_PROPERTIES,
@@ -51,6 +51,8 @@ export interface VariableDefinition {
   initialValue: number | boolean | string | TrackedLight[]
   description?: string
   isParameter?: boolean
+  /** Constrained set of allowed literal values; drives a selector in the effect-raiser parameter UI */
+  validValues?: string[]
 }
 
 export interface EventDefinition {
@@ -339,17 +341,7 @@ export interface AudioEventNode extends BaseEventNode {
   triggerMode: 'edge' | 'level'
 }
 
-export const NODE_EFFECT_TYPES = [
-  'set-color',
-  'blackout',
-  'chase',
-  'sweep',
-  'rotation',
-  'flash',
-  'cycle',
-  'dual-mode-rotation',
-  'alternating-pattern',
-] as const
+export const NODE_EFFECT_TYPES = ['set-color', 'blackout'] as const
 
 export type NodeEffectType = (typeof NODE_EFFECT_TYPES)[number]
 
@@ -377,46 +369,7 @@ export interface ActionTimingConfig {
   level?: ValueSource
 }
 
-export type NodeChaseOrder = 'linear' | 'inverse-linear'
-
-export type SweepDirection = 'forward' | 'reverse'
-export type RotationDirection = 'clockwise' | 'counter-clockwise'
-
 export interface NodeActionConfig {
-  perLightOffsetMs?: number
-  order?: NodeChaseOrder
-  loop?: boolean
-  /** Sweep: total time (ms), fade durations (ms), overlap (0-100), delay between sweeps (ms), direction */
-  sweepTime?: number
-  sweepFadeInDuration?: number
-  sweepFadeOutDuration?: number
-  sweepLightOverlap?: number
-  sweepBetweenDelay?: number
-  sweepDirection?: SweepDirection
-  /** Rotation: direction, beats per cycle, start offset (number or variable) */
-  rotationDirection?: RotationDirection
-  beatsPerCycle?: number
-  startOffset?: number | ValueSource
-  /** Flash: hold time (ms), fade in/out durations (ms) */
-  holdTime?: number
-  flashDurationIn?: number
-  flashDurationOut?: number
-  /** Flash: delay after hold before next cycle (ms), e.g. for strobes */
-  endWait?: number
-  /** Cycle: transition duration (ms), step trigger (WaitCondition), base color for inactive lights */
-  cycleTransitionDuration?: number
-  cycleStepTrigger?: WaitCondition
-  cycleBaseColor?: string
-  cycleBaseBrightness?: string
-  /** Dual-mode rotation: solid colour when not spinning, condition to switch mode, large venue flag */
-  dualModeEnabled?: boolean
-  dualModeSolidColor?: string
-  dualModeSwitchCondition?: WaitCondition
-  dualModeIsLargeVenue?: boolean
-  /** Alternating pattern: second target (pattern B), switch and complete conditions */
-  patternBTarget?: NodeActionTarget
-  switchCondition?: WaitCondition
-  completeCondition?: WaitCondition
   custom?: Record<string, unknown>
 }
 

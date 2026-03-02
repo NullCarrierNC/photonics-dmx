@@ -21,7 +21,6 @@ import {
   EventRaiserNode,
   EventListenerNode,
   LogicNode,
-  NodeActionConfig,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
 import type { TrackedLight } from '../../../types'
@@ -235,28 +234,6 @@ export class EffectExecutionEngine {
   }
 
   /**
-   * Resolve config values that may reference effect variables (e.g. startOffset as ValueSource).
-   */
-  private resolveConfigValues(
-    config: NodeActionConfig | undefined,
-    context: ExecutionContext,
-  ): NodeActionConfig | undefined {
-    if (!config) return undefined
-    const out: NodeActionConfig = { ...config }
-    if (
-      config.startOffset !== undefined &&
-      typeof config.startOffset === 'object' &&
-      config.startOffset !== null &&
-      'source' in config.startOffset
-    ) {
-      const resolved = Number(
-        resolveValue('number', config.startOffset as any, context, this.variableDefinitions),
-      )
-      out.startOffset = Math.max(0, resolved)
-    }
-    return out
-  }
-
   /**
    * Helper to get the var store for a named variable.
    */
@@ -292,18 +269,6 @@ export class EffectExecutionEngine {
     const resolvedColor = resolveActionColor(action.color, context)
     const resolvedTiming = resolveActionTiming(action.timing, context)
     const resolvedLayer = resolveActionLayer(action.layer, context)
-    const resolvedConfig = this.resolveConfigValues(action.config, context)
-
-    // Resolve patternB lights for alternating-pattern actions
-    let patternBLights: TrackedLight[] | undefined
-    if (action.effectType === 'alternating-pattern' && action.config?.patternBTarget) {
-      patternBLights =
-        ActionEffectFactory.resolveLights(
-          this.lightManager,
-          action.config.patternBTarget,
-          getVar,
-        ) ?? []
-    }
 
     // Build action chain: collect consecutive single-edge set-color action nodes
     const buildActionChain = (): ActionNode[] => {
@@ -332,12 +297,11 @@ export class EffectExecutionEngine {
     // Submit a single action (no chaining)
     const submitSingleAction = (): void => {
       const effect = ActionEffectFactory.buildEffect({
-        action: { ...action, config: resolvedConfig } as ActionNode,
+        action,
         lights,
         resolvedColor,
         resolvedTiming,
         resolvedLayer,
-        patternBLights,
       })
 
       if (!effect) {

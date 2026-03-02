@@ -10,16 +10,7 @@ import {
 } from '../../../../../../../photonics-dmx/constants/options'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 
-const EFFECT_TYPES_WITH_COLOR: NodeEffectType[] = [
-  'set-color',
-  'chase',
-  'sweep',
-  'rotation',
-  'flash',
-  'cycle',
-  'dual-mode-rotation',
-  'alternating-pattern',
-]
+const EFFECT_TYPES_WITH_COLOR: NodeEffectType[] = ['set-color']
 
 type ActionColorFieldsProps = {
   node: ActionNode

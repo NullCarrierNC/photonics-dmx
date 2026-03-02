@@ -77,6 +77,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
                       | 'light-array'
                       | 'event'
                   }
+                  validLiterals={param.validValues}
                   integerOnly={integerOnly}
                   availableVariables={availableVariables}
                 />
