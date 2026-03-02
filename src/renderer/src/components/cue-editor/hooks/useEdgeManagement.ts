@@ -19,7 +19,7 @@ export type UseEdgeManagementParams = {
 
 export function useEdgeManagement({
   nodes,
-  edges,
+  edges: _edges,
   setNodes,
   setEdges,
   setIsDirty,
@@ -93,23 +93,26 @@ export function useEdgeManagement({
         return prevNodes
       })
 
-      const sourceNode = nodes.find((n) => n.id === connection.source)
-      let fromPort: string | null = null
-      if (connection.sourceHandle) {
-        fromPort = connection.sourceHandle
-      } else if (sourceNode?.data.kind === 'logic') {
-        const logicPayload = sourceNode.data.payload as LogicNode
-        if (logicPayload.logicType === 'conditional') {
-          const existingEdges = edges.filter((e) => e.source === sourceNode.id)
-          if (existingEdges.length === 0) fromPort = 'true'
-          else if (existingEdges.length === 1) fromPort = 'false'
+      setEdges((prevEdges) => {
+        let fromPort: string | null = null
+        if (connection.sourceHandle) {
+          fromPort = connection.sourceHandle
+        } else {
+          const sourceNode = nodes.find((n) => n.id === connection.source)
+          if (sourceNode?.data.kind === 'logic') {
+            const logicPayload = sourceNode.data.payload as LogicNode
+            if (logicPayload.logicType === 'conditional') {
+              const existingEdges = prevEdges.filter((e) => e.source === sourceNode.id)
+              if (existingEdges.length === 0) fromPort = 'true'
+              else if (existingEdges.length === 1) fromPort = 'false'
+            }
+          }
         }
-      }
-
-      setEdges((eds) => addEdge({ ...connection, type: 'default', data: { fromPort } }, eds))
+        return addEdge({ ...connection, type: 'default', data: { fromPort } }, prevEdges)
+      })
       setIsDirty(true)
     },
-    [edges, isValidNodeConnection, nodes, setEdges, setIsDirty, setNodes],
+    [isValidNodeConnection, nodes, setEdges, setIsDirty, setNodes],
   )
 
   const isValidConnection = useCallback(

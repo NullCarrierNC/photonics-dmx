@@ -230,33 +230,38 @@ export function useCueFileIO({
 
   const handleDelete = useCallback(async () => {
     if (!editorDoc?.path) return
+
+    try {
+      if (editorDoc.mode === 'effect') {
+        await deleteEffectFile(editorDoc.path)
+      } else {
+        await deleteNodeCueFile(editorDoc.path)
+      }
+    } catch (error) {
+      console.error('Failed to delete file', error)
+      onSaveError?.(`Failed to delete: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+
     if (editorDoc.path === lastStoredFilePathRef.current) {
       clearLastFilePath()
     }
-
+    setEditorDoc(null)
+    setSelectedCueId(null)
+    setFilename('untitled.json')
+    loadCueIntoFlow(null)
+    setValidationErrors([])
+    setIsDirty(false)
     if (editorDoc.mode === 'effect') {
-      await deleteEffectFile(editorDoc.path)
-      setEditorDoc(null)
-      setSelectedCueId(null)
-      setFilename('untitled.json')
-      loadCueIntoFlow(null)
-      setValidationErrors([])
-      setIsDirty(false)
       refreshEffectFiles()
     } else {
-      await deleteNodeCueFile(editorDoc.path)
-      setEditorDoc(null)
-      setSelectedCueId(null)
-      setFilename('untitled.json')
-      loadCueIntoFlow(null)
-      setValidationErrors([])
-      setIsDirty(false)
       refreshFiles()
     }
   }, [
     clearLastFilePath,
     editorDoc,
     loadCueIntoFlow,
+    onSaveError,
     refreshFiles,
     refreshEffectFiles,
     lastStoredFilePathRef,

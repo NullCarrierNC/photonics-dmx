@@ -137,27 +137,40 @@ export function useNodeSelection({
         nds.map((node) => {
           if (node.id !== selectedNodeId) return node
           const nextPayload = { ...node.data.payload, ...updates } as T
+          const label = (() => {
+            switch (node.data.kind) {
+              case 'event':
+                return activeMode === 'yarg'
+                  ? (nextPayload as YargEventNode).eventType
+                  : (nextPayload as AudioEventNode).eventType
+              case 'action':
+                return (nextPayload as ActionNode).effectType
+              case 'logic':
+                return (nextPayload as LogicNode).logicType
+              case 'event-raiser':
+                return (nextPayload as EventRaiserNode).eventName
+                  ? `Raise: ${(nextPayload as EventRaiserNode).eventName}`
+                  : 'Raise Event'
+              case 'event-listener':
+                return (nextPayload as EventListenerNode).eventName
+                  ? `Listen: ${(nextPayload as EventListenerNode).eventName}`
+                  : 'Listen Event'
+              case 'effect-raiser':
+                return node.data.effectName ? `Effect: ${node.data.effectName}` : 'Raise Effect'
+              case 'effect-listener':
+                return 'Effect Listener'
+              case 'notes':
+                return (nextPayload as NotesNode).label ?? 'Notes'
+              default:
+                return node.data.label
+            }
+          })()
           return {
             ...node,
             data: {
               ...node.data,
               payload: nextPayload,
-              label:
-                node.data.kind === 'event'
-                  ? activeMode === 'yarg'
-                    ? (nextPayload as YargEventNode).eventType
-                    : (nextPayload as AudioEventNode).eventType
-                  : node.data.kind === 'action'
-                    ? (nextPayload as ActionNode).effectType
-                    : node.data.kind === 'logic'
-                      ? (nextPayload as LogicNode).logicType
-                      : node.data.kind === 'event-raiser'
-                        ? (nextPayload as EventRaiserNode).eventName
-                          ? `Raise: ${(nextPayload as EventRaiserNode).eventName}`
-                          : 'Raise Event'
-                        : (nextPayload as EventListenerNode).eventName
-                          ? `Listen: ${(nextPayload as EventListenerNode).eventName}`
-                          : 'Listen Event',
+              label,
             },
           }
         }),

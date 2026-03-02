@@ -556,32 +556,37 @@ const CueEditor: React.FC = () => {
     const currentCue = cueFile.cues.find((c) => c.id === selectedCueId)
     const effectRefs = currentCue?.effects ?? []
 
-    // Load each effect definition
+    let cancelled = false
+
     const loadEffects = async () => {
-      const newDefinitions = new Map<string, EffectDefinition>()
-
-      for (const effectRef of effectRefs) {
+      const effectFileList = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
+      const promises = effectRefs.map(async (effectRef) => {
         try {
-          // Find the effect file
-          const effectFile = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
-          const fileEntry = effectFile.find((f) => f.groupId === effectRef.effectFileId)
-
-          if (fileEntry) {
-            const effectFileData = (await readEffectFile(fileEntry.path)) as EffectFile
-            const effectDef = effectFileData.effects.find((e) => e.id === effectRef.effectId)
-            if (effectDef) {
-              newDefinitions.set(effectRef.effectId, effectDef)
-            }
-          }
+          const fileEntry = effectFileList.find((f) => f.groupId === effectRef.effectFileId)
+          if (!fileEntry) return null
+          const effectFileData = (await readEffectFile(fileEntry.path)) as EffectFile
+          const effectDef = effectFileData.effects.find((e) => e.id === effectRef.effectId)
+          return effectDef ? ([effectRef.effectId, effectDef] as const) : null
         } catch (error) {
           console.warn(`Failed to load effect ${effectRef.effectId}:`, error)
+          return null
         }
-      }
+      })
 
+      const results = await Promise.all(promises)
+      if (cancelled) return
+
+      const newDefinitions = new Map<string, EffectDefinition>()
+      for (const result of results) {
+        if (result) newDefinitions.set(result[0], result[1])
+      }
       setLoadedEffectDefinitions(newDefinitions)
     }
 
     loadEffects()
+    return () => {
+      cancelled = true
+    }
   }, [editorDoc, selectedCueId, mode, groupedEffectFiles])
 
   const handleJsonEditorSave = useCallback(
