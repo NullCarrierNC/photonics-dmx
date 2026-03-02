@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useRef } from 'react'
-import { useEdgesState, useNodesState, type Edge } from 'reactflow'
+import {
+  useEdgesState,
+  useNodesState,
+  type Edge,
+  type NodeChange,
+  type EdgeChange,
+} from 'reactflow'
 import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
@@ -28,8 +34,27 @@ const useCueFlow = ({
   effectDefinitions,
 }: UseCueFlowParams) => {
   const setSelectedNodeIdRef = useRef<(id: string | null) => void>(() => {})
-  const [nodes, setNodes, onNodesChange] = useNodesState<EditorNodeData>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([])
+  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<EditorNodeData>([])
+  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge[]>([])
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChangeRaw(changes)
+      const hasDirtyChange = changes.some(
+        (c) => (c.type === 'position' && c.dragging === false) || c.type === 'remove',
+      )
+      if (hasDirtyChange) setIsDirty(true)
+    },
+    [onNodesChangeRaw, setIsDirty],
+  )
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      onEdgesChangeRaw(changes)
+      if (changes.some((c) => c.type === 'remove')) setIsDirty(true)
+    },
+    [onEdgesChangeRaw, setIsDirty],
+  )
 
   const flowSync = useFlowSync({
     setNodes,
