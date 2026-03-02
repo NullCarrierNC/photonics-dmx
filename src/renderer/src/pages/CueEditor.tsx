@@ -4,6 +4,7 @@ import type { Layout } from 'react-resizable-panels'
 import 'reactflow/dist/style.css'
 import CueFlowCanvas from '../components/cue-editor/components/CueFlowCanvas'
 import CueJsonEditor from '../components/cue-editor/components/CueJsonEditor'
+import EffectJsonEditor from '../components/cue-editor/components/EffectJsonEditor'
 import CueFileSidebar from '../components/cue-editor/components/CueFileSidebar'
 import CueMetadataForm from '../components/cue-editor/components/CueMetadataForm'
 import NodeSidebar from '../components/cue-editor/components/NodeSidebar'
@@ -52,7 +53,7 @@ type EditorCueOrEffect =
   | YargEffectDefinition
   | AudioEffectDefinition
   | null
-import { readEffectFile, showItemInFolder } from '../ipcApi'
+import { readEffectFile, runNodeScript, showItemInFolder } from '../ipcApi'
 
 const SIDEBAR_LAYOUT_KEY = 'photonics.nodeCueEditor.sidebarLayout'
 // Original grid was minmax(260px,300px) | 2fr | minmax(260px,400px) — approximate as %
@@ -587,6 +588,33 @@ const CueEditor: React.FC = () => {
     [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setIsDirty],
   )
 
+  const handleJsonEffectSave = useCallback(
+    (updatedEffect: YargEffectDefinition | AudioEffectDefinition) => {
+      if (!editorDoc || editorDoc.mode !== 'effect' || !selectedCueId) return
+      const file = editorDoc.file as EffectFile
+      const updatedFile: EffectFile = {
+        ...file,
+        effects: file.effects.map((e) => (e.id === selectedCueId ? updatedEffect : e)),
+      }
+      setEditorDoc({ mode: 'effect', file: updatedFile, path: editorDoc.path })
+      loadCueIntoFlow(updatedEffect)
+      setShowJsonEditor(false)
+      setJsonEditorDirty(false)
+      setIsDirty(true)
+    },
+    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setIsDirty],
+  )
+
+  const handleGraphPrettify = useCallback(async () => {
+    if (!editorDoc?.path || !selectedCueId) return
+    if (isDirty) await handleSave()
+    await runNodeScript({
+      scriptName: 'node-graph-prettier.mjs',
+      args: ['--file', editorDoc.path, '--id', selectedCueId],
+    })
+    await handleReload()
+  }, [editorDoc, selectedCueId, isDirty, handleSave, handleReload])
+
   const guardJsonEditorNavigation = useCallback(
     (action: () => void) => {
       const jsonDirty = showJsonEditor && jsonEditorDirty
@@ -707,9 +735,24 @@ const CueEditor: React.FC = () => {
             />
 
             {showJsonEditor &&
-            editorDoc?.mode === 'cue' &&
+            editorDoc?.mode === 'effect' &&
             selectedCueId &&
-            currentCueDefinition ? (
+            currentEffectDefinition ? (
+              <EffectJsonEditor
+                effectDefinition={currentEffectDefinition}
+                editorDoc={editorDoc}
+                selectedEffectId={selectedCueId}
+                onSave={handleJsonEffectSave}
+                onCancel={() => {
+                  setShowJsonEditor(false)
+                  setJsonEditorDirty(false)
+                }}
+                onDirtyChange={setJsonEditorDirty}
+              />
+            ) : showJsonEditor &&
+              editorDoc?.mode === 'cue' &&
+              selectedCueId &&
+              currentCueDefinition ? (
               <CueJsonEditor
                 cueDefinition={currentCueDefinition}
                 editorDoc={editorDoc}
@@ -727,7 +770,11 @@ const CueEditor: React.FC = () => {
                   nodes={nodes}
                   edges={edges}
                   nodeTypes={nodeTypes}
-                  selectedCueName={currentCueDefinition?.name}
+                  selectedCueName={
+                    editorDoc?.mode === 'effect'
+                      ? currentEffectDefinition?.name
+                      : currentCueDefinition?.name
+                  }
                   contextMenu={contextMenu}
                   paneContextMenu={paneContextMenu}
                   flowWrapperRef={flowWrapperRef}
@@ -753,6 +800,7 @@ const CueEditor: React.FC = () => {
                   addEffectListenerNode={addEffectListenerNode}
                   addNotesNode={addNotesNode}
                   onJsonToggle={() => setShowJsonEditor(true)}
+                  onGraphPrettify={handleGraphPrettify}
                 />
               </ActiveNodesContext.Provider>
             )}

@@ -7,12 +7,12 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { linter, lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { ensureSyntaxTree } from '@codemirror/language'
 import type {
-  AudioNodeCueDefinition,
-  NodeCueFile,
-  YargNodeCueDefinition,
+  AudioEffectDefinition,
+  EffectFile,
+  YargEffectDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
-import { validateNodeCue } from '../../../ipcApi'
+import { validateEffect } from '../../../ipcApi'
 
 /**
  * Resolve a JSON Pointer path (e.g. ["nodes", "events", "0", "type"]) to character
@@ -75,19 +75,19 @@ function resolveJsonPath(
   return { from: cur.from, to: cur.to }
 }
 
-type CueJsonEditorProps = {
-  cueDefinition: YargNodeCueDefinition | AudioNodeCueDefinition
+type EffectJsonEditorProps = {
+  effectDefinition: YargEffectDefinition | AudioEffectDefinition
   editorDoc: EditorDocument
-  selectedCueId: string
-  onSave: (updatedCue: YargNodeCueDefinition | AudioNodeCueDefinition) => void
+  selectedEffectId: string
+  onSave: (updatedEffect: YargEffectDefinition | AudioEffectDefinition) => void
   onCancel: () => void
   onDirtyChange?: (dirty: boolean) => void
 }
 
-const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
-  cueDefinition,
+const EffectJsonEditor: React.FC<EffectJsonEditorProps> = ({
+  effectDefinition,
   editorDoc,
-  selectedCueId,
+  selectedEffectId,
   onSave,
   onCancel,
   onDirtyChange,
@@ -110,15 +110,15 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
 
   const showSaveButton = validationPassed && !contentChangedAfterValidation
 
-  const buildFileWithCue = useCallback(
-    (cue: YargNodeCueDefinition | AudioNodeCueDefinition): NodeCueFile => {
-      const file = editorDoc.file as NodeCueFile
+  const buildFileWithEffect = useCallback(
+    (effect: YargEffectDefinition | AudioEffectDefinition): EffectFile => {
+      const file = editorDoc.file as EffectFile
       return {
         ...file,
-        cues: file.cues.map((c) => (c.id === selectedCueId ? cue : c)),
+        effects: file.effects.map((e) => (e.id === selectedEffectId ? effect : e)),
       }
     },
-    [editorDoc.file, selectedCueId],
+    [editorDoc.file, selectedEffectId],
   )
 
   const handleValidate = useCallback(async () => {
@@ -131,7 +131,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
 
     let parsed: unknown
     try {
-      parsed = JSON.parse(raw) as YargNodeCueDefinition | AudioNodeCueDefinition
+      parsed = JSON.parse(raw) as YargEffectDefinition | AudioEffectDefinition
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Invalid JSON'
       setValidationErrors([`Parse error: ${message}`])
@@ -139,8 +139,10 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
       return
     }
 
-    const fileWithCue = buildFileWithCue(parsed as YargNodeCueDefinition | AudioNodeCueDefinition)
-    const result = await validateNodeCue({ content: fileWithCue })
+    const fileWithEffect = buildFileWithEffect(
+      parsed as YargEffectDefinition | AudioEffectDefinition,
+    )
+    const result = await validateEffect({ content: fileWithEffect })
 
     if (!result.valid) {
       setValidationErrors(result.errors ?? ['Validation failed'])
@@ -148,13 +150,13 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
       const structured =
         (result as { structuredErrors?: { instancePath: string; message: string }[] })
           .structuredErrors ?? []
-      const cueIndex = fileWithCue.cues.findIndex((c) => c.id === selectedCueId)
-      const cuePrefix = cueIndex >= 0 ? `/cues/${cueIndex}/` : ''
+      const effectIndex = fileWithEffect.effects.findIndex((e) => e.id === selectedEffectId)
+      const effectPrefix = effectIndex >= 0 ? `/effects/${effectIndex}/` : ''
       const diagnostics: Diagnostic[] = []
       for (const err of structured) {
         const pathRelative =
-          cuePrefix && err.instancePath.startsWith(cuePrefix)
-            ? err.instancePath.slice(cuePrefix.length)
+          effectPrefix && err.instancePath.startsWith(effectPrefix)
+            ? err.instancePath.slice(effectPrefix.length)
             : err.instancePath
         const segments = pathRelative.split('/').filter(Boolean)
         const pos = resolveJsonPath(view.state, segments)
@@ -176,7 +178,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
     setValidationErrors([])
     setValidationPassed(true)
     setContentChangedAfterValidation(false)
-  }, [buildFileWithCue, selectedCueId])
+  }, [buildFileWithEffect, selectedEffectId])
 
   const handleSave = useCallback(() => {
     const view = viewRef.current
@@ -184,7 +186,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
 
     const raw = view.state.doc.toString()
     try {
-      const parsed = JSON.parse(raw) as YargNodeCueDefinition | AudioNodeCueDefinition
+      const parsed = JSON.parse(raw) as YargEffectDefinition | AudioEffectDefinition
       onSave(parsed)
     } catch {
       setValidationErrors(['Parse error: cannot save invalid JSON'])
@@ -213,7 +215,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
     ]
 
     const initialState = EditorState.create({
-      doc: JSON.stringify(cueDefinition, null, 2),
+      doc: JSON.stringify(effectDefinition, null, 2),
       extensions,
     })
 
@@ -227,7 +229,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
       view.destroy()
       viewRef.current = null
     }
-  }, [cueDefinition])
+  }, [effectDefinition])
 
   return (
     <div className="flex-1 min-h-0 relative flex flex-col rounded-b-lg overflow-hidden bg-[#282c34]">
@@ -266,4 +268,4 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
   )
 }
 
-export default CueJsonEditor
+export default EffectJsonEditor
