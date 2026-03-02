@@ -56,8 +56,10 @@ const CueFileSidebar: React.FC<Props> = ({
     (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
   )
 
-  // Use the appropriate file list based on editor mode
-  const displayFileList = isEffectMode ? effectFileList : fileList
+  // Use the appropriate file list based on editor mode, sorted alphabetically by group name
+  const displayFileList = [...(isEffectMode ? effectFileList : fileList)].sort((a, b) =>
+    (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, { sensitivity: 'base' }),
+  )
 
   return (
     <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-hidden flex flex-col flex-1 min-h-0">
@@ -80,10 +82,15 @@ const CueFileSidebar: React.FC<Props> = ({
                 ? onSelectEffectFile(file as EffectFileSummary)
                 : onSelectFile(file as NodeCueFileSummary)
             }>
-            <div className="font-semibold truncate">{file.groupName}</div>
-            <div className="text-[10px] text-gray-500 truncate">{file.path}</div>
+            <div
+              className={`font-semibold truncate ${file.bundled === true ? 'text-yellow-600 dark:text-yellow-400' : ''}`}>
+              {file.groupName}
+            </div>
             <div className="text-[10px] text-gray-500">
-              {file.cueCount} {itemCountLabel}
+              {isEffectMode
+                ? (file as EffectFileSummary).effectCount
+                : (file as NodeCueFileSummary).cueCount}{' '}
+              {itemCountLabel}
             </div>
           </button>
         ))}

@@ -13,6 +13,7 @@ export interface EffectFileSummary {
   mode: EffectMode
   updatedAt: number
   errors?: string[]
+  bundled?: boolean
 }
 
 export interface EffectListSummary {
@@ -42,8 +43,8 @@ export class EffectLoader extends EventEmitter {
   constructor(options: EffectLoaderOptions) {
     super()
     this.baseDir = options.baseDir
-    this.yargDir = path.join(this.baseDir, 'effects', 'yarg')
-    this.audioDir = path.join(this.baseDir, 'effects', 'audio')
+    this.yargDir = path.join(this.baseDir, 'node-data', 'effects', 'yarg')
+    this.audioDir = path.join(this.baseDir, 'node-data', 'effects', 'audio')
   }
 
   public async loadAll(): Promise<EffectLoadResult> {
@@ -263,6 +264,7 @@ export class EffectLoader extends EventEmitter {
       effectCount: file.effects.length,
       mode,
       updatedAt: Date.now(),
+      bundled: file.bundled ?? false,
     }
 
     this.updateSummary(summary)

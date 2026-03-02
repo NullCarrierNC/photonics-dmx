@@ -910,6 +910,7 @@ const yargFileSchema: JSONSchemaType<YargNodeCueFile> = {
       minItems: 1,
       items: yargCueSchema,
     },
+    bundled: { type: 'boolean', nullable: true },
   },
 }
 
@@ -926,6 +927,7 @@ const audioFileSchema: JSONSchemaType<AudioNodeCueFile> = {
       minItems: 1,
       items: audioCueSchema,
     },
+    bundled: { type: 'boolean', nullable: true },
   },
 }
 

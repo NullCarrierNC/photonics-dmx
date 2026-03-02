@@ -17,9 +17,12 @@ const VariableList: React.FC<VariableListProps> = ({
   if (variables.length === 0) {
     return <p className="text-[10px] text-gray-500 italic">No variables</p>
   }
+  const sortedVariables = [...variables].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+  )
   return (
     <div className="space-y-1">
-      {variables.map((varDef) => (
+      {sortedVariables.map((varDef) => (
         <div
           key={varDef.name}
           className="flex items-center gap-2 text-[11px] p-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">

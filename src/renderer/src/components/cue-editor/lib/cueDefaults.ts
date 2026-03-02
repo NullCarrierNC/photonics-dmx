@@ -131,6 +131,7 @@ const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
       mode,
       group,
       cues: [createDefaultCue('yarg') as YargNodeCueDefinition],
+      bundled: false,
     } as YargNodeCueFile
   }
 
@@ -139,6 +140,7 @@ const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
     mode,
     group,
     cues: [createDefaultCue('audio') as AudioNodeCueDefinition],
+    bundled: false,
   } as AudioNodeCueFile
 }
 
@@ -179,6 +181,7 @@ const createDefaultEffectFile = (mode: EffectMode): EffectFile => {
       mode,
       group,
       effects: [createDefaultEffect('yarg') as YargEffectDefinition],
+      bundled: false,
     } as YargEffectFile
   }
 
@@ -187,6 +190,7 @@ const createDefaultEffectFile = (mode: EffectMode): EffectFile => {
     mode,
     group,
     effects: [createDefaultEffect('audio') as AudioEffectDefinition],
+    bundled: false,
   } as AudioEffectFile
 }
 

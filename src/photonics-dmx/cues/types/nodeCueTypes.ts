@@ -302,6 +302,7 @@ export interface YargNodeCueFile {
   mode: 'yarg'
   group: NodeCueGroupMeta
   cues: YargNodeCueDefinition[]
+  bundled?: boolean
 }
 
 export interface AudioNodeCueFile {
@@ -309,6 +310,7 @@ export interface AudioNodeCueFile {
   mode: 'audio'
   group: NodeCueGroupMeta
   cues: AudioNodeCueDefinition[]
+  bundled?: boolean
 }
 
 export type NodeCueFile = YargNodeCueFile | AudioNodeCueFile
@@ -437,6 +439,7 @@ export interface YargEffectFile {
   mode: 'yarg'
   group: EffectGroupMeta
   effects: YargEffectDefinition[]
+  bundled?: boolean
 }
 
 export interface AudioEffectFile {
@@ -444,6 +447,7 @@ export interface AudioEffectFile {
   mode: 'audio'
   group: EffectGroupMeta
   effects: AudioEffectDefinition[]
+  bundled?: boolean
 }
 
 export type EffectFile = YargEffectFile | AudioEffectFile

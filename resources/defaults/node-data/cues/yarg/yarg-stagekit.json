@@ -1,0 +1,6677 @@
+{
+  "version": 1,
+  "mode": "yarg",
+  "group": {
+    "id": "yarg-stagekit",
+    "name": "StageKit JSON",
+    "description": "YARG StageKit cues as node cue definitions"
+  },
+  "cues": [
+    {
+      "id": "cue-sk-intro",
+      "name": "Intro",
+      "description": "Solid green on all front/back lights",
+      "cueType": "Intro",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-946c8abc-de2d-4f4c-a912-e00ae0c15edd",
+            "type": "event",
+            "eventType": "beat"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-a17410fb-8b17-411d-a3ed-44d9f5655616",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 200
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-946c8abc-de2d-4f4c-a912-e00ae0c15edd",
+          "to": "action-a17410fb-8b17-411d-a3ed-44d9f5655616"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-946c8abc-de2d-4f4c-a912-e00ae0c15edd": {
+            "x": -11.334082754328847,
+            "y": -5.824219550937414
+          },
+          "action-a17410fb-8b17-411d-a3ed-44d9f5655616": {
+            "x": 7.6875928323715925,
+            "y": 130.58446696773171
+          }
+        },
+        "viewport": {
+          "x": 601.367433720734,
+          "y": 153.21490721870214,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-sk-silhouettes",
+      "name": "Silhouettes",
+      "description": "Solid green on all front/back lights",
+      "cueType": "Silhouettes",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-silhouettes-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-silhouettes-green",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-silhouettes-start",
+          "to": "action-sk-silhouettes-green"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-silhouettes-start": {
+            "x": -11.18864568695426,
+            "y": 4.203825902193785
+          },
+          "action-sk-silhouettes-green": {
+            "x": -1.4359771460294724,
+            "y": 122.41047477722168
+          }
+        },
+        "viewport": {
+          "x": 604.7342335623689,
+          "y": 152.5196372452192,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-sk-flare-fast",
+      "name": "Flare Fast",
+      "description": "Solid blue additive on all front/back lights",
+      "cueType": "Flare_Fast",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-flare-fast-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-flare-fast-blue",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-flare-fast-start",
+          "to": "action-sk-flare-fast-blue"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-flare-fast-start": {
+            "x": -7.686222804710269,
+            "y": -7.077825922518969
+          },
+          "action-sk-flare-fast-blue": {
+            "x": 8.089816868305206,
+            "y": 126.35004607215524
+          }
+        },
+        "viewport": {
+          "x": 599.8486522261519,
+          "y": 155.2729174438864,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-sk-flare-slow",
+      "name": "Flare Slow",
+      "description": "Solid white on all front/back lights",
+      "cueType": "Flare_Slow",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-flare-slow-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-flare-slow-white",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-flare-slow-start",
+          "to": "action-sk-flare-slow-white"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-flare-slow-start": {
+            "x": 9.30088958144188,
+            "y": 3.154237788170576
+          },
+          "action-sk-flare-slow-white": {
+            "x": -9.399227114394307,
+            "y": 128.6184568591416
+          }
+        },
+        "viewport": {
+          "x": 600.0368765748572,
+          "y": 150.58523950725794,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-sk-menu",
+      "name": "Menu",
+      "description": "Blue sweep across front/back lights, 2000ms",
+      "cueType": "Menu",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-menu-start",
+            "type": "event",
+            "eventType": "cue-called"
+          },
+          {
+            "id": "event-f0515c11-0720-41dd-8583-4a5400574d71",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-98e79c64-e87e-4f66-89cc-1a8705cc6e30",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 200
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk-menu-setup-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "all-lights-array",
+            "outputs": [],
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "action-sk-menu-sweep",
+            "type": "effect-raiser",
+            "effectId": "effect-sweep-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 10
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-f0515c11-0720-41dd-8583-4a5400574d71",
+          "to": "action-98e79c64-e87e-4f66-89cc-1a8705cc6e30"
+        },
+        {
+          "from": "event-sk-menu-start",
+          "to": "sk-menu-setup-all"
+        },
+        {
+          "from": "sk-menu-setup-all",
+          "to": "action-sk-menu-sweep"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-menu-start": {
+            "x": 263.4732055347413,
+            "y": -2.0342952609062195
+          },
+          "event-f0515c11-0720-41dd-8583-4a5400574d71": {
+            "x": 4.8774734772741795,
+            "y": -6.406514700502157
+          },
+          "action-98e79c64-e87e-4f66-89cc-1a8705cc6e30": {
+            "x": -5.989311575889587,
+            "y": 131.3616075590253
+          },
+          "sk-menu-setup-all": {
+            "x": 251.25557010620832,
+            "y": 129.56211198493838
+          },
+          "action-sk-menu-sweep": {
+            "x": 260.3863600939512,
+            "y": 252.22282484918833
+          }
+        },
+        "viewport": {
+          "x": 503.4435397654306,
+          "y": 107.81888369424269,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-sweep-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Sweep Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-cool-auto",
+      "name": "Cool Automatic",
+      "description": "2x blue CW, 1x green CCW on beat",
+      "cueType": "Cool_Automatic",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-cool-auto-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-cool-auto-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-cool-auto-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk-cool-auto-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-cool-auto-green-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "greenOffset"
+          },
+          {
+            "id": "sk-cool-auto-blue2-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "blue2Offset"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-cool-auto-cw1",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-cool-auto-cw2",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 2
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "blue2Offset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-cool-auto-ccw",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "greenOffset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-cool-auto-start",
+          "to": "sk-cool-auto-num"
+        },
+        {
+          "from": "sk-cool-auto-num",
+          "to": "sk-cool-auto-all"
+        },
+        {
+          "from": "sk-cool-auto-all",
+          "to": "sk-cool-auto-green-off"
+        },
+        {
+          "from": "sk-cool-auto-green-off",
+          "to": "sk-cool-auto-blue2-off"
+        },
+        {
+          "from": "event-sk-cool-auto-called",
+          "to": "sk-cool-auto-cw1"
+        },
+        {
+          "from": "event-sk-cool-auto-called",
+          "to": "sk-cool-auto-cw2"
+        },
+        {
+          "from": "event-sk-cool-auto-called",
+          "to": "sk-cool-auto-ccw"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-cool-auto-start": {
+            "x": -8.600264048203826,
+            "y": 0.1465497389435768
+          },
+          "event-sk-cool-auto-called": {
+            "x": 264.45518063381314,
+            "y": 5.4896638430655
+          },
+          "sk-cool-auto-num": {
+            "x": 10.068823970854282,
+            "y": 122.17523024231195
+          },
+          "sk-cool-auto-all": {
+            "x": -11.16491598263383,
+            "y": 247.5705344416201
+          },
+          "sk-cool-auto-green-off": {
+            "x": -9.503721836954355,
+            "y": 369.77080078423023
+          },
+          "sk-cool-auto-blue2-off": {
+            "x": 7.3494168519973755,
+            "y": 504.49091049283743
+          },
+          "sk-cool-auto-cw1": {
+            "x": 250.6518717110157,
+            "y": 117.50053986161947
+          },
+          "sk-cool-auto-cw2": {
+            "x": 509.8550967127085,
+            "y": 130.38066091760993
+          },
+          "sk-cool-auto-ccw": {
+            "x": 791.4808902684599,
+            "y": 127.9694596529007
+          }
+        },
+        "viewport": {
+          "x": 307.3815096428152,
+          "y": 10.760952413082123,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "greenOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "blue2Offset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-cw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-rotation-ccw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CCW"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-cool-manual",
+      "name": "Cool Manual",
+      "description": "2x blue CW, 1x green CCW on keyframe",
+      "cueType": "Cool_Manual",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-cool-manual-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-cool-manual-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-cool-manual-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk-cool-manual-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-cool-manual-green-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "greenOffset"
+          },
+          {
+            "id": "sk-cool-manual-blue2-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "blue2Offset"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-cool-manual-cw1",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-cool-manual-cw2",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 2
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "blue2Offset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-cool-manual-ccw",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "greenOffset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-cool-manual-start",
+          "to": "sk-cool-manual-num"
+        },
+        {
+          "from": "sk-cool-manual-num",
+          "to": "sk-cool-manual-all"
+        },
+        {
+          "from": "sk-cool-manual-all",
+          "to": "sk-cool-manual-green-off"
+        },
+        {
+          "from": "sk-cool-manual-green-off",
+          "to": "sk-cool-manual-blue2-off"
+        },
+        {
+          "from": "event-sk-cool-manual-called",
+          "to": "sk-cool-manual-cw1"
+        },
+        {
+          "from": "event-sk-cool-manual-called",
+          "to": "sk-cool-manual-cw2"
+        },
+        {
+          "from": "event-sk-cool-manual-called",
+          "to": "sk-cool-manual-ccw"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-cool-manual-start": {
+            "x": 6.791944244876504,
+            "y": -1.6716351807117462
+          },
+          "event-sk-cool-manual-called": {
+            "x": 259.94212024845183,
+            "y": 2.347775664180517
+          },
+          "sk-cool-manual-num": {
+            "x": -5.871263265609741,
+            "y": 120.42965757846832
+          },
+          "sk-cool-manual-all": {
+            "x": -11.546666745096445,
+            "y": 255.70531933009624
+          },
+          "sk-cool-manual-green-off": {
+            "x": -3.182586494833231,
+            "y": 373.89403215795755
+          },
+          "sk-cool-manual-blue2-off": {
+            "x": 0.11231034435331821,
+            "y": 505.5888085179031
+          },
+          "sk-cool-manual-cw1": {
+            "x": 264.3415390532464,
+            "y": 120.16340785846114
+          },
+          "sk-cool-manual-cw2": {
+            "x": 529.0784498695284,
+            "y": 131.8192181326449
+          },
+          "sk-cool-manual-ccw": {
+            "x": 775.4948919061571,
+            "y": 119.22021013498306
+          }
+        },
+        "viewport": {
+          "x": 313.51941556460224,
+          "y": 11.031059998553246,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "greenOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "blue2Offset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-cw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-rotation-ccw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CCW"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-warm-auto",
+      "name": "Warm Automatic",
+      "description": "2x red CW, 1x yellow CCW on beat",
+      "cueType": "Warm_Automatic",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-warm-auto-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-warm-auto-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-warm-auto-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk-warm-auto-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-warm-auto-yellow-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "yellowOffset"
+          },
+          {
+            "id": "sk-warm-auto-red2-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "red2Offset"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-warm-auto-cw",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-warm-auto-cw2",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 2
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "red2Offset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-warm-auto-ccw",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "yellowOffset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-warm-auto-start",
+          "to": "sk-warm-auto-num"
+        },
+        {
+          "from": "sk-warm-auto-num",
+          "to": "sk-warm-auto-all"
+        },
+        {
+          "from": "sk-warm-auto-all",
+          "to": "sk-warm-auto-yellow-off"
+        },
+        {
+          "from": "sk-warm-auto-yellow-off",
+          "to": "sk-warm-auto-red2-off"
+        },
+        {
+          "from": "event-sk-warm-auto-called",
+          "to": "sk-warm-auto-cw"
+        },
+        {
+          "from": "event-sk-warm-auto-called",
+          "to": "sk-warm-auto-cw2"
+        },
+        {
+          "from": "event-sk-warm-auto-called",
+          "to": "sk-warm-auto-ccw"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-warm-auto-start": {
+            "x": 2.2607185039669275,
+            "y": -2.1441618725657463
+          },
+          "event-sk-warm-auto-called": {
+            "x": 262.7175809144974,
+            "y": 2.017498329281807
+          },
+          "sk-warm-auto-num": {
+            "x": -7.571210129186511,
+            "y": 129.60524986311793
+          },
+          "sk-warm-auto-all": {
+            "x": 11.51012784987688,
+            "y": 247.9319191761315
+          },
+          "sk-warm-auto-yellow-off": {
+            "x": -1.2733243647962809,
+            "y": 377.9194411598146
+          },
+          "sk-warm-auto-red2-off": {
+            "x": -2.580136187374592,
+            "y": 494.3094790093601
+          },
+          "sk-warm-auto-cw": {
+            "x": 255.3687413521111,
+            "y": 123.81700939685106
+          },
+          "sk-warm-auto-cw2": {
+            "x": 509.55547573789954,
+            "y": 124.95326021313667
+          },
+          "sk-warm-auto-ccw": {
+            "x": 784.06209602952,
+            "y": 122.34107571095228
+          }
+        },
+        "viewport": {
+          "x": 308.81591778737493,
+          "y": 15.438006073702127,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "yellowOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "red2Offset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-cw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-rotation-ccw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CCW"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-warm-manual",
+      "name": "Warm Manual",
+      "description": "2x red CW, 1x yellow CCW on keyframe",
+      "cueType": "Warm_Manual",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-warm-manual-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-warm-manual-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-warm-manual-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk-warm-manual-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-warm-manual-yellow-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "yellowOffset"
+          },
+          {
+            "id": "sk-warm-manual-red2-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "red2Offset"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-warm-manual-cw",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-warm-manual-cw2",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 2
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "red2Offset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-warm-manual-ccw",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "yellowOffset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-warm-manual-start",
+          "to": "sk-warm-manual-num"
+        },
+        {
+          "from": "sk-warm-manual-num",
+          "to": "sk-warm-manual-all"
+        },
+        {
+          "from": "sk-warm-manual-all",
+          "to": "sk-warm-manual-yellow-off"
+        },
+        {
+          "from": "sk-warm-manual-yellow-off",
+          "to": "sk-warm-manual-red2-off"
+        },
+        {
+          "from": "event-sk-warm-manual-called",
+          "to": "sk-warm-manual-cw"
+        },
+        {
+          "from": "event-sk-warm-manual-called",
+          "to": "sk-warm-manual-cw2"
+        },
+        {
+          "from": "event-sk-warm-manual-called",
+          "to": "sk-warm-manual-ccw"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-warm-manual-start": {
+            "x": -2.424702225252986,
+            "y": 4.533393494784832
+          },
+          "event-sk-warm-manual-called": {
+            "x": 258.58090998604894,
+            "y": -5.089396018534899
+          },
+          "sk-warm-manual-num": {
+            "x": -7.834582502022386,
+            "y": 132.64845218881965
+          },
+          "sk-warm-manual-all": {
+            "x": 5.183738641440868,
+            "y": 246.80517817661166
+          },
+          "sk-warm-manual-yellow-off": {
+            "x": 6.970827396959066,
+            "y": 380.8744365423918
+          },
+          "sk-warm-manual-red2-off": {
+            "x": -9.85548172518611,
+            "y": 496.75682877749205
+          },
+          "sk-warm-manual-cw": {
+            "x": 250.46567381732166,
+            "y": 120.51505118235946
+          },
+          "sk-warm-manual-cw2": {
+            "x": 514.3550924826413,
+            "y": 125.89385829493403
+          },
+          "sk-warm-manual-ccw": {
+            "x": 781.6850083228201,
+            "y": 121.64409189671278
+          }
+        },
+        "viewport": {
+          "x": 310.56392752588727,
+          "y": 15.62471271539107,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "yellowOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "red2Offset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-cw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-rotation-ccw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CCW"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-harmony",
+      "name": "Harmony",
+      "description": "Large: yellow+red CW; Small: cyan CW",
+      "cueType": "Harmony",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-harmony-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-harmony-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-harmony-venue",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "venue-size",
+            "assignTo": "venueSize"
+          },
+          {
+            "id": "sk-harmony-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk-harmony-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-harmony-yellow-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 3
+            },
+            "assignTo": "yellowOffset"
+          },
+          {
+            "id": "sk-harmony-red-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "redOffset"
+          },
+          {
+            "id": "sk-harmony-is-large",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "venueSize"
+            },
+            "right": {
+              "source": "literal",
+              "value": "Large"
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-harmony-cyan",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "cyan"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "sk-harmony-yellow",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "yellowOffset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "sk-harmony-red",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "redOffset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-harmony-start",
+          "to": "sk-harmony-venue"
+        },
+        {
+          "from": "sk-harmony-venue",
+          "to": "sk-harmony-num"
+        },
+        {
+          "from": "sk-harmony-num",
+          "to": "sk-harmony-all"
+        },
+        {
+          "from": "sk-harmony-all",
+          "to": "sk-harmony-yellow-off"
+        },
+        {
+          "from": "sk-harmony-yellow-off",
+          "to": "sk-harmony-red-off"
+        },
+        {
+          "from": "event-sk-harmony-called",
+          "to": "sk-harmony-is-large"
+        },
+        {
+          "from": "sk-harmony-is-large",
+          "to": "sk-harmony-yellow",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-harmony-is-large",
+          "to": "sk-harmony-cyan",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-harmony-yellow",
+          "to": "sk-harmony-red"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-harmony-start": {
+            "x": 11.186406841501594,
+            "y": -6.473227098584175
+          },
+          "event-sk-harmony-called": {
+            "x": 252.2667101211846,
+            "y": -2.5539770238101482
+          },
+          "sk-harmony-venue": {
+            "x": -8.770068442448974,
+            "y": 117.96040293574333
+          },
+          "sk-harmony-num": {
+            "x": -8.473050685599446,
+            "y": 254.7722670659423
+          },
+          "sk-harmony-all": {
+            "x": -0.8379587363451719,
+            "y": 380.22267051041126
+          },
+          "sk-harmony-yellow-off": {
+            "x": -11.65918698348105,
+            "y": 498.3883852735162
+          },
+          "sk-harmony-red-off": {
+            "x": 7.663006028160453,
+            "y": 627.2153034992516
+          },
+          "sk-harmony-is-large": {
+            "x": 262.14697204343975,
+            "y": 130.60548834875226
+          },
+          "sk-harmony-cyan": {
+            "x": 518.5744954161346,
+            "y": 251.41315881162882
+          },
+          "sk-harmony-yellow": {
+            "x": 265.3835455942899,
+            "y": 242.5049189440906
+          },
+          "sk-harmony-red": {
+            "x": 303.63982756955374,
+            "y": 655.5117717706546
+          }
+        },
+        "viewport": {
+          "x": 298.0572497870264,
+          "y": 115.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "venueSize",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "",
+          "isParameter": false
+        },
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "yellowOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "redOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-cw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CW"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-searchlights",
+      "name": "Searchlights",
+      "description": "CCW yellow; 8+ lights also CCW red offset 1",
+      "cueType": "Searchlights",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-searchlights-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-searchlights-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-searchlights-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk-searchlights-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-searchlights-has-red",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": ">=",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 8
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-searchlights-yellow",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "sk-searchlights-red",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 20
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-searchlights-start",
+          "to": "sk-searchlights-num"
+        },
+        {
+          "from": "sk-searchlights-num",
+          "to": "sk-searchlights-all"
+        },
+        {
+          "from": "event-sk-searchlights-called",
+          "to": "sk-searchlights-has-red"
+        },
+        {
+          "from": "sk-searchlights-has-red",
+          "to": "sk-searchlights-yellow",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-searchlights-has-red",
+          "to": "sk-searchlights-yellow",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-searchlights-has-red",
+          "to": "sk-searchlights-red",
+          "fromPort": "true"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-searchlights-start": {
+            "x": 261.80339159071445,
+            "y": 1.1990827694535255
+          },
+          "event-sk-searchlights-called": {
+            "x": 520.1201393995434,
+            "y": -6.86790894344449
+          },
+          "sk-searchlights-num": {
+            "x": 265.8935543183395,
+            "y": 87.62650177064768
+          },
+          "sk-searchlights-all": {
+            "x": 256.4145216449624,
+            "y": 203.6432303664177
+          },
+          "sk-searchlights-has-red": {
+            "x": 528.5939066428691,
+            "y": 117.99012338370085
+          },
+          "sk-searchlights-yellow": {
+            "x": 657.1555101107931,
+            "y": 410.542650937968
+          },
+          "sk-searchlights-red": {
+            "x": 403.32514767062867,
+            "y": 410.5616975835794
+          }
+        },
+        "viewport": {
+          "x": 250.05724978702642,
+          "y": 99.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-ccw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CCW"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-score",
+      "name": "Score",
+      "description": "Yellow CW opposite pairs, blue CCW individual",
+      "cueType": "Score",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-score-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-score-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-score-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-score-pairs",
+            "type": "logic",
+            "logicType": "create-pairs",
+            "pairType": "opposite",
+            "sourceVariable": "allLights",
+            "assignTo": "pairedLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-score-yellow",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "pairedLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-score-blue",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 20
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-score-start",
+          "to": "sk-score-all"
+        },
+        {
+          "from": "sk-score-all",
+          "to": "sk-score-pairs"
+        },
+        {
+          "from": "event-sk-score-called",
+          "to": "sk-score-yellow"
+        },
+        {
+          "from": "event-sk-score-called",
+          "to": "sk-score-blue"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-score-start": {
+            "x": 5.233371516689658,
+            "y": -7.211720149964094
+          },
+          "event-sk-score-called": {
+            "x": 268.3758735600859,
+            "y": -6.917502246797085
+          },
+          "sk-score-all": {
+            "x": -5.403018297627568,
+            "y": 128.56926752626896
+          },
+          "sk-score-pairs": {
+            "x": 11.142601814121008,
+            "y": 257.63424490764737
+          },
+          "sk-score-yellow": {
+            "x": 248.25605745241046,
+            "y": 117.7390435449779
+          },
+          "sk-score-blue": {
+            "x": 511.24996094219387,
+            "y": 132.89378997310996
+          }
+        },
+        "viewport": {
+          "x": 410.30739650828764,
+          "y": 106.09155321586877,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "pairedLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-cw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-rotation-ccw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CCW"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-strobe-slow",
+      "name": "Strobe Slow",
+      "description": "Strobe white at BPM/8, 70ms hold",
+      "cueType": "Strobe_Slow",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-strobe-slow-start",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-strobe-slow-white",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 70
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 255
+            }
+          },
+          {
+            "id": "action-sk-strobe-slow-black",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "interval"
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 255
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk-strobe-slow-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk-strobe-slow-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk-strobe-slow-interval",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 8
+            },
+            "assignTo": "interval"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-strobe-slow-start",
+          "to": "sk-strobe-slow-bpm"
+        },
+        {
+          "from": "sk-strobe-slow-bpm",
+          "to": "sk-strobe-slow-beat-ms"
+        },
+        {
+          "from": "sk-strobe-slow-beat-ms",
+          "to": "sk-strobe-slow-interval"
+        },
+        {
+          "from": "sk-strobe-slow-interval",
+          "to": "action-sk-strobe-slow-white"
+        },
+        {
+          "from": "action-sk-strobe-slow-white",
+          "to": "action-sk-strobe-slow-black"
+        },
+        {
+          "from": "action-sk-strobe-slow-black",
+          "to": "action-sk-strobe-slow-white"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-strobe-slow-start": {
+            "x": 5.666995290666819,
+            "y": -5.967437744140625
+          },
+          "action-sk-strobe-slow-white": {
+            "x": 4.956674225628376,
+            "y": 505.3116079829633
+          },
+          "action-sk-strobe-slow-black": {
+            "x": 283.45618326306544,
+            "y": 495.3312011702624
+          },
+          "sk-strobe-slow-bpm": {
+            "x": -1.2915085460990667,
+            "y": 123.68237586691976
+          },
+          "sk-strobe-slow-beat-ms": {
+            "x": -8.462054880335927,
+            "y": 248.1685901992023
+          },
+          "sk-strobe-slow-interval": {
+            "x": -11.532766956835985,
+            "y": 369.3868732601404
+          }
+        },
+        "viewport": {
+          "x": 250.05724978702642,
+          "y": 99.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "interval",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-strobe-medium",
+      "name": "Strobe Medium",
+      "description": "Strobe white at BPM/16, 60ms hold",
+      "cueType": "Strobe_Medium",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-strobe-medium-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-strobe-medium-white",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 60
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 255
+            }
+          },
+          {
+            "id": "action-sk-strobe-medium-black",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "interval"
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 255
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk-strobe-medium-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk-strobe-medium-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk-strobe-medium-interval",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 16
+            },
+            "assignTo": "interval"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-strobe-medium-start",
+          "to": "sk-strobe-medium-bpm"
+        },
+        {
+          "from": "sk-strobe-medium-bpm",
+          "to": "sk-strobe-medium-beat-ms"
+        },
+        {
+          "from": "sk-strobe-medium-beat-ms",
+          "to": "sk-strobe-medium-interval"
+        },
+        {
+          "from": "sk-strobe-medium-interval",
+          "to": "action-sk-strobe-medium-white"
+        },
+        {
+          "from": "action-sk-strobe-medium-white",
+          "to": "action-sk-strobe-medium-black"
+        },
+        {
+          "from": "action-sk-strobe-medium-black",
+          "to": "action-sk-strobe-medium-white"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-strobe-medium-start": {
+            "x": -5.285714540630579,
+            "y": 6.373385921120644
+          },
+          "action-sk-strobe-medium-white": {
+            "x": 0.9361506085842848,
+            "y": 501.95671858265996
+          },
+          "action-sk-strobe-medium-black": {
+            "x": 320.4319642596623,
+            "y": 500.19557217777015
+          },
+          "sk-strobe-medium-bpm": {
+            "x": -9.923248054459691,
+            "y": 118.6407208442688
+          },
+          "sk-strobe-medium-beat-ms": {
+            "x": 5.02102704718709,
+            "y": 246.02116546034813
+          },
+          "sk-strobe-medium-interval": {
+            "x": -6.317980600520968,
+            "y": 382.33880672976375
+          }
+        },
+        "viewport": {
+          "x": 250.05724978702642,
+          "y": 99.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "interval",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-strobe-fast",
+      "name": "Strobe Fast",
+      "description": "Strobe white at BPM/32, 50ms hold",
+      "cueType": "Strobe_Fast",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-strobe-fast-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-strobe-fast-white",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 50
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 255
+            }
+          },
+          {
+            "id": "action-sk-strobe-fast-black",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "interval"
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 255
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk-strobe-fast-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk-strobe-fast-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk-strobe-fast-interval",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 32
+            },
+            "assignTo": "interval"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-strobe-fast-start",
+          "to": "sk-strobe-fast-bpm"
+        },
+        {
+          "from": "sk-strobe-fast-bpm",
+          "to": "sk-strobe-fast-beat-ms"
+        },
+        {
+          "from": "sk-strobe-fast-beat-ms",
+          "to": "sk-strobe-fast-interval"
+        },
+        {
+          "from": "sk-strobe-fast-interval",
+          "to": "action-sk-strobe-fast-white"
+        },
+        {
+          "from": "action-sk-strobe-fast-white",
+          "to": "action-sk-strobe-fast-black"
+        },
+        {
+          "from": "action-sk-strobe-fast-black",
+          "to": "action-sk-strobe-fast-white"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-strobe-fast-start": {
+            "x": -1.7065809778869152,
+            "y": 7.984691008925438
+          },
+          "action-sk-strobe-fast-white": {
+            "x": -68.86667310217331,
+            "y": 508.95465662837773
+          },
+          "action-sk-strobe-fast-black": {
+            "x": 289.06912597636017,
+            "y": 498.3487086413279
+          },
+          "sk-strobe-fast-bpm": {
+            "x": -10.293420927599072,
+            "y": 119.08032855018973
+          },
+          "sk-strobe-fast-beat-ms": {
+            "x": -11.375788561999798,
+            "y": 244.64896833524108
+          },
+          "sk-strobe-fast-interval": {
+            "x": -7.570198332890868,
+            "y": 382.8745437525213
+          }
+        },
+        "viewport": {
+          "x": 250.05724978702642,
+          "y": 99.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "interval",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-strobe-fastest",
+      "name": "Strobe Fastest",
+      "description": "Strobe white at BPM/64, 40ms hold",
+      "cueType": "Strobe_Fastest",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-strobe-fastest-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-strobe-fastest-white",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 40
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 255
+            }
+          },
+          {
+            "id": "action-sk-strobe-fastest-black",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "interval"
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 255
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk-strobe-fastest-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk-strobe-fastest-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk-strobe-fastest-interval",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 64
+            },
+            "assignTo": "interval"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-strobe-fastest-start",
+          "to": "sk-strobe-fastest-bpm"
+        },
+        {
+          "from": "sk-strobe-fastest-bpm",
+          "to": "sk-strobe-fastest-beat-ms"
+        },
+        {
+          "from": "sk-strobe-fastest-beat-ms",
+          "to": "sk-strobe-fastest-interval"
+        },
+        {
+          "from": "sk-strobe-fastest-interval",
+          "to": "action-sk-strobe-fastest-white"
+        },
+        {
+          "from": "action-sk-strobe-fastest-white",
+          "to": "action-sk-strobe-fastest-black"
+        },
+        {
+          "from": "action-sk-strobe-fastest-black",
+          "to": "action-sk-strobe-fastest-white"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-strobe-fastest-start": {
+            "x": -1.3502389378845692,
+            "y": -4.577998001128435
+          },
+          "action-sk-strobe-fastest-white": {
+            "x": -2.2345848362892866,
+            "y": 492.05596428737044
+          },
+          "action-sk-strobe-fastest-black": {
+            "x": 343.59426075052704,
+            "y": 484.32127647845687
+          },
+          "sk-strobe-fastest-bpm": {
+            "x": -3.132577456533909,
+            "y": 117.71241904050112
+          },
+          "sk-strobe-fastest-beat-ms": {
+            "x": 9.976529885083437,
+            "y": 256.32200799137354
+          },
+          "sk-strobe-fastest-interval": {
+            "x": -1.0968803856521845,
+            "y": 372.43872198835015
+          }
+        },
+        "viewport": {
+          "x": 250.05724978702642,
+          "y": 99.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "interval",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-default",
+      "name": "Default",
+      "description": "Blue/red alternate on keyframe; small venue: yellow flash OFF on drum-red",
+      "cueType": "Default",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-default-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-default-keyframe",
+            "type": "event",
+            "eventType": "keyframe"
+          },
+          {
+            "id": "event-sk-default-drum-red",
+            "type": "event",
+            "eventType": "drum-red"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-default-blue-inner",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "inner-half-major"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-default-red-outer",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "outter-half-minor"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-default-red-inner",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "inner-half-major"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-default-blue-outer",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "outter-half-minor"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-default-yellow-off",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 200
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 10
+            }
+          },
+          {
+            "id": "action-sk-default-yellow-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 10
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk-default-venue",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "venue-size",
+            "assignTo": "venueSize"
+          },
+          {
+            "id": "sk-default-init-toggle",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "toggle",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "sk-default-flip",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "literal",
+              "value": 1
+            },
+            "right": {
+              "source": "variable",
+              "name": "toggle"
+            },
+            "assignTo": "toggle"
+          },
+          {
+            "id": "sk-default-cond-toggle",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "toggle"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "sk-default-small-venue",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "venueSize"
+            },
+            "right": {
+              "source": "literal",
+              "value": "Small"
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-default-start",
+          "to": "sk-default-venue"
+        },
+        {
+          "from": "sk-default-venue",
+          "to": "sk-default-init-toggle"
+        },
+        {
+          "from": "event-sk-default-keyframe",
+          "to": "sk-default-flip"
+        },
+        {
+          "from": "sk-default-flip",
+          "to": "sk-default-cond-toggle"
+        },
+        {
+          "from": "sk-default-cond-toggle",
+          "to": "action-sk-default-blue-inner",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-default-cond-toggle",
+          "to": "action-sk-default-red-outer",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-default-cond-toggle",
+          "to": "action-sk-default-red-inner",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-default-cond-toggle",
+          "to": "action-sk-default-blue-outer",
+          "fromPort": "false"
+        },
+        {
+          "from": "event-sk-default-drum-red",
+          "to": "sk-default-small-venue"
+        },
+        {
+          "from": "sk-default-small-venue",
+          "to": "action-sk-default-yellow-on",
+          "fromPort": "true"
+        },
+        {
+          "from": "action-sk-default-yellow-on",
+          "to": "action-sk-default-yellow-off"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-default-start": {
+            "x": 252.89043559879065,
+            "y": 4.005740936845541
+          },
+          "event-sk-default-keyframe": {
+            "x": 518.6576696168631,
+            "y": 0.9477335810661316
+          },
+          "event-sk-default-drum-red": {
+            "x": 781.3411926683038,
+            "y": 0.08342303708195686
+          },
+          "action-sk-default-blue-inner": {
+            "x": 286.96310437934517,
+            "y": 625.2403077099771
+          },
+          "action-sk-default-red-outer": {
+            "x": 73.03081543308224,
+            "y": 503.7322467656794
+          },
+          "action-sk-default-red-inner": {
+            "x": 587.2828334012943,
+            "y": 776.4008728783689
+          },
+          "action-sk-default-blue-outer": {
+            "x": 776.4618769735271,
+            "y": 638.8094927492841
+          },
+          "action-sk-default-yellow-off": {
+            "x": 1177.7848287310546,
+            "y": 475.76228590659184
+          },
+          "action-sk-default-yellow-on": {
+            "x": 786.2865409422666,
+            "y": 254.38458167389035
+          },
+          "sk-default-venue": {
+            "x": 271.8348946683109,
+            "y": 122.17959105223417
+          },
+          "sk-default-init-toggle": {
+            "x": 259.1593510583043,
+            "y": 249.27183558791876
+          },
+          "sk-default-flip": {
+            "x": 528.3104259949178,
+            "y": 117.85224476084113
+          },
+          "sk-default-cond-toggle": {
+            "x": 522.191388675943,
+            "y": 256.27594703808427
+          },
+          "sk-default-small-venue": {
+            "x": 779.6615361236036,
+            "y": 117.1725384555757
+          }
+        },
+        "viewport": {
+          "x": 115.05724978702642,
+          "y": 41.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "venueSize",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "",
+          "isParameter": false
+        },
+        {
+          "name": "toggle",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-frenzy",
+      "name": "Frenzy",
+      "description": "Color cycle: large red/blue/yellow, small red/green/blue; 25% beat delay",
+      "cueType": "Frenzy",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-frenzy-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-frenzy-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-frenzy-c1",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color1"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "stepMs"
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-frenzy-c2",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color2"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "stepMs"
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-frenzy-c3",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color3"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "stepMs"
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk-frenzy-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk-frenzy-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk-frenzy-step",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0.25
+            },
+            "assignTo": "stepMs"
+          },
+          {
+            "id": "sk-frenzy-venue",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "venue-size",
+            "assignTo": "venueSize"
+          },
+          {
+            "id": "sk-frenzy-is-large",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "venueSize"
+            },
+            "right": {
+              "source": "literal",
+              "value": "Large"
+            }
+          },
+          {
+            "id": "sk-frenzy-set-large",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "color2",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "blue"
+            }
+          },
+          {
+            "id": "sk-frenzy-set-large-2",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "color3",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "yellow"
+            }
+          },
+          {
+            "id": "sk-frenzy-set-small",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "color2",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "green"
+            }
+          },
+          {
+            "id": "sk-frenzy-set-small-2",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "color3",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "blue"
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-frenzy-start",
+          "to": "sk-frenzy-bpm"
+        },
+        {
+          "from": "sk-frenzy-bpm",
+          "to": "sk-frenzy-beat-ms"
+        },
+        {
+          "from": "sk-frenzy-beat-ms",
+          "to": "sk-frenzy-step"
+        },
+        {
+          "from": "sk-frenzy-step",
+          "to": "sk-frenzy-venue"
+        },
+        {
+          "from": "sk-frenzy-venue",
+          "to": "sk-frenzy-is-large"
+        },
+        {
+          "from": "sk-frenzy-is-large",
+          "to": "sk-frenzy-set-large",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-frenzy-set-large",
+          "to": "sk-frenzy-set-large-2"
+        },
+        {
+          "from": "sk-frenzy-set-large-2",
+          "to": "action-sk-frenzy-c1"
+        },
+        {
+          "from": "sk-frenzy-is-large",
+          "to": "sk-frenzy-set-small",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-frenzy-set-small",
+          "to": "sk-frenzy-set-small-2"
+        },
+        {
+          "from": "sk-frenzy-set-small-2",
+          "to": "action-sk-frenzy-c1"
+        },
+        {
+          "from": "action-sk-frenzy-c1",
+          "to": "action-sk-frenzy-c2"
+        },
+        {
+          "from": "action-sk-frenzy-c2",
+          "to": "action-sk-frenzy-c3"
+        },
+        {
+          "from": "event-sk-frenzy-called",
+          "to": "action-sk-frenzy-c1"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-frenzy-start": {
+            "x": 266.14140519313514,
+            "y": 4.495253369212151
+          },
+          "event-sk-frenzy-called": {
+            "x": 281.23462290675366,
+            "y": 764.4983377760096
+          },
+          "action-sk-frenzy-c1": {
+            "x": 248.17898465692997,
+            "y": 1007.4019052572548
+          },
+          "action-sk-frenzy-c2": {
+            "x": 262.6387510653585,
+            "y": 1127.221950661391
+          },
+          "action-sk-frenzy-c3": {
+            "x": 250.01708178035915,
+            "y": 1257.7226627506316
+          },
+          "sk-frenzy-bpm": {
+            "x": 258.8737454749644,
+            "y": 122.50129394605756
+          },
+          "sk-frenzy-beat-ms": {
+            "x": 263.76673735305667,
+            "y": 251.67416900396347
+          },
+          "sk-frenzy-step": {
+            "x": 250.94871445931494,
+            "y": 374.65800731256604
+          },
+          "sk-frenzy-venue": {
+            "x": 262.3235076479614,
+            "y": 492.671338878572
+          },
+          "sk-frenzy-is-large": {
+            "x": 270.62068171426654,
+            "y": 620.2178792208433
+          },
+          "sk-frenzy-set-large": {
+            "x": -4.347600633278489,
+            "y": 750.820196647197
+          },
+          "sk-frenzy-set-large-2": {
+            "x": -8.72585435025394,
+            "y": 874.8138165473938
+          },
+          "sk-frenzy-set-small": {
+            "x": 523.4569780472666,
+            "y": 751.3664292581379
+          },
+          "sk-frenzy-set-small-2": {
+            "x": 508.7405654527247,
+            "y": 874.9185961931944
+          }
+        },
+        "viewport": {
+          "x": 230.05724978702642,
+          "y": 50.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stepMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "venueSize",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "",
+          "isParameter": false
+        },
+        {
+          "name": "color1",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "red",
+          "isParameter": false
+        },
+        {
+          "name": "color2",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "blue",
+          "isParameter": false
+        },
+        {
+          "name": "color3",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "yellow",
+          "isParameter": false
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-stomp",
+      "name": "Stomp",
+      "description": "Five groups toggle on keyframe: front q1 yellow, front q4 red, back q1 red, back q4 yellow, inner green",
+      "cueType": "Stomp",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-stomp-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-stomp-keyframe",
+            "type": "event",
+            "eventType": "keyframe"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-stomp-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-stomp-fq4",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-4"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-stomp-bq1",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-stomp-bq4",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-4"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-stomp-inner",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "inner-half-minor"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-stomp-off",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk-stomp-init",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "toggle",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "sk-stomp-flip",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "literal",
+              "value": 1
+            },
+            "right": {
+              "source": "variable",
+              "name": "toggle"
+            },
+            "assignTo": "toggle"
+          },
+          {
+            "id": "sk-stomp-cond",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "toggle"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-stomp-start",
+          "to": "sk-stomp-init"
+        },
+        {
+          "from": "event-sk-stomp-keyframe",
+          "to": "sk-stomp-flip"
+        },
+        {
+          "from": "sk-stomp-flip",
+          "to": "sk-stomp-cond"
+        },
+        {
+          "from": "sk-stomp-cond",
+          "to": "action-sk-stomp-on",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-stomp-cond",
+          "to": "action-sk-stomp-off",
+          "fromPort": "false"
+        },
+        {
+          "from": "action-sk-stomp-on",
+          "to": "action-sk-stomp-fq4"
+        },
+        {
+          "from": "action-sk-stomp-fq4",
+          "to": "action-sk-stomp-bq1"
+        },
+        {
+          "from": "action-sk-stomp-bq1",
+          "to": "action-sk-stomp-bq4"
+        },
+        {
+          "from": "action-sk-stomp-bq4",
+          "to": "action-sk-stomp-inner"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-stomp-start": {
+            "x": 9.695820640772581,
+            "y": -6.636130798608065
+          },
+          "event-sk-stomp-keyframe": {
+            "x": 267.5550094470382,
+            "y": 6.289380583912134
+          },
+          "action-sk-stomp-on": {
+            "x": -10.898880958557129,
+            "y": 381.9043862335384
+          },
+          "action-sk-stomp-fq4": {
+            "x": 4.8338712472468615,
+            "y": 493.60498249158263
+          },
+          "action-sk-stomp-bq1": {
+            "x": 1.8387242294847965,
+            "y": 618.3059518001974
+          },
+          "action-sk-stomp-bq4": {
+            "x": -10.254430940374732,
+            "y": 751.9597436115146
+          },
+          "action-sk-stomp-inner": {
+            "x": -5.451423184946179,
+            "y": 875.5997236408293
+          },
+          "action-sk-stomp-off": {
+            "x": 348.47683471570633,
+            "y": 416.29107436340007
+          },
+          "sk-stomp-init": {
+            "x": -9.868522485718131,
+            "y": 131.8998315706849
+          },
+          "sk-stomp-flip": {
+            "x": 257.1499913521111,
+            "y": 127.6038325317204
+          },
+          "sk-stomp-cond": {
+            "x": 262.6111167855561,
+            "y": 250.54983723908663
+          }
+        },
+        "viewport": {
+          "x": 250.05724978702642,
+          "y": 99.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "toggle",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-silhouettes-spotlight",
+      "name": "Silhouettes Spotlight",
+      "description": "After Intro: blue flash on drum-red. After Dischord: solid green. Else: dark",
+      "cueType": "Silhouettes_Spotlight",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-ss-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-ss-drum-red",
+            "type": "event",
+            "eventType": "drum-red"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-sk-ss-green",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "action-sk-ss-dark",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk-ss-prev",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "previous-cue",
+            "assignTo": "prevCue"
+          },
+          {
+            "id": "sk-ss-is-intro",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "prevCue"
+            },
+            "right": {
+              "source": "literal",
+              "value": "Intro"
+            }
+          },
+          {
+            "id": "sk-ss-is-dischord",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "prevCue"
+            },
+            "right": {
+              "source": "literal",
+              "value": "Dischord"
+            }
+          },
+          {
+            "id": "sk-ss-setup-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "all-lights-array",
+            "outputs": [],
+            "dataProperty": "all-lights-array",
+            "assignTo": "skSsAllLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "action-sk-ss-blue-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "skSsAllLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 200
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 50
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 150
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-ss-drum-red",
+          "to": "sk-ss-prev"
+        },
+        {
+          "from": "sk-ss-prev",
+          "to": "sk-ss-is-dischord"
+        },
+        {
+          "from": "sk-ss-prev",
+          "to": "sk-ss-is-intro"
+        },
+        {
+          "from": "sk-ss-is-dischord",
+          "to": "action-sk-ss-green",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-ss-is-dischord",
+          "to": "sk-ss-is-intro",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-ss-is-intro",
+          "to": "action-sk-ss-dark",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-ss-is-intro",
+          "to": "action-sk-ss-blue-flash",
+          "fromPort": "true"
+        },
+        {
+          "from": "event-sk-ss-start",
+          "to": "sk-ss-setup-all"
+        },
+        {
+          "from": "sk-ss-setup-all",
+          "to": "sk-ss-prev"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-ss-start": {
+            "x": 8.980444550514221,
+            "y": 0.22640182077884674
+          },
+          "event-sk-ss-drum-red": {
+            "x": 261.45125059969723,
+            "y": -6.358030389994383
+          },
+          "action-sk-ss-green": {
+            "x": 41.505301185908024,
+            "y": 567.9470649802358
+          },
+          "action-sk-ss-dark": {
+            "x": 624.8640475866098,
+            "y": 688.7358107791986
+          },
+          "sk-ss-prev": {
+            "x": 259.31048550084233,
+            "y": 242.86652893945575
+          },
+          "sk-ss-is-intro": {
+            "x": 503.09995005186715,
+            "y": 511.82765133821636
+          },
+          "sk-ss-is-dischord": {
+            "x": 270.1769848316908,
+            "y": 382.9671789482236
+          },
+          "sk-ss-setup-all": {
+            "x": 14.896089898621995,
+            "y": 100.91718935617541
+          },
+          "action-sk-ss-blue-flash": {
+            "x": 393.3655142112309,
+            "y": 707.5516106380974
+          }
+        },
+        "viewport": {
+          "x": 250.05724978702642,
+          "y": 99.41351847885329,
+          "zoom": 0.641768312924964
+        }
+      },
+      "variables": [
+        {
+          "name": "prevCue",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "",
+          "isParameter": false
+        },
+        {
+          "name": "skSsAllLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-dischord",
+      "name": "Dischord",
+      "description": "Yellow CW on beat, green dual-mode or CCW on measure, blue alternating patterns on keyframe, red flash on drum-red",
+      "cueType": "Dischord",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-dischord-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-dischord-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-dischord-venue",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "venue-size",
+            "assignTo": "venueSize"
+          },
+          {
+            "id": "sk-dischord-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-dischord-is-large",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "venueSize"
+            },
+            "right": {
+              "source": "literal",
+              "value": "Large"
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-dischord-yellow",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 2
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "sk-dischord-green-large",
+            "type": "effect-raiser",
+            "effectId": "effect-dual-mode-rotation",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 2
+              },
+              "dualModeSolidColor": {
+                "source": "literal",
+                "value": "white"
+              },
+              "dualModeSwitchCondition": {
+                "source": "literal",
+                "value": "measure"
+              }
+            }
+          },
+          {
+            "id": "sk-dischord-green-small",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-ccw-2beats",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-dischord-blue",
+            "type": "effect-raiser",
+            "effectId": "effect-alternating-pattern",
+            "parameterValues": {
+              "lights": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "lightFilter": {
+                "source": "literal",
+                "value": "third-2"
+              },
+              "patternBGroups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "patternBFilter": {
+                "source": "literal",
+                "value": "even"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              }
+            }
+          },
+          {
+            "id": "sk-dischord-red",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 101
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "drum-red"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 120
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 150
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-dischord-start",
+          "to": "sk-dischord-venue"
+        },
+        {
+          "from": "sk-dischord-venue",
+          "to": "sk-dischord-all"
+        },
+        {
+          "from": "sk-dischord-all",
+          "to": "sk-dischord-is-large"
+        },
+        {
+          "from": "event-sk-dischord-called",
+          "to": "sk-dischord-yellow"
+        },
+        {
+          "from": "event-sk-dischord-called",
+          "to": "sk-dischord-blue"
+        },
+        {
+          "from": "event-sk-dischord-called",
+          "to": "sk-dischord-red"
+        },
+        {
+          "from": "sk-dischord-is-large",
+          "to": "sk-dischord-green-large",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-dischord-is-large",
+          "to": "sk-dischord-green-small",
+          "fromPort": "false"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-dischord-start": {
+            "x": 271.7768145054579,
+            "y": 6.168488070368767
+          },
+          "event-sk-dischord-called": {
+            "x": 793.6154587109384,
+            "y": 17.86599858943299
+          },
+          "sk-dischord-venue": {
+            "x": 265.80661334469914,
+            "y": 132.18162512034178
+          },
+          "sk-dischord-all": {
+            "x": 253.60050545819104,
+            "y": 242.37579565122724
+          },
+          "sk-dischord-is-large": {
+            "x": 251.24695785157382,
+            "y": 382.738244663924
+          },
+          "sk-dischord-yellow": {
+            "x": 558.6558562887076,
+            "y": 137.65130501493763
+          },
+          "sk-dischord-green-large": {
+            "x": 79.49345859698951,
+            "y": 526.319077629596
+          },
+          "sk-dischord-green-small": {
+            "x": 348.5688651483507,
+            "y": 538.9239606484771
+          },
+          "sk-dischord-blue": {
+            "x": 780.3543061758576,
+            "y": 126.96700783617791
+          },
+          "sk-dischord-red": {
+            "x": 1008.9466279498124,
+            "y": 135.64226527009134
+          }
+        },
+        "viewport": {
+          "x": -103.39713887921016,
+          "y": 76.34135662234229,
+          "zoom": 0.8975100506672617
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "venueSize",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "",
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-cw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-dual-mode-rotation",
+          "effectFileId": "yarg-core-effects",
+          "name": "Dual-Mode Rotation"
+        },
+        {
+          "effectId": "effect-rotation-ccw-2beats",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CCW (2 beats)"
+        },
+        {
+          "effectId": "effect-alternating-pattern",
+          "effectFileId": "yarg-core-effects",
+          "name": "Alternating Pattern"
+        },
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-sweep",
+      "name": "Sweep",
+      "description": "Large: red diagonal sweep. Small: yellow diagonal + blue forward + green reverse rotations on beat",
+      "cueType": "Sweep",
+      "style": "primary",
+      "effects": [
+        {
+          "effectId": "effect-diagonal-sweep",
+          "effectFileId": "yarg-stagekit-effects",
+          "name": "Diagonal Sweep"
+        },
+        {
+          "effectId": "effect-sweep-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Sweep Colour"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-sweep-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-sweep-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-sweep-venue",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "venue-size",
+            "assignTo": "venueSize"
+          },
+          {
+            "id": "sk-sweep-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-sweep-len",
+            "type": "logic",
+            "logicType": "array-length",
+            "sourceVariable": "allLights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk-sweep-half",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "halfOffset"
+          },
+          {
+            "id": "sk-sweep-start-a",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "startA"
+          },
+          {
+            "id": "sk-sweep-start-b",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "startA"
+            },
+            "right": {
+              "source": "variable",
+              "name": "halfOffset"
+            },
+            "assignTo": "startB"
+          },
+          {
+            "id": "sk-sweep-is-large",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "venueSize"
+            },
+            "right": {
+              "source": "literal",
+              "value": "Large"
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-sweep-diag-effect",
+            "type": "effect-raiser",
+            "effectId": "effect-diagonal-sweep",
+            "parameterValues": {
+              "allLights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "colorName": {
+                "source": "literal",
+                "value": "red"
+              },
+              "colorBrightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "layerValue": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-sweep-yellow-a",
+            "type": "effect-raiser",
+            "effectId": "effect-sweep-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-sweep-yellow-b",
+            "type": "effect-raiser",
+            "effectId": "effect-sweep-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-sweep-blue",
+            "type": "effect-raiser",
+            "effectId": "effect-sweep-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 10
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk-sweep-green",
+            "type": "effect-raiser",
+            "effectId": "effect-sweep-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 15
+              },
+              "color": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-sweep-start",
+          "to": "sk-sweep-venue"
+        },
+        {
+          "from": "sk-sweep-venue",
+          "to": "sk-sweep-all"
+        },
+        {
+          "from": "sk-sweep-all",
+          "to": "sk-sweep-len"
+        },
+        {
+          "from": "sk-sweep-len",
+          "to": "sk-sweep-half"
+        },
+        {
+          "from": "sk-sweep-half",
+          "to": "sk-sweep-start-a"
+        },
+        {
+          "from": "sk-sweep-start-a",
+          "to": "sk-sweep-start-b"
+        },
+        {
+          "from": "event-sk-sweep-called",
+          "to": "sk-sweep-is-large"
+        },
+        {
+          "from": "sk-sweep-is-large",
+          "to": "sk-sweep-diag-effect",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-sweep-is-large",
+          "to": "sk-sweep-yellow-a",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-sweep-is-large",
+          "to": "sk-sweep-yellow-b",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-sweep-is-large",
+          "to": "sk-sweep-blue",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-sweep-is-large",
+          "to": "sk-sweep-green",
+          "fromPort": "false"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-sweep-start": {
+            "x": -7.635034980252385,
+            "y": 5.62316432967782
+          },
+          "event-sk-sweep-called": {
+            "x": 270.7532073147595,
+            "y": -7.51287791505456
+          },
+          "sk-sweep-venue": {
+            "x": -2.9713885243982077,
+            "y": 120.04759149625897
+          },
+          "sk-sweep-all": {
+            "x": -4.540391653776169,
+            "y": 243.4208654947579
+          },
+          "sk-sweep-len": {
+            "x": 11.875161990523338,
+            "y": 380.0718046426773
+          },
+          "sk-sweep-half": {
+            "x": 1.9642559476196766,
+            "y": 505.6993770636618
+          },
+          "sk-sweep-start-a": {
+            "x": -10.08018851839006,
+            "y": 620.928892031312
+          },
+          "sk-sweep-start-b": {
+            "x": -11.086179004982114,
+            "y": 743.0668873973191
+          },
+          "sk-sweep-is-large": {
+            "x": 262.52444262616336,
+            "y": 118.32158290594816
+          },
+          "sk-sweep-diag-effect": {
+            "x": 262.1991860810667,
+            "y": 248.84373714402318
+          },
+          "sk-sweep-yellow-a": {
+            "x": 508.16866053911076,
+            "y": 278.77289498093
+          },
+          "sk-sweep-yellow-b": {
+            "x": 767.4848606057701,
+            "y": 275.37354491891733
+          },
+          "sk-sweep-blue": {
+            "x": 1051.3241444882005,
+            "y": 272.19370728899696
+          },
+          "sk-sweep-green": {
+            "x": 1295.3996510617435,
+            "y": 254.39108676835895
+          }
+        },
+        "viewport": {
+          "x": 96.9785996832843,
+          "y": 111.17505141781663,
+          "zoom": 0.6029559297177003
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "venueSize",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "",
+          "isParameter": false
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "halfOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "startA",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "startB",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ]
+    }
+  ]
+}

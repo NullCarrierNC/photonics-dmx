@@ -48,7 +48,9 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
   const loadEffectFiles = async () => {
     try {
       const summary = await listEffectFiles()
-      const allFiles = [...summary.yarg, ...summary.audio]
+      const allFiles = [...summary.yarg, ...summary.audio].sort((a, b) =>
+        (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, { sensitivity: 'base' }),
+      )
       setAvailableFiles(allFiles)
     } catch (error) {
       console.error('Failed to load effect files', error)
@@ -59,11 +61,15 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
     setLoadingEffects(true)
     try {
       const file = await readEffectFile(filePath)
-      const effects = file.effects.map((e) => ({
-        id: e.id,
-        name: e.name,
-        description: e.description,
-      }))
+      const effects = file.effects
+        .map((e) => ({
+          id: e.id,
+          name: e.name,
+          description: e.description,
+        }))
+        .sort((a, b) =>
+          (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
+        )
       setAvailableEffects(effects)
     } catch (error) {
       console.error('Failed to load effects from file', error)
