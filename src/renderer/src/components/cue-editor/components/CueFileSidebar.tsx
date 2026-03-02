@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { FaTrash } from 'react-icons/fa'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
@@ -6,6 +6,8 @@ import type {
   NodeCueMode,
   YargNodeCueDefinition,
   AudioNodeCueDefinition,
+  YargEffectDefinition,
+  AudioEffectDefinition,
   NodeCueFile,
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -25,7 +27,14 @@ type Props = {
   onAddEffect: () => void
   onRemoveCue: (cueId: string) => void
   onRemoveEffect: (effectId: string) => void
-  onSelectCue: (cue: YargNodeCueDefinition | AudioNodeCueDefinition | null) => void
+  onSelectCue: (
+    cue:
+      | YargNodeCueDefinition
+      | AudioNodeCueDefinition
+      | YargEffectDefinition
+      | AudioEffectDefinition
+      | null,
+  ) => void
 }
 
 const CueFileSidebar: React.FC<Props> = ({
@@ -51,18 +60,26 @@ const CueFileSidebar: React.FC<Props> = ({
   const itemCountLabel = isEffectMode ? 'effect(s)' : 'cue(s)'
 
   // Get the items list based on the loaded document type, sorted alphabetically by name
-  const rawItems = editorDoc
-    ? editorDoc.mode === 'effect'
-      ? (editorDoc.file as EffectFile).effects
-      : (editorDoc.file as NodeCueFile).cues
-    : []
-  const items = [...rawItems].sort((a, b) =>
-    (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
-  )
+  const items = useMemo(() => {
+    const rawItems = editorDoc
+      ? editorDoc.mode === 'effect'
+        ? (editorDoc.file as EffectFile).effects
+        : (editorDoc.file as NodeCueFile).cues
+      : []
+    return [...rawItems].sort((a, b) =>
+      (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
+    )
+  }, [editorDoc])
 
   // Use the appropriate file list based on editor mode, sorted alphabetically by group name
-  const displayFileList = [...(isEffectMode ? effectFileList : fileList)].sort((a, b) =>
-    (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, { sensitivity: 'base' }),
+  const displayFileList = useMemo(
+    () =>
+      [...(isEffectMode ? effectFileList : fileList)].sort((a, b) =>
+        (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, {
+          sensitivity: 'base',
+        }),
+      ),
+    [isEffectMode, effectFileList, fileList],
   )
 
   return (
@@ -113,10 +130,7 @@ const CueFileSidebar: React.FC<Props> = ({
             <div key={item.id} className="flex items-center gap-2">
               <button
                 className={`flex-1 text-left px-2 py-1 rounded border ${selectedCueId === item.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400' : 'border-gray-200 dark:border-gray-700'}`}
-                onClick={() =>
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- file summary to cue type
-                  onSelectCue(item as any)
-                }>
+                onClick={() => onSelectCue(item)}>
                 {item.name}
               </button>
               <button

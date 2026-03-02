@@ -66,7 +66,7 @@ const EventNodesSection: React.FC<{
       <button
         className="border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
         onClick={() => addEventNode(getDefaultEventOption(activeMode))}>
-        System Event
+        System Event Listener
       </button>
       {addEventListenerNode && (
         <button

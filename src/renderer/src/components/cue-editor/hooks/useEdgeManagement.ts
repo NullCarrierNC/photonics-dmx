@@ -8,6 +8,7 @@ import {
   type LogicNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorNode } from '../lib/types'
+import { isValidEditorEdge } from '../lib/edgeValidation'
 
 export type UseEdgeManagementParams = {
   nodes: EditorNode[]
@@ -15,6 +16,7 @@ export type UseEdgeManagementParams = {
   setNodes: React.Dispatch<React.SetStateAction<EditorNode[]>>
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>
   setIsDirty: (dirty: boolean) => void
+  editorMode: 'cue' | 'effect'
 }
 
 export function useEdgeManagement({
@@ -23,6 +25,7 @@ export function useEdgeManagement({
   setNodes,
   setEdges,
   setIsDirty,
+  editorMode,
 }: UseEdgeManagementParams) {
   const isValidNodeConnection = useCallback(
     (sourceId?: string | null, targetId?: string | null) => {
@@ -30,27 +33,9 @@ export function useEdgeManagement({
       const sourceNode = nodes.find((node) => node.id === sourceId)
       const targetNode = nodes.find((node) => node.id === targetId)
       if (!sourceNode || !targetNode) return false
-      if (sourceNode.data.kind === 'notes' || targetNode.data.kind === 'notes') return false
-      if (targetNode.data.kind === 'event-listener' || targetNode.data.kind === 'effect-listener')
-        return false
-      const validTargets = ['action', 'logic', 'event-raiser', 'effect-raiser']
-      if (sourceNode.data.kind === 'event' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'logic' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'action' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'event-raiser' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'effect-raiser' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'event-listener' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'effect-listener' && validTargets.includes(targetNode.data.kind))
-        return true
-      return false
+      return isValidEditorEdge(sourceNode.data.kind, targetNode.data.kind, editorMode)
     },
-    [nodes],
+    [nodes, editorMode],
   )
 
   const onConnect = useCallback(

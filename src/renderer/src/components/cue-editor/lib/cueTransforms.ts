@@ -18,6 +18,7 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument, EditorNode } from './types'
 import { getAudioEventLabel, getYargEventLabel } from './cueUtils'
+import { isValidEditorEdge } from './edgeValidation'
 
 /** Edge data for editor edges (port info for logic/conditional nodes). */
 export type EditorEdgeData = { fromPort?: string | null; toPort?: string | null }
@@ -165,30 +166,7 @@ const updateDocumentFromFlow = (
     const sourceNode = nodes.find((node) => node.id === edge.source)
     const targetNode = nodes.find((node) => node.id === edge.target)
     if (!sourceNode || !targetNode) return false
-
-    const validSourceKinds = [
-      'event',
-      'action',
-      'logic',
-      'event-raiser',
-      'event-listener',
-      'effect-raiser',
-    ]
-    const validTargetKinds = ['action', 'logic', 'event-raiser', 'effect-raiser']
-
-    // Event raiser can have children, event listener cannot have inputs
-    if (sourceNode.data.kind === 'event-listener') {
-      return validTargetKinds.includes(targetNode.data.kind)
-    }
-
-    // All other nodes can connect to actions, logic, event-raisers, or effect-raisers
-    if (
-      validSourceKinds.includes(sourceNode.data.kind) &&
-      validTargetKinds.includes(targetNode.data.kind)
-    ) {
-      return true
-    }
-    return false
+    return isValidEditorEdge(sourceNode.data.kind, targetNode.data.kind, 'cue')
   })
 
   const updatedCue = {
@@ -360,30 +338,7 @@ const updateEffectDocumentFromFlow = (
     const sourceNode = nodes.find((node) => node.id === edge.source)
     const targetNode = nodes.find((node) => node.id === edge.target)
     if (!sourceNode || !targetNode) return false
-
-    const validSourceKinds = [
-      'event',
-      'action',
-      'logic',
-      'event-raiser',
-      'event-listener',
-      'effect-listener',
-    ]
-    const validTargetKinds = ['action', 'logic', 'event-raiser']
-
-    // Event listener and effect listener cannot have inputs
-    if (sourceNode.data.kind === 'event-listener' || sourceNode.data.kind === 'effect-listener') {
-      return validTargetKinds.includes(targetNode.data.kind)
-    }
-
-    // All other nodes can connect to actions, logic, or event-raisers
-    if (
-      validSourceKinds.includes(sourceNode.data.kind) &&
-      validTargetKinds.includes(targetNode.data.kind)
-    ) {
-      return true
-    }
-    return false
+    return isValidEditorEdge(sourceNode.data.kind, targetNode.data.kind, 'effect')
   })
 
   const updatedEffect = {

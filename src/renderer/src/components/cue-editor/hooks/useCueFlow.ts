@@ -22,6 +22,7 @@ import { useNodeCreation } from './useNodeCreation'
 
 type UseCueFlowParams = {
   activeMode: NodeCueMode
+  editorMode: 'cue' | 'effect'
   setIsDirty: (dirty: boolean) => void
   flowWrapperRef?: React.RefObject<HTMLDivElement>
   effectDefinitions?: Map<string, EffectDefinition>
@@ -29,13 +30,14 @@ type UseCueFlowParams = {
 
 const useCueFlow = ({
   activeMode,
+  editorMode,
   setIsDirty,
   flowWrapperRef,
   effectDefinitions,
 }: UseCueFlowParams) => {
   const setSelectedNodeIdRef = useRef<(id: string | null) => void>(() => {})
   const [nodes, setNodes, onNodesChangeRaw] = useNodesState<EditorNodeData>([])
-  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge[]>([])
+  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>([])
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -78,7 +80,14 @@ const useCueFlow = ({
     setSelectedNodeIdRef.current = selection.setSelectedNodeId
   }, [selection.setSelectedNodeId])
 
-  const edgeMgmt = useEdgeManagement({ nodes, edges, setEdges, setNodes, setIsDirty })
+  const edgeMgmt = useEdgeManagement({
+    nodes,
+    edges,
+    setEdges,
+    setNodes,
+    setIsDirty,
+    editorMode,
+  })
 
   const nodeCreation = useNodeCreation({ nodes, setNodes, activeMode, setIsDirty })
 

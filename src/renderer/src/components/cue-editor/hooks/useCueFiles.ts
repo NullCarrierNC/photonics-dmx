@@ -323,7 +323,6 @@ const useCueFiles = ({
     setIsDirty,
     setValidationErrors,
     handleModeChange,
-    handleNewFile: crud.handleNewFile,
     handleCreateNewFile: crud.handleCreateNewFile,
     updateGroupMeta: metadata.updateGroupMeta,
     updateCueMetadata: metadata.updateCueMetadata,

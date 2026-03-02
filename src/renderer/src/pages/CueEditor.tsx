@@ -210,6 +210,7 @@ const CueEditor: React.FC = () => {
     handlePaneContextMenu,
   } = useCueFlow({
     activeMode,
+    editorMode,
     setIsDirty,
     flowWrapperRef,
     effectDefinitions: loadedEffectDefinitions,
