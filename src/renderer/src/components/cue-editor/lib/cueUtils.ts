@@ -34,6 +34,15 @@ const getTextColorForBg = (name: string): string => {
   return lightish.includes(name) ? '#111827' : '#f9fafb'
 }
 
+const HIDDEN_CUE_TYPES = new Set(['NoCue', 'UnknownCue', 'Strobe', 'DisableAll', 'Strobe_Off'])
+
+/** Returns false for internal/system cue types that should never appear in the UI selector. */
+function isCueTypeSelectable(type: string): boolean {
+  if (HIDDEN_CUE_TYPES.has(type)) return false
+  if (type.startsWith('Keyframe_')) return false
+  return true
+}
+
 /** Returns the first item when sorted alphabetically by name (matches sidebar order). */
 function firstByName<T extends { name?: string; id: string }>(items: T[]): T | null {
   if (items.length === 0) return null
@@ -50,4 +59,5 @@ export {
   getConditionLabel,
   getTextColorForBg,
   getYargEventLabel,
+  isCueTypeSelectable,
 }

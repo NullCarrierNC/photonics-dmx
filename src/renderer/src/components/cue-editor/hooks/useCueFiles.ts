@@ -22,6 +22,7 @@ import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/l
 import { useCueFileIO } from './useCueFileIO'
 import { useCueCrud } from './useCueCrud'
 import { useCueMetadata } from './useCueMetadata'
+import { isCueTypeSelectable } from '../lib/cueUtils'
 
 type UseCueFilesParams = {
   loadCueIntoFlow: (
@@ -104,6 +105,7 @@ const useCueFiles = ({
     refreshFiles,
     refreshEffectFiles,
     onSaveSuccess,
+    onSaveError: onError,
     lastStoredFilePathRef,
   })
 
@@ -181,7 +183,7 @@ const useCueFiles = ({
 
   useEffect(() => {
     getNodeCueTypes(mode)
-      .then((types: string[]) => setAvailableCueTypes(types))
+      .then((types: string[]) => setAvailableCueTypes(types.filter(isCueTypeSelectable)))
       .catch(() => setAvailableCueTypes([]))
   }, [mode])
 

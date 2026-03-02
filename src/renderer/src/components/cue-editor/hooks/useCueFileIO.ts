@@ -25,7 +25,6 @@ import {
   validateNodeCue,
   validateEffect,
 } from '../../../ipcApi'
-import { createDefaultFile, createDefaultEffectFile } from '../lib/cueDefaults'
 
 export type UseCueFileIOParams = {
   editorDoc: EditorDocument | null
@@ -52,7 +51,14 @@ export type UseCueFileIOParams = {
   refreshFiles: () => Promise<void>
   refreshEffectFiles: () => Promise<void>
   onSaveSuccess?: (message: string) => void
+  onSaveError?: (message: string) => void
   lastStoredFilePathRef: React.MutableRefObject<string | null>
+}
+
+/** Translates internal field names to user-facing labels in save error messages. */
+function formatSaveError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  return raw.replace(/\bcueType\b/g, 'Game Event Trigger')
 }
 
 export function useCueFileIO({
@@ -73,6 +79,7 @@ export function useCueFileIO({
   refreshFiles,
   refreshEffectFiles,
   onSaveSuccess,
+  onSaveError,
   lastStoredFilePathRef,
 }: UseCueFileIOParams) {
   const selectFile = useCallback(
@@ -155,7 +162,10 @@ export function useCueFileIO({
           filename,
           content: effectContent,
         })
-        if (!response.success) return
+        if (!response.success) {
+          onSaveError?.(`Failed to save effect: ${filename}`)
+          return
+        }
         setEditorDoc({ mode: 'effect', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])
@@ -164,6 +174,7 @@ export function useCueFileIO({
         onSaveSuccess?.(`Effect saved: ${filename}`)
       } catch (error) {
         console.error('Failed to save effect file', error)
+        onSaveError?.(formatSaveError(error))
       }
     } else {
       const cueContent = updatedFile as NodeCueFile
@@ -178,7 +189,10 @@ export function useCueFileIO({
           filename,
           content: cueContent,
         })
-        if (!response.success) return
+        if (!response.success) {
+          onSaveError?.(`Failed to save cue: ${filename}`)
+          return
+        }
         setEditorDoc({ mode: 'cue', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])
@@ -187,6 +201,7 @@ export function useCueFileIO({
         onSaveSuccess?.(`Cue saved: ${filename}`)
       } catch (error) {
         console.error('Failed to save node cue file', error)
+        onSaveError?.(formatSaveError(error))
       }
     }
   }, [
@@ -197,6 +212,7 @@ export function useCueFileIO({
     refreshEffectFiles,
     rememberLastFilePath,
     onSaveSuccess,
+    onSaveError,
     setEditorDoc,
     setValidationErrors,
     setIsDirty,
@@ -210,30 +226,27 @@ export function useCueFileIO({
 
     if (editorDoc.mode === 'effect') {
       await deleteEffectFile(editorDoc.path)
-      const file = createDefaultEffectFile(mode)
-      setEditorDoc({ mode: 'effect', file, path: null })
-      setSelectedCueId(file.effects[0]?.id ?? null)
-      setFilename(`${file.group.id}.json`)
-      loadCueIntoFlow(file.effects[0] ?? null)
+      setEditorDoc(null)
+      setSelectedCueId(null)
+      setFilename('untitled.json')
+      loadCueIntoFlow(null)
       setValidationErrors([])
-      setIsDirty(true)
+      setIsDirty(false)
       refreshEffectFiles()
     } else {
       await deleteNodeCueFile(editorDoc.path)
-      const file = createDefaultFile(mode)
-      setEditorDoc({ mode: 'cue', file, path: null })
-      setSelectedCueId(file.cues[0]?.id ?? null)
-      setFilename(`${file.group.id}.json`)
-      loadCueIntoFlow(file.cues[0] ?? null)
+      setEditorDoc(null)
+      setSelectedCueId(null)
+      setFilename('untitled.json')
+      loadCueIntoFlow(null)
       setValidationErrors([])
-      setIsDirty(true)
+      setIsDirty(false)
       refreshFiles()
     }
   }, [
     clearLastFilePath,
     editorDoc,
     loadCueIntoFlow,
-    mode,
     refreshFiles,
     refreshEffectFiles,
     lastStoredFilePathRef,
