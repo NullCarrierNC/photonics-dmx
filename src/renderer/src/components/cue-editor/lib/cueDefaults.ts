@@ -50,6 +50,13 @@ const buildDefaultYargEvent = (): YargEventNode => ({
   eventType: 'beat',
 })
 
+/** Default event for blank cues: Cue Started (once per lifecycle), connected to set-color. */
+const buildDefaultYargCueStartedEvent = (): YargEventNode => ({
+  id: `event-${createId()}`,
+  type: 'event',
+  eventType: 'cue-started',
+})
+
 const buildDefaultAudioEvent = (): AudioEventNode => ({
   id: `event-${createId()}`,
   type: 'event',
@@ -90,15 +97,17 @@ const createDefaultCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeC
 }
 
 const createBlankCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeCueDefinition => {
+  const eventNode = mode === 'yarg' ? buildDefaultYargCueStartedEvent() : buildDefaultAudioEvent()
+  const actionNode = buildDefaultAction()
   const base = {
     id: `cue-${createId()}`,
     name: 'New Cue',
     description: '',
     nodes: {
-      events: [],
-      actions: [],
+      events: [eventNode],
+      actions: [actionNode],
     },
-    connections: [],
+    connections: [{ from: eventNode.id, to: actionNode.id }],
     layout: {
       nodePositions: {},
     },
@@ -130,7 +139,7 @@ const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
       version: 1,
       mode,
       group,
-      cues: [createDefaultCue('yarg') as YargNodeCueDefinition],
+      cues: [createBlankCue('yarg') as YargNodeCueDefinition],
       bundled: false,
     } as YargNodeCueFile
   }
@@ -139,7 +148,7 @@ const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
     version: 1,
     mode,
     group,
-    cues: [createDefaultCue('audio') as AudioNodeCueDefinition],
+    cues: [createBlankCue('audio') as AudioNodeCueDefinition],
     bundled: false,
   } as AudioNodeCueFile
 }

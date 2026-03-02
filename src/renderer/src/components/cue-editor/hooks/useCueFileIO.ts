@@ -9,6 +9,7 @@ import type {
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
+import { firstByName } from '../lib/cueUtils'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import {
   readNodeCueFile,
@@ -82,10 +83,13 @@ export function useCueFileIO({
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
         const cueFile = file as NodeCueFile
-        const cueId = cueFile.cues[0]?.id ?? null
+        const firstCue = firstByName(
+          cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[],
+        )
+        const cueId = firstCue?.id ?? null
         setSelectedCueId(cueId)
         setIsDirty(false)
-        loadCueIntoFlow(file.cues[0] ?? null)
+        loadCueIntoFlow(firstCue ?? null)
         rememberLastFilePath(fileSummary.path)
       } catch (error) {
         console.error('Failed to open node cue file', error)
@@ -110,10 +114,13 @@ export function useCueFileIO({
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
         const effectFile = file as EffectFile
-        const effectId = effectFile.effects[0]?.id ?? null
+        const firstEffect = firstByName(
+          effectFile.effects as (YargEffectDefinition | AudioEffectDefinition)[],
+        )
+        const effectId = firstEffect?.id ?? null
         setSelectedCueId(effectId)
         setIsDirty(false)
-        loadCueIntoFlow(effectFile.effects[0] ?? null)
+        loadCueIntoFlow(firstEffect ?? null)
         rememberLastFilePath(fileSummary.path)
       } catch (error) {
         console.error('Failed to open effect file', error)
@@ -273,24 +280,27 @@ export function useCueFileIO({
           setMode(file.mode)
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
           const effectFile = file as EffectFile
+          const firstEffect = firstByName(
+            effectFile.effects as (YargEffectDefinition | AudioEffectDefinition)[],
+          )
           const effectId =
-            effectFile.effects.find((e) => e.id === selectedCueId)?.id ??
-            effectFile.effects[0]?.id ??
-            null
+            effectFile.effects.find((e) => e.id === selectedCueId)?.id ?? firstEffect?.id ?? null
           setSelectedCueId(effectId)
           setIsDirty(false)
-          loadCueIntoFlow(effectFile.effects.find((e) => e.id === effectId) ?? null)
+          loadCueIntoFlow(effectFile.effects.find((e) => e.id === effectId) ?? firstEffect ?? null)
         } else {
           const file = await readNodeCueFile(currentPath)
           setEditorDoc({ mode: 'cue', file, path: currentPath })
           setMode(file.mode)
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
           const cueFile = file as NodeCueFile
-          const cueId =
-            cueFile.cues.find((c) => c.id === selectedCueId)?.id ?? cueFile.cues[0]?.id ?? null
+          const firstCue = firstByName(
+            cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[],
+          )
+          const cueId = cueFile.cues.find((c) => c.id === selectedCueId)?.id ?? firstCue?.id ?? null
           setSelectedCueId(cueId)
           setIsDirty(false)
-          loadCueIntoFlow(cueFile.cues.find((c) => c.id === cueId) ?? null)
+          loadCueIntoFlow(cueFile.cues.find((c) => c.id === cueId) ?? firstCue ?? null)
         }
       } catch (error) {
         console.error('Failed to reload current file', error)

@@ -12,7 +12,6 @@ import type {
 import { getNodeCueTypes, listNodeCueFiles, listEffectFiles } from '../../../ipcApi'
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
-import { createDefaultFile } from '../lib/cueDefaults'
 import {
   clearStoredLastFilePath,
   getStoredLastFilePath,
@@ -44,21 +43,12 @@ const useCueFiles = ({
   onSaveSuccess,
   onError,
 }: UseCueFilesParams) => {
-  const [initialDoc] = useState<EditorDocument>(() => ({
-    mode: 'cue' as const,
-    file: createDefaultFile('yarg'),
-    path: null,
-  }))
-  const initialCueFile = initialDoc.file as NodeCueFile
-
   const [files, setFiles] = useState<NodeCueFileSummary[]>([])
   const [effectFiles, setEffectFiles] = useState<EffectFileSummary[]>([])
   const [mode, setMode] = useState<NodeCueMode>('yarg')
-  const [editorDoc, setEditorDoc] = useState<EditorDocument | null>(initialDoc)
-  const [selectedCueId, setSelectedCueId] = useState<string | null>(
-    initialCueFile.cues[0]?.id ?? null,
-  )
-  const [filename, setFilename] = useState<string>(`${initialCueFile.group.id ?? 'untitled'}.json`)
+  const [editorDoc, setEditorDoc] = useState<EditorDocument | null>(null)
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(null)
+  const [filename, setFilename] = useState<string>('untitled.json')
   const [availableCueTypes, setAvailableCueTypes] = useState<string[]>([])
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [isDirty, setIsDirty] = useState<boolean>(false)
@@ -216,14 +206,6 @@ const useCueFiles = ({
     fileIO.selectFile(summary)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: fileIO.selectFile only
   }, [clearLastFilePath, files, fileIO.selectFile])
-
-  useEffect(() => {
-    if (initialDoc.mode === 'cue') {
-      const initialCue = initialCueFile.cues[0] ?? null
-      loadCueIntoFlow(initialCue as YargNodeCueDefinition | AudioNodeCueDefinition | null)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialDoc/initialCueFile are stable
-  }, [loadCueIntoFlow])
 
   return {
     mode,

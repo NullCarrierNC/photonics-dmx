@@ -34,8 +34,18 @@ const getTextColorForBg = (name: string): string => {
   return lightish.includes(name) ? '#111827' : '#f9fafb'
 }
 
+/** Returns the first item when sorted alphabetically by name (matches sidebar order). */
+function firstByName<T extends { name?: string; id: string }>(items: T[]): T | null {
+  if (items.length === 0) return null
+  const sorted = [...items].sort((a, b) =>
+    (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
+  )
+  return sorted[0] ?? null
+}
+
 export {
   displayValueSource,
+  firstByName,
   getAudioEventLabel,
   getConditionLabel,
   getTextColorForBg,

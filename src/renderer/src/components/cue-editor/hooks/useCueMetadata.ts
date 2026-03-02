@@ -111,7 +111,7 @@ export function useCueMetadata({
         setEditorDoc({ mode: 'effect', file, path: null })
         setSelectedCueId(file.effects[0]?.id ?? null)
         setFilename(`${file.group.id}.json`)
-        loadCueIntoFlow(null)
+        loadCueIntoFlow(file.effects[0] ?? null)
         setIsDirty(true)
       } else if (!editorDoc || editorDoc.mode === 'effect') {
         const file = createDefaultFile(cueMode)

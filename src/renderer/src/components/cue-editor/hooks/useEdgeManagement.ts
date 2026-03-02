@@ -82,11 +82,6 @@ export function useEdgeManagement({
               waitForCondition: { source: 'literal', value: inheritedWaitForCondition },
               waitForTime: { source: 'literal', value: 0 },
             }
-          } else if (sourceNode.data.kind === 'action') {
-            const sourceAction = sourceNode.data.payload as ActionNode
-            targetAction.color = { ...sourceAction.color }
-            targetAction.target = { ...sourceAction.target }
-            targetAction.layer = sourceAction.layer
           }
 
           return prevNodes.map((node) =>
