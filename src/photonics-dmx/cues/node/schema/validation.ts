@@ -13,12 +13,7 @@ import {
   EventRaiserNode,
   EventListenerNode,
   NotesNode,
-  // Effect types - imported for future schema expansion
-  EffectRaiserNode as _EffectRaiserNode,
-  EffectEventListenerNode as _EffectEventListenerNode,
   EffectReference,
-  YargEffectDefinition as _YargEffectDefinition,
-  AudioEffectDefinition as _AudioEffectDefinition,
   YargEffectFile,
   AudioEffectFile,
   EffectFile,
@@ -39,18 +34,8 @@ import {
   YargNodeCueDefinition,
   YargNodeCueFile,
 } from '../../types/nodeCueTypes'
-import {
-  WaitCondition,
-  YargEventType,
-  YARG_EVENT_TYPES as YARG_EVENT_TYPES_SOURCE,
-} from '../../../types'
-import {
-  WAIT_CONDITIONS_WITH_NONE_DELAY,
-  AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY,
-} from '../../../constants/options'
-
-// Song-based wait conditions for action timing (excludes system events)
-const WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY]
+import { YargEventType, YARG_EVENT_TYPES as YARG_EVENT_TYPES_SOURCE } from '../../../types'
+import { AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY } from '../../../constants/options'
 
 // All event types for YARG event nodes (includes system events + song events)
 const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENT_TYPES_SOURCE]
@@ -130,11 +115,11 @@ const timingSchema: JSONSchemaType<ActionTimingConfig> = {
   required: ['waitForCondition', 'waitForTime', 'duration', 'waitUntilCondition', 'waitUntilTime'],
   additionalProperties: false,
   properties: {
-    waitForCondition: { type: 'string', enum: WAIT_CONDITIONS },
+    waitForCondition: valueSourceSchema,
     waitForTime: valueSourceSchema,
     waitForConditionCount: { ...valueSourceSchema, nullable: true },
     duration: valueSourceSchema,
-    waitUntilCondition: { type: 'string', enum: WAIT_CONDITIONS },
+    waitUntilCondition: valueSourceSchema,
     waitUntilTime: valueSourceSchema,
     waitUntilConditionCount: { ...valueSourceSchema, nullable: true },
     easing: { type: 'string', nullable: true },
@@ -147,41 +132,6 @@ const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
   additionalProperties: false,
   required: [],
   properties: {
-    perLightOffsetMs: { type: 'number', nullable: true, minimum: 0 },
-    order: { type: 'string', enum: ['linear', 'inverse-linear'], nullable: true },
-    loop: { type: 'boolean', nullable: true },
-    sweepTime: { type: 'number', nullable: true, minimum: 0 },
-    sweepFadeInDuration: { type: 'number', nullable: true, minimum: 0 },
-    sweepFadeOutDuration: { type: 'number', nullable: true, minimum: 0 },
-    sweepLightOverlap: { type: 'number', nullable: true, minimum: 0, maximum: 100 },
-    sweepBetweenDelay: { type: 'number', nullable: true, minimum: 0 },
-    sweepDirection: { type: 'string', enum: ['forward', 'reverse'], nullable: true },
-    rotationDirection: { type: 'string', enum: ['clockwise', 'counter-clockwise'], nullable: true },
-    beatsPerCycle: { type: 'number', nullable: true, minimum: 1 },
-    startOffset: {
-      oneOf: [{ type: 'number', minimum: 0 }, valueSourceSchema, { type: 'null' }],
-    } as any,
-    holdTime: { type: 'number', nullable: true, minimum: 0 },
-    flashDurationIn: { type: 'number', nullable: true, minimum: 0 },
-    flashDurationOut: { type: 'number', nullable: true, minimum: 0 },
-    endWait: { type: 'number', nullable: true, minimum: 0 },
-    cycleTransitionDuration: { type: 'number', nullable: true, minimum: 0 },
-    cycleStepTrigger: { type: 'string', nullable: true },
-    cycleBaseColor: { type: 'string', nullable: true },
-    cycleBaseBrightness: { type: 'string', nullable: true },
-    dualModeEnabled: { type: 'boolean', nullable: true },
-    dualModeSolidColor: { type: 'string', nullable: true },
-    dualModeSwitchCondition: { type: 'string', nullable: true },
-    dualModeIsLargeVenue: { type: 'boolean', nullable: true },
-    patternBTarget: {
-      type: 'object',
-      nullable: true,
-      required: ['groups', 'filter'],
-      additionalProperties: false,
-      properties: { groups: valueSourceSchema, filter: valueSourceSchema },
-    } as any,
-    switchCondition: { type: 'string', nullable: true },
-    completeCondition: { type: 'string', nullable: true },
     custom: { type: 'object', nullable: true, additionalProperties: true },
   },
 }
@@ -200,6 +150,7 @@ const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
     initialValue: { type: ['number', 'boolean', 'string', 'array'] } as any,
     description: { type: 'string', nullable: true },
     isParameter: { type: 'boolean', nullable: true },
+    validValues: { type: 'array', items: { type: 'string' }, nullable: true } as any,
   },
 }
 
@@ -959,6 +910,7 @@ const yargFileSchema: JSONSchemaType<YargNodeCueFile> = {
       minItems: 1,
       items: yargCueSchema,
     },
+    bundled: { type: 'boolean', nullable: true },
   },
 }
 
@@ -975,6 +927,7 @@ const audioFileSchema: JSONSchemaType<AudioNodeCueFile> = {
       minItems: 1,
       items: audioCueSchema,
     },
+    bundled: { type: 'boolean', nullable: true },
   },
 }
 

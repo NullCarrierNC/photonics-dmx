@@ -345,9 +345,6 @@ const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCre
   const addActionNode = useCallback(
     (effectType: NodeEffectType, position?: { x: number; y: number }) => {
       const action = { ...buildDefaultAction(), id: `action-${createId()}`, effectType }
-      if (effectType === 'chase') {
-        action.config = { ...action.config, perLightOffsetMs: 50, order: 'linear' }
-      }
       const nodeWidth = 150
       const nodeHeight = 80
       const centeredPosition = position

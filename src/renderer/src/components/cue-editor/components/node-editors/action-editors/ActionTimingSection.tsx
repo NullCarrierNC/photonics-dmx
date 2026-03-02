@@ -7,6 +7,14 @@ import type { WaitCondition } from '../../../../../../../photonics-dmx/types'
 import { EASING_OPTIONS, getActionWaitOptions } from '../../../lib/options'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 
+function conditionFromValueSource(
+  vs: { source: string; value?: unknown; name?: string } | undefined,
+): WaitCondition {
+  if (!vs) return 'none'
+  if (vs.source === 'literal') return String(vs.value) as WaitCondition
+  return 'none'
+}
+
 type ActionTimingSectionProps = {
   node: ActionNode
   currentTiming: NonNullable<ActionNode['timing']>
@@ -30,9 +38,9 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
         Wait For Condition
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={currentTiming.waitForCondition}
+          value={conditionFromValueSource(currentTiming.waitForCondition)}
           onChange={(event) =>
-            updateTiming({ waitForCondition: event.target.value as WaitCondition })
+            updateTiming({ waitForCondition: { source: 'literal', value: event.target.value } })
           }
           disabled={selectedActionHasEventParent}>
           {getActionWaitOptions(activeMode).map((option) => (
@@ -45,7 +53,10 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
           <span className="text-[10px] text-gray-500">Inherited from event parent</span>
         )}
       </label>
-      {!(node.effectType === 'set-color' && currentTiming.waitForCondition === 'none') && (
+      {!(
+        node.effectType === 'set-color' &&
+        conditionFromValueSource(currentTiming.waitForCondition) === 'none'
+      ) && (
         <>
           <ValueSourceEditor
             label="Wait For Time (ms)"
@@ -78,9 +89,9 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
         Wait Until Condition
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={currentTiming.waitUntilCondition}
+          value={conditionFromValueSource(currentTiming.waitUntilCondition)}
           onChange={(event) =>
-            updateTiming({ waitUntilCondition: event.target.value as WaitCondition })
+            updateTiming({ waitUntilCondition: { source: 'literal', value: event.target.value } })
           }>
           {getActionWaitOptions(activeMode).map((option) => (
             <option key={option.value} value={option.value}>
@@ -89,7 +100,10 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
           ))}
         </select>
       </label>
-      {!(node.effectType === 'set-color' && currentTiming.waitUntilCondition === 'none') && (
+      {!(
+        node.effectType === 'set-color' &&
+        conditionFromValueSource(currentTiming.waitUntilCondition) === 'none'
+      ) && (
         <>
           <ValueSourceEditor
             label="Wait Until Time (ms)"

@@ -16,6 +16,11 @@ files:
 asarUnpack:
   - "**/*.node"
   - "**/node_modules/@serialport"
+extraResources:
+  - from: resources/defaults
+    to: defaults
+    filter:
+      - "**/*"
 win:
   executableName: Photonics
 nsis:

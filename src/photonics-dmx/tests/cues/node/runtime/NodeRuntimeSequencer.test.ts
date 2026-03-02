@@ -93,10 +93,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 30 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
       layer: { source: 'literal', value: 1 },
@@ -116,10 +116,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 30 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
       layer: { source: 'literal', value: 5 },
@@ -210,10 +210,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'beat',
+        waitForCondition: { source: 'literal', value: 'beat' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -310,10 +310,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -413,10 +413,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -494,10 +494,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -572,10 +572,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'beat',
+        waitUntilCondition: { source: 'literal', value: 'beat' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -650,10 +650,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'beat',
+        waitUntilCondition: { source: 'literal', value: 'beat' },
         waitUntilConditionCount: { source: 'literal', value: 2 },
         waitUntilTime: { source: 'literal', value: 0 },
       },
@@ -728,10 +728,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'measure',
+        waitForCondition: { source: 'literal', value: 'measure' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -750,10 +750,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'keyframe',
+        waitForCondition: { source: 'literal', value: 'keyframe' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -837,11 +837,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'measure',
+        waitForCondition: { source: 'literal', value: 'measure' },
         waitForConditionCount: { source: 'literal', value: 2 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -860,11 +860,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'keyframe',
+        waitForCondition: { source: 'literal', value: 'keyframe' },
         waitForConditionCount: { source: 'literal', value: 2 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -956,11 +956,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'drum-red',
+        waitForCondition: { source: 'literal', value: 'drum-red' },
         waitForConditionCount: { source: 'literal', value: 2 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -979,11 +979,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'guitar-green',
+        waitForCondition: { source: 'literal', value: 'guitar-green' },
         waitForConditionCount: { source: 'literal', value: 1 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1071,11 +1071,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'bass-blue',
+        waitForCondition: { source: 'literal', value: 'bass-blue' },
         waitForConditionCount: { source: 'literal', value: 2 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1094,11 +1094,11 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'keys-yellow',
+        waitForCondition: { source: 'literal', value: 'keys-yellow' },
         waitForConditionCount: { source: 'literal', value: 1 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1196,10 +1196,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'variable', name: 'durationMs', fallback: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1401,10 +1401,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1499,10 +1499,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1609,10 +1609,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1728,10 +1728,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1824,10 +1824,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1846,10 +1846,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -1941,10 +1941,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -2005,190 +2005,6 @@ describe('Node runtime with real Sequencer', () => {
     randomSpy.mockRestore()
   })
 
-  it('applies per-light chase offsets in linear order', () => {
-    const eventNode: YargEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'chase',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'green' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: 'none',
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-      config: {
-        perLightOffsetMs: 20,
-        order: 'linear',
-      },
-    }
-
-    const definition: YargNodeCueDefinition = {
-      id: 'chase-linear',
-      name: 'Chase Linear',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [{ from: 'event-1', to: 'action-1' }],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:chase-linear',
-      harness.sequencer,
-      harness.lightManager,
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const green = getColor('green', 'high')
-    const [first, second, third, fourth] = harness.frontLightIds
-
-    expect(harness.getLightState(first)).toMatchObject({
-      red: green.red,
-      green: green.green,
-      blue: green.blue,
-      blendMode: green.blendMode,
-    })
-    expect(harness.getLightState(second)).toBeNull()
-    expect(harness.getLightState(third)).toBeNull()
-    expect(harness.getLightState(fourth)).toBeNull()
-
-    harness.advanceBy(20)
-    expect(harness.getLightState(second)).toMatchObject({
-      red: green.red,
-      green: green.green,
-      blue: green.blue,
-      blendMode: green.blendMode,
-    })
-
-    harness.advanceBy(20)
-    expect(harness.getLightState(third)).toMatchObject({
-      red: green.red,
-      green: green.green,
-      blue: green.blue,
-      blendMode: green.blendMode,
-    })
-
-    harness.advanceBy(20)
-    expect(harness.getLightState(fourth)).toMatchObject({
-      red: green.red,
-      green: green.green,
-      blue: green.blue,
-      blendMode: green.blendMode,
-    })
-  })
-
-  it('applies per-light chase offsets in inverse order', () => {
-    const eventNode: YargEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'chase',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: 'none',
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-      config: {
-        perLightOffsetMs: 15,
-        order: 'inverse-linear',
-      },
-    }
-
-    const definition: YargNodeCueDefinition = {
-      id: 'chase-inverse',
-      name: 'Chase Inverse',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [{ from: 'event-1', to: 'action-1' }],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:chase-inverse',
-      harness.sequencer,
-      harness.lightManager,
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const blue = getColor('blue', 'high')
-    const [first, second, third, fourth] = harness.frontLightIds
-
-    expect(harness.getLightState(fourth)).toMatchObject({
-      red: blue.red,
-      green: blue.green,
-      blue: blue.blue,
-      blendMode: blue.blendMode,
-    })
-    expect(harness.getLightState(first)).toBeNull()
-    expect(harness.getLightState(second)).toBeNull()
-    expect(harness.getLightState(third)).toBeNull()
-
-    harness.advanceBy(15)
-    expect(harness.getLightState(third)).toMatchObject({
-      red: blue.red,
-      green: blue.green,
-      blue: blue.blue,
-      blendMode: blue.blendMode,
-    })
-  })
-
   it('raises events to trigger listener actions in a new context', () => {
     const eventNode: YargEventNode = {
       id: 'event-1',
@@ -2227,10 +2043,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }
@@ -2249,10 +2065,10 @@ describe('Node runtime with real Sequencer', () => {
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: 'none',
+        waitForCondition: { source: 'literal', value: 'none' },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
-        waitUntilCondition: 'none',
+        waitUntilCondition: { source: 'literal', value: 'none' },
         waitUntilTime: { source: 'literal', value: 0 },
       },
     }

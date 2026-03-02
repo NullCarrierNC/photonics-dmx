@@ -56,10 +56,10 @@ describe('Effect runtime with real Sequencer', () => {
               blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'literal', value: 0 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
             },
           },
@@ -128,10 +128,10 @@ describe('Effect runtime with real Sequencer', () => {
               blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'variable', name: 'startDelay', fallback: 0 },
               duration: { source: 'literal', value: 0 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
             },
           },
@@ -205,10 +205,10 @@ describe('Effect runtime with real Sequencer', () => {
               blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'variable', name: 'fadeDuration', fallback: 0 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
             },
           },
@@ -281,10 +281,10 @@ describe('Effect runtime with real Sequencer', () => {
               blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'literal', value: 0 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
             },
           },
@@ -368,10 +368,10 @@ describe('Effect runtime with real Sequencer', () => {
               blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'literal', value: 0 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
             },
           },
@@ -466,10 +466,10 @@ describe('Effect runtime with real Sequencer', () => {
               blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'literal', value: 0 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
             },
           },
@@ -561,10 +561,10 @@ describe('Effect runtime with real Sequencer', () => {
               blendMode: { source: 'variable', name: 'blendMode', fallback: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'literal', value: 0 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
             },
           },
@@ -630,10 +630,10 @@ describe('Effect runtime with real Sequencer', () => {
               blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'literal', value: 0 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
             },
           },
@@ -673,88 +673,6 @@ describe('Effect runtime with real Sequencer', () => {
       green: expected.green,
       blue: expected.blue,
       blendMode: expected.blendMode,
-    })
-  })
-
-  it('applies per-light chase offsets inside effects', () => {
-    const effect: YargEffectDefinition = {
-      id: 'chase-effect',
-      mode: 'yarg',
-      name: 'Chase Effect',
-      description: '',
-      nodes: {
-        events: [],
-        actions: [
-          {
-            id: 'action-1',
-            type: 'action',
-            effectType: 'chase',
-            target: {
-              groups: { source: 'literal', value: 'front' },
-              filter: { source: 'literal', value: 'all' },
-            },
-            color: {
-              name: { source: 'literal', value: 'yellow' },
-              brightness: { source: 'literal', value: 'high' },
-              blendMode: { source: 'literal', value: 'replace' },
-            },
-            timing: {
-              waitForCondition: 'none',
-              waitForTime: { source: 'literal', value: 0 },
-              duration: { source: 'literal', value: 0 },
-              waitUntilCondition: 'none',
-              waitUntilTime: { source: 'literal', value: 0 },
-            },
-            config: {
-              perLightOffsetMs: 15,
-              order: 'linear',
-            },
-          },
-        ],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectListeners: [
-          {
-            id: 'listener-1',
-            type: 'effect-listener',
-            label: 'Entry',
-            outputs: ['action-1'],
-          },
-        ],
-      },
-      connections: [{ from: 'listener-1', to: 'action-1' }],
-      layout: { nodePositions: {} },
-    }
-
-    const compiledEffect = EffectCompiler.compile(effect)
-    const engine = new EffectExecutionEngine(
-      compiledEffect,
-      harness.sequencer,
-      harness.lightManager,
-      {},
-      createCueData(),
-    )
-
-    engine.triggerEffect(createCueData())
-    harness.advanceBy(1)
-
-    const yellow = getColor('yellow', 'high')
-    const [first, second] = harness.frontLightIds
-    expect(harness.getLightState(first)).toMatchObject({
-      red: yellow.red,
-      green: yellow.green,
-      blue: yellow.blue,
-      blendMode: yellow.blendMode,
-    })
-    expect(harness.getLightState(second)).toBeNull()
-
-    harness.advanceBy(15)
-    expect(harness.getLightState(second)).toMatchObject({
-      red: yellow.red,
-      green: yellow.green,
-      blue: yellow.blue,
-      blendMode: yellow.blendMode,
     })
   })
 })

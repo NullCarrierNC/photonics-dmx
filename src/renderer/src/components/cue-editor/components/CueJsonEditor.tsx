@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { EditorState } from '@codemirror/state'
-import { EditorView, keymap } from '@codemirror/view'
+import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap } from '@codemirror/commands'
 import { json, jsonParseLinter } from '@codemirror/lang-json'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -195,6 +195,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
     if (!containerRef.current) return
 
     const extensions = [
+      lineNumbers(),
       json(),
       oneDark,
       keymap.of(defaultKeymap),

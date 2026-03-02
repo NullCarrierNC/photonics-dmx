@@ -130,10 +130,10 @@ describe('Runtime Event System', () => {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -204,10 +204,10 @@ describe('Runtime Event System', () => {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -225,10 +225,10 @@ describe('Runtime Event System', () => {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -319,10 +319,10 @@ describe('Runtime Event System', () => {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -340,10 +340,10 @@ describe('Runtime Event System', () => {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -427,10 +427,10 @@ describe('Runtime Event System', () => {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -448,10 +448,10 @@ describe('Runtime Event System', () => {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -521,10 +521,10 @@ describe('Runtime Event System', () => {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -575,10 +575,10 @@ describe('Runtime Event System', () => {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }

@@ -14,6 +14,7 @@ import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock'
 import { app } from 'electron'
 import { sendToAllWindows } from '../utils/windowUtils'
+import { copyDefaultData } from '../utils/copyDefaultData'
 import * as path from 'path'
 import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 
@@ -145,6 +146,8 @@ export class ControllerManager {
     await this.initializeSequencer()
     await this.initializeCueRegistry()
     await this.initializeAudioCueRegistry()
+    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
+    await copyDefaultData(process.resourcesPath, baseDir)
     await this.initializeEffectLoader() // Initialize effects BEFORE node cues
     await this.initializeNodeCueLoader()
     await this.initializeListeners()

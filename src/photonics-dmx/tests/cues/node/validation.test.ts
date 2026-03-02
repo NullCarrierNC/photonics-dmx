@@ -30,10 +30,10 @@ describe('Node cue validation', () => {
               blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'literal', value: 200 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
               easing: 'sinInOut',
               level: { source: 'literal', value: 1 },
@@ -90,10 +90,10 @@ describe('Node cue validation', () => {
               blendMode: { source: 'literal', value: 'add' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'literal', value: 150 },
-              waitUntilCondition: 'delay',
+              waitUntilCondition: { source: 'literal', value: 'delay' },
               waitUntilTime: { source: 'literal', value: 100 },
               easing: 'sinInOut',
               level: { source: 'literal', value: 1 },
@@ -138,10 +138,10 @@ describe('Node cue validation', () => {
               blendMode: { source: 'literal', value: 'replace' },
             },
             timing: {
-              waitForCondition: 'none',
+              waitForCondition: { source: 'literal', value: 'none' },
               waitForTime: { source: 'literal', value: 0 },
               duration: { source: 'literal', value: 100 },
-              waitUntilCondition: 'none',
+              waitUntilCondition: { source: 'literal', value: 'none' },
               waitUntilTime: { source: 'literal', value: 0 },
               easing: 'sinInOut',
               level: { source: 'literal', value: 1 },
@@ -190,5 +190,368 @@ describe('Node cue validation', () => {
       ],
     })
     expect(cycleWithAction.valid).toBe(true)
+  })
+
+  describe('schema rejections', () => {
+    const validCue = (): YargNodeCueDefinition => ({
+      id: 'test-cue',
+      name: 'Test Cue',
+      description: '',
+      cueType: CueType.Chorus,
+      style: 'primary',
+      nodes: {
+        events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
+            },
+            color: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
+            },
+            timing: {
+              waitForCondition: { source: 'literal', value: 'none' },
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 200 },
+              waitUntilCondition: { source: 'literal', value: 'none' },
+              waitUntilTime: { source: 'literal', value: 0 },
+              easing: 'sinInOut',
+              level: { source: 'literal', value: 1 },
+            },
+          },
+        ],
+      },
+      connections: [{ from: 'event-1', to: 'action-1' }],
+      layout: { nodePositions: {} },
+    })
+
+    const validFile = () => ({
+      version: 1,
+      mode: 'yarg',
+      group: { id: 'group-1', name: 'Test Group' },
+      cues: [validCue()],
+    })
+
+    it('rejects cue missing id', () => {
+      const cue = validCue()
+      const { id: _id, ...cueWithoutId } = cue
+      const result = validateYargNodeCueFile({
+        ...validFile(),
+        cues: [cueWithoutId as YargNodeCueDefinition],
+      })
+      expect(result.valid).toBe(false)
+      expect(result.errors.length).toBeGreaterThan(0)
+    })
+
+    it('rejects cue missing name', () => {
+      const cue = validCue()
+      const { name: _n, ...cueWithoutName } = cue
+      const result = validateYargNodeCueFile({
+        ...validFile(),
+        cues: [{ ...cueWithoutName, name: undefined } as unknown as YargNodeCueDefinition],
+      })
+      expect(result.valid).toBe(false)
+      expect(result.errors.length).toBeGreaterThan(0)
+    })
+
+    it('rejects invalid effectType on action node', () => {
+      const cue = validCue()
+      const action = cue.nodes.actions[0]
+      const invalidCue = {
+        ...cue,
+        nodes: {
+          ...cue.nodes,
+          actions: [{ ...action, effectType: 'invalid-effect' as any }],
+        },
+      }
+      const result = validateYargNodeCueFile({ ...validFile(), cues: [invalidCue] })
+      expect(result.valid).toBe(false)
+      expect(result.errors.length).toBeGreaterThan(0)
+    })
+
+    it('rejects invalid logicType on logic node', () => {
+      const cue = validCue()
+      cue.nodes.logic = [
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'invalid-logic' as any,
+          operator: 'add',
+          left: { source: 'literal', value: 1 },
+          right: { source: 'literal', value: 2 },
+        } as any,
+      ]
+      cue.connections = [
+        { from: 'event-1', to: 'logic-1' },
+        { from: 'logic-1', to: 'action-1' },
+      ]
+      const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+      expect(result.valid).toBe(false)
+      expect(result.errors.length).toBeGreaterThan(0)
+    })
+
+    it('rejects invalid comparator on conditional node', () => {
+      const cue = validCue()
+      cue.nodes.logic = [
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'conditional',
+          comparator: 'invalid-comp' as any,
+          left: { source: 'literal', value: 1 },
+          right: { source: 'literal', value: 0 },
+        } as any,
+      ]
+      cue.connections = [
+        { from: 'event-1', to: 'logic-1' },
+        { from: 'logic-1', to: 'action-1', fromPort: 'true' },
+      ]
+      const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+      expect(result.valid).toBe(false)
+      expect(result.errors.length).toBeGreaterThan(0)
+    })
+
+    it('rejects invalid operator on math node', () => {
+      const cue = validCue()
+      cue.nodes.logic = [
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'math',
+          operator: 'invalid-op' as any,
+          left: { source: 'literal', value: 1 },
+          right: { source: 'literal', value: 2 },
+        } as any,
+      ]
+      cue.connections = [
+        { from: 'event-1', to: 'logic-1' },
+        { from: 'logic-1', to: 'action-1' },
+      ]
+      const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+      expect(result.valid).toBe(false)
+      expect(result.errors.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('node variety coverage', () => {
+    it('validates cue with effectRaiser and effectListener nodes', () => {
+      const definition: YargNodeCueDefinition = {
+        id: 'effect-cue',
+        name: 'Effect Cue',
+        cueType: CueType.Chorus,
+        style: 'primary',
+        nodes: {
+          events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 200 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: 'sinInOut',
+                level: { source: 'literal', value: 1 },
+              },
+            },
+          ],
+          effectRaisers: [{ id: 'raiser-1', type: 'effect-raiser', effectId: 'eff-1' }],
+          effectListeners: [{ id: 'listener-1', type: 'effect-listener' }],
+        },
+        connections: [
+          { from: 'event-1', to: 'action-1' },
+          { from: 'listener-1', to: 'action-1' },
+        ],
+        layout: { nodePositions: {} },
+      }
+      const result = validateYargNodeCueFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g1', name: 'Group' },
+        cues: [definition],
+      })
+      expect(result.valid).toBe(true)
+    })
+
+    it('validates cue with eventRaiser and eventListener nodes', () => {
+      const definition: YargNodeCueDefinition = {
+        id: 'event-cue',
+        name: 'Event Cue',
+        cueType: CueType.Chorus,
+        style: 'primary',
+        nodes: {
+          events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 200 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: 'sinInOut',
+                level: { source: 'literal', value: 1 },
+              },
+            },
+          ],
+          eventRaisers: [{ id: 'raiser-1', type: 'event-raiser', eventName: 'custom' }],
+          eventListeners: [{ id: 'listener-1', type: 'event-listener', eventName: 'custom' }],
+        },
+        connections: [
+          { from: 'event-1', to: 'action-1' },
+          { from: 'listener-1', to: 'action-1' },
+        ],
+        events: [{ name: 'custom', description: '' }],
+        layout: { nodePositions: {} },
+      }
+      const result = validateYargNodeCueFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g1', name: 'Group' },
+        cues: [definition],
+      })
+      expect(result.valid).toBe(true)
+    })
+
+    it('validates cue containing array-manipulation logic node types', () => {
+      const definition: YargNodeCueDefinition = {
+        id: 'array-cue',
+        name: 'Array Cue',
+        cueType: CueType.Chorus,
+        style: 'primary',
+        nodes: {
+          events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 200 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: 'sinInOut',
+                level: { source: 'literal', value: 1 },
+              },
+            },
+          ],
+          logic: [
+            {
+              id: 'rev-1',
+              type: 'logic',
+              logicType: 'reverse-lights',
+              sourceVariable: 'arr',
+              assignTo: 'rev',
+            },
+            {
+              id: 'concat-1',
+              type: 'logic',
+              logicType: 'concat-lights',
+              sourceVariables: ['a', 'b'],
+              assignTo: 'c',
+            },
+            {
+              id: 'len-1',
+              type: 'logic',
+              logicType: 'array-length',
+              sourceVariable: 'arr',
+              assignTo: 'len',
+            },
+            {
+              id: 'shuf-1',
+              type: 'logic',
+              logicType: 'shuffle-lights',
+              sourceVariable: 'arr',
+              assignTo: 'shuf',
+            },
+            {
+              id: 'rand-1',
+              type: 'logic',
+              logicType: 'random',
+              mode: 'random-integer',
+              min: { source: 'literal', value: 0 },
+              max: { source: 'literal', value: 10 },
+              assignTo: 'r',
+            },
+            {
+              id: 'delay-1',
+              type: 'logic',
+              logicType: 'delay',
+              delayTime: { source: 'literal', value: 0 },
+            },
+            {
+              id: 'dbg-1',
+              type: 'logic',
+              logicType: 'debugger',
+              message: { source: 'literal', value: 'ok' },
+              variablesToLog: [],
+            },
+          ],
+        },
+        connections: [
+          { from: 'event-1', to: 'rev-1' },
+          { from: 'rev-1', to: 'action-1' },
+        ],
+        variables: [
+          { name: 'arr', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'rev', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'a', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'b', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'c', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'len', type: 'number', scope: 'cue', initialValue: 0 },
+          { name: 'shuf', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'r', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+        layout: { nodePositions: {} },
+      }
+      const result = validateYargNodeCueFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g1', name: 'Group' },
+        cues: [definition],
+      })
+      expect(result.valid).toBe(true)
+    })
   })
 })

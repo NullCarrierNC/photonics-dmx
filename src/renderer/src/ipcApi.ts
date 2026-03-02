@@ -296,6 +296,9 @@ export const showItemInFolder = (filePath: string) =>
 
 export const openPath = (filePath: string) => window.api.invoke(SHELL.OPEN_PATH, filePath)
 
+export const runNodeScript = (payload: { scriptName: string; args: string[] }) =>
+  window.api.invoke(SHELL.RUN_NODE_SCRIPT, payload)
+
 // ---------------------------------------------------------------------------
 // Node cue debug
 // ---------------------------------------------------------------------------

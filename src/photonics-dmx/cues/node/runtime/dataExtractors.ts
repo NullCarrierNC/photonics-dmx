@@ -153,6 +153,8 @@ export function extractConfigDataValue(
       return lightManager.getLightsInGroup('front')
     case 'back-lights-array':
       return lightManager.getLightsInGroup('back')
+    case 'strobe-lights-array':
+      return lightManager.getLightsInGroup('strobe')
   }
 
   // Try to parse as a pattern filter property (DRY approach)

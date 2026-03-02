@@ -190,6 +190,10 @@ export interface IpcInvokeMap {
     request: string
     response: string
   }
+  [SHELL.RUN_NODE_SCRIPT]: {
+    request: { scriptName: string; args: string[] }
+    response: { stdout: string; stderr: string }
+  }
 
   // ---- Cue / listeners ----
   [CUE.DISABLE_YARG]: {

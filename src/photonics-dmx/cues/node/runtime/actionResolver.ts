@@ -7,6 +7,7 @@ import { ExecutionContext } from './ExecutionContext'
 import { resolveValue, resolveColor, resolveBrightness, resolveBlendMode } from './valueResolver'
 import { ResolvedActionTiming, ResolvedColorSetting } from '../compiler/ActionEffectFactory'
 import { ActionTimingConfig, NodeColorSetting, ValueSource } from '../../types/nodeCueTypes'
+import type { WaitCondition } from '../../../types'
 
 export function resolveActionTiming(
   timing: ActionTimingConfig,
@@ -14,6 +15,12 @@ export function resolveActionTiming(
 ): ResolvedActionTiming {
   return {
     ...timing,
+    waitForCondition: String(
+      resolveValue('string', timing.waitForCondition, context),
+    ) as WaitCondition,
+    waitUntilCondition: String(
+      resolveValue('string', timing.waitUntilCondition, context),
+    ) as WaitCondition,
     waitForTime: Number(resolveValue('number', timing.waitForTime, context)),
     waitForConditionCount: timing.waitForConditionCount
       ? Number(resolveValue('number', timing.waitForConditionCount, context))

@@ -85,6 +85,16 @@ export class EffectCompiler {
       )
     }
 
+    // Duplicate effect listener IDs are not allowed
+    const effectListenerIds = effectListeners.map((l) => l.id)
+    const duplicateIds = effectListenerIds.filter((id, i) => effectListenerIds.indexOf(id) !== i)
+    if (duplicateIds.length > 0) {
+      const uniqueDuplicates = [...new Set(duplicateIds)]
+      throw new EffectCompilationError(
+        `Duplicate Effect Listener node id(s): ${uniqueDuplicates.join(', ')}.`,
+      )
+    }
+
     // Must have at least one action or runtime event mechanism
     if (!actions.length && !eventRaisers.length && !eventListeners.length) {
       throw new EffectCompilationError(

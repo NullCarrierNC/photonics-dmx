@@ -40,6 +40,7 @@ describe('EffectExecutionEngine', () => {
 
   beforeEach(() => {
     mockSequencer = {
+      addEffect: jest.fn(),
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
       }),
@@ -82,10 +83,10 @@ describe('EffectExecutionEngine', () => {
                 blendMode: { source: 'literal', value: 'replace' },
               },
               timing: {
-                waitForCondition: 'none',
+                waitForCondition: { source: 'literal', value: 'none' },
                 waitForTime: { source: 'literal', value: 0 },
                 duration: { source: 'literal', value: 100 },
-                waitUntilCondition: 'none',
+                waitUntilCondition: { source: 'literal', value: 'none' },
                 waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear',
                 level: { source: 'literal', value: 1 },
@@ -216,10 +217,10 @@ describe('EffectExecutionEngine', () => {
                 blendMode: { source: 'literal', value: 'replace' },
               },
               timing: {
-                waitForCondition: 'none',
+                waitForCondition: { source: 'literal', value: 'none' },
                 waitForTime: { source: 'literal', value: 0 },
                 duration: { source: 'literal', value: 100 },
-                waitUntilCondition: 'none',
+                waitUntilCondition: { source: 'literal', value: 'none' },
                 waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear',
                 level: { source: 'literal', value: 1 },
@@ -308,10 +309,10 @@ describe('EffectExecutionEngine', () => {
                 blendMode: { source: 'literal', value: 'replace' },
               },
               timing: {
-                waitForCondition: 'none',
+                waitForCondition: { source: 'literal', value: 'none' },
                 waitForTime: { source: 'literal', value: 0 },
                 duration: { source: 'literal', value: 100 },
-                waitUntilCondition: 'none',
+                waitUntilCondition: { source: 'literal', value: 'none' },
                 waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear',
                 level: { source: 'literal', value: 1 },
@@ -367,8 +368,11 @@ describe('EffectExecutionEngine', () => {
 
       await engine.triggerEffect(createCueData())
 
-      // Verify action was executed via internal event
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled()
+      // Verify action was executed via internal event (engine may use addEffect or addEffectWithCallback)
+      expect(
+        mockSequencer.addEffectWithCallback.mock.calls.length +
+          mockSequencer.addEffect.mock.calls.length,
+      ).toBeGreaterThanOrEqual(1)
     })
   })
 
@@ -396,10 +400,10 @@ describe('EffectExecutionEngine', () => {
                 blendMode: { source: 'literal', value: 'replace' },
               },
               timing: {
-                waitForCondition: 'none',
+                waitForCondition: { source: 'literal', value: 'none' },
                 waitForTime: { source: 'literal', value: 0 },
                 duration: { source: 'literal', value: 1000 },
-                waitUntilCondition: 'none',
+                waitUntilCondition: { source: 'literal', value: 'none' },
                 waitUntilTime: { source: 'literal', value: 0 },
                 easing: 'linear',
                 level: { source: 'literal', value: 1 },

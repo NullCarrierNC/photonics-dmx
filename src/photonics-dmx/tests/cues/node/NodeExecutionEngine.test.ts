@@ -121,10 +121,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
           easing: 'linear',
         },
@@ -193,10 +193,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -214,10 +214,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -339,10 +339,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -360,10 +360,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -467,10 +467,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -598,10 +598,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -647,10 +647,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -729,10 +729,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -949,10 +949,10 @@ describe('NodeExecutionEngine', () => {
           blendMode: { source: 'literal', value: 'replace' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 100 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
           easing: 'linear',
           level: { source: 'literal', value: 1 },
@@ -1055,10 +1055,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -1149,10 +1149,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -1255,10 +1255,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -1352,10 +1352,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -1373,10 +1373,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'low' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -1484,10 +1484,10 @@ describe('NodeExecutionEngine', () => {
           brightness: { source: 'literal', value: 'high' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -1614,10 +1614,10 @@ describe('NodeExecutionEngine', () => {
           blendMode: { source: 'literal', value: 'replace' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
           easing: 'sinInOut',
           level: { source: 'literal', value: 1 },
@@ -1708,10 +1708,10 @@ describe('NodeExecutionEngine', () => {
           blendMode: { source: 'literal', value: 'replace' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
           easing: 'sinInOut',
           level: { source: 'literal', value: 1 },
@@ -1791,10 +1791,10 @@ describe('NodeExecutionEngine', () => {
           blendMode: { source: 'literal', value: 'replace' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
           easing: 'sinInOut',
           level: { source: 'literal', value: 1 },
@@ -1888,10 +1888,10 @@ describe('NodeExecutionEngine', () => {
           blendMode: { source: 'literal', value: 'replace' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'variable', name: 'calculatedDuration', fallback: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
           easing: 'sinInOut',
           level: { source: 'literal', value: 1 },
@@ -1991,10 +1991,10 @@ describe('NodeExecutionEngine', () => {
           blendMode: { source: 'literal', value: 'replace' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 200 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
           easing: 'sinInOut',
           level: { source: 'literal', value: 1 },

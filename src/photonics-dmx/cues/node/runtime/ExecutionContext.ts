@@ -16,6 +16,12 @@ export class ExecutionContext {
   private visitedNodes: Map<string, number> = new Map() // nodeId -> phase when last visited
   private phase: number = 0
   private activeNodes: Map<string, ActionNode> = new Map() // Nodes waiting for completion
+  /**
+   * Depth counter incremented while a synchronous node-dispatch batch is in progress.
+   * Prevents premature context disposal when a dead-end branch is encountered before
+   * a sibling branch has had a chance to register a blocking node (e.g. delay).
+   */
+  private batchDepth: number = 0
   /** Per-node state for for-each-light iteration (index for next iteration, length). */
   private forEachLightState: Map<string, { index: number; length: number }> = new Map()
   /** Current iteration index when inside a for-each-light body (for unique effect naming). */
@@ -127,10 +133,37 @@ export class ExecutionContext {
   }
 
   /**
+   * Signal that a synchronous node-dispatch batch is starting.
+   * While batchDepth > 0, tryComplete() will not fire to avoid prematurely
+   * disposing the context when a dead-end branch is reached before a sibling
+   * branch has had a chance to register a blocking node (e.g. a delay).
+   */
+  public beginBatch(): void {
+    this.batchDepth++
+  }
+
+  /**
+   * Signal that a synchronous node-dispatch batch has ended.
+   * The caller is responsible for calling tryComplete() after endBatch() returns.
+   */
+  public endBatch(): void {
+    if (this.batchDepth > 0) this.batchDepth--
+  }
+
+  /**
    * Register an active action node (waiting for completion).
    */
   public registerActiveAction(nodeId: string, actionNode: ActionNode): void {
     this.activeNodes.set(nodeId, actionNode)
+  }
+
+  /**
+   * Check whether a specific node is still registered as an active (blocking) action.
+   * Used by delay timer callbacks to guard against phase-mismatch: other blocking nodes
+   * can advance the execution phase while a delay waits, making hasVisited() unreliable.
+   */
+  public isActionActive(nodeId: string): boolean {
+    return this.activeNodes.has(nodeId)
   }
 
   /**
@@ -183,11 +216,13 @@ export class ExecutionContext {
   /**
    * If execution is complete, fire the context-complete callback once and return true.
    * Safe to call multiple times; callback fires at most once.
-   * Returns false while there are active actions or a for-each-light loop is in progress.
+   * Returns false while there are active actions, a for-each-light loop is in progress,
+   * or a synchronous node-dispatch batch is still running (batchDepth > 0).
    */
   public tryComplete(): boolean {
     if (this.hasActiveActions()) return false
     if (this.forEachLightState.size > 0) return false
+    if (this.batchDepth > 0) return false
     if (this.completed) return true
     this.completed = true
     if (this.onContextCompleteCallback) {
@@ -220,6 +255,7 @@ export class ExecutionContext {
     this.activeTimers.clear()
     this.visitedNodes.clear()
     this.phase = 0
+    this.batchDepth = 0
     this.activeNodes.clear()
     this.forEachLightState.clear()
     this.forEachIterationIndex = -1

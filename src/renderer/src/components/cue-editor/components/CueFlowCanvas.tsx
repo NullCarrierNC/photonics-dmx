@@ -50,6 +50,7 @@ type Props = {
   addEffectListenerNode?: (position?: { x: number; y: number }) => void
   addNotesNode?: (variant: NotesVariant, position?: { x: number; y: number }) => void
   onJsonToggle?: () => void
+  onGraphPrettify?: () => void
 }
 
 const CueFlowCanvas: React.FC<Props> = ({
@@ -82,6 +83,7 @@ const CueFlowCanvas: React.FC<Props> = ({
   addEffectListenerNode,
   addNotesNode,
   onJsonToggle,
+  onGraphPrettify,
 }) => {
   const handlePaneMenuClick = (action: () => void) => {
     action()
@@ -157,15 +159,26 @@ const CueFlowCanvas: React.FC<Props> = ({
           <div className="min-w-0 truncate">
             {selectedCueName ? `Cue: ${selectedCueName}` : 'Select or add a cue'}
           </div>
-          {editorMode === 'cue' && onJsonToggle && (
-            <button
-              type="button"
-              onClick={onJsonToggle}
-              className="shrink-0 ml-auto px-2 py-0.5 rounded border border-gray-400 dark:border-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
-              title="Edit cue JSON">
-              JSON
-            </button>
-          )}
+          <div className="shrink-0 ml-auto flex items-center gap-2">
+            {onGraphPrettify && (
+              <button
+                type="button"
+                onClick={onGraphPrettify}
+                className="px-2 py-0.5 rounded border border-gray-400 dark:border-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                title="Re-layout graph nodes">
+                Graph Prettier
+              </button>
+            )}
+            {onJsonToggle && (
+              <button
+                type="button"
+                onClick={onJsonToggle}
+                className="px-2 py-0.5 rounded border border-gray-400 dark:border-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                title="Edit cue JSON">
+                JSON
+              </button>
+            )}
+          </div>
         </Panel>
         <MiniMap
           pannable

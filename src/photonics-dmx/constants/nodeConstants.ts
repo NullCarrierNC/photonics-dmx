@@ -65,6 +65,7 @@ export const BASE_CONFIG_DATA_PROPERTIES = [
   'all-lights-array',
   'front-lights-array',
   'back-lights-array',
+  'strobe-lights-array',
 ] as const
 
 /**

@@ -35,6 +35,7 @@ export interface NodeCueFileSummary {
   mode: NodeCueMode
   updatedAt: number
   errors?: string[]
+  bundled?: boolean
 }
 
 export interface NodeCueListSummary {
@@ -74,8 +75,8 @@ export class NodeCueLoader extends EventEmitter {
   constructor(private readonly options: NodeCueLoaderOptions) {
     super()
     this.baseDir = options.baseDir
-    this.yargDir = path.join(this.baseDir, 'node-cues', 'yarg')
-    this.audioDir = path.join(this.baseDir, 'node-cues', 'audio')
+    this.yargDir = path.join(this.baseDir, 'node-data', 'cues', 'yarg')
+    this.audioDir = path.join(this.baseDir, 'node-data', 'cues', 'audio')
   }
 
   public async loadAll(): Promise<NodeCueLoadResult> {
@@ -267,6 +268,7 @@ export class NodeCueLoader extends EventEmitter {
       cueCount: file.cues.length,
       mode,
       updatedAt: Date.now(),
+      bundled: file.bundled ?? false,
     }
 
     this.updateSummary(summary)

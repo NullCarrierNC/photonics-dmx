@@ -9,7 +9,6 @@ import { createDefaultActionTiming } from '../../../../../../photonics-dmx/cues/
 import ValueSourceEditor from '../shared/ValueSourceEditor'
 import ActionTargetSection from './action-editors/ActionTargetSection'
 import ActionColorFields from './action-editors/ActionColorFields'
-import ActionEffectConfigs from './action-editors/ActionEffectConfigs'
 import ActionTimingSection from './action-editors/ActionTimingSection'
 
 interface ActionNodeEditorProps {
@@ -34,82 +33,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
     })
 
   const setEffectType = (v: NodeEffectType) => {
-    if (v === 'chase') {
-      updateNode({
-        effectType: 'chase',
-        config: {
-          ...node.config,
-          perLightOffsetMs: node.config?.perLightOffsetMs ?? 50,
-          order: node.config?.order ?? 'linear',
-        },
-      })
-    } else if (v === 'sweep') {
-      updateNode({
-        effectType: 'sweep',
-        config: {
-          ...node.config,
-          sweepTime: 900,
-          sweepFadeInDuration: 300,
-          sweepFadeOutDuration: 600,
-          sweepLightOverlap: 70,
-          sweepBetweenDelay: 0,
-          sweepDirection: 'forward',
-        },
-      })
-    } else if (v === 'rotation') {
-      updateNode({
-        effectType: 'rotation',
-        config: {
-          ...node.config,
-          rotationDirection: 'clockwise',
-          beatsPerCycle: 1,
-          startOffset: 0,
-        },
-      })
-    } else if (v === 'flash') {
-      updateNode({
-        effectType: 'flash',
-        config: {
-          ...node.config,
-          holdTime: 100,
-          flashDurationIn: 50,
-          flashDurationOut: 100,
-        },
-      })
-    } else if (v === 'cycle') {
-      updateNode({
-        effectType: 'cycle',
-        config: {
-          ...node.config,
-          cycleTransitionDuration: 100,
-          cycleStepTrigger: 'beat',
-          cycleBaseColor: 'transparent',
-          cycleBaseBrightness: 'low',
-        },
-      })
-    } else if (v === 'dual-mode-rotation') {
-      updateNode({
-        effectType: 'dual-mode-rotation',
-        config: {
-          ...node.config,
-          beatsPerCycle: 2,
-          dualModeSolidColor: 'green',
-          dualModeSwitchCondition: 'measure',
-          dualModeIsLargeVenue: true,
-        },
-      })
-    } else if (v === 'alternating-pattern') {
-      updateNode({
-        effectType: 'alternating-pattern',
-        config: {
-          ...node.config,
-          switchCondition: 'keyframe',
-          completeCondition: 'beat',
-        },
-      })
-    } else {
-      updateNode({ effectType: v })
-    }
+    updateNode({ effectType: v })
   }
 
   return (
@@ -136,13 +60,6 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
 
       <ActionColorFields
         node={node}
-        availableVariables={availableVariables}
-        updateNode={updateNode}
-      />
-
-      <ActionEffectConfigs
-        node={node}
-        activeMode={activeMode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

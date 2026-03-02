@@ -25,7 +25,6 @@ import {
   EventListenerNode,
   EffectRaiserNode,
   LogicNode,
-  NodeActionConfig,
   VariableDefinition,
   ValueSource,
 } from '../../types/nodeCueTypes'
@@ -45,6 +44,7 @@ import {
 } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
+import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { sendToAllWindows } from '../../../../main/utils/windowUtils'
 
@@ -179,30 +179,6 @@ export class NodeExecutionEngine {
 
   private getVariableValue(name: string, context: ExecutionContext): VariableValue | undefined {
     return context.cueLevelVarStore.get(name) ?? context.groupLevelVarStore.get(name)
-  }
-
-  /**
-   * Resolve config values that may be ValueSource (e.g. startOffset for rotation).
-   * Returns a copy of config with resolved numbers; non-ValueSource fields are passed through.
-   */
-  private resolveConfigValues(
-    config: NodeActionConfig | undefined,
-    context: ExecutionContext,
-  ): NodeActionConfig | undefined {
-    if (!config) return undefined
-    const out: NodeActionConfig = { ...config }
-    if (
-      config.startOffset !== undefined &&
-      typeof config.startOffset === 'object' &&
-      config.startOffset !== null &&
-      'source' in config.startOffset
-    ) {
-      const resolved = Number(
-        resolveValue('number', config.startOffset, context, this.variableDefinitions),
-      )
-      out.startOffset = Math.max(0, resolved)
-    }
-    return out
   }
 
   /**
@@ -471,21 +447,17 @@ export class NodeExecutionEngine {
 
       const actionChain = buildActionChain()
 
-      const resolvedConfig = this.resolveConfigValues(actionNode.config, context)
-
       const resolvedAction = {
         ...actionNode,
         target: resolvedTarget,
         color: resolvedColor,
         timing: resolvedTiming,
         layer: resolvedLayer,
-        config: resolvedConfig,
       } as ActionNode & {
         target: ResolvedActionTarget
         color: ResolvedColorSetting
         timing: ResolvedActionTiming
         layer: number
-        config?: NodeActionConfig
       }
 
       const lights = ActionEffectFactory.resolveLights(
@@ -520,21 +492,6 @@ export class NodeExecutionEngine {
         return
       }
 
-      const getVar = (varName: string) => {
-        const cueVar = context.cueLevelVarStore.get(varName)
-        const groupVar = context.groupLevelVarStore.get(varName)
-        return cueVar ?? groupVar
-      }
-      let patternBLights: TrackedLight[] | undefined
-      if (actionNode.effectType === 'alternating-pattern' && actionNode.config?.patternBTarget) {
-        patternBLights =
-          ActionEffectFactory.resolveLights(
-            this.lightManager,
-            actionNode.config.patternBTarget,
-            getVar,
-          ) ?? []
-      }
-
       const submitSingleAction = (): void => {
         const effect = ActionEffectFactory.buildEffect({
           action: resolvedAction,
@@ -545,7 +502,6 @@ export class NodeExecutionEngine {
           resolvedColor,
           resolvedTiming,
           resolvedLayer,
-          patternBLights,
         })
 
         if (!effect) {
@@ -595,16 +551,7 @@ export class NodeExecutionEngine {
       }
 
       const resolveChainStep = (a: ActionNode): ChainStep | null => {
-        if (
-          a.effectType === 'blackout' ||
-          a.effectType === 'chase' ||
-          a.effectType === 'sweep' ||
-          a.effectType === 'rotation' ||
-          a.effectType === 'flash' ||
-          a.effectType === 'cycle' ||
-          a.effectType === 'dual-mode-rotation' ||
-          a.effectType === 'alternating-pattern'
-        ) {
+        if (a.effectType === 'blackout') {
           return null
         }
 
@@ -826,10 +773,10 @@ export class NodeExecutionEngine {
           brightness: { source: 'literal', value: 'medium' },
         },
         timing: {
-          waitForCondition: 'none',
+          waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
           duration: { source: 'literal', value: 0 },
-          waitUntilCondition: 'none',
+          waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
@@ -837,7 +784,9 @@ export class NodeExecutionEngine {
 
       const timerId = setTimeout(() => {
         context.removeTimer(timerId)
-        if (context.hasVisited(nodeId)) {
+        // Guard on isActionActive rather: other blocking nodes (e.g. from a
+        // for-each-light body) can advance the execution phase while the delay waits
+        if (context.isActionActive(nodeId)) {
           this.debugLog(`delay complete nodeId=${nodeId} ctx=${context.id}`)
           this.emitNodeExecution('deactivated', nodeId)
           context.completeAction(nodeId)
@@ -896,19 +845,22 @@ export class NodeExecutionEngine {
         return
       }
 
+      // Inside a for-each-light loop each iteration must get its own engine instance.
+      // Outside loops the iteration index is -1, so the key reduces to raiserNode.id.
+      const iterIdx = context.getForEachIterationIndex()
+      const engineKey = iterIdx >= 0 ? `${raiserNode.id}:${iterIdx}` : raiserNode.id
+
       // Check if this effect raiser already has an active execution
-      const existingEngine = this.activeEffectEngines.get(raiserNode.id)
+      const existingEngine = this.activeEffectEngines.get(engineKey)
       if (existingEngine) {
         // If the existing engine still has active contexts, block re-triggering
         if (existingEngine.hasActiveContexts()) {
           this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`)
-          // Continue to next nodes (don't block the cue execution, just skip this trigger)
-          this.continueToNextNodes(raiserNode.id, context)
           return
         } else {
           // Engine exists but no active contexts - clean it up and allow new trigger
           this.debugLog(`Effect raiser ${raiserNode.id} cleaning up completed engine`)
-          this.activeEffectEngines.delete(raiserNode.id)
+          this.activeEffectEngines.delete(engineKey)
         }
       }
 
@@ -943,14 +895,20 @@ export class NodeExecutionEngine {
         context.cueData, // Pass caller's cue data
       )
 
-      // Set up completion callback to remove from tracking when effect becomes idle
+      // Set up completion callback: for persistent raisers, re-trigger immediately on idle.
+      // For non-persistent raisers, remove from tracking so the next cue-called can start fresh.
       effectEngine.setOnIdle(() => {
-        this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`)
-        this.activeEffectEngines.delete(raiserNode.id)
+        if (raiserNode.isPersistent && this.activeEffectEngines.has(engineKey)) {
+          this.debugLog(`Effect raiser ${raiserNode.id} persistent: re-triggering`)
+          effectEngine.triggerEffect(context.cueData)
+        } else {
+          this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`)
+          this.activeEffectEngines.delete(engineKey)
+        }
       })
 
       // Store the engine in active tracking
-      this.activeEffectEngines.set(raiserNode.id, effectEngine)
+      this.activeEffectEngines.set(engineKey, effectEngine)
 
       // Trigger effect (blocking for this raiser node, but non-blocking for cue execution)
       effectEngine.triggerEffect(context.cueData)
@@ -1032,27 +990,15 @@ export class NodeExecutionEngine {
   }
 
   /**
-   * Collect all node IDs reachable from startNodeIds via the adjacency graph, excluding excludeNodeId.
-   * Used to find for-each-light body nodes so they can be unmarked between iterations.
+   * Collect all node IDs reachable from startNodeIds, excluding excludeNodeId.
+   * Delegates to shared engineUtils for de-duplication.
    */
   private collectReachableNodes(
     adjacency: Map<string, Connection[]>,
     startNodeIds: string[],
     excludeNodeId: string,
   ): Set<string> {
-    const result = new Set<string>()
-    const queue = [...startNodeIds]
-    while (queue.length > 0) {
-      const id = queue.shift()!
-      if (id === excludeNodeId) continue
-      if (result.has(id)) continue
-      result.add(id)
-      const outgoing = adjacency.get(id) ?? []
-      for (const conn of outgoing) {
-        queue.push(conn.to)
-      }
-    }
-    return result
+    return collectReachableNodes(adjacency, startNodeIds, excludeNodeId)
   }
 
   /**
@@ -1153,10 +1099,21 @@ export class NodeExecutionEngine {
 
   /**
    * Continue execution to the next nodes.
+   *
+   * Wraps the dispatch loop with beginBatch/endBatch so that a dead-end branch
+   * encountered partway through the batch cannot prematurely dispose the context
+   * before sibling branches have had a chance to register blocking nodes (e.g. delays).
    */
   private continueExecution(nodeIds: string[], context: ExecutionContext): void {
+    context.beginBatch()
     for (const nodeId of nodeIds) {
       this.executeNode(nodeId, context)
+    }
+    context.endBatch()
+    // After the batch completes, check whether the context is now done.
+    // This handles pure-logic flows where no blocking node was registered.
+    if (context.tryComplete()) {
+      context.dispose()
     }
   }
 
