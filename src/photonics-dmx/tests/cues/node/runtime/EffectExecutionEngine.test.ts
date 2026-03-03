@@ -44,6 +44,7 @@ describe('EffectExecutionEngine', () => {
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
       }),
+      removeEffectCallback: jest.fn(),
       removeEffect: jest.fn(),
     } as any
 
@@ -445,6 +446,147 @@ describe('EffectExecutionEngine', () => {
       expect(callTime).toBeLessThan(100)
 
       await promise // Wait for actual completion
+    })
+  })
+
+  describe('Idle gating for callback-backed effects', () => {
+    const createForEachBlockingEffect = (): YargEffectDefinition => ({
+      id: 'for-each-blocking-effect',
+      mode: 'yarg',
+      name: 'For Each Blocking Effect',
+      description: '',
+      variables: [
+        {
+          name: 'lights',
+          type: 'light-array',
+          scope: 'cue',
+          initialValue: [
+            { id: 'light1', position: 0 },
+            { id: 'light2', position: 1 },
+          ],
+        },
+        { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
+        { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+      ],
+      nodes: {
+        events: [],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'variable', name: 'currentLight' },
+              filter: { source: 'literal', value: 'all' },
+            },
+            color: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
+            },
+            timing: {
+              waitForCondition: { source: 'literal', value: 'none' },
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 50 },
+              waitUntilCondition: { source: 'literal', value: 'delay' },
+              waitUntilTime: { source: 'literal', value: 25 },
+              easing: 'linear',
+              level: { source: 'literal', value: 1 },
+            },
+            layer: { source: 'literal', value: 0 },
+          },
+        ],
+        logic: [
+          {
+            id: 'for-each-1',
+            type: 'logic',
+            logicType: 'for-each-light',
+            sourceVariable: 'lights',
+            currentLightVariable: 'currentLight',
+            currentIndexVariable: 'idx',
+          } as any,
+        ],
+        eventRaisers: [],
+        eventListeners: [],
+        effectListeners: [
+          {
+            id: 'listener-1',
+            type: 'effect-listener',
+            label: 'Entry',
+            outputs: ['for-each-1'],
+          },
+        ],
+      },
+      connections: [
+        { from: 'listener-1', to: 'for-each-1' },
+        { from: 'for-each-1', to: 'action-1', fromPort: 'each' },
+      ],
+      layout: { nodePositions: {} },
+    })
+
+    it('does not fire idle until all pending callback-backed submissions complete', () => {
+      const callbacks: Array<() => void> = []
+      mockSequencer.addEffectWithCallback.mockImplementation((_name, _effect, callback) => {
+        callbacks.push(callback)
+      })
+
+      const compiledEffect = EffectCompiler.compile(createForEachBlockingEffect())
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        {},
+        createCueData(),
+      )
+      const onIdle = jest.fn()
+      engine.setOnIdle(onIdle)
+
+      engine.triggerEffect(createCueData())
+
+      expect(callbacks).toHaveLength(2)
+      expect(onIdle).not.toHaveBeenCalled()
+
+      callbacks[0]()
+      expect(onIdle).not.toHaveBeenCalled()
+
+      callbacks[1]()
+      expect(onIdle).toHaveBeenCalledTimes(1)
+    })
+
+    it('cancelAll clears submitted callback-backed effects and prevents idle retrigger', () => {
+      const callbacks: Array<() => void> = []
+      mockSequencer.addEffectWithCallback.mockImplementation((_name, _effect, callback) => {
+        callbacks.push(callback)
+      })
+
+      const compiledEffect = EffectCompiler.compile(createForEachBlockingEffect())
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        {},
+        createCueData(),
+      )
+      const onIdle = jest.fn()
+      engine.setOnIdle(onIdle)
+
+      engine.triggerEffect(createCueData())
+      expect(callbacks).toHaveLength(2)
+
+      const submittedNames = mockSequencer.addEffectWithCallback.mock.calls.map((call) => call[0])
+      engine.cancelAll()
+
+      expect(mockSequencer.removeEffectCallback).toHaveBeenCalledTimes(2)
+      expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(2)
+      for (const name of submittedNames) {
+        expect(mockSequencer.removeEffectCallback).toHaveBeenCalledWith(name)
+        expect(mockSequencer.removeEffect).toHaveBeenCalledWith(name, 0)
+      }
+
+      // Simulate stale callback invocations after cancel: idle callback should already be detached.
+      callbacks[0]()
+      callbacks[1]()
+      expect(onIdle).not.toHaveBeenCalled()
     })
   })
 })

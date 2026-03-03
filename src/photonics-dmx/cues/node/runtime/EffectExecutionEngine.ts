@@ -58,6 +58,18 @@ export class EffectExecutionEngine {
   private onIdleCallback?: () => void // Called when all contexts complete
   /** Effect names and layers submitted via addEffectWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
+  /** Callback-backed effects still running in sequencer for this engine instance. */
+  private pendingCallbackEffects: Set<string> = new Set()
+
+  private maybeFireIdle(): void {
+    if (
+      this.onIdleCallback &&
+      this.activeContexts.size === 0 &&
+      this.pendingCallbackEffects.size === 0
+    ) {
+      this.onIdleCallback()
+    }
+  }
 
   private emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
     sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
@@ -142,10 +154,7 @@ export class EffectExecutionEngine {
 
     context.setOnContextComplete(() => {
       this.activeContexts.delete(context.id)
-      // Check if effect is now idle (all contexts done)
-      if (this.activeContexts.size === 0 && this.onIdleCallback) {
-        this.onIdleCallback()
-      }
+      this.maybeFireIdle()
     })
 
     this.activeContexts.set(context.id, context)
@@ -163,10 +172,7 @@ export class EffectExecutionEngine {
     } else {
       // No children - context completes immediately
       this.activeContexts.delete(context.id)
-      // Check if effect is now idle (all contexts done)
-      if (this.activeContexts.size === 0 && this.onIdleCallback) {
-        this.onIdleCallback()
-      }
+      this.maybeFireIdle()
     }
   }
 
@@ -320,12 +326,15 @@ export class EffectExecutionEngine {
 
       if (shouldBlock) {
         context.registerActiveAction(action.id, action)
+        this.pendingCallbackEffects.add(effectName)
         const callback = (): void => {
+          this.pendingCallbackEffects.delete(effectName)
           this.submittedEffects.delete(effectName)
           this.emitNodeExecution('deactivated', action.id)
           context.advancePhase()
           context.completeAction(action.id)
           this.continueToNextNodes(action.id, context)
+          this.maybeFireIdle()
         }
         this.submittedEffects.set(effectName, resolvedLayer)
         this.sequencer.addEffectWithCallback(effectName, effect, callback)
@@ -423,7 +432,9 @@ export class EffectExecutionEngine {
 
     if (chainHasBlockingStep) {
       context.registerActiveAction(lastChainNode.id, lastChainNode)
+      this.pendingCallbackEffects.add(chainEffectName)
       const callback = (): void => {
+        this.pendingCallbackEffects.delete(chainEffectName)
         this.submittedEffects.delete(chainEffectName)
         for (const a of actionChain) {
           this.emitNodeExecution('deactivated', a.id)
@@ -431,6 +442,7 @@ export class EffectExecutionEngine {
         context.advancePhase()
         context.completeAction(lastChainNode.id)
         this.continueToNextNodes(lastChainNode.id, context)
+        this.maybeFireIdle()
       }
       this.submittedEffects.set(chainEffectName, chainData.baseLayer)
       this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback)
@@ -635,10 +647,7 @@ export class EffectExecutionEngine {
 
     context.setOnContextComplete(() => {
       this.activeContexts.delete(context.id)
-      // Check if effect is now idle (all contexts done)
-      if (this.activeContexts.size === 0 && this.onIdleCallback) {
-        this.onIdleCallback()
-      }
+      this.maybeFireIdle()
     })
 
     this.activeContexts.set(context.id, context)
@@ -718,6 +727,7 @@ export class EffectExecutionEngine {
       this.sequencer.removeEffect(name, layer)
     }
     this.submittedEffects.clear()
+    this.pendingCallbackEffects.clear()
     this.onIdleCallback = undefined
   }
 
