@@ -378,6 +378,15 @@
           "isParameter": true
         },
         {
+          "name": "lowBrightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "low",
+          "description": "Brightness level to fade out to (same colour as sweep)",
+          "isParameter": true,
+          "validValues": ["low", "medium", "high", "max"]
+        },
+        {
           "name": "numLights",
           "type": "number",
           "scope": "cue",
@@ -615,12 +624,12 @@
             },
             "color": {
               "name": {
-                "source": "literal",
-                "value": "transparent"
+                "source": "variable",
+                "name": "color"
               },
               "brightness": {
-                "source": "literal",
-                "value": "max"
+                "source": "variable",
+                "name": "lowBrightness"
               },
               "blendMode": {
                 "source": "variable",
@@ -2062,8 +2071,8 @@
             "y": 242.5238067880273
           },
           "rcw-foreach": {
-            "x": 8.315172242000699,
-            "y": 380.0186789929867
+            "x": 57.606060981399196,
+            "y": 344.8109013219878
           },
           "rcw-raw1": {
             "x": 5.957706185057759,
@@ -2115,9 +2124,9 @@
           }
         },
         "viewport": {
-          "x": 256.12686761178065,
-          "y": 107.75600288660246,
-          "zoom": 0.5
+          "x": 388.17912361963886,
+          "y": 140.507262670662,
+          "zoom": 0.5680563024139482
         }
       }
     },
@@ -4974,8 +4983,8 @@
             "y": 247.56012749671936
           },
           "rccw2-foreach": {
-            "x": -1.6183711029589176,
-            "y": 369.18654173240066
+            "x": 63.722802146622826,
+            "y": 361.78942777961777
           },
           "rccw2-raw1": {
             "x": -1.1495310757309198,
@@ -5023,9 +5032,9 @@
           }
         },
         "viewport": {
-          "x": 158.74071329255042,
-          "y": 36.582146920694356,
-          "zoom": 0.6849164899827831
+          "x": 202.09786459127582,
+          "y": 202.64407504123437,
+          "zoom": 0.8111271555770423
         }
       }
     },
@@ -5288,5 +5297,6 @@
         }
       }
     }
-  ]
+  ],
+  "bundled": true
 }

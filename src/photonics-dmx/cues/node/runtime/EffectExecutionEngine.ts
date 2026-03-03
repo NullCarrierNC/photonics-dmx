@@ -714,9 +714,11 @@ export class EffectExecutionEngine {
     }
     this.activeContexts.clear()
     for (const [name, layer] of this.submittedEffects) {
+      this.sequencer.removeEffectCallback(name)
       this.sequencer.removeEffect(name, layer)
     }
     this.submittedEffects.clear()
+    this.onIdleCallback = undefined
   }
 
   /**

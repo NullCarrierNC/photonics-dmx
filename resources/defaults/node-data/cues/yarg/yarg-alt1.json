@@ -2261,18 +2261,18 @@
             "y": 249.47215816006064
           },
           "y1-coolauto-effect-front": {
-            "x": -3.2516972981393337,
-            "y": 372.0091897659004
+            "x": -134.3568568968917,
+            "y": 366.4302468042513
           },
           "y1-coolauto-effect-back": {
-            "x": 266.4197321329266,
-            "y": 379.11348693817854
+            "x": 129.73562957252523,
+            "y": 359.58718657240684
           }
         },
         "viewport": {
-          "x": 503.08025878225453,
-          "y": 57.58684525359422,
-          "zoom": 0.75
+          "x": 315.75070978862084,
+          "y": 331.25085596394865,
+          "zoom": 0.7169816984143661
         }
       },
       "variables": [
@@ -2463,202 +2463,6 @@
           "y1-warmman-effect-back": {
             "x": 127.70837097837386,
             "y": 375.0831426934499
-          }
-        },
-        "viewport": {
-          "x": 216.74115558414928,
-          "y": 170.90466820511764,
-          "zoom": 0.5617984168070286
-        }
-      },
-      "variables": [
-        {
-          "name": "frontLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
-        {
-          "name": "backLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        }
-      ],
-      "effects": [
-        {
-          "effectId": "effect-cross-fade-colors",
-          "effectFileId": "yarg-core-effects",
-          "name": "Cross-Fade Colours"
-        }
-      ]
-    },
-    {
-      "id": "cue-y1-warm-auto",
-      "name": "Warm Automatic",
-      "description": "Alternates red and yellow between front and back on measure",
-      "cueType": "Warm_Automatic",
-      "style": "primary",
-      "nodes": {
-        "events": [
-          {
-            "id": "y1-warmauto-event-start",
-            "type": "event",
-            "eventType": "cue-started"
-          }
-        ],
-        "actions": [],
-        "logic": [
-          {
-            "id": "y1-warmauto-logic-front",
-            "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "front-lights-array",
-            "assignTo": "frontLights"
-          },
-          {
-            "id": "y1-warmauto-logic-back",
-            "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "back-lights-array",
-            "assignTo": "backLights"
-          }
-        ],
-        "eventRaisers": [],
-        "eventListeners": [],
-        "effectRaisers": [
-          {
-            "id": "y1-warmauto-effect-front",
-            "type": "effect-raiser",
-            "effectId": "effect-cross-fade-colors",
-            "isPersistent": true,
-            "parameterValues": {
-              "lights": {
-                "source": "variable",
-                "name": "frontLights"
-              },
-              "layer": {
-                "source": "literal",
-                "value": 2
-              },
-              "startColor": {
-                "source": "literal",
-                "value": "yellow"
-              },
-              "startBrightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "endColor": {
-                "source": "literal",
-                "value": "red"
-              },
-              "endBrightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "duration": {
-                "source": "literal",
-                "value": 400
-              },
-              "crossFadeTrigger": {
-                "source": "literal",
-                "value": "measure"
-              }
-            }
-          },
-          {
-            "id": "y1-warmauto-effect-back",
-            "type": "effect-raiser",
-            "effectId": "effect-cross-fade-colors",
-            "isPersistent": true,
-            "parameterValues": {
-              "lights": {
-                "source": "variable",
-                "name": "backLights"
-              },
-              "layer": {
-                "source": "literal",
-                "value": 1
-              },
-              "startColor": {
-                "source": "literal",
-                "value": "red"
-              },
-              "startBrightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "endColor": {
-                "source": "literal",
-                "value": "yellow"
-              },
-              "endBrightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "duration": {
-                "source": "literal",
-                "value": 400
-              },
-              "crossFadeTrigger": {
-                "source": "literal",
-                "value": "measure"
-              }
-            }
-          }
-        ],
-        "notes": []
-      },
-      "connections": [
-        {
-          "from": "y1-warmauto-event-start",
-          "to": "y1-warmauto-logic-front"
-        },
-        {
-          "from": "y1-warmauto-logic-front",
-          "to": "y1-warmauto-logic-back"
-        },
-        {
-          "from": "y1-warmauto-logic-back",
-          "to": "y1-warmauto-effect-front"
-        },
-        {
-          "from": "y1-warmauto-logic-back",
-          "to": "y1-warmauto-effect-back"
-        }
-      ],
-      "layout": {
-        "nodePositions": {
-          "y1-warmauto-event-start": {
-            "x": 4.243432581424713,
-            "y": -5.330089319497347
-          },
-          "y1-warmauto-logic-front": {
-            "x": 9.87193974852562,
-            "y": 123.85408350452781
-          },
-          "y1-warmauto-logic-back": {
-            "x": -11.770066956058145,
-            "y": 243.31162486597896
-          },
-          "y1-warmauto-effect-front": {
-            "x": -137.665516203499,
-            "y": 384.3135753072861
-          },
-          "y1-warmauto-effect-back": {
-            "x": 111.04896887394557,
-            "y": 377.4904562342397
           }
         },
         "viewport": {
@@ -3674,8 +3478,8 @@
             "y": 880.3378836512566
           },
           "notes-5e925f84-44c8-4284-9ee1-60d4e27278d2": {
-            "x": 6.606748066842556,
-            "y": -200.17758394777775
+            "x": 231.30576506612692,
+            "y": 7.877061421929966
           },
           "notes-1da819e8-d790-408e-9610-919c0ac3f3dc": {
             "x": 247.74083192377782,
@@ -3683,9 +3487,9 @@
           }
         },
         "viewport": {
-          "x": 601.6777325724252,
-          "y": -132.20759340794757,
-          "zoom": 0.75
+          "x": 374.01056982897774,
+          "y": 41.97989896633618,
+          "zoom": 0.7877053932746079
         }
       },
       "variables": [
@@ -4472,9 +4276,9 @@
           }
         },
         "viewport": {
-          "x": 229.6191076111803,
-          "y": 85.92791038023972,
-          "zoom": 0.6233005971375482
+          "x": 413.4298351137139,
+          "y": 108.36340031611564,
+          "zoom": 0.5034777750283594
         }
       },
       "variables": [
@@ -4756,26 +4560,26 @@
             "y": 926.0651079962188
           },
           "y1-search-logic-set-fwd": {
-            "x": 4.312450708821416,
-            "y": 500.095762193203
+            "x": 109.5802552251472,
+            "y": 521.9437970928177
           },
           "y1-search-logic-set-rev": {
-            "x": 527.3524795435369,
-            "y": 506.71426110342145
-          },
-          "y1-search-action": {
-            "x": 274.59596013354803,
-            "y": 622.2241639096171
+            "x": 414.1399350637148,
+            "y": 518.6313710486659
           },
           "logic-ef2a578e-d5ad-4abd-bc92-04a91ecf4ec8": {
             "x": 474.86294006658954,
             "y": 326.252754605964
+          },
+          "y1-search-action": {
+            "x": 274.59596013354803,
+            "y": 622.2241639096171
           }
         },
         "viewport": {
-          "x": 139.33885246610953,
-          "y": -24.02302168790111,
-          "zoom": 0.7239690861897786
+          "x": 311.4298351137139,
+          "y": 345.36340031611564,
+          "zoom": 0.5034777750283594
         }
       },
       "variables": [
@@ -7127,5 +6931,6 @@
         }
       ]
     }
-  ]
+  ],
+  "bundled": true
 }

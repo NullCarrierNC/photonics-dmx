@@ -211,6 +211,7 @@ export class YargNodeCue implements INetCue {
   onStop(): void {
     if (this.executionEngine) {
       this.executionEngine.cancelAll()
+      this.executionEngine = undefined
     }
 
     this.cueLevelVarStore.clear()

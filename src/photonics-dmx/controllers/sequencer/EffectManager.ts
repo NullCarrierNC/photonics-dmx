@@ -620,8 +620,9 @@ export class EffectManager implements IEffectManager {
         this.layerManager.resetLayerTracking(layer)
       }
 
-      // Clean up transitions ONLY if requested AND there's no next effect
-      if (shouldRemoveTransitions && !hasNextEffect) {
+      // Clean up transitions ONLY if requested AND there's no next effect.
+      // Layer 0 is the base layer: do not remove its state so the last running cue's light state persists.
+      if (shouldRemoveTransitions && !hasNextEffect && layer > 0) {
         lightsToCleanup.push(lightId)
       }
     }
