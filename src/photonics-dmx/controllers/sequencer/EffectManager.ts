@@ -120,6 +120,27 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
+   * Clears all effects and starts the given effect, with a completion callback.
+   * Same as setEffect but registers a callback that fires when the effect completes.
+   * Used by node cues when the first submission is blocking to avoid a visible black frame
+   * (clear and add happen in one tick via setEffect).
+   *
+   * @param name The name of the effect
+   * @param effect The effect configuration
+   * @param onComplete Callback to fire when effect completes
+   * @param isPersistent If true, the effect re-queues itself after completing
+   */
+  public setEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent: boolean = false,
+  ): void {
+    this.effectCallbacks.set(name, onComplete)
+    this.setEffect(name, effect, isPersistent)
+  }
+
+  /**
    * Remove a completion callback for an effect.
    *
    * @param name The name of the effect

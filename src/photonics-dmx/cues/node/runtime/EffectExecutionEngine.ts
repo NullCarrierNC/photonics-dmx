@@ -60,6 +60,8 @@ export class EffectExecutionEngine {
   private submittedEffects: Map<string, number> = new Map()
   /** Callback-backed effects still running in sequencer for this engine instance. */
   private pendingCallbackEffects: Set<string> = new Set()
+  /** When .use is true, the next effect submission must use setEffect (then set .use = false). */
+  private firstSubmissionUsesSetEffectRef?: { use: boolean }
 
   private maybeFireIdle(): void {
     if (
@@ -86,6 +88,7 @@ export class EffectExecutionEngine {
     lightManager: DmxLightManager,
     parameterValues: Record<string, any>,
     callerCueData: CueData | AudioCueData,
+    firstSubmissionUsesSetEffectRef?: { use: boolean },
   ) {
     this.instanceId = ++EffectExecutionEngine.nextInstanceId
     this.compiledEffect = compiledEffect
@@ -93,6 +96,7 @@ export class EffectExecutionEngine {
     this.lightManager = lightManager
     this.parameterValues = parameterValues
     this.callerCueData = callerCueData
+    this.firstSubmissionUsesSetEffectRef = firstSubmissionUsesSetEffectRef
     this.variableDefinitions = compiledEffect.definition.variables ?? []
 
     // Initialize effect-local variable store
@@ -323,6 +327,7 @@ export class EffectExecutionEngine {
           : `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}`
 
       const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
+      const useSetEffect = this.firstSubmissionUsesSetEffectRef?.use === true
 
       if (shouldBlock) {
         context.registerActiveAction(action.id, action)
@@ -337,10 +342,20 @@ export class EffectExecutionEngine {
           this.maybeFireIdle()
         }
         this.submittedEffects.set(effectName, resolvedLayer)
-        this.sequencer.addEffectWithCallback(effectName, effect, callback)
+        if (useSetEffect) {
+          this.firstSubmissionUsesSetEffectRef!.use = false
+          this.sequencer.setEffectWithCallback(effectName, effect, callback)
+        } else {
+          this.sequencer.addEffectWithCallback(effectName, effect, callback)
+        }
       } else {
         this.submittedEffects.set(effectName, resolvedLayer)
-        this.sequencer.addEffect(effectName, effect)
+        if (useSetEffect) {
+          this.firstSubmissionUsesSetEffectRef!.use = false
+          void this.sequencer.setEffect(effectName, effect)
+        } else {
+          this.sequencer.addEffect(effectName, effect)
+        }
         this.emitNodeExecution('deactivated', action.id)
         this.continueToNextNodes(action.id, context)
       }
@@ -430,6 +445,7 @@ export class EffectExecutionEngine {
       (step) => step.resolvedTiming.waitUntilCondition !== 'none',
     )
 
+    const useSetEffectChain = this.firstSubmissionUsesSetEffectRef?.use === true
     if (chainHasBlockingStep) {
       context.registerActiveAction(lastChainNode.id, lastChainNode)
       this.pendingCallbackEffects.add(chainEffectName)
@@ -445,10 +461,20 @@ export class EffectExecutionEngine {
         this.maybeFireIdle()
       }
       this.submittedEffects.set(chainEffectName, chainData.baseLayer)
-      this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback)
+      if (useSetEffectChain) {
+        this.firstSubmissionUsesSetEffectRef!.use = false
+        this.sequencer.setEffectWithCallback(chainEffectName, composedEffect, callback)
+      } else {
+        this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback)
+      }
     } else {
       this.submittedEffects.set(chainEffectName, chainData.baseLayer)
-      this.sequencer.addEffect(chainEffectName, composedEffect)
+      if (useSetEffectChain) {
+        this.firstSubmissionUsesSetEffectRef!.use = false
+        void this.sequencer.setEffect(chainEffectName, composedEffect)
+      } else {
+        this.sequencer.addEffect(chainEffectName, composedEffect)
+      }
       for (const a of actionChain) {
         this.emitNodeExecution('deactivated', a.id)
       }

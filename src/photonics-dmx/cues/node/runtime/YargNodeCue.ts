@@ -27,6 +27,10 @@ export class YargNodeCue implements INetCue {
   private isExecutingCueStarted = false
   private queuedParameters: CueData[] = []
 
+  // First run of Primary cue: first effect submission uses setEffect to clear state
+  private firstSubmissionUsesSetEffectRef = { use: false }
+  private clearedForThisActivation = false
+
   constructor(
     groupId: string,
     private readonly compiledCue: CompiledYargCue,
@@ -81,6 +85,7 @@ export class YargNodeCue implements INetCue {
         this.groupLevelVarStore,
         this.effectRegistry,
         variableDefinitions,
+        this.firstSubmissionUsesSetEffectRef,
       )
     }
 
@@ -115,6 +120,12 @@ export class YargNodeCue implements INetCue {
     // Fire non-cue events immediately; they don't participate in the cue lifecycle queue.
     for (const event of otherEvents) {
       this.executionEngine.startExecution(event, parameters)
+    }
+
+    // Primary cue: first run of this activation uses setEffect (clear then add) for layer 0.
+    if (hasCueEvent && this.style === CueStyle.Primary && !this.clearedForThisActivation) {
+      this.firstSubmissionUsesSetEffectRef.use = true
+      this.clearedForThisActivation = true
     }
 
     // If cue-started is present on this call, run it first, then run cue-called after it completes.
@@ -222,6 +233,10 @@ export class YargNodeCue implements INetCue {
     // Reset queuing state
     this.isExecutingCueStarted = false
     this.queuedParameters = []
+
+    // Next time this cue runs (Primary), first submission will use setEffect again
+    this.firstSubmissionUsesSetEffectRef.use = false
+    this.clearedForThisActivation = false
   }
 
   private initializeVariables(): void {

@@ -1,6 +1,7 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
+import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
 import {
   YargNodeCueDefinition,
   YargEventNode,
@@ -57,6 +58,10 @@ describe('Runtime Event System', () => {
       }),
       removeEffectCallback: jest.fn(),
       setEffect: jest.fn(),
+      setEffectWithCallback: jest.fn((_name, _effect, callback) => {
+        // Same as setEffect; callback for when effect completes (blocking path)
+        setTimeout(() => callback(), 0)
+      }),
       removeEffect: jest.fn(),
       removeAllEffects: jest.fn(),
       removeEffectByLayer: jest.fn(),
@@ -601,6 +606,286 @@ describe('Runtime Event System', () => {
       expect(() => {
         NodeCueCompiler.compileYargCue(cueDefinition)
       }).toThrow(/references undefined event/)
+    })
+  })
+
+  describe('First submission setEffect lifecycle', () => {
+    it('uses setEffect for first submission when ref.use is true (engine with ref)', async () => {
+      const cueStartedEvent: YargEventNode = {
+        id: 'e-start',
+        type: 'event',
+        eventType: 'cue-started',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'medium' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+      const cueDefinition: YargNodeCueDefinition = {
+        id: 'cue-lifecycle',
+        name: 'Lifecycle Cue',
+        cueType: 'Intro' as any,
+        style: 'primary',
+        nodes: {
+          events: [cueStartedEvent],
+          actions: [actionNode],
+          logic: [],
+        },
+        connections: [{ from: 'e-start', to: 'action1' }],
+        layout: { nodePositions: {} },
+      }
+      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const firstSubmissionRef = { use: true }
+      const engine = new NodeExecutionEngine(
+        compiled,
+        'cue-lifecycle',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        [],
+        firstSubmissionRef,
+      )
+      engine.startExecution(cueStartedEvent, createCueData())
+      expect(mockSequencer.setEffect).toHaveBeenCalledTimes(1)
+      expect(firstSubmissionRef.use).toBe(false)
+      expect(mockSequencer.addEffect).not.toHaveBeenCalled()
+      // Clearing is done inside setEffect; node code must not call removeAllEffects directly (avoids black flash)
+      expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
+    })
+
+    it('uses addEffect when ref is not passed (engine without ref)', async () => {
+      const cueStartedEvent: YargEventNode = {
+        id: 'e-start',
+        type: 'event',
+        eventType: 'cue-started',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'blue' },
+          brightness: { source: 'literal', value: 'medium' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+      const cueDefinition: YargNodeCueDefinition = {
+        id: 'cue-no-ref',
+        name: 'No Ref Cue',
+        cueType: 'Intro' as any,
+        style: 'primary',
+        nodes: {
+          events: [cueStartedEvent],
+          actions: [actionNode],
+          logic: [],
+        },
+        connections: [{ from: 'e-start', to: 'action1' }],
+        layout: { nodePositions: {} },
+      }
+      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const engine = new NodeExecutionEngine(
+        compiled,
+        'cue-no-ref',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+      engine.startExecution(cueStartedEvent, createCueData())
+      expect(mockSequencer.setEffect).not.toHaveBeenCalled()
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
+    })
+
+    it('YargNodeCue (Primary): first execute uses setEffect, second uses addEffect, after onStop first again uses setEffect', async () => {
+      const cueStartedEvent: YargEventNode = {
+        id: 'e-start',
+        type: 'event',
+        eventType: 'cue-started',
+      }
+      const cueCalledEvent: YargEventNode = {
+        id: 'e-called',
+        type: 'event',
+        eventType: 'cue-called',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'green' },
+          brightness: { source: 'literal', value: 'medium' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+      const cueDefinition: YargNodeCueDefinition = {
+        id: 'cue-full',
+        name: 'Full Lifecycle Cue',
+        cueType: 'Intro' as any,
+        style: 'primary',
+        nodes: {
+          events: [cueStartedEvent, cueCalledEvent],
+          actions: [actionNode],
+          logic: [],
+        },
+        connections: [
+          { from: 'e-start', to: 'action1' },
+          { from: 'e-called', to: 'action1' },
+        ],
+        layout: { nodePositions: {} },
+      }
+      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const cue = new YargNodeCue('group1', compiled)
+      const cueData = createCueData()
+
+      await cue.execute(cueData, mockSequencer, mockLightManager)
+      expect(mockSequencer.setEffect).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
+      const addEffectAfterFirst = (mockSequencer.addEffect as jest.Mock).mock.calls.length
+      expect(addEffectAfterFirst).toBeGreaterThanOrEqual(0)
+
+      await cue.execute(cueData, mockSequencer, mockLightManager)
+      expect(mockSequencer.setEffect).toHaveBeenCalledTimes(1)
+      expect((mockSequencer.addEffect as jest.Mock).mock.calls.length).toBeGreaterThan(
+        addEffectAfterFirst,
+      )
+
+      cue.onStop()
+      await cue.execute(cueData, mockSequencer, mockLightManager)
+      expect(mockSequencer.setEffect).toHaveBeenCalledTimes(2)
+    })
+
+    it('YargNodeCue (Secondary): first execute uses addEffect only, never setEffect', async () => {
+      const cueStartedEvent: YargEventNode = {
+        id: 'e-start',
+        type: 'event',
+        eventType: 'cue-started',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'medium' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+      const cueDefinition: YargNodeCueDefinition = {
+        id: 'cue-secondary',
+        name: 'Secondary Overlay Cue',
+        cueType: 'Intro' as any,
+        style: 'secondary',
+        nodes: {
+          events: [cueStartedEvent],
+          actions: [actionNode],
+          logic: [],
+        },
+        connections: [{ from: 'e-start', to: 'action1' }],
+        layout: { nodePositions: {} },
+      }
+      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const cue = new YargNodeCue('group1', compiled)
+      const cueData = createCueData()
+
+      await cue.execute(cueData, mockSequencer, mockLightManager)
+      expect(mockSequencer.setEffect).not.toHaveBeenCalled()
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
+    })
+
+    it('YargNodeCue (Primary, no cue-started node): first execute uses setEffect', async () => {
+      const cueCalledEvent: YargEventNode = {
+        id: 'e-called',
+        type: 'event',
+        eventType: 'cue-called',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'blue' },
+          brightness: { source: 'literal', value: 'medium' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+      const cueDefinition: YargNodeCueDefinition = {
+        id: 'cue-primary-called-only',
+        name: 'Primary Cue Called Only',
+        cueType: 'Intro' as any,
+        style: 'primary',
+        nodes: {
+          events: [cueCalledEvent],
+          actions: [actionNode],
+          logic: [],
+        },
+        connections: [{ from: 'e-called', to: 'action1' }],
+        layout: { nodePositions: {} },
+      }
+      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const cue = new YargNodeCue('group1', compiled)
+      const cueData = createCueData()
+
+      await cue.execute(cueData, mockSequencer, mockLightManager)
+      expect(mockSequencer.setEffect).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
     })
   })
 })

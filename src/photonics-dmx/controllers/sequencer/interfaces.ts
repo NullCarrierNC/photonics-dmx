@@ -277,6 +277,17 @@ export interface ILightingController {
   ): void
 
   /**
+   * Clears all effects and starts the given effect, with a completion callback.
+   * Same as setEffect but registers a callback that fires when the effect completes.
+   */
+  setEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean,
+  ): void
+
+  /**
    * Remove a completion callback for an effect.
    */
   removeEffectCallback(name: string): void

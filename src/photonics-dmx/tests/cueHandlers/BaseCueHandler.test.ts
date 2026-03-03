@@ -80,6 +80,7 @@ describe('AbstractCueHandler', () => {
       removeAllEffectsForced: jest.fn(),
       setState: jest.fn(),
       addEffectWithCallback: jest.fn(),
+      setEffectWithCallback: jest.fn(),
       removeEffectCallback: jest.fn(),
       onBeat: jest.fn(),
       onMeasure: jest.fn(),
