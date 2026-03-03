@@ -688,12 +688,12 @@
             },
             "color": {
               "name": {
-                "source": "literal",
-                "value": "transparent"
+                "source": "variable",
+                "name": "color"
               },
               "brightness": {
-                "source": "literal",
-                "value": "max"
+                "source": "variable",
+                "name": "lowBrightness"
               },
               "blendMode": {
                 "source": "variable",
