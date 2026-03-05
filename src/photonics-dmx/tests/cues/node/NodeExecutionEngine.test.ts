@@ -783,6 +783,86 @@ describe('NodeExecutionEngine', () => {
       const state = engine.getExecutionState()
       expect(state.activeContexts).toHaveLength(0)
     })
+
+    it('cancelAll(true) leaves effects on sequencer so lights stay lit during cue transition', () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+      }
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Default,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [],
+        },
+        connections: [{ from: 'event1', to: 'action1' }],
+      }
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([['action1', actionNode]]),
+        logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]]),
+      }
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+
+      engine.startExecution(eventNode, createCueData('Strong'))
+
+      const removeEffectBefore = (mockSequencer.removeEffect as jest.Mock).mock.calls.length
+      const removeCallbackBefore = (mockSequencer.removeEffectCallback as jest.Mock).mock.calls
+        .length
+
+      engine.cancelAll(true)
+
+      // Callbacks must still be removed so stale completions do not fire
+      expect(mockSequencer.removeEffectCallback).toHaveBeenCalledTimes(removeCallbackBefore + 1)
+      // Effects must NOT be removed so the next cue's setEffect can transition from them
+      expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectBefore)
+
+      const state = engine.getExecutionState()
+      expect(state.activeContexts).toHaveLength(0)
+    })
   })
 
   describe('Effect Raiser Node', () => {

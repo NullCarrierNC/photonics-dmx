@@ -17,9 +17,19 @@ import { INetCue } from '../cues/interfaces/INetCue'
  * Layer 0 will maintain its state though.
  * addEffect will not clear other effects unless it's on the same layer.
  */
+const STROBE_TYPES: CueType[] = [
+  CueType.Strobe_Fastest,
+  CueType.Strobe_Fast,
+  CueType.Strobe_Medium,
+  CueType.Strobe_Slow,
+  CueType.Strobe_Off,
+]
+
 class YargCueHandler extends BaseCueHandler {
-  private currentExecutingCue: INetCue | null = null
-  private currentExecutingCueType: CueType | null = null
+  private currentPrimaryCue: INetCue | null = null
+  private currentPrimaryCueType: CueType | null = null
+  private currentSecondaryCue: INetCue | null = null
+  private currentSecondaryCueType: CueType | null = null
 
   constructor(
     lightManager: DmxLightManager,
@@ -68,8 +78,13 @@ class YargCueHandler extends BaseCueHandler {
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Strobe_Off:
+        if (this.currentSecondaryCue) {
+          this.currentSecondaryCue.onStop?.()
+          this.currentSecondaryCue = null
+          this.currentSecondaryCueType = null
+        }
         this.emit('cueHandled', historicCueData)
-        return // Do nothing
+        return
       case CueType.Keyframe_First:
       case CueType.Keyframe_Next:
       case CueType.Keyframe_Previous:
@@ -92,29 +107,30 @@ class YargCueHandler extends BaseCueHandler {
     const cue = this.registry.getCueImplementation(cueType, trackMode)
 
     if (cue) {
-      // Always check for cue transitions first
-      if (this.currentExecutingCueType !== cueType) {
-        // console.log(`[Lifecycle] Cue change detected: ${this.currentExecutingCueType} -> ${cueType}`);
+      const incomingIsStrobe = STROBE_TYPES.includes(cueType)
 
-        // Strobes run on layer 255 above regular cues - don't clear effects when transitioning TO a strobe
-        const strobeTypes = [
-          'Strobe_Fastest',
-          'Strobe_Fast',
-          'Strobe_Medium',
-          'Strobe_Slow',
-          'Strobe_Off',
-        ]
-        const incomingIsStrobe = strobeTypes.includes(cueType)
-
-        // Only stop the current cue if we're NOT transitioning to a strobe
-        if (!incomingIsStrobe) {
-          this.stopCurrentCue()
+      if (incomingIsStrobe) {
+        // Strobes run on top of primary; track separately so we don't lose the primary cue reference.
+        if (this.currentSecondaryCueType !== cueType) {
+          if (this.currentSecondaryCue) {
+            this.currentSecondaryCue.onStop?.()
+            this.currentSecondaryCue = null
+            this.currentSecondaryCueType = null
+          }
+          this.currentSecondaryCue = cue
+          this.currentSecondaryCueType = cueType
         }
-
-        // ALWAYS update the tracking, regardless of whether we stopped the cue
-        // console.log(`[Lifecycle] Starting new cue: ${cue.cueId} (${cueType})`);
-        this.currentExecutingCue = cue
-        this.currentExecutingCueType = cueType
+      } else {
+        // Non-strobe (primary) cue: stop previous primary only; leave secondary (strobe) untouched.
+        if (this.currentPrimaryCueType !== cueType) {
+          if (this.currentPrimaryCue) {
+            this.currentPrimaryCue.onStop?.()
+            this.currentPrimaryCue = null
+            this.currentPrimaryCueType = null
+          }
+          this.currentPrimaryCue = cue
+          this.currentPrimaryCueType = cueType
+        }
       }
 
       await cue.execute(historicCueData, this._sequencer, this._lightManager)
@@ -126,14 +142,19 @@ class YargCueHandler extends BaseCueHandler {
   }
 
   /**
-   * Stop the currently executing cue and call its onStop lifecycle method
+   * Stop the currently executing primary and secondary cues and call their onStop lifecycle methods.
+   * Used when transitioning to a new primary cue, on blackout, and by stopActiveCue().
    */
   private stopCurrentCue(): void {
-    if (this.currentExecutingCue) {
-      //  console.log(`[Lifecycle] Calling onStop for cue: ${this.currentExecutingCue.cueId}`);
-      this.currentExecutingCue.onStop?.()
-      this.currentExecutingCue = null
-      this.currentExecutingCueType = null
+    if (this.currentPrimaryCue) {
+      this.currentPrimaryCue.onStop?.()
+      this.currentPrimaryCue = null
+      this.currentPrimaryCueType = null
+    }
+    if (this.currentSecondaryCue) {
+      this.currentSecondaryCue.onStop?.()
+      this.currentSecondaryCue = null
+      this.currentSecondaryCueType = null
     }
   }
 
@@ -288,16 +309,16 @@ class YargCueHandler extends BaseCueHandler {
    * Clean up resources and call destroy lifecycle on any executing cue
    */
   public shutdown(): void {
-    // console.log('[Lifecycle] YargCueHandler shutdown called');
-    // Call onDestroy on currently executing cue
-    if (this.currentExecutingCue) {
-      //   console.log(`[Lifecycle] Calling onDestroy for cue: ${this.currentExecutingCue.cueId}`);
-      this.currentExecutingCue.onDestroy?.()
-      this.currentExecutingCue = null
-      this.currentExecutingCueType = null
+    if (this.currentPrimaryCue) {
+      this.currentPrimaryCue.onDestroy?.()
+      this.currentPrimaryCue = null
+      this.currentPrimaryCueType = null
     }
-
-    // Call parent shutdown
+    if (this.currentSecondaryCue) {
+      this.currentSecondaryCue.onDestroy?.()
+      this.currentSecondaryCue = null
+      this.currentSecondaryCueType = null
+    }
     super.shutdown()
   }
 }

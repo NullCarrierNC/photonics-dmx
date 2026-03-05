@@ -321,13 +321,14 @@ export class EffectExecutionEngine {
         return
       }
 
+      const useSetEffect = this.firstSubmissionUsesSetEffectRef?.use === true
+
       const effectName =
         iterIdx >= 0
           ? `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}:${iterIdx}`
           : `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}`
 
       const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
-      const useSetEffect = this.firstSubmissionUsesSetEffectRef?.use === true
 
       if (shouldBlock) {
         context.registerActiveAction(action.id, action)
@@ -742,15 +743,18 @@ export class EffectExecutionEngine {
 
   /**
    * Cancel all active executions.
+   * @param skipEffectRemoval When true, leave submitted effects on the sequencer so the next cue's setEffect can transition from them instead of from black.
    */
-  public cancelAll(): void {
+  public cancelAll(skipEffectRemoval = false): void {
     for (const context of this.activeContexts.values()) {
       context.dispose()
     }
     this.activeContexts.clear()
     for (const [name, layer] of this.submittedEffects) {
       this.sequencer.removeEffectCallback(name)
-      this.sequencer.removeEffect(name, layer)
+      if (!skipEffectRemoval) {
+        this.sequencer.removeEffect(name, layer)
+      }
     }
     this.submittedEffects.clear()
     this.pendingCallbackEffects.clear()

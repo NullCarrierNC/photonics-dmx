@@ -1170,8 +1170,9 @@ export class NodeExecutionEngine {
 
   /**
    * Cancel all active executions (called on cue stop).
+   * @param skipEffectRemoval When true, leave submitted effects on the sequencer so the next cue's setEffect can transition from them instead of from black.
    */
-  public cancelAll(): void {
+  public cancelAll(skipEffectRemoval = false): void {
     for (const nodeId of this.pendingActivations) {
       sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
         type: 'deactivated',
@@ -1187,16 +1188,18 @@ export class NodeExecutionEngine {
     }
     this.activeContexts.clear()
 
-    // Remove all submitted effects from the sequencer so lights stop immediately
+    // Remove callbacks but optionally keep effects on the sequencer
     for (const [name, layer] of this.submittedEffects) {
       this.sequencer.removeEffectCallback(name)
-      this.sequencer.removeEffect(name, layer)
+      if (!skipEffectRemoval) {
+        this.sequencer.removeEffect(name, layer)
+      }
     }
     this.submittedEffects.clear()
 
     // Cancel all active effect engines
     for (const effectEngine of this.activeEffectEngines.values()) {
-      effectEngine.cancelAll()
+      effectEngine.cancelAll(skipEffectRemoval)
     }
     this.activeEffectEngines.clear()
   }

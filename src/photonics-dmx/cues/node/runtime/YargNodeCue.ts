@@ -221,7 +221,11 @@ export class YargNodeCue implements INetCue {
 
   onStop(): void {
     if (this.executionEngine) {
-      this.executionEngine.cancelAll()
+      // Primary cues: leave effects on the sequencer so the next cue's setEffect can
+      // transition from them instead of from black. Secondary cues: remove effects
+      // immediately since no subsequent setEffect will clean them up.
+      const skipEffectRemoval = this.style === CueStyle.Primary
+      this.executionEngine.cancelAll(skipEffectRemoval)
       this.executionEngine = undefined
     }
 

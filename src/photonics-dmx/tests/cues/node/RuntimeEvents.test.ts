@@ -795,6 +795,58 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.setEffect).toHaveBeenCalledTimes(2)
     })
 
+    it('YargNodeCue onStop does not remove effects from sequencer so lights stay lit during cue transition', async () => {
+      const cueStartedEvent: YargEventNode = {
+        id: 'e-start',
+        type: 'event',
+        eventType: 'cue-started',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'blue' },
+          brightness: { source: 'literal', value: 'medium' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+      const cueDefinition: YargNodeCueDefinition = {
+        id: 'cue-transition',
+        name: 'Transition Test Cue',
+        cueType: 'Intro' as any,
+        style: 'primary',
+        nodes: {
+          events: [cueStartedEvent],
+          actions: [actionNode],
+          logic: [],
+        },
+        connections: [{ from: 'e-start', to: 'action1' }],
+        layout: { nodePositions: {} },
+      }
+      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const cue = new YargNodeCue('group1', compiled)
+      const cueData = createCueData()
+
+      await cue.execute(cueData, mockSequencer, mockLightManager)
+      expect(mockSequencer.setEffect).toHaveBeenCalled()
+
+      const removeEffectCallsBefore = (mockSequencer.removeEffect as jest.Mock).mock.calls.length
+      cue.onStop()
+      // Effects must not be removed so the next cue's setEffect can transition from them instead of from black
+      expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectCallsBefore)
+    })
+
     it('YargNodeCue (Secondary): first execute uses addEffect only, never setEffect', async () => {
       const cueStartedEvent: YargEventNode = {
         id: 'e-start',

@@ -588,5 +588,33 @@ describe('EffectExecutionEngine', () => {
       callbacks[1]()
       expect(onIdle).not.toHaveBeenCalled()
     })
+
+    it('cancelAll(true) leaves effects on sequencer so lights stay lit during cue transition', () => {
+      const callbacks: Array<() => void> = []
+      mockSequencer.addEffectWithCallback.mockImplementation((_name, _effect, callback) => {
+        callbacks.push(callback)
+      })
+
+      const compiledEffect = EffectCompiler.compile(createForEachBlockingEffect())
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        {},
+        createCueData(),
+      )
+
+      engine.triggerEffect(createCueData())
+      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled()
+
+      const removeEffectBefore = (mockSequencer.removeEffect as jest.Mock).mock.calls.length
+      const removeCallbackBefore = (mockSequencer.removeEffectCallback as jest.Mock).mock.calls
+        .length
+
+      engine.cancelAll(true)
+
+      expect(mockSequencer.removeEffectCallback).toHaveBeenCalledTimes(removeCallbackBefore + 2)
+      expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectBefore)
+    })
   })
 })
