@@ -898,6 +898,8 @@ export class NodeExecutionEngine {
         // If the existing engine still has active contexts, block re-triggering
         if (existingEngine.hasActiveContexts()) {
           this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`)
+          this.emitNodeExecution('deactivated', raiserNode.id)
+          this.continueToNextNodes(raiserNode.id, context)
           return
         } else {
           // Engine exists but no active contexts - clean it up and allow new trigger

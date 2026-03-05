@@ -9,7 +9,10 @@ import {
   EventRaiserNode,
   EventListenerNode,
   EventDefinition,
+  EffectRaiserNode,
+  YargEffectDefinition,
 } from '../../../cues/types/nodeCueTypes'
+import { EffectCompiler } from '../../../cues/node/compiler/EffectCompiler'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../../cues/types/cueTypes'
@@ -886,6 +889,118 @@ describe('Runtime Event System', () => {
       await cue.execute(cueData, mockSequencer, mockLightManager)
       expect(mockSequencer.setEffect).toHaveBeenCalledTimes(1)
       expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Effect-raiser blocked path completion', () => {
+    it('second startExecutionWithCallback completes context when effect raiser is blocked (effect still running)', async () => {
+      // Mock that never calls the effect completion callback so the effect engine keeps activeContexts
+      const neverCallMockSequencer = {
+        ...mockSequencer,
+        addEffectWithCallback: jest.fn(
+          (_name: string, _effect: unknown, _callback: () => void) => {},
+        ),
+        setEffectWithCallback: jest.fn(
+          (_name: string, _effect: unknown, _callback: () => void) => {},
+        ),
+      } as any
+
+      const beatEvent: YargEventNode = {
+        id: 'e-beat',
+        type: 'event',
+        eventType: 'beat',
+      }
+      const effectRaiserNode: EffectRaiserNode = {
+        id: 'raiser1',
+        type: 'effect-raiser',
+        effectId: 'blocking-effect',
+        label: 'Raise',
+      }
+      const cueDefinition: YargNodeCueDefinition = {
+        id: 'cue-blocking',
+        name: 'Blocking Cue',
+        cueType: 'Intro' as any,
+        style: 'primary',
+        nodes: {
+          events: [beatEvent],
+          actions: [],
+          logic: [],
+          effectRaisers: [effectRaiserNode],
+        },
+        connections: [{ from: 'e-beat', to: 'raiser1' }],
+        layout: { nodePositions: {} },
+      }
+      const compiledCue = NodeCueCompiler.compileYargCue(cueDefinition)
+
+      const effectDef: YargEffectDefinition = {
+        id: 'blocking-effect',
+        mode: 'yarg',
+        name: 'Blocking',
+        description: '',
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'act1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'red' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 100 },
+                waitUntilCondition: { source: 'literal', value: 'beat' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 0 },
+            },
+          ],
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'el1', type: 'effect-listener', label: 'Entry', outputs: ['act1'] },
+          ],
+        },
+        connections: [{ from: 'el1', to: 'act1' }],
+        layout: { nodePositions: {} },
+      }
+      const compiledEffect = EffectCompiler.compile(effectDef)
+      const effectRegistry = new EffectRegistry()
+      effectRegistry.registerEffect('blocking-effect', compiledEffect)
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'group1:cue-blocking',
+        neverCallMockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        effectRegistry,
+      )
+
+      const callback1 = jest.fn()
+      const callback2 = jest.fn()
+      const cueData = createCueData()
+      Object.assign(cueData, { beat: 'Strong' })
+
+      engine.startExecutionWithCallback(beatEvent, cueData, callback1)
+      await Promise.resolve()
+      expect(callback1).toHaveBeenCalledTimes(1)
+
+      engine.startExecutionWithCallback(beatEvent, cueData, callback2)
+      await Promise.resolve()
+      expect(callback2).toHaveBeenCalledTimes(1)
     })
   })
 })
