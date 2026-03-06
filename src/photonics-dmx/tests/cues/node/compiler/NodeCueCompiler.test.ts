@@ -58,13 +58,13 @@ describe('NodeCueCompiler', () => {
       expect(calculateActionDuration(action)).toBe(100)
     })
 
-    it('uses fallback for variable-source fields; zero fallback yields default for that term', () => {
+    it('uses default for variable-source fields at compile time', () => {
       const action = minimalAction('a1', {
-        waitForTime: { source: 'variable', name: 't1', fallback: 0 },
-        duration: { source: 'variable', name: 'dur', fallback: 0 },
-        waitUntilTime: { source: 'variable', name: 't2', fallback: 0 },
+        waitForTime: { source: 'variable', name: 't1' },
+        duration: { source: 'variable', name: 'dur' },
+        waitUntilTime: { source: 'variable', name: 't2' },
       })
-      // duration has default 200; 0 || 200 === 200 so total is 0+200+0
+      // Variable sources use default per term at compile time: 0+200+0
       expect(calculateActionDuration(action)).toBe(200)
     })
   })

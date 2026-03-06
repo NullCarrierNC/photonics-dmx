@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useRef } from 'react'
-import { useEdgesState, useNodesState, type Edge } from 'reactflow'
+import {
+  useEdgesState,
+  useNodesState,
+  type Edge,
+  type NodeChange,
+  type EdgeChange,
+} from 'reactflow'
 import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
@@ -16,6 +22,7 @@ import { useNodeCreation } from './useNodeCreation'
 
 type UseCueFlowParams = {
   activeMode: NodeCueMode
+  editorMode: 'cue' | 'effect'
   setIsDirty: (dirty: boolean) => void
   flowWrapperRef?: React.RefObject<HTMLDivElement>
   effectDefinitions?: Map<string, EffectDefinition>
@@ -23,13 +30,33 @@ type UseCueFlowParams = {
 
 const useCueFlow = ({
   activeMode,
+  editorMode,
   setIsDirty,
   flowWrapperRef,
   effectDefinitions,
 }: UseCueFlowParams) => {
   const setSelectedNodeIdRef = useRef<(id: string | null) => void>(() => {})
-  const [nodes, setNodes, onNodesChange] = useNodesState<EditorNodeData>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([])
+  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<EditorNodeData>([])
+  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>([])
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChangeRaw(changes)
+      const hasDirtyChange = changes.some(
+        (c) => (c.type === 'position' && c.dragging === false) || c.type === 'remove',
+      )
+      if (hasDirtyChange) setIsDirty(true)
+    },
+    [onNodesChangeRaw, setIsDirty],
+  )
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      onEdgesChangeRaw(changes)
+      if (changes.some((c) => c.type === 'remove')) setIsDirty(true)
+    },
+    [onEdgesChangeRaw, setIsDirty],
+  )
 
   const flowSync = useFlowSync({
     setNodes,
@@ -53,7 +80,14 @@ const useCueFlow = ({
     setSelectedNodeIdRef.current = selection.setSelectedNodeId
   }, [selection.setSelectedNodeId])
 
-  const edgeMgmt = useEdgeManagement({ nodes, edges, setEdges, setNodes, setIsDirty })
+  const edgeMgmt = useEdgeManagement({
+    nodes,
+    edges,
+    setEdges,
+    setNodes,
+    setIsDirty,
+    editorMode,
+  })
 
   const nodeCreation = useNodeCreation({ nodes, setNodes, activeMode, setIsDirty })
 

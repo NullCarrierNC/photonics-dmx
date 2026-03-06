@@ -9,6 +9,13 @@ import type {
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
+import { firstByName } from '../lib/cueUtils'
+import type { EditorModeKey } from './useLastCueFilePath'
+import {
+  clearLastFilePathForMode,
+  setLastActiveMode,
+  setLastFilePathForMode,
+} from './useLastCueFilePath'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import {
   readNodeCueFile,
@@ -24,7 +31,6 @@ import {
   validateNodeCue,
   validateEffect,
 } from '../../../ipcApi'
-import { createDefaultFile, createDefaultEffectFile } from '../lib/cueDefaults'
 
 export type UseCueFileIOParams = {
   editorDoc: EditorDocument | null
@@ -51,7 +57,14 @@ export type UseCueFileIOParams = {
   refreshFiles: () => Promise<void>
   refreshEffectFiles: () => Promise<void>
   onSaveSuccess?: (message: string) => void
+  onSaveError?: (message: string) => void
   lastStoredFilePathRef: React.MutableRefObject<string | null>
+}
+
+/** Translates internal field names to user-facing labels in save error messages. */
+function formatSaveError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  return raw.replace(/\bcueType\b/g, 'Game Event Trigger')
 }
 
 export function useCueFileIO({
@@ -72,21 +85,29 @@ export function useCueFileIO({
   refreshFiles,
   refreshEffectFiles,
   onSaveSuccess,
+  onSaveError,
   lastStoredFilePathRef,
 }: UseCueFileIOParams) {
   const selectFile = useCallback(
-    async (fileSummary: NodeCueFileSummary) => {
+    async (fileSummary: NodeCueFileSummary, preferredItemId?: string) => {
       try {
         const file = await readNodeCueFile(fileSummary.path)
         setEditorDoc({ mode: 'cue', file, path: fileSummary.path })
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
         const cueFile = file as NodeCueFile
-        const cueId = cueFile.cues[0]?.id ?? null
+        const cues = cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[]
+        const preferredCue =
+          preferredItemId != null ? cues.find((c) => c.id === preferredItemId) : null
+        const cueToLoad = preferredCue ?? firstByName(cues)
+        const cueId = cueToLoad?.id ?? null
         setSelectedCueId(cueId)
         setIsDirty(false)
-        loadCueIntoFlow(file.cues[0] ?? null)
+        loadCueIntoFlow(cueToLoad ?? null)
         rememberLastFilePath(fileSummary.path)
+        const modeKey: EditorModeKey = file.mode === 'yarg' ? 'yarg-cue' : 'audio-cue'
+        setLastFilePathForMode(modeKey, fileSummary.path)
+        setLastActiveMode(modeKey)
       } catch (error) {
         console.error('Failed to open node cue file', error)
       }
@@ -103,18 +124,25 @@ export function useCueFileIO({
   )
 
   const selectEffectFile = useCallback(
-    async (fileSummary: EffectFileSummary) => {
+    async (fileSummary: EffectFileSummary, preferredItemId?: string) => {
       try {
         const file = await readEffectFile(fileSummary.path)
         setEditorDoc({ mode: 'effect', file, path: fileSummary.path })
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
         const effectFile = file as EffectFile
-        const effectId = effectFile.effects[0]?.id ?? null
+        const effects = effectFile.effects as (YargEffectDefinition | AudioEffectDefinition)[]
+        const preferredEffect =
+          preferredItemId != null ? effects.find((e) => e.id === preferredItemId) : null
+        const effectToLoad = preferredEffect ?? firstByName(effects)
+        const effectId = effectToLoad?.id ?? null
         setSelectedCueId(effectId)
         setIsDirty(false)
-        loadCueIntoFlow(effectFile.effects[0] ?? null)
+        loadCueIntoFlow(effectToLoad ?? null)
         rememberLastFilePath(fileSummary.path)
+        const modeKey: EditorModeKey = file.mode === 'yarg' ? 'yarg-effect' : 'audio-effect'
+        setLastFilePathForMode(modeKey, fileSummary.path)
+        setLastActiveMode(modeKey)
       } catch (error) {
         console.error('Failed to open effect file', error)
       }
@@ -130,17 +158,17 @@ export function useCueFileIO({
     ],
   )
 
-  const handleSave = useCallback(async () => {
-    if (!editorDoc) return
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (!editorDoc) return false
     const updatedFile = getUpdatedDocument()
-    if (!updatedFile) return
+    if (!updatedFile) return false
 
     if (editorDoc.mode === 'effect') {
       const effectContent = updatedFile as EffectFile
       const validation = await validateEffect({ content: effectContent })
       if (!validation.valid) {
         setValidationErrors(validation.errors)
-        return
+        return false
       }
       try {
         const response = await saveEffectFile({
@@ -148,22 +176,28 @@ export function useCueFileIO({
           filename,
           content: effectContent,
         })
-        if (!response.success) return
+        if (!response.success) {
+          onSaveError?.(`Failed to save effect: ${filename}`)
+          return false
+        }
         setEditorDoc({ mode: 'effect', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])
         setIsDirty(false)
         refreshEffectFiles()
         onSaveSuccess?.(`Effect saved: ${filename}`)
+        return true
       } catch (error) {
         console.error('Failed to save effect file', error)
+        onSaveError?.(formatSaveError(error))
+        return false
       }
     } else {
       const cueContent = updatedFile as NodeCueFile
       const validation = await validateNodeCue({ content: cueContent })
       if (!validation.valid) {
         setValidationErrors(validation.errors)
-        return
+        return false
       }
       try {
         const response = await saveNodeCueFile({
@@ -171,15 +205,21 @@ export function useCueFileIO({
           filename,
           content: cueContent,
         })
-        if (!response.success) return
+        if (!response.success) {
+          onSaveError?.(`Failed to save cue: ${filename}`)
+          return false
+        }
         setEditorDoc({ mode: 'cue', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])
         setIsDirty(false)
         refreshFiles()
         onSaveSuccess?.(`Cue saved: ${filename}`)
+        return true
       } catch (error) {
         console.error('Failed to save node cue file', error)
+        onSaveError?.(formatSaveError(error))
+        return false
       }
     }
   }, [
@@ -190,6 +230,7 @@ export function useCueFileIO({
     refreshEffectFiles,
     rememberLastFilePath,
     onSaveSuccess,
+    onSaveError,
     setEditorDoc,
     setValidationErrors,
     setIsDirty,
@@ -197,36 +238,49 @@ export function useCueFileIO({
 
   const handleDelete = useCallback(async () => {
     if (!editorDoc?.path) return
+
+    try {
+      if (editorDoc.mode === 'effect') {
+        await deleteEffectFile(editorDoc.path)
+      } else {
+        await deleteNodeCueFile(editorDoc.path)
+      }
+    } catch (error) {
+      console.error('Failed to delete file', error)
+      onSaveError?.(`Failed to delete: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+
     if (editorDoc.path === lastStoredFilePathRef.current) {
       clearLastFilePath()
     }
-
+    const fileMode = editorDoc.file.mode
+    const modeKey: EditorModeKey =
+      editorDoc.mode === 'effect'
+        ? fileMode === 'yarg'
+          ? 'yarg-effect'
+          : 'audio-effect'
+        : fileMode === 'yarg'
+          ? 'yarg-cue'
+          : 'audio-cue'
+    clearLastFilePathForMode(modeKey)
+    setEditorDoc(null)
+    setSelectedCueId(null)
+    setFilename('untitled.json')
+    loadCueIntoFlow(null)
+    setValidationErrors([])
+    setIsDirty(false)
     if (editorDoc.mode === 'effect') {
-      await deleteEffectFile(editorDoc.path)
-      const file = createDefaultEffectFile(mode)
-      setEditorDoc({ mode: 'effect', file, path: null })
-      setSelectedCueId(file.effects[0]?.id ?? null)
-      setFilename(`${file.group.id}.json`)
-      loadCueIntoFlow(file.effects[0] ?? null)
-      setValidationErrors([])
-      setIsDirty(true)
       refreshEffectFiles()
     } else {
-      await deleteNodeCueFile(editorDoc.path)
-      const file = createDefaultFile(mode)
-      setEditorDoc({ mode: 'cue', file, path: null })
-      setSelectedCueId(file.cues[0]?.id ?? null)
-      setFilename(`${file.group.id}.json`)
-      loadCueIntoFlow(file.cues[0] ?? null)
-      setValidationErrors([])
-      setIsDirty(true)
       refreshFiles()
     }
   }, [
     clearLastFilePath,
+    clearLastFilePathForMode,
     editorDoc,
     loadCueIntoFlow,
-    mode,
+    onSaveError,
     refreshFiles,
     refreshEffectFiles,
     lastStoredFilePathRef,
@@ -273,24 +327,27 @@ export function useCueFileIO({
           setMode(file.mode)
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
           const effectFile = file as EffectFile
+          const firstEffect = firstByName(
+            effectFile.effects as (YargEffectDefinition | AudioEffectDefinition)[],
+          )
           const effectId =
-            effectFile.effects.find((e) => e.id === selectedCueId)?.id ??
-            effectFile.effects[0]?.id ??
-            null
+            effectFile.effects.find((e) => e.id === selectedCueId)?.id ?? firstEffect?.id ?? null
           setSelectedCueId(effectId)
           setIsDirty(false)
-          loadCueIntoFlow(effectFile.effects.find((e) => e.id === effectId) ?? null)
+          loadCueIntoFlow(effectFile.effects.find((e) => e.id === effectId) ?? firstEffect ?? null)
         } else {
           const file = await readNodeCueFile(currentPath)
           setEditorDoc({ mode: 'cue', file, path: currentPath })
           setMode(file.mode)
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
           const cueFile = file as NodeCueFile
-          const cueId =
-            cueFile.cues.find((c) => c.id === selectedCueId)?.id ?? cueFile.cues[0]?.id ?? null
+          const firstCue = firstByName(
+            cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[],
+          )
+          const cueId = cueFile.cues.find((c) => c.id === selectedCueId)?.id ?? firstCue?.id ?? null
           setSelectedCueId(cueId)
           setIsDirty(false)
-          loadCueIntoFlow(cueFile.cues.find((c) => c.id === cueId) ?? null)
+          loadCueIntoFlow(cueFile.cues.find((c) => c.id === cueId) ?? firstCue ?? null)
         }
       } catch (error) {
         console.error('Failed to reload current file', error)

@@ -107,6 +107,15 @@ export class Sequencer implements ILightingController {
     this.effectManager.addEffectWithCallback(name, effect, onComplete, isPersistent)
   }
 
+  public setEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent: boolean = false,
+  ): void {
+    this.effectManager.setEffectWithCallback(name, effect, onComplete, isPersistent)
+  }
+
   /**
    * Remove a completion callback for an effect.
    *

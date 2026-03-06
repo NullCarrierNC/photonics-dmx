@@ -105,7 +105,6 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
       onChange({
         source: 'variable',
         name: isVariableSource(source) ? source.name ?? 'var1' : 'var1',
-        fallback: isVariableSource(source) ? source.fallback : undefined,
       })
     } else {
       // Switch to literal mode
@@ -180,90 +179,27 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
           )}
         </div>
       ) : (
-        // Variable mode: variable dropdown and fallback below
-        <div className="space-y-2 mt-1">
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex flex-col font-medium text-xs">
-              Variable
-              <select
-                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={isVariableSource(source) ? source.name ?? '' : ''}
-                onChange={(event) =>
-                  onChange({
-                    source: 'variable',
-                    name: event.target.value || 'var1',
-                    fallback: isVariableSource(source) ? source.fallback : undefined,
-                  })
-                }>
-                <option value="">-- Select --</option>
-                {compatibleVariables.map((v) => (
-                  <option key={v.name} value={v.name}>
-                    {v.name} ({v.type})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col font-medium text-xs">
-              Fallback
-              {isBoolean ? (
-                <select
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={isVariableSource(source) && source.fallback === true ? 'true' : 'false'}
-                  onChange={(event) =>
-                    onChange({
-                      source: 'variable',
-                      name: isVariableSource(source) ? source.name : 'var1',
-                      fallback: event.target.value === 'true',
-                    })
-                  }>
-                  <option value="true">true</option>
-                  <option value="false">false</option>
-                </select>
-              ) : effectiveValidLiterals ? (
-                // Show dropdown for constrained fallback values
-                <select
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={String(isVariableSource(source) ? source.fallback ?? '' : '')}
-                  onChange={(event) =>
-                    onChange({
-                      source: 'variable',
-                      name: isVariableSource(source) ? source.name : 'var1',
-                      fallback: event.target.value,
-                    })
-                  }>
-                  <option value="">-- None --</option>
-                  {effectiveValidLiterals.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="number"
-                  step={integerOnly ? '1' : '0.1'}
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={
-                    isVariableSource(source) && typeof source.fallback === 'number'
-                      ? source.fallback
-                      : 0
-                  }
-                  onChange={(event) => {
-                    let fallbackValue = Number(event.target.value)
-                    // Round to integer if integerOnly is true
-                    if (integerOnly) {
-                      fallbackValue = Math.round(fallbackValue)
-                    }
-                    onChange({
-                      source: 'variable',
-                      name: isVariableSource(source) ? source.name : 'var1',
-                      fallback: fallbackValue,
-                    })
-                  }}
-                />
-              )}
-            </label>
-          </div>
+        // Variable mode: variable dropdown only
+        <div className="mt-1">
+          <label className="flex flex-col font-medium text-xs">
+            Variable
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={isVariableSource(source) ? source.name ?? '' : ''}
+              onChange={(event) =>
+                onChange({
+                  source: 'variable',
+                  name: event.target.value || 'var1',
+                })
+              }>
+              <option value="">-- Select --</option>
+              {compatibleVariables.map((v) => (
+                <option key={v.name} value={v.name}>
+                  {v.name} ({v.type})
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
     </div>

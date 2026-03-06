@@ -49,7 +49,10 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
   exportLabel,
   deleteLabel,
 }) => (
-  <div className="flex justify-between items-center gap-4 flex-wrap">
+  <div className="relative flex justify-between items-center gap-4 flex-wrap">
+    <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-700 dark:text-gray-200 pointer-events-none select-none">
+      {isEffectMode ? 'Effect Editor' : 'Cue Editor'}
+    </span>
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-0">
         <button
@@ -91,14 +94,14 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
       </div>
     </div>
     <div className="flex gap-2">
-      <button className={secondaryButton} onClick={onNewFile}>
-        {newFileLabel}
-      </button>
       <button
         className={`${primaryButton} ${!hasEditorDoc ? 'opacity-50 cursor-not-allowed' : ''}`}
         onClick={onSave}
         disabled={!hasEditorDoc}>
         Save
+      </button>
+      <button className={secondaryButton} onClick={onNewFile}>
+        {newFileLabel}
       </button>
       <button className={secondaryButton} onClick={onImport}>
         {importLabel}

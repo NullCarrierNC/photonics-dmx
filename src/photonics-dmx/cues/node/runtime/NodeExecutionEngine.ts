@@ -41,6 +41,7 @@ import {
   resolveLocationGroups,
   resolveLightTarget,
   getVariableStore,
+  UninitializedVariableError,
 } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
@@ -92,6 +93,8 @@ export class NodeExecutionEngine {
    * the static global flag so existing engines can start logging immediately.
    */
   private debugEnabled: boolean
+  /** When .use is true, the next effect submission must use setEffect (then set .use = false). */
+  private firstSubmissionUsesSetEffectRef?: { use: boolean }
 
   constructor(
     compiledCue: CompiledYargCue | CompiledAudioCue,
@@ -102,6 +105,7 @@ export class NodeExecutionEngine {
     groupLevelVarStore: Map<string, VariableValue>,
     effectRegistry: EffectRegistry,
     variableDefinitions: VariableDefinition[] = [],
+    firstSubmissionUsesSetEffectRef?: { use: boolean },
   ) {
     this.compiledCue = compiledCue
     this.cueId = cueId
@@ -111,6 +115,7 @@ export class NodeExecutionEngine {
     this.groupLevelVarStore = groupLevelVarStore
     this.effectRegistry = effectRegistry
     this.variableDefinitions = variableDefinitions
+    this.firstSubmissionUsesSetEffectRef = firstSubmissionUsesSetEffectRef
 
     // Debug logging is opt-in to avoid noisy logs in normal operation.
     // Enable with either env var:
@@ -266,6 +271,9 @@ export class NodeExecutionEngine {
         }
       }
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error starting execution for event ${eventNode.id}:`, error)
     }
   }
@@ -526,6 +534,7 @@ export class NodeExecutionEngine {
         })
 
         const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
+        const useSetEffect = this.firstSubmissionUsesSetEffectRef?.use === true
 
         if (shouldBlock) {
           context.registerActiveAction(actionNode.id, actionNode)
@@ -535,10 +544,20 @@ export class NodeExecutionEngine {
             context.completeAction(actionNode.id)
           }
           this.submittedEffects.set(effectName, resolvedLayer)
-          this.sequencer.addEffectWithCallback(effectName, effect, callback)
+          if (useSetEffect) {
+            this.firstSubmissionUsesSetEffectRef!.use = false
+            this.sequencer.setEffectWithCallback(effectName, effect, callback)
+          } else {
+            this.sequencer.addEffectWithCallback(effectName, effect, callback)
+          }
         } else {
           this.submittedEffects.set(effectName, resolvedLayer)
-          this.sequencer.addEffect(effectName, effect)
+          if (useSetEffect) {
+            this.firstSubmissionUsesSetEffectRef!.use = false
+            void this.sequencer.setEffect(effectName, effect)
+          } else {
+            this.sequencer.addEffect(effectName, effect)
+          }
           this.emitNodeExecution('deactivated', actionNode.id)
           this.continueToNextNodes(actionNode.id, context)
         }
@@ -661,6 +680,7 @@ export class NodeExecutionEngine {
       )
       const lastChainNode = actionChain[actionChain.length - 1]
 
+      const useSetEffectChain = this.firstSubmissionUsesSetEffectRef?.use === true
       if (chainHasBlockingStep) {
         context.registerActiveAction(lastChainNode.id, lastChainNode)
         const callback = (): void => {
@@ -671,16 +691,29 @@ export class NodeExecutionEngine {
           context.completeAction(lastChainNode.id)
         }
         this.submittedEffects.set(chainEffectName, chainData.baseLayer)
-        this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback)
+        if (useSetEffectChain) {
+          this.firstSubmissionUsesSetEffectRef!.use = false
+          this.sequencer.setEffectWithCallback(chainEffectName, composedEffect, callback)
+        } else {
+          this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback)
+        }
       } else {
         this.submittedEffects.set(chainEffectName, chainData.baseLayer)
-        this.sequencer.addEffect(chainEffectName, composedEffect)
+        if (useSetEffectChain) {
+          this.firstSubmissionUsesSetEffectRef!.use = false
+          void this.sequencer.setEffect(chainEffectName, composedEffect)
+        } else {
+          this.sequencer.addEffect(chainEffectName, composedEffect)
+        }
         for (const a of actionChain) {
           this.emitNodeExecution('deactivated', a.id)
         }
         this.continueToNextNodes(lastChainNode.id, context)
       }
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing action node ${actionNode.id}:`, error)
       // Continue execution despite error
       this.continueToNextNodes(actionNode.id, context)
@@ -735,6 +768,9 @@ export class NodeExecutionEngine {
       }
       this.emitNodeExecution('deactivated', nodeId)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing logic node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
       // Continue to all outgoing edges despite error
@@ -794,6 +830,9 @@ export class NodeExecutionEngine {
       }, actualDelay)
       context.addTimer(timerId)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing delay node ${nodeId}:`, error)
       // Continue to all outgoing edges despite error
       this.continueToNextNodes(nodeId, context)
@@ -825,6 +864,9 @@ export class NodeExecutionEngine {
       // Continue immediately to raiser's child (non-blocking)
       this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing event raiser node ${raiserNode.id}:`, error)
       // Continue execution despite error
       this.continueToNextNodes(raiserNode.id, context)
@@ -856,6 +898,8 @@ export class NodeExecutionEngine {
         // If the existing engine still has active contexts, block re-triggering
         if (existingEngine.hasActiveContexts()) {
           this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`)
+          this.emitNodeExecution('deactivated', raiserNode.id)
+          this.continueToNextNodes(raiserNode.id, context)
           return
         } else {
           // Engine exists but no active contexts - clean it up and allow new trigger
@@ -893,6 +937,7 @@ export class NodeExecutionEngine {
         this.lightManager,
         paramValues,
         context.cueData, // Pass caller's cue data
+        this.firstSubmissionUsesSetEffectRef,
       )
 
       // Set up completion callback: for persistent raisers, re-trigger immediately on idle.
@@ -917,6 +962,9 @@ export class NodeExecutionEngine {
       // Continue immediately (non-blocking like EventRaiserNode)
       this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing effect raiser node ${raiserNode.id}:`, error)
       this.emitNodeExecution('deactivated', raiserNode.id)
       // Continue execution despite error
@@ -965,6 +1013,9 @@ export class NodeExecutionEngine {
         this.activeContexts.delete(context.id)
       }
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error starting listener execution for ${listenerNode.id}:`, error)
     }
   }
@@ -1119,8 +1170,9 @@ export class NodeExecutionEngine {
 
   /**
    * Cancel all active executions (called on cue stop).
+   * @param skipEffectRemoval When true, leave submitted effects on the sequencer so the next cue's setEffect can transition from them instead of from black.
    */
-  public cancelAll(): void {
+  public cancelAll(skipEffectRemoval = false): void {
     for (const nodeId of this.pendingActivations) {
       sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
         type: 'deactivated',
@@ -1136,15 +1188,18 @@ export class NodeExecutionEngine {
     }
     this.activeContexts.clear()
 
-    // Remove all submitted effects from the sequencer so lights stop immediately
+    // Remove callbacks but optionally keep effects on the sequencer
     for (const [name, layer] of this.submittedEffects) {
-      this.sequencer.removeEffect(name, layer)
+      this.sequencer.removeEffectCallback(name)
+      if (!skipEffectRemoval) {
+        this.sequencer.removeEffect(name, layer)
+      }
     }
     this.submittedEffects.clear()
 
     // Cancel all active effect engines
     for (const effectEngine of this.activeEffectEngines.values()) {
-      effectEngine.cancelAll()
+      effectEngine.cancelAll(skipEffectRemoval)
     }
     this.activeEffectEngines.clear()
   }

@@ -3,8 +3,8 @@
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
-    "name": "StageKit JSON",
-    "description": "YARG StageKit cues as node cue definitions"
+    "name": "StageKit",
+    "description": "Cues that mimic the original Stage Kit, but mapped to a DMX light array"
   },
   "cues": [
     {
@@ -538,6 +538,7 @@
             "id": "action-sk-menu-sweep",
             "type": "effect-raiser",
             "effectId": "effect-sweep-color",
+            "isPersistent": true,
             "parameterValues": {
               "lights": {
                 "source": "variable",
@@ -578,6 +579,10 @@
               "betweenDelay": {
                 "source": "literal",
                 "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
               }
             }
           }
@@ -609,22 +614,22 @@
             "y": -6.406514700502157
           },
           "action-98e79c64-e87e-4f66-89cc-1a8705cc6e30": {
-            "x": -5.989311575889587,
-            "y": 131.3616075590253
+            "x": -7.654074278593782,
+            "y": 169.6511497212216
           },
           "sk-menu-setup-all": {
-            "x": 251.25557010620832,
-            "y": 129.56211198493838
+            "x": 254.5850955116166,
+            "y": 122.07067982276953
           },
           "action-sk-menu-sweep": {
-            "x": 260.3863600939512,
-            "y": 252.22282484918833
+            "x": 264.5482668507118,
+            "y": 310.48951944383487
           }
         },
         "viewport": {
-          "x": 503.4435397654306,
-          "y": 107.81888369424269,
-          "zoom": 0.75
+          "x": 106.98665447620238,
+          "y": 113.15281877469664,
+          "zoom": 1.2013724218780641
         }
       },
       "variables": [
@@ -748,6 +753,10 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -787,6 +796,10 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -826,11 +839,32 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
               }
             }
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "notes-5d9969ec-26a8-49db-9003-30d499e9fb46",
+            "type": "notes",
+            "label": "Notes",
+            "note": "The Cue Started event only fires once \nwhen the cue is first triggered.\n\nThis is good for initializing any variables you will need.",
+            "style": "notes",
+            "title": "Cue Started Fires Once"
+          },
+          {
+            "id": "notes-e0f2caaf-39a0-4a8a-8b31-633bc16f5794",
+            "type": "notes",
+            "label": "Notes",
+            "note": "Cue Called fires repeatedly while a cue is active. \n\nIf the cue is already running the second call \nwill get queued and run when the first ends.",
+            "style": "notes",
+            "title": "Cue Called Fires Repeatedly"
+          }
+        ]
       },
       "connections": [
         {
@@ -899,12 +933,20 @@
           "sk-cool-auto-ccw": {
             "x": 791.4808902684599,
             "y": 127.9694596529007
+          },
+          "notes-5d9969ec-26a8-49db-9003-30d499e9fb46": {
+            "x": -372.68071951362424,
+            "y": -45.64732857635829
+          },
+          "notes-e0f2caaf-39a0-4a8a-8b31-633bc16f5794": {
+            "x": 479.38152520363303,
+            "y": -83.84894968453943
           }
         },
         "viewport": {
-          "x": 307.3815096428152,
-          "y": 10.760952413082123,
-          "zoom": 0.75
+          "x": 247.4636175154837,
+          "y": 20.745762149925213,
+          "zoom": 0.5
         }
       },
       "variables": [
@@ -2669,13 +2711,13 @@
       "name": "Strobe Slow",
       "description": "Strobe white at BPM/8, 70ms hold",
       "cueType": "Strobe_Slow",
-      "style": "primary",
+      "style": "secondary",
       "nodes": {
         "events": [
           {
             "id": "event-sk-strobe-slow-start",
             "type": "event",
-            "eventType": "cue-called"
+            "eventType": "cue-started"
           }
         ],
         "actions": [
@@ -2906,9 +2948,9 @@
           }
         },
         "viewport": {
-          "x": 250.05724978702642,
-          "y": 99.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 347.3849101138853,
+          "y": 257.5929361026589,
+          "zoom": 0.7888141344914608
         }
       },
       "variables": [
@@ -2940,7 +2982,7 @@
       "name": "Strobe Medium",
       "description": "Strobe white at BPM/16, 60ms hold",
       "cueType": "Strobe_Medium",
-      "style": "primary",
+      "style": "secondary",
       "nodes": {
         "events": [
           {
@@ -3177,9 +3219,9 @@
           }
         },
         "viewport": {
-          "x": 250.05724978702642,
-          "y": 99.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 347.3849101138853,
+          "y": 257.5929361026589,
+          "zoom": 0.7888141344914608
         }
       },
       "variables": [
@@ -3211,7 +3253,7 @@
       "name": "Strobe Fast",
       "description": "Strobe white at BPM/32, 50ms hold",
       "cueType": "Strobe_Fast",
-      "style": "primary",
+      "style": "secondary",
       "nodes": {
         "events": [
           {
@@ -3448,9 +3490,9 @@
           }
         },
         "viewport": {
-          "x": 250.05724978702642,
-          "y": 99.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 347.3849101138853,
+          "y": 257.5929361026589,
+          "zoom": 0.7888141344914608
         }
       },
       "variables": [
@@ -3482,7 +3524,7 @@
       "name": "Strobe Fastest",
       "description": "Strobe white at BPM/64, 40ms hold",
       "cueType": "Strobe_Fastest",
-      "style": "primary",
+      "style": "secondary",
       "nodes": {
         "events": [
           {
@@ -3719,9 +3761,9 @@
           }
         },
         "viewport": {
-          "x": 250.05724978702642,
-          "y": 99.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 347.3849101138853,
+          "y": 257.5929361026589,
+          "zoom": 0.7888141344914608
         }
       },
       "variables": [
@@ -6673,5 +6715,6 @@
         }
       ]
     }
-  ]
+  ],
+  "bundled": true
 }

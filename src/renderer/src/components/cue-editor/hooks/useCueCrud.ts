@@ -20,6 +20,7 @@ import {
   createDefaultEffectFile,
   createDefaultEffect,
 } from '../lib/cueDefaults'
+import { firstByName } from '../lib/cueUtils'
 import { validateNodeCue, validateEffect, saveNodeCueFile, saveEffectFile } from '../../../ipcApi'
 
 export type UseCueCrudParams = {
@@ -58,8 +59,6 @@ export function useCueCrud({
   refreshEffectFiles,
   onError,
 }: UseCueCrudParams) {
-  const handleNewFile = useCallback(() => {}, [])
-
   const handleCreateNewFile = useCallback(
     async (metadata: {
       groupId: string
@@ -156,6 +155,7 @@ export function useCueCrud({
   )
 
   const handleAddCue = useCallback(() => {
+    if (!editorDoc) setFilename('untitled.json')
     const baseDoc = editorDoc ?? {
       mode: 'cue' as const,
       file: createDefaultFile(mode),
@@ -179,9 +179,10 @@ export function useCueCrud({
     setSelectedCueId(newCue.id)
     loadCueIntoFlow(newCue as YargNodeCueDefinition | AudioNodeCueDefinition)
     setIsDirty(true)
-  }, [editorDoc, mode, loadCueIntoFlow, setEditorDoc, setSelectedCueId, setIsDirty])
+  }, [editorDoc, mode, loadCueIntoFlow, setEditorDoc, setFilename, setSelectedCueId, setIsDirty])
 
   const handleAddEffect = useCallback(() => {
+    if (!editorDoc) setFilename('untitled.json')
     const baseDoc = editorDoc ?? {
       mode: 'effect' as const,
       file: createDefaultEffectFile(mode as EffectMode),
@@ -211,7 +212,7 @@ export function useCueCrud({
     setSelectedCueId(newEffect.id)
     loadCueIntoFlow(newEffect as YargEffectDefinition | AudioEffectDefinition)
     setIsDirty(true)
-  }, [editorDoc, mode, loadCueIntoFlow, setEditorDoc, setSelectedCueId, setIsDirty])
+  }, [editorDoc, mode, loadCueIntoFlow, setEditorDoc, setFilename, setSelectedCueId, setIsDirty])
 
   const removeCue = useCallback(
     (cueId: string) => {
@@ -230,11 +231,13 @@ export function useCueCrud({
 
       let nextCueId = selectedCueId
       if (cueId === selectedCueId) {
-        nextCueId = updatedCues[0]?.id ?? null
+        const firstCue = firstByName(updatedCues)
+        nextCueId = firstCue?.id ?? null
         setSelectedCueId(nextCueId)
       }
 
-      const nextCue = updatedCues.find((cue) => cue.id === nextCueId) ?? updatedCues[0] ?? null
+      const nextCue =
+        updatedCues.find((cue) => cue.id === nextCueId) ?? firstByName(updatedCues) ?? null
       loadCueIntoFlow(nextCue as YargNodeCueDefinition | AudioNodeCueDefinition | null)
       setIsDirty(true)
     },
@@ -264,12 +267,15 @@ export function useCueCrud({
 
       let nextEffectId = selectedCueId
       if (effectId === selectedCueId) {
-        nextEffectId = updatedEffects[0]?.id ?? null
+        const firstEffect = firstByName(updatedEffects)
+        nextEffectId = firstEffect?.id ?? null
         setSelectedCueId(nextEffectId)
       }
 
       const nextEffect =
-        updatedEffects.find((effect) => effect.id === nextEffectId) ?? updatedEffects[0] ?? null
+        updatedEffects.find((effect) => effect.id === nextEffectId) ??
+        firstByName(updatedEffects) ??
+        null
       loadCueIntoFlow(nextEffect as YargEffectDefinition | AudioEffectDefinition | null)
       setIsDirty(true)
     },
@@ -277,7 +283,6 @@ export function useCueCrud({
   )
 
   return {
-    handleNewFile,
     handleCreateNewFile,
     handleAddCue,
     handleAddEffect,

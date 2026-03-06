@@ -26,7 +26,7 @@ import {
 import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue } from './executionTypes'
-import { resolveValue, getVariableStore } from './valueResolver'
+import { resolveValue, getVariableStore, UninitializedVariableError } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
@@ -58,6 +58,20 @@ export class EffectExecutionEngine {
   private onIdleCallback?: () => void // Called when all contexts complete
   /** Effect names and layers submitted via addEffectWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
+  /** Callback-backed effects still running in sequencer for this engine instance. */
+  private pendingCallbackEffects: Set<string> = new Set()
+  /** When .use is true, the next effect submission must use setEffect (then set .use = false). */
+  private firstSubmissionUsesSetEffectRef?: { use: boolean }
+
+  private maybeFireIdle(): void {
+    if (
+      this.onIdleCallback &&
+      this.activeContexts.size === 0 &&
+      this.pendingCallbackEffects.size === 0
+    ) {
+      this.onIdleCallback()
+    }
+  }
 
   private emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
     sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
@@ -74,6 +88,7 @@ export class EffectExecutionEngine {
     lightManager: DmxLightManager,
     parameterValues: Record<string, any>,
     callerCueData: CueData | AudioCueData,
+    firstSubmissionUsesSetEffectRef?: { use: boolean },
   ) {
     this.instanceId = ++EffectExecutionEngine.nextInstanceId
     this.compiledEffect = compiledEffect
@@ -81,6 +96,7 @@ export class EffectExecutionEngine {
     this.lightManager = lightManager
     this.parameterValues = parameterValues
     this.callerCueData = callerCueData
+    this.firstSubmissionUsesSetEffectRef = firstSubmissionUsesSetEffectRef
     this.variableDefinitions = compiledEffect.definition.variables ?? []
 
     // Initialize effect-local variable store
@@ -142,10 +158,7 @@ export class EffectExecutionEngine {
 
     context.setOnContextComplete(() => {
       this.activeContexts.delete(context.id)
-      // Check if effect is now idle (all contexts done)
-      if (this.activeContexts.size === 0 && this.onIdleCallback) {
-        this.onIdleCallback()
-      }
+      this.maybeFireIdle()
     })
 
     this.activeContexts.set(context.id, context)
@@ -163,10 +176,7 @@ export class EffectExecutionEngine {
     } else {
       // No children - context completes immediately
       this.activeContexts.delete(context.id)
-      // Check if effect is now idle (all contexts done)
-      if (this.activeContexts.size === 0 && this.onIdleCallback) {
-        this.onIdleCallback()
-      }
+      this.maybeFireIdle()
     }
   }
 
@@ -311,6 +321,8 @@ export class EffectExecutionEngine {
         return
       }
 
+      const useSetEffect = this.firstSubmissionUsesSetEffectRef?.use === true
+
       const effectName =
         iterIdx >= 0
           ? `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}:${iterIdx}`
@@ -320,18 +332,31 @@ export class EffectExecutionEngine {
 
       if (shouldBlock) {
         context.registerActiveAction(action.id, action)
+        this.pendingCallbackEffects.add(effectName)
         const callback = (): void => {
+          this.pendingCallbackEffects.delete(effectName)
           this.submittedEffects.delete(effectName)
           this.emitNodeExecution('deactivated', action.id)
           context.advancePhase()
           context.completeAction(action.id)
           this.continueToNextNodes(action.id, context)
+          this.maybeFireIdle()
         }
         this.submittedEffects.set(effectName, resolvedLayer)
-        this.sequencer.addEffectWithCallback(effectName, effect, callback)
+        if (useSetEffect) {
+          this.firstSubmissionUsesSetEffectRef!.use = false
+          this.sequencer.setEffectWithCallback(effectName, effect, callback)
+        } else {
+          this.sequencer.addEffectWithCallback(effectName, effect, callback)
+        }
       } else {
         this.submittedEffects.set(effectName, resolvedLayer)
-        this.sequencer.addEffect(effectName, effect)
+        if (useSetEffect) {
+          this.firstSubmissionUsesSetEffectRef!.use = false
+          void this.sequencer.setEffect(effectName, effect)
+        } else {
+          this.sequencer.addEffect(effectName, effect)
+        }
         this.emitNodeExecution('deactivated', action.id)
         this.continueToNextNodes(action.id, context)
       }
@@ -421,9 +446,12 @@ export class EffectExecutionEngine {
       (step) => step.resolvedTiming.waitUntilCondition !== 'none',
     )
 
+    const useSetEffectChain = this.firstSubmissionUsesSetEffectRef?.use === true
     if (chainHasBlockingStep) {
       context.registerActiveAction(lastChainNode.id, lastChainNode)
+      this.pendingCallbackEffects.add(chainEffectName)
       const callback = (): void => {
+        this.pendingCallbackEffects.delete(chainEffectName)
         this.submittedEffects.delete(chainEffectName)
         for (const a of actionChain) {
           this.emitNodeExecution('deactivated', a.id)
@@ -431,12 +459,23 @@ export class EffectExecutionEngine {
         context.advancePhase()
         context.completeAction(lastChainNode.id)
         this.continueToNextNodes(lastChainNode.id, context)
+        this.maybeFireIdle()
       }
       this.submittedEffects.set(chainEffectName, chainData.baseLayer)
-      this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback)
+      if (useSetEffectChain) {
+        this.firstSubmissionUsesSetEffectRef!.use = false
+        this.sequencer.setEffectWithCallback(chainEffectName, composedEffect, callback)
+      } else {
+        this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback)
+      }
     } else {
       this.submittedEffects.set(chainEffectName, chainData.baseLayer)
-      this.sequencer.addEffect(chainEffectName, composedEffect)
+      if (useSetEffectChain) {
+        this.firstSubmissionUsesSetEffectRef!.use = false
+        void this.sequencer.setEffect(chainEffectName, composedEffect)
+      } else {
+        this.sequencer.addEffect(chainEffectName, composedEffect)
+      }
       for (const a of actionChain) {
         this.emitNodeExecution('deactivated', a.id)
       }
@@ -539,6 +578,9 @@ export class EffectExecutionEngine {
       this.continueExecution(nextNodes, context)
       this.emitNodeExecution('deactivated', logic.id)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing logic node ${logic.id}:`, error)
       this.emitNodeExecution('deactivated', logic.id)
       // Continue to all outgoing edges despite error
@@ -593,6 +635,9 @@ export class EffectExecutionEngine {
       }, actualDelay)
       context.addTimer(timerId)
     } catch (error) {
+      if (error instanceof UninitializedVariableError) {
+        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+      }
       console.error(`Error executing delay node ${delayNode.id}:`, error)
       this.emitNodeExecution('deactivated', delayNode.id)
       this.continueToNextNodes(delayNode.id, context)
@@ -629,10 +674,7 @@ export class EffectExecutionEngine {
 
     context.setOnContextComplete(() => {
       this.activeContexts.delete(context.id)
-      // Check if effect is now idle (all contexts done)
-      if (this.activeContexts.size === 0 && this.onIdleCallback) {
-        this.onIdleCallback()
-      }
+      this.maybeFireIdle()
     })
 
     this.activeContexts.set(context.id, context)
@@ -658,7 +700,14 @@ export class EffectExecutionEngine {
   private continueExecution(nodeIds: string[], context: ExecutionContext): void {
     context.beginBatch()
     for (const nodeId of nodeIds) {
-      this.executeNode(nodeId, context)
+      try {
+        this.executeNode(nodeId, context)
+      } catch (error) {
+        if (error instanceof UninitializedVariableError) {
+          sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        }
+        console.error(`Error executing node ${nodeId}:`, error)
+      }
     }
     context.endBatch()
     if (context.tryComplete()) {
@@ -694,16 +743,22 @@ export class EffectExecutionEngine {
 
   /**
    * Cancel all active executions.
+   * @param skipEffectRemoval When true, leave submitted effects on the sequencer so the next cue's setEffect can transition from them instead of from black.
    */
-  public cancelAll(): void {
+  public cancelAll(skipEffectRemoval = false): void {
     for (const context of this.activeContexts.values()) {
       context.dispose()
     }
     this.activeContexts.clear()
     for (const [name, layer] of this.submittedEffects) {
-      this.sequencer.removeEffect(name, layer)
+      this.sequencer.removeEffectCallback(name)
+      if (!skipEffectRemoval) {
+        this.sequencer.removeEffect(name, layer)
+      }
     }
     this.submittedEffects.clear()
+    this.pendingCallbackEffects.clear()
+    this.onIdleCallback = undefined
   }
 
   /**

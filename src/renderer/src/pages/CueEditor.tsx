@@ -106,6 +106,7 @@ const CueEditor: React.FC = () => {
   const [showJsonEditor, setShowJsonEditor] = useState(false)
   const [jsonEditorDirty, setJsonEditorDirty] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [loadedEffectDefinitions, setLoadedEffectDefinitions] = useState<
     Map<string, EffectDefinition>
   >(new Map())
@@ -123,6 +124,7 @@ const CueEditor: React.FC = () => {
   const {
     mode,
     activeMode,
+    editorMode,
     groupedFiles,
     groupedEffectFiles,
     editorDoc,
@@ -160,7 +162,7 @@ const CueEditor: React.FC = () => {
   })
 
   const cueMode = mode
-  const isEffectMode = editorDoc?.mode === 'effect'
+  const isEffectMode = editorMode === 'effect'
 
   const handleCueModeChange = useCallback(
     (mode: 'yarg' | 'audio') => {
@@ -208,6 +210,7 @@ const CueEditor: React.FC = () => {
     handlePaneContextMenu,
   } = useCueFlow({
     activeMode,
+    editorMode,
     setIsDirty,
     flowWrapperRef,
     effectDefinitions: loadedEffectDefinitions,
@@ -248,6 +251,17 @@ const CueEditor: React.FC = () => {
         ? `${(editorDoc.file as NodeCueFile).group.id}:${selectedCueId}`
         : selectedCueId ?? null
   const activeNodeIds = useActiveNodes(currentGraphId)
+
+  const usedCueTypes = useMemo((): Set<string> => {
+    if (!editorDoc || editorDoc.mode !== 'cue' || activeMode !== 'yarg') return new Set()
+    const cueFile = editorDoc.file as NodeCueFile
+    return new Set(
+      cueFile.cues
+        .filter((cue) => cue.id !== selectedCueId)
+        .map((cue) => (cue as YargNodeCueDefinition).cueType)
+        .filter(Boolean),
+    )
+  }, [editorDoc, selectedCueId, activeMode])
 
   const nodeTypes = useMemo(
     () => ({
@@ -543,32 +557,37 @@ const CueEditor: React.FC = () => {
     const currentCue = cueFile.cues.find((c) => c.id === selectedCueId)
     const effectRefs = currentCue?.effects ?? []
 
-    // Load each effect definition
+    let cancelled = false
+
     const loadEffects = async () => {
-      const newDefinitions = new Map<string, EffectDefinition>()
-
-      for (const effectRef of effectRefs) {
+      const effectFileList = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
+      const promises = effectRefs.map(async (effectRef) => {
         try {
-          // Find the effect file
-          const effectFile = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
-          const fileEntry = effectFile.find((f) => f.groupId === effectRef.effectFileId)
-
-          if (fileEntry) {
-            const effectFileData = (await readEffectFile(fileEntry.path)) as EffectFile
-            const effectDef = effectFileData.effects.find((e) => e.id === effectRef.effectId)
-            if (effectDef) {
-              newDefinitions.set(effectRef.effectId, effectDef)
-            }
-          }
+          const fileEntry = effectFileList.find((f) => f.groupId === effectRef.effectFileId)
+          if (!fileEntry) return null
+          const effectFileData = (await readEffectFile(fileEntry.path)) as EffectFile
+          const effectDef = effectFileData.effects.find((e) => e.id === effectRef.effectId)
+          return effectDef ? ([effectRef.effectId, effectDef] as const) : null
         } catch (error) {
           console.warn(`Failed to load effect ${effectRef.effectId}:`, error)
+          return null
         }
-      }
+      })
 
+      const results = await Promise.all(promises)
+      if (cancelled) return
+
+      const newDefinitions = new Map<string, EffectDefinition>()
+      for (const result of results) {
+        if (result) newDefinitions.set(result[0], result[1])
+      }
       setLoadedEffectDefinitions(newDefinitions)
     }
 
     loadEffects()
+    return () => {
+      cancelled = true
+    }
   }, [editorDoc, selectedCueId, mode, groupedEffectFiles])
 
   const handleJsonEditorSave = useCallback(
@@ -607,7 +626,10 @@ const CueEditor: React.FC = () => {
 
   const handleGraphPrettify = useCallback(async () => {
     if (!editorDoc?.path || !selectedCueId) return
-    if (isDirty) await handleSave()
+    if (isDirty) {
+      const saved = await handleSave()
+      if (!saved) return
+    }
     await runNodeScript({
       scriptName: 'node-graph-prettier.mjs',
       args: ['--file', editorDoc.path, '--id', selectedCueId],
@@ -647,20 +669,20 @@ const CueEditor: React.FC = () => {
   const newFileLabel = isEffectMode ? 'New Effect File' : 'New Cue File'
   const importLabel = isEffectMode ? 'Import Effect' : 'Import Cue'
   const exportLabel = isEffectMode ? 'Export Effect' : 'Export Cue'
-  const deleteLabel = isEffectMode ? 'Delete Effect' : 'Delete Cue'
+  const deleteLabel = isEffectMode ? 'Delete Effect File' : 'Delete Cue File'
 
   return (
     <div className="p-4 space-y-4 text-sm h-full flex flex-col">
       <CueEditorToolbar
         cueMode={cueMode}
         isEffectMode={isEffectMode}
-        onCueModeChange={handleCueModeChange}
-        onEffectToggle={handleEffectToggle}
+        onCueModeChange={(m) => guardJsonEditorNavigation(() => handleCueModeChange(m))}
+        onEffectToggle={(e) => guardJsonEditorNavigation(() => handleEffectToggle(e))}
         onNewFile={() => setShowNewFileModal(true)}
         onSave={handleSave}
         onImport={handleImport}
         onExport={handleExport}
-        onDelete={handleDelete}
+        onDelete={() => setShowDeleteConfirm(true)}
         hasEditorDoc={!!editorDoc}
         hasFile={hasFile}
         newFileLabel={newFileLabel}
@@ -682,6 +704,7 @@ const CueEditor: React.FC = () => {
           className="flex flex-col gap-4 overflow-hidden min-h-0">
           <CueFileSidebar
             mode={mode}
+            isEffectMode={isEffectMode}
             fileList={fileList}
             effectFileList={effectFiles}
             editorDoc={editorDoc}
@@ -727,16 +750,18 @@ const CueEditor: React.FC = () => {
               currentCue={currentCueDefinition}
               currentEffect={currentEffectDefinition}
               availableCueTypes={availableCueTypes}
+              usedCueTypes={usedCueTypes}
               activeMode={activeMode}
-              editorMode={editorDoc?.mode ?? 'cue'}
+              editorMode={editorMode}
               onGroupChange={updateGroupMeta}
               onCueMetadataChange={updateCueMetadata}
               onEffectMetadataChange={updateEffectMetadata}
             />
 
             {showJsonEditor &&
-            editorDoc?.mode === 'effect' &&
+            editorMode === 'effect' &&
             selectedCueId &&
+            editorDoc &&
             currentEffectDefinition ? (
               <EffectJsonEditor
                 effectDefinition={currentEffectDefinition}
@@ -750,8 +775,9 @@ const CueEditor: React.FC = () => {
                 onDirtyChange={setJsonEditorDirty}
               />
             ) : showJsonEditor &&
-              editorDoc?.mode === 'cue' &&
+              editorMode === 'cue' &&
               selectedCueId &&
+              editorDoc &&
               currentCueDefinition ? (
               <CueJsonEditor
                 cueDefinition={currentCueDefinition}
@@ -771,7 +797,7 @@ const CueEditor: React.FC = () => {
                   edges={edges}
                   nodeTypes={nodeTypes}
                   selectedCueName={
-                    editorDoc?.mode === 'effect'
+                    editorMode === 'effect'
                       ? currentEffectDefinition?.name
                       : currentCueDefinition?.name
                   }
@@ -790,7 +816,7 @@ const CueEditor: React.FC = () => {
                   setReactFlowInstance={setReactFlowInstance}
                   isValidConnection={isValidConnection}
                   activeMode={activeMode}
-                  editorMode={editorDoc?.mode ?? 'cue'}
+                  editorMode={editorMode}
                   addEventNode={addEventNode}
                   addActionNode={addActionNode}
                   addLogicNode={addLogicNode}
@@ -812,7 +838,7 @@ const CueEditor: React.FC = () => {
           <div className={`h-full ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
             <NodeSidebar
               activeMode={activeMode}
-              editorMode={editorDoc?.mode ?? 'cue'}
+              editorMode={editorMode}
               selectedNode={selectedNode}
               selectedActionHasEventParent={selectedActionHasEventParent}
               availableVariables={availableVariables}
@@ -847,6 +873,41 @@ const CueEditor: React.FC = () => {
         )}
         <span>{isDirty ? 'Unsaved changes' : 'All changes saved'}</span>
       </div>
+
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 max-w-sm text-sm space-y-3">
+            <p id="delete-confirm-title" className="font-semibold">
+              Delete {deleteLabel}?
+            </p>
+            <p className="text-gray-600 dark:text-gray-400">
+              This will permanently delete all items in the{' '}
+              <span className="font-medium">{filename}</span> file. This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowDeleteConfirm(false)
+                  await handleDelete()
+                }}
+                className="px-3 py-1.5 text-sm font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-3 py-1.5 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <NewFileModal
         isOpen={showNewFileModal}

@@ -573,6 +573,7 @@ export interface IpcEventMap {
     timestamp: number
   }
   [RENDERER_RECEIVE.NODE_EXECUTION]: NodeExecutionPayload
+  [RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR]: string
 }
 
 export type IpcEventChannel = keyof IpcEventMap

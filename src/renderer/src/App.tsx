@@ -93,6 +93,14 @@ export const App = (): JSX.Element => {
     [showToast],
   )
 
+  const handleNodeCueRuntimeError = useCallback(
+    (msg: string): void => {
+      console.error('Node cue runtime error:', msg)
+      showToast(msg, 'error', 5000)
+    },
+    [showToast],
+  )
+
   // Handler for cue state updates
   const handleCueStateUpdate = useCallback(
     (cueState: CueStateUpdatePayload): void => {
@@ -336,6 +344,7 @@ export const App = (): JSX.Element => {
     setIsLeftMenuCollapsed,
     handleSenderError,
     handleYargError,
+    handleNodeCueRuntimeError,
     handleSenderNetworkError,
     handleCueStateUpdate,
     handleSenderStartFailure,

@@ -1,10 +1,13 @@
-import React from 'react'
+import React, { useMemo, useState } from 'react'
+import { FaTrash } from 'react-icons/fa'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type {
   NodeCueMode,
   YargNodeCueDefinition,
   AudioNodeCueDefinition,
+  YargEffectDefinition,
+  AudioEffectDefinition,
   NodeCueFile,
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -12,6 +15,7 @@ import type { EditorDocument } from '../lib/types'
 
 type Props = {
   mode: NodeCueMode
+  isEffectMode: boolean
   fileList: NodeCueFileSummary[]
   effectFileList: EffectFileSummary[]
   editorDoc: EditorDocument | null
@@ -23,11 +27,19 @@ type Props = {
   onAddEffect: () => void
   onRemoveCue: (cueId: string) => void
   onRemoveEffect: (effectId: string) => void
-  onSelectCue: (cue: YargNodeCueDefinition | AudioNodeCueDefinition | null) => void
+  onSelectCue: (
+    cue:
+      | YargNodeCueDefinition
+      | AudioNodeCueDefinition
+      | YargEffectDefinition
+      | AudioEffectDefinition
+      | null,
+  ) => void
 }
 
 const CueFileSidebar: React.FC<Props> = ({
   mode,
+  isEffectMode,
   fileList,
   effectFileList,
   editorDoc,
@@ -41,24 +53,33 @@ const CueFileSidebar: React.FC<Props> = ({
   onRemoveEffect,
   onSelectCue,
 }) => {
-  const isEffectMode = editorDoc?.mode === 'effect'
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
+
   const listLabel = isEffectMode ? 'Effect List' : 'Cue List'
   const addLabel = isEffectMode ? '+ Add Effect' : '+ Add Cue'
   const itemCountLabel = isEffectMode ? 'effect(s)' : 'cue(s)'
 
-  // Get the items list based on mode, sorted alphabetically by name
-  const rawItems = editorDoc
-    ? isEffectMode
-      ? (editorDoc.file as EffectFile).effects
-      : (editorDoc.file as NodeCueFile).cues
-    : []
-  const items = [...rawItems].sort((a, b) =>
-    (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
-  )
+  // Get the items list based on the loaded document type, sorted alphabetically by name
+  const items = useMemo(() => {
+    const rawItems = editorDoc
+      ? editorDoc.mode === 'effect'
+        ? (editorDoc.file as EffectFile).effects
+        : (editorDoc.file as NodeCueFile).cues
+      : []
+    return [...rawItems].sort((a, b) =>
+      (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
+    )
+  }, [editorDoc])
 
   // Use the appropriate file list based on editor mode, sorted alphabetically by group name
-  const displayFileList = [...(isEffectMode ? effectFileList : fileList)].sort((a, b) =>
-    (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, { sensitivity: 'base' }),
+  const displayFileList = useMemo(
+    () =>
+      [...(isEffectMode ? effectFileList : fileList)].sort((a, b) =>
+        (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, {
+          sensitivity: 'base',
+        }),
+      ),
+    [isEffectMode, effectFileList, fileList],
   )
 
   return (
@@ -109,27 +130,67 @@ const CueFileSidebar: React.FC<Props> = ({
             <div key={item.id} className="flex items-center gap-2">
               <button
                 className={`flex-1 text-left px-2 py-1 rounded border ${selectedCueId === item.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400' : 'border-gray-200 dark:border-gray-700'}`}
-                onClick={() =>
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- file summary to cue type
-                  onSelectCue(item as any)
-                }>
+                onClick={() => onSelectCue(item)}>
                 {item.name}
               </button>
               <button
-                className="text-[11px] text-red-500 hover:underline disabled:text-gray-400"
-                onClick={() => (isEffectMode ? onRemoveEffect(item.id) : onRemoveCue(item.id))}
+                className="text-red-500 hover:text-red-700 disabled:text-gray-300 dark:disabled:text-gray-600 p-1"
+                onClick={() => setPendingRemoveId(item.id)}
                 disabled={items.length <= 1}
                 title={
                   items.length <= 1
                     ? `At least one ${isEffectMode ? 'effect' : 'cue'} is required`
                     : `Remove ${isEffectMode ? 'effect' : 'cue'}`
                 }>
-                Remove
+                <FaTrash className="w-3 h-3" />
               </button>
             </div>
           ))}
         </div>
       </div>
+
+      {pendingRemoveId !== null &&
+        (() => {
+          const target = items.find((i) => i.id === pendingRemoveId)
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="remove-confirm-title">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 max-w-sm text-sm space-y-3">
+                <p id="remove-confirm-title" className="font-semibold">
+                  Remove {isEffectMode ? 'effect' : 'cue'}?
+                </p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Remove <span className="font-medium">{target?.name ?? pendingRemoveId}</span> from
+                  this file?
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isEffectMode) {
+                        onRemoveEffect(pendingRemoveId)
+                      } else {
+                        onRemoveCue(pendingRemoveId)
+                      }
+                      setPendingRemoveId(null)
+                    }}
+                    className="px-3 py-1.5 text-sm font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                    Remove
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingRemoveId(null)}
+                    className="px-3 py-1.5 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
     </aside>
   )
 }

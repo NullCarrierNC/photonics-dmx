@@ -12,10 +12,17 @@ import ReactFlow, {
   type OnNodesChange,
   type ReactFlowInstance,
 } from 'reactflow'
-import type { EditorNode, NotesVariant } from '../lib/types'
-import { NODE_EFFECT_TYPES } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { EditorNode, EventOption, NotesVariant } from '../lib/types'
+import {
+  NODE_EFFECT_TYPES,
+  type LogicNode,
+  type NodeEffectType,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type {
+  AudioEventNode,
+  YargEventNode,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
-import type { LogicNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 type Props = {
   nodes: EditorNode[]
@@ -38,12 +45,12 @@ type Props = {
   isValidConnection: (connection: Connection) => boolean
   activeMode: 'yarg' | 'audio'
   editorMode: 'cue' | 'effect'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-flow node option type
-  addEventNode: (option?: any, position?: { x: number; y: number }) => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- effect type from registry
-  addActionNode: (effectType: any, position?: { x: number; y: number }) => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- logic type from registry
-  addLogicNode: (logicType: any, position?: { x: number; y: number }) => void
+  addEventNode: (
+    option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
+    position?: { x: number; y: number },
+  ) => void
+  addActionNode: (effectType: NodeEffectType, position?: { x: number; y: number }) => void
+  addLogicNode: (logicType: LogicNode['logicType'], position?: { x: number; y: number }) => void
   addEventRaiserNode?: (position?: { x: number; y: number }) => void
   addEventListenerNode?: (position?: { x: number; y: number }) => void
   addEffectRaiserNode?: (position?: { x: number; y: number }) => void
@@ -232,7 +239,7 @@ const CueFlowCanvas: React.FC<Props> = ({
                     }),
                   )
                 }>
-                System Event
+                System Event Listener
               </button>
             </>
           )}
@@ -284,6 +291,9 @@ const CueFlowCanvas: React.FC<Props> = ({
               'concat-lights',
               'delay',
               'debugger',
+              'random',
+              'shuffle-lights',
+              'for-each-light',
             ] as LogicNode['logicType'][]
           )
             .sort()

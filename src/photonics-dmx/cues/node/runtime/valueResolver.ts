@@ -19,6 +19,14 @@ import { VariableValue } from './executionTypes'
 /** Optional; when provided, variable lookups use scope-aware store (cue vs cue-group). */
 type VariableDefinitionsForScope = { name: string; scope: 'cue' | 'cue-group' }[]
 
+/** Thrown when a variable source references a variable that has not been initialized. */
+export class UninitializedVariableError extends Error {
+  constructor(public readonly varName: string) {
+    super(`Variable "${varName}" is not initialized`)
+    this.name = 'UninitializedVariableError'
+  }
+}
+
 /**
  * Resolve a value source to an actual value at runtime.
  * When variableDefinitions is provided, variable sources are resolved from the scope-correct
@@ -91,29 +99,7 @@ export function resolveValue(
     return existing.value === true || existing.value === 'true'
   }
 
-  // Use fallback
-  if (expectedType === 'light-array') {
-    return Array.isArray(source.fallback) ? (source.fallback as TrackedLight[]) : []
-  }
-  if (
-    expectedType === 'string' ||
-    expectedType === 'cue-type' ||
-    expectedType === 'color' ||
-    expectedType === 'event'
-  ) {
-    return source.fallback !== undefined ? String(source.fallback) : ''
-  }
-  if (expectedType === 'number') {
-    if (typeof source.fallback === 'number') return source.fallback
-    if (typeof source.fallback === 'boolean') return source.fallback ? 1 : 0
-    if (typeof source.fallback === 'string') {
-      const parsed = parseFloat(source.fallback)
-      return isNaN(parsed) ? 0 : parsed
-    }
-    return 0
-  }
-
-  return source.fallback === true || source.fallback === 'true'
+  throw new UninitializedVariableError(source.name)
 }
 
 /**

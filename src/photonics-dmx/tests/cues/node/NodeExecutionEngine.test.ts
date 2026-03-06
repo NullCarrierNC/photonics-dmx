@@ -15,6 +15,8 @@ import { VariableValue } from '../../../cues/node/runtime/executionTypes'
 import type { CompiledEffect } from '../../../cues/node/runtime/EffectRegistry'
 import type { TrackedLight } from '../../../types'
 import type { FixtureConfig } from '../../../types'
+import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
+import { sendToAllWindows } from '../../../../main/utils/windowUtils'
 
 /** Minimal fixture config for test TrackedLight objects */
 type MinimalLightConfig = Partial<FixtureConfig>
@@ -778,6 +780,86 @@ describe('NodeExecutionEngine', () => {
       engine.cancelAll()
 
       // Execution state should be empty
+      const state = engine.getExecutionState()
+      expect(state.activeContexts).toHaveLength(0)
+    })
+
+    it('cancelAll(true) leaves effects on sequencer so lights stay lit during cue transition', () => {
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+      }
+
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 100 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: CueType.Default,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [],
+        },
+        connections: [{ from: 'event1', to: 'action1' }],
+      }
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([['action1', actionNode]]),
+        logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]]),
+      }
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+
+      engine.startExecution(eventNode, createCueData('Strong'))
+
+      const removeEffectBefore = (mockSequencer.removeEffect as jest.Mock).mock.calls.length
+      const removeCallbackBefore = (mockSequencer.removeEffectCallback as jest.Mock).mock.calls
+        .length
+
+      engine.cancelAll(true)
+
+      // Callbacks must still be removed so stale completions do not fire
+      expect(mockSequencer.removeEffectCallback).toHaveBeenCalledTimes(removeCallbackBefore + 1)
+      // Effects must NOT be removed so the next cue's setEffect can transition from them
+      expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectBefore)
+
       const state = engine.getExecutionState()
       expect(state.activeContexts).toHaveLength(0)
     })
@@ -1609,7 +1691,7 @@ describe('NodeExecutionEngine', () => {
           filter: { source: 'literal', value: 'all' },
         },
         color: {
-          name: { source: 'variable', name: 'myColor', fallback: 'blue' },
+          name: { source: 'variable', name: 'myColor' },
           brightness: { source: 'literal', value: 'medium' },
           blendMode: { source: 'literal', value: 'replace' },
         },
@@ -1699,7 +1781,7 @@ describe('NodeExecutionEngine', () => {
         type: 'action',
         effectType: 'set-color',
         target: {
-          groups: { source: 'variable', name: 'targetGroups', fallback: 'front' },
+          groups: { source: 'variable', name: 'targetGroups' },
           filter: { source: 'literal', value: 'all' },
         },
         color: {
@@ -1768,8 +1850,8 @@ describe('NodeExecutionEngine', () => {
       // Groups should be resolved to ['front', 'back']
     })
 
-    it('should use fallback when variable not found', () => {
-      // Action references non-existent variable, should use fallback
+    it('should report runtime error when variable not found', () => {
+      // Action references non-existent variable; runtime reports error via IPC
       const eventNode: YargEventNode = {
         id: 'event1',
         type: 'event',
@@ -1786,7 +1868,7 @@ describe('NodeExecutionEngine', () => {
           filter: { source: 'literal', value: 'all' },
         },
         color: {
-          name: { source: 'variable', name: 'nonExistentColor', fallback: 'green' },
+          name: { source: 'variable', name: 'nonExistentColor' },
           brightness: { source: 'literal', value: 'medium' },
           blendMode: { source: 'literal', value: 'replace' },
         },
@@ -1841,8 +1923,10 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
-      // Should use fallback color 'green'
+      expect(sendToAllWindows).toHaveBeenCalledWith(
+        RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+        expect.stringContaining('nonExistentColor'),
+      )
     })
 
     it('should resolve variable for duration', () => {
@@ -1890,7 +1974,7 @@ describe('NodeExecutionEngine', () => {
         timing: {
           waitForCondition: { source: 'literal', value: 'none' },
           waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'variable', name: 'calculatedDuration', fallback: 200 },
+          duration: { source: 'variable', name: 'calculatedDuration' },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
           easing: 'sinInOut',

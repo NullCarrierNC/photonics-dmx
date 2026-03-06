@@ -8,6 +8,7 @@ import {
   type LogicNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorNode } from '../lib/types'
+import { isValidEditorEdge } from '../lib/edgeValidation'
 
 export type UseEdgeManagementParams = {
   nodes: EditorNode[]
@@ -15,14 +16,16 @@ export type UseEdgeManagementParams = {
   setNodes: React.Dispatch<React.SetStateAction<EditorNode[]>>
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>
   setIsDirty: (dirty: boolean) => void
+  editorMode: 'cue' | 'effect'
 }
 
 export function useEdgeManagement({
   nodes,
-  edges,
+  edges: _edges,
   setNodes,
   setEdges,
   setIsDirty,
+  editorMode,
 }: UseEdgeManagementParams) {
   const isValidNodeConnection = useCallback(
     (sourceId?: string | null, targetId?: string | null) => {
@@ -30,27 +33,9 @@ export function useEdgeManagement({
       const sourceNode = nodes.find((node) => node.id === sourceId)
       const targetNode = nodes.find((node) => node.id === targetId)
       if (!sourceNode || !targetNode) return false
-      if (sourceNode.data.kind === 'notes' || targetNode.data.kind === 'notes') return false
-      if (targetNode.data.kind === 'event-listener' || targetNode.data.kind === 'effect-listener')
-        return false
-      const validTargets = ['action', 'logic', 'event-raiser', 'effect-raiser']
-      if (sourceNode.data.kind === 'event' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'logic' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'action' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'event-raiser' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'effect-raiser' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'event-listener' && validTargets.includes(targetNode.data.kind))
-        return true
-      if (sourceNode.data.kind === 'effect-listener' && validTargets.includes(targetNode.data.kind))
-        return true
-      return false
+      return isValidEditorEdge(sourceNode.data.kind, targetNode.data.kind, editorMode)
     },
-    [nodes],
+    [nodes, editorMode],
   )
 
   const onConnect = useCallback(
@@ -82,11 +67,6 @@ export function useEdgeManagement({
               waitForCondition: { source: 'literal', value: inheritedWaitForCondition },
               waitForTime: { source: 'literal', value: 0 },
             }
-          } else if (sourceNode.data.kind === 'action') {
-            const sourceAction = sourceNode.data.payload as ActionNode
-            targetAction.color = { ...sourceAction.color }
-            targetAction.target = { ...sourceAction.target }
-            targetAction.layer = sourceAction.layer
           }
 
           return prevNodes.map((node) =>
@@ -98,23 +78,26 @@ export function useEdgeManagement({
         return prevNodes
       })
 
-      const sourceNode = nodes.find((n) => n.id === connection.source)
-      let fromPort: string | null = null
-      if (connection.sourceHandle) {
-        fromPort = connection.sourceHandle
-      } else if (sourceNode?.data.kind === 'logic') {
-        const logicPayload = sourceNode.data.payload as LogicNode
-        if (logicPayload.logicType === 'conditional') {
-          const existingEdges = edges.filter((e) => e.source === sourceNode.id)
-          if (existingEdges.length === 0) fromPort = 'true'
-          else if (existingEdges.length === 1) fromPort = 'false'
+      setEdges((prevEdges) => {
+        let fromPort: string | null = null
+        if (connection.sourceHandle) {
+          fromPort = connection.sourceHandle
+        } else {
+          const sourceNode = nodes.find((n) => n.id === connection.source)
+          if (sourceNode?.data.kind === 'logic') {
+            const logicPayload = sourceNode.data.payload as LogicNode
+            if (logicPayload.logicType === 'conditional') {
+              const existingEdges = prevEdges.filter((e) => e.source === sourceNode.id)
+              if (existingEdges.length === 0) fromPort = 'true'
+              else if (existingEdges.length === 1) fromPort = 'false'
+            }
+          }
         }
-      }
-
-      setEdges((eds) => addEdge({ ...connection, type: 'default', data: { fromPort } }, eds))
+        return addEdge({ ...connection, type: 'default', data: { fromPort } }, prevEdges)
+      })
       setIsDirty(true)
     },
-    [edges, isValidNodeConnection, nodes, setEdges, setIsDirty, setNodes],
+    [isValidNodeConnection, nodes, setEdges, setIsDirty, setNodes],
   )
 
   const isValidConnection = useCallback(

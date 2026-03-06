@@ -12,22 +12,22 @@ import {
 import { AudioEventType } from '../cues/types/nodeCueTypes'
 
 export const COLOR_OPTIONS: Color[] = [
-  'red',
+  'amber',
+  'black',
   'blue',
-  'yellow',
-  'green',
+  'chartreuse',
   'cyan',
+  'green',
+  'magenta',
   'orange',
   'purple',
-  'chartreuse',
+  'red',
   'teal',
-  'violet',
-  'magenta',
-  'vermilion',
-  'amber',
-  'white',
-  'black',
   'transparent',
+  'vermilion',
+  'violet',
+  'white',
+  'yellow',
 ]
 
 export const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max']

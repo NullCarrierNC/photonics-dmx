@@ -18,6 +18,7 @@ type Props = {
   currentCue: YargNodeCueDefinition | AudioNodeCueDefinition | null
   currentEffect?: YargEffectDefinition | AudioEffectDefinition | null
   availableCueTypes: string[]
+  usedCueTypes?: Set<string>
   activeMode: NodeCueMode
   editorMode: EditorMode
   onGroupChange: (updates: Partial<NodeCueGroupMeta | EffectGroupMeta>) => void
@@ -33,12 +34,17 @@ const CueMetadataForm: React.FC<Props> = ({
   currentCue,
   currentEffect,
   availableCueTypes,
+  usedCueTypes,
   activeMode,
   editorMode,
   onGroupChange,
   onCueMetadataChange,
   onEffectMetadataChange,
 }) => {
+  const currentCueType = (currentCue as YargNodeCueDefinition | null)?.cueType
+  const filteredCueTypes = availableCueTypes.filter(
+    (type) => !usedCueTypes?.has(type) || type === currentCueType,
+  )
   const isEffectMode = editorMode === 'effect'
   const itemLabel = isEffectMode ? 'Effect' : 'Cue'
   const currentItem = isEffectMode ? currentEffect : currentCue
@@ -132,14 +138,14 @@ const CueMetadataForm: React.FC<Props> = ({
           {!isEffectMode && activeMode === 'yarg' && (
             <>
               <label className="flex flex-col font-medium">
-                Cue Type
+                Game Event Trigger
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={(currentCue as YargNodeCueDefinition).cueType}
                   onChange={(event) =>
                     onCueMetadataChange({ cueType: event.target.value as CueType })
                   }>
-                  {availableCueTypes.map((type) => (
+                  {filteredCueTypes.map((type) => (
                     <option key={type} value={type}>
                       {type}
                     </option>

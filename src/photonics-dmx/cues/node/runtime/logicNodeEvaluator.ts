@@ -11,7 +11,12 @@ import { LogicNode, ValueSource, VariableDefinition, VariableType } from '../../
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue } from './executionTypes'
 import { Connection } from '../../types/nodeCueTypes'
-import { resolveValue, inferType, getVariableStore } from './valueResolver'
+import {
+  resolveValue,
+  inferType,
+  getVariableStore,
+  UninitializedVariableError,
+} from './valueResolver'
 import { extractCueDataValue, extractConfigDataValue } from './dataExtractors'
 
 export interface LogicNodeEvaluatorContext {
@@ -108,10 +113,6 @@ export function evaluateLogicNode(
         const groupVar = context.groupLevelVarStore.get(source.name)
         const existing = cueVar ?? groupVar
         if (existing) return existing.type as VariableType
-        if (Array.isArray(source.fallback)) return 'light-array'
-        if (typeof source.fallback === 'boolean') return 'boolean'
-        if (typeof source.fallback === 'number') return 'number'
-        if (typeof source.fallback === 'string') return 'string'
         return 'number'
       }
 
@@ -294,21 +295,8 @@ export function evaluateLogicNode(
               indices = [Math.floor(parsed)]
             }
           }
-        } else if (logicNode.index.fallback !== undefined) {
-          // Use fallback
-          const fallback = logicNode.index.fallback
-          if (typeof fallback === 'number') {
-            indices = [Math.floor(fallback)]
-          } else if (typeof fallback === 'string') {
-            indices = fallback
-              .split(',')
-              .map((s) => s.trim())
-              .map((s) => {
-                const parsed = parseInt(s, 10)
-                return isNaN(parsed) ? null : parsed
-              })
-              .filter((idx): idx is number => idx !== null)
-          }
+        } else {
+          throw new UninitializedVariableError(logicNode.index.name)
         }
       }
 

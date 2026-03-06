@@ -18,6 +18,7 @@ export interface UseAppIpcListenersParams {
   setIsLeftMenuCollapsed: (collapsed: boolean) => void
   handleSenderError: (msg: string) => void
   handleYargError: (msg: string) => void
+  handleNodeCueRuntimeError: (msg: string) => void
   handleSenderNetworkError: (data: { sender: string; error: string; autoDisabled: boolean }) => void
   handleCueStateUpdate: (cueState: CueStateUpdatePayload) => void
   handleSenderStartFailure: (data: { sender: string; error: string }) => void
@@ -41,6 +42,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     setIsLeftMenuCollapsed,
     handleSenderError,
     handleYargError,
+    handleNodeCueRuntimeError,
     handleSenderNetworkError,
     handleCueStateUpdate,
     handleSenderStartFailure,
@@ -137,6 +139,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
 
     addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
     addIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
+    addIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, handleNodeCueRuntimeError)
     addIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError)
     addIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate)
     addIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure)
@@ -159,6 +162,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     return () => {
       removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
       removeIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
+      removeIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, handleNodeCueRuntimeError)
       removeIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError)
       removeIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate)
       removeIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure)
@@ -174,6 +178,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     activeConfig,
     handleSenderError,
     handleYargError,
+    handleNodeCueRuntimeError,
     handleSenderNetworkError,
     handleCueStateUpdate,
     handleSenderStartFailure,
