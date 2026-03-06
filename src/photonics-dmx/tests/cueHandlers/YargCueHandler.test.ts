@@ -38,26 +38,56 @@ class MockCueImplementation implements INetCue {
   }
 }
 
+// Strobe (secondary) cue mock for lifecycle tests
+class MockStrobeCue implements INetCue {
+  private _id: string
+  executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+  onStopMock = jest.fn()
+  constructor(public cueId: CueType) {
+    this._id = `mock-strobe-${cueId}-${Math.random().toString(36).substring(2, 11)}`
+  }
+  get id(): string {
+    return this._id
+  }
+  description = 'Mock strobe for testing'
+  style = CueStyle.Secondary
+  async execute(): Promise<void> {
+    return this.executeMock()
+  }
+  onStop(): void {
+    this.onStopMock()
+  }
+  onPause(): void {
+    /* no-op */
+  }
+  onDestroy(): void {
+    /* no-op */
+  }
+}
+
 describe('YargCueHandler', () => {
   let cueHandler: YargCueHandler
   let mockLightManager: jest.Mocked<DmxLightManager>
   let mockSequencer: jest.Mocked<ILightingController>
   let registry: YargCueRegistry
+  let mockStrobeCue: MockStrobeCue
 
   beforeEach(() => {
     // Get and reset the YargCueRegistry
     registry = YargCueRegistry.getInstance()
     registry.reset()
 
+    mockStrobeCue = new MockStrobeCue(CueType.Strobe_Fast)
     // Define and register a minimal mock default group for this test suite
     const mockDefaultGroup: ICueGroup = {
       id: 'mock-default',
       name: 'mock-default',
       description: 'Mock default group for testing',
-      cues: new Map([
+      cues: new Map<CueType, INetCue>([
         // Include at least the cues needed for fallback tests
         [CueType.Default, new MockCueImplementation('Default')],
         [CueType.Unknown, new MockCueImplementation('Unknown')], // Handle the unknown cue test
+        [CueType.Strobe_Fast, mockStrobeCue],
       ]),
     }
     registry.registerGroup(mockDefaultGroup)
@@ -235,6 +265,24 @@ describe('YargCueHandler', () => {
       // Should emit again after debounce period
       expect(cueHandledListener).toHaveBeenCalledTimes(2)
 
+      jest.useRealTimers()
+    })
+
+    it('Strobe_Off clears secondary so same strobe can re-activate (rapid Strobe_X -> Strobe_Off -> Strobe_X)', async () => {
+      jest.useFakeTimers()
+      await cueHandler.handleCue(CueType.Strobe_Fast, mockCueData)
+      expect(mockStrobeCue.executeMock).toHaveBeenCalledTimes(1)
+      expect(mockStrobeCue.onStopMock).not.toHaveBeenCalled()
+
+      jest.advanceTimersByTime(20)
+      await cueHandler.handleCue(CueType.Strobe_Off, mockCueData)
+      expect(mockStrobeCue.onStopMock).toHaveBeenCalledTimes(1)
+      expect(mockStrobeCue.executeMock).toHaveBeenCalledTimes(1)
+
+      jest.advanceTimersByTime(20)
+      await cueHandler.handleCue(CueType.Strobe_Fast, mockCueData)
+      expect(mockStrobeCue.executeMock).toHaveBeenCalledTimes(2)
+      expect(mockStrobeCue.onStopMock).toHaveBeenCalledTimes(1)
       jest.useRealTimers()
     })
   })

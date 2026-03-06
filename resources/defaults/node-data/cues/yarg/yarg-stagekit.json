@@ -2717,7 +2717,7 @@
           {
             "id": "event-sk-strobe-slow-start",
             "type": "event",
-            "eventType": "cue-called"
+            "eventType": "cue-started"
           }
         ],
         "actions": [

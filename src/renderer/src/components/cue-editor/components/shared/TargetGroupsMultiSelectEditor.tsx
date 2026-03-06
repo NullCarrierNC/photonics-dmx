@@ -1,5 +1,6 @@
 import React from 'react'
 import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { LOCATION_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 import { isVariableSource } from './nodeEditorUtils'
 
 interface TargetGroupsMultiSelectEditorProps {
@@ -8,8 +9,6 @@ interface TargetGroupsMultiSelectEditorProps {
   onChange: (next: ValueSource) => void
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
 }
-
-const TARGET_GROUPS: Array<'front' | 'back'> = ['front', 'back']
 
 const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps> = ({
   label,
@@ -23,20 +22,20 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
   }
   const isLiteral = source.source === 'literal'
 
-  // Parse comma-separated string to array
+  // Parse comma-separated string to array (front, back, strobe; same as runtime resolveLocationGroups)
   const selectedGroups =
     isLiteral && typeof source.value === 'string'
       ? source.value
           .split(',')
           .map((g) => g.trim())
-          .filter((g) => TARGET_GROUPS.includes(g as (typeof TARGET_GROUPS)[number]))
+          .filter((g) => LOCATION_OPTIONS.includes(g as (typeof LOCATION_OPTIONS)[number]))
       : []
 
   // Check if group is selected
-  const isSelected = (group: 'front' | 'back') => selectedGroups.includes(group)
+  const isSelected = (group: (typeof LOCATION_OPTIONS)[number]) => selectedGroups.includes(group)
 
   // Handle group toggle
-  const handleGroupToggle = (group: 'front' | 'back', checked: boolean) => {
+  const handleGroupToggle = (group: (typeof LOCATION_OPTIONS)[number], checked: boolean) => {
     const updated = checked
       ? [...selectedGroups.filter((g) => g !== group), group]
       : selectedGroups.filter((g) => g !== group)
@@ -79,7 +78,7 @@ const TargetGroupsMultiSelectEditor: React.FC<TargetGroupsMultiSelectEditorProps
             />
           </label>
           <div className="flex items-center gap-4">
-            {TARGET_GROUPS.map((group) => (
+            {LOCATION_OPTIONS.map((group) => (
               <label key={group} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
