@@ -52,8 +52,7 @@ export class ListenerCoordinator {
     if (this.cueHandler) {
       this.cueHandler.shutdown()
     }
-    const debouncePeriod = this.deps.getPreference('effectDebounce')
-    this.cueHandler = new YargCueHandler(dmxLightManager, effectsController, debouncePeriod)
+    this.cueHandler = new YargCueHandler(dmxLightManager, effectsController)
     this.deps.setCueHandlerRef(this.cueHandler)
     this.yargListener?.shutdown()
     this.yargListener = new YargNetworkListener(this.cueHandler)

@@ -129,20 +129,23 @@ export function setupSimulationHandlers(
             beat: 'Strong',
             keyframe: 'Unknown',
           })
-          if (cueGroup) {
-            try {
-              const registry = YargCueRegistry.getInstance()
+          const registry = YargCueRegistry.getInstance()
+          const savedActive = cueGroup ? registry.getActiveGroups() : []
+          try {
+            if (cueGroup) {
               registry.setActiveGroups([cueGroup])
-            } catch (error) {
-              console.warn(`Failed to set active cue group: ${error}`)
+            }
+            const cueHandler = controllerManager.getCueHandler()
+            if (cueHandler && effectId) {
+              const cueType = getCueTypeFromId(effectId)
+              if (cueType) await cueHandler.handleCue(cueType, mockCueData)
+            }
+            sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+          } finally {
+            if (cueGroup) {
+              registry.setActiveGroups(savedActive)
             }
           }
-          const cueHandler = controllerManager.getCueHandler()
-          if (cueHandler && effectId) {
-            const cueType = getCueTypeFromId(effectId)
-            if (cueType) await cueHandler.handleCue(cueType, mockCueData)
-          }
-          sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
         }
         controllerManager.getLightingController()?.onBeat()
         return true
@@ -172,20 +175,23 @@ export function setupSimulationHandlers(
             beat: 'Unknown',
             keyframe: 'Next',
           })
-          if (cueGroup) {
-            try {
-              const registry = YargCueRegistry.getInstance()
+          const registry = YargCueRegistry.getInstance()
+          const savedActive = cueGroup ? registry.getActiveGroups() : []
+          try {
+            if (cueGroup) {
               registry.setActiveGroups([cueGroup])
-            } catch (error) {
-              console.warn(`Failed to set active cue group: ${error}`)
+            }
+            const cueHandler = controllerManager.getCueHandler()
+            if (cueHandler && effectId) {
+              const cueType = getCueTypeFromId(effectId)
+              if (cueType) await cueHandler.handleCue(cueType, mockCueData)
+            }
+            sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+          } finally {
+            if (cueGroup) {
+              registry.setActiveGroups(savedActive)
             }
           }
-          const cueHandler = controllerManager.getCueHandler()
-          if (cueHandler && effectId) {
-            const cueType = getCueTypeFromId(effectId)
-            if (cueType) await cueHandler.handleCue(cueType, mockCueData)
-          }
-          sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
         }
         controllerManager.getLightingController()?.onKeyframe()
         return true
@@ -215,20 +221,23 @@ export function setupSimulationHandlers(
             beat: 'Measure',
             keyframe: 'Unknown',
           })
-          if (cueGroup) {
-            try {
-              const registry = YargCueRegistry.getInstance()
+          const registry = YargCueRegistry.getInstance()
+          const savedActive = cueGroup ? registry.getActiveGroups() : []
+          try {
+            if (cueGroup) {
               registry.setActiveGroups([cueGroup])
-            } catch (error) {
-              console.warn(`Failed to set active cue group: ${error}`)
+            }
+            const cueHandler = controllerManager.getCueHandler()
+            if (cueHandler && effectId) {
+              const cueType = getCueTypeFromId(effectId)
+              if (cueType) await cueHandler.handleCue(cueType, mockCueData)
+            }
+            sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+          } finally {
+            if (cueGroup) {
+              registry.setActiveGroups(savedActive)
             }
           }
-          const cueHandler = controllerManager.getCueHandler()
-          if (cueHandler && effectId) {
-            const cueType = getCueTypeFromId(effectId)
-            if (cueType) await cueHandler.handleCue(cueType, mockCueData)
-          }
-          sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
         }
         controllerManager.getLightingController()?.onMeasure()
         return true
@@ -310,16 +319,19 @@ export function setupSimulationHandlers(
               console.warn(`Unknown instrument: ${instrument}`)
               return { success: false, error: `Unknown instrument: ${instrument}` }
           }
-          if (cueGroup) {
-            try {
-              const registry = YargCueRegistry.getInstance()
+          const registry = YargCueRegistry.getInstance()
+          const savedActive = cueGroup ? registry.getActiveGroups() : []
+          try {
+            if (cueGroup) {
               registry.setActiveGroups([cueGroup])
-            } catch (error) {
-              console.warn(`Failed to set active cue group: ${error}`)
+            }
+            sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+            return { success: true }
+          } finally {
+            if (cueGroup) {
+              registry.setActiveGroups(savedActive)
             }
           }
-          sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-          return { success: true }
         }
         return { success: false, error: 'No cue handler available' }
       } catch (error) {

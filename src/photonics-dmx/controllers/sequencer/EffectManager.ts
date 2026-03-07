@@ -219,7 +219,6 @@ export class EffectManager implements IEffectManager {
       console.warn('Cancelling blackout for setEffect')
       this.systemEffects.cancelBlackout()
     }
-    this.removeAllEffects()
 
     if (effect.transitions.length === 0) {
       console.warn(`Effect "${name}" has no transitions. Ignoring.`)
@@ -233,20 +232,20 @@ export class EffectManager implements IEffectManager {
     // Check if the effect contains transitions for layer 0
     const hasLayer0 = transitionsByLayerAndLight.has(0)
 
-    // Check to see if we've called setEffect before for this effect. If so, queue it and don't clear all.
+    // Shared remediation: when replacing the same-named layer-0 effect, do not call removeAllEffects().
+    // That would clear all layers and publish black; instead replace in place so there is no intermediate black.
     if (hasLayer0 && this._lastCalled0LayerEffect === name) {
-      transitionsByLayerAndLight.forEach((layerMap, layer) => {
-        layerMap.forEach((_, lightId) => {
-          this.layerManager.addQueuedEffect(layer, lightId, { name, effect, isPersistent, lightId })
-        })
-      })
-    } else {
+      this.removeEffect(name, 0)
       this.addEffect(name, effect, isPersistent)
+      this._lastCalled0LayerEffect = name
+      return
+    }
 
-      // Update the last layer 0 effect name if this effect targets layer 0
-      if (hasLayer0) {
-        this._lastCalled0LayerEffect = name
-      }
+    this.removeAllEffects()
+
+    this.addEffect(name, effect, isPersistent)
+    if (hasLayer0) {
+      this._lastCalled0LayerEffect = name
     }
   }
 
@@ -309,6 +308,44 @@ export class EffectManager implements IEffectManager {
     )
 
     return true
+  }
+
+  /**
+   * Like addEffectUnblockedName but with a completion callback.
+   * If the effect was added, the callback is fired when the effect completes.
+   * If the effect was discarded (same name already running), the callback is fired immediately.
+   */
+  public addEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent: boolean = false,
+  ): void {
+    const added = this.addEffectUnblockedName(name, effect, isPersistent)
+    if (added) {
+      this.effectCallbacks.set(name, onComplete)
+    } else {
+      onComplete()
+    }
+  }
+
+  /**
+   * Like setEffectUnblockedName but with a completion callback.
+   * If the effect was set, the callback is fired when the effect completes.
+   * If the effect was discarded (same name already running), the callback is fired immediately.
+   */
+  public setEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent: boolean = false,
+  ): void {
+    const set = this.setEffectUnblockedName(name, effect, isPersistent)
+    if (set) {
+      this.effectCallbacks.set(name, onComplete)
+    } else {
+      onComplete()
+    }
   }
 
   /**
@@ -481,9 +518,10 @@ export class EffectManager implements IEffectManager {
       // 3. Use clearAllTransitions() which clears maps and publishes black states
       this.lightTransitionController.clearAllTransitions()
 
-      // 4. Reset effect tracking state
+      // 4. Reset effect tracking state and clear callbacks to avoid orphaned references
       this._lastCalled0LayerEffect = ''
       this.persistentRuns.clear()
+      this.effectCallbacks.clear()
     } finally {
       // Always release the clearing lock, even if an error occurs
       this.lightTransitionController.endClearingSequence()

@@ -13,8 +13,6 @@ import { LightTarget, LocationGroup, TrackedLight, CueGroup } from '../types'
 export abstract class BaseCueHandler extends EventEmitter {
   protected _lightManager: DmxLightManager
   protected _sequencer: ILightingController
-  protected debouncePeriod: number
-  protected lastDebouncedCueTime: number = 0
   protected registry: YargCueRegistry
 
   // Cue history tracking
@@ -25,15 +23,10 @@ export abstract class BaseCueHandler extends EventEmitter {
   private lastCueChangeTime = 0
   private previousCueData?: Partial<CueData>
 
-  constructor(
-    lightManager: DmxLightManager,
-    photonicsSequencer: ILightingController,
-    debouncePeriod: number,
-  ) {
+  constructor(lightManager: DmxLightManager, photonicsSequencer: ILightingController) {
     super()
     this._lightManager = lightManager
     this._sequencer = photonicsSequencer
-    this.debouncePeriod = debouncePeriod
     this.registry = YargCueRegistry.getInstance()
   }
 
@@ -123,19 +116,6 @@ export abstract class BaseCueHandler extends EventEmitter {
   }
 
   /**
-   * Check if enough time has passed since the last cue
-   * @returns true if enough time has passed, false otherwise
-   */
-  protected checkDebounce(): boolean {
-    const now = Date.now()
-    if (now - this.lastDebouncedCueTime < this.debouncePeriod) {
-      return false
-    }
-    this.lastDebouncedCueTime = now
-    return true
-  }
-
-  /**
    * Add a listener for handled cues
    * @param listener The listener function
    */
@@ -162,11 +142,11 @@ export abstract class BaseCueHandler extends EventEmitter {
   */
 
   /**
-   * Set the debounce period for effects
-   * @param time The debounce period in milliseconds
+   * Set the debounce period for effects (no-op; debouncing has been removed).
+   * @param _time The debounce period in milliseconds (ignored)
    */
-  public setEffectDebouncePeriod(time: number): void {
-    this.debouncePeriod = time
+  public setEffectDebouncePeriod(_time: number): void {
+    // Debouncing removed; kept for API compatibility.
   }
 
   /**

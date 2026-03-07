@@ -4,7 +4,8 @@
   "group": {
     "id": "yarg-alt1",
     "name": "YARG Alt 1",
-    "description": "YARG Alternative 1 cues as node cue definitions"
+    "description": "YARG Alternative 1 cues as node cue definitions",
+    "isDefault": true
   },
   "cues": [
     {

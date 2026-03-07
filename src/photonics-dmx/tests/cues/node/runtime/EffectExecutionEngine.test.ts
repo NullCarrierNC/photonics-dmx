@@ -41,7 +41,19 @@ describe('EffectExecutionEngine', () => {
   beforeEach(() => {
     mockSequencer = {
       addEffect: jest.fn(),
+      setEffect: jest.fn(),
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
+        setTimeout(() => callback(), 0)
+      }),
+      setEffectWithCallback: jest.fn((_name, _effect, callback) => {
+        setTimeout(() => callback(), 0)
+      }),
+      addEffectUnblockedName: jest.fn().mockReturnValue(true),
+      setEffectUnblockedName: jest.fn().mockReturnValue(true),
+      addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
+        setTimeout(() => callback(), 0)
+      }),
+      setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
       }),
       removeEffectCallback: jest.fn(),
@@ -369,10 +381,10 @@ describe('EffectExecutionEngine', () => {
 
       await engine.triggerEffect(createCueData())
 
-      // Verify action was executed via internal event (engine may use addEffect or addEffectWithCallback)
+      // Verify action was executed via internal event (engine may use addEffectUnblockedName or addEffectUnblockedNameWithCallback)
       expect(
-        mockSequencer.addEffectWithCallback.mock.calls.length +
-          mockSequencer.addEffect.mock.calls.length,
+        mockSequencer.addEffectUnblockedNameWithCallback.mock.calls.length +
+          mockSequencer.addEffectUnblockedName.mock.calls.length,
       ).toBeGreaterThanOrEqual(1)
     })
   })
@@ -526,9 +538,11 @@ describe('EffectExecutionEngine', () => {
 
     it('does not fire idle until all pending callback-backed submissions complete', () => {
       const callbacks: Array<() => void> = []
-      mockSequencer.addEffectWithCallback.mockImplementation((_name, _effect, callback) => {
-        callbacks.push(callback)
-      })
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, _effect, callback) => {
+          callbacks.push(callback)
+        },
+      )
 
       const compiledEffect = EffectCompiler.compile(createForEachBlockingEffect())
       const engine = new EffectExecutionEngine(
@@ -555,9 +569,11 @@ describe('EffectExecutionEngine', () => {
 
     it('cancelAll clears submitted callback-backed effects and prevents idle retrigger', () => {
       const callbacks: Array<() => void> = []
-      mockSequencer.addEffectWithCallback.mockImplementation((_name, _effect, callback) => {
-        callbacks.push(callback)
-      })
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, _effect, callback) => {
+          callbacks.push(callback)
+        },
+      )
 
       const compiledEffect = EffectCompiler.compile(createForEachBlockingEffect())
       const engine = new EffectExecutionEngine(
@@ -573,7 +589,9 @@ describe('EffectExecutionEngine', () => {
       engine.triggerEffect(createCueData())
       expect(callbacks).toHaveLength(2)
 
-      const submittedNames = mockSequencer.addEffectWithCallback.mock.calls.map((call) => call[0])
+      const submittedNames = mockSequencer.addEffectUnblockedNameWithCallback.mock.calls.map(
+        (call) => call[0],
+      )
       engine.cancelAll()
 
       expect(mockSequencer.removeEffectCallback).toHaveBeenCalledTimes(2)
@@ -591,9 +609,11 @@ describe('EffectExecutionEngine', () => {
 
     it('cancelAll(true) leaves effects on sequencer so lights stay lit during cue transition', () => {
       const callbacks: Array<() => void> = []
-      mockSequencer.addEffectWithCallback.mockImplementation((_name, _effect, callback) => {
-        callbacks.push(callback)
-      })
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, _effect, callback) => {
+          callbacks.push(callback)
+        },
+      )
 
       const compiledEffect = EffectCompiler.compile(createForEachBlockingEffect())
       const engine = new EffectExecutionEngine(
@@ -605,7 +625,7 @@ describe('EffectExecutionEngine', () => {
       )
 
       engine.triggerEffect(createCueData())
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedNameWithCallback).toHaveBeenCalled()
 
       const removeEffectBefore = (mockSequencer.removeEffect as jest.Mock).mock.calls.length
       const removeCallbackBefore = (mockSequencer.removeEffectCallback as jest.Mock).mock.calls

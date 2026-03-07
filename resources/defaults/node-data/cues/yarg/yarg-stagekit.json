@@ -4,7 +4,8 @@
   "group": {
     "id": "yarg-stagekit",
     "name": "StageKit",
-    "description": "Cues that mimic the original Stage Kit, but mapped to a DMX light array"
+    "description": "Cues that mimic the original Stage Kit, but mapped to a DMX light array",
+    "isStageKit": true
   },
   "cues": [
     {
@@ -2718,139 +2719,24 @@
             "id": "event-sk-strobe-slow-start",
             "type": "event",
             "eventType": "cue-started"
-          }
-        ],
-        "actions": [
-          {
-            "id": "action-sk-strobe-slow-white",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "white"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "max"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 70
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
           },
           {
-            "id": "action-sk-strobe-slow-black",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "variable",
-                "name": "interval"
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
+            "id": "event-sk-strobe-slow-called",
+            "type": "event",
+            "eventType": "cue-called"
           }
         ],
+        "actions": [],
         "logic": [
+          {
+            "id": "sk-strobe-slow-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
           {
             "id": "sk-strobe-slow-bpm",
             "type": "logic",
@@ -2874,7 +2760,7 @@
             "assignTo": "beatMs"
           },
           {
-            "id": "sk-strobe-slow-interval",
+            "id": "sk-strobe-slow-endwait",
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
@@ -2886,128 +2772,26 @@
               "source": "literal",
               "value": 8
             },
-            "assignTo": "interval"
+            "assignTo": "endWait"
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
-        "effectRaisers": [],
-        "notes": []
-      },
-      "connections": [
-        {
-          "from": "event-sk-strobe-slow-start",
-          "to": "sk-strobe-slow-bpm"
-        },
-        {
-          "from": "sk-strobe-slow-bpm",
-          "to": "sk-strobe-slow-beat-ms"
-        },
-        {
-          "from": "sk-strobe-slow-beat-ms",
-          "to": "sk-strobe-slow-interval"
-        },
-        {
-          "from": "sk-strobe-slow-interval",
-          "to": "action-sk-strobe-slow-white"
-        },
-        {
-          "from": "action-sk-strobe-slow-white",
-          "to": "action-sk-strobe-slow-black"
-        },
-        {
-          "from": "action-sk-strobe-slow-black",
-          "to": "action-sk-strobe-slow-white"
-        }
-      ],
-      "layout": {
-        "nodePositions": {
-          "event-sk-strobe-slow-start": {
-            "x": 5.666995290666819,
-            "y": -5.967437744140625
-          },
-          "action-sk-strobe-slow-white": {
-            "x": 4.956674225628376,
-            "y": 505.3116079829633
-          },
-          "action-sk-strobe-slow-black": {
-            "x": 283.45618326306544,
-            "y": 495.3312011702624
-          },
-          "sk-strobe-slow-bpm": {
-            "x": -1.2915085460990667,
-            "y": 123.68237586691976
-          },
-          "sk-strobe-slow-beat-ms": {
-            "x": -8.462054880335927,
-            "y": 248.1685901992023
-          },
-          "sk-strobe-slow-interval": {
-            "x": -11.532766956835985,
-            "y": 369.3868732601404
-          }
-        },
-        "viewport": {
-          "x": 347.3849101138853,
-          "y": 257.5929361026589,
-          "zoom": 0.7888141344914608
-        }
-      },
-      "variables": [
-        {
-          "name": "bpmVar",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 120,
-          "isParameter": false
-        },
-        {
-          "name": "beatMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "interval",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        }
-      ]
-    },
-    {
-      "id": "cue-sk-strobe-medium",
-      "name": "Strobe Medium",
-      "description": "Strobe white at BPM/16, 60ms hold",
-      "cueType": "Strobe_Medium",
-      "style": "secondary",
-      "nodes": {
-        "events": [
+        "effectRaisers": [
           {
-            "id": "event-sk-strobe-medium-start",
-            "type": "event",
-            "eventType": "cue-started"
-          }
-        ],
-        "actions": [
-          {
-            "id": "action-sk-strobe-medium-white",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
+            "id": "sk-strobe-slow-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
               },
-              "filter": {
+              "layer": {
                 "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
+                "value": 255
+              },
+              "color": {
                 "source": "literal",
                 "value": "white"
               },
@@ -3019,109 +2803,132 @@
                 "source": "literal",
                 "value": "replace"
               },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
+              "startCondition": {
                 "source": "literal",
                 "value": "none"
               },
-              "waitForTime": {
+              "startDelay": {
                 "source": "literal",
                 "value": 0
               },
-              "duration": {
+              "holdTime": {
+                "source": "literal",
+                "value": 70
+              },
+              "durationIn": {
                 "source": "literal",
                 "value": 0
               },
-              "waitUntilCondition": {
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
                 "source": "literal",
                 "value": "delay"
               },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 60
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
-          },
-          {
-            "id": "action-sk-strobe-medium-black",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
+              "endWait": {
                 "source": "variable",
-                "name": "interval"
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
+                "name": "endWait"
               }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
             }
           }
         ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-strobe-slow-start",
+          "to": "sk-strobe-slow-setup"
+        },
+        {
+          "from": "sk-strobe-slow-setup",
+          "to": "sk-strobe-slow-bpm"
+        },
+        {
+          "from": "sk-strobe-slow-bpm",
+          "to": "sk-strobe-slow-beat-ms"
+        },
+        {
+          "from": "sk-strobe-slow-beat-ms",
+          "to": "sk-strobe-slow-endwait"
+        },
+        {
+          "from": "event-sk-strobe-slow-called",
+          "to": "sk-strobe-slow-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-strobe-slow-start": { "x": 5, "y": -6 },
+          "event-sk-strobe-slow-called": { "x": 268, "y": 2 },
+          "sk-strobe-slow-setup": { "x": 2, "y": 124 },
+          "sk-strobe-slow-bpm": { "x": -1, "y": 248 },
+          "sk-strobe-slow-beat-ms": { "x": -8, "y": 368 },
+          "sk-strobe-slow-endwait": { "x": -11, "y": 501 },
+          "sk-strobe-slow-flash": { "x": 254, "y": 121 }
+        },
+        "viewport": { "x": 347, "y": 257, "zoom": 0.79 }
+      },
+      "variables": [
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 500,
+          "isParameter": false
+        },
+        {
+          "name": "endWait",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 125,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-sk-strobe-medium",
+      "name": "Strobe Medium",
+      "description": "Strobe white at BPM/16, 60ms hold",
+      "cueType": "Strobe_Medium",
+      "style": "secondary",
+      "nodes": {
+        "events": [
+          { "id": "event-sk-strobe-medium-start", "type": "event", "eventType": "cue-started" },
+          { "id": "event-sk-strobe-medium-called", "type": "event", "eventType": "cue-called" }
+        ],
+        "actions": [],
         "logic": [
+          {
+            "id": "sk-strobe-medium-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
           {
             "id": "sk-strobe-medium-bpm",
             "type": "logic",
@@ -3134,97 +2941,55 @@
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": {
-              "source": "literal",
-              "value": 60000
-            },
-            "right": {
-              "source": "variable",
-              "name": "bpmVar"
-            },
+            "left": { "source": "literal", "value": 60000 },
+            "right": { "source": "variable", "name": "bpmVar" },
             "assignTo": "beatMs"
           },
           {
-            "id": "sk-strobe-medium-interval",
+            "id": "sk-strobe-medium-endwait",
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "beatMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            },
-            "assignTo": "interval"
+            "left": { "source": "variable", "name": "beatMs" },
+            "right": { "source": "literal", "value": 16 },
+            "assignTo": "endWait"
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
-        "effectRaisers": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-medium-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": { "source": "variable", "name": "strobeLights" },
+              "layer": { "source": "literal", "value": 255 },
+              "color": { "source": "literal", "value": "white" },
+              "brightness": { "source": "literal", "value": "max" },
+              "blendMode": { "source": "literal", "value": "replace" },
+              "startCondition": { "source": "literal", "value": "none" },
+              "startDelay": { "source": "literal", "value": 0 },
+              "holdTime": { "source": "literal", "value": 60 },
+              "durationIn": { "source": "literal", "value": 0 },
+              "durationOut": { "source": "literal", "value": 0 },
+              "endWaitCondition": { "source": "literal", "value": "delay" },
+              "endWait": { "source": "variable", "name": "endWait" }
+            }
+          }
+        ],
         "notes": []
       },
       "connections": [
-        {
-          "from": "event-sk-strobe-medium-start",
-          "to": "sk-strobe-medium-bpm"
-        },
-        {
-          "from": "sk-strobe-medium-bpm",
-          "to": "sk-strobe-medium-beat-ms"
-        },
-        {
-          "from": "sk-strobe-medium-beat-ms",
-          "to": "sk-strobe-medium-interval"
-        },
-        {
-          "from": "sk-strobe-medium-interval",
-          "to": "action-sk-strobe-medium-white"
-        },
-        {
-          "from": "action-sk-strobe-medium-white",
-          "to": "action-sk-strobe-medium-black"
-        },
-        {
-          "from": "action-sk-strobe-medium-black",
-          "to": "action-sk-strobe-medium-white"
-        }
+        { "from": "event-sk-strobe-medium-start", "to": "sk-strobe-medium-setup" },
+        { "from": "sk-strobe-medium-setup", "to": "sk-strobe-medium-bpm" },
+        { "from": "sk-strobe-medium-bpm", "to": "sk-strobe-medium-beat-ms" },
+        { "from": "sk-strobe-medium-beat-ms", "to": "sk-strobe-medium-endwait" },
+        { "from": "event-sk-strobe-medium-called", "to": "sk-strobe-medium-flash" }
       ],
-      "layout": {
-        "nodePositions": {
-          "event-sk-strobe-medium-start": {
-            "x": -5.285714540630579,
-            "y": 6.373385921120644
-          },
-          "action-sk-strobe-medium-white": {
-            "x": 0.9361506085842848,
-            "y": 501.95671858265996
-          },
-          "action-sk-strobe-medium-black": {
-            "x": 320.4319642596623,
-            "y": 500.19557217777015
-          },
-          "sk-strobe-medium-bpm": {
-            "x": -9.923248054459691,
-            "y": 118.6407208442688
-          },
-          "sk-strobe-medium-beat-ms": {
-            "x": 5.02102704718709,
-            "y": 246.02116546034813
-          },
-          "sk-strobe-medium-interval": {
-            "x": -6.317980600520968,
-            "y": 382.33880672976375
-          }
-        },
-        "viewport": {
-          "x": 347.3849101138853,
-          "y": 257.5929361026589,
-          "zoom": 0.7888141344914608
-        }
-      },
+      "layout": { "nodePositions": {}, "viewport": { "x": 347, "y": 257, "zoom": 0.79 } },
       "variables": [
+        { "name": "strobeLights", "type": "light-array", "scope": "cue", "initialValue": [] },
         {
           "name": "bpmVar",
           "type": "number",
@@ -3236,15 +3001,22 @@
           "name": "beatMs",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 500,
           "isParameter": false
         },
         {
-          "name": "interval",
+          "name": "endWait",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 62,
           "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
         }
       ]
     },
@@ -3256,143 +3028,20 @@
       "style": "secondary",
       "nodes": {
         "events": [
-          {
-            "id": "event-sk-strobe-fast-start",
-            "type": "event",
-            "eventType": "cue-started"
-          }
+          { "id": "event-sk-strobe-fast-start", "type": "event", "eventType": "cue-started" },
+          { "id": "event-sk-strobe-fast-called", "type": "event", "eventType": "cue-called" }
         ],
-        "actions": [
-          {
-            "id": "action-sk-strobe-fast-white",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "white"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "max"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 50
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
-          },
-          {
-            "id": "action-sk-strobe-fast-black",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "variable",
-                "name": "interval"
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
+          {
+            "id": "sk-strobe-fast-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
           {
             "id": "sk-strobe-fast-bpm",
             "type": "logic",
@@ -3405,97 +3054,55 @@
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": {
-              "source": "literal",
-              "value": 60000
-            },
-            "right": {
-              "source": "variable",
-              "name": "bpmVar"
-            },
+            "left": { "source": "literal", "value": 60000 },
+            "right": { "source": "variable", "name": "bpmVar" },
             "assignTo": "beatMs"
           },
           {
-            "id": "sk-strobe-fast-interval",
+            "id": "sk-strobe-fast-endwait",
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "beatMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 32
-            },
-            "assignTo": "interval"
+            "left": { "source": "variable", "name": "beatMs" },
+            "right": { "source": "literal", "value": 32 },
+            "assignTo": "endWait"
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
-        "effectRaisers": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-fast-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": { "source": "variable", "name": "strobeLights" },
+              "layer": { "source": "literal", "value": 255 },
+              "color": { "source": "literal", "value": "white" },
+              "brightness": { "source": "literal", "value": "max" },
+              "blendMode": { "source": "literal", "value": "replace" },
+              "startCondition": { "source": "literal", "value": "none" },
+              "startDelay": { "source": "literal", "value": 0 },
+              "holdTime": { "source": "literal", "value": 50 },
+              "durationIn": { "source": "literal", "value": 0 },
+              "durationOut": { "source": "literal", "value": 0 },
+              "endWaitCondition": { "source": "literal", "value": "delay" },
+              "endWait": { "source": "variable", "name": "endWait" }
+            }
+          }
+        ],
         "notes": []
       },
       "connections": [
-        {
-          "from": "event-sk-strobe-fast-start",
-          "to": "sk-strobe-fast-bpm"
-        },
-        {
-          "from": "sk-strobe-fast-bpm",
-          "to": "sk-strobe-fast-beat-ms"
-        },
-        {
-          "from": "sk-strobe-fast-beat-ms",
-          "to": "sk-strobe-fast-interval"
-        },
-        {
-          "from": "sk-strobe-fast-interval",
-          "to": "action-sk-strobe-fast-white"
-        },
-        {
-          "from": "action-sk-strobe-fast-white",
-          "to": "action-sk-strobe-fast-black"
-        },
-        {
-          "from": "action-sk-strobe-fast-black",
-          "to": "action-sk-strobe-fast-white"
-        }
+        { "from": "event-sk-strobe-fast-start", "to": "sk-strobe-fast-setup" },
+        { "from": "sk-strobe-fast-setup", "to": "sk-strobe-fast-bpm" },
+        { "from": "sk-strobe-fast-bpm", "to": "sk-strobe-fast-beat-ms" },
+        { "from": "sk-strobe-fast-beat-ms", "to": "sk-strobe-fast-endwait" },
+        { "from": "event-sk-strobe-fast-called", "to": "sk-strobe-fast-flash" }
       ],
-      "layout": {
-        "nodePositions": {
-          "event-sk-strobe-fast-start": {
-            "x": -1.7065809778869152,
-            "y": 7.984691008925438
-          },
-          "action-sk-strobe-fast-white": {
-            "x": -68.86667310217331,
-            "y": 508.95465662837773
-          },
-          "action-sk-strobe-fast-black": {
-            "x": 289.06912597636017,
-            "y": 498.3487086413279
-          },
-          "sk-strobe-fast-bpm": {
-            "x": -10.293420927599072,
-            "y": 119.08032855018973
-          },
-          "sk-strobe-fast-beat-ms": {
-            "x": -11.375788561999798,
-            "y": 244.64896833524108
-          },
-          "sk-strobe-fast-interval": {
-            "x": -7.570198332890868,
-            "y": 382.8745437525213
-          }
-        },
-        "viewport": {
-          "x": 347.3849101138853,
-          "y": 257.5929361026589,
-          "zoom": 0.7888141344914608
-        }
-      },
+      "layout": { "nodePositions": {}, "viewport": { "x": 347, "y": 257, "zoom": 0.79 } },
       "variables": [
+        { "name": "strobeLights", "type": "light-array", "scope": "cue", "initialValue": [] },
         {
           "name": "bpmVar",
           "type": "number",
@@ -3507,15 +3114,22 @@
           "name": "beatMs",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 500,
           "isParameter": false
         },
         {
-          "name": "interval",
+          "name": "endWait",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 31,
           "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
         }
       ]
     },
@@ -3527,143 +3141,20 @@
       "style": "secondary",
       "nodes": {
         "events": [
-          {
-            "id": "event-sk-strobe-fastest-start",
-            "type": "event",
-            "eventType": "cue-started"
-          }
+          { "id": "event-sk-strobe-fastest-start", "type": "event", "eventType": "cue-started" },
+          { "id": "event-sk-strobe-fastest-called", "type": "event", "eventType": "cue-called" }
         ],
-        "actions": [
-          {
-            "id": "action-sk-strobe-fastest-white",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "white"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "max"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 40
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
-          },
-          {
-            "id": "action-sk-strobe-fastest-black",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "variable",
-                "name": "interval"
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
+          {
+            "id": "sk-strobe-fastest-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
           {
             "id": "sk-strobe-fastest-bpm",
             "type": "logic",
@@ -3676,97 +3167,55 @@
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": {
-              "source": "literal",
-              "value": 60000
-            },
-            "right": {
-              "source": "variable",
-              "name": "bpmVar"
-            },
+            "left": { "source": "literal", "value": 60000 },
+            "right": { "source": "variable", "name": "bpmVar" },
             "assignTo": "beatMs"
           },
           {
-            "id": "sk-strobe-fastest-interval",
+            "id": "sk-strobe-fastest-endwait",
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "beatMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 64
-            },
-            "assignTo": "interval"
+            "left": { "source": "variable", "name": "beatMs" },
+            "right": { "source": "literal", "value": 64 },
+            "assignTo": "endWait"
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
-        "effectRaisers": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-fastest-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": { "source": "variable", "name": "strobeLights" },
+              "layer": { "source": "literal", "value": 255 },
+              "color": { "source": "literal", "value": "white" },
+              "brightness": { "source": "literal", "value": "max" },
+              "blendMode": { "source": "literal", "value": "replace" },
+              "startCondition": { "source": "literal", "value": "none" },
+              "startDelay": { "source": "literal", "value": 0 },
+              "holdTime": { "source": "literal", "value": 40 },
+              "durationIn": { "source": "literal", "value": 0 },
+              "durationOut": { "source": "literal", "value": 0 },
+              "endWaitCondition": { "source": "literal", "value": "delay" },
+              "endWait": { "source": "variable", "name": "endWait" }
+            }
+          }
+        ],
         "notes": []
       },
       "connections": [
-        {
-          "from": "event-sk-strobe-fastest-start",
-          "to": "sk-strobe-fastest-bpm"
-        },
-        {
-          "from": "sk-strobe-fastest-bpm",
-          "to": "sk-strobe-fastest-beat-ms"
-        },
-        {
-          "from": "sk-strobe-fastest-beat-ms",
-          "to": "sk-strobe-fastest-interval"
-        },
-        {
-          "from": "sk-strobe-fastest-interval",
-          "to": "action-sk-strobe-fastest-white"
-        },
-        {
-          "from": "action-sk-strobe-fastest-white",
-          "to": "action-sk-strobe-fastest-black"
-        },
-        {
-          "from": "action-sk-strobe-fastest-black",
-          "to": "action-sk-strobe-fastest-white"
-        }
+        { "from": "event-sk-strobe-fastest-start", "to": "sk-strobe-fastest-setup" },
+        { "from": "sk-strobe-fastest-setup", "to": "sk-strobe-fastest-bpm" },
+        { "from": "sk-strobe-fastest-bpm", "to": "sk-strobe-fastest-beat-ms" },
+        { "from": "sk-strobe-fastest-beat-ms", "to": "sk-strobe-fastest-endwait" },
+        { "from": "event-sk-strobe-fastest-called", "to": "sk-strobe-fastest-flash" }
       ],
-      "layout": {
-        "nodePositions": {
-          "event-sk-strobe-fastest-start": {
-            "x": -1.3502389378845692,
-            "y": -4.577998001128435
-          },
-          "action-sk-strobe-fastest-white": {
-            "x": -2.2345848362892866,
-            "y": 492.05596428737044
-          },
-          "action-sk-strobe-fastest-black": {
-            "x": 343.59426075052704,
-            "y": 484.32127647845687
-          },
-          "sk-strobe-fastest-bpm": {
-            "x": -3.132577456533909,
-            "y": 117.71241904050112
-          },
-          "sk-strobe-fastest-beat-ms": {
-            "x": 9.976529885083437,
-            "y": 256.32200799137354
-          },
-          "sk-strobe-fastest-interval": {
-            "x": -1.0968803856521845,
-            "y": 372.43872198835015
-          }
-        },
-        "viewport": {
-          "x": 347.3849101138853,
-          "y": 257.5929361026589,
-          "zoom": 0.7888141344914608
-        }
-      },
+      "layout": { "nodePositions": {}, "viewport": { "x": 347, "y": 257, "zoom": 0.79 } },
       "variables": [
+        { "name": "strobeLights", "type": "light-array", "scope": "cue", "initialValue": [] },
         {
           "name": "bpmVar",
           "type": "number",
@@ -3778,15 +3227,22 @@
           "name": "beatMs",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 500,
           "isParameter": false
         },
         {
-          "name": "interval",
+          "name": "endWait",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 15,
           "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
         }
       ]
     },
@@ -4747,10 +4203,6 @@
           "to": "sk-frenzy-set-large-2"
         },
         {
-          "from": "sk-frenzy-set-large-2",
-          "to": "action-sk-frenzy-c1"
-        },
-        {
           "from": "sk-frenzy-is-large",
           "to": "sk-frenzy-set-small",
           "fromPort": "false"
@@ -4758,10 +4210,6 @@
         {
           "from": "sk-frenzy-set-small",
           "to": "sk-frenzy-set-small-2"
-        },
-        {
-          "from": "sk-frenzy-set-small-2",
-          "to": "action-sk-frenzy-c1"
         },
         {
           "from": "action-sk-frenzy-c1",

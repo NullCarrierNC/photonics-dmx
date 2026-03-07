@@ -356,135 +356,126 @@ export class YargNetworkListener extends EventEmitter {
         bonusEffect,
       }
       //console.log("Keyframe:", YargCueData.keyframe);
-      // Change Detection: Compare with lastData (excluding timestamp)
-      if (this.lastData && this.isDataEqual(this.lastData, YargCueData)) {
-        // console.log("Received identical packet, skipping processing.");
-        return
-      }
-
-      // Check for scene transitions and handle Menu -> Gameplay transition
-      this.handleSceneTransition(YargCueData.currentScene)
-
-      const logData = {
-        currentScene: YargCueData.currentScene,
-        songSection: YargCueData.songSection,
-        beatsPerMinute: YargCueData.beatsPerMinute,
-        lightingCue: lightingCue,
-        guitarNotes: YargCueData.guitarNotes,
-        bassNotes: YargCueData.bassNotes,
-        drumNotes: YargCueData.drumNotes,
-        keysNotes: YargCueData.keysNotes,
-        postProcessing: YargCueData.postProcessing,
-        fogState: YargCueData.fogState,
-        beat: YargCueData.beat,
-        keyframe: YargCueData.keyframe,
-        performer: YargCueData.performer,
-        strobeState: YargCueData.strobeState,
-      }
-
-      // console.log("Listener Data:", logData);
-      if (this.lastLogData && !this.isDataEqual(this.lastLogData, logData)) {
-        this.lastLogData = logData
-        // console.log("\n", logData , ",")
-      }
-
-      this.lastLogData = logData
-      // Add to batch log buffer
-      // this.logBuffer.push(dataWithTimestamp);
-
-      // Track the beat:
-      switch (YargCueData.beat) {
-        case 'Strong':
-          // this.emit('handleBeat');
-          this.cueHandler.handleBeat()
-          break
-        case 'Measure':
-          //  this.emit('handleMeasure');
-          this.cueHandler.handleMeasure()
-          break
-      }
-
-      // Handle keyframe events
-      switch (YargCueData.keyframe) {
-        case 'First':
-        case 'Next':
-        case 'Previous':
-          this.cueHandler.handleKeyframe()
-          break
-      }
-
-      // Handle known lighting cue by emitting an event
-      const cueType = lightingCue //lightingCueMap[lightingCueValue];
-      if (cueType) {
-        //this.emit('handleCue', cueType, YargCueData);
-        this.cueHandler.handleCue(cueType, YargCueData)
-      } else {
-        console.warn(`Unknown lighting cue value received: ${lightingCue}`)
-      }
-
-      // Handle strobe state changes
-      if (YargCueData.strobeState && YargCueData.strobeState !== 'Strobe_Off') {
-        // Convert strobe state to cue type and handle it
-        let strobeCueType: CueType
-        switch (YargCueData.strobeState) {
-          case 'Strobe_Slow':
-            strobeCueType = CueType.Strobe_Slow
-            break
-          case 'Strobe_Medium':
-            strobeCueType = CueType.Strobe_Medium
-            break
-          case 'Strobe_Fast':
-            strobeCueType = CueType.Strobe_Fast
-            break
-          case 'Strobe_Fastest':
-            strobeCueType = CueType.Strobe_Fastest
-            break
-          default:
-            return // Unknown strobe state
-        }
-        this.cueHandler.handleCue(strobeCueType, YargCueData)
-      }
-
-      // Handle individual drum notes
-      YargCueData.drumNotes.forEach((note) => {
-        if (note !== DrumNoteType.None) {
-          this.cueHandler.handleDrumNote(note, YargCueData)
-        }
-      })
-
-      // Handle individual guitar notes
-      YargCueData.guitarNotes.forEach((note) => {
-        if (note !== InstrumentNoteType.None) {
-          this.cueHandler.handleGuitarNote(note, YargCueData)
-        }
-      })
-
-      // Handle individual bass notes
-      YargCueData.bassNotes.forEach((note) => {
-        if (note !== InstrumentNoteType.None) {
-          this.cueHandler.handleBassNote(note, YargCueData)
-        }
-      })
-
-      // Handle individual keys notes
-      YargCueData.keysNotes.forEach((note) => {
-        if (note !== InstrumentNoteType.None) {
-          this.cueHandler.handleKeysNote(note, YargCueData)
-        }
-      })
-
-      // Update lastData (exclude timestamp)
-      this.lastData = YargCueData
-
-      // Flush to disk periodically
-      /*
-      if (this.logBuffer.length >= this.flushThreshold) {
-        this.flushLogBuffer();
-      }
-        */
+      this.processCueData(YargCueData)
     } catch (error) {
       console.error('YARG Listener: Error during packet deserialization:', error)
     }
+  }
+
+  /**
+   * Process one frame of cue data: beat/keyframe, lighting cue, strobe (including passive strobe-off),
+   * and instrument notes. Used by deserializePacket and by tests for passive strobe behaviour.
+   */
+  public processCueData(YargCueData: CueData): void {
+    // No identical-frame dedupe: repeated frames are forwarded unchanged.
+    // The downstream handler and cue implementation decide whether to execute, coalesce, or queue.
+    this.handleSceneTransition(YargCueData.currentScene)
+
+    const logData = {
+      currentScene: YargCueData.currentScene,
+      songSection: YargCueData.songSection,
+      beatsPerMinute: YargCueData.beatsPerMinute,
+      lightingCue: YargCueData.lightingCue,
+      guitarNotes: YargCueData.guitarNotes,
+      bassNotes: YargCueData.bassNotes,
+      drumNotes: YargCueData.drumNotes,
+      keysNotes: YargCueData.keysNotes,
+      postProcessing: YargCueData.postProcessing,
+      fogState: YargCueData.fogState,
+      beat: YargCueData.beat,
+      keyframe: YargCueData.keyframe,
+      performer: YargCueData.performer,
+      strobeState: YargCueData.strobeState,
+    }
+    if (this.lastLogData && !this.isDataEqual(this.lastLogData, logData)) {
+      this.lastLogData = logData
+    }
+    this.lastLogData = logData
+
+    switch (YargCueData.beat) {
+      case 'Strong':
+        this.cueHandler.handleBeat()
+        break
+      case 'Measure':
+        this.cueHandler.handleMeasure()
+        break
+    }
+
+    switch (YargCueData.keyframe) {
+      case 'First':
+      case 'Next':
+      case 'Previous':
+        this.cueHandler.handleKeyframe()
+        break
+    }
+
+    const cueType = YargCueData.lightingCue
+    if (cueType) {
+      this.cueHandler.handleCue(cueType as CueType, YargCueData)
+    } else {
+      console.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
+    }
+
+    const activeStrobeStates: StrobeState[] = [
+      'Strobe_Slow',
+      'Strobe_Medium',
+      'Strobe_Fast',
+      'Strobe_Fastest',
+    ]
+    const previousHadActiveStrobe =
+      this.lastData?.strobeState != null &&
+      this.lastData.strobeState !== 'Strobe_Off' &&
+      (activeStrobeStates as string[]).includes(this.lastData.strobeState)
+    const currentHasActiveStrobe =
+      YargCueData.strobeState != null &&
+      YargCueData.strobeState !== 'Strobe_Off' &&
+      (activeStrobeStates as string[]).includes(YargCueData.strobeState)
+
+    if (currentHasActiveStrobe) {
+      let strobeCueType: CueType
+      switch (YargCueData.strobeState) {
+        case 'Strobe_Slow':
+          strobeCueType = CueType.Strobe_Slow
+          break
+        case 'Strobe_Medium':
+          strobeCueType = CueType.Strobe_Medium
+          break
+        case 'Strobe_Fast':
+          strobeCueType = CueType.Strobe_Fast
+          break
+        case 'Strobe_Fastest':
+          strobeCueType = CueType.Strobe_Fastest
+          break
+        default:
+          strobeCueType = CueType.Strobe_Slow
+      }
+      this.cueHandler.handleCue(strobeCueType, YargCueData)
+    } else if (previousHadActiveStrobe) {
+      this.cueHandler.handleCue(CueType.Strobe_Off, YargCueData)
+    }
+
+    YargCueData.drumNotes.forEach((note) => {
+      if (note !== DrumNoteType.None) {
+        this.cueHandler.handleDrumNote(note, YargCueData)
+      }
+    })
+    YargCueData.guitarNotes.forEach((note) => {
+      if (note !== InstrumentNoteType.None) {
+        this.cueHandler.handleGuitarNote(note, YargCueData)
+      }
+    })
+    YargCueData.bassNotes.forEach((note) => {
+      if (note !== InstrumentNoteType.None) {
+        this.cueHandler.handleBassNote(note, YargCueData)
+      }
+    })
+    YargCueData.keysNotes.forEach((note) => {
+      if (note !== InstrumentNoteType.None) {
+        this.cueHandler.handleKeysNote(note, YargCueData)
+      }
+    })
+
+    this.lastData = YargCueData
   }
 
   /**

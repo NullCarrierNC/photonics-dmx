@@ -25,8 +25,12 @@ export interface INetCue {
 
   /**
    * Style of the cue based on layer usage:
-   * - Primary: Sets values to layer 0 (main lighting effect)
-   * - Secondary: Only sets higher layers, skips layer 0 (overlay effects like sweep)
+   * - Primary: A new primary replaces the current primary
+   * - Secondary: Overlay effect on higher layers; runs concurrently with the primary and
+   *   replaces the current non-strobe secondary overlay
+   *
+   * Strobes are a handler-level concept identified by cue type rather than a third style value.
+   * They run on the highest layers and may coexist with both a primary and a non-strobe secondary.
    */
   style: CueStyle
 

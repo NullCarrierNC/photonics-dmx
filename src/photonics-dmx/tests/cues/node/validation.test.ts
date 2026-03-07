@@ -1,6 +1,8 @@
 import {
   validateYargNodeCueFile,
   validateAudioNodeCueFile,
+  validateYargEffectFile,
+  validateEffectFile,
 } from '../../../cues/node/schema/validation'
 import { YargNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
@@ -552,6 +554,79 @@ describe('Node cue validation', () => {
         cues: [definition],
       })
       expect(result.valid).toBe(true)
+    })
+  })
+
+  describe('Effect file validation', () => {
+    it('validates a minimal YARG effect file', () => {
+      const result = validateYargEffectFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'effect-group', name: 'Effect Group' },
+        effects: [
+          {
+            id: 'eff-1',
+            name: 'Test Effect',
+            mode: 'yarg',
+            nodes: {
+              events: [{ id: 'e1', type: 'event', eventType: 'beat' }],
+              actions: [],
+            },
+            connections: [],
+          },
+        ],
+      })
+      expect(result.valid).toBe(true)
+      expect(result.data?.effects).toHaveLength(1)
+    })
+
+    it('rejects duplicate effect ids (semantic)', () => {
+      const result = validateYargEffectFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g', name: 'G' },
+        effects: [
+          {
+            id: 'dup',
+            name: 'First',
+            mode: 'yarg',
+            nodes: { events: [], actions: [] },
+            connections: [],
+          },
+          {
+            id: 'dup',
+            name: 'Second',
+            mode: 'yarg',
+            nodes: { events: [], actions: [] },
+            connections: [],
+          },
+        ],
+      })
+      expect(result.valid).toBe(false)
+      expect(result.errors.some((e) => e.includes('Duplicate effect id'))).toBe(true)
+    })
+
+    it('validateEffectFile dispatches by mode', () => {
+      expect(
+        validateEffectFile({ version: 1, mode: 'yarg', group: { id: 'a', name: 'A' }, effects: [] })
+          .valid,
+      ).toBe(false)
+      const validYarg = validateEffectFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'a', name: 'A' },
+        effects: [
+          {
+            id: 'e1',
+            name: 'E',
+            mode: 'yarg',
+            nodes: { events: [], actions: [] },
+            connections: [],
+          },
+        ],
+      })
+      expect(validYarg.valid).toBe(true)
+      expect(validYarg.mode).toBe('yarg')
     })
   })
 })

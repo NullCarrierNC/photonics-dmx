@@ -14,7 +14,6 @@ export interface TestEffectRunnerContext {
   createCueHandler: (
     dmxLightManager: DmxLightManager,
     effectsController: ILightingController,
-    debouncePeriod: number,
   ) => YargCueHandler
   setCueHandler: (handler: YargCueHandler | null) => void
 }
@@ -92,8 +91,7 @@ export class TestEffectRunner {
     let cueHandler = this.ctx.getCueHandler()
     if (!cueHandler) {
       console.log('Creating temporary YARG cue handler for testing')
-      const debouncePeriod = this.ctx.getConfig().getPreference('effectDebounce')
-      cueHandler = this.ctx.createCueHandler(dmxLightManager, effectsController, debouncePeriod)
+      cueHandler = this.ctx.createCueHandler(dmxLightManager, effectsController)
       this.ctx.setCueHandler(cueHandler)
     }
 

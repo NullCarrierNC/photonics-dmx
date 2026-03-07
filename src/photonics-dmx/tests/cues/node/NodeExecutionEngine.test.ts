@@ -1,7 +1,8 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine'
 import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext'
-import { CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
+import { NodeCueCompiler, CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
+import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
 import {
   YargNodeCueDefinition,
   YargEventNode,
@@ -61,10 +62,16 @@ describe('NodeExecutionEngine', () => {
     mockSequencer = {
       addEffect: jest.fn(),
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        // Automatically invoke callback after a short delay to simulate completion
-        if (callback) {
-          setTimeout(() => callback(), 1)
-        }
+        if (callback) setTimeout(() => callback(), 1)
+      }),
+      setEffectWithCallback: jest.fn((_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(), 1)
+      }),
+      addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(), 1)
+      }),
+      setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(), 1)
       }),
       removeEffectCallback: jest.fn(),
       setEffect: jest.fn(),
@@ -171,7 +178,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, parameters)
 
       // Verify that addEffect was called
-      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
       expect(mockLightManager.getLights).toHaveBeenCalled()
     })
 
@@ -307,7 +314,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       // With different layers chain is not composed; each action is submitted (fire-and-forget)
-      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(2)
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -424,8 +431,8 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       // Since 5 > 3 is true, action-true should be executed
-      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
-      const call = jest.mocked(mockSequencer.addEffect).mock.calls[0]
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
+      const call = jest.mocked(mockSequencer.addEffectUnblockedName).mock.calls[0]
       const effectName = call[0]
       expect(effectName).toContain('action-true')
     })
@@ -544,7 +551,7 @@ describe('NodeExecutionEngine', () => {
       })
 
       // Action should execute because 42 == 42
-      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -1103,7 +1110,7 @@ describe('NodeExecutionEngine', () => {
 
       // Both effect and subsequent action should execute
       // Effect executes async, action executes in chain
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
     })
   })
 
@@ -1199,7 +1206,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.type).toBe('number')
 
       // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
     })
 
     it('should extract config data and assign to variable', () => {
@@ -1305,7 +1312,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.type).toBe('number')
 
       // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
     })
 
     it('should handle cue data node without assignTo', () => {
@@ -1392,7 +1399,7 @@ describe('NodeExecutionEngine', () => {
       expect(cueLevelVarStore.size).toBe(0)
 
       // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
     })
 
     it('should use cue data in conditional branching', () => {
@@ -1531,7 +1538,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.value).toBe(3)
 
       // Should execute high action (3 >= 2)
-      expect(mockSequencer.addEffect).toHaveBeenCalledWith(
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledWith(
         expect.stringContaining('action-high'),
         expect.anything(),
       )
@@ -1642,7 +1649,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.type).toBe('number')
 
       // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
     })
   })
 
@@ -1752,7 +1759,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
       // The resolved color should be 'red' from the variable
     })
 
@@ -1846,7 +1853,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
       // Groups should be resolved to ['front', 'back']
     })
 
@@ -2036,7 +2043,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
       // Duration should be 120 (BPM) * 5 = 600
       expect(cueLevelVarStore.get('calculatedDuration')?.value).toBe(600)
     })
@@ -2131,7 +2138,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
       // Should resolve to default color 'blue' (from resolveColor method)
     })
   })
@@ -2574,6 +2581,76 @@ describe('NodeExecutionEngine', () => {
       expect(selectedLight?.type).toBe('light-array')
       // Index -1 should wrap to the last element (index 2)
       expect(selectedLight?.value).toEqual([mockLights[2]])
+    })
+  })
+
+  describe('two cues sharing one groupId, one stops', () => {
+    it('second cue can still run after first cue is stopped', async () => {
+      const groupId = 'shared-group'
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'cue-started',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: 'linear',
+        },
+      }
+      const definition1: YargNodeCueDefinition = {
+        id: 'cue-a',
+        name: 'Cue A',
+        cueType: CueType.Sweep,
+        style: 'primary',
+        nodes: { events: [eventNode], actions: [actionNode], logic: [] },
+        connections: [{ from: 'event1', to: 'action1' }],
+      }
+      const definition2: YargNodeCueDefinition = {
+        id: 'cue-b',
+        name: 'Cue B',
+        cueType: CueType.Stomp,
+        style: 'primary',
+        nodes: {
+          events: [{ ...eventNode, id: 'ev2', eventType: 'cue-started' }],
+          actions: [{ ...actionNode, id: 'act2' }],
+          logic: [],
+        },
+        connections: [{ from: 'ev2', to: 'act2' }],
+      }
+      const compiled1 = NodeCueCompiler.compileYargCue(definition1)
+      const compiled2 = NodeCueCompiler.compileYargCue(definition2)
+      const registry = new EffectRegistry()
+      const cue1 = new YargNodeCue(groupId, compiled1, registry)
+      const cue2 = new YargNodeCue(groupId, compiled2, registry)
+      const params = createCueData('Strong')
+
+      await cue1.execute(params, mockSequencer, mockLightManager)
+      cue1.onStop()
+      const totalCallsBefore =
+        (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length +
+        (mockSequencer.addEffectUnblockedName as jest.Mock).mock.calls.length
+      await cue2.execute(params, mockSequencer, mockLightManager)
+      const totalCallsAfter =
+        (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length +
+        (mockSequencer.addEffectUnblockedName as jest.Mock).mock.calls.length
+
+      expect(totalCallsAfter).toBeGreaterThan(totalCallsBefore)
     })
   })
 })

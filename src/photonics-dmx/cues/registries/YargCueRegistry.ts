@@ -719,19 +719,24 @@ export class YargCueRegistry {
   }
 
   /**
-   * Set which groups are enabled.
-   * All newly enabled groups will also be activated by default.
+   * Set which groups are enabled (preference allowlist).
+   * Does not replace the current active groups: only updates the enabled set and
+   * removes from active any group that is no longer enabled.
+   * Newly enabled groups are not auto-activated; active selection is independent.
    * @param groupIds The IDs of the groups to enable
    */
   public setEnabledGroups(groupIds: string[]): void {
-    this.enabledGroups.clear()
-    this.activeGroups.clear()
-
+    const newEnabled = new Set<string>()
     for (const id of groupIds) {
       if (this.groups.has(id)) {
-        this.enabledGroups.add(id)
-        // All enabled groups are active by default
-        this.activeGroups.add(id)
+        newEnabled.add(id)
+      }
+    }
+    this.enabledGroups = newEnabled
+    // Remove from active any group that is no longer enabled; leave other active groups unchanged
+    for (const activeId of Array.from(this.activeGroups)) {
+      if (!this.enabledGroups.has(activeId)) {
+        this.activeGroups.delete(activeId)
       }
     }
   }

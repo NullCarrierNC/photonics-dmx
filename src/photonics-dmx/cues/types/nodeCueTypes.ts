@@ -17,6 +17,10 @@ export interface NodeCueGroupMeta {
   name: string
   description?: string
   variables?: VariableDefinition[]
+  /** When true, this group is set as the registry default (fallback) group after load. */
+  isDefault?: boolean
+  /** When true, this group is set as the registry stage-kit group after load. */
+  isStageKit?: boolean
 }
 
 export interface NodeLayoutMetadata {

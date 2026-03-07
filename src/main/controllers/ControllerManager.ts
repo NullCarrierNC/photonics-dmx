@@ -94,7 +94,7 @@ export class ControllerManager {
       getEffectsController: () => this.effectsController,
       getDmxLightManager: () => this.dmxLightManager!,
       ensureInitialized: () => this.init(),
-      createCueHandler: (dmx, eff, debounce) => new YargCueHandler(dmx, eff, debounce),
+      createCueHandler: (dmx, eff) => new YargCueHandler(dmx, eff),
       setCueHandler: (h) => {
         this.cueHandler = h
       },
@@ -336,14 +336,8 @@ export class ControllerManager {
   private async initializeListeners(): Promise<void> {
     if (!this.dmxLightManager || !this.effectsController) return
 
-    const debouncePeriod = this.config.getPreference('effectDebounce')
-
     // Create cue handler (default to YARG)
-    this.cueHandler = new YargCueHandler(
-      this.dmxLightManager,
-      this.effectsController,
-      debouncePeriod,
-    )
+    this.cueHandler = new YargCueHandler(this.dmxLightManager, this.effectsController)
   }
 
   /**

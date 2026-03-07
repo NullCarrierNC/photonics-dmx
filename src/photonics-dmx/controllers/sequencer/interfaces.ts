@@ -159,6 +159,18 @@ export interface IEffectManager {
   setEffect(name: string, effect: Effect, isPersistent?: boolean): void
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
+  addEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean,
+  ): void
+  setEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean,
+  ): void
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   startNextEffectInQueue(layer: number, lightId: string): boolean
   /**
@@ -258,6 +270,18 @@ export interface ILightingController {
   setEffect(name: string, effect: Effect, isPersistent?: boolean): Promise<void>
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
+  addEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean,
+  ): void
+  setEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean,
+  ): void
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   removeEffect(name: string, layer: number): void
   removeAllEffects(): void

@@ -17,7 +17,11 @@ import { NodeCueCompilationError, NodeCueCompiler } from '../compiler/NodeCueCom
 import { YargCueRegistry } from '../../registries/YargCueRegistry'
 import { AudioCueRegistry, AudioCueGroup } from '../../registries/AudioCueRegistry'
 import type { ICueGroup } from '../../interfaces/INetCueGroup'
+import { INetCue } from '../../interfaces/INetCue'
 import { YargNodeCue } from '../runtime/YargNodeCue'
+import { YargNodeCueV2 } from '../v2/YargNodeCueV2'
+import { isNodeV2Enabled } from '../v2/nodeV2FeatureFlag'
+import { CompiledEffectIndex } from '../v2/CompiledEffectIndex'
 import { AudioNodeCue } from '../runtime/AudioNodeCue'
 import { CueType } from '../../types/cueTypes'
 import { AudioCueType, BuiltInAudioCues } from '../../types/audioCueTypes'
@@ -49,11 +53,18 @@ export interface NodeCueLoadResult {
   errors: string[]
 }
 
+/** Optional host callbacks for node cue debug/error emission; used when the host provides them (e.g. V2 path). */
+export type NodeRuntimeCallbacks = import('../runtime/executionTypes').NodeRuntimeCallbacks
+
 interface NodeCueLoaderOptions {
   baseDir: string
   yargRegistry: YargCueRegistry
   audioRegistry: AudioCueRegistry
   effectLoader?: EffectLoader
+  /** When provided and V2 is enabled, passed to YargNodeCueV2 for debug/error emission. */
+  getNodeRuntimeCallbacks?: () => NodeRuntimeCallbacks | undefined
+  /** When provided and V2 is enabled, compiled effects are cached here and reused across cues. */
+  getCompiledEffectIndex?: () => CompiledEffectIndex | undefined
 }
 
 interface FileRegistration {
@@ -285,6 +296,13 @@ export class NodeCueLoader extends EventEmitter {
     if (mode === 'yarg') {
       const group = await this.buildYargGroup(file as YargNodeCueFile)
       this.options.yargRegistry.registerGroup(group)
+      const groupMeta = (file as YargNodeCueFile).group
+      if (groupMeta.isDefault) {
+        this.options.yargRegistry.setDefaultGroup(group.id)
+      }
+      if (groupMeta.isStageKit) {
+        this.options.yargRegistry.setStageKitGroup(group.id)
+      }
     } else {
       const group = await this.buildAudioGroup(file as AudioNodeCueFile)
       this.options.audioRegistry.registerGroup(group)
@@ -312,7 +330,7 @@ export class NodeCueLoader extends EventEmitter {
   }
 
   private async buildYargGroup(file: YargNodeCueFile): Promise<ICueGroup> {
-    const cueMap = new Map<CueType, YargNodeCue>()
+    const cueMap = new Map<CueType, INetCue>()
 
     for (const cue of file.cues) {
       if (cueMap.has(cue.cueType)) {
@@ -328,7 +346,15 @@ export class NodeCueLoader extends EventEmitter {
         // Build effect registry for this cue
         const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
 
-        cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled, effectRegistry))
+        if (isNodeV2Enabled()) {
+          const callbacks = this.options.getNodeRuntimeCallbacks?.()
+          cueMap.set(
+            cue.cueType,
+            new YargNodeCueV2(file.group.id, compiled, effectRegistry, callbacks),
+          )
+        } else {
+          cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled, effectRegistry))
+        }
       } catch (err) {
         console.warn(`Skipping cue '${cue.cueType}':`, err)
       }
@@ -465,8 +491,16 @@ export class NodeCueLoader extends EventEmitter {
       return registry
     }
 
+    const effectIndex = isNodeV2Enabled() ? this.options.getCompiledEffectIndex?.() : undefined
+
     for (const effectRef of effectReferences) {
       try {
+        const cached = effectIndex?.get(mode, effectRef.effectFileId, effectRef.effectId)
+        if (cached) {
+          registry.registerEffect(effectRef.effectId, cached)
+          continue
+        }
+
         const effectFile = await this.options.effectLoader.loadEffectByReference(effectRef, mode)
 
         if (!effectFile) {
@@ -476,7 +510,6 @@ export class NodeCueLoader extends EventEmitter {
           continue
         }
 
-        // Find the effect with the matching ID
         const effect = effectFile.effects.find((e) => e.id === effectRef.effectId)
 
         if (!effect) {
@@ -486,10 +519,8 @@ export class NodeCueLoader extends EventEmitter {
           continue
         }
 
-        // Compile the effect
         const compiledEffect = EffectCompiler.compile(effect)
-
-        // Register the effect with its ID
+        effectIndex?.set(mode, effectRef.effectFileId, effectRef.effectId, compiledEffect)
         registry.registerEffect(effectRef.effectId, compiledEffect)
       } catch (error) {
         console.error(`Failed to load/compile effect ${effectRef.effectId}:`, error)

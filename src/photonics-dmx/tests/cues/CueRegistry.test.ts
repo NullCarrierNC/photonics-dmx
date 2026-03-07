@@ -404,4 +404,50 @@ describe('YargCueRegistry', () => {
       expect(cueWithoutAutoGen!.cueId).toBe('stagekit-cool-auto')
     })
   })
+
+  describe('setEnabledGroups (enabled vs active separation)', () => {
+    it('does not overwrite active groups when setting enabled groups', () => {
+      registry.reset()
+      const groupA: ICueGroup = {
+        id: 'groupA',
+        name: 'Group A',
+        cues: new Map([[CueType.Default, new MockCueImplementation('a-default')]]),
+      }
+      const groupB: ICueGroup = {
+        id: 'groupB',
+        name: 'Group B',
+        cues: new Map([[CueType.Default, new MockCueImplementation('b-default')]]),
+      }
+      registry.registerGroup(groupA)
+      registry.registerGroup(groupB)
+      registry.setActiveGroups(['groupA'])
+      expect(registry.getActiveGroups()).toEqual(['groupA'])
+
+      registry.setEnabledGroups(['groupA', 'groupB'])
+      expect(registry.getEnabledGroups()).toEqual(expect.arrayContaining(['groupA', 'groupB']))
+      expect(registry.getActiveGroups()).toEqual(['groupA'])
+    })
+
+    it('removes from active any group that is no longer enabled', () => {
+      registry.reset()
+      const groupA: ICueGroup = {
+        id: 'groupA',
+        name: 'Group A',
+        cues: new Map([[CueType.Default, new MockCueImplementation('a-default')]]),
+      }
+      const groupB: ICueGroup = {
+        id: 'groupB',
+        name: 'Group B',
+        cues: new Map([[CueType.Default, new MockCueImplementation('b-default')]]),
+      }
+      registry.registerGroup(groupA)
+      registry.registerGroup(groupB)
+      registry.setEnabledGroups(['groupA', 'groupB'])
+      registry.setActiveGroups(['groupA', 'groupB'])
+      expect(registry.getActiveGroups()).toHaveLength(2)
+
+      registry.setEnabledGroups(['groupA'])
+      expect(registry.getActiveGroups()).toEqual(['groupA'])
+    })
+  })
 })
