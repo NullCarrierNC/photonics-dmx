@@ -952,20 +952,18 @@ export class NodeExecutionEngine {
       const iterIdx = context.getForEachIterationIndex()
       const engineKey = iterIdx >= 0 ? `${raiserNode.id}:${iterIdx}` : raiserNode.id
 
-      // Check if this effect raiser already has an active execution
+      // Check if this effect raiser already has an active execution (contexts or callback-backed effects)
       const existingEngine = this.activeEffectEngines.get(engineKey)
       if (existingEngine) {
-        // If the existing engine still has active contexts, block re-triggering
-        if (existingEngine.hasActiveContexts()) {
+        if (existingEngine.isBusy()) {
           this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`)
           this.emitNodeExecution('deactivated', raiserNode.id)
           this.continueToNextNodes(raiserNode.id, context)
           return
-        } else {
-          // Engine exists but no active contexts - clean it up and allow new trigger
-          this.debugLog(`Effect raiser ${raiserNode.id} cleaning up completed engine`)
-          this.activeEffectEngines.delete(engineKey)
         }
+        // Engine is idle - clean it up and allow new trigger
+        this.debugLog(`Effect raiser ${raiserNode.id} cleaning up idle engine`)
+        this.activeEffectEngines.delete(engineKey)
       }
 
       // Look up effect from registry

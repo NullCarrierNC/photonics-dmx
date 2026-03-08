@@ -818,7 +818,16 @@ export class EffectExecutionEngine {
   }
 
   /**
-   * Set a callback to be invoked when all execution contexts complete (effect becomes idle).
+   * True while the effect is running: has active contexts or callback-backed effects still pending.
+   * Use this to block retriggers until the effect is truly idle (matches when onIdle fires).
+   */
+  public isBusy(): boolean {
+    return this.activeContexts.size > 0 || this.pendingCallbackEffects.size > 0
+  }
+
+  /**
+   * Set a callback to be invoked when the effect becomes idle (no active contexts and no
+   * pending callback-backed effects).
    */
   public setOnIdle(callback: () => void): void {
     this.onIdleCallback = callback
