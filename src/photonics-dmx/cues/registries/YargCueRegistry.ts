@@ -381,6 +381,12 @@ export class YargCueRegistry {
             // No active group has this cue, so the fallback is still valid
             //     console.log(`[Consistency] No active group has ${cueType}, fallback is still valid`);
           }
+        } else {
+          // Non-fallback: require the cached group to still be active (e.g. not toggled off in DMX preview)
+          if (!this.activeGroups.has(lastSelection.groupId)) {
+            this.clearCueConsistencyTracking(cueType)
+            return null
+          }
         }
 
         //  console.log(`[Consistency] Using consistent selection for ${cueType} (${now - lastExecutionTime}ms since last execution)`);
@@ -777,21 +783,30 @@ export class YargCueRegistry {
 
   /**
    * Set the active groups for cue selection.
+   * Clears consistency tracking only when the active set actually changes (e.g. DMX preview toggle).
    * @param groupIds Array of group IDs to set as active
    */
   public setActiveGroups(groupIds: string[]): void {
-    // Clear consistency tracking when active groups change
-    this.clearConsistencyTracking()
-
-    this.activeGroups.clear()
+    const newActive = new Set<string>()
     for (const groupId of groupIds) {
       if (this.enabledGroups.has(groupId)) {
-        this.activeGroups.add(groupId)
+        newActive.add(groupId)
       } else {
         console.warn(`Cannot activate group '${groupId}': group not enabled`)
       }
     }
-    //  console.log(`Active groups set to: ${Array.from(this.activeGroups)}`);
+
+    const sameSet =
+      newActive.size === this.activeGroups.size &&
+      Array.from(newActive).every((id) => this.activeGroups.has(id))
+    if (!sameSet) {
+      this.clearConsistencyTracking()
+    }
+
+    this.activeGroups.clear()
+    for (const id of newActive) {
+      this.activeGroups.add(id)
+    }
   }
 
   /**

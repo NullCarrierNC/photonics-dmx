@@ -256,11 +256,10 @@ describe('YargCueRegistry', () => {
       expect(secondCue).toBeDefined()
     })
 
-    it('should clear consistency tracking when active groups change', () => {
+    it('should preserve consistency when setActiveGroups is called twice with the same list', () => {
       const registry = YargCueRegistry.getInstance()
       registry.reset()
 
-      // Set up test groups
       const group1: ICueGroup = {
         id: 'group1',
         name: 'group1',
@@ -274,21 +273,55 @@ describe('YargCueRegistry', () => {
       registry.registerGroup(group1)
       registry.registerGroup(group2)
       registry.setEnabledGroups(['group1', 'group2'])
-      registry.setActiveGroups(['group1'])
-
-      // Set consistency window
+      registry.setActiveGroups(['group1', 'group2'])
       registry.setCueConsistencyWindow(2000)
 
-      // Call a cue to establish tracking
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+      const firstGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+
+      // Re-apply same active list (e.g. UI refresh) – should not clear consistency
+      registry.setActiveGroups(['group1', 'group2'])
+
+      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(secondCue).toBeTruthy()
+      const secondGroupId = secondCue!.id.includes('group1') ? 'group1' : 'group2'
+      expect(secondGroupId).toBe(firstGroupId)
+    })
+
+    it('should clear consistency when setActiveGroups is called with a different list', () => {
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
+      const group1: ICueGroup = {
+        id: 'group1',
+        name: 'group1',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')]]),
+      }
+      const group2: ICueGroup = {
+        id: 'group2',
+        name: 'group2',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')]]),
+      }
+      registry.registerGroup(group1)
+      registry.registerGroup(group2)
+      registry.setEnabledGroups(['group1', 'group2'])
+      registry.setActiveGroups(['group1', 'group2'])
+      registry.setCueConsistencyWindow(2000)
+
       const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
       expect(firstCue).toBeTruthy()
 
-      // Change active groups
+      // Change active groups (e.g. DMX preview toggle)
       registry.setActiveGroups(['group2'])
 
-      // Check that consistency tracking was cleared
       const status = registry.getConsistencyStatus()
       expect(status.trackedCues).toHaveLength(0)
+
+      // Next getCueImplementation must use the new active set (only group2)
+      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(secondCue).toBeTruthy()
+      expect(secondCue!.id).toContain('group2')
     })
 
     it('should provide consistency status information', () => {

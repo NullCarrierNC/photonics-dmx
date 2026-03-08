@@ -25,11 +25,8 @@ const STROBE_TYPES: CueType[] = [
 
 class YargCueHandler extends BaseCueHandler {
   private currentPrimaryCue: INetCue | null = null
-  private currentPrimaryCueType: CueType | null = null
   private currentSecondaryCue: INetCue | null = null
-  private currentSecondaryCueType: CueType | null = null
   private currentStrobeCue: INetCue | null = null
-  private currentStrobeCueType: CueType | null = null
 
   constructor(lightManager: DmxLightManager, photonicsSequencer: ILightingController) {
     super(lightManager, photonicsSequencer)
@@ -79,7 +76,6 @@ class YargCueHandler extends BaseCueHandler {
         if (this.currentStrobeCue) {
           this.currentStrobeCue.onStop?.()
           this.currentStrobeCue = null
-          this.currentStrobeCueType = null
         }
         this.emit('cueHandled', historicCueData)
         return
@@ -117,37 +113,25 @@ class YargCueHandler extends BaseCueHandler {
 
       if (incomingIsStrobe) {
         // Strobes run on top of primary and secondary overlays; track separately so Strobe_Off only clears strobes.
-        if (this.currentStrobeCueType !== cueType) {
-          if (this.currentStrobeCue) {
-            this.currentStrobeCue.onStop?.()
-            this.currentStrobeCue = null
-            this.currentStrobeCueType = null
-          }
-          this.currentStrobeCue = cue
-          this.currentStrobeCueType = cueType
+        if (this.currentStrobeCue && this.currentStrobeCue !== cue) {
+          this.currentStrobeCue.onStop?.()
+          this.currentStrobeCue = null
         }
+        this.currentStrobeCue = cue
       } else if (incomingIsSecondary) {
         // Non-strobe overlays run concurrently with primary and strobes, but replace the existing secondary overlay.
-        if (this.currentSecondaryCueType !== cueType) {
-          if (this.currentSecondaryCue) {
-            this.currentSecondaryCue.onStop?.()
-            this.currentSecondaryCue = null
-            this.currentSecondaryCueType = null
-          }
-          this.currentSecondaryCue = cue
-          this.currentSecondaryCueType = cueType
+        if (this.currentSecondaryCue && this.currentSecondaryCue !== cue) {
+          this.currentSecondaryCue.onStop?.()
+          this.currentSecondaryCue = null
         }
+        this.currentSecondaryCue = cue
       } else {
-        // Primary: stop previous primary only; leave secondary untouched.
-        if (this.currentPrimaryCueType !== cueType) {
-          if (this.currentPrimaryCue) {
-            this.currentPrimaryCue.onStop?.()
-            this.currentPrimaryCue = null
-            this.currentPrimaryCueType = null
-          }
-          this.currentPrimaryCue = cue
-          this.currentPrimaryCueType = cueType
+        // Primary: stop previous primary when switching to a different cue instance (e.g. different group); leave secondary untouched.
+        if (this.currentPrimaryCue && this.currentPrimaryCue !== cue) {
+          this.currentPrimaryCue.onStop?.()
+          this.currentPrimaryCue = null
         }
+        this.currentPrimaryCue = cue
       }
 
       await cue.execute(historicCueData, this._sequencer, this._lightManager)
@@ -166,17 +150,14 @@ class YargCueHandler extends BaseCueHandler {
     if (this.currentPrimaryCue) {
       this.currentPrimaryCue.onStop?.()
       this.currentPrimaryCue = null
-      this.currentPrimaryCueType = null
     }
     if (this.currentSecondaryCue) {
       this.currentSecondaryCue.onStop?.()
       this.currentSecondaryCue = null
-      this.currentSecondaryCueType = null
     }
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
-      this.currentStrobeCueType = null
     }
   }
 
@@ -334,17 +315,14 @@ class YargCueHandler extends BaseCueHandler {
     if (this.currentPrimaryCue) {
       this.currentPrimaryCue.onDestroy?.()
       this.currentPrimaryCue = null
-      this.currentPrimaryCueType = null
     }
     if (this.currentSecondaryCue) {
       this.currentSecondaryCue.onDestroy?.()
       this.currentSecondaryCue = null
-      this.currentSecondaryCueType = null
     }
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onDestroy?.()
       this.currentStrobeCue = null
-      this.currentStrobeCueType = null
     }
     super.shutdown()
   }
