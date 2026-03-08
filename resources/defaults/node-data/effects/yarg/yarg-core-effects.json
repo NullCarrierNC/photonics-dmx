@@ -387,6 +387,32 @@
           "validValues": ["low", "medium", "high", "max"]
         },
         {
+          "name": "lowColor",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "description": "Colour for inactive lights (transparent = off)",
+          "isParameter": true,
+          "validValues": [
+            "amber",
+            "black",
+            "blue",
+            "chartreuse",
+            "cyan",
+            "green",
+            "magenta",
+            "orange",
+            "purple",
+            "red",
+            "teal",
+            "transparent",
+            "vermilion",
+            "violet",
+            "white",
+            "yellow"
+          ]
+        },
+        {
           "name": "numLights",
           "type": "number",
           "scope": "cue",
@@ -625,7 +651,7 @@
             "color": {
               "name": {
                 "source": "variable",
-                "name": "color"
+                "name": "lowColor"
               },
               "brightness": {
                 "source": "variable",
@@ -689,7 +715,7 @@
             "color": {
               "name": {
                 "source": "variable",
-                "name": "color"
+                "name": "lowColor"
               },
               "brightness": {
                 "source": "variable",

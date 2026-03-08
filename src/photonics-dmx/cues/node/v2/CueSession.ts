@@ -90,17 +90,27 @@ export class CueSession {
     this.cueStartedFired = true
   }
 
-  /** Initialize variable stores from compiled cue/group definitions. */
+  /** Initialize variable stores from compiled cue/group definitions. Route by scope: cue -> cueLevelVarStore, cue-group -> groupLevelVarStore. */
   initializeVariables(
     cueVariables: VariableDefinition[],
     groupVariables: VariableDefinition[],
   ): void {
     for (const varDef of cueVariables) {
-      if (!this.cueLevelVarStore.has(varDef.name)) {
-        this.cueLevelVarStore.set(varDef.name, {
-          type: varDef.type,
-          value: varDef.initialValue,
-        })
+      if (varDef.scope === 'cue') {
+        if (!this.cueLevelVarStore.has(varDef.name)) {
+          this.cueLevelVarStore.set(varDef.name, {
+            type: varDef.type,
+            value: varDef.initialValue,
+          })
+        }
+      } else {
+        // scope === 'cue-group'
+        if (!this.groupLevelVarStore.has(varDef.name)) {
+          this.groupLevelVarStore.set(varDef.name, {
+            type: varDef.type,
+            value: varDef.initialValue,
+          })
+        }
       }
     }
     for (const varDef of groupVariables) {
@@ -113,14 +123,16 @@ export class CueSession {
     }
   }
 
-  /** Reset cue-level store and re-seed from definitions (e.g. on cue-started). */
+  /** Reset cue-level store and re-seed from definitions (e.g. on cue-started). Only cue-scoped variables; group-level is preserved. */
   resetCueLevelVariables(cueVariables: VariableDefinition[]): void {
     this.cueLevelVarStore.clear()
     for (const varDef of cueVariables) {
-      this.cueLevelVarStore.set(varDef.name, {
-        type: varDef.type,
-        value: varDef.initialValue,
-      })
+      if (varDef.scope === 'cue') {
+        this.cueLevelVarStore.set(varDef.name, {
+          type: varDef.type,
+          value: varDef.initialValue,
+        })
+      }
     }
   }
 

@@ -10,6 +10,7 @@ import type {
   YargNodeCueDefinition,
   YargEventNode,
   ActionNode,
+  VariableDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../../cues/types/cueTypes'
 import { GraphExecutionEngine } from '../../../../cues/node/v2/GraphExecutionEngine'
@@ -284,6 +285,45 @@ describe('GraphExecutionEngine', () => {
       expect(sequencer.setEffectUnblockedNameWithCallback).toHaveBeenCalledTimes(1)
       expect(sequencer.addEffectUnblockedNameWithCallback).toHaveBeenCalledTimes(2)
       jest.useRealTimers()
+    })
+  })
+
+  describe('CueSession variable scope', () => {
+    it('initializeVariables puts cue-scoped in cue store and cue-group-scoped in group store', () => {
+      const session = new CueSession()
+      const cueVars: VariableDefinition[] = [
+        { name: 'x', type: 'number', scope: 'cue', initialValue: 0 },
+        { name: 'ltr', type: 'number', scope: 'cue-group', initialValue: 1 },
+      ]
+      const fileGroupVars: VariableDefinition[] = []
+      session.initializeVariables(cueVars, fileGroupVars)
+
+      const cueStore = session.getCueLevelVarStore()
+      const groupStore = session.getGroupLevelVarStore()
+      expect(cueStore.has('x')).toBe(true)
+      expect(cueStore.get('x')?.value).toBe(0)
+      expect(cueStore.has('ltr')).toBe(false)
+      expect(groupStore.has('ltr')).toBe(true)
+      expect(groupStore.get('ltr')?.value).toBe(1)
+    })
+
+    it('resetCueLevelVariables only repopulates cue-scoped vars; group store unchanged', () => {
+      const session = new CueSession()
+      const cueVars: VariableDefinition[] = [
+        { name: 'x', type: 'number', scope: 'cue', initialValue: 0 },
+        { name: 'ltr', type: 'number', scope: 'cue-group', initialValue: 1 },
+      ]
+      session.initializeVariables(cueVars, [])
+      const groupStore = session.getGroupLevelVarStore()
+      groupStore.set('ltr', { type: 'number', value: -1 })
+
+      session.resetCueLevelVariables(cueVars)
+
+      const cueStore = session.getCueLevelVarStore()
+      expect(cueStore.has('x')).toBe(true)
+      expect(cueStore.get('x')?.value).toBe(0)
+      expect(cueStore.has('ltr')).toBe(false)
+      expect(groupStore.get('ltr')?.value).toBe(-1)
     })
   })
 })
