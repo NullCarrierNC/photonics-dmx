@@ -302,6 +302,69 @@ describe('TransitionEngine', () => {
     })
   })
 
+  describe('delay with waitUntilConditionCount', () => {
+    it('should set waitEndTime to currentTime + (count * waitUntilTime) when delay and count > 0', () => {
+      const currentTime = 1000
+      const transition = createMockEffectTransition({
+        waitForCondition: 'none',
+        waitUntilCondition: 'delay',
+        waitUntilTime: 500,
+        waitUntilConditionCount: 3,
+        transform: { color: createMockRGBIP(), easing: 'linear', duration: 0 },
+      })
+      const mockEffect = createMockActiveEffect({
+        state: 'idle',
+        transitions: [transition],
+        lastEndState: createMockRGBIP({ red: 0, green: 0, blue: 0, intensity: 0, opacity: 0 }),
+      })
+
+      transitionEngine.prepareTransition(mockEffect, transition, currentTime)
+      // prepareTransition calls startTransition when waitForCondition is 'none'
+      expect(mockEffect.state).toBe('waitingUntil')
+      expect(mockEffect.waitEndTime).toBe(currentTime + 3 * 500) // 1000 + 1500 = 2500
+    })
+
+    it('should set waitEndTime to currentTime + 0 when delay and count is 0', () => {
+      const currentTime = 1000
+      const transition = createMockEffectTransition({
+        waitForCondition: 'none',
+        waitUntilCondition: 'delay',
+        waitUntilTime: 500,
+        waitUntilConditionCount: 0,
+        transform: { color: createMockRGBIP(), easing: 'linear', duration: 0 },
+      })
+      const mockEffect = createMockActiveEffect({
+        state: 'idle',
+        transitions: [transition],
+        lastEndState: createMockRGBIP({ red: 0, green: 0, blue: 0, intensity: 0, opacity: 0 }),
+      })
+
+      transitionEngine.prepareTransition(mockEffect, transition, currentTime)
+      expect(mockEffect.state).toBe('waitingUntil')
+      expect(mockEffect.waitEndTime).toBe(currentTime) // advance immediately
+    })
+
+    it('should set waitEndTime to currentTime + waitUntilTime when delay and count undefined', () => {
+      const currentTime = 1000
+      const transition = createMockEffectTransition({
+        waitForCondition: 'none',
+        waitUntilCondition: 'delay',
+        waitUntilTime: 500,
+        waitUntilConditionCount: undefined,
+        transform: { color: createMockRGBIP(), easing: 'linear', duration: 0 },
+      })
+      const mockEffect = createMockActiveEffect({
+        state: 'idle',
+        transitions: [transition],
+        lastEndState: createMockRGBIP({ red: 0, green: 0, blue: 0, intensity: 0, opacity: 0 }),
+      })
+
+      transitionEngine.prepareTransition(mockEffect, transition, currentTime)
+      expect(mockEffect.state).toBe('waitingUntil')
+      expect(mockEffect.waitEndTime).toBe(currentTime + 500) // treat as 1 step
+    })
+  })
+
   describe('getFinalState and clearFinalStates', () => {
     it('should get and clear final states for specific layers', () => {
       // Setup test data

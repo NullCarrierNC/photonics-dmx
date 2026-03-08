@@ -83,6 +83,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
   let setActiveGroupsHandler: (event: unknown, groupNames: string[]) => Promise<any>
   let getAvailableCuesHandler: (event: unknown, groupName?: string) => Promise<any>
   let simulateBeatHandler: (event: unknown, data?: any) => Promise<boolean>
+  let startTestEffectHandler: (event: unknown, data?: any) => Promise<any>
 
   beforeEach(() => {
     // Reset mocks
@@ -100,6 +101,8 @@ describe('IPC Light Handlers for Cue Registry', () => {
         getAvailableCuesHandler = handler
       } else if (channel === LIGHT.SIMULATE_BEAT) {
         simulateBeatHandler = handler
+      } else if (channel === LIGHT.START_TEST_EFFECT) {
+        startTestEffectHandler = handler
       }
     })
 
@@ -283,6 +286,26 @@ describe('IPC Light Handlers for Cue Registry', () => {
       )
 
       expect(registry.getActiveGroups()).toEqual(['default'])
+    })
+  })
+
+  describe('start-test-effect handler', () => {
+    it('forwards effectId, venueSize, bpm, and cueGroup to controllerManager.startTestEffect', async () => {
+      mockControllerManager.getIsInitialized = jest.fn().mockReturnValue(true)
+      const effectId = 'Score'
+      const venueSize = 'Large'
+      const bpm = 120
+      const cueGroup = 'yarg-stagekit'
+
+      await startTestEffectHandler({}, { effectId, venueSize, bpm, cueGroup })
+
+      expect(mockControllerManager.startTestEffect).toHaveBeenCalledTimes(1)
+      expect(mockControllerManager.startTestEffect).toHaveBeenCalledWith(
+        effectId,
+        venueSize,
+        bpm,
+        cueGroup,
+      )
     })
   })
 })

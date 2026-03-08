@@ -218,6 +218,47 @@ describe('EffectManager', () => {
       )
     })
 
+    it('should set waitEndTime to currentTime + (count * waitUntilTime) for delay first transition', () => {
+      const mockLight = createMockTrackedLight()
+      const effect: Effect = {
+        id: 'delay-effect',
+        description: 'Delay with count',
+        transitions: [
+          {
+            lights: [mockLight],
+            layer: 1,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+              color: createMockRGBIP({ red: 255 }),
+              easing: 'linear',
+              duration: 0,
+            },
+            waitUntilCondition: 'delay',
+            waitUntilTime: 500,
+            waitUntilConditionCount: 2,
+          },
+        ],
+      }
+      layerManager.getActiveEffect.mockReturnValue(undefined)
+
+      effectManager.addEffect('test', effect)
+
+      expect(layerManager.addActiveEffect).toHaveBeenCalledWith(
+        1,
+        'test-light-1',
+        expect.objectContaining({
+          name: 'test',
+          state: 'waitingUntil',
+        }),
+      )
+      const capturedLightEffect = layerManager.addActiveEffect.mock.calls[0][2] as LightEffectState
+      // count * waitUntilTime = 2 * 500 = 1000
+      expect(capturedLightEffect.waitEndTime - capturedLightEffect.transitionStartTime).toBeCloseTo(
+        1000,
+      )
+    })
+
     it('should cancel blackout if adding an effect below layer 200', () => {
       // Mock blackout active state
       systemEffects.isBlackoutActive.mockReturnValue(true)

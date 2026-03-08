@@ -175,7 +175,22 @@ export class EffectExecutionEngine {
     // Apply parameter values to effect variables
     this.applyParameterValues(effectListener)
 
-    // Create execution context with caller's cue data
+    // Diagnostic: when effect uses delay-based stepping, ensure waitUntilTime made it into the store
+    const waitUntilConditionVar = this.effectVarStore.get('waitUntilCondition')
+    const waitUntilTimeVar = this.effectVarStore.get('waitUntilTime')
+    const delayCondition = waitUntilConditionVar && String(waitUntilConditionVar.value) === 'delay'
+    if (delayCondition) {
+      const waitMs =
+        waitUntilTimeVar && typeof waitUntilTimeVar.value === 'number' ? waitUntilTimeVar.value : 0
+      if (waitMs <= 0) {
+        console.warn(
+          `[EffectExecutionEngine] effect ${this.compiledEffect.definition.id}: waitUntilCondition is delay but waitUntilTime is ${waitMs} (expected > 0 for stepping). parameterValues had: ${JSON.stringify(this.parameterValues['waitUntilTime'])}`,
+        )
+      }
+    }
+
+    // Create execution context with caller's cue data. cueLevelVarStore is the effect's
+    // var store so resolveActionTiming() reads waitUntilCondition/waitUntilTime from it.
     const context = new ExecutionContext(
       { id: effectListener.id, type: 'event', outputs: effectListener.outputs } as any,
       cueData, // Pass caller's cue data
@@ -208,8 +223,49 @@ export class EffectExecutionEngine {
   }
 
   /**
+   * Resolve a literal ValueSource to a primitive for storage in the effect var store.
+   * Parameter values from the cue are often ValueSource objects; storing them raw
+   * causes resolution to return 0/1 instead of the actual number (e.g. waitUntilTime 500).
+   */
+  private resolveParameterValue(
+    raw: unknown,
+    paramType: string,
+  ): number | string | boolean | TrackedLight[] {
+    if (raw == null) return paramType === 'number' ? 0 : paramType === 'boolean' ? false : ''
+    const vs = raw as { source?: string; value?: unknown }
+    if (vs && typeof vs === 'object' && vs.source === 'literal' && 'value' in vs) {
+      const v = vs.value
+      if (paramType === 'number') {
+        if (typeof v === 'number' && !Number.isNaN(v)) return v
+        if (typeof v === 'string') {
+          const n = parseFloat(v)
+          return Number.isNaN(n) ? 0 : n
+        }
+        return typeof v === 'boolean' ? (v ? 1 : 0) : 0
+      }
+      if (paramType === 'string' || paramType === 'color' || paramType === 'event')
+        return String(v ?? '')
+      if (paramType === 'boolean') return v === true || v === 'true'
+      if (paramType === 'light-array') return Array.isArray(v) ? (v as TrackedLight[]) : []
+    }
+    // Already-resolved values (e.g. from NodeExecutionEngine): coerce so delay timing is reliable
+    if (paramType === 'number') {
+      if (typeof raw === 'number' && !Number.isNaN(raw)) return raw
+      if (typeof raw === 'string') {
+        const n = parseFloat(raw)
+        return Number.isNaN(n) ? 0 : n
+      }
+    }
+    if (paramType === 'string' || paramType === 'color' || paramType === 'event')
+      return String(raw ?? '')
+    return raw as number | string | boolean | TrackedLight[]
+  }
+
+  /**
    * Apply parameter values to effect variables.
    * Parameters are variables with isParameter: true in the effect definition.
+   * Caller (NodeExecutionEngine) passes resolved primitives with correct types (e.g. waitUntilCondition
+   * 'delay', waitUntilTime 500/200, color 'yellow'/'blue'); we store them per param type for action timing.
    */
   private applyParameterValues(_listener: EffectEventListenerNode): void {
     // Get all variables marked as parameters
@@ -217,7 +273,8 @@ export class EffectExecutionEngine {
 
     for (const paramVar of parameterVars) {
       // Check if a value was provided, otherwise use the default
-      const value = this.parameterValues[paramVar.name] ?? paramVar.initialValue
+      const raw = this.parameterValues[paramVar.name] ?? paramVar.initialValue
+      const value = this.resolveParameterValue(raw, paramVar.type)
 
       this.effectVarStore.set(paramVar.name, {
         type: paramVar.type,
@@ -468,7 +525,9 @@ export class EffectExecutionEngine {
 
     const lastChainNode = actionChain[actionChain.length - 1]
     const chainHasBlockingStep = chainData.steps.some(
-      (step) => step.resolvedTiming.waitUntilCondition !== 'none',
+      (step) =>
+        step.resolvedTiming.waitUntilCondition !== 'none' ||
+        step.resolvedTiming.waitForCondition !== 'none',
     )
 
     const useSetEffectChain = this.getAndConsumeInitialClearPolicy()

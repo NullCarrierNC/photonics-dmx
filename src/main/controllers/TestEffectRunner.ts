@@ -26,6 +26,7 @@ export class TestEffectRunner {
   private testVenueSize: 'NoVenue' | 'Small' | 'Large' = 'Large'
   private testBpm = 120
   private effectId: string | null = null
+  private testCueGroup: string | undefined = undefined
 
   constructor(private readonly ctx: TestEffectRunnerContext) {}
 
@@ -33,9 +34,10 @@ export class TestEffectRunner {
     effectId: string,
     venueSize?: 'NoVenue' | 'Small' | 'Large',
     bpm?: number,
+    cueGroup?: string,
   ): void {
     console.log(
-      `TestEffectRunner.startTestEffect effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}`,
+      `TestEffectRunner.startTestEffect effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}, cueGroup: ${cueGroup ?? 'none'}`,
     )
 
     if (this.testEffectInterval) {
@@ -46,6 +48,7 @@ export class TestEffectRunner {
     this.testVenueSize = venueSize ?? 'Large'
     this.testBpm = bpm ?? 120
     this.effectId = effectId
+    this.testCueGroup = cueGroup
     console.log(`Set testVenueSize to: ${this.testVenueSize}, testBpm to: ${this.testBpm}`)
 
     this.ctx
@@ -68,6 +71,7 @@ export class TestEffectRunner {
       this.testEffectInterval = null
     }
     this.effectId = null
+    this.testCueGroup = undefined
 
     const cueHandler = this.ctx.getCueHandler()
     if (cueHandler instanceof YargCueHandler) {
@@ -138,6 +142,7 @@ export class TestEffectRunner {
       strobeState: strobe,
       performer: 0,
       trackMode: 'simulated',
+      simulationCueGroup: this.testCueGroup,
       beat: 'Off',
       keyframe: 'Off',
       bonusEffect: false,

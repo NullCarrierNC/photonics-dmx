@@ -111,6 +111,9 @@ const normalizeWaitFor = (
   return { waitFor, waitForTime }
 }
 
+/** Builds one step transition. timing is ResolvedActionTiming from the effect run (effect var store);
+ * for delay-based cues, waitUntilCondition is 'delay' and waitUntilTime is ms; TransitionEngine
+ * advances these in handleWaitingUntil on clock ticks, not SongEventHandler. */
 const createSingleColorTransition = (params: {
   lights: TrackedLight[]
   layer: number
@@ -122,6 +125,15 @@ const createSingleColorTransition = (params: {
 }): EffectTransition => {
   const { lights, layer, waitFor, waitForTime, color, timing, easing } = params
   const duration = safeDuration(timing.duration, 0, 0)
+
+  // Diagnostic: delay-based stepping requires waitUntilTime > 0
+  if (timing.waitUntilCondition === 'delay' && (timing.waitUntilTime ?? 0) <= 0) {
+    console.warn(
+      '[ActionEffectFactory] createSingleColorTransition: waitUntilCondition is delay but waitUntilTime is',
+      timing.waitUntilTime,
+      '(expected > 0 for per-light stepping)',
+    )
+  }
 
   return {
     lights,

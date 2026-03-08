@@ -347,8 +347,9 @@ export class ControllerManager {
     effectId: string,
     venueSize?: 'NoVenue' | 'Small' | 'Large',
     bpm?: number,
+    cueGroup?: string,
   ): void {
-    this.testEffectRunner.startTestEffect(effectId, venueSize, bpm)
+    this.testEffectRunner.startTestEffect(effectId, venueSize, bpm, cueGroup)
   }
 
   /**

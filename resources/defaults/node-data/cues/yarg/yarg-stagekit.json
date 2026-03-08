@@ -2577,11 +2577,15 @@
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "beat"
+                "value": "delay"
               },
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
               }
             }
           },
@@ -2616,11 +2620,15 @@
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "beat"
+                "value": "delay"
               },
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 200
               }
             }
           }
@@ -2641,7 +2649,7 @@
           "to": "sk-score-yellow"
         },
         {
-          "from": "event-sk-score-called",
+          "from": "sk-score-yellow",
           "to": "sk-score-blue"
         }
       ],

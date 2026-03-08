@@ -6,6 +6,8 @@ export type MockCueDataOptions = {
   effectId?: string | null
   beat?: CueData['beat']
   keyframe?: string
+  /** When set with trackMode 'simulated', use this group for deterministic cue resolution. */
+  simulationCueGroup?: string
 }
 
 /**
@@ -18,6 +20,7 @@ export function createMockCueData(options: MockCueDataOptions = {}): CueData {
     effectId,
     beat = 'Unknown',
     keyframe = 'Unknown',
+    simulationCueGroup,
   } = options
 
   const base: CueData = {
@@ -42,6 +45,7 @@ export function createMockCueData(options: MockCueDataOptions = {}): CueData {
     strobeState: 'Strobe_Off',
     performer: 0,
     trackMode: 'simulated',
+    simulationCueGroup,
     beat,
     keyframe,
     bonusEffect: false,

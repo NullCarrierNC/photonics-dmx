@@ -283,6 +283,40 @@ export class YargCueRegistry {
   }
 
   /**
+   * Get cue implementation from a specific group (deterministic, for simulation).
+   * Does not use random selection or mutate activeGroups. Routes through
+   * handlePrimaryCue/handleSecondaryCue so state tracking and cue-state updates are preserved.
+   * @param cueType The cue type to resolve
+   * @param groupId The group to use (must exist and contain the cue, or fallback to defaultGroup if it has the cue)
+   * @param trackMode Used only for autoGen flag when calling handlers
+   * @returns The cue implementation or null if not found in the group or default fallback
+   */
+  public getCueImplementationFromGroup(
+    cueType: CueType,
+    groupId: string,
+    trackMode: 'tracked' | 'autogen' | 'simulated' = 'simulated',
+  ): INetCue | null {
+    const group = this.groups.get(groupId)
+    if (group?.cues.has(cueType)) {
+      const cue = group.cues.get(cueType)!
+      const selection = { groupId, isFallback: false }
+      if (cue.style === CueStyle.Primary) {
+        return this.handlePrimaryCue(cueType, selection, trackMode === 'autogen')
+      }
+      return this.handleSecondaryCue(cueType, selection, trackMode === 'autogen')
+    }
+    if (this.defaultGroup && this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
+      const selection = { groupId: this.defaultGroup, isFallback: true }
+      const cue = this.groups.get(this.defaultGroup)!.cues.get(cueType)!
+      if (cue.style === CueStyle.Primary) {
+        return this.handlePrimaryCue(cueType, selection, trackMode === 'autogen')
+      }
+      return this.handleSecondaryCue(cueType, selection, trackMode === 'autogen')
+    }
+    return null
+  }
+
+  /**
    * Set the cue consistency window to prevent rapid randomization changes.
    * @param windowMs The consistency window in milliseconds (default: 2000ms)
    */

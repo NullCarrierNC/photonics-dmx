@@ -1,6 +1,7 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine'
 import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext'
 import { NodeCueCompiler, CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
+import { EffectCompiler } from '../../../cues/node/compiler/EffectCompiler'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
 import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
 import {
@@ -9,6 +10,7 @@ import {
   ActionNode,
   LogicNode,
 } from '../../../cues/types/nodeCueTypes'
+import type { YargEffectDefinition } from '../../../cues/types/nodeCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { Beat, CueData, CueType } from '../../../cues/types/cueTypes'
@@ -1111,6 +1113,182 @@ describe('NodeExecutionEngine', () => {
       // Both effect and subsequent action should execute
       // Effect executes async, action executes in chain
       expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
+    })
+
+    it('resolves effect raiser literal parameter values with correct types (score cue regression)', () => {
+      const scoreLikeEffect: YargEffectDefinition = {
+        id: 'score-like-effect',
+        mode: 'yarg',
+        name: 'Score-like',
+        description: '',
+        variables: [
+          {
+            name: 'lights',
+            type: 'light-array',
+            scope: 'cue',
+            initialValue: [],
+            isParameter: true,
+          },
+          { name: 'color', type: 'color', scope: 'cue', initialValue: 'white', isParameter: true },
+          {
+            name: 'waitUntilCondition',
+            type: 'string',
+            scope: 'cue',
+            initialValue: 'beat',
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilTime',
+            type: 'number',
+            scope: 'cue',
+            initialValue: 0,
+            isParameter: true,
+          },
+          { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'variable', name: 'color' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
+                waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+          ],
+          logic: [
+            {
+              id: 'for-each-1',
+              type: 'logic',
+              logicType: 'for-each-light',
+              sourceVariable: 'lights',
+              currentLightVariable: 'currentLight',
+              currentIndexVariable: 'idx',
+            } as any,
+          ],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-1', type: 'effect-listener', label: 'Entry', outputs: ['for-each-1'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-1', to: 'for-each-1' },
+          { from: 'for-each-1', to: 'action-1', fromPort: 'each' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(scoreLikeEffect)
+      const effectRegistry = new EffectRegistry()
+      effectRegistry.registerEffect('score-like-effect', compiledEffect)
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+      }
+
+      const effectRaiserNode = {
+        id: 'raiser1',
+        type: 'effect-raiser' as const,
+        effectId: 'score-like-effect',
+        label: 'Score Effect',
+        outputs: [] as string[],
+        parameterValues: {
+          lights: { source: 'variable' as const, name: 'lights' },
+          color: { source: 'literal' as const, value: 'yellow' },
+          waitUntilCondition: { source: 'literal' as const, value: 'delay' },
+          waitUntilTime: { source: 'literal' as const, value: 500 },
+        },
+      }
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: 'TestType' as CueType,
+        style: 'primary',
+        description: 'Test',
+        nodes: {
+          events: [eventNode],
+          actions: [],
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectRaisers: [effectRaiserNode],
+        },
+        connections: [{ from: 'event1', to: 'raiser1' }],
+      }
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map(),
+        logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map([['raiser1', effectRaiserNode]]),
+        eventDefinitions: [],
+        adjacency: new Map([['event1', [{ from: 'event1', to: 'raiser1' }]]]),
+      }
+
+      cueLevelVarStore.set('lights', {
+        type: 'light-array',
+        value: [
+          { id: 'light1', position: 0 },
+          { id: 'light2', position: 1 },
+        ],
+      })
+
+      let submittedEffect: any
+      const captureEffect = (_name: string, effectArg: any, _callback?: () => void) => {
+        submittedEffect = effectArg
+      }
+      ;(mockSequencer.addEffectUnblockedNameWithCallback as jest.Mock).mockImplementation(
+        captureEffect,
+      )
+      ;(mockSequencer.setEffectUnblockedNameWithCallback as jest.Mock).mockImplementation(
+        captureEffect,
+      )
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        effectRegistry,
+      )
+
+      engine.startExecution(eventNode, createCueData('Strong'))
+
+      expect(submittedEffect).toBeDefined()
+      expect(submittedEffect.transitions?.length).toBeGreaterThan(0)
+      const firstTransition = submittedEffect.transitions[0]
+      expect(firstTransition.waitUntilCondition).toBe('delay')
+      expect(firstTransition.waitUntilTime).toBe(500)
+      expect(firstTransition.transform?.color?.red).toBeGreaterThan(0)
+      expect(firstTransition.transform?.color?.green).toBeGreaterThan(0)
     })
   })
 

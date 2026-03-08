@@ -114,6 +114,43 @@ describe('YargCueRegistry', () => {
     })
   })
 
+  describe('getCueImplementationFromGroup', () => {
+    beforeEach(() => {
+      registry.registerGroup(customGroup)
+    })
+
+    it('should return implementation from the requested group (deterministic)', () => {
+      const impl = registry.getCueImplementationFromGroup(CueType.Chorus, 'custom')
+      expect(impl).toBeDefined()
+      expect((impl as MockCueImplementation).cueId).toBe('custom-chorus')
+    })
+
+    it('should return same implementation on repeated calls with same group', () => {
+      const a = registry.getCueImplementationFromGroup(CueType.Chorus, 'custom')
+      const b = registry.getCueImplementationFromGroup(CueType.Chorus, 'custom')
+      expect(a).toBe(b)
+      expect((a as MockCueImplementation).cueId).toBe('custom-chorus')
+    })
+
+    it('should return default group cue when requested group does not have the cue', () => {
+      const impl = registry.getCueImplementationFromGroup(CueType.Default, 'custom')
+      expect(impl).toBeDefined()
+      expect((impl as MockCueImplementation).cueId).toBe('default')
+    })
+
+    it('should return null when neither requested group nor default has the cue', () => {
+      const impl = registry.getCueImplementationFromGroup(CueType.BigRockEnding, 'custom')
+      expect(impl).toBeNull()
+    })
+
+    it('should not use active groups (explicit group only)', () => {
+      registry.setActiveGroups(['default'])
+      const impl = registry.getCueImplementationFromGroup(CueType.Chorus, 'custom')
+      expect(impl).toBeDefined()
+      expect((impl as MockCueImplementation).cueId).toBe('custom-chorus')
+    })
+  })
+
   describe('setActiveGroups', () => {
     beforeEach(() => {
       registry.registerGroup(customGroup)

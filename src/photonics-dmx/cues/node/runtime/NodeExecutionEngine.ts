@@ -27,6 +27,7 @@ import {
   LogicNode,
   VariableDefinition,
   ValueSource,
+  VariableType,
 } from '../../types/nodeCueTypes'
 import type { Connection } from '../../types/nodeCueTypes'
 import { TrackedLight } from '../../../types'
@@ -56,6 +57,20 @@ type ChainStep = {
   resolvedLayer: number
   resolvedTiming: ResolvedActionTiming
   resolvedColor: ResolvedColorSetting
+}
+
+/**
+ * Infer variable type from a value source when the effect parameter definition is missing.
+ * Used so unknown parameters are not coerced through a numeric fallback (which would turn
+ * e.g. "delay" or "yellow" into 0).
+ */
+function inferEffectParameterType(source: ValueSource | undefined): VariableType {
+  if (!source || source.source !== 'literal') return 'string'
+  const v = source.value
+  if (typeof v === 'number') return 'number'
+  if (typeof v === 'boolean') return 'boolean'
+  if (Array.isArray(v)) return 'light-array'
+  return 'string'
 }
 
 export class NodeExecutionEngine {
@@ -966,12 +981,13 @@ export class NodeExecutionEngine {
         return
       }
 
-      // Resolve parameter values
+      // Resolve parameter values using the effect's declared parameter types so string/color/event
+      // params are not coerced through a numeric fallback.
       const paramValues: Record<string, string | number | boolean | TrackedLight[]> = {}
       for (const [paramName, valueSource] of Object.entries(raiserNode.parameterValues ?? {})) {
-        // Get parameter type from effect definition
         const paramDef = compiledEffect.parameters.get(paramName)
-        const expectedType = paramDef?.type ?? 'number' // Default to number if not found
+        const expectedType: VariableType =
+          paramDef != null ? paramDef.type : inferEffectParameterType(valueSource)
         paramValues[paramName] = resolveValue(expectedType, valueSource, context)
       }
 
@@ -987,8 +1003,10 @@ export class NodeExecutionEngine {
         this.consumeInitialClearPolicy,
       )
 
-      // Set up completion callback: for persistent raisers, re-trigger immediately on idle.
-      // For non-persistent raisers, remove from tracking so the next cue-called can start fresh.
+      // Set up completion callback: when effect is idle, do cleanup/persistent logic then continue
+      // to the next node. Continuing only on idle ensures delay-based stepping (e.g. Score 500ms
+      // yellow, 200ms blue) is observed: the next raiser (e.g. blue) runs after this effect
+      // completes instead of in the same tick (which would replace this effect via addEffect).
       effectEngine.setOnIdle(() => {
         if (raiserNode.isPersistent && this.activeEffectEngines.has(engineKey)) {
           this.debugLog(`Effect raiser ${raiserNode.id} persistent: re-triggering`)
@@ -997,17 +1015,15 @@ export class NodeExecutionEngine {
           this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`)
           this.activeEffectEngines.delete(engineKey)
         }
+        this.emitNodeExecution('deactivated', raiserNode.id)
+        this.continueToNextNodes(raiserNode.id, context)
       })
 
       // Store the engine in active tracking
       this.activeEffectEngines.set(engineKey, effectEngine)
 
-      // Trigger effect (blocking for this raiser node, but non-blocking for cue execution)
+      // Trigger effect; continue to next node only when effect goes idle (in setOnIdle above)
       effectEngine.triggerEffect(context.cueData)
-
-      this.emitNodeExecution('deactivated', raiserNode.id)
-      // Continue immediately (non-blocking like EventRaiserNode)
-      this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
         this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)

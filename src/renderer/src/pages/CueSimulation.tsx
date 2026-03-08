@@ -266,7 +266,12 @@ const CueSimulation: React.FC = () => {
     }
 
     try {
-      const result = await startTestEffect(selectedEffect.id, selectedVenueSize, selectedBpm)
+      const result = await startTestEffect(
+        selectedEffect.id,
+        selectedVenueSize,
+        selectedBpm,
+        selectedGroupId || undefined,
+      )
       if (!result.success) {
         console.error('Failed to start test effect:', result.error)
       }

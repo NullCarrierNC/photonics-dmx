@@ -102,7 +102,14 @@ class YargCueHandler extends BaseCueHandler {
     // Get implementation from registry
     // Use trackMode, defaulting to 'tracked' if not specified
     const trackMode = parameters.trackMode || 'tracked'
-    const cue = this.registry.getCueImplementation(cueType, trackMode)
+    const cue =
+      trackMode === 'simulated' && parameters.simulationCueGroup
+        ? this.registry.getCueImplementationFromGroup(
+            cueType,
+            parameters.simulationCueGroup,
+            trackMode,
+          )
+        : this.registry.getCueImplementation(cueType, trackMode)
 
     if (cue) {
       const incomingIsStrobe = STROBE_TYPES.includes(cueType)

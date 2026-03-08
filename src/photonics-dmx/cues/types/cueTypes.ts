@@ -144,6 +144,8 @@ export type CueData = {
   strobeState: StrobeState
   performer: number
   trackMode?: 'tracked' | 'autogen' | 'simulated'
+  /** When set with trackMode 'simulated', use this group for cue resolution instead of random active-group selection. */
+  simulationCueGroup?: string
   beat: Beat
   keyframe: string
   bonusEffect: boolean

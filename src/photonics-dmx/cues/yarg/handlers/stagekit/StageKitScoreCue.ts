@@ -7,7 +7,10 @@ import { getColor } from '../../../../helpers/dmxHelpers'
 import { getSweepEffect } from '../../../../effects/sweepEffect'
 
 /**
- * StageKit Score Cue - Yellow clockwise rotation + Blue counter-clockwise rotation
+ * StageKit Score Cue - Yellow clockwise rotation + Blue counter-clockwise rotation.
+ * Timing: Yellow 500ms per step (opposite pairs), Blue 200ms per step (individual, reversed).
+ * The node-based Score cue (cue-sk-score in yarg-stagekit.json) is intended to match this:
+ * effect-rotation-cw with waitUntilCondition delay, waitUntilTime 500; effect-rotation-ccw with 200.
  */
 export class StageKitScoreCue implements INetCue {
   id = 'stagekit-score'

@@ -232,8 +232,7 @@ export class EffectManager implements IEffectManager {
     // Check if the effect contains transitions for layer 0
     const hasLayer0 = transitionsByLayerAndLight.has(0)
 
-    // Shared remediation: when replacing the same-named layer-0 effect, do not call removeAllEffects().
-    // That would clear all layers and publish black; instead replace in place so there is no intermediate black.
+    // Check to see if we've called setEffect before for this effect. If so, queue it and don't clear all.
     if (hasLayer0 && this._lastCalled0LayerEffect === name) {
       this.removeEffect(name, 0)
       this.addEffect(name, effect, isPersistent)
@@ -632,10 +631,28 @@ export class EffectManager implements IEffectManager {
           firstTransition.transform.easing,
         )
 
-        // Update effect state to transitioning
-        lightEffect.state = 'transitioning'
-        lightEffect.transitionStartTime = currentTime
-        lightEffect.waitEndTime = currentTime + firstTransition.transform.duration
+        if (firstTransition.transform.duration > 0) {
+          // Update effect state to transitioning
+          lightEffect.state = 'transitioning'
+          lightEffect.transitionStartTime = currentTime
+          lightEffect.waitEndTime = currentTime + firstTransition.transform.duration
+        } else {
+          // Skip transitioning state if duration is 0
+          lightEffect.lastEndState = color
+          lightEffect.state = 'waitingUntil'
+          if (firstTransition.waitUntilCondition === 'delay') {
+            lightEffect.transitionStartTime = currentTime
+            const count = firstTransition.waitUntilConditionCount ?? 1
+            const delayMs = count > 0 ? count * firstTransition.waitUntilTime : 0
+            lightEffect.waitEndTime = currentTime + delayMs
+          } else if (firstTransition.waitUntilCondition === 'none') {
+            lightEffect.currentTransitionIndex += 1
+            lightEffect.state = 'idle'
+          } else {
+            lightEffect.transitionStartTime = currentTime
+            lightEffect.waitEndTime = currentTime
+          }
+        }
       } else if (firstTransition.waitForCondition === 'delay') {
         // Set up delay-based waiting
         lightEffect.waitEndTime = currentTime + firstTransition.waitForTime

@@ -1430,6 +1430,14 @@
           "isParameter": true
         },
         {
+          "name": "waitUntilTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Ms to wait per phase when waitUntilCondition is delay",
+          "isParameter": true
+        },
+        {
           "name": "numLights",
           "type": "number",
           "scope": "cue",
@@ -1581,8 +1589,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -1649,8 +1657,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -1717,8 +1725,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -2212,6 +2220,14 @@
           "isParameter": true
         },
         {
+          "name": "waitUntilTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Ms to wait per phase when waitUntilCondition is delay",
+          "isParameter": true
+        },
+        {
           "name": "numLights",
           "type": "number",
           "scope": "cue",
@@ -2363,8 +2379,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -2431,8 +2447,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -2499,8 +2515,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
