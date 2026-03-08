@@ -196,23 +196,26 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Get enabled cue groups
   ipcMain.handle(CONFIG.GET_ENABLED_CUE_GROUPS, async () => {
     const registry = YargCueRegistry.getInstance()
-    const prefs = controllerManager.getConfig().getAllPreferences()
+    const config = controllerManager.getConfig()
+    const prefs = config.getAllPreferences()
     let enabled = prefs.enabledCueGroups
     const allGroups = registry.getAllGroups()
+    const knownYargCueGroups = prefs.knownYargCueGroups ?? []
 
-    // If the preference hasn't been set, default to all groups enabled
     if (enabled === undefined) {
       enabled = allGroups
-      await controllerManager.getConfig().setEnabledCueGroups(enabled)
+      await config.setEnabledCueGroups(enabled)
+      await config.setKnownYargCueGroups(allGroups)
       registry.setEnabledGroups(enabled)
     } else {
-      // Automatically enable any newly added cue groups so new groups are not hidden by default
-      const missingGroups = allGroups.filter((id) => !enabled!.includes(id))
-      if (missingGroups.length > 0) {
-        enabled = [...enabled, ...missingGroups]
-        await controllerManager.getConfig().setEnabledCueGroups(enabled)
-        registry.setEnabledGroups(enabled)
+      // Auto-enable only genuinely new groups (not yet in known list); user-disabled groups stay disabled
+      const newGroups = allGroups.filter((id) => !knownYargCueGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabled = [...enabled, ...newGroups]
+        await config.setEnabledCueGroups(enabled)
       }
+      await config.setKnownYargCueGroups(allGroups)
+      registry.setEnabledGroups(enabled)
     }
 
     // Initialize stage kit priority in the registry if not already set

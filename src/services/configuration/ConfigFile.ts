@@ -162,8 +162,10 @@ export class ConfigFile<T> {
     }
     const content = JSON.stringify(versionedData, null, 2)
     const dir = path.dirname(this.filePath)
+    this.ensureConfigDirectory(dir)
     const basename = path.basename(this.filePath)
-    const tempPath = path.join(dir, `.${basename}.tmp.${process.pid}`)
+    const unique = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const tempPath = path.join(dir, `.${basename}.tmp.${unique}`)
     try {
       await fsPromises.writeFile(tempPath, content, 'utf-8')
       await fsPromises.rename(tempPath, this.filePath)

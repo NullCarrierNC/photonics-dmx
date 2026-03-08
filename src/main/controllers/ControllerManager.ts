@@ -150,6 +150,7 @@ export class ControllerManager {
     await copyDefaultData(process.resourcesPath, baseDir)
     await this.initializeEffectLoader() // Initialize effects BEFORE node cues
     await this.initializeNodeCueLoader()
+    this.applyYargEnabledGroupsFromConfig()
     await this.initializeListeners()
 
     this.isInitialized = true
@@ -276,6 +277,26 @@ export class ControllerManager {
       }
       console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
     }
+  }
+
+  /**
+   * Re-apply Yarg enabled groups from configuration after all groups are registered.
+   * Node cue groups are registered in initializeNodeCueLoader(), and each registerGroup()
+   * adds the group to enabled by default, which would overwrite a saved "disabled" preference.
+   * Calling this after the node cue loader ensures the persisted preference wins.
+   */
+  private applyYargEnabledGroupsFromConfig(): void {
+    const registry = YargCueRegistry.getInstance()
+    const registeredIds = registry.getAllGroups()
+    const enabledGroupIds = this.config.getEnabledCueGroups()
+
+    if (enabledGroupIds !== undefined) {
+      const restricted = enabledGroupIds.filter((id) => registeredIds.includes(id))
+      registry.setEnabledGroups(restricted)
+      console.log('CueRegistry enabled groups re-applied from config:', restricted)
+    }
+    // If no saved preference, leave registry as-is (all groups enabled from registerGroup);
+    // GET_ENABLED_CUE_GROUPS will default to all and persist when the UI first reads.
   }
 
   private async initializeNodeCueLoader(): Promise<void> {
