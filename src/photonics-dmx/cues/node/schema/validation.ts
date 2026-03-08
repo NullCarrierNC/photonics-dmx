@@ -560,6 +560,7 @@ const forEachLightLogicSchema: JSONSchemaType<LogicNode> = {
     sourceVariable: { type: 'string' },
     currentLightVariable: { type: 'string' },
     currentIndexVariable: { type: 'string' },
+    groupSize: { ...valueSourceSchema, nullable: true },
   },
 } as any
 

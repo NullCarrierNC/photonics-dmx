@@ -637,7 +637,8 @@ export class EffectManager implements IEffectManager {
           lightEffect.transitionStartTime = currentTime
           lightEffect.waitEndTime = currentTime + firstTransition.transform.duration
         } else {
-          // Skip transitioning state if duration is 0
+          // Duration is 0 — snap to end colour immediately but defer completion to the next
+          // frame so the LTC has a chance to blend this layer before it is torn down.
           lightEffect.lastEndState = color
           lightEffect.state = 'waitingUntil'
           if (firstTransition.waitUntilCondition === 'delay') {
@@ -646,8 +647,8 @@ export class EffectManager implements IEffectManager {
             const delayMs = count > 0 ? count * firstTransition.waitUntilTime : 0
             lightEffect.waitEndTime = currentTime + delayMs
           } else if (firstTransition.waitUntilCondition === 'none') {
-            lightEffect.currentTransitionIndex += 1
-            lightEffect.state = 'idle'
+            // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
+            // next updateTransitions call, after the current frame's blend pass has run.
           } else {
             lightEffect.transitionStartTime = currentTime
             lightEffect.waitEndTime = currentTime

@@ -2586,6 +2586,14 @@
               "waitUntilTime": {
                 "source": "literal",
                 "value": 500
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 2
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -2629,6 +2637,10 @@
               "waitUntilTime": {
                 "source": "literal",
                 "value": 200
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
               }
             }
           }
@@ -2649,19 +2661,19 @@
           "to": "sk-score-yellow"
         },
         {
-          "from": "sk-score-yellow",
+          "from": "event-sk-score-called",
           "to": "sk-score-blue"
         }
       ],
       "layout": {
         "nodePositions": {
           "event-sk-score-start": {
-            "x": 5.233371516689658,
-            "y": -7.211720149964094
+            "x": -11.909252197584578,
+            "y": 29.35921044048763
           },
           "event-sk-score-called": {
-            "x": 268.3758735600859,
-            "y": -6.917502246797085
+            "x": 260.37598249342454,
+            "y": 15.93932937223525
           },
           "sk-score-all": {
             "x": -5.403018297627568,
@@ -2676,14 +2688,14 @@
             "y": 117.7390435449779
           },
           "sk-score-blue": {
-            "x": 511.24996094219387,
-            "y": 132.89378997310996
+            "x": 489.53597090411324,
+            "y": 136.3223147159647
           }
         },
         "viewport": {
-          "x": 410.30739650828764,
-          "y": 106.09155321586877,
-          "zoom": 0.75
+          "x": 184.8330757137428,
+          "y": 64.99181557372887,
+          "zoom": 0.875011914746159
         }
       },
       "variables": [
@@ -2868,15 +2880,40 @@
       ],
       "layout": {
         "nodePositions": {
-          "event-sk-strobe-slow-start": { "x": 5, "y": -6 },
-          "event-sk-strobe-slow-called": { "x": 268, "y": 2 },
-          "sk-strobe-slow-setup": { "x": 2, "y": 124 },
-          "sk-strobe-slow-bpm": { "x": -1, "y": 248 },
-          "sk-strobe-slow-beat-ms": { "x": -8, "y": 368 },
-          "sk-strobe-slow-endwait": { "x": -11, "y": 501 },
-          "sk-strobe-slow-flash": { "x": 254, "y": 121 }
+          "event-sk-strobe-slow-start": {
+            "x": 5,
+            "y": -6
+          },
+          "event-sk-strobe-slow-called": {
+            "x": 268,
+            "y": 2
+          },
+          "sk-strobe-slow-setup": {
+            "x": 2,
+            "y": 124
+          },
+          "sk-strobe-slow-bpm": {
+            "x": -1,
+            "y": 248
+          },
+          "sk-strobe-slow-beat-ms": {
+            "x": -8,
+            "y": 368
+          },
+          "sk-strobe-slow-endwait": {
+            "x": -11,
+            "y": 501
+          },
+          "sk-strobe-slow-flash": {
+            "x": 254,
+            "y": 121
+          }
         },
-        "viewport": { "x": 347, "y": 257, "zoom": 0.79 }
+        "viewport": {
+          "x": 347,
+          "y": 257,
+          "zoom": 0.79
+        }
       },
       "variables": [
         {
@@ -2923,8 +2960,16 @@
       "style": "secondary",
       "nodes": {
         "events": [
-          { "id": "event-sk-strobe-medium-start", "type": "event", "eventType": "cue-started" },
-          { "id": "event-sk-strobe-medium-called", "type": "event", "eventType": "cue-called" }
+          {
+            "id": "event-sk-strobe-medium-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-strobe-medium-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
         ],
         "actions": [],
         "logic": [
@@ -2949,8 +2994,14 @@
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": { "source": "literal", "value": 60000 },
-            "right": { "source": "variable", "name": "bpmVar" },
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
             "assignTo": "beatMs"
           },
           {
@@ -2958,8 +3009,14 @@
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": { "source": "variable", "name": "beatMs" },
-            "right": { "source": "literal", "value": 16 },
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 16
+            },
             "assignTo": "endWait"
           }
         ],
@@ -2971,33 +3028,96 @@
             "type": "effect-raiser",
             "effectId": "effect-flash-color",
             "parameterValues": {
-              "lights": { "source": "variable", "name": "strobeLights" },
-              "layer": { "source": "literal", "value": 255 },
-              "color": { "source": "literal", "value": "white" },
-              "brightness": { "source": "literal", "value": "max" },
-              "blendMode": { "source": "literal", "value": "replace" },
-              "startCondition": { "source": "literal", "value": "none" },
-              "startDelay": { "source": "literal", "value": 0 },
-              "holdTime": { "source": "literal", "value": 60 },
-              "durationIn": { "source": "literal", "value": 0 },
-              "durationOut": { "source": "literal", "value": 0 },
-              "endWaitCondition": { "source": "literal", "value": "delay" },
-              "endWait": { "source": "variable", "name": "endWait" }
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 60
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
             }
           }
         ],
         "notes": []
       },
       "connections": [
-        { "from": "event-sk-strobe-medium-start", "to": "sk-strobe-medium-setup" },
-        { "from": "sk-strobe-medium-setup", "to": "sk-strobe-medium-bpm" },
-        { "from": "sk-strobe-medium-bpm", "to": "sk-strobe-medium-beat-ms" },
-        { "from": "sk-strobe-medium-beat-ms", "to": "sk-strobe-medium-endwait" },
-        { "from": "event-sk-strobe-medium-called", "to": "sk-strobe-medium-flash" }
+        {
+          "from": "event-sk-strobe-medium-start",
+          "to": "sk-strobe-medium-setup"
+        },
+        {
+          "from": "sk-strobe-medium-setup",
+          "to": "sk-strobe-medium-bpm"
+        },
+        {
+          "from": "sk-strobe-medium-bpm",
+          "to": "sk-strobe-medium-beat-ms"
+        },
+        {
+          "from": "sk-strobe-medium-beat-ms",
+          "to": "sk-strobe-medium-endwait"
+        },
+        {
+          "from": "event-sk-strobe-medium-called",
+          "to": "sk-strobe-medium-flash"
+        }
       ],
-      "layout": { "nodePositions": {}, "viewport": { "x": 347, "y": 257, "zoom": 0.79 } },
+      "layout": {
+        "nodePositions": {},
+        "viewport": {
+          "x": 347,
+          "y": 257,
+          "zoom": 0.79
+        }
+      },
       "variables": [
-        { "name": "strobeLights", "type": "light-array", "scope": "cue", "initialValue": [] },
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
         {
           "name": "bpmVar",
           "type": "number",
@@ -3036,8 +3156,16 @@
       "style": "secondary",
       "nodes": {
         "events": [
-          { "id": "event-sk-strobe-fast-start", "type": "event", "eventType": "cue-started" },
-          { "id": "event-sk-strobe-fast-called", "type": "event", "eventType": "cue-called" }
+          {
+            "id": "event-sk-strobe-fast-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-strobe-fast-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
         ],
         "actions": [],
         "logic": [
@@ -3062,8 +3190,14 @@
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": { "source": "literal", "value": 60000 },
-            "right": { "source": "variable", "name": "bpmVar" },
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
             "assignTo": "beatMs"
           },
           {
@@ -3071,8 +3205,14 @@
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": { "source": "variable", "name": "beatMs" },
-            "right": { "source": "literal", "value": 32 },
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 32
+            },
             "assignTo": "endWait"
           }
         ],
@@ -3084,33 +3224,96 @@
             "type": "effect-raiser",
             "effectId": "effect-flash-color",
             "parameterValues": {
-              "lights": { "source": "variable", "name": "strobeLights" },
-              "layer": { "source": "literal", "value": 255 },
-              "color": { "source": "literal", "value": "white" },
-              "brightness": { "source": "literal", "value": "max" },
-              "blendMode": { "source": "literal", "value": "replace" },
-              "startCondition": { "source": "literal", "value": "none" },
-              "startDelay": { "source": "literal", "value": 0 },
-              "holdTime": { "source": "literal", "value": 50 },
-              "durationIn": { "source": "literal", "value": 0 },
-              "durationOut": { "source": "literal", "value": 0 },
-              "endWaitCondition": { "source": "literal", "value": "delay" },
-              "endWait": { "source": "variable", "name": "endWait" }
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 50
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
             }
           }
         ],
         "notes": []
       },
       "connections": [
-        { "from": "event-sk-strobe-fast-start", "to": "sk-strobe-fast-setup" },
-        { "from": "sk-strobe-fast-setup", "to": "sk-strobe-fast-bpm" },
-        { "from": "sk-strobe-fast-bpm", "to": "sk-strobe-fast-beat-ms" },
-        { "from": "sk-strobe-fast-beat-ms", "to": "sk-strobe-fast-endwait" },
-        { "from": "event-sk-strobe-fast-called", "to": "sk-strobe-fast-flash" }
+        {
+          "from": "event-sk-strobe-fast-start",
+          "to": "sk-strobe-fast-setup"
+        },
+        {
+          "from": "sk-strobe-fast-setup",
+          "to": "sk-strobe-fast-bpm"
+        },
+        {
+          "from": "sk-strobe-fast-bpm",
+          "to": "sk-strobe-fast-beat-ms"
+        },
+        {
+          "from": "sk-strobe-fast-beat-ms",
+          "to": "sk-strobe-fast-endwait"
+        },
+        {
+          "from": "event-sk-strobe-fast-called",
+          "to": "sk-strobe-fast-flash"
+        }
       ],
-      "layout": { "nodePositions": {}, "viewport": { "x": 347, "y": 257, "zoom": 0.79 } },
+      "layout": {
+        "nodePositions": {},
+        "viewport": {
+          "x": 347,
+          "y": 257,
+          "zoom": 0.79
+        }
+      },
       "variables": [
-        { "name": "strobeLights", "type": "light-array", "scope": "cue", "initialValue": [] },
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
         {
           "name": "bpmVar",
           "type": "number",
@@ -3149,8 +3352,16 @@
       "style": "secondary",
       "nodes": {
         "events": [
-          { "id": "event-sk-strobe-fastest-start", "type": "event", "eventType": "cue-started" },
-          { "id": "event-sk-strobe-fastest-called", "type": "event", "eventType": "cue-called" }
+          {
+            "id": "event-sk-strobe-fastest-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-strobe-fastest-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
         ],
         "actions": [],
         "logic": [
@@ -3175,8 +3386,14 @@
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": { "source": "literal", "value": 60000 },
-            "right": { "source": "variable", "name": "bpmVar" },
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
             "assignTo": "beatMs"
           },
           {
@@ -3184,8 +3401,14 @@
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
-            "left": { "source": "variable", "name": "beatMs" },
-            "right": { "source": "literal", "value": 64 },
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 64
+            },
             "assignTo": "endWait"
           }
         ],
@@ -3197,33 +3420,96 @@
             "type": "effect-raiser",
             "effectId": "effect-flash-color",
             "parameterValues": {
-              "lights": { "source": "variable", "name": "strobeLights" },
-              "layer": { "source": "literal", "value": 255 },
-              "color": { "source": "literal", "value": "white" },
-              "brightness": { "source": "literal", "value": "max" },
-              "blendMode": { "source": "literal", "value": "replace" },
-              "startCondition": { "source": "literal", "value": "none" },
-              "startDelay": { "source": "literal", "value": 0 },
-              "holdTime": { "source": "literal", "value": 40 },
-              "durationIn": { "source": "literal", "value": 0 },
-              "durationOut": { "source": "literal", "value": 0 },
-              "endWaitCondition": { "source": "literal", "value": "delay" },
-              "endWait": { "source": "variable", "name": "endWait" }
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 40
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
             }
           }
         ],
         "notes": []
       },
       "connections": [
-        { "from": "event-sk-strobe-fastest-start", "to": "sk-strobe-fastest-setup" },
-        { "from": "sk-strobe-fastest-setup", "to": "sk-strobe-fastest-bpm" },
-        { "from": "sk-strobe-fastest-bpm", "to": "sk-strobe-fastest-beat-ms" },
-        { "from": "sk-strobe-fastest-beat-ms", "to": "sk-strobe-fastest-endwait" },
-        { "from": "event-sk-strobe-fastest-called", "to": "sk-strobe-fastest-flash" }
+        {
+          "from": "event-sk-strobe-fastest-start",
+          "to": "sk-strobe-fastest-setup"
+        },
+        {
+          "from": "sk-strobe-fastest-setup",
+          "to": "sk-strobe-fastest-bpm"
+        },
+        {
+          "from": "sk-strobe-fastest-bpm",
+          "to": "sk-strobe-fastest-beat-ms"
+        },
+        {
+          "from": "sk-strobe-fastest-beat-ms",
+          "to": "sk-strobe-fastest-endwait"
+        },
+        {
+          "from": "event-sk-strobe-fastest-called",
+          "to": "sk-strobe-fastest-flash"
+        }
       ],
-      "layout": { "nodePositions": {}, "viewport": { "x": 347, "y": 257, "zoom": 0.79 } },
+      "layout": {
+        "nodePositions": {},
+        "viewport": {
+          "x": 347,
+          "y": 257,
+          "zoom": 0.79
+        }
+      },
       "variables": [
-        { "name": "strobeLights", "type": "light-array", "scope": "cue", "initialValue": [] },
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
         {
           "name": "bpmVar",
           "type": "number",

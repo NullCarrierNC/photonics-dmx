@@ -126,13 +126,12 @@ const createSingleColorTransition = (params: {
   const { lights, layer, waitFor, waitForTime, color, timing, easing } = params
   const duration = safeDuration(timing.duration, 0, 0)
 
-  // Diagnostic: delay-based stepping requires waitUntilTime > 0
-  if (timing.waitUntilCondition === 'delay' && (timing.waitUntilTime ?? 0) <= 0) {
-    console.warn(
-      '[ActionEffectFactory] createSingleColorTransition: waitUntilCondition is delay but waitUntilTime is',
-      timing.waitUntilTime,
-      '(expected > 0 for per-light stepping)',
-    )
+  // Coerce invalid delay: delay with waitUntilTime <= 0 or NaN is treated as no wait
+  let waitUntilCondition = timing.waitUntilCondition
+  let waitUntilTime = safeDuration(timing.waitUntilTime, 0, 0)
+  if (waitUntilCondition === 'delay' && waitUntilTime <= 0) {
+    waitUntilCondition = 'none'
+    waitUntilTime = 0
   }
 
   return {
@@ -146,8 +145,8 @@ const createSingleColorTransition = (params: {
       easing,
       duration,
     },
-    waitUntilCondition: timing.waitUntilCondition,
-    waitUntilTime: safeDuration(timing.waitUntilTime, 0, 0),
+    waitUntilCondition,
+    waitUntilTime,
     waitUntilConditionCount: timing.waitUntilConditionCount,
   }
 }
@@ -164,6 +163,14 @@ const createSingleColorEffect = (params: {
   const duration = safeDuration(timing.duration, 0, 0)
   const { waitForTime } = normalizeWaitFor(timing, 0)
 
+  // Coerce invalid delay: delay with waitUntilTime <= 0 or NaN is treated as no wait
+  let waitUntilCondition = timing.waitUntilCondition
+  let waitUntilTime = safeDuration(timing.waitUntilTime, 0, 0)
+  if (waitUntilCondition === 'delay' && waitUntilTime <= 0) {
+    waitUntilCondition = 'none'
+    waitUntilTime = 0
+  }
+
   return {
     id: 'single-color',
     description: 'Single color effect',
@@ -179,8 +186,8 @@ const createSingleColorEffect = (params: {
           easing,
           duration,
         },
-        waitUntilCondition: timing.waitUntilCondition,
-        waitUntilTime: safeDuration(timing.waitUntilTime, 0, 0),
+        waitUntilCondition,
+        waitUntilTime,
         waitUntilConditionCount: timing.waitUntilConditionCount,
       },
     ],

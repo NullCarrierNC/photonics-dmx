@@ -175,20 +175,6 @@ export class EffectExecutionEngine {
     // Apply parameter values to effect variables
     this.applyParameterValues(effectListener)
 
-    // Diagnostic: when effect uses delay-based stepping, ensure waitUntilTime made it into the store
-    const waitUntilConditionVar = this.effectVarStore.get('waitUntilCondition')
-    const waitUntilTimeVar = this.effectVarStore.get('waitUntilTime')
-    const delayCondition = waitUntilConditionVar && String(waitUntilConditionVar.value) === 'delay'
-    if (delayCondition) {
-      const waitMs =
-        waitUntilTimeVar && typeof waitUntilTimeVar.value === 'number' ? waitUntilTimeVar.value : 0
-      if (waitMs <= 0) {
-        console.warn(
-          `[EffectExecutionEngine] effect ${this.compiledEffect.definition.id}: waitUntilCondition is delay but waitUntilTime is ${waitMs} (expected > 0 for stepping). parameterValues had: ${JSON.stringify(this.parameterValues['waitUntilTime'])}`,
-        )
-      }
-    }
-
     // Create execution context with caller's cue data. cueLevelVarStore is the effect's
     // var store so resolveActionTiming() reads waitUntilCondition/waitUntilTime from it.
     const context = new ExecutionContext(
@@ -592,14 +578,29 @@ export class EffectExecutionEngine {
     }
 
     const lightsArray = sourceVar.value as TrackedLight[]
-    const length = lightsArray.length
+    const rawLength = lightsArray.length
+
+    // Resolve group size from ValueSource (literal or variable) when set
+    let groupSize = 1
+    if (logicNode.groupSize) {
+      const resolved = Number(resolveValue('number', logicNode.groupSize, context))
+      if (typeof resolved === 'number' && !Number.isNaN(resolved) && resolved > 0) {
+        groupSize = Math.floor(resolved)
+      }
+    }
+
+    const length = groupSize > 1 ? Math.floor(rawLength / groupSize) : rawLength
 
     const bodyNodeIds = collectReachableNodes(adjacency, eachTargets, nodeId)
     context.setForEachLightState(nodeId, { index: 0, length })
 
     for (let i = 0; i < length; i++) {
-      const currentLight = lightsArray[i]
-      const currentLightArray = currentLight ? [currentLight] : []
+      const currentLightArray =
+        groupSize > 1
+          ? lightsArray.slice(i * groupSize, (i + 1) * groupSize)
+          : lightsArray[i]
+            ? [lightsArray[i]]
+            : []
       this.getVarStore(logicNode.currentLightVariable, context).set(
         logicNode.currentLightVariable,
         { type: 'light-array', value: currentLightArray },

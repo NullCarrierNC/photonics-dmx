@@ -1438,7 +1438,22 @@
           "isParameter": true
         },
         {
+          "name": "groupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "Iterate in groups of this many lights (e.g. 2 for opposite pairs)",
+          "isParameter": true
+        },
+        {
           "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "numGroups",
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
@@ -1755,6 +1770,23 @@
             "assignTo": "numLights"
           },
           {
+            "id": "rcw-num-groups",
+            "type": "logic",
+            "logicType": "math",
+            "label": "numGroups = numLights / groupSize",
+            "outputs": [],
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "variable",
+              "name": "groupSize"
+            },
+            "assignTo": "numGroups"
+          },
+          {
             "id": "rcw-phase2-count",
             "type": "logic",
             "logicType": "math",
@@ -1779,7 +1811,11 @@
             "outputs": [],
             "sourceVariable": "lights",
             "currentLightVariable": "currentLight",
-            "currentIndexVariable": "idx"
+            "currentIndexVariable": "idx",
+            "groupSize": {
+              "source": "variable",
+              "name": "groupSize"
+            }
           },
           {
             "id": "rcw-raw1",
@@ -1802,7 +1838,7 @@
             "id": "rcw-raw2",
             "type": "logic",
             "logicType": "math",
-            "label": "raw2 = raw1 + numLights",
+            "label": "raw2 = raw1 + numGroups",
             "outputs": [],
             "operator": "add",
             "left": {
@@ -1811,7 +1847,7 @@
             },
             "right": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "assignTo": "raw2"
           },
@@ -1819,7 +1855,7 @@
             "id": "rcw-steps-on",
             "type": "logic",
             "logicType": "math",
-            "label": "stepsOn = raw2 % numLights",
+            "label": "stepsOn = raw2 % numGroups",
             "outputs": [],
             "operator": "modulus",
             "left": {
@@ -1828,7 +1864,7 @@
             },
             "right": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "assignTo": "stepsOn"
           },
@@ -1836,12 +1872,12 @@
             "id": "rcw-num-minus",
             "type": "logic",
             "logicType": "math",
-            "label": "numMinus = numLights - stepsOn",
+            "label": "numMinus = numGroups - stepsOn",
             "outputs": [],
             "operator": "subtract",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "right": {
               "source": "variable",
@@ -1977,7 +2013,16 @@
             "outputs": []
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "notes-602af270-549c-43e5-939b-b9dae67901ed",
+            "type": "notes",
+            "label": "Notes",
+            "note": "For each normally increments by 1.\nGroup Size lets us increment by X, while also reducing\nthe number of iterations / X.\n\nE.g. groupSize 2 means for each step we iterate two\nlights instead of one, and halve the total number\nof iterations. \n\nThis is used by cues like Score to move groups of two\ndefined lights in a clockwise pattern.",
+            "style": "notes",
+            "title": "For Each Light & Group Size"
+          }
+        ]
       },
       "connections": [
         {
@@ -1986,6 +2031,10 @@
         },
         {
           "from": "rcw-num-lights",
+          "to": "rcw-num-groups"
+        },
+        {
+          "from": "rcw-num-groups",
           "to": "rcw-phase2-count"
         },
         {
@@ -2071,8 +2120,12 @@
             "y": 1071.5626748725772
           },
           "rcw-num-lights": {
-            "x": -0.913223572075367,
-            "y": 131.4937989860773
+            "x": 17.086776427924633,
+            "y": 21.49379898607731
+          },
+          "rcw-num-groups": {
+            "x": 51.56838946372727,
+            "y": 135.51311212236578
           },
           "rcw-phase2-count": {
             "x": -3.0710418429225683,
@@ -2127,14 +2180,18 @@
             "y": 618.8741846941411
           },
           "rcw-listener": {
-            "x": 1.5539837032556534,
-            "y": 4.904221013188362
+            "x": -26.446016296744347,
+            "y": -91.09577898681164
+          },
+          "notes-602af270-549c-43e5-939b-b9dae67901ed": {
+            "x": -344.7859663395264,
+            "y": 292.680286774842
           }
         },
         "viewport": {
-          "x": 388.17912361963886,
-          "y": 140.507262670662,
-          "zoom": 0.5680563024139482
+          "x": 355.9607721765864,
+          "y": -12.168187321042069,
+          "zoom": 0.8766057213160353
         }
       }
     },
@@ -2228,7 +2285,22 @@
           "isParameter": true
         },
         {
+          "name": "groupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "Iterate in groups of this many lights (e.g. 2 for opposite pairs)",
+          "isParameter": true
+        },
+        {
           "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "numGroups",
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
@@ -2545,6 +2617,23 @@
             "assignTo": "numLights"
           },
           {
+            "id": "rccw-num-groups",
+            "type": "logic",
+            "logicType": "math",
+            "label": "numGroups = numLights / groupSize",
+            "outputs": [],
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "variable",
+              "name": "groupSize"
+            },
+            "assignTo": "numGroups"
+          },
+          {
             "id": "rccw-phase2-count",
             "type": "logic",
             "logicType": "math",
@@ -2569,7 +2658,11 @@
             "outputs": [],
             "sourceVariable": "lights",
             "currentLightVariable": "currentLight",
-            "currentIndexVariable": "idx"
+            "currentIndexVariable": "idx",
+            "groupSize": {
+              "source": "variable",
+              "name": "groupSize"
+            }
           },
           {
             "id": "rccw-raw1",
@@ -2592,7 +2685,7 @@
             "id": "rccw-raw2",
             "type": "logic",
             "logicType": "math",
-            "label": "raw2 = raw1 + numLights",
+            "label": "raw2 = raw1 + numGroups",
             "outputs": [],
             "operator": "add",
             "left": {
@@ -2601,7 +2694,7 @@
             },
             "right": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "assignTo": "raw2"
           },
@@ -2609,7 +2702,7 @@
             "id": "rccw-steps-on",
             "type": "logic",
             "logicType": "math",
-            "label": "stepsOn = raw2 % numLights",
+            "label": "stepsOn = raw2 % numGroups",
             "outputs": [],
             "operator": "modulus",
             "left": {
@@ -2618,7 +2711,7 @@
             },
             "right": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "assignTo": "stepsOn"
           },
@@ -2626,12 +2719,12 @@
             "id": "rccw-num-minus",
             "type": "logic",
             "logicType": "math",
-            "label": "numMinus = numLights - stepsOn",
+            "label": "numMinus = numGroups - stepsOn",
             "outputs": [],
             "operator": "subtract",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "right": {
               "source": "variable",
@@ -2776,6 +2869,10 @@
         },
         {
           "from": "rccw-num-lights",
+          "to": "rccw-num-groups"
+        },
+        {
+          "from": "rccw-num-groups",
           "to": "rccw-phase2-count"
         },
         {
@@ -2861,16 +2958,20 @@
             "y": 1021.5539752580225
           },
           "rccw-num-lights": {
-            "x": 2.008732298389077,
-            "y": 120.35809352621436
+            "x": 40.00873229838908,
+            "y": 46.35809352621436
+          },
+          "rccw-num-groups": {
+            "x": 24,
+            "y": 142
           },
           "rccw-phase2-count": {
             "x": -7.79876465164125,
             "y": 247.88150107860565
           },
           "rccw-foreach": {
-            "x": -3.5803973637521267,
-            "y": 376.2959604561329
+            "x": 36.41960263624787,
+            "y": 348.2959604561329
           },
           "rccw-raw1": {
             "x": -10.539574367925525,
@@ -2917,13 +3018,13 @@
             "y": 473.54141522571445
           },
           "rccw-listener": {
-            "x": 11.216093447059393,
-            "y": -6.859663091599941
+            "x": 9.216093447059393,
+            "y": -38.85966309159994
           }
         },
         "viewport": {
-          "x": 117.69980657852744,
-          "y": 51.99637341933817,
+          "x": 287.20934851401483,
+          "y": 85.689574029488,
           "zoom": 0.5
         }
       }

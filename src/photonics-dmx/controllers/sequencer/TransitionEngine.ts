@@ -307,12 +307,13 @@ export class TransitionEngine implements ITransitionEngine {
       activeEffect.transitionStartTime = currentTime
       activeEffect.waitEndTime = currentTime + transition.transform.duration
     } else {
-      // If duration is 0, skip transitioning state and go straight to waitingUntil
+      // Duration is 0 — snap to end colour immediately but defer completion to the next
+      // frame so the LTC has a chance to blend this layer before it is torn down.
       activeEffect.lastEndState = color
       activeEffect.state = 'waitingUntil'
       if (transition.waitUntilCondition === 'none') {
-        activeEffect.currentTransitionIndex += 1
-        activeEffect.state = 'idle'
+        // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
+        // next updateTransitions call, after the current frame's blend pass has run.
       } else if (transition.waitUntilCondition === 'delay') {
         activeEffect.transitionStartTime = currentTime
         activeEffect.waitEndTime = currentTime + this.computeDelayWaitTime(transition)

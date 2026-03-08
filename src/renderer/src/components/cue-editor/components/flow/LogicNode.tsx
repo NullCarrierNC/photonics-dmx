@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { FONT_COURIER_NEW } from '../../lib/styles'
 import type {
+  ForEachLightLogicNode,
   LogicNode,
   ValueSource,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -201,6 +202,8 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
       )
     }
     if (logicType === 'for-each-light') {
+      const groupSize = (logic as ForEachLightLogicNode).groupSize
+      const groupSizeText = groupSize ? formatValueSource(groupSize) : ''
       return (
         <>
           <div>
@@ -210,6 +213,11 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
             Light → <Mono>{logic.currentLightVariable || '?'}</Mono> Index →{' '}
             <Mono>{logic.currentIndexVariable || '?'}</Mono>
           </div>
+          {groupSizeText && (
+            <div>
+              Group size → <Mono>{groupSizeText}</Mono>
+            </div>
+          )}
         </>
       )
     }

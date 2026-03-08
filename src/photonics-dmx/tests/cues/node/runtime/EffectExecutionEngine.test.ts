@@ -418,6 +418,128 @@ describe('EffectExecutionEngine', () => {
       expect(submitted[0].transitions?.[0].waitUntilTime).toBe(500)
     })
 
+    it('coerces delay + waitUntilTime 0 to none + 0 (Stage Kit menu-style, no warning)', async () => {
+      const effect: YargEffectDefinition = {
+        id: 'sweep-like',
+        mode: 'yarg',
+        name: 'Sweep-like',
+        description: '',
+        variables: [
+          {
+            name: 'lights',
+            type: 'light-array',
+            scope: 'cue',
+            initialValue: [],
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilCondition',
+            type: 'string',
+            scope: 'cue',
+            initialValue: 'delay',
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilTime',
+            type: 'number',
+            scope: 'cue',
+            initialValue: 0,
+            isParameter: true,
+          },
+          { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
+                waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+          ],
+          logic: [
+            {
+              id: 'for-each-1',
+              type: 'logic',
+              logicType: 'for-each-light',
+              sourceVariable: 'lights',
+              currentLightVariable: 'currentLight',
+              currentIndexVariable: 'idx',
+              outputs: [],
+            },
+          ],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-1', type: 'effect-listener', label: 'Entry', outputs: ['for-each-1'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-1', to: 'for-each-1' },
+          { from: 'for-each-1', to: 'action-1', fromPort: 'each' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(effect)
+      const lights = [{ id: 'light1', position: 0 }]
+      const parameterValues = {
+        lights,
+        waitUntilCondition: 'delay',
+        waitUntilTime: 0,
+      }
+
+      const submitted: any[] = []
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, effectArg, _callback) => {
+          submitted.push(effectArg)
+        },
+      )
+      mockSequencer.addEffectUnblockedName.mockImplementation((_name, effectArg) => {
+        submitted.push(effectArg)
+        return true
+      })
+
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        parameterValues,
+        createCueData(),
+      )
+
+      await engine.triggerEffect(createCueData())
+
+      expect(submitted.length).toBe(1)
+      expect(submitted[0].transitions?.[0].waitUntilCondition).toBe('none')
+      expect(submitted[0].transitions?.[0].waitUntilTime).toBe(0)
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('waitUntilCondition is delay but waitUntilTime'),
+      )
+      warnSpy.mockRestore()
+    })
+
     it('score-like chained rotation: all transitions get delay and waitUntilTime from effect params (200ms)', async () => {
       const effect: YargEffectDefinition = {
         id: 'rotation-like',
@@ -582,6 +704,122 @@ describe('EffectExecutionEngine', () => {
           expect(t.waitUntilTime).toBe(200)
         },
       )
+    })
+
+    it('iterates in groups when groupSize is set (pairs fire together)', async () => {
+      const effect: YargEffectDefinition = {
+        id: 'grouped-foreach',
+        mode: 'yarg',
+        name: 'Grouped',
+        description: '',
+        variables: [
+          {
+            name: 'lights',
+            type: 'light-array',
+            scope: 'cue',
+            initialValue: [],
+            isParameter: true,
+          },
+          { name: 'groupSize', type: 'number', scope: 'cue', initialValue: 1, isParameter: true },
+          { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'white' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+          ],
+          logic: [
+            {
+              id: 'for-each-1',
+              type: 'logic',
+              logicType: 'for-each-light',
+              sourceVariable: 'lights',
+              currentLightVariable: 'currentLight',
+              currentIndexVariable: 'idx',
+              groupSize: { source: 'variable', name: 'groupSize' },
+              outputs: [],
+            } as any,
+          ],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-1', type: 'effect-listener', label: 'Entry', outputs: ['for-each-1'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-1', to: 'for-each-1' },
+          { from: 'for-each-1', to: 'action-1', fromPort: 'each' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(effect)
+      const lights = [
+        { id: 'light1', position: 0 },
+        { id: 'light2', position: 1 },
+        { id: 'light3', position: 2 },
+        { id: 'light4', position: 3 },
+      ]
+      const parameterValues = { lights, groupSize: 2 }
+
+      const submissions: any[] = []
+      const captureEffect = (_name: string, effectArg: any) => submissions.push(effectArg)
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (name, effectArg, _callback) => captureEffect(name, effectArg),
+      )
+      mockSequencer.addEffectUnblockedName.mockImplementation((name, effectArg) => {
+        captureEffect(name, effectArg)
+        return true
+      })
+
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        parameterValues,
+        createCueData(),
+      )
+
+      await engine.triggerEffect(createCueData())
+
+      // 4 lights / groupSize 2 = 2 iterations; each iteration submits one effect
+      expect(submissions.length).toBe(2)
+      // First submission: group [light1, light2]
+      expect(submissions[0].transitions[0].lights).toHaveLength(2)
+      expect(submissions[0].transitions[0].lights.map((l: { id: string }) => l.id)).toEqual([
+        'light1',
+        'light2',
+      ])
+      // Second submission: group [light3, light4]
+      expect(submissions[1].transitions[0].lights).toHaveLength(2)
+      expect(submissions[1].transitions[0].lights.map((l: { id: string }) => l.id)).toEqual([
+        'light3',
+        'light4',
+      ])
     })
   })
 
