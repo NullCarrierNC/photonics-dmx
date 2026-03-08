@@ -584,6 +584,10 @@
               "lowBrightness": {
                 "source": "literal",
                 "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "blue"
               }
             }
           }
