@@ -1,8 +1,9 @@
 import React from 'react'
 import { type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
+import FlowNodeFrame from './FlowNodeFrame'
 
-const NotesNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => {
+const NotesNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) => {
   if (data.kind !== 'notes') return null
   const notesPayload = data.payload as {
     title?: string
@@ -29,7 +30,8 @@ const NotesNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => {
       : 'border-yellow-400 dark:border-yellow-500'
 
   return (
-    <div
+    <FlowNodeFrame
+      id={id}
       className={`px-3 py-2.5 rounded-sm text-xs shadow-lg min-w-[320px] max-w-[440px] transform rotate-[-1.5deg] ${containerClasses} ${selectedStyles}`}
       style={{
         boxShadow: selected
@@ -42,7 +44,7 @@ const NotesNode: React.FC<NodeProps<EditorNodeData>> = ({ data, selected }) => {
         <div className={`font-bold mb-1.5 border-b pb-1 text-[11px] ${titleClasses}`}>{title}</div>
       )}
       <div className="text-[11px] break-words leading-relaxed whitespace-pre-wrap">{note}</div>
-    </div>
+    </FlowNodeFrame>
   )
 }
 

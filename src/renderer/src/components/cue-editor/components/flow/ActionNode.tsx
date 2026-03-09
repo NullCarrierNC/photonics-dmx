@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { getConditionLabel, getTextColorForBg, displayValueSource } from '../../lib/cueUtils'
 import { FONT_COURIER_NEW } from '../../lib/styles'
+import FlowNodeFrame from './FlowNodeFrame'
 import type {
   ActionNode as ActionPayload,
   ValueSource,
@@ -83,7 +84,8 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected })
   const textColorForNode = colorName === 'transparent' ? '#f9fafb' : textColor
 
   return (
-    <div
+    <FlowNodeFrame
+      id={id}
       className={`px-3 py-2 rounded-lg border text-xs shadow-sm min-w-[160px] relative ${selectedStyles} ${activeStyles}`}
       style={{
         borderColor: isColorVariable ? '#666' : 'rgba(0,0,0,0.15)',
@@ -127,7 +129,7 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected })
         Wait until: <span style={FONT_COURIER_NEW}>{waitUntil}</span>
       </div>
       <Handle type="source" position={Position.Bottom} />
-    </div>
+    </FlowNodeFrame>
   )
 }
 

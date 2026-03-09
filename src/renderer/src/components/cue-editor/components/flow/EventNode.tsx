@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { FONT_COURIER_NEW } from '../../lib/styles'
 import { useActiveNodesContext } from '../../context/ActiveNodesContext'
+import FlowNodeFrame from './FlowNodeFrame'
 
 const EventNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) => {
   const activeNodeIds = useActiveNodesContext()
@@ -17,7 +18,8 @@ const EventNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) 
     ? 'shadow-[0_0_20px_12px_rgba(34,197,94,0.7)] ring-[3px] ring-green-400 brightness-125 transition-shadow duration-150'
     : 'transition-shadow duration-300'
   return (
-    <div
+    <FlowNodeFrame
+      id={id}
       className={`px-3 py-2 rounded-lg border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-xs shadow-sm min-w-[140px] ${selectedStyles} ${activeStyles}`}>
       <div className="flex items-center gap-1 font-semibold text-blue-800 dark:text-blue-100">
         <span role="img" aria-label="event">
@@ -28,7 +30,7 @@ const EventNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) 
         </span>
       </div>
       <Handle type="source" position={Position.Bottom} />
-    </div>
+    </FlowNodeFrame>
   )
 }
 

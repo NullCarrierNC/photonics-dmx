@@ -203,6 +203,7 @@ const CueEditor: React.FC = () => {
     addEffectListenerNode,
     addNotesNode,
     updateSelectedNode,
+    updateNodeId,
     loadCueIntoFlow,
     setReactFlowInstance,
     reactFlowInstance,
@@ -854,6 +855,7 @@ const CueEditor: React.FC = () => {
               addEffectListenerNode={addEffectListenerNode}
               addNotesNode={addNotesNode}
               updateSelectedNode={updateSelectedNode}
+              updateNodeId={updateNodeId}
             />
           </div>
         </Panel>

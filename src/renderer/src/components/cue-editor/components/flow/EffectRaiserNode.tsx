@@ -2,6 +2,7 @@ import React from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { FONT_COURIER_NEW } from '../../lib/styles'
+import FlowNodeFrame from './FlowNodeFrame'
 import type {
   EffectRaiserNode,
   ValueSource,
@@ -63,7 +64,8 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selec
   const hasSetValues = paramEntries.length > 0
 
   return (
-    <div
+    <FlowNodeFrame
+      id={id}
       className={`px-3 py-2 rounded-lg border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-xs shadow-sm min-w-[140px] max-w-[200px] ${selectedStyles} ${activeStyles}`}>
       <Handle type="target" position={Position.Top} />
       <div className="flex flex-col gap-1">
@@ -131,7 +133,7 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selec
         )}
       </div>
       <Handle type="source" position={Position.Bottom} />
-    </div>
+    </FlowNodeFrame>
   )
 }
 

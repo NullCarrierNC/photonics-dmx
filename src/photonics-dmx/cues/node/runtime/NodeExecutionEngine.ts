@@ -320,7 +320,10 @@ export class NodeExecutionEngine {
       }
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        this.runtimeEmit(
+          RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+          `${eventNode.id}: ${error.message}`,
+        )
       }
       console.error(`Error starting execution for event ${eventNode.id}:`, error)
     }
@@ -772,7 +775,10 @@ export class NodeExecutionEngine {
       }
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        this.runtimeEmit(
+          RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+          `${actionNode.id}: ${error.message}`,
+        )
       }
       console.error(`Error executing action node ${actionNode.id}:`, error)
       // Continue execution despite error
@@ -829,7 +835,7 @@ export class NodeExecutionEngine {
       this.emitNodeExecution('deactivated', nodeId)
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${error.message}`)
       }
       console.error(`Error executing logic node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
@@ -891,7 +897,7 @@ export class NodeExecutionEngine {
       context.addTimer(timerId)
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${error.message}`)
       }
       console.error(`Error executing delay node ${nodeId}:`, error)
       // Continue to all outgoing edges despite error
@@ -925,7 +931,10 @@ export class NodeExecutionEngine {
       this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        this.runtimeEmit(
+          RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+          `${raiserNode.id}: ${error.message}`,
+        )
       }
       console.error(`Error executing event raiser node ${raiserNode.id}:`, error)
       // Continue execution despite error
@@ -1024,7 +1033,10 @@ export class NodeExecutionEngine {
       effectEngine.triggerEffect(context.cueData)
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        this.runtimeEmit(
+          RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+          `${raiserNode.id}: ${error.message}`,
+        )
       }
       console.error(`Error executing effect raiser node ${raiserNode.id}:`, error)
       this.emitNodeExecution('deactivated', raiserNode.id)
@@ -1079,7 +1091,10 @@ export class NodeExecutionEngine {
       }
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        this.runtimeEmit(
+          RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+          `${listenerNode.id}: ${error.message}`,
+        )
       }
       console.error(`Error starting listener execution for ${listenerNode.id}:`, error)
     }

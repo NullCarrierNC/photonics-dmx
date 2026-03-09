@@ -117,6 +117,41 @@ export function useNodeSelection({
     [reactFlowInstance],
   )
 
+  const updateNodeId = useCallback(
+    (newId: string) => {
+      if (!selectedNodeId) return
+      const trimmed = newId.trim()
+      if (!trimmed) return
+      const isDuplicate = nodes.some((n) => n.id === trimmed && n.id !== selectedNodeId)
+      if (isDuplicate) return
+      if (trimmed === selectedNodeId) return
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.id !== selectedNodeId) return node
+          const nextPayload = { ...node.data.payload, id: trimmed }
+          return {
+            ...node,
+            id: trimmed,
+            data: {
+              ...node.data,
+              payload: nextPayload,
+            },
+          }
+        }),
+      )
+      setEdges((eds) =>
+        eds.map((edge) => ({
+          ...edge,
+          source: edge.source === selectedNodeId ? trimmed : edge.source,
+          target: edge.target === selectedNodeId ? trimmed : edge.target,
+        })),
+      )
+      setSelectedNodeId(trimmed)
+      setIsDirty(true)
+    },
+    [selectedNodeId, nodes, setNodes, setEdges, setIsDirty],
+  )
+
   const updateSelectedNode = useCallback(
     <
       T extends
@@ -193,6 +228,7 @@ export function useNodeSelection({
     closeContextMenu,
     handlePaneContextMenu,
     updateSelectedNode,
+    updateNodeId,
     selectedNode,
     selectedActionHasEventParent,
   }

@@ -2,6 +2,7 @@ import React from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { FONT_COURIER_NEW } from '../../lib/styles'
+import FlowNodeFrame from './FlowNodeFrame'
 import type {
   ForEachLightLogicNode,
   LogicNode,
@@ -333,7 +334,8 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
     : 'transition-shadow duration-300'
 
   return (
-    <div
+    <FlowNodeFrame
+      id={id}
       className={`px-3 py-2 rounded-lg border-2 ${nodeStyles} ${selectedStyles} ${activeStyles}`}>
       <Handle type="target" position={Position.Top} />
       <div className={titleStyles}>{data.label}</div>
@@ -367,7 +369,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
       ) : (
         <Handle type="source" position={Position.Bottom} />
       )}
-    </div>
+    </FlowNodeFrame>
   )
 }
 

@@ -662,7 +662,7 @@ export class EffectExecutionEngine {
       this.emitNodeExecution('deactivated', logic.id)
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${logic.id}: ${error.message}`)
       }
       console.error(`Error executing logic node ${logic.id}:`, error)
       this.emitNodeExecution('deactivated', logic.id)
@@ -719,7 +719,10 @@ export class EffectExecutionEngine {
       context.addTimer(timerId)
     } catch (error) {
       if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+        this.runtimeEmit(
+          RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+          `${delayNode.id}: ${error.message}`,
+        )
       }
       console.error(`Error executing delay node ${delayNode.id}:`, error)
       this.emitNodeExecution('deactivated', delayNode.id)
@@ -787,7 +790,7 @@ export class EffectExecutionEngine {
         this.executeNode(nodeId, context)
       } catch (error) {
         if (error instanceof UninitializedVariableError) {
-          this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+          this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${error.message}`)
         }
         console.error(`Error executing node ${nodeId}:`, error)
       }

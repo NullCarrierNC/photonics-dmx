@@ -130,6 +130,7 @@ const useCueFlow = ({
     addEffectListenerNode: nodeCreation.addEffectListenerNode,
     addNotesNode: nodeCreation.addNotesNode,
     updateSelectedNode: selection.updateSelectedNode,
+    updateNodeId: selection.updateNodeId,
     loadCueIntoFlow,
     setReactFlowInstance: flowSync.setReactFlowInstance,
     reactFlowInstance: flowSync.reactFlowInstance,
