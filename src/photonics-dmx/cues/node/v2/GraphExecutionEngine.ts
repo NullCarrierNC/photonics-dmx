@@ -20,6 +20,20 @@ import { ExecutionPhase } from './types'
 import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
 import type { ExecutionParameters } from './GraphExecutionPolicy'
 
+/**
+ * True if the payload carries instrument-event data (e.g. drum/guitar/bass/keys notes).
+ * Used to avoid overwriting a queued instrument-bearing run with a plain tick.
+ */
+function hasInstrumentNotes(params: ExecutionParameters): boolean {
+  const data = params as CueData
+  return (
+    (Array.isArray(data.drumNotes) && data.drumNotes.length > 0) ||
+    (Array.isArray(data.guitarNotes) && data.guitarNotes.length > 0) ||
+    (Array.isArray(data.bassNotes) && data.bassNotes.length > 0) ||
+    (Array.isArray(data.keysNotes) && data.keysNotes.length > 0)
+  )
+}
+
 /** Session interface: variable stores and initial-clear policy. */
 export interface IGraphExecutionSession {
   getCueLevelVarStore(): Map<string, VariableValue>
@@ -249,6 +263,10 @@ export class GraphExecutionEngine {
     const hasCueEvent = cueStartedNodes.length > 0 || cueCalledNodes.length > 0
 
     if (this.policy.queuing && hasCueEvent && this.isExecutingCueStarted) {
+      const existing = this.queuedParameters[0]
+      if (existing && hasInstrumentNotes(existing) && !hasInstrumentNotes(parameters)) {
+        return
+      }
       this.queuedParameters = [parameters]
       return
     }
@@ -299,6 +317,9 @@ export class GraphExecutionEngine {
     cueCalledNodes: BaseEventNode[],
     params: CueData,
   ): void {
+    if (this.session.markCueStartedFired) {
+      this.session.markCueStartedFired()
+    }
     const runCueStartedAtIndex = (idx: number): void => {
       const ev = cueStartedNodes[idx]
       engine.startExecutionWithCallback(ev, params, () => {
@@ -306,9 +327,6 @@ export class GraphExecutionEngine {
         if (nextIdx < cueStartedNodes.length) {
           runCueStartedAtIndex(nextIdx)
           return
-        }
-        if (this.session.markCueStartedFired) {
-          this.session.markCueStartedFired()
         }
         if (cueCalledNodes.length > 0) {
           let remaining = cueCalledNodes.length

@@ -12,7 +12,7 @@ import type {
   ActionNode,
   VariableDefinition,
 } from '../../../../cues/types/nodeCueTypes'
-import { CueType } from '../../../../cues/types/cueTypes'
+import { CueType, DrumNoteType } from '../../../../cues/types/cueTypes'
 import { GraphExecutionEngine } from '../../../../cues/node/v2/GraphExecutionEngine'
 import { cueGraphPolicy } from '../../../../cues/node/v2/GraphExecutionPolicy'
 import { CueSession } from '../../../../cues/node/v2/CueSession'
@@ -284,6 +284,113 @@ describe('GraphExecutionEngine', () => {
       await jest.runAllTimersAsync()
       expect(sequencer.setEffectUnblockedNameWithCallback).toHaveBeenCalledTimes(1)
       expect(sequencer.addEffectUnblockedNameWithCallback).toHaveBeenCalledTimes(2)
+      jest.useRealTimers()
+    })
+
+    it('preserves queued instrument payload when plain tick would overwrite', async () => {
+      jest.useFakeTimers()
+      const eventStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+      const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventDrumRed: YargEventNode = {
+        id: 'ev-drum-red',
+        type: 'event',
+        eventType: 'drum-red',
+      }
+      const action1: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 0 },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 0 },
+          waitUntilCondition: { source: 'literal', value: 'delay' as const },
+          waitUntilTime: { source: 'literal', value: 10 },
+          easing: 'linear',
+        },
+      }
+      const action2: ActionNode = {
+        id: 'action2',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'yellow' },
+          brightness: { source: 'literal', value: 'medium' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 0 },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 0 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: 'linear',
+        },
+      }
+      const def: YargNodeCueDefinition = {
+        id: 'drum-cue',
+        name: 'Drum Cue',
+        cueType: CueType.Sweep,
+        style: 'primary',
+        nodes: {
+          events: [eventStart, eventCalled, eventDrumRed],
+          actions: [action1, action2],
+          logic: [],
+        },
+        connections: [
+          { from: 'ev-start', to: 'action1' },
+          { from: 'ev-called', to: 'action1' },
+          { from: 'ev-drum-red', to: 'action2' },
+        ],
+      }
+      const compiled = NodeCueCompiler.compileYargCue(def)
+      session.initializeVariables(def.variables ?? [], [])
+      const policy = cueGraphPolicy(groupId, 'group1:drum-cue')
+      const engine = GraphExecutionEngine.forCue(
+        compiled,
+        'group1:drum-cue',
+        policy,
+        session,
+        sequencer,
+        lightManager,
+        new EffectRegistry(),
+        compiled.definition.variables ?? [],
+        noopCallbacks,
+      )
+      const baseParams = {
+        beat: 'Strong',
+        strobeState: 'Strobe_Off',
+        drumNotes: [] as DrumNoteType[],
+        guitarNotes: [],
+        bassNotes: [],
+        keysNotes: [],
+      } as unknown as CueData
+
+      engine.startCueRun(baseParams, { hasCueStartedFired: false })
+      engine.startCueRun(
+        { ...baseParams, drumNotes: [DrumNoteType.RedDrum] },
+        { hasCueStartedFired: false },
+      )
+      engine.startCueRun({ ...baseParams, beat: 'Weak' }, { hasCueStartedFired: false })
+
+      expect(sequencer.setEffectUnblockedNameWithCallback).toHaveBeenCalledTimes(1)
+      await jest.runAllTimersAsync()
+      expect(sequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
       jest.useRealTimers()
     })
   })
