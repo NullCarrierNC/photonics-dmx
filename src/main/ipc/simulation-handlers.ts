@@ -238,8 +238,6 @@ export function setupSimulationHandlers(
         const { instrument, noteType, venueSize = 'Small', bpm = 120, cueGroup, effectId } = data
         const cueHandler = controllerManager.getCueHandler()
         if (cueHandler) {
-          // Instrument-note simulation drives sequencer note events only; it does not resolve
-          // cues by type from the registry. simulationCueGroup is passed for API consistency.
           const mockCueData = createMockCueData({
             venueSize,
             bpm,
@@ -297,6 +295,16 @@ export function setupSimulationHandlers(
               console.warn(`Unknown instrument: ${instrument}`)
               return { success: false, error: `Unknown instrument: ${instrument}` }
           }
+
+          // Run the current test cue with CueData that includes the note so the node graph
+          // runs the instrument-event branch (e.g. drum-red).
+          if (effectId && cueGroup) {
+            const cueType = getCueTypeFromId(effectId)
+            if (cueType) {
+              await cueHandler.handleCue(cueType, mockCueData)
+            }
+          }
+
           sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
           return { success: true }
         }
