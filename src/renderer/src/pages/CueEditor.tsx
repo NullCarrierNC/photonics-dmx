@@ -300,6 +300,41 @@ const CueEditor: React.FC = () => {
     [editorDoc, selectedCueId, updateGroupMeta, updateCueMetadata, updateEffectMetadata],
   )
 
+  const handleSyncVariableValidValues = useCallback(
+    (varName: string, scope: 'cue' | 'cue-group', validValues: string[]) => {
+      if (!editorDoc) return
+
+      if (editorDoc.mode === 'effect') {
+        const vars = (currentEffectDefinition?.variables ?? []).map((v) =>
+          v.name === varName ? { ...v, validValues: [...validValues] } : v,
+        )
+        updateEffectMetadata({ variables: vars })
+      } else {
+        const cueFile = editorDoc.file as NodeCueFile
+        if (scope === 'cue-group') {
+          const groupVars = (cueFile.group.variables ?? []).map((v) =>
+            v.name === varName ? { ...v, validValues: [...validValues] } : v,
+          )
+          updateGroupMeta({ variables: groupVars })
+        } else {
+          if (!selectedCueId) return
+          const cueVars = (cueFile.cues.find((c) => c.id === selectedCueId)?.variables ?? []).map(
+            (v) => (v.name === varName ? { ...v, validValues: [...validValues] } : v),
+          )
+          updateCueMetadata({ variables: cueVars })
+        }
+      }
+    },
+    [
+      editorDoc,
+      selectedCueId,
+      currentEffectDefinition?.variables,
+      updateGroupMeta,
+      updateCueMetadata,
+      updateEffectMetadata,
+    ],
+  )
+
   const handleEventsChange = useCallback(
     (events: EventDefinition[]) => {
       if (!editorDoc || !selectedCueId) return
@@ -510,6 +545,7 @@ const CueEditor: React.FC = () => {
         name: v.name,
         type: v.type,
         scope: 'cue' as const, // Effect variables are cue-scoped
+        validValues: v.validValues,
       }))
       return effectVars
     }
@@ -520,6 +556,7 @@ const CueEditor: React.FC = () => {
       name: v.name,
       type: v.type,
       scope: 'cue-group' as const,
+      validValues: v.validValues,
     }))
 
     const cueVars = selectedCueId
@@ -527,6 +564,7 @@ const CueEditor: React.FC = () => {
           name: v.name,
           type: v.type,
           scope: 'cue' as const,
+          validValues: v.validValues,
         }))
       : []
 
@@ -851,6 +889,7 @@ const CueEditor: React.FC = () => {
               availableEvents={availableEvents}
               availableEffects={availableEffects}
               currentEffect={currentEffectDefinition}
+              onSyncVariableValidValues={handleSyncVariableValidValues}
               addEventNode={addEventNode}
               addActionNode={addActionNode}
               addLogicNode={addLogicNode}

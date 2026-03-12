@@ -38,8 +38,18 @@ import DebuggerLogicEditor from './logic/DebuggerLogicEditor'
 export interface LogicNodeEditorProps {
   node: LogicNode
   activeMode: NodeCueMode
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  availableVariables: {
+    name: string
+    type: string
+    scope: 'cue' | 'cue-group'
+    validValues?: string[]
+  }[]
   updateNode: (updates: Partial<LogicNode>) => void
+  onSyncVariableValidValues?: (
+    varName: string,
+    scope: 'cue' | 'cue-group',
+    validValues: string[],
+  ) => void
 }
 
 const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
@@ -47,6 +57,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
   activeMode,
   availableVariables,
   updateNode,
+  onSyncVariableValidValues,
 }) => {
   if (node.logicType === 'variable') {
     return (
@@ -75,6 +86,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
         activeMode={activeMode}
         availableVariables={availableVariables}
         updateNode={updateNode}
+        onSyncVariableValidValues={onSyncVariableValidValues}
       />
     )
   }

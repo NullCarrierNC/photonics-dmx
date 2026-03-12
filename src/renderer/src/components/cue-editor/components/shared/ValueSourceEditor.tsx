@@ -17,7 +17,12 @@ interface ValueSourceEditorProps {
     | 'event'
     | 'either'
   validLiterals?: string[]
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  availableVariables: {
+    name: string
+    type: string
+    scope: 'cue' | 'cue-group'
+    validValues?: string[]
+  }[]
   integerOnly?: boolean // For number fields that should only accept integers
 }
 

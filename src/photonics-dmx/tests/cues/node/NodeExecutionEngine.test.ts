@@ -1086,17 +1086,39 @@ describe('NodeExecutionEngine', () => {
         ]),
       }
 
+      const effectListenerNode = {
+        id: 'eff-listener-1',
+        type: 'effect-listener' as const,
+        outputs: [],
+      }
       const mockEffect = {
-        definition: { id: 'test-effect', name: 'Test' },
+        definition: {
+          id: 'test-effect',
+          name: 'Test',
+          variables: [],
+          nodes: {
+            events: [],
+            actions: [],
+            logic: [],
+            effectListeners: [effectListenerNode],
+            eventRaisers: [],
+            eventListeners: [],
+          },
+          connections: [],
+        },
         eventRaiserMap: new Map(),
         eventListenerMap: new Map(),
+        effectListenerMap: new Map([[effectListenerNode.id, effectListenerNode]]),
         actionMap: new Map(),
         logicMap: new Map(),
-        adjacency: new Map(),
+        adjacency: new Map([[effectListenerNode.id, []]]),
+        eventMap: new Map(),
+        eventDefinitions: [],
+        parameters: new Map(),
       }
 
       const effectRegistry = new EffectRegistry()
-      effectRegistry.registerEffect('test-effect', mockEffect as CompiledEffect)
+      effectRegistry.registerEffect('test-effect', mockEffect as unknown as CompiledEffect)
 
       const engine = new NodeExecutionEngine(
         compiledCue,

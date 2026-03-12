@@ -52,10 +52,12 @@ const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
   availableVariables,
   updateNode,
 }) => {
-  const inferExpected = (otherSide: ValueSource | undefined): ExpectedType => {
-    if (!otherSide || otherSide.source !== 'variable') return 'either'
+  const inferExpectedAndValidLiterals = (
+    otherSide: ValueSource | undefined,
+  ): { expected: ExpectedType; validLiterals?: string[] } => {
+    if (!otherSide || otherSide.source !== 'variable') return { expected: 'either' }
     const varDef = availableVariables.find((v) => v.name === otherSide.name)
-    if (!varDef) return 'either'
+    if (!varDef) return { expected: 'either' }
     const t = varDef.type
     if (
       t === 'number' ||
@@ -66,13 +68,15 @@ const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
       t === 'light-array' ||
       t === 'event'
     ) {
-      return t
+      return { expected: t, validLiterals: varDef.validValues }
     }
-    return 'either'
+    return { expected: 'either' }
   }
 
-  const expectedLeft = inferExpected(node.right)
-  const expectedRight = inferExpected(node.left)
+  const { expected: expectedLeft, validLiterals: validLiteralsLeft } =
+    inferExpectedAndValidLiterals(node.right)
+  const { expected: expectedRight, validLiterals: validLiteralsRight } =
+    inferExpectedAndValidLiterals(node.left)
 
   useEffect(() => {
     if (node.left?.source === 'literal' && node.left.value !== undefined) {
@@ -111,6 +115,7 @@ const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
         onChange={(next) => updateNode({ left: next })}
         availableVariables={availableVariables}
         expected={expectedLeft}
+        validLiterals={validLiteralsLeft}
       />
       <ValueSourceEditor
         label="Right"
@@ -118,6 +123,7 @@ const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
         onChange={(next) => updateNode({ right: next })}
         availableVariables={availableVariables}
         expected={expectedRight}
+        validLiterals={validLiteralsRight}
       />
       <p className="text-[10px] text-gray-500">
         First outgoing edge becomes TRUE branch, second becomes FALSE.

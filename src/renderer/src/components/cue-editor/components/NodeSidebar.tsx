@@ -35,10 +35,20 @@ type Props = {
   editorMode: EditorMode
   selectedNode: EditorNode | null
   selectedActionHasEventParent: boolean
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  availableVariables: {
+    name: string
+    type: string
+    scope: 'cue' | 'cue-group'
+    validValues?: string[]
+  }[]
   availableEvents?: string[]
   availableEffects?: { id: string; name: string; definition?: EffectDefinition }[]
   currentEffect?: YargEffectDefinition | AudioEffectDefinition | null
+  onSyncVariableValidValues?: (
+    varName: string,
+    scope: 'cue' | 'cue-group',
+    validValues: string[],
+  ) => void
   addEventNode: (
     option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
   ) => void
@@ -104,6 +114,7 @@ const NodeSidebar: React.FC<Props> = ({
   availableEvents = [],
   availableEffects = [],
   currentEffect,
+  onSyncVariableValidValues,
   addEventNode,
   addActionNode,
   addLogicNode,
@@ -199,6 +210,7 @@ const NodeSidebar: React.FC<Props> = ({
                 activeMode={activeMode}
                 availableVariables={availableVariables}
                 updateNode={(updates) => updateSelectedNode<LogicNode>(updates)}
+                onSyncVariableValidValues={onSyncVariableValidValues}
               />
             )}
             {selectedNode.data.kind === 'action' && (

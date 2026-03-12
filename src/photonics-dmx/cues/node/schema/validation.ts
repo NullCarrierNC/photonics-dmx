@@ -1046,6 +1046,48 @@ const detectCycles = (
   return errors
 }
 
+/**
+ * Semantic check: conditional nodes that compare a literal against a variable
+ * with validValues must use a literal that is in the variable's validValues list.
+ */
+const checkConditionalValidValues = (
+  cueName: string,
+  logicNodes: LogicNode[],
+  variableDefinitions: VariableDefinition[],
+  errors: string[],
+): void => {
+  const varMap = new Map(variableDefinitions.map((v) => [v.name, v]))
+  for (const node of logicNodes) {
+    if (node.logicType !== 'conditional') continue
+    const left = node.left
+    const right = node.right
+    const literalStr = (s: ValueSource | undefined): string | null =>
+      s?.source === 'literal' && s.value != null ? String(s.value) : null
+    const varNameFrom = (s: ValueSource | undefined): string | null =>
+      s?.source === 'variable' ? s.name : null
+    const leftLiteral = literalStr(left)
+    const rightVar = varNameFrom(right)
+    const rightLiteral = literalStr(right)
+    const leftVar = varNameFrom(left)
+    if (leftLiteral !== null && rightVar !== null) {
+      const def = varMap.get(rightVar)
+      if (def?.validValues?.length && !def.validValues.includes(leftLiteral)) {
+        errors.push(
+          `cue '${cueName}': Conditional '${node.id}' compares literal "${leftLiteral}" against variable "${rightVar}" — valid values are: ${def.validValues.join(', ')}`,
+        )
+      }
+    }
+    if (rightLiteral !== null && leftVar !== null) {
+      const def = varMap.get(leftVar)
+      if (def?.validValues?.length && !def.validValues.includes(rightLiteral)) {
+        errors.push(
+          `cue '${cueName}': Conditional '${node.id}' compares literal "${rightLiteral}" against variable "${leftVar}" — valid values are: ${def.validValues.join(', ')}`,
+        )
+      }
+    }
+  }
+}
+
 export const validateYargNodeCueFile = (
   value: unknown,
 ): NodeCueValidationResult<YargNodeCueFile> => {
@@ -1088,6 +1130,10 @@ export const validateYargNodeCueFile = (
     const nonEventIds = new Set<string>([...logicIds, ...actionIds])
     const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
     semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
+
+    // Check conditional nodes: literal vs variable validValues
+    const cueVarDefs = [...groupVariables, ...cueVariables]
+    checkConditionalValidValues(cue.name, cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
@@ -1147,6 +1193,10 @@ export const validateAudioNodeCueFile = (
     const nonEventIds = new Set<string>([...logicIds, ...actionIds])
     const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
     semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
+
+    // Check conditional nodes: literal vs variable validValues
+    const cueVarDefs = [...groupVariables, ...cueVariables]
+    checkConditionalValidValues(cue.name, cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
