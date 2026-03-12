@@ -26,7 +26,7 @@ import {
 import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
-import { resolveValue, getVariableStore, UninitializedVariableError } from './valueResolver'
+import { resolveValue, getVariableStore } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
@@ -661,13 +661,10 @@ export class EffectExecutionEngine {
       this.continueExecution(nextNodes, context)
       this.emitNodeExecution('deactivated', logic.id)
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${logic.id}: ${error.message}`)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${logic.id}: ${msg}`)
       console.error(`Error executing logic node ${logic.id}:`, error)
       this.emitNodeExecution('deactivated', logic.id)
-      // Continue to all outgoing edges despite error
-      this.continueToNextNodes(logic.id, context)
     }
   }
 
@@ -718,15 +715,10 @@ export class EffectExecutionEngine {
       }, actualDelay)
       context.addTimer(timerId)
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        this.runtimeEmit(
-          RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
-          `${delayNode.id}: ${error.message}`,
-        )
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${delayNode.id}: ${msg}`)
       console.error(`Error executing delay node ${delayNode.id}:`, error)
       this.emitNodeExecution('deactivated', delayNode.id)
-      this.continueToNextNodes(delayNode.id, context)
     }
   }
 
@@ -789,9 +781,8 @@ export class EffectExecutionEngine {
       try {
         this.executeNode(nodeId, context)
       } catch (error) {
-        if (error instanceof UninitializedVariableError) {
-          this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${error.message}`)
-        }
+        const msg = error instanceof Error ? error.message : String(error)
+        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
         console.error(`Error executing node ${nodeId}:`, error)
       }
     }
