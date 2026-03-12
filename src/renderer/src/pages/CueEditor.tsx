@@ -25,7 +25,9 @@ import { useToast } from '../hooks/useToast'
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles'
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow'
 import { useActiveNodes } from '../components/cue-editor/hooks/useActiveNodes'
+import { useErrorNodes } from '../components/cue-editor/hooks/useErrorNodes'
 import { ActiveNodesContext } from '../components/cue-editor/context/ActiveNodesContext'
+import { ErrorNodesContext } from '../components/cue-editor/context/ErrorNodesContext'
 import {
   updateDocumentFromFlow,
   updateEffectDocumentFromFlow,
@@ -252,6 +254,7 @@ const CueEditor: React.FC = () => {
         ? `${(editorDoc.file as NodeCueFile).group.id}:${selectedCueId}`
         : selectedCueId ?? null
   const activeNodeIds = useActiveNodes(currentGraphId)
+  const errorNodeIds = useErrorNodes(currentGraphId)
 
   const usedCueTypes = useMemo((): Set<string> => {
     if (!editorDoc || editorDoc.mode !== 'cue' || activeMode !== 'yarg') return new Set()
@@ -793,42 +796,44 @@ const CueEditor: React.FC = () => {
               />
             ) : (
               <ActiveNodesContext.Provider value={activeNodeIds}>
-                <CueFlowCanvas
-                  nodes={nodes}
-                  edges={edges}
-                  nodeTypes={nodeTypes}
-                  selectedCueName={
-                    editorMode === 'effect'
-                      ? currentEffectDefinition?.name
-                      : currentCueDefinition?.name
-                  }
-                  contextMenu={contextMenu}
-                  paneContextMenu={paneContextMenu}
-                  flowWrapperRef={flowWrapperRef}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  onConnect={onConnect}
-                  onSelectionChange={handleNodeSelection}
-                  onNodeContextMenu={handleNodeContextMenu}
-                  onEdgeContextMenu={onEdgeContextMenu}
-                  onPaneClick={closeContextMenu}
-                  onPaneContextMenu={handlePaneContextMenu}
-                  onRemoveNode={handleRemoveNode}
-                  setReactFlowInstance={setReactFlowInstance}
-                  isValidConnection={isValidConnection}
-                  activeMode={activeMode}
-                  editorMode={editorMode}
-                  addEventNode={addEventNode}
-                  addActionNode={addActionNode}
-                  addLogicNode={addLogicNode}
-                  addEventRaiserNode={addEventRaiserNode}
-                  addEventListenerNode={addEventListenerNode}
-                  addEffectRaiserNode={addEffectRaiserNode}
-                  addEffectListenerNode={addEffectListenerNode}
-                  addNotesNode={addNotesNode}
-                  onJsonToggle={() => setShowJsonEditor(true)}
-                  onGraphPrettify={handleGraphPrettify}
-                />
+                <ErrorNodesContext.Provider value={errorNodeIds}>
+                  <CueFlowCanvas
+                    nodes={nodes}
+                    edges={edges}
+                    nodeTypes={nodeTypes}
+                    selectedCueName={
+                      editorMode === 'effect'
+                        ? currentEffectDefinition?.name
+                        : currentCueDefinition?.name
+                    }
+                    contextMenu={contextMenu}
+                    paneContextMenu={paneContextMenu}
+                    flowWrapperRef={flowWrapperRef}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    onSelectionChange={handleNodeSelection}
+                    onNodeContextMenu={handleNodeContextMenu}
+                    onEdgeContextMenu={onEdgeContextMenu}
+                    onPaneClick={closeContextMenu}
+                    onPaneContextMenu={handlePaneContextMenu}
+                    onRemoveNode={handleRemoveNode}
+                    setReactFlowInstance={setReactFlowInstance}
+                    isValidConnection={isValidConnection}
+                    activeMode={activeMode}
+                    editorMode={editorMode}
+                    addEventNode={addEventNode}
+                    addActionNode={addActionNode}
+                    addLogicNode={addLogicNode}
+                    addEventRaiserNode={addEventRaiserNode}
+                    addEventListenerNode={addEventListenerNode}
+                    addEffectRaiserNode={addEffectRaiserNode}
+                    addEffectListenerNode={addEffectListenerNode}
+                    addNotesNode={addNotesNode}
+                    onJsonToggle={() => setShowJsonEditor(true)}
+                    onGraphPrettify={handleGraphPrettify}
+                  />
+                </ErrorNodesContext.Provider>
               </ActiveNodesContext.Provider>
             )}
             <CueEditorValidationErrors errors={validationErrors} />

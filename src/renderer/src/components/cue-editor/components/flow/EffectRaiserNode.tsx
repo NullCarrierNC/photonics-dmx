@@ -8,11 +8,8 @@ import type {
   ValueSource,
   VariableDefinition,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { useActiveNodesContext } from '../../context/ActiveNodesContext'
 
 const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) => {
-  const activeNodeIds = useActiveNodesContext()
-  const isActive = activeNodeIds.has(id)
   if (data.kind !== 'effect-raiser') return null
   const raiserPayload = data.payload as EffectRaiserNode
   const effectName = data.effectName || '(select effect)'
@@ -20,9 +17,6 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selec
   const selectedStyles = selected
     ? 'shadow-[0_0_18px_16px_rgba(59,130,246,0.8)] ring-[5px] ring-blue-400'
     : ''
-  const activeStyles = isActive
-    ? 'shadow-[0_0_20px_12px_rgba(34,197,94,0.7)] ring-[3px] ring-green-400 brightness-125 transition-shadow duration-150'
-    : 'transition-shadow duration-300'
 
   // Format a ValueSource for display
   const formatValueSource = (valueSource: ValueSource | undefined): string => {
@@ -66,7 +60,7 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selec
   return (
     <FlowNodeFrame
       id={id}
-      className={`px-3 py-2 rounded-lg border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-xs shadow-sm min-w-[140px] max-w-[200px] ${selectedStyles} ${activeStyles}`}>
+      className={`px-3 py-2 rounded-lg border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-xs shadow-sm min-w-[140px] max-w-[200px] ${selectedStyles}`}>
       <Handle type="target" position={Position.Top} />
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1 font-semibold text-cyan-800 dark:text-cyan-100">
