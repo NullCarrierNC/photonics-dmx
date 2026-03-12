@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useAtomValue } from 'jotai'
 import type {
   ActionNode,
   AudioEventNode,
@@ -27,6 +28,7 @@ import EventNodeEditor from './node-editors/EventNodeEditor'
 import LogicNodeEditor from './node-editors/LogicNodeEditor'
 import ActionNodeEditor from './node-editors/ActionNodeEditor'
 import NotesNodeEditor from './node-editors/NotesNodeEditor'
+import { showNodeIdsAtom } from '../../../atoms'
 
 type Props = {
   activeMode: NodeCueMode
@@ -113,6 +115,7 @@ const NodeSidebar: React.FC<Props> = ({
   updateSelectedNode,
   updateNodeId,
 }) => {
+  const showNodeIds = useAtomValue(showNodeIdsAtom)
   return (
     <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner h-full flex flex-col overflow-hidden">
       {!selectedNode ? (
@@ -139,20 +142,24 @@ const NodeSidebar: React.FC<Props> = ({
         <div className="p-3 flex-1 overflow-y-auto space-y-4">
           <div>
             <h3 className="font-semibold text-sm mb-2">Selected Node</h3>
-            <div className="mb-3">
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Node ID</label>
-              {updateNodeId ? (
-                <NodeIdInput
-                  key={selectedNode.id}
-                  nodeId={selectedNode.id}
-                  onCommit={updateNodeId}
-                />
-              ) : (
-                <span className="block text-sm font-mono text-gray-700 dark:text-gray-300 break-all">
-                  {selectedNode.id}
-                </span>
-              )}
-            </div>
+            {showNodeIds && (
+              <div className="mb-3">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Node ID
+                </label>
+                {updateNodeId ? (
+                  <NodeIdInput
+                    key={selectedNode.id}
+                    nodeId={selectedNode.id}
+                    onCommit={updateNodeId}
+                  />
+                ) : (
+                  <span className="block text-sm font-mono text-gray-700 dark:text-gray-300 break-all">
+                    {selectedNode.id}
+                  </span>
+                )}
+              </div>
+            )}
             {selectedNode.data.kind === 'effect-raiser' && (
               <EffectRaiserEditor
                 node={selectedNode.data.payload as EffectRaiserNode}
