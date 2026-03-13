@@ -218,6 +218,9 @@ export class SongEventHandler implements ISongEventHandler {
             if (currentTransition.waitForConditionCount === 0) {
               this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
             }
+          } else if (currentTransition.waitForConditionCount === 0) {
+            // Count is explicitly 0: start transition immediately (no beat consumed)
+            this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
           } else {
             // No count specified, start transition immediately
             this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
@@ -251,18 +254,26 @@ export class SongEventHandler implements ISongEventHandler {
                 activeEffect.state = 'idle'
               }
             }
-          } else {
-            // No count specified, move to next transition immediately
-            // Move to the next transition and immediately prepare it
+          } else if (currentTransition.waitUntilConditionCount === 0) {
+            // Count is explicitly 0: advance immediately (no beat consumed)
             activeEffect.currentTransitionIndex += 1
 
-            // Check if there's another transition and prepare it immediately
             if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
               const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
               activeEffect.state = 'idle'
               this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime)
             } else {
-              // If no more transitions, just set to idle
+              activeEffect.state = 'idle'
+            }
+          } else {
+            // No count specified, move to next transition immediately
+            activeEffect.currentTransitionIndex += 1
+
+            if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
+              const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
+              activeEffect.state = 'idle'
+              this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime)
+            } else {
               activeEffect.state = 'idle'
             }
           }

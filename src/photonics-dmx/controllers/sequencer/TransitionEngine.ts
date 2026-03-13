@@ -314,6 +314,17 @@ export class TransitionEngine implements ITransitionEngine {
       if (transition.waitUntilCondition === 'none') {
         // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
         // next updateTransitions call, after the current frame's blend pass has run.
+      } else if (
+        transition.waitUntilCondition !== 'delay' &&
+        transition.waitUntilConditionCount === 0
+      ) {
+        // Event-type condition with count 0: advance immediately (no event like beat or keyframe needed).
+        activeEffect.currentTransitionIndex += 1
+        activeEffect.state = 'idle'
+        if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
+          const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
+          this.prepareTransition(activeEffect, nextTransition, currentTime)
+        }
       } else if (transition.waitUntilCondition === 'delay') {
         activeEffect.transitionStartTime = currentTime
         activeEffect.waitEndTime = currentTime + this.computeDelayWaitTime(transition)
@@ -345,6 +356,16 @@ export class TransitionEngine implements ITransitionEngine {
       if (transition.waitUntilCondition === 'none') {
         activeEffect.currentTransitionIndex += 1
         activeEffect.state = 'idle'
+      } else if (
+        transition.waitUntilCondition !== 'delay' &&
+        transition.waitUntilConditionCount === 0
+      ) {
+        activeEffect.currentTransitionIndex += 1
+        activeEffect.state = 'idle'
+        if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
+          const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
+          this.prepareTransition(activeEffect, nextTransition, currentTime)
+        }
       } else if (transition.waitUntilCondition === 'delay') {
         activeEffect.transitionStartTime = currentTime
         activeEffect.waitEndTime = currentTime + this.computeDelayWaitTime(transition)
@@ -372,7 +393,10 @@ export class TransitionEngine implements ITransitionEngine {
         activeEffect.currentTransitionIndex += 1
         activeEffect.state = 'idle'
       }
-    } else if (transition.waitUntilCondition === 'none') {
+    } else if (
+      transition.waitUntilCondition === 'none' ||
+      transition.waitUntilConditionCount === 0
+    ) {
       activeEffect.currentTransitionIndex += 1
       activeEffect.state = 'idle'
     }
