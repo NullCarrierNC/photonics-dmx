@@ -48,6 +48,11 @@ import type {
   YargNodeCueDefinition,
   AudioNodeCueDefinition,
 } from '../../../photonics-dmx/cues/types/nodeCueTypes'
+import {
+  getAudioCueDataPropertyMeta,
+  getYargCueDataPropertyMeta,
+} from '../../../photonics-dmx/constants/cueDataPropertyMeta'
+import { readEffectFile, runNodeScript, showItemInFolder } from '../ipcApi'
 
 type EditorCueOrEffect =
   | YargNodeCueDefinition
@@ -55,11 +60,54 @@ type EditorCueOrEffect =
   | YargEffectDefinition
   | AudioEffectDefinition
   | null
-import { readEffectFile, runNodeScript, showItemInFolder } from '../ipcApi'
 
 const SIDEBAR_LAYOUT_KEY = 'photonics.nodeCueEditor.sidebarLayout'
 // Original grid was minmax(260px,300px) | 2fr | minmax(260px,400px) — approximate as %
 const DEFAULT_SIDEBAR_LAYOUT: Layout = { left: 25, center: 42, right: 33 }
+
+type AvailableVariable = {
+  name: string
+  type: string
+  scope: 'cue' | 'cue-group'
+  validValues?: string[]
+}
+
+function deriveCueDataValidValues(
+  logicNodes: LogicNode[] | undefined,
+  mode: 'yarg' | 'audio',
+): Map<string, string[]> {
+  const derivedValidValues = new Map<string, string[]>()
+
+  for (const node of logicNodes ?? []) {
+    if (node.logicType !== 'cue-data' || !node.assignTo || !node.dataProperty) continue
+
+    const meta =
+      mode === 'yarg'
+        ? getYargCueDataPropertyMeta(node.dataProperty)
+        : getAudioCueDataPropertyMeta(node.dataProperty)
+
+    if (!meta?.validValues?.length) continue
+    derivedValidValues.set(node.assignTo, [...meta.validValues])
+  }
+
+  return derivedValidValues
+}
+
+function enrichAvailableVariables(
+  variables: AvailableVariable[],
+  logicNodes: LogicNode[] | undefined,
+  mode: 'yarg' | 'audio',
+): AvailableVariable[] {
+  const derivedValidValues = deriveCueDataValidValues(logicNodes, mode)
+  if (derivedValidValues.size === 0) return variables
+
+  return variables.map((variable) => {
+    if (variable.validValues?.length) return variable
+
+    const validValues = derivedValidValues.get(variable.name)
+    return validValues ? { ...variable, validValues } : variable
+  })
+}
 
 function getStoredSidebarLayout(): Layout | null {
   try {
@@ -547,11 +595,12 @@ const CueEditor: React.FC = () => {
         scope: 'cue' as const, // Effect variables are cue-scoped
         validValues: v.validValues,
       }))
-      return effectVars
+      return enrichAvailableVariables(effectVars, currentEffectDefinition?.nodes.logic, activeMode)
     }
 
     // Cue mode: combine group and cue variables
     const cueFile = editorDoc.file as NodeCueFile
+    const currentCue = selectedCueId ? cueFile.cues.find((c) => c.id === selectedCueId) : undefined
     const groupVars = (cueFile.group.variables ?? []).map((v) => ({
       name: v.name,
       type: v.type,
@@ -559,17 +608,15 @@ const CueEditor: React.FC = () => {
       validValues: v.validValues,
     }))
 
-    const cueVars = selectedCueId
-      ? (cueFile.cues.find((c) => c.id === selectedCueId)?.variables ?? []).map((v) => ({
-          name: v.name,
-          type: v.type,
-          scope: 'cue' as const,
-          validValues: v.validValues,
-        }))
-      : []
+    const cueVars = (currentCue?.variables ?? []).map((v) => ({
+      name: v.name,
+      type: v.type,
+      scope: 'cue' as const,
+      validValues: v.validValues,
+    }))
 
-    return [...groupVars, ...cueVars]
-  }, [editorDoc, selectedCueId, currentEffectDefinition])
+    return enrichAvailableVariables([...groupVars, ...cueVars], currentCue?.nodes.logic, activeMode)
+  }, [editorDoc, selectedCueId, currentEffectDefinition, activeMode])
 
   const availableEvents = useMemo(() => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return []
