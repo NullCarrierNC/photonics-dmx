@@ -108,6 +108,7 @@ const useCueFlow = ({
 
   return {
     nodes,
+    setNodes,
     edges,
     onNodesChange,
     onEdgesChange,

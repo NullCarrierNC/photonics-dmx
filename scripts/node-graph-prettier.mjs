@@ -12,11 +12,29 @@
  *  - Slight random jitter applied to each node so graphs don't look identical
  *
  * Usage:
- *   node scripts/layout-nodes.mjs [--file <path-or-filename>] [--id <cue-or-effect-id>]
+ *   node scripts/node-graph-prettier.mjs [options]
  *
  * Options:
- *   --file  Match file paths (full, partial, or filename). Only matching files are processed.
- *   --id    Only process the cue/effect with this exact ID (across matched files).
+ *   --file <path>   Absolute or relative path to a JSON file to process directly.
+ *                   May be specified multiple times. When given, the built-in file
+ *                   list is ignored entirely.
+ *   --kind <kind>   'cues' or 'effects'. Required when --file is used and the kind
+ *                   cannot be inferred. If omitted the script tries to detect it by
+ *                   checking which top-level key ('cues' / 'effects') the file has.
+ *   --id <id>       Only process the cue/effect with this exact ID.
+ *
+ * Examples:
+ *   # Process all built-in files
+ *   node scripts/node-graph-prettier.mjs
+ *
+ *   # Process a single arbitrary file (kind auto-detected)
+ *   node scripts/node-graph-prettier.mjs --file /path/to/my-cues.json
+ *
+ *   # Process a specific cue inside an arbitrary file
+ *   node scripts/node-graph-prettier.mjs --file /path/to/my-cues.json --id my-cue-id
+ *
+ *   # Process an arbitrary effects file with explicit kind
+ *   node scripts/node-graph-prettier.mjs --file /path/to/my-effects.json --kind effects
  */
 
 import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'fs'
@@ -46,10 +64,10 @@ const EVENT_TYPE_ORDER = {
   'other': 99,
 }
 
-// Base path for data files
+// Base path for built-in data files
 const DATA_BASE = resolve('/Users/myriad/Library/Application Support/Photonics.rocks')
 
-const FILES = [
+const BUILTIN_FILES = [
   { path: `${DATA_BASE}/node-cues/yarg/yarg-alt1.json`, kind: 'cues' },
   { path: `${DATA_BASE}/node-cues/yarg/yarg-stagekit.json`, kind: 'cues' },
   { path: `${DATA_BASE}/node-cues/yarg/yarg-stagekit-mine.json`, kind: 'cues' },
@@ -62,19 +80,65 @@ const FILES = [
 
 function parseArgs() {
   const args = process.argv.slice(2)
-  let filterByFile = null
+  const explicitFiles = [] // { path, kind? } from --file / --kind pairs
+  let pendingFile = null // last --file value waiting for a possible --kind
   let filterById = null
+
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--file' && args[i + 1] != null) {
-      filterByFile = args[++i]
+      // Flush any previous --file that had no --kind
+      if (pendingFile != null) explicitFiles.push({ path: pendingFile, kind: null })
+      pendingFile = resolve(args[++i])
+    } else if (args[i] === '--kind' && args[i + 1] != null) {
+      const kind = args[++i]
+      if (kind !== 'cues' && kind !== 'effects') {
+        console.error(`--kind must be 'cues' or 'effects', got: "${kind}"`)
+        process.exit(1)
+      }
+      if (pendingFile != null) {
+        explicitFiles.push({ path: pendingFile, kind })
+        pendingFile = null
+      } else {
+        console.warn('--kind given without a preceding --file; ignored.')
+      }
     } else if (args[i] === '--id' && args[i + 1] != null) {
       filterById = args[++i]
+    } else if (args[i] === '--help' || args[i] === '-h') {
+      printUsage()
+      process.exit(0)
     }
   }
-  return { filterByFile, filterById }
+  // Flush a trailing --file with no --kind
+  if (pendingFile != null) explicitFiles.push({ path: pendingFile, kind: null })
+
+  return { explicitFiles, filterById }
 }
 
-const { filterByFile, filterById } = parseArgs()
+function printUsage() {
+  console.log(`
+Usage: node scripts/node-graph-prettier.mjs [options]
+
+Options:
+  --file <path>   JSON file to process (may be repeated; disables built-in list)
+  --kind <kind>   'cues' or 'effects' for the preceding --file (auto-detected if omitted)
+  --id   <id>     Only process the cue/effect with this exact ID
+  --help          Show this message
+`)
+}
+
+/**
+ * Attempt to detect whether a parsed JSON object is a cues or effects file.
+ * Returns 'cues', 'effects', or null if ambiguous.
+ */
+function detectKind(data) {
+  const hasCues = Array.isArray(data.cues)
+  const hasEffects = Array.isArray(data.effects)
+  if (hasCues && !hasEffects) return 'cues'
+  if (hasEffects && !hasCues) return 'effects'
+  return null
+}
+
+const { explicitFiles, filterById } = parseArgs()
 
 // ─── Seeded PRNG (mulberry32) ─────────────────────────────────────────────────
 
@@ -266,7 +330,7 @@ function detectChainSegments(nodeMap, outEdges, inEdges) {
  * Walk nodes in topological order. When a single-in, single-out chain node would push
  * depth past WRAP_DEPTH, start a new column group (reset Y). Returns groupOf and layerInGroup.
  */
-function assignGroups(nodeMap, outEdges, inEdges, layers, _chainSegments) {
+function assignGroups(_nodeMap, outEdges, inEdges, layers, _chainSegments) {
   const groupOf = new Map()
   const layerInGroup = new Map()
 
@@ -623,15 +687,43 @@ function processFile(filePath, kind, filterById = null) {
   return filterById ? processedRequestedId : undefined
 }
 
+// ─── Build the list of files to process ──────────────────────────────────────
+
+/**
+ * Resolve the final list of { path, kind } entries to process.
+ * When --file arguments were provided they fully replace the built-in list.
+ * For each explicit file with no --kind, we auto-detect from the JSON content.
+ */
+function resolveFilesToProcess(explicitFiles) {
+  if (explicitFiles.length === 0) return BUILTIN_FILES
+
+  const resolved = []
+  for (const { path: filePath, kind } of explicitFiles) {
+    if (!existsSync(filePath)) {
+      console.warn(`File not found, skipping: ${filePath}`)
+      continue
+    }
+    let resolvedKind = kind
+    if (!resolvedKind) {
+      const data = JSON.parse(readFileSync(filePath, 'utf-8'))
+      resolvedKind = detectKind(data)
+      if (!resolvedKind) {
+        console.error(
+          `Cannot detect kind for "${filePath}" — it has both or neither 'cues'/'effects' keys.\n` +
+            `Pass --kind cues  or  --kind effects after --file to specify it explicitly.`,
+        )
+        process.exit(1)
+      }
+      console.log(`  Auto-detected kind: ${resolvedKind} for ${filePath}`)
+    }
+    resolved.push({ path: filePath, kind: resolvedKind })
+  }
+  return resolved
+}
+
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
-const filesToProcess = filterByFile
-  ? FILES.filter(({ path }) => path.includes(filterByFile))
-  : FILES
-
-if (filterByFile && filesToProcess.length === 0) {
-  console.warn(`No files match --file "${filterByFile}".`)
-}
+const filesToProcess = resolveFilesToProcess(explicitFiles)
 
 let idWasFound = false
 for (const { path, kind } of filesToProcess) {

@@ -32,6 +32,7 @@ import {
   updateDocumentFromFlow,
   updateEffectDocumentFromFlow,
 } from '../components/cue-editor/lib/cueTransforms'
+import { layoutGraph } from '../components/cue-editor/lib/graphPrettier'
 import type {
   NodeCueFile,
   EffectFile,
@@ -52,7 +53,7 @@ import {
   getAudioCueDataPropertyMeta,
   getYargCueDataPropertyMeta,
 } from '../../../photonics-dmx/constants/cueDataPropertyMeta'
-import { readEffectFile, runNodeScript, showItemInFolder } from '../ipcApi'
+import { readEffectFile, showItemInFolder } from '../ipcApi'
 
 type EditorCueOrEffect =
   | YargNodeCueDefinition
@@ -231,6 +232,7 @@ const CueEditor: React.FC = () => {
 
   const {
     nodes,
+    setNodes,
     edges,
     onNodesChange,
     onEdgesChange,
@@ -713,18 +715,36 @@ const CueEditor: React.FC = () => {
     [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setIsDirty],
   )
 
-  const handleGraphPrettify = useCallback(async () => {
-    if (!editorDoc?.path || !selectedCueId) return
-    if (isDirty) {
-      const saved = await handleSave()
-      if (!saved) return
+  const handleGraphPrettify = useCallback(() => {
+    const definition = editorDoc?.mode === 'effect' ? currentEffectDefinition : currentCueDefinition
+    if (!definition) return
+
+    const nodesData = definition.nodes
+    const connections = definition.connections
+    const existingPositions = definition.layout?.nodePositions ?? {}
+    const result = layoutGraph(definition.id, nodesData, connections, existingPositions)
+    if (!('nodePositions' in result) || !result.nodePositions) return
+
+    setNodes((prev) =>
+      prev.map((node) => {
+        const newPos = result.nodePositions[node.id]
+        return newPos ? { ...node, position: newPos } : node
+      }),
+    )
+
+    if (result.viewport && reactFlowInstance) {
+      reactFlowInstance.setViewport(result.viewport)
     }
-    await runNodeScript({
-      scriptName: 'node-graph-prettier.mjs',
-      args: ['--file', editorDoc.path, '--id', selectedCueId],
-    })
-    await handleReload()
-  }, [editorDoc, selectedCueId, isDirty, handleSave, handleReload])
+
+    setIsDirty(true)
+  }, [
+    editorDoc?.mode,
+    currentCueDefinition,
+    currentEffectDefinition,
+    setNodes,
+    reactFlowInstance,
+    setIsDirty,
+  ])
 
   const guardJsonEditorNavigation = useCallback(
     (action: () => void) => {

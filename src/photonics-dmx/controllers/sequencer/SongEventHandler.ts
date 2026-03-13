@@ -219,7 +219,7 @@ export class SongEventHandler implements ISongEventHandler {
               this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
             }
           } else if (currentTransition.waitForConditionCount === 0) {
-            // Count is explicitly 0: start transition immediately (no beat consumed)
+            // Count is explicitly 0: start transition immediately (no event like beat or keyframe consumed)
             this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
           } else {
             // No count specified, start transition immediately
