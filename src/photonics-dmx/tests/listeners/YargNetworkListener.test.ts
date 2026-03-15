@@ -1,6 +1,6 @@
 /**
  * Tests for YargNetworkListener: lifecycle (start/stop), passive strobe shutdown,
- * and identical-frame forwarding.
+ * identical-frame throttling (30 Hz), and immediate forwarding of changed frames.
  * UDP socket is mocked.
  */
 
@@ -164,8 +164,19 @@ describe('YargNetworkListener', () => {
     })
   })
 
-  describe('identical-frame handling (no dedupe)', () => {
-    it('processCueData forwards identical frames so keep-alive refreshes reach the handler', () => {
+  describe('identical-frame throttling (30 Hz)', () => {
+    const throttleMs = 1000 / 30
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      jest.setSystemTime(0)
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it('limits identical frames to 30 updates per second', () => {
       const frame: CueData = {
         ...defaultCueData,
         lightingCue: CueType.Frenzy,
@@ -174,10 +185,44 @@ describe('YargNetworkListener', () => {
         keyframe: 'Off',
       }
       listener.processCueData(frame)
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
+
+      for (let i = 0; i < 10; i++) {
+        listener.processCueData(frame)
+      }
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
+
+      jest.advanceTimersByTime(throttleMs + 1)
       listener.processCueData(frame)
       expect(cueHandler.handleCue).toHaveBeenCalledTimes(2)
       expect(cueHandler.handleCue).toHaveBeenNthCalledWith(1, CueType.Frenzy, frame)
       expect(cueHandler.handleCue).toHaveBeenNthCalledWith(2, CueType.Frenzy, frame)
+    })
+
+    it('forwards changed frame immediately even within throttle window', () => {
+      const frameA: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Frenzy,
+        strobeState: 'Strobe_Off',
+        beat: 'Off',
+        keyframe: 'Off',
+      }
+      const frameB: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Sweep,
+        strobeState: 'Strobe_Off',
+        beat: 'Off',
+        keyframe: 'Off',
+      }
+
+      listener.processCueData(frameA)
+      listener.processCueData(frameA)
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
+
+      listener.processCueData(frameB)
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(2)
+      expect(cueHandler.handleCue).toHaveBeenNthCalledWith(1, CueType.Frenzy, frameA)
+      expect(cueHandler.handleCue).toHaveBeenNthCalledWith(2, CueType.Sweep, frameB)
     })
   })
 })

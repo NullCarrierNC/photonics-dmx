@@ -101,6 +101,8 @@ enum BeatByte {
 const PORT = 36107
 const PACKET_HEADER = 0x59415247 // 'YARG' in hex
 const YARG_DATAGRAM_VERSION = 1
+/** Max rate for forwarding identical-state packets (30 updates per second). */
+const IDENTICAL_FRAME_THROTTLE_MS = 1000 / 30
 
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
@@ -117,6 +119,9 @@ export class YargNetworkListener extends EventEmitter {
 
   // To store the last processed data for change detection (excluding timestamp)
   private lastData: CueData | null = null
+
+  /** Timestamp (ms) when we last forwarded an identical frame; used to throttle unchanged packets to 30 Hz. */
+  private lastForwardedIdenticalAt = 0
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- log payload shape varies
   private lastLogData: Record<string, any> | null = null
@@ -365,10 +370,14 @@ export class YargNetworkListener extends EventEmitter {
   /**
    * Process one frame of cue data: beat/keyframe, lighting cue, strobe (including passive strobe-off),
    * and instrument notes. Used by deserializePacket and by tests for passive strobe behaviour.
+   * Identical frames are forwarded at most 30 times per second; changed frames are forwarded immediately.
    */
   public processCueData(YargCueData: CueData): void {
-    // No identical-frame dedupe: repeated frames are forwarded unchanged.
-    // The downstream handler and cue implementation decide whether to execute, coalesce, or queue.
+    const isIdentical = this.lastData !== null && this.isDataEqual(this.lastData, YargCueData)
+    if (isIdentical && Date.now() - this.lastForwardedIdenticalAt < IDENTICAL_FRAME_THROTTLE_MS) {
+      return
+    }
+
     this.handleSceneTransition(YargCueData.currentScene)
 
     const logData = {
@@ -476,6 +485,9 @@ export class YargNetworkListener extends EventEmitter {
     })
 
     this.lastData = YargCueData
+    if (isIdentical) {
+      this.lastForwardedIdenticalAt = Date.now()
+    }
   }
 
   /**
@@ -755,31 +767,26 @@ export class YargNetworkListener extends EventEmitter {
   /**
    * Compares two data objects for equality.
    * Performs a shallow comparison of all enumerable properties.
-   * Excludes the 'timestamp' property.
    * @param data1 First data object.
    * @param data2 Second data object.
-   * @returns True if all properties (excluding 'timestamp') are equal, false otherwise.
+   * @returns True if all properties are equal, false otherwise.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic log comparison
-  private isDataEqual(data1: Record<string, any>, data2: Record<string, any>): boolean {
-    const keys1 = Object.keys(data1)
-    const keys2 = Object.keys(data2)
+  private isDataEqual<T extends Record<string, unknown>>(data1: T, data2: T): boolean {
+    const keys1 = Object.keys(data1) as (keyof T)[]
+    const keys2 = Object.keys(data2) as (keyof T)[]
 
     if (keys1.length !== keys2.length) return false
 
     for (const key of keys1) {
-      // For array comparisons, perform a shallow comparison
-      if (Array.isArray(data1[key]) && Array.isArray(data2[key])) {
-        if (data1[key].length !== data2[key].length) return false
-        for (let i = 0; i < data1[key].length; i++) {
-          if (data1[key][i] !== data2[key][i]) {
-            return false
-          }
+      const value1 = data1[key]
+      const value2 = data2[key]
+      if (Array.isArray(value1) && Array.isArray(value2)) {
+        if (value1.length !== value2.length) return false
+        for (let i = 0; i < value1.length; i++) {
+          if (value1[i] !== value2[i]) return false
         }
       } else {
-        if (data1[key] !== data2[key]) {
-          return false
-        }
+        if (value1 !== value2) return false
       }
     }
     return true
