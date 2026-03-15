@@ -325,6 +325,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'sacnConfig',
   'brightness',
   'enabledCueGroups',
+  'knownYargCueGroups',
   'enabledAudioCueGroups',
   'cueConsistencyWindow',
   'clockRate',

@@ -13,20 +13,33 @@ export function resolveActionTiming(
   timing: ActionTimingConfig,
   context: ExecutionContext,
 ): ResolvedActionTiming {
+  let waitUntilCondition = String(
+    resolveValue('string', timing.waitUntilCondition, context),
+  ) as WaitCondition
+  let waitUntilTime = Number(resolveValue('number', timing.waitUntilTime, context))
+
+  // Coerce invalid delay: delay with waitUntilTime <= 0 or NaN is treated as no wait so the effect
+  // var store and any direct use of timing stay consistent.
+  if (
+    waitUntilCondition === 'delay' &&
+    (typeof waitUntilTime !== 'number' || Number.isNaN(waitUntilTime) || waitUntilTime <= 0)
+  ) {
+    waitUntilCondition = 'none'
+    waitUntilTime = 0
+  }
+
   return {
     ...timing,
     waitForCondition: String(
       resolveValue('string', timing.waitForCondition, context),
     ) as WaitCondition,
-    waitUntilCondition: String(
-      resolveValue('string', timing.waitUntilCondition, context),
-    ) as WaitCondition,
+    waitUntilCondition,
     waitForTime: Number(resolveValue('number', timing.waitForTime, context)),
     waitForConditionCount: timing.waitForConditionCount
       ? Number(resolveValue('number', timing.waitForConditionCount, context))
       : undefined,
     duration: Number(resolveValue('number', timing.duration, context)),
-    waitUntilTime: Number(resolveValue('number', timing.waitUntilTime, context)),
+    waitUntilTime,
     waitUntilConditionCount: timing.waitUntilConditionCount
       ? Number(resolveValue('number', timing.waitUntilConditionCount, context))
       : undefined,

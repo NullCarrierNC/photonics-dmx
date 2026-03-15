@@ -78,18 +78,23 @@ export function setupSimulationHandlers(
     LIGHT.START_TEST_EFFECT,
     async (
       _,
-      data: { effectId: string; venueSize?: 'NoVenue' | 'Small' | 'Large'; bpm?: number },
+      data: {
+        effectId: string
+        venueSize?: 'NoVenue' | 'Small' | 'Large'
+        bpm?: number
+        cueGroup?: string
+      },
     ) => {
-      const { effectId, venueSize, bpm } = data ?? {}
+      const { effectId, venueSize, bpm, cueGroup } = data ?? {}
       console.log(
-        `IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}`,
+        `IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}, cueGroup: ${cueGroup ?? 'none'}`,
       )
       try {
         if (!controllerManager.getIsInitialized()) {
           console.log('System not initialized, initializing now before testing effect')
           await controllerManager.init()
         }
-        controllerManager.startTestEffect(effectId, venueSize, bpm)
+        controllerManager.startTestEffect(effectId, venueSize, bpm, cueGroup)
         return { success: true }
       } catch (error) {
         console.error('Error starting test effect:', error)
@@ -128,15 +133,8 @@ export function setupSimulationHandlers(
             effectId: effectId ?? undefined,
             beat: 'Strong',
             keyframe: 'Unknown',
+            simulationCueGroup: cueGroup,
           })
-          if (cueGroup) {
-            try {
-              const registry = YargCueRegistry.getInstance()
-              registry.setActiveGroups([cueGroup])
-            } catch (error) {
-              console.warn(`Failed to set active cue group: ${error}`)
-            }
-          }
           const cueHandler = controllerManager.getCueHandler()
           if (cueHandler && effectId) {
             const cueType = getCueTypeFromId(effectId)
@@ -171,15 +169,8 @@ export function setupSimulationHandlers(
             effectId: effectId ?? undefined,
             beat: 'Unknown',
             keyframe: 'Next',
+            simulationCueGroup: cueGroup,
           })
-          if (cueGroup) {
-            try {
-              const registry = YargCueRegistry.getInstance()
-              registry.setActiveGroups([cueGroup])
-            } catch (error) {
-              console.warn(`Failed to set active cue group: ${error}`)
-            }
-          }
           const cueHandler = controllerManager.getCueHandler()
           if (cueHandler && effectId) {
             const cueType = getCueTypeFromId(effectId)
@@ -214,15 +205,8 @@ export function setupSimulationHandlers(
             effectId: effectId ?? undefined,
             beat: 'Measure',
             keyframe: 'Unknown',
+            simulationCueGroup: cueGroup,
           })
-          if (cueGroup) {
-            try {
-              const registry = YargCueRegistry.getInstance()
-              registry.setActiveGroups([cueGroup])
-            } catch (error) {
-              console.warn(`Failed to set active cue group: ${error}`)
-            }
-          }
           const cueHandler = controllerManager.getCueHandler()
           if (cueHandler && effectId) {
             const cueType = getCueTypeFromId(effectId)
@@ -260,6 +244,7 @@ export function setupSimulationHandlers(
             effectId: effectId ?? undefined,
             beat: 'Unknown',
             keyframe: 'Unknown',
+            simulationCueGroup: cueGroup,
           })
           switch (instrument) {
             case 'guitar': {
@@ -310,14 +295,16 @@ export function setupSimulationHandlers(
               console.warn(`Unknown instrument: ${instrument}`)
               return { success: false, error: `Unknown instrument: ${instrument}` }
           }
-          if (cueGroup) {
-            try {
-              const registry = YargCueRegistry.getInstance()
-              registry.setActiveGroups([cueGroup])
-            } catch (error) {
-              console.warn(`Failed to set active cue group: ${error}`)
+
+          // Run the current test cue with CueData that includes the note so the node graph
+          // runs the instrument-event branch (e.g. drum-red).
+          if (effectId && cueGroup) {
+            const cueType = getCueTypeFromId(effectId)
+            if (cueType) {
+              await cueHandler.handleCue(cueType, mockCueData)
             }
           }
+
           sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
           return { success: true }
         }

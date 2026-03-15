@@ -67,8 +67,11 @@ jest.mock('electron', () => ({
   ipcMain: mockIpcMain,
 }))
 
+jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
+
 // Import the setup function
 import { setupLightHandlers } from '../../ipc/light-handlers'
+import { LIGHT } from '../../../shared/ipcChannels'
 
 describe('IPC Light Handlers for Cue Registry', () => {
   let registry: CueRegistry
@@ -79,10 +82,14 @@ describe('IPC Light Handlers for Cue Registry', () => {
   let getCueGroupsHandler: (event: unknown, ...args: any[]) => Promise<any>
   let setActiveGroupsHandler: (event: unknown, groupNames: string[]) => Promise<any>
   let getAvailableCuesHandler: (event: unknown, groupName?: string) => Promise<any>
+  let simulateBeatHandler: (event: unknown, data?: any) => Promise<boolean>
+  let startTestEffectHandler: (event: unknown, data?: any) => Promise<any>
 
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks()
+    mockControllerManager.getLightingController = jest.fn().mockReturnValue({ onBeat: jest.fn() })
+    mockControllerManager.getCueHandler = jest.fn().mockReturnValue({ handleCue: jest.fn() })
 
     // Capture the handlers when they're registered
     mockIpcMain.handle.mockImplementation((channel: string, handler: any) => {
@@ -92,6 +99,10 @@ describe('IPC Light Handlers for Cue Registry', () => {
         setActiveGroupsHandler = handler
       } else if (channel === 'get-available-cues') {
         getAvailableCuesHandler = handler
+      } else if (channel === LIGHT.SIMULATE_BEAT) {
+        simulateBeatHandler = handler
+      } else if (channel === LIGHT.START_TEST_EFFECT) {
+        startTestEffectHandler = handler
       }
     })
 
@@ -255,6 +266,46 @@ describe('IPC Light Handlers for Cue Registry', () => {
     it("should return empty array for a group that doesn't exist", async () => {
       const cues = await getAvailableCuesHandler({}, 'non-existent')
       expect(cues).toEqual([])
+    })
+  })
+
+  describe('simulate-beat with cueGroup (non-destructive active groups)', () => {
+    it('restores active groups after simulating with a different cueGroup', async () => {
+      registry.setEnabledGroups(['default', 'custom'])
+      await setActiveGroupsHandler({}, ['default'])
+      expect(registry.getActiveGroups()).toEqual(['default'])
+
+      await simulateBeatHandler(
+        {},
+        {
+          venueSize: 'Small',
+          bpm: 120,
+          cueGroup: 'custom',
+          effectId: CueType.Chorus,
+        },
+      )
+
+      expect(registry.getActiveGroups()).toEqual(['default'])
+    })
+  })
+
+  describe('start-test-effect handler', () => {
+    it('forwards effectId, venueSize, bpm, and cueGroup to controllerManager.startTestEffect', async () => {
+      mockControllerManager.getIsInitialized = jest.fn().mockReturnValue(true)
+      const effectId = 'Score'
+      const venueSize = 'Large'
+      const bpm = 120
+      const cueGroup = 'yarg-stagekit'
+
+      await startTestEffectHandler({}, { effectId, venueSize, bpm, cueGroup })
+
+      expect(mockControllerManager.startTestEffect).toHaveBeenCalledTimes(1)
+      expect(mockControllerManager.startTestEffect).toHaveBeenCalledWith(
+        effectId,
+        venueSize,
+        bpm,
+        cueGroup,
+      )
     })
   })
 })

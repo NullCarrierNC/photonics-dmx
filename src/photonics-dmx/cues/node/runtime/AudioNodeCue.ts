@@ -129,7 +129,10 @@ export class AudioNodeCue implements IAudioCue {
           actionStep = this.findFirstAction(event.id)
         } catch (error) {
           if (error instanceof UninitializedVariableError) {
-            sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
+            sendToAllWindows(
+              RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+              `${event.id}: ${error.message}`,
+            )
           }
           console.error(`Error in findFirstAction for event ${event.id}:`, error)
           continue

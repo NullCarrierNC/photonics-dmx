@@ -11,7 +11,6 @@ import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPrev
 import DmxRigSelector from '@renderer/components/DmxRigSelector'
 import { useTimeoutEffect } from '../utils/useTimeout'
 import CueRegistrySelector from '@renderer/components/CueRegistrySelector'
-import { ActiveGroupsSelectorRef } from '../components/ActiveCueGroupsSelector'
 import CueSimulationAbout from './CueSimulation/CueSimulationAbout'
 import CueSimulationActions from './CueSimulation/CueSimulationActions'
 import CueSimulationInstrument from './CueSimulation/CueSimulationInstrument'
@@ -21,7 +20,6 @@ import {
   getPrefs,
   savePrefs,
   getCueGroups,
-  setActiveCueGroups,
   getAvailableCues,
   simulateBeat,
   simulateKeyframe,
@@ -74,12 +72,9 @@ const CueSimulation: React.FC = () => {
   useTimeoutEffect(resetMeasureIndicator, showMeasureIndicator ? 200 : null)
   useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 200 : null)
 
-  const activeGroupsSelectorRef = useRef<ActiveGroupsSelectorRef>(null)
-
-  // Track initialization phases to avoid overriding active groups during startup
+  // Track initialization phases
   const isInitialMount = useRef(true)
   const isFullyInitialized = useRef(false)
-  const isSettingActiveGroup = useRef(false)
   const isLoadingFromPrefs = useRef(false)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasLoadedSavedEffect = useRef(false)
@@ -249,63 +244,20 @@ const CueSimulation: React.FC = () => {
     }
   }, [selectedGroupId])
 
-  // Single useEffect to handle set-active-cue-groups when selectedGroupId changes
+  // Simulation uses cueGroup in the simulate payload; we do not set global active groups here.
   useEffect(() => {
-    if (selectedGroupId && !isSettingActiveGroup.current) {
-      isSettingActiveGroup.current = true
-      setActiveCueGroups([selectedGroupId])
-        .then((result) => {
-          if (result.success) {
-            activeGroupsSelectorRef.current?.refreshActiveGroups()
-            console.log(`Set active cue groups: ${selectedGroupId}`)
-            // Mark as fully initialized after first successful group selection
-            if (isInitialMount.current) {
-              isInitialMount.current = false
-            }
-            isFullyInitialized.current = true
-          } else {
-            console.error('Failed to set active groups for preview:', result.error)
-          }
-        })
-        .catch((err) => {
-          console.error('Error setting active groups for preview:', err)
-        })
-        .finally(() => {
-          isSettingActiveGroup.current = false
-        })
-    }
-  }, [selectedGroupId])
-
-  // Helper function to ensure active group matches the selected group when user interacts with effects
-  // This is only needed for explicit user actions, not when group changes (handled by useEffect above)
-  const ensureActiveGroupMatches = useCallback(async () => {
-    if (selectedGroupId && isFullyInitialized.current && !isSettingActiveGroup.current) {
-      try {
-        isSettingActiveGroup.current = true
-        const result = await setActiveCueGroups([selectedGroupId])
-        if (result.success) {
-          activeGroupsSelectorRef.current?.refreshActiveGroups()
-          console.log(`Set active group to match selected group: ${selectedGroupId}`)
-        } else {
-          console.error('Failed to set active group to match selection:', result.error)
-        }
-      } catch (error) {
-        console.error('Error setting active group to match selection:', error)
-      } finally {
-        isSettingActiveGroup.current = false
+    if (selectedGroupId) {
+      if (isInitialMount.current) {
+        isInitialMount.current = false
       }
+      isFullyInitialized.current = true
     }
   }, [selectedGroupId])
 
-  const handleEffectSelect = useCallback(
-    async (effect: EffectSelector) => {
-      console.log('Effect selected:', effect)
-      setSelectedEffect(effect)
-      // When user selects an effect, ensure the active group matches the selected group
-      await ensureActiveGroupMatches()
-    },
-    [ensureActiveGroupMatches],
-  )
+  const handleEffectSelect = useCallback(async (effect: EffectSelector) => {
+    console.log('Effect selected:', effect)
+    setSelectedEffect(effect)
+  }, [])
 
   const handleTestEffect = async () => {
     if (!selectedEffect) {
@@ -313,10 +265,13 @@ const CueSimulation: React.FC = () => {
       return
     }
 
-    // Ensure the active group matches the selected group when testing an effect
-    await ensureActiveGroupMatches()
     try {
-      const result = await startTestEffect(selectedEffect.id, selectedVenueSize, selectedBpm)
+      const result = await startTestEffect(
+        selectedEffect.id,
+        selectedVenueSize,
+        selectedBpm,
+        selectedGroupId || undefined,
+      )
       if (!result.success) {
         console.error('Failed to start test effect:', result.error)
       }
@@ -381,7 +336,7 @@ const CueSimulation: React.FC = () => {
 
   const handleRegistryChange = (type: CueRegistryType) => {
     setSelectedRegistryType(type)
-    // Future implementation: switch between YARG and RB3E registries
+    // UI is currently YARG-only; registry type is not yet wired to a different backend.
   }
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
@@ -403,7 +358,6 @@ const CueSimulation: React.FC = () => {
           // Only update state if the selection actually changed
           setSelectedGroup((prevSelectedGroup) => {
             if (prevSelectedGroup !== displayName) {
-              // Note: set-active-cue-groups is now handled by the useEffect watching selectedGroupId
               return displayName
             }
             return prevSelectedGroup

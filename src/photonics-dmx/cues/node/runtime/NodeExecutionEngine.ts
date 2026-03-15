@@ -27,11 +27,12 @@ import {
   LogicNode,
   VariableDefinition,
   ValueSource,
+  VariableType,
 } from '../../types/nodeCueTypes'
 import type { Connection } from '../../types/nodeCueTypes'
 import { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
-import { ExecutionState, VariableValue } from './executionTypes'
+import { ExecutionState, VariableValue, NodeRuntimeCallbacks } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { EffectExecutionEngine } from './EffectExecutionEngine'
 
@@ -41,7 +42,6 @@ import {
   resolveLocationGroups,
   resolveLightTarget,
   getVariableStore,
-  UninitializedVariableError,
 } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
@@ -56,6 +56,20 @@ type ChainStep = {
   resolvedLayer: number
   resolvedTiming: ResolvedActionTiming
   resolvedColor: ResolvedColorSetting
+}
+
+/**
+ * Infer variable type from a value source when the effect parameter definition is missing.
+ * Used so unknown parameters are not coerced through a numeric fallback (which would turn
+ * e.g. "delay" or "yellow" into 0).
+ */
+function inferEffectParameterType(source: ValueSource | undefined): VariableType {
+  if (!source || source.source !== 'literal') return 'string'
+  const v = source.value
+  if (typeof v === 'number') return 'number'
+  if (typeof v === 'boolean') return 'boolean'
+  if (Array.isArray(v)) return 'light-array'
+  return 'string'
 }
 
 export class NodeExecutionEngine {
@@ -84,7 +98,7 @@ export class NodeExecutionEngine {
   private eventListeners: Map<string, EventListenerNode[]> = new Map()
   private effectRegistry: EffectRegistry
   private activeEffectEngines: Map<string, EffectExecutionEngine> = new Map()
-  /** Effect names and layers submitted via addEffect/addEffectWithCallback, for cancelAll to remove. */
+  /** Effect names and layers submitted via addEffectUnblockedName/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
   /** Node IDs that have emitted 'activated' but not yet 'deactivated', so cancelAll can flush them. */
   private pendingActivations: Set<string> = new Set()
@@ -95,6 +109,14 @@ export class NodeExecutionEngine {
   private debugEnabled: boolean
   /** When .use is true, the next effect submission must use setEffect (then set .use = false). */
   private firstSubmissionUsesSetEffectRef?: { use: boolean }
+  /** When provided (e.g. by V2 CueSession), use instead of reading/mutating the ref. */
+  private readonly consumeInitialClearPolicy?: () => boolean
+  private readonly runtimeCallbacks?: NodeRuntimeCallbacks
+  /** When provided (e.g. by V2), called for each context start/complete/cancel/blocked/running so caller can drive ExecutionStateMachine. */
+  private readonly onContextLifecycle?: (
+    contextId: string,
+    event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
+  ) => void
 
   constructor(
     compiledCue: CompiledYargCue | CompiledAudioCue,
@@ -106,6 +128,12 @@ export class NodeExecutionEngine {
     effectRegistry: EffectRegistry,
     variableDefinitions: VariableDefinition[] = [],
     firstSubmissionUsesSetEffectRef?: { use: boolean },
+    runtimeCallbacks?: NodeRuntimeCallbacks,
+    consumeInitialClearPolicy?: () => boolean,
+    onContextLifecycle?: (
+      contextId: string,
+      event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
+    ) => void,
   ) {
     this.compiledCue = compiledCue
     this.cueId = cueId
@@ -116,6 +144,9 @@ export class NodeExecutionEngine {
     this.effectRegistry = effectRegistry
     this.variableDefinitions = variableDefinitions
     this.firstSubmissionUsesSetEffectRef = firstSubmissionUsesSetEffectRef
+    this.consumeInitialClearPolicy = consumeInitialClearPolicy
+    this.runtimeCallbacks = runtimeCallbacks
+    this.onContextLifecycle = onContextLifecycle
 
     // Debug logging is opt-in to avoid noisy logs in normal operation.
     // Enable with either env var:
@@ -126,6 +157,18 @@ export class NodeExecutionEngine {
 
     // Register all event listeners during initialization
     this.registerEventListeners()
+  }
+
+  /** Returns whether the next effect submission should use setEffect, and consumes the policy (session or ref). */
+  private getAndConsumeInitialClearPolicy(): boolean {
+    if (this.consumeInitialClearPolicy) {
+      return this.consumeInitialClearPolicy()
+    }
+    const v = this.firstSubmissionUsesSetEffectRef?.use === true
+    if (this.firstSubmissionUsesSetEffectRef) {
+      this.firstSubmissionUsesSetEffectRef.use = false
+    }
+    return v
   }
 
   private debugLog(message: string, data?: unknown): void {
@@ -242,6 +285,7 @@ export class NodeExecutionEngine {
       })
 
       context.setOnContextComplete(() => {
+        this.onContextLifecycle?.(context.id, 'completed')
         this.activeContexts.delete(context.id)
         // Fire external completion callback if provided
         if (onComplete) {
@@ -250,6 +294,8 @@ export class NodeExecutionEngine {
       })
 
       this.activeContexts.set(context.id, context)
+
+      this.onContextLifecycle?.(context.id, 'started')
 
       this.emitNodeExecution('activated', eventNode.id)
       this.emitNodeExecution('deactivated', eventNode.id)
@@ -263,6 +309,7 @@ export class NodeExecutionEngine {
         this.continueExecution(nextNodes, context)
       } else {
         // No nodes to execute, context completes immediately
+        this.onContextLifecycle?.(context.id, 'completed')
         context.dispose()
         this.activeContexts.delete(context.id)
         // Fire completion callback even for empty execution
@@ -271,10 +318,17 @@ export class NodeExecutionEngine {
         }
       }
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${eventNode.id}: ${msg}`)
       console.error(`Error starting execution for event ${eventNode.id}:`, error)
+    }
+  }
+
+  private runtimeEmit(channel: string, payload: unknown): void {
+    if (this.runtimeCallbacks) {
+      this.runtimeCallbacks.emit(channel, payload)
+    } else {
+      sendToAllWindows(channel, payload)
     }
   }
 
@@ -284,7 +338,7 @@ export class NodeExecutionEngine {
     } else {
       this.pendingActivations.delete(nodeId)
     }
-    sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
+    this.runtimeEmit(RENDERER_RECEIVE.NODE_EXECUTION, {
       type,
       cueId: this.cueId,
       nodeId,
@@ -534,7 +588,7 @@ export class NodeExecutionEngine {
         })
 
         const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
-        const useSetEffect = this.firstSubmissionUsesSetEffectRef?.use === true
+        const useSetEffect = this.getAndConsumeInitialClearPolicy()
 
         if (shouldBlock) {
           context.registerActiveAction(actionNode.id, actionNode)
@@ -545,18 +599,16 @@ export class NodeExecutionEngine {
           }
           this.submittedEffects.set(effectName, resolvedLayer)
           if (useSetEffect) {
-            this.firstSubmissionUsesSetEffectRef!.use = false
-            this.sequencer.setEffectWithCallback(effectName, effect, callback)
+            this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
           } else {
-            this.sequencer.addEffectWithCallback(effectName, effect, callback)
+            this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
           }
         } else {
           this.submittedEffects.set(effectName, resolvedLayer)
           if (useSetEffect) {
-            this.firstSubmissionUsesSetEffectRef!.use = false
-            void this.sequencer.setEffect(effectName, effect)
+            this.sequencer.setEffectUnblockedName(effectName, effect)
           } else {
-            this.sequencer.addEffect(effectName, effect)
+            this.sequencer.addEffectUnblockedName(effectName, effect)
           }
           this.emitNodeExecution('deactivated', actionNode.id)
           this.continueToNextNodes(actionNode.id, context)
@@ -680,7 +732,7 @@ export class NodeExecutionEngine {
       )
       const lastChainNode = actionChain[actionChain.length - 1]
 
-      const useSetEffectChain = this.firstSubmissionUsesSetEffectRef?.use === true
+      const useSetEffectChain = this.getAndConsumeInitialClearPolicy()
       if (chainHasBlockingStep) {
         context.registerActiveAction(lastChainNode.id, lastChainNode)
         const callback = (): void => {
@@ -692,18 +744,24 @@ export class NodeExecutionEngine {
         }
         this.submittedEffects.set(chainEffectName, chainData.baseLayer)
         if (useSetEffectChain) {
-          this.firstSubmissionUsesSetEffectRef!.use = false
-          this.sequencer.setEffectWithCallback(chainEffectName, composedEffect, callback)
+          this.sequencer.setEffectUnblockedNameWithCallback(
+            chainEffectName,
+            composedEffect,
+            callback,
+          )
         } else {
-          this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback)
+          this.sequencer.addEffectUnblockedNameWithCallback(
+            chainEffectName,
+            composedEffect,
+            callback,
+          )
         }
       } else {
         this.submittedEffects.set(chainEffectName, chainData.baseLayer)
         if (useSetEffectChain) {
-          this.firstSubmissionUsesSetEffectRef!.use = false
-          void this.sequencer.setEffect(chainEffectName, composedEffect)
+          this.sequencer.setEffectUnblockedName(chainEffectName, composedEffect)
         } else {
-          this.sequencer.addEffect(chainEffectName, composedEffect)
+          this.sequencer.addEffectUnblockedName(chainEffectName, composedEffect)
         }
         for (const a of actionChain) {
           this.emitNodeExecution('deactivated', a.id)
@@ -711,12 +769,10 @@ export class NodeExecutionEngine {
         this.continueToNextNodes(lastChainNode.id, context)
       }
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${actionNode.id}: ${msg}`)
       console.error(`Error executing action node ${actionNode.id}:`, error)
-      // Continue execution despite error
-      this.continueToNextNodes(actionNode.id, context)
+      this.emitNodeExecution('deactivated', actionNode.id)
     }
   }
 
@@ -750,7 +806,7 @@ export class NodeExecutionEngine {
         variableDefinitions: this.variableDefinitions,
         executeNode: (nextNodeId: string, ctx: ExecutionContext) =>
           this.executeNode(nextNodeId, ctx),
-        debugOutput: sendToAllWindows,
+        debugOutput: (channel: string, payload: unknown) => this.runtimeEmit(channel, payload),
       }
 
       const nextNodes = evaluateLogicNode(logicNode, nodeId, edges, context, evaluatorContext)
@@ -768,13 +824,10 @@ export class NodeExecutionEngine {
       }
       this.emitNodeExecution('deactivated', nodeId)
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
       console.error(`Error executing logic node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
-      // Continue to all outgoing edges despite error
-      this.continueToNextNodes(nodeId, context)
     }
   }
 
@@ -830,12 +883,10 @@ export class NodeExecutionEngine {
       }, actualDelay)
       context.addTimer(timerId)
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
       console.error(`Error executing delay node ${nodeId}:`, error)
-      // Continue to all outgoing edges despite error
-      this.continueToNextNodes(nodeId, context)
+      this.emitNodeExecution('deactivated', nodeId)
     }
   }
 
@@ -864,12 +915,10 @@ export class NodeExecutionEngine {
       // Continue immediately to raiser's child (non-blocking)
       this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${raiserNode.id}: ${msg}`)
       console.error(`Error executing event raiser node ${raiserNode.id}:`, error)
-      // Continue execution despite error
-      this.continueToNextNodes(raiserNode.id, context)
+      this.emitNodeExecution('deactivated', raiserNode.id)
     }
   }
 
@@ -892,20 +941,18 @@ export class NodeExecutionEngine {
       const iterIdx = context.getForEachIterationIndex()
       const engineKey = iterIdx >= 0 ? `${raiserNode.id}:${iterIdx}` : raiserNode.id
 
-      // Check if this effect raiser already has an active execution
+      // Check if this effect raiser already has an active execution (contexts or callback-backed effects)
       const existingEngine = this.activeEffectEngines.get(engineKey)
       if (existingEngine) {
-        // If the existing engine still has active contexts, block re-triggering
-        if (existingEngine.hasActiveContexts()) {
+        if (existingEngine.isBusy()) {
           this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`)
           this.emitNodeExecution('deactivated', raiserNode.id)
           this.continueToNextNodes(raiserNode.id, context)
           return
-        } else {
-          // Engine exists but no active contexts - clean it up and allow new trigger
-          this.debugLog(`Effect raiser ${raiserNode.id} cleaning up completed engine`)
-          this.activeEffectEngines.delete(engineKey)
         }
+        // Engine is idle - clean it up and allow new trigger
+        this.debugLog(`Effect raiser ${raiserNode.id} cleaning up idle engine`)
+        this.activeEffectEngines.delete(engineKey)
       }
 
       // Look up effect from registry
@@ -921,16 +968,17 @@ export class NodeExecutionEngine {
         return
       }
 
-      // Resolve parameter values
+      // Resolve parameter values using the effect's declared parameter types so string/color/event
+      // params are not coerced through a numeric fallback.
       const paramValues: Record<string, string | number | boolean | TrackedLight[]> = {}
       for (const [paramName, valueSource] of Object.entries(raiserNode.parameterValues ?? {})) {
-        // Get parameter type from effect definition
         const paramDef = compiledEffect.parameters.get(paramName)
-        const expectedType = paramDef?.type ?? 'number' // Default to number if not found
+        const expectedType: VariableType =
+          paramDef != null ? paramDef.type : inferEffectParameterType(valueSource)
         paramValues[paramName] = resolveValue(expectedType, valueSource, context)
       }
 
-      // Create effect execution engine
+      // Create effect execution engine (share initial-clear policy so first submission in cue or effect uses setEffect)
       const effectEngine = new EffectExecutionEngine(
         compiledEffect,
         this.sequencer,
@@ -938,10 +986,14 @@ export class NodeExecutionEngine {
         paramValues,
         context.cueData, // Pass caller's cue data
         this.firstSubmissionUsesSetEffectRef,
+        this.runtimeCallbacks,
+        this.consumeInitialClearPolicy,
       )
 
-      // Set up completion callback: for persistent raisers, re-trigger immediately on idle.
-      // For non-persistent raisers, remove from tracking so the next cue-called can start fresh.
+      // Set up completion callback: when effect is idle, do cleanup/persistent logic then continue
+      // to the next node. Continuing only on idle ensures delay-based stepping (e.g. Score 500ms
+      // yellow, 200ms blue) is observed: the next raiser (e.g. blue) runs after this effect
+      // completes instead of in the same tick (which would replace this effect via addEffect).
       effectEngine.setOnIdle(() => {
         if (raiserNode.isPersistent && this.activeEffectEngines.has(engineKey)) {
           this.debugLog(`Effect raiser ${raiserNode.id} persistent: re-triggering`)
@@ -950,25 +1002,20 @@ export class NodeExecutionEngine {
           this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`)
           this.activeEffectEngines.delete(engineKey)
         }
+        this.emitNodeExecution('deactivated', raiserNode.id)
+        this.continueToNextNodes(raiserNode.id, context)
       })
 
       // Store the engine in active tracking
       this.activeEffectEngines.set(engineKey, effectEngine)
 
-      // Trigger effect (blocking for this raiser node, but non-blocking for cue execution)
+      // Trigger effect; continue to next node only when effect goes idle (in setOnIdle above)
       effectEngine.triggerEffect(context.cueData)
-
-      this.emitNodeExecution('deactivated', raiserNode.id)
-      // Continue immediately (non-blocking like EventRaiserNode)
-      this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${raiserNode.id}: ${msg}`)
       console.error(`Error executing effect raiser node ${raiserNode.id}:`, error)
       this.emitNodeExecution('deactivated', raiserNode.id)
-      // Continue execution despite error
-      this.continueToNextNodes(raiserNode.id, context)
     }
   }
 
@@ -992,10 +1039,13 @@ export class NodeExecutionEngine {
       })
 
       context.setOnContextComplete(() => {
+        this.onContextLifecycle?.(context.id, 'completed')
         this.activeContexts.delete(context.id)
       })
 
       this.activeContexts.set(context.id, context)
+
+      this.onContextLifecycle?.(context.id, 'started')
 
       this.emitNodeExecution('activated', listenerNode.id)
       this.emitNodeExecution('deactivated', listenerNode.id)
@@ -1009,13 +1059,13 @@ export class NodeExecutionEngine {
         this.continueExecution(nextNodes, context)
       } else {
         // No child nodes, context completes immediately
+        this.onContextLifecycle?.(context.id, 'completed')
         context.dispose()
         this.activeContexts.delete(context.id)
       }
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${listenerNode.id}: ${msg}`)
       console.error(`Error starting listener execution for ${listenerNode.id}:`, error)
     }
   }
@@ -1030,6 +1080,7 @@ export class NodeExecutionEngine {
       return // Context already completed or cancelled
     }
 
+    this.onContextLifecycle?.(contextId, 'running')
     context.advancePhase()
     // Continue to next nodes after this action
     this.continueToNextNodes(nodeId, context)
@@ -1165,6 +1216,8 @@ export class NodeExecutionEngine {
     // This handles pure-logic flows where no blocking node was registered.
     if (context.tryComplete()) {
       context.dispose()
+    } else {
+      this.onContextLifecycle?.(context.id, 'blocked')
     }
   }
 
@@ -1174,7 +1227,7 @@ export class NodeExecutionEngine {
    */
   public cancelAll(skipEffectRemoval = false): void {
     for (const nodeId of this.pendingActivations) {
-      sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_EXECUTION, {
         type: 'deactivated',
         cueId: this.cueId,
         nodeId,
@@ -1183,7 +1236,8 @@ export class NodeExecutionEngine {
     }
     this.pendingActivations.clear()
 
-    for (const context of this.activeContexts.values()) {
+    for (const [contextId, context] of this.activeContexts) {
+      this.onContextLifecycle?.(contextId, 'cancelled')
       context.dispose()
     }
     this.activeContexts.clear()

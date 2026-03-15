@@ -32,7 +32,7 @@ function minimalCueData(overrides?: Partial<CueData>): CueData {
     fogState: false,
     strobeState: 'Strobe_Off',
     performer: 1,
-    keyframe: 'kf-1',
+    keyframe: 'Off',
     bonusEffect: true,
     beat: 'Strong',
     previousCue: 'Intro',
@@ -62,8 +62,8 @@ describe('dataExtractors', () => {
     })
 
     it('extracts keyframe', () => {
-      const cueData = minimalCueData({ keyframe: 'custom-key' })
-      expect(extractYargCueDataValue('keyframe', cueData, 'my-cue')).toBe('custom-key')
+      const cueData = minimalCueData({ keyframe: 'Next' })
+      expect(extractYargCueDataValue('keyframe', cueData, 'my-cue')).toBe('Next')
     })
 
     it('extracts venue-size', () => {

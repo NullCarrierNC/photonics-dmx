@@ -47,6 +47,8 @@ export interface AppPreferences {
     max: number
   }
   enabledCueGroups: string[]
+  /** IDs of Yarg cue groups we have seen before; used to auto-enable only genuinely new groups */
+  knownYargCueGroups?: string[]
   enabledAudioCueGroups?: string[]
   cueConsistencyWindow: number
   clockRate: number
@@ -368,6 +370,20 @@ export class ConfigurationManager {
    */
   async setEnabledCueGroups(groupIds: string[]): Promise<void> {
     await this.setPreference('enabledCueGroups', groupIds)
+  }
+
+  /**
+   * Gets the known Yarg cue group IDs (discovered in past runs); used to distinguish new groups from user-disabled ones.
+   */
+  getKnownYargCueGroups(): string[] | undefined {
+    return this.preferences.get().knownYargCueGroups
+  }
+
+  /**
+   * Sets the known Yarg cue group IDs (e.g. after loading all groups).
+   */
+  async setKnownYargCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('knownYargCueGroups', groupIds)
   }
 
   /**

@@ -4,8 +4,7 @@
  * This suite tests the functionality of the AbstractCueHandler.
  * It creates a concrete subclass (TestCueHandler) to implement the abstract methods for testing purposes.
  *
- * The tests verify that:
- *  - Rapid cue calls are debounced, meaning that multiple quick calls only invoke the handler once.
+ * The tests verify BaseCueHandler behaviour (registry, history, etc.).
  */
 
 import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler'
@@ -81,10 +80,15 @@ describe('AbstractCueHandler', () => {
       setState: jest.fn(),
       addEffectWithCallback: jest.fn(),
       setEffectWithCallback: jest.fn(),
+      addEffectUnblockedNameWithCallback: jest.fn(),
+      setEffectUnblockedNameWithCallback: jest.fn(),
       removeEffectCallback: jest.fn(),
       onBeat: jest.fn(),
       onMeasure: jest.fn(),
       onKeyframe: jest.fn(),
+      onKeyframeFirst: jest.fn(),
+      onKeyframeNext: jest.fn(),
+      onKeyframePrevious: jest.fn(),
       onDrumNote: jest.fn(),
       onGuitarNote: jest.fn(),
       onBassNote: jest.fn(),
@@ -99,7 +103,7 @@ describe('AbstractCueHandler', () => {
       shutdown: jest.fn(),
     } as ILightingController
 
-    cueHandler = new TestCueHandler(lightManager, sequencer, 100)
+    cueHandler = new TestCueHandler(lightManager, sequencer)
   })
 
   afterEach(() => {

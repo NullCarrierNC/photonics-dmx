@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { useAtomValue } from 'jotai'
 import type {
   ActionNode,
   AudioEventNode,
@@ -27,16 +28,27 @@ import EventNodeEditor from './node-editors/EventNodeEditor'
 import LogicNodeEditor from './node-editors/LogicNodeEditor'
 import ActionNodeEditor from './node-editors/ActionNodeEditor'
 import NotesNodeEditor from './node-editors/NotesNodeEditor'
+import { showNodeIdsAtom } from '../../../atoms'
 
 type Props = {
   activeMode: NodeCueMode
   editorMode: EditorMode
   selectedNode: EditorNode | null
   selectedActionHasEventParent: boolean
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  availableVariables: {
+    name: string
+    type: string
+    scope: 'cue' | 'cue-group'
+    validValues?: string[]
+  }[]
   availableEvents?: string[]
   availableEffects?: { id: string; name: string; definition?: EffectDefinition }[]
   currentEffect?: YargEffectDefinition | AudioEffectDefinition | null
+  onSyncVariableValidValues?: (
+    varName: string,
+    scope: 'cue' | 'cue-group',
+    validValues: string[],
+  ) => void
   addEventNode: (
     option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
   ) => void
@@ -61,6 +73,36 @@ type Props = {
   >(
     updates: Partial<T>,
   ) => void
+  updateNodeId?: (newId: string) => void
+}
+
+/** Keyed by nodeId so draft state resets when selection changes without using an effect. */
+const NodeIdInput: React.FC<{
+  nodeId: string
+  onCommit?: (newId: string) => void
+}> = ({ nodeId, onCommit }) => {
+  const [draft, setDraft] = useState(nodeId)
+  const commit = (): void => {
+    const trimmed = draft.trim()
+    if (trimmed && trimmed !== nodeId && onCommit) onCommit(trimmed)
+    else if (trimmed !== nodeId) setDraft(nodeId)
+  }
+  return (
+    <input
+      type="text"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.currentTarget.blur()
+          commit()
+        }
+      }}
+      className="w-full px-2 py-1.5 text-sm font-mono rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+      spellCheck={false}
+    />
+  )
 }
 
 const NodeSidebar: React.FC<Props> = ({
@@ -72,6 +114,7 @@ const NodeSidebar: React.FC<Props> = ({
   availableEvents = [],
   availableEffects = [],
   currentEffect,
+  onSyncVariableValidValues,
   addEventNode,
   addActionNode,
   addLogicNode,
@@ -81,7 +124,9 @@ const NodeSidebar: React.FC<Props> = ({
   addEffectListenerNode,
   addNotesNode,
   updateSelectedNode,
+  updateNodeId,
 }) => {
+  const showNodeIds = useAtomValue(showNodeIdsAtom)
   return (
     <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner h-full flex flex-col overflow-hidden">
       {!selectedNode ? (
@@ -108,9 +153,28 @@ const NodeSidebar: React.FC<Props> = ({
         <div className="p-3 flex-1 overflow-y-auto space-y-4">
           <div>
             <h3 className="font-semibold text-sm mb-2">Selected Node</h3>
+            {showNodeIds && (
+              <div className="mb-3">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Node ID
+                </label>
+                {updateNodeId ? (
+                  <NodeIdInput
+                    key={selectedNode.id}
+                    nodeId={selectedNode.id}
+                    onCommit={updateNodeId}
+                  />
+                ) : (
+                  <span className="block text-sm font-mono text-gray-700 dark:text-gray-300 break-all">
+                    {selectedNode.id}
+                  </span>
+                )}
+              </div>
+            )}
             {selectedNode.data.kind === 'effect-raiser' && (
               <EffectRaiserEditor
                 node={selectedNode.data.payload as EffectRaiserNode}
+                activeMode={activeMode}
                 availableEffects={availableEffects}
                 availableVariables={availableVariables}
                 updateNode={(updates) => updateSelectedNode<EffectRaiserNode>(updates)}
@@ -147,6 +211,7 @@ const NodeSidebar: React.FC<Props> = ({
                 activeMode={activeMode}
                 availableVariables={availableVariables}
                 updateNode={(updates) => updateSelectedNode<LogicNode>(updates)}
+                onSyncVariableValidValues={onSyncVariableValidValues}
               />
             )}
             {selectedNode.data.kind === 'action' && (

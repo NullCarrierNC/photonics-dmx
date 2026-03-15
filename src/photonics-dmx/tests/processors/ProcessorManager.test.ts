@@ -27,9 +27,12 @@ describe('ProcessorManager', () => {
     mockLightManager = new DmxLightManager(config)
     mockSequencer = {
       addEffect: jest.fn(),
-      addEffectWithCallback: jest.fn(),
-      removeEffectCallback: jest.fn(),
       setEffect: jest.fn(),
+      addEffectWithCallback: jest.fn(),
+      setEffectWithCallback: jest.fn(),
+      addEffectUnblockedNameWithCallback: jest.fn(),
+      setEffectUnblockedNameWithCallback: jest.fn(),
+      removeEffectCallback: jest.fn(),
       removeEffect: jest.fn(),
       removeAllEffects: jest.fn(),
       removeEffectByLayer: jest.fn(),

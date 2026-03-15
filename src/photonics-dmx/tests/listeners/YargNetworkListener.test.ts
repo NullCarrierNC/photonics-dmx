@@ -1,18 +1,19 @@
 /**
- * Tests for YargNetworkListener lifecycle and packet handling.
- * UDP socket is mocked; we verify start/stop and that invalid packets are ignored.
+ * Tests for YargNetworkListener: lifecycle (start/stop), passive strobe shutdown,
+ * identical-frame throttling (30 Hz), and immediate forwarding of changed frames.
+ * UDP socket is mocked.
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { YargNetworkListener } from '../../listeners/YARG/YargNetworkListener'
 import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler'
-import { CueData, CueType } from '../../cues/types/cueTypes'
+import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { createMockLightingConfig } from '../helpers/testFixtures'
 
 class MockCueHandler extends BaseCueHandler {
-  public async handleCue(_cueType: CueType, _parameters: CueData): Promise<void> {}
+  public handleCue = jest.fn(async (_cueType: CueType, _parameters: CueData): Promise<void> => {})
   public handleCueNoCue = jest.fn(async (_: CueData): Promise<void> => {})
   protected handleCueDischord = jest.fn(async (_: CueData): Promise<void> => {})
   protected handleCueChorus = jest.fn(async (_: CueData): Promise<void> => {})
@@ -77,8 +78,10 @@ describe('YargNetworkListener', () => {
     mockSequencer = {
       addEffect: jest.fn(),
       removeEffect: jest.fn(),
+      onBeat: jest.fn(),
+      onMeasure: jest.fn(),
     } as unknown as ILightingController
-    cueHandler = new MockCueHandler(lightManager, mockSequencer, 50)
+    cueHandler = new MockCueHandler(lightManager, mockSequencer)
     listener = new YargNetworkListener(cueHandler)
   })
 
@@ -109,5 +112,117 @@ describe('YargNetworkListener', () => {
     listener.start()
     listener.shutdown()
     expect(mockClose).toHaveBeenCalled()
+  })
+
+  describe('passive strobe shutdown', () => {
+    it('when previous frame had active strobe and current frame has no active strobe, emits Strobe_Off', () => {
+      const frameWithStrobe: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Default,
+        strobeState: 'Strobe_Slow',
+        beat: 'Off',
+        keyframe: 'Off',
+      }
+      const frameWithoutStrobe: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Default,
+        strobeState: 'Strobe_Off',
+        beat: 'Off',
+        keyframe: 'Off',
+      }
+
+      listener.processCueData(frameWithStrobe)
+      expect(cueHandler.handleCue).toHaveBeenCalledWith(CueType.Default, frameWithStrobe)
+      expect(cueHandler.handleCue).toHaveBeenCalledWith(CueType.Strobe_Slow, frameWithStrobe)
+
+      listener.processCueData(frameWithoutStrobe)
+      expect(cueHandler.handleCue).toHaveBeenCalledWith(CueType.Strobe_Off, frameWithoutStrobe)
+    })
+
+    it('when previous frame had active strobe and current frame has only primary cue, emits Strobe_Off and primary cue', () => {
+      const frameWithStrobe: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Default,
+        strobeState: 'Strobe_Slow',
+        beat: 'Off',
+        keyframe: 'Off',
+      }
+      const framePrimaryOnly: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Sweep,
+        strobeState: 'Strobe_Off',
+        beat: 'Off',
+        keyframe: 'Off',
+      }
+
+      listener.processCueData(frameWithStrobe)
+      listener.processCueData(framePrimaryOnly)
+
+      const handleCueCalls = (cueHandler.handleCue as jest.Mock).mock.calls
+      expect(handleCueCalls[handleCueCalls.length - 2][0]).toBe(CueType.Sweep)
+      expect(handleCueCalls[handleCueCalls.length - 1][0]).toBe(CueType.Strobe_Off)
+    })
+  })
+
+  describe('identical-frame throttling (30 Hz)', () => {
+    const throttleMs = 1000 / 30
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      jest.setSystemTime(0)
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it('limits identical frames to 30 updates per second', () => {
+      const frame: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Frenzy,
+        strobeState: 'Strobe_Off',
+        beat: 'Strong',
+        keyframe: 'Off',
+      }
+      listener.processCueData(frame)
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
+
+      for (let i = 0; i < 10; i++) {
+        listener.processCueData(frame)
+      }
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
+
+      jest.advanceTimersByTime(throttleMs + 1)
+      listener.processCueData(frame)
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(2)
+      expect(cueHandler.handleCue).toHaveBeenNthCalledWith(1, CueType.Frenzy, frame)
+      expect(cueHandler.handleCue).toHaveBeenNthCalledWith(2, CueType.Frenzy, frame)
+    })
+
+    it('forwards changed frame immediately even within throttle window', () => {
+      const frameA: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Frenzy,
+        strobeState: 'Strobe_Off',
+        beat: 'Off',
+        keyframe: 'Off',
+      }
+      const frameB: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Sweep,
+        strobeState: 'Strobe_Off',
+        beat: 'Off',
+        keyframe: 'Off',
+      }
+
+      listener.processCueData(frameA)
+      listener.processCueData(frameA)
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
+
+      listener.processCueData(frameB)
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(2)
+      expect(cueHandler.handleCue).toHaveBeenNthCalledWith(1, CueType.Frenzy, frameA)
+      expect(cueHandler.handleCue).toHaveBeenNthCalledWith(2, CueType.Sweep, frameB)
+    })
   })
 })

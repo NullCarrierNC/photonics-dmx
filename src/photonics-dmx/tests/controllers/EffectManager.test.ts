@@ -218,6 +218,47 @@ describe('EffectManager', () => {
       )
     })
 
+    it('should set waitEndTime to currentTime + (count * waitUntilTime) for delay first transition', () => {
+      const mockLight = createMockTrackedLight()
+      const effect: Effect = {
+        id: 'delay-effect',
+        description: 'Delay with count',
+        transitions: [
+          {
+            lights: [mockLight],
+            layer: 1,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+              color: createMockRGBIP({ red: 255 }),
+              easing: 'linear',
+              duration: 0,
+            },
+            waitUntilCondition: 'delay',
+            waitUntilTime: 500,
+            waitUntilConditionCount: 2,
+          },
+        ],
+      }
+      layerManager.getActiveEffect.mockReturnValue(undefined)
+
+      effectManager.addEffect('test', effect)
+
+      expect(layerManager.addActiveEffect).toHaveBeenCalledWith(
+        1,
+        'test-light-1',
+        expect.objectContaining({
+          name: 'test',
+          state: 'waitingUntil',
+        }),
+      )
+      const capturedLightEffect = layerManager.addActiveEffect.mock.calls[0][2] as LightEffectState
+      // count * waitUntilTime = 2 * 500 = 1000
+      expect(capturedLightEffect.waitEndTime - capturedLightEffect.transitionStartTime).toBeCloseTo(
+        1000,
+      )
+    })
+
     it('should cancel blackout if adding an effect below layer 200', () => {
       // Mock blackout active state
       systemEffects.isBlackoutActive.mockReturnValue(true)
@@ -413,6 +454,45 @@ describe('EffectManager', () => {
           layer: 1,
           lightId: 'test-light-1',
         }),
+      )
+    })
+
+    it('shared remediation: same-name setEffect does not call removeAllEffects (no intermediate black)', () => {
+      const mockLight = createMockTrackedLight()
+      const mockColor = createMockRGBIP({ red: 255 })
+      const effectLayer0: Effect = {
+        id: 'primary-effect',
+        description: 'Primary',
+        transitions: [
+          {
+            lights: [mockLight],
+            layer: 0,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+              color: mockColor,
+              easing: 'linear',
+              duration: 1000,
+            },
+            waitUntilCondition: 'none',
+            waitUntilTime: 0,
+          },
+        ],
+      }
+
+      layerManager.getActiveEffect.mockReturnValue(undefined)
+      layerManager.getActiveEffects.mockReturnValue(new Map())
+
+      effectManager.setEffect('primary', effectLayer0)
+      const fullClearCallCountAfterFirst = layerManager.clearAllActiveEffects.mock.calls.length
+
+      layerManager.getActiveEffect.mockReturnValue(undefined)
+      layerManager.getActiveEffects.mockReturnValue(new Map())
+
+      effectManager.setEffect('primary', effectLayer0)
+
+      expect(layerManager.clearAllActiveEffects.mock.calls.length).toBe(
+        fullClearCallCountAfterFirst,
       )
     })
   })
@@ -796,6 +876,24 @@ describe('EffectManager', () => {
 
       // If the method exists, we'll consider the test passed
       expect(typeof removeEffectByLayer).toBe('function')
+    })
+
+    it('shared remediation: clears effectCallbacks to avoid orphaned callbacks', () => {
+      const effectManagerWithCallbacks = new EffectManager(
+        layerManager as unknown as ILayerManager,
+        transitionEngine as unknown as ITransitionEngine,
+        effectTransformer as unknown as IEffectTransformer,
+        systemEffects as unknown as ISystemEffectsController,
+      )
+      const callbacks = (effectManagerWithCallbacks as any).effectCallbacks as Map<
+        string,
+        () => void
+      >
+      callbacks.set('orphan', () => {})
+
+      effectManagerWithCallbacks.removeAllEffects()
+
+      expect(callbacks.size).toBe(0)
     })
   })
 })

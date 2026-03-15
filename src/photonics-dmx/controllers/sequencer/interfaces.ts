@@ -159,6 +159,18 @@ export interface IEffectManager {
   setEffect(name: string, effect: Effect, isPersistent?: boolean): void
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
+  addEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean,
+  ): void
+  setEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean,
+  ): void
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   startNextEffectInQueue(layer: number, lightId: string): boolean
   /**
@@ -190,6 +202,9 @@ export interface ISongEventHandler {
   onBeat(): void
   onMeasure(): void
   onKeyframe(): void
+  onKeyframeFirst(): void
+  onKeyframeNext(): void
+  onKeyframePrevious(): void
   onDrumNote(noteType: DrumNoteType): void
   onGuitarNote(noteType: InstrumentNoteType): void
   onBassNote(noteType: InstrumentNoteType): void
@@ -199,6 +214,9 @@ export interface ISongEventHandler {
       | 'beat'
       | 'measure'
       | 'keyframe'
+      | 'keyframe-first'
+      | 'keyframe-next'
+      | 'keyframe-previous'
       | 'drum-kick'
       | 'drum-red'
       | 'drum-yellow'
@@ -258,6 +276,18 @@ export interface ILightingController {
   setEffect(name: string, effect: Effect, isPersistent?: boolean): Promise<void>
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
+  addEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean,
+  ): void
+  setEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent?: boolean,
+  ): void
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   removeEffect(name: string, layer: number): void
   removeAllEffects(): void
@@ -296,6 +326,9 @@ export interface ILightingController {
   onBeat(): void
   onMeasure(): void
   onKeyframe(): void
+  onKeyframeFirst(): void
+  onKeyframeNext(): void
+  onKeyframePrevious(): void
   onDrumNote(noteType: DrumNoteType): void
   onGuitarNote(noteType: InstrumentNoteType): void
   onBassNote(noteType: InstrumentNoteType): void

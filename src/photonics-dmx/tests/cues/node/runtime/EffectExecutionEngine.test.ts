@@ -33,7 +33,7 @@ describe('EffectExecutionEngine', () => {
     fogState: false,
     strobeState: 'Strobe_Off',
     performer: 0,
-    keyframe: '',
+    keyframe: 'Off',
     bonusEffect: false,
     beat: 'Strong' as any,
   })
@@ -41,7 +41,19 @@ describe('EffectExecutionEngine', () => {
   beforeEach(() => {
     mockSequencer = {
       addEffect: jest.fn(),
+      setEffect: jest.fn(),
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
+        setTimeout(() => callback(), 0)
+      }),
+      setEffectWithCallback: jest.fn((_name, _effect, callback) => {
+        setTimeout(() => callback(), 0)
+      }),
+      addEffectUnblockedName: jest.fn().mockReturnValue(true),
+      setEffectUnblockedName: jest.fn().mockReturnValue(true),
+      addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
+        setTimeout(() => callback(), 0)
+      }),
+      setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
       }),
       removeEffectCallback: jest.fn(),
@@ -190,6 +202,624 @@ describe('EffectExecutionEngine', () => {
 
       // Should not throw
       expect(() => engine.triggerEffect(createCueData())).not.toThrow()
+    })
+
+    it('preserves delay timing and color in transitions when params are delay and 500/200 (score cue regression)', async () => {
+      const effect: YargEffectDefinition = {
+        id: 'score-like-effect',
+        mode: 'yarg',
+        name: 'Score-like',
+        description: '',
+        variables: [
+          {
+            name: 'lights',
+            type: 'light-array',
+            scope: 'cue',
+            initialValue: [],
+            isParameter: true,
+          },
+          { name: 'color', type: 'color', scope: 'cue', initialValue: 'white', isParameter: true },
+          {
+            name: 'waitUntilCondition',
+            type: 'string',
+            scope: 'cue',
+            initialValue: 'beat',
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilTime',
+            type: 'number',
+            scope: 'cue',
+            initialValue: 0,
+            isParameter: true,
+          },
+          { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'variable', name: 'color' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
+                waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+          ],
+          logic: [
+            {
+              id: 'for-each-1',
+              type: 'logic',
+              logicType: 'for-each-light',
+              sourceVariable: 'lights',
+              currentLightVariable: 'currentLight',
+              currentIndexVariable: 'idx',
+            } as any,
+          ],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-1', type: 'effect-listener', label: 'Entry', outputs: ['for-each-1'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-1', to: 'for-each-1' },
+          { from: 'for-each-1', to: 'action-1', fromPort: 'each' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(effect)
+      const parameterValues = {
+        lights: [
+          { id: 'light1', position: 0 },
+          { id: 'light2', position: 1 },
+        ],
+        color: 'yellow',
+        waitUntilCondition: 'delay',
+        waitUntilTime: 500,
+      }
+
+      let submittedEffect: any
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, effectArg, _callback) => {
+          submittedEffect = effectArg
+        },
+      )
+
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        parameterValues,
+        createCueData(),
+      )
+
+      await engine.triggerEffect(createCueData())
+
+      expect(submittedEffect).toBeDefined()
+      expect(submittedEffect.transitions).toBeDefined()
+      expect(submittedEffect.transitions.length).toBeGreaterThan(0)
+      const firstTransition = submittedEffect.transitions[0]
+      expect(firstTransition.waitUntilCondition).toBe('delay')
+      expect(firstTransition.waitUntilTime).toBe(500)
+      // Resolved color is RGBIO (yellow has high R/G, low B); would be wrong if param was coerced to 0
+      expect(firstTransition.transform?.color).toBeDefined()
+      expect(firstTransition.transform.color.red).toBeGreaterThan(0)
+      expect(firstTransition.transform.color.green).toBeGreaterThan(0)
+    })
+
+    it('second trigger still applies delay params (regression: stop then start score)', async () => {
+      const effect: YargEffectDefinition = {
+        id: 'score-like',
+        mode: 'yarg',
+        name: 'Score-like',
+        description: '',
+        variables: [
+          {
+            name: 'waitUntilCondition',
+            type: 'string',
+            scope: 'cue',
+            initialValue: 'beat',
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilTime',
+            type: 'number',
+            scope: 'cue',
+            initialValue: 0,
+            isParameter: true,
+          },
+        ],
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'white' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
+                waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+          ],
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-1', type: 'effect-listener', label: 'Entry', outputs: ['action-1'] },
+          ],
+        },
+        connections: [{ from: 'listener-1', to: 'action-1' }],
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(effect)
+      const parameterValues = { waitUntilCondition: 'delay', waitUntilTime: 500 }
+
+      const submitted: any[] = []
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, effectArg, _callback) => {
+          submitted.push(effectArg)
+        },
+      )
+
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        parameterValues,
+        createCueData(),
+      )
+
+      await engine.triggerEffect(createCueData())
+      expect(submitted.length).toBe(1)
+      expect(submitted[0].transitions?.[0].waitUntilCondition).toBe('delay')
+      expect(submitted[0].transitions?.[0].waitUntilTime).toBe(500)
+
+      submitted.length = 0
+      await engine.triggerEffect(createCueData())
+      expect(submitted.length).toBe(1)
+      expect(submitted[0].transitions?.[0].waitUntilCondition).toBe('delay')
+      expect(submitted[0].transitions?.[0].waitUntilTime).toBe(500)
+    })
+
+    it('coerces delay + waitUntilTime 0 to none + 0 (Stage Kit menu-style, no warning)', async () => {
+      const effect: YargEffectDefinition = {
+        id: 'sweep-like',
+        mode: 'yarg',
+        name: 'Sweep-like',
+        description: '',
+        variables: [
+          {
+            name: 'lights',
+            type: 'light-array',
+            scope: 'cue',
+            initialValue: [],
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilCondition',
+            type: 'string',
+            scope: 'cue',
+            initialValue: 'delay',
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilTime',
+            type: 'number',
+            scope: 'cue',
+            initialValue: 0,
+            isParameter: true,
+          },
+          { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
+                waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+          ],
+          logic: [
+            {
+              id: 'for-each-1',
+              type: 'logic',
+              logicType: 'for-each-light',
+              sourceVariable: 'lights',
+              currentLightVariable: 'currentLight',
+              currentIndexVariable: 'idx',
+              outputs: [],
+            },
+          ],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-1', type: 'effect-listener', label: 'Entry', outputs: ['for-each-1'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-1', to: 'for-each-1' },
+          { from: 'for-each-1', to: 'action-1', fromPort: 'each' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(effect)
+      const lights = [{ id: 'light1', position: 0 }]
+      const parameterValues = {
+        lights,
+        waitUntilCondition: 'delay',
+        waitUntilTime: 0,
+      }
+
+      const submitted: any[] = []
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, effectArg, _callback) => {
+          submitted.push(effectArg)
+        },
+      )
+      mockSequencer.addEffectUnblockedName.mockImplementation((_name, effectArg) => {
+        submitted.push(effectArg)
+        return true
+      })
+
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        parameterValues,
+        createCueData(),
+      )
+
+      await engine.triggerEffect(createCueData())
+
+      expect(submitted.length).toBe(1)
+      expect(submitted[0].transitions?.[0].waitUntilCondition).toBe('none')
+      expect(submitted[0].transitions?.[0].waitUntilTime).toBe(0)
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('waitUntilCondition is delay but waitUntilTime'),
+      )
+      warnSpy.mockRestore()
+    })
+
+    it('score-like chained rotation: all transitions get delay and waitUntilTime from effect params (200ms)', async () => {
+      const effect: YargEffectDefinition = {
+        id: 'rotation-like',
+        mode: 'yarg',
+        name: 'Rotation-like',
+        description: '',
+        variables: [
+          {
+            name: 'lights',
+            type: 'light-array',
+            scope: 'cue',
+            initialValue: [],
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilCondition',
+            type: 'string',
+            scope: 'cue',
+            initialValue: 'beat',
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilTime',
+            type: 'number',
+            scope: 'cue',
+            initialValue: 0,
+            isParameter: true,
+          },
+          { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'phase1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
+                waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+            {
+              id: 'phase2',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
+                waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+            {
+              id: 'phase3',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
+                waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+          ],
+          logic: [
+            {
+              id: 'for-each-1',
+              type: 'logic',
+              logicType: 'for-each-light',
+              sourceVariable: 'lights',
+              currentLightVariable: 'currentLight',
+              currentIndexVariable: 'idx',
+              outputs: [],
+            } as any,
+          ],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-1', type: 'effect-listener', label: 'Entry', outputs: ['for-each-1'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-1', to: 'for-each-1' },
+          { from: 'for-each-1', to: 'phase1', fromPort: 'each' },
+          { from: 'phase1', to: 'phase2' },
+          { from: 'phase2', to: 'phase3' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(effect)
+      const parameterValues = {
+        lights: [{ id: 'light1', position: 0 }],
+        waitUntilCondition: 'delay',
+        waitUntilTime: 200,
+      }
+
+      let submittedEffect: any
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, effectArg, _callback) => {
+          submittedEffect = effectArg
+        },
+      )
+
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        parameterValues,
+        createCueData(),
+      )
+
+      await engine.triggerEffect(createCueData())
+
+      expect(submittedEffect?.transitions?.length).toBe(3)
+      submittedEffect.transitions.forEach(
+        (t: { waitUntilCondition: string; waitUntilTime: number }) => {
+          expect(t.waitUntilCondition).toBe('delay')
+          expect(t.waitUntilTime).toBe(200)
+        },
+      )
+    })
+
+    it('iterates in groups when groupSize is set (pairs fire together)', async () => {
+      const effect: YargEffectDefinition = {
+        id: 'grouped-foreach',
+        mode: 'yarg',
+        name: 'Grouped',
+        description: '',
+        variables: [
+          {
+            name: 'lights',
+            type: 'light-array',
+            scope: 'cue',
+            initialValue: [],
+            isParameter: true,
+          },
+          { name: 'groupSize', type: 'number', scope: 'cue', initialValue: 1, isParameter: true },
+          { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'white' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+          ],
+          logic: [
+            {
+              id: 'for-each-1',
+              type: 'logic',
+              logicType: 'for-each-light',
+              sourceVariable: 'lights',
+              currentLightVariable: 'currentLight',
+              currentIndexVariable: 'idx',
+              groupSize: { source: 'variable', name: 'groupSize' },
+              outputs: [],
+            } as any,
+          ],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-1', type: 'effect-listener', label: 'Entry', outputs: ['for-each-1'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-1', to: 'for-each-1' },
+          { from: 'for-each-1', to: 'action-1', fromPort: 'each' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(effect)
+      const lights = [
+        { id: 'light1', position: 0 },
+        { id: 'light2', position: 1 },
+        { id: 'light3', position: 2 },
+        { id: 'light4', position: 3 },
+      ]
+      const parameterValues = { lights, groupSize: 2 }
+
+      const submissions: any[] = []
+      const captureEffect = (_name: string, effectArg: any) => submissions.push(effectArg)
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (name, effectArg, _callback) => captureEffect(name, effectArg),
+      )
+      mockSequencer.addEffectUnblockedName.mockImplementation((name, effectArg) => {
+        captureEffect(name, effectArg)
+        return true
+      })
+
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        parameterValues,
+        createCueData(),
+      )
+
+      await engine.triggerEffect(createCueData())
+
+      // 4 lights / groupSize 2 = 2 iterations; each iteration submits one effect
+      expect(submissions.length).toBe(2)
+      // First submission: group [light1, light2]
+      expect(submissions[0].transitions[0].lights).toHaveLength(2)
+      expect(submissions[0].transitions[0].lights.map((l: { id: string }) => l.id)).toEqual([
+        'light1',
+        'light2',
+      ])
+      // Second submission: group [light3, light4]
+      expect(submissions[1].transitions[0].lights).toHaveLength(2)
+      expect(submissions[1].transitions[0].lights.map((l: { id: string }) => l.id)).toEqual([
+        'light3',
+        'light4',
+      ])
     })
   })
 
@@ -369,10 +999,10 @@ describe('EffectExecutionEngine', () => {
 
       await engine.triggerEffect(createCueData())
 
-      // Verify action was executed via internal event (engine may use addEffect or addEffectWithCallback)
+      // Verify action was executed via internal event (engine may use addEffectUnblockedName or addEffectUnblockedNameWithCallback)
       expect(
-        mockSequencer.addEffectWithCallback.mock.calls.length +
-          mockSequencer.addEffect.mock.calls.length,
+        mockSequencer.addEffectUnblockedNameWithCallback.mock.calls.length +
+          mockSequencer.addEffectUnblockedName.mock.calls.length,
       ).toBeGreaterThanOrEqual(1)
     })
   })
@@ -526,9 +1156,11 @@ describe('EffectExecutionEngine', () => {
 
     it('does not fire idle until all pending callback-backed submissions complete', () => {
       const callbacks: Array<() => void> = []
-      mockSequencer.addEffectWithCallback.mockImplementation((_name, _effect, callback) => {
-        callbacks.push(callback)
-      })
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, _effect, callback) => {
+          callbacks.push(callback)
+        },
+      )
 
       const compiledEffect = EffectCompiler.compile(createForEachBlockingEffect())
       const engine = new EffectExecutionEngine(
@@ -555,9 +1187,11 @@ describe('EffectExecutionEngine', () => {
 
     it('cancelAll clears submitted callback-backed effects and prevents idle retrigger', () => {
       const callbacks: Array<() => void> = []
-      mockSequencer.addEffectWithCallback.mockImplementation((_name, _effect, callback) => {
-        callbacks.push(callback)
-      })
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, _effect, callback) => {
+          callbacks.push(callback)
+        },
+      )
 
       const compiledEffect = EffectCompiler.compile(createForEachBlockingEffect())
       const engine = new EffectExecutionEngine(
@@ -573,7 +1207,9 @@ describe('EffectExecutionEngine', () => {
       engine.triggerEffect(createCueData())
       expect(callbacks).toHaveLength(2)
 
-      const submittedNames = mockSequencer.addEffectWithCallback.mock.calls.map((call) => call[0])
+      const submittedNames = mockSequencer.addEffectUnblockedNameWithCallback.mock.calls.map(
+        (call) => call[0],
+      )
       engine.cancelAll()
 
       expect(mockSequencer.removeEffectCallback).toHaveBeenCalledTimes(2)
@@ -591,9 +1227,11 @@ describe('EffectExecutionEngine', () => {
 
     it('cancelAll(true) leaves effects on sequencer so lights stay lit during cue transition', () => {
       const callbacks: Array<() => void> = []
-      mockSequencer.addEffectWithCallback.mockImplementation((_name, _effect, callback) => {
-        callbacks.push(callback)
-      })
+      mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
+        (_name, _effect, callback) => {
+          callbacks.push(callback)
+        },
+      )
 
       const compiledEffect = EffectCompiler.compile(createForEachBlockingEffect())
       const engine = new EffectExecutionEngine(
@@ -605,7 +1243,7 @@ describe('EffectExecutionEngine', () => {
       )
 
       engine.triggerEffect(createCueData())
-      expect(mockSequencer.addEffectWithCallback).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedNameWithCallback).toHaveBeenCalled()
 
       const removeEffectBefore = (mockSequencer.removeEffect as jest.Mock).mock.calls.length
       const removeCallbackBefore = (mockSequencer.removeEffectCallback as jest.Mock).mock.calls

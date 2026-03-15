@@ -283,6 +283,40 @@ export class YargCueRegistry {
   }
 
   /**
+   * Get cue implementation from a specific group (deterministic, for simulation).
+   * Does not use random selection or mutate activeGroups. Routes through
+   * handlePrimaryCue/handleSecondaryCue so state tracking and cue-state updates are preserved.
+   * @param cueType The cue type to resolve
+   * @param groupId The group to use (must exist and contain the cue, or fallback to defaultGroup if it has the cue)
+   * @param trackMode Used only for autoGen flag when calling handlers
+   * @returns The cue implementation or null if not found in the group or default fallback
+   */
+  public getCueImplementationFromGroup(
+    cueType: CueType,
+    groupId: string,
+    trackMode: 'tracked' | 'autogen' | 'simulated' = 'simulated',
+  ): INetCue | null {
+    const group = this.groups.get(groupId)
+    if (group?.cues.has(cueType)) {
+      const cue = group.cues.get(cueType)!
+      const selection = { groupId, isFallback: false }
+      if (cue.style === CueStyle.Primary) {
+        return this.handlePrimaryCue(cueType, selection, trackMode === 'autogen')
+      }
+      return this.handleSecondaryCue(cueType, selection, trackMode === 'autogen')
+    }
+    if (this.defaultGroup && this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
+      const selection = { groupId: this.defaultGroup, isFallback: true }
+      const cue = this.groups.get(this.defaultGroup)!.cues.get(cueType)!
+      if (cue.style === CueStyle.Primary) {
+        return this.handlePrimaryCue(cueType, selection, trackMode === 'autogen')
+      }
+      return this.handleSecondaryCue(cueType, selection, trackMode === 'autogen')
+    }
+    return null
+  }
+
+  /**
    * Set the cue consistency window to prevent rapid randomization changes.
    * @param windowMs The consistency window in milliseconds (default: 2000ms)
    */
@@ -346,6 +380,12 @@ export class YargCueRegistry {
           } else {
             // No active group has this cue, so the fallback is still valid
             //     console.log(`[Consistency] No active group has ${cueType}, fallback is still valid`);
+          }
+        } else {
+          // Non-fallback: require the cached group to still be active (e.g. not toggled off in DMX preview)
+          if (!this.activeGroups.has(lastSelection.groupId)) {
+            this.clearCueConsistencyTracking(cueType)
+            return null
           }
         }
 
@@ -719,40 +759,54 @@ export class YargCueRegistry {
   }
 
   /**
-   * Set which groups are enabled.
-   * All newly enabled groups will also be activated by default.
+   * Set which groups are enabled (preference allowlist).
+   * Does not replace the current active groups: only updates the enabled set and
+   * removes from active any group that is no longer enabled.
+   * Newly enabled groups are not auto-activated; active selection is independent.
    * @param groupIds The IDs of the groups to enable
    */
   public setEnabledGroups(groupIds: string[]): void {
-    this.enabledGroups.clear()
-    this.activeGroups.clear()
-
+    const newEnabled = new Set<string>()
     for (const id of groupIds) {
       if (this.groups.has(id)) {
-        this.enabledGroups.add(id)
-        // All enabled groups are active by default
-        this.activeGroups.add(id)
+        newEnabled.add(id)
+      }
+    }
+    this.enabledGroups = newEnabled
+    // Remove from active any group that is no longer enabled; leave other active groups unchanged
+    for (const activeId of Array.from(this.activeGroups)) {
+      if (!this.enabledGroups.has(activeId)) {
+        this.activeGroups.delete(activeId)
       }
     }
   }
 
   /**
    * Set the active groups for cue selection.
+   * Clears consistency tracking only when the active set actually changes (e.g. DMX preview toggle).
    * @param groupIds Array of group IDs to set as active
    */
   public setActiveGroups(groupIds: string[]): void {
-    // Clear consistency tracking when active groups change
-    this.clearConsistencyTracking()
-
-    this.activeGroups.clear()
+    const newActive = new Set<string>()
     for (const groupId of groupIds) {
       if (this.enabledGroups.has(groupId)) {
-        this.activeGroups.add(groupId)
+        newActive.add(groupId)
       } else {
         console.warn(`Cannot activate group '${groupId}': group not enabled`)
       }
     }
-    //  console.log(`Active groups set to: ${Array.from(this.activeGroups)}`);
+
+    const sameSet =
+      newActive.size === this.activeGroups.size &&
+      Array.from(newActive).every((id) => this.activeGroups.has(id))
+    if (!sameSet) {
+      this.clearConsistencyTracking()
+    }
+
+    this.activeGroups.clear()
+    for (const id of newActive) {
+      this.activeGroups.add(id)
+    }
   }
 
   /**

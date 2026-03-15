@@ -90,9 +90,15 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={conditionFromValueSource(currentTiming.waitUntilCondition)}
-          onChange={(event) =>
-            updateTiming({ waitUntilCondition: { source: 'literal', value: event.target.value } })
-          }>
+          onChange={(event) => {
+            const value = event.target.value as WaitCondition
+            updateTiming({
+              waitUntilCondition: { source: 'literal', value },
+              ...(value !== 'none' && {
+                waitUntilConditionCount: { source: 'literal', value: 1 },
+              }),
+            })
+          }}>
           {getActionWaitOptions(activeMode).map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}

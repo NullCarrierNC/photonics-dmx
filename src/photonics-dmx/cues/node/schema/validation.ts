@@ -17,6 +17,7 @@ import {
   YargEffectFile,
   AudioEffectFile,
   EffectFile,
+  EffectGroupMeta,
   EffectMode,
   LogicComparator,
   LogicNode,
@@ -559,6 +560,7 @@ const forEachLightLogicSchema: JSONSchemaType<LogicNode> = {
     sourceVariable: { type: 'string' },
     currentLightVariable: { type: 'string' },
     currentIndexVariable: { type: 'string' },
+    groupSize: { ...valueSourceSchema, nullable: true },
   },
 } as any
 
@@ -895,6 +897,8 @@ const groupSchema: JSONSchemaType<NodeCueGroupMeta> = {
       items: variableDefinitionSchema,
       default: [],
     },
+    isDefault: { type: 'boolean', nullable: true },
+    isStageKit: { type: 'boolean', nullable: true },
   },
 }
 
@@ -1042,6 +1046,48 @@ const detectCycles = (
   return errors
 }
 
+/**
+ * Semantic check: conditional nodes that compare a literal against a variable
+ * with validValues must use a literal that is in the variable's validValues list.
+ */
+const checkConditionalValidValues = (
+  cueName: string,
+  logicNodes: LogicNode[],
+  variableDefinitions: VariableDefinition[],
+  errors: string[],
+): void => {
+  const varMap = new Map(variableDefinitions.map((v) => [v.name, v]))
+  for (const node of logicNodes) {
+    if (node.logicType !== 'conditional') continue
+    const left = node.left
+    const right = node.right
+    const literalStr = (s: ValueSource | undefined): string | null =>
+      s?.source === 'literal' && s.value != null ? String(s.value) : null
+    const varNameFrom = (s: ValueSource | undefined): string | null =>
+      s?.source === 'variable' ? s.name : null
+    const leftLiteral = literalStr(left)
+    const rightVar = varNameFrom(right)
+    const rightLiteral = literalStr(right)
+    const leftVar = varNameFrom(left)
+    if (leftLiteral !== null && rightVar !== null) {
+      const def = varMap.get(rightVar)
+      if (def?.validValues?.length && !def.validValues.includes(leftLiteral)) {
+        errors.push(
+          `cue '${cueName}': Conditional '${node.id}' compares literal "${leftLiteral}" against variable "${rightVar}" — valid values are: ${def.validValues.join(', ')}`,
+        )
+      }
+    }
+    if (rightLiteral !== null && leftVar !== null) {
+      const def = varMap.get(leftVar)
+      if (def?.validValues?.length && !def.validValues.includes(rightLiteral)) {
+        errors.push(
+          `cue '${cueName}': Conditional '${node.id}' compares literal "${rightLiteral}" against variable "${leftVar}" — valid values are: ${def.validValues.join(', ')}`,
+        )
+      }
+    }
+  }
+}
+
 export const validateYargNodeCueFile = (
   value: unknown,
 ): NodeCueValidationResult<YargNodeCueFile> => {
@@ -1084,6 +1130,10 @@ export const validateYargNodeCueFile = (
     const nonEventIds = new Set<string>([...logicIds, ...actionIds])
     const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
     semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
+
+    // Check conditional nodes: literal vs variable validValues
+    const cueVarDefs = [...groupVariables, ...cueVariables]
+    checkConditionalValidValues(cue.name, cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
@@ -1143,6 +1193,10 @@ export const validateAudioNodeCueFile = (
     const nonEventIds = new Set<string>([...logicIds, ...actionIds])
     const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
     semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
+
+    // Check conditional nodes: literal vs variable validValues
+    const cueVarDefs = [...groupVariables, ...cueVariables]
+    checkConditionalValidValues(cue.name, cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
@@ -1184,8 +1238,53 @@ export const validateNodeCueFile = (value: unknown): NodeCueValidationResult => 
 }
 
 // ============================================================================
-// Effect File Validation
+// Effect File Validation (schema + semantic parity with cue validation)
 // ============================================================================
+
+const effectGroupMetaSchema: JSONSchemaType<EffectGroupMeta> = {
+  type: 'object',
+  required: ['id', 'name'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    name: { type: 'string', minLength: 1 },
+    description: { type: 'string', nullable: true },
+  },
+}
+
+const yargEffectFileSchema: JSONSchemaType<YargEffectFile> = {
+  type: 'object',
+  required: ['version', 'mode', 'group', 'effects'],
+  additionalProperties: false,
+  properties: {
+    version: { type: 'integer', const: 1 },
+    mode: { type: 'string', const: 'yarg' },
+    group: effectGroupMetaSchema,
+    effects: {
+      type: 'array',
+      minItems: 1,
+      items: {
+        type: 'object',
+        required: ['id', 'name', 'mode'],
+        additionalProperties: true,
+        properties: {
+          id: stringIdSchema,
+          name: { type: 'string', minLength: 1 },
+          mode: { type: 'string', const: 'yarg' },
+          description: { type: 'string', nullable: true },
+          nodes: { type: 'object', nullable: true },
+          connections: { type: 'array', nullable: true },
+          layout: { type: 'object', nullable: true },
+          variables: { type: 'array', nullable: true },
+          events: { type: 'array', nullable: true },
+        },
+      } as any,
+    },
+    bundled: { type: 'boolean', nullable: true },
+  },
+}
+
+const validateYargEffectSchema = ajv.compile<YargEffectFile>(yargEffectFileSchema)
 
 export interface EffectValidationResult<T = EffectFile> {
   valid: boolean
@@ -1195,11 +1294,9 @@ export interface EffectValidationResult<T = EffectFile> {
 }
 
 /**
- * Validate YARG Effect File
- * Note: Simplified validation - expand schemas as needed
+ * Validate YARG Effect File (schema + semantic, parity with cue validation).
  */
 export const validateYargEffectFile = (value: unknown): EffectValidationResult<YargEffectFile> => {
-  // Basic validation
   if (!value || typeof value !== 'object') {
     return {
       valid: false,
@@ -1207,57 +1304,36 @@ export const validateYargEffectFile = (value: unknown): EffectValidationResult<Y
     }
   }
 
-  const file = value as any
-
-  // Check required fields
-  if (file.version !== 1) {
+  if (!validateYargEffectSchema(value)) {
     return {
       valid: false,
-      errors: ['version must be 1'],
+      errors: formatErrors(validateYargEffectSchema.errors as DefinedError[]),
+      mode: 'yarg',
     }
   }
 
-  if (file.mode !== 'yarg') {
-    return {
-      valid: false,
-      errors: ['mode must be "yarg"'],
-    }
-  }
+  const file = value as YargEffectFile
+  const semanticErrors: string[] = []
 
-  if (!file.group || !file.group.id || !file.group.name) {
-    return {
-      valid: false,
-      errors: ['group must have id and name'],
-    }
-  }
-
-  if (!Array.isArray(file.effects)) {
-    return {
-      valid: false,
-      errors: ['effects must be an array'],
-    }
-  }
-
-  // Basic effect validation
+  const effectIds = new Set<string>()
   for (const effect of file.effects) {
-    if (!effect.id || !effect.name || !effect.mode) {
-      return {
-        valid: false,
-        errors: ['Each effect must have id, name, and mode'],
-      }
+    if (effectIds.has(effect.id)) {
+      semanticErrors.push(`Duplicate effect id: '${effect.id}'`)
     }
+    effectIds.add(effect.id)
+  }
 
-    if (effect.mode !== 'yarg') {
-      return {
-        valid: false,
-        errors: [`Effect ${effect.name} mode must be "yarg"`],
-      }
+  if (semanticErrors.length > 0) {
+    return {
+      valid: false,
+      errors: semanticErrors,
+      mode: 'yarg',
     }
   }
 
   return {
     valid: true,
-    data: file as YargEffectFile,
+    data: file,
     errors: [],
     mode: 'yarg',
   }

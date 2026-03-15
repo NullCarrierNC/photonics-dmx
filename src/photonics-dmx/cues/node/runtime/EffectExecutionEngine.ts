@@ -25,8 +25,8 @@ import {
 } from '../../types/nodeCueTypes'
 import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
-import { VariableValue } from './executionTypes'
-import { resolveValue, getVariableStore, UninitializedVariableError } from './valueResolver'
+import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
+import { resolveValue, getVariableStore } from './valueResolver'
 import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
@@ -56,12 +56,27 @@ export class EffectExecutionEngine {
   private eventListeners: Map<string, EventListenerNode[]> = new Map()
   private callerCueData: CueData | AudioCueData // Cue data from caller
   private onIdleCallback?: () => void // Called when all contexts complete
-  /** Effect names and layers submitted via addEffectWithCallback, for cancelAll to remove. */
+  /** Effect names and layers submitted via addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
   /** Callback-backed effects still running in sequencer for this engine instance. */
   private pendingCallbackEffects: Set<string> = new Set()
   /** When .use is true, the next effect submission must use setEffect (then set .use = false). */
   private firstSubmissionUsesSetEffectRef?: { use: boolean }
+  /** When provided (e.g. by V2), use instead of reading/mutating the ref. */
+  private readonly consumeInitialClearPolicy?: () => boolean
+  private readonly runtimeCallbacks?: NodeRuntimeCallbacks
+
+  /** Returns whether the next effect submission should use setEffect, and consumes the policy. */
+  private getAndConsumeInitialClearPolicy(): boolean {
+    if (this.consumeInitialClearPolicy) {
+      return this.consumeInitialClearPolicy()
+    }
+    const v = this.firstSubmissionUsesSetEffectRef?.use === true
+    if (this.firstSubmissionUsesSetEffectRef) {
+      this.firstSubmissionUsesSetEffectRef.use = false
+    }
+    return v
+  }
 
   private maybeFireIdle(): void {
     if (
@@ -73,8 +88,16 @@ export class EffectExecutionEngine {
     }
   }
 
+  private runtimeEmit(channel: string, payload: unknown): void {
+    if (this.runtimeCallbacks) {
+      this.runtimeCallbacks.emit(channel, payload)
+    } else {
+      sendToAllWindows(channel, payload)
+    }
+  }
+
   private emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
-    sendToAllWindows(RENDERER_RECEIVE.NODE_EXECUTION, {
+    this.runtimeEmit(RENDERER_RECEIVE.NODE_EXECUTION, {
       type,
       cueId: this.compiledEffect.definition.id,
       nodeId,
@@ -89,6 +112,8 @@ export class EffectExecutionEngine {
     parameterValues: Record<string, any>,
     callerCueData: CueData | AudioCueData,
     firstSubmissionUsesSetEffectRef?: { use: boolean },
+    runtimeCallbacks?: NodeRuntimeCallbacks,
+    consumeInitialClearPolicy?: () => boolean,
   ) {
     this.instanceId = ++EffectExecutionEngine.nextInstanceId
     this.compiledEffect = compiledEffect
@@ -97,6 +122,8 @@ export class EffectExecutionEngine {
     this.parameterValues = parameterValues
     this.callerCueData = callerCueData
     this.firstSubmissionUsesSetEffectRef = firstSubmissionUsesSetEffectRef
+    this.consumeInitialClearPolicy = consumeInitialClearPolicy
+    this.runtimeCallbacks = runtimeCallbacks
     this.variableDefinitions = compiledEffect.definition.variables ?? []
 
     // Initialize effect-local variable store
@@ -148,7 +175,8 @@ export class EffectExecutionEngine {
     // Apply parameter values to effect variables
     this.applyParameterValues(effectListener)
 
-    // Create execution context with caller's cue data
+    // Create execution context with caller's cue data. cueLevelVarStore is the effect's
+    // var store so resolveActionTiming() reads waitUntilCondition/waitUntilTime from it.
     const context = new ExecutionContext(
       { id: effectListener.id, type: 'event', outputs: effectListener.outputs } as any,
       cueData, // Pass caller's cue data
@@ -181,8 +209,49 @@ export class EffectExecutionEngine {
   }
 
   /**
+   * Resolve a literal ValueSource to a primitive for storage in the effect var store.
+   * Parameter values from the cue are often ValueSource objects; storing them raw
+   * causes resolution to return 0/1 instead of the actual number (e.g. waitUntilTime 500).
+   */
+  private resolveParameterValue(
+    raw: unknown,
+    paramType: string,
+  ): number | string | boolean | TrackedLight[] {
+    if (raw == null) return paramType === 'number' ? 0 : paramType === 'boolean' ? false : ''
+    const vs = raw as { source?: string; value?: unknown }
+    if (vs && typeof vs === 'object' && vs.source === 'literal' && 'value' in vs) {
+      const v = vs.value
+      if (paramType === 'number') {
+        if (typeof v === 'number' && !Number.isNaN(v)) return v
+        if (typeof v === 'string') {
+          const n = parseFloat(v)
+          return Number.isNaN(n) ? 0 : n
+        }
+        return typeof v === 'boolean' ? (v ? 1 : 0) : 0
+      }
+      if (paramType === 'string' || paramType === 'color' || paramType === 'event')
+        return String(v ?? '')
+      if (paramType === 'boolean') return v === true || v === 'true'
+      if (paramType === 'light-array') return Array.isArray(v) ? (v as TrackedLight[]) : []
+    }
+    // Already-resolved values (e.g. from NodeExecutionEngine): coerce so delay timing is reliable
+    if (paramType === 'number') {
+      if (typeof raw === 'number' && !Number.isNaN(raw)) return raw
+      if (typeof raw === 'string') {
+        const n = parseFloat(raw)
+        return Number.isNaN(n) ? 0 : n
+      }
+    }
+    if (paramType === 'string' || paramType === 'color' || paramType === 'event')
+      return String(raw ?? '')
+    return raw as number | string | boolean | TrackedLight[]
+  }
+
+  /**
    * Apply parameter values to effect variables.
    * Parameters are variables with isParameter: true in the effect definition.
+   * Caller (NodeExecutionEngine) passes resolved primitives with correct types (e.g. waitUntilCondition
+   * 'delay', waitUntilTime 500/200, color 'yellow'/'blue'); we store them per param type for action timing.
    */
   private applyParameterValues(_listener: EffectEventListenerNode): void {
     // Get all variables marked as parameters
@@ -190,7 +259,8 @@ export class EffectExecutionEngine {
 
     for (const paramVar of parameterVars) {
       // Check if a value was provided, otherwise use the default
-      const value = this.parameterValues[paramVar.name] ?? paramVar.initialValue
+      const raw = this.parameterValues[paramVar.name] ?? paramVar.initialValue
+      const value = this.resolveParameterValue(raw, paramVar.type)
 
       this.effectVarStore.set(paramVar.name, {
         type: paramVar.type,
@@ -321,7 +391,7 @@ export class EffectExecutionEngine {
         return
       }
 
-      const useSetEffect = this.firstSubmissionUsesSetEffectRef?.use === true
+      const useSetEffect = this.getAndConsumeInitialClearPolicy()
 
       const effectName =
         iterIdx >= 0
@@ -344,18 +414,16 @@ export class EffectExecutionEngine {
         }
         this.submittedEffects.set(effectName, resolvedLayer)
         if (useSetEffect) {
-          this.firstSubmissionUsesSetEffectRef!.use = false
-          this.sequencer.setEffectWithCallback(effectName, effect, callback)
+          this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
         } else {
-          this.sequencer.addEffectWithCallback(effectName, effect, callback)
+          this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
         }
       } else {
         this.submittedEffects.set(effectName, resolvedLayer)
         if (useSetEffect) {
-          this.firstSubmissionUsesSetEffectRef!.use = false
-          void this.sequencer.setEffect(effectName, effect)
+          this.sequencer.setEffectUnblockedName(effectName, effect)
         } else {
-          this.sequencer.addEffect(effectName, effect)
+          this.sequencer.addEffectUnblockedName(effectName, effect)
         }
         this.emitNodeExecution('deactivated', action.id)
         this.continueToNextNodes(action.id, context)
@@ -443,10 +511,12 @@ export class EffectExecutionEngine {
 
     const lastChainNode = actionChain[actionChain.length - 1]
     const chainHasBlockingStep = chainData.steps.some(
-      (step) => step.resolvedTiming.waitUntilCondition !== 'none',
+      (step) =>
+        step.resolvedTiming.waitUntilCondition !== 'none' ||
+        step.resolvedTiming.waitForCondition !== 'none',
     )
 
-    const useSetEffectChain = this.firstSubmissionUsesSetEffectRef?.use === true
+    const useSetEffectChain = this.getAndConsumeInitialClearPolicy()
     if (chainHasBlockingStep) {
       context.registerActiveAction(lastChainNode.id, lastChainNode)
       this.pendingCallbackEffects.add(chainEffectName)
@@ -463,18 +533,16 @@ export class EffectExecutionEngine {
       }
       this.submittedEffects.set(chainEffectName, chainData.baseLayer)
       if (useSetEffectChain) {
-        this.firstSubmissionUsesSetEffectRef!.use = false
-        this.sequencer.setEffectWithCallback(chainEffectName, composedEffect, callback)
+        this.sequencer.setEffectUnblockedNameWithCallback(chainEffectName, composedEffect, callback)
       } else {
-        this.sequencer.addEffectWithCallback(chainEffectName, composedEffect, callback)
+        this.sequencer.addEffectUnblockedNameWithCallback(chainEffectName, composedEffect, callback)
       }
     } else {
       this.submittedEffects.set(chainEffectName, chainData.baseLayer)
       if (useSetEffectChain) {
-        this.firstSubmissionUsesSetEffectRef!.use = false
-        void this.sequencer.setEffect(chainEffectName, composedEffect)
+        this.sequencer.setEffectUnblockedName(chainEffectName, composedEffect)
       } else {
-        this.sequencer.addEffect(chainEffectName, composedEffect)
+        this.sequencer.addEffectUnblockedName(chainEffectName, composedEffect)
       }
       for (const a of actionChain) {
         this.emitNodeExecution('deactivated', a.id)
@@ -510,14 +578,29 @@ export class EffectExecutionEngine {
     }
 
     const lightsArray = sourceVar.value as TrackedLight[]
-    const length = lightsArray.length
+    const rawLength = lightsArray.length
+
+    // Resolve group size from ValueSource (literal or variable) when set
+    let groupSize = 1
+    if (logicNode.groupSize) {
+      const resolved = Number(resolveValue('number', logicNode.groupSize, context))
+      if (typeof resolved === 'number' && !Number.isNaN(resolved) && resolved > 0) {
+        groupSize = Math.floor(resolved)
+      }
+    }
+
+    const length = groupSize > 1 ? Math.floor(rawLength / groupSize) : rawLength
 
     const bodyNodeIds = collectReachableNodes(adjacency, eachTargets, nodeId)
     context.setForEachLightState(nodeId, { index: 0, length })
 
     for (let i = 0; i < length; i++) {
-      const currentLight = lightsArray[i]
-      const currentLightArray = currentLight ? [currentLight] : []
+      const currentLightArray =
+        groupSize > 1
+          ? lightsArray.slice(i * groupSize, (i + 1) * groupSize)
+          : lightsArray[i]
+            ? [lightsArray[i]]
+            : []
       this.getVarStore(logicNode.currentLightVariable, context).set(
         logicNode.currentLightVariable,
         { type: 'light-array', value: currentLightArray },
@@ -569,7 +652,7 @@ export class EffectExecutionEngine {
         variableDefinitions: this.variableDefinitions,
         executeNode: (nextNodeId: string, ctx: ExecutionContext) =>
           this.executeNode(nextNodeId, ctx),
-        debugOutput: sendToAllWindows,
+        debugOutput: (channel: string, payload: unknown) => this.runtimeEmit(channel, payload),
       }
 
       const nextNodes = evaluateLogicNode(logic, logic.id, edges, context, evaluatorContext)
@@ -578,13 +661,10 @@ export class EffectExecutionEngine {
       this.continueExecution(nextNodes, context)
       this.emitNodeExecution('deactivated', logic.id)
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${logic.id}: ${msg}`)
       console.error(`Error executing logic node ${logic.id}:`, error)
       this.emitNodeExecution('deactivated', logic.id)
-      // Continue to all outgoing edges despite error
-      this.continueToNextNodes(logic.id, context)
     }
   }
 
@@ -635,12 +715,10 @@ export class EffectExecutionEngine {
       }, actualDelay)
       context.addTimer(timerId)
     } catch (error) {
-      if (error instanceof UninitializedVariableError) {
-        sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-      }
+      const msg = error instanceof Error ? error.message : String(error)
+      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${delayNode.id}: ${msg}`)
       console.error(`Error executing delay node ${delayNode.id}:`, error)
       this.emitNodeExecution('deactivated', delayNode.id)
-      this.continueToNextNodes(delayNode.id, context)
     }
   }
 
@@ -703,9 +781,8 @@ export class EffectExecutionEngine {
       try {
         this.executeNode(nodeId, context)
       } catch (error) {
-        if (error instanceof UninitializedVariableError) {
-          sendToAllWindows(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, error.message)
-        }
+        const msg = error instanceof Error ? error.message : String(error)
+        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
         console.error(`Error executing node ${nodeId}:`, error)
       }
     }
@@ -735,7 +812,16 @@ export class EffectExecutionEngine {
   }
 
   /**
-   * Set a callback to be invoked when all execution contexts complete (effect becomes idle).
+   * True while the effect is running: has active contexts or callback-backed effects still pending.
+   * Use this to block retriggers until the effect is truly idle (matches when onIdle fires).
+   */
+  public isBusy(): boolean {
+    return this.activeContexts.size > 0 || this.pendingCallbackEffects.size > 0
+  }
+
+  /**
+   * Set a callback to be invoked when the effect becomes idle (no active contexts and no
+   * pending callback-backed effects).
    */
   public setOnIdle(callback: () => void): void {
     this.onIdleCallback = callback

@@ -96,10 +96,50 @@ describe('Node cue chaining', () => {
       addEffect: (name: string, _effect: Effect) => {
         callOrder.push(name)
       },
+      setEffect: () => Promise.resolve(),
       addEffectWithCallback: (name: string, _effect: Effect, callback: () => void) => {
         callOrder.push(name)
         callback()
       },
+      setEffectWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+        callOrder.push(name)
+        callback()
+      },
+      addEffectUnblockedName: (name: string) => {
+        callOrder.push(name)
+        return true
+      },
+      setEffectUnblockedName: (name: string) => {
+        callOrder.push(name)
+        return true
+      },
+      addEffectUnblockedNameWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+        callOrder.push(name)
+        callback()
+      },
+      setEffectUnblockedNameWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+        callOrder.push(name)
+        callback()
+      },
+      removeEffectCallback: () => {},
+      removeEffectByLayer: () => {},
+      removeEffect: () => {},
+      removeAllEffects: () => {},
+      getActiveEffectsForLight: () => new Map(),
+      isLayerFreeForLight: () => true,
+      setState: () => {},
+      onBeat: () => {},
+      onMeasure: () => {},
+      onKeyframe: () => {},
+      onDrumNote: () => {},
+      onGuitarNote: () => {},
+      onBassNote: () => {},
+      onKeysNote: () => {},
+      blackout: () => Promise.resolve(),
+      cancelBlackout: () => {},
+      enableDebug: () => {},
+      debugLightLayers: () => {},
+      shutdown: () => {},
     }
 
     await cue.execute({ beat: 'Strong' } as any, sequencerMock as ILightingController, null as any)

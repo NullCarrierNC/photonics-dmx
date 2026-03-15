@@ -1,13 +1,16 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine'
 import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext'
-import { CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
+import { NodeCueCompiler, CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
+import { EffectCompiler } from '../../../cues/node/compiler/EffectCompiler'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
+import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
 import {
   YargNodeCueDefinition,
   YargEventNode,
   ActionNode,
   LogicNode,
 } from '../../../cues/types/nodeCueTypes'
+import type { YargEffectDefinition } from '../../../cues/types/nodeCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { Beat, CueData, CueType } from '../../../cues/types/cueTypes'
@@ -51,7 +54,7 @@ describe('NodeExecutionEngine', () => {
     fogState: false,
     strobeState: 'Strobe_Off',
     performer: 0,
-    keyframe: '',
+    keyframe: 'Off',
     bonusEffect: false,
     beat: beat ?? 'Unknown',
   })
@@ -61,10 +64,16 @@ describe('NodeExecutionEngine', () => {
     mockSequencer = {
       addEffect: jest.fn(),
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        // Automatically invoke callback after a short delay to simulate completion
-        if (callback) {
-          setTimeout(() => callback(), 1)
-        }
+        if (callback) setTimeout(() => callback(), 1)
+      }),
+      setEffectWithCallback: jest.fn((_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(), 1)
+      }),
+      addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(), 1)
+      }),
+      setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(), 1)
       }),
       removeEffectCallback: jest.fn(),
       setEffect: jest.fn(),
@@ -171,7 +180,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, parameters)
 
       // Verify that addEffect was called
-      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
       expect(mockLightManager.getLights).toHaveBeenCalled()
     })
 
@@ -307,7 +316,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       // With different layers chain is not composed; each action is submitted (fire-and-forget)
-      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(2)
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -424,8 +433,8 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       // Since 5 > 3 is true, action-true should be executed
-      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
-      const call = jest.mocked(mockSequencer.addEffect).mock.calls[0]
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
+      const call = jest.mocked(mockSequencer.addEffectUnblockedName).mock.calls[0]
       const effectName = call[0]
       expect(effectName).toContain('action-true')
     })
@@ -544,7 +553,7 @@ describe('NodeExecutionEngine', () => {
       })
 
       // Action should execute because 42 == 42
-      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -1077,17 +1086,39 @@ describe('NodeExecutionEngine', () => {
         ]),
       }
 
+      const effectListenerNode = {
+        id: 'eff-listener-1',
+        type: 'effect-listener' as const,
+        outputs: [],
+      }
       const mockEffect = {
-        definition: { id: 'test-effect', name: 'Test' },
+        definition: {
+          id: 'test-effect',
+          name: 'Test',
+          variables: [],
+          nodes: {
+            events: [],
+            actions: [],
+            logic: [],
+            effectListeners: [effectListenerNode],
+            eventRaisers: [],
+            eventListeners: [],
+          },
+          connections: [],
+        },
         eventRaiserMap: new Map(),
         eventListenerMap: new Map(),
+        effectListenerMap: new Map([[effectListenerNode.id, effectListenerNode]]),
         actionMap: new Map(),
         logicMap: new Map(),
-        adjacency: new Map(),
+        adjacency: new Map([[effectListenerNode.id, []]]),
+        eventMap: new Map(),
+        eventDefinitions: [],
+        parameters: new Map(),
       }
 
       const effectRegistry = new EffectRegistry()
-      effectRegistry.registerEffect('test-effect', mockEffect as CompiledEffect)
+      effectRegistry.registerEffect('test-effect', mockEffect as unknown as CompiledEffect)
 
       const engine = new NodeExecutionEngine(
         compiledCue,
@@ -1103,7 +1134,183 @@ describe('NodeExecutionEngine', () => {
 
       // Both effect and subsequent action should execute
       // Effect executes async, action executes in chain
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
+    })
+
+    it('resolves effect raiser literal parameter values with correct types (score cue regression)', () => {
+      const scoreLikeEffect: YargEffectDefinition = {
+        id: 'score-like-effect',
+        mode: 'yarg',
+        name: 'Score-like',
+        description: '',
+        variables: [
+          {
+            name: 'lights',
+            type: 'light-array',
+            scope: 'cue',
+            initialValue: [],
+            isParameter: true,
+          },
+          { name: 'color', type: 'color', scope: 'cue', initialValue: 'white', isParameter: true },
+          {
+            name: 'waitUntilCondition',
+            type: 'string',
+            scope: 'cue',
+            initialValue: 'beat',
+            isParameter: true,
+          },
+          {
+            name: 'waitUntilTime',
+            type: 'number',
+            scope: 'cue',
+            initialValue: 0,
+            isParameter: true,
+          },
+          { name: 'currentLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'variable', name: 'currentLight' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'variable', name: 'color' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
+                waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
+                easing: 'linear',
+                level: { source: 'literal', value: 1 },
+              },
+              layer: { source: 'literal', value: 1 },
+            },
+          ],
+          logic: [
+            {
+              id: 'for-each-1',
+              type: 'logic',
+              logicType: 'for-each-light',
+              sourceVariable: 'lights',
+              currentLightVariable: 'currentLight',
+              currentIndexVariable: 'idx',
+            } as any,
+          ],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-1', type: 'effect-listener', label: 'Entry', outputs: ['for-each-1'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-1', to: 'for-each-1' },
+          { from: 'for-each-1', to: 'action-1', fromPort: 'each' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(scoreLikeEffect)
+      const effectRegistry = new EffectRegistry()
+      effectRegistry.registerEffect('score-like-effect', compiledEffect)
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+      }
+
+      const effectRaiserNode = {
+        id: 'raiser1',
+        type: 'effect-raiser' as const,
+        effectId: 'score-like-effect',
+        label: 'Score Effect',
+        outputs: [] as string[],
+        parameterValues: {
+          lights: { source: 'variable' as const, name: 'lights' },
+          color: { source: 'literal' as const, value: 'yellow' },
+          waitUntilCondition: { source: 'literal' as const, value: 'delay' },
+          waitUntilTime: { source: 'literal' as const, value: 500 },
+        },
+      }
+
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        cueType: 'TestType' as CueType,
+        style: 'primary',
+        description: 'Test',
+        nodes: {
+          events: [eventNode],
+          actions: [],
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectRaisers: [effectRaiserNode],
+        },
+        connections: [{ from: 'event1', to: 'raiser1' }],
+      }
+
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map(),
+        logicMap: new Map(),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map([['raiser1', effectRaiserNode]]),
+        eventDefinitions: [],
+        adjacency: new Map([['event1', [{ from: 'event1', to: 'raiser1' }]]]),
+      }
+
+      cueLevelVarStore.set('lights', {
+        type: 'light-array',
+        value: [
+          { id: 'light1', position: 0 },
+          { id: 'light2', position: 1 },
+        ],
+      })
+
+      let submittedEffect: any
+      const captureEffect = (_name: string, effectArg: any, _callback?: () => void) => {
+        submittedEffect = effectArg
+      }
+      ;(mockSequencer.addEffectUnblockedNameWithCallback as jest.Mock).mockImplementation(
+        captureEffect,
+      )
+      ;(mockSequencer.setEffectUnblockedNameWithCallback as jest.Mock).mockImplementation(
+        captureEffect,
+      )
+
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        effectRegistry,
+      )
+
+      engine.startExecution(eventNode, createCueData('Strong'))
+
+      expect(submittedEffect).toBeDefined()
+      expect(submittedEffect.transitions?.length).toBeGreaterThan(0)
+      const firstTransition = submittedEffect.transitions[0]
+      expect(firstTransition.waitUntilCondition).toBe('delay')
+      expect(firstTransition.waitUntilTime).toBe(500)
+      expect(firstTransition.transform?.color?.red).toBeGreaterThan(0)
+      expect(firstTransition.transform?.color?.green).toBeGreaterThan(0)
     })
   })
 
@@ -1199,7 +1406,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.type).toBe('number')
 
       // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
     })
 
     it('should extract config data and assign to variable', () => {
@@ -1305,7 +1512,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.type).toBe('number')
 
       // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
     })
 
     it('should handle cue data node without assignTo', () => {
@@ -1392,7 +1599,7 @@ describe('NodeExecutionEngine', () => {
       expect(cueLevelVarStore.size).toBe(0)
 
       // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
     })
 
     it('should use cue data in conditional branching', () => {
@@ -1531,7 +1738,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.value).toBe(3)
 
       // Should execute high action (3 >= 2)
-      expect(mockSequencer.addEffect).toHaveBeenCalledWith(
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledWith(
         expect.stringContaining('action-high'),
         expect.anything(),
       )
@@ -1642,7 +1849,7 @@ describe('NodeExecutionEngine', () => {
       expect(storedVar?.type).toBe('number')
 
       // Action should still execute
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
     })
   })
 
@@ -1752,7 +1959,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
       // The resolved color should be 'red' from the variable
     })
 
@@ -1846,7 +2053,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
       // Groups should be resolved to ['front', 'back']
     })
 
@@ -2036,7 +2243,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
       // Duration should be 120 (BPM) * 5 = 600
       expect(cueLevelVarStore.get('calculatedDuration')?.value).toBe(600)
     })
@@ -2131,7 +2338,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(mockSequencer.addEffect).toHaveBeenCalled()
+      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
       // Should resolve to default color 'blue' (from resolveColor method)
     })
   })
@@ -2574,6 +2781,76 @@ describe('NodeExecutionEngine', () => {
       expect(selectedLight?.type).toBe('light-array')
       // Index -1 should wrap to the last element (index 2)
       expect(selectedLight?.value).toEqual([mockLights[2]])
+    })
+  })
+
+  describe('two cues sharing one groupId, one stops', () => {
+    it('second cue can still run after first cue is stopped', async () => {
+      const groupId = 'shared-group'
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'cue-started',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: 'linear',
+        },
+      }
+      const definition1: YargNodeCueDefinition = {
+        id: 'cue-a',
+        name: 'Cue A',
+        cueType: CueType.Sweep,
+        style: 'primary',
+        nodes: { events: [eventNode], actions: [actionNode], logic: [] },
+        connections: [{ from: 'event1', to: 'action1' }],
+      }
+      const definition2: YargNodeCueDefinition = {
+        id: 'cue-b',
+        name: 'Cue B',
+        cueType: CueType.Stomp,
+        style: 'primary',
+        nodes: {
+          events: [{ ...eventNode, id: 'ev2', eventType: 'cue-started' }],
+          actions: [{ ...actionNode, id: 'act2' }],
+          logic: [],
+        },
+        connections: [{ from: 'ev2', to: 'act2' }],
+      }
+      const compiled1 = NodeCueCompiler.compileYargCue(definition1)
+      const compiled2 = NodeCueCompiler.compileYargCue(definition2)
+      const registry = new EffectRegistry()
+      const cue1 = new YargNodeCue(groupId, compiled1, registry)
+      const cue2 = new YargNodeCue(groupId, compiled2, registry)
+      const params = createCueData('Strong')
+
+      await cue1.execute(params, mockSequencer, mockLightManager)
+      cue1.onStop()
+      const totalCallsBefore =
+        (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length +
+        (mockSequencer.addEffectUnblockedName as jest.Mock).mock.calls.length
+      await cue2.execute(params, mockSequencer, mockLightManager)
+      const totalCallsAfter =
+        (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length +
+        (mockSequencer.addEffectUnblockedName as jest.Mock).mock.calls.length
+
+      expect(totalCallsAfter).toBeGreaterThan(totalCallsBefore)
     })
   })
 })

@@ -219,7 +219,6 @@ export class EffectManager implements IEffectManager {
       console.warn('Cancelling blackout for setEffect')
       this.systemEffects.cancelBlackout()
     }
-    this.removeAllEffects()
 
     if (effect.transitions.length === 0) {
       console.warn(`Effect "${name}" has no transitions. Ignoring.`)
@@ -235,18 +234,17 @@ export class EffectManager implements IEffectManager {
 
     // Check to see if we've called setEffect before for this effect. If so, queue it and don't clear all.
     if (hasLayer0 && this._lastCalled0LayerEffect === name) {
-      transitionsByLayerAndLight.forEach((layerMap, layer) => {
-        layerMap.forEach((_, lightId) => {
-          this.layerManager.addQueuedEffect(layer, lightId, { name, effect, isPersistent, lightId })
-        })
-      })
-    } else {
+      this.removeEffect(name, 0)
       this.addEffect(name, effect, isPersistent)
+      this._lastCalled0LayerEffect = name
+      return
+    }
 
-      // Update the last layer 0 effect name if this effect targets layer 0
-      if (hasLayer0) {
-        this._lastCalled0LayerEffect = name
-      }
+    this.removeAllEffects()
+
+    this.addEffect(name, effect, isPersistent)
+    if (hasLayer0) {
+      this._lastCalled0LayerEffect = name
     }
   }
 
@@ -309,6 +307,44 @@ export class EffectManager implements IEffectManager {
     )
 
     return true
+  }
+
+  /**
+   * Like addEffectUnblockedName but with a completion callback.
+   * If the effect was added, the callback is fired when the effect completes.
+   * If the effect was discarded (same name already running), the callback is fired immediately.
+   */
+  public addEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent: boolean = false,
+  ): void {
+    const added = this.addEffectUnblockedName(name, effect, isPersistent)
+    if (added) {
+      this.effectCallbacks.set(name, onComplete)
+    } else {
+      onComplete()
+    }
+  }
+
+  /**
+   * Like setEffectUnblockedName but with a completion callback.
+   * If the effect was set, the callback is fired when the effect completes.
+   * If the effect was discarded (same name already running), the callback is fired immediately.
+   */
+  public setEffectUnblockedNameWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: () => void,
+    isPersistent: boolean = false,
+  ): void {
+    const set = this.setEffectUnblockedName(name, effect, isPersistent)
+    if (set) {
+      this.effectCallbacks.set(name, onComplete)
+    } else {
+      onComplete()
+    }
   }
 
   /**
@@ -481,9 +517,10 @@ export class EffectManager implements IEffectManager {
       // 3. Use clearAllTransitions() which clears maps and publishes black states
       this.lightTransitionController.clearAllTransitions()
 
-      // 4. Reset effect tracking state
+      // 4. Reset effect tracking state and clear callbacks to avoid orphaned references
       this._lastCalled0LayerEffect = ''
       this.persistentRuns.clear()
+      this.effectCallbacks.clear()
     } finally {
       // Always release the clearing lock, even if an error occurs
       this.lightTransitionController.endClearingSequence()
@@ -594,10 +631,29 @@ export class EffectManager implements IEffectManager {
           firstTransition.transform.easing,
         )
 
-        // Update effect state to transitioning
-        lightEffect.state = 'transitioning'
-        lightEffect.transitionStartTime = currentTime
-        lightEffect.waitEndTime = currentTime + firstTransition.transform.duration
+        if (firstTransition.transform.duration > 0) {
+          // Update effect state to transitioning
+          lightEffect.state = 'transitioning'
+          lightEffect.transitionStartTime = currentTime
+          lightEffect.waitEndTime = currentTime + firstTransition.transform.duration
+        } else {
+          // Duration is 0 — snap to end colour immediately but defer completion to the next
+          // frame so the LTC has a chance to blend this layer before it is torn down.
+          lightEffect.lastEndState = color
+          lightEffect.state = 'waitingUntil'
+          if (firstTransition.waitUntilCondition === 'delay') {
+            lightEffect.transitionStartTime = currentTime
+            const count = firstTransition.waitUntilConditionCount ?? 1
+            const delayMs = count > 0 ? count * firstTransition.waitUntilTime : 0
+            lightEffect.waitEndTime = currentTime + delayMs
+          } else if (firstTransition.waitUntilCondition === 'none') {
+            // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
+            // next updateTransitions call, after the current frame's blend pass has run.
+          } else {
+            lightEffect.transitionStartTime = currentTime
+            lightEffect.waitEndTime = currentTime
+          }
+        }
       } else if (firstTransition.waitForCondition === 'delay') {
         // Set up delay-based waiting
         lightEffect.waitEndTime = currentTime + firstTransition.waitForTime

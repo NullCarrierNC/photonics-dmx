@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAtom } from 'jotai'
 import type { IpcEventMap } from '../../../../../shared/ipcTypes'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers'
+import { showNodeIdsAtom } from '../../../atoms'
 
 type DebugLogEntry = IpcEventMap['node-cues:debug-log']
 
@@ -24,13 +26,13 @@ interface DebugPanelProps {
 }
 
 const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
+  const [showNodeIds, setShowNodeIds] = useAtom(showNodeIdsAtom)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [entries, setEntries] = useState<DebugLogEntry[]>([])
 
-  const handleDebugLog = useCallback((payload: DebugLogEntry) => {
-    if (!payload) return
+  const appendEntry = useCallback((entry: DebugLogEntry) => {
     setEntries((prev) => {
-      const next = [...prev, payload]
+      const next = [...prev, entry]
       if (next.length > MAX_ENTRIES) {
         next.splice(0, next.length - MAX_ENTRIES)
       }
@@ -38,10 +40,31 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
     })
   }, [])
 
+  const handleDebugLog = useCallback(
+    (payload: DebugLogEntry) => {
+      if (!payload) return
+      appendEntry(payload)
+    },
+    [appendEntry],
+  )
+
+  const handleRuntimeError = useCallback(
+    (message: string) => {
+      if (typeof message !== 'string') return
+      appendEntry({ message, variables: [], timestamp: Date.now() })
+    },
+    [appendEntry],
+  )
+
   useEffect(() => {
     addIpcListener(RENDERER_RECEIVE.DEBUG_LOG, handleDebugLog)
     return () => removeIpcListener(RENDERER_RECEIVE.DEBUG_LOG, handleDebugLog)
   }, [handleDebugLog])
+
+  useEffect(() => {
+    addIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, handleRuntimeError)
+    return () => removeIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, handleRuntimeError)
+  }, [handleRuntimeError])
 
   const outputRows = useMemo(
     () =>
@@ -75,6 +98,14 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
   return (
     <div
       className={`border-t border-gray-200 dark:border-gray-700 pt-3 flex flex-col ${className ?? ''}`}>
+      <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300 cursor-pointer mb-2">
+        <input
+          type="checkbox"
+          checked={showNodeIds}
+          onChange={(e) => setShowNodeIds(e.target.checked)}
+        />
+        Show Node IDs
+      </label>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">Debug Panel</h3>
         <div className="flex items-center gap-2">

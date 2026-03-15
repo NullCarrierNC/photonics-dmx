@@ -98,7 +98,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
     }
   })
 
-  // Update effect debounce time
+  // Persist effect debounce preference (stored for compatibility; cue debouncing has been removed, so setEffectDebouncePeriod is a no-op).
   ipcMain.on(CUE.UPDATE_EFFECT_DEBOUNCE, (_, debounceTime: number) => {
     void (async () => {
       try {

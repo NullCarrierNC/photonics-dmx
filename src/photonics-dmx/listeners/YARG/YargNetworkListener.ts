@@ -34,6 +34,7 @@ enum SceneIndexByte {
   Gameplay = 2,
   Score = 3,
   Calibration = 4,
+  Practice = 5,
 }
 
 enum PauseStateByte {
@@ -74,14 +75,33 @@ enum PostProcessingByte {
   Default = 0,
   Bloom = 1,
   Bright = 2,
-  Saturation = 3,
-  Contrast = 4,
-  Sharpness = 5,
-  Vignette = 6,
-  ChromaticAberration = 7,
-  MotionBlur = 8,
-  DepthOfField = 9,
-  AmbientOcclusion = 10,
+  Contrast = 3,
+  Posterize = 4,
+  PhotoNegative = 5,
+  Mirror = 6,
+  BlackAndWhite = 7,
+  SepiaTone = 8,
+  SilverTone = 9,
+  Choppy_BlackAndWhite = 10,
+  PhotoNegative_RedAndBlack = 11,
+  Polarized_BlackAndWhite = 12,
+  Polarized_RedAndBlue = 13,
+  Desaturated_Blue = 14,
+  Desaturated_Red = 15,
+  Contrast_Red = 16,
+  Contrast_Green = 17,
+  Contrast_Blue = 18,
+  Grainy_Film = 19,
+  Grainy_ChromaticAbberation = 20,
+  Scanlines = 21,
+  Scanlines_BlackAndWhite = 22,
+  Scanlines_Blue = 23,
+  Scanlines_Security = 24,
+  Trails = 25,
+  Trails_Long = 26,
+  Trails_Desaturated = 27,
+  Trails_Flickery = 28,
+  Trails_Spacey = 29,
 }
 
 enum KeyFrameByte {
@@ -101,6 +121,8 @@ enum BeatByte {
 const PORT = 36107
 const PACKET_HEADER = 0x59415247 // 'YARG' in hex
 const YARG_DATAGRAM_VERSION = 1
+/** Max rate for forwarding identical-state packets (30 updates per second). */
+const IDENTICAL_FRAME_THROTTLE_MS = 1000 / 30
 
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
@@ -118,11 +140,15 @@ export class YargNetworkListener extends EventEmitter {
   // To store the last processed data for change detection (excluding timestamp)
   private lastData: CueData | null = null
 
+  /** Timestamp (ms) when we last forwarded an identical frame; used to throttle unchanged packets to 30 Hz. */
+  private lastForwardedIdenticalAt = 0
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- log payload shape varies
   private lastLogData: Record<string, any> | null = null
 
   // Track the last scene to detect transitions
-  private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | null = null
+  private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' | null =
+    null
 
   constructor(cueHandler: BaseCueHandler) {
     super() // Initialize EventEmitter
@@ -323,9 +349,21 @@ export class YargNetworkListener extends EventEmitter {
         throw new Error(errorMessage)
       }
 
-      // Added missing fields
-      //  const spotlight = buffer.readUInt8(offset); offset += 1;
-      //   const singalong = buffer.readUInt8(offset); offset += 1;
+      const spotlight = buffer.readUInt8(offset)
+      offset += 1
+      const singalong = buffer.readUInt8(offset)
+      offset += 1
+
+      let cameraCutConstraint: number | undefined
+      let cameraCutPriority: number | undefined
+      let cameraCutSubject: number | undefined
+      if (buffer.length >= 47) {
+        cameraCutConstraint = buffer.readUInt8(offset)
+        offset += 1
+        cameraCutPriority = buffer.readUInt8(offset)
+        offset += 1
+        cameraCutSubject = buffer.readUInt8(offset)
+      }
 
       const lightingCue = lightingCueMap[lightingCueValue] || `Unknown (${lightingCueValue})`
 
@@ -349,141 +387,150 @@ export class YargNetworkListener extends EventEmitter {
         postProcessing: this.getPostProcessing(postProcessingByte),
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
-        performer: 0, //No longer in the network data?
+        performer: 0,
+        spotlight,
+        singalong,
+        ...(cameraCutConstraint !== undefined && {
+          cameraCutConstraint,
+          cameraCutPriority: cameraCutPriority!,
+          cameraCutSubject: cameraCutSubject!,
+        }),
         trackMode: autoGenTrack ? 'autogen' : 'tracked',
         beat: this.getBeatDescription(beatValue),
         keyframe: this.getKeyframeDescription(keyframeValue),
         bonusEffect,
       }
       //console.log("Keyframe:", YargCueData.keyframe);
-      // Change Detection: Compare with lastData (excluding timestamp)
-      if (this.lastData && this.isDataEqual(this.lastData, YargCueData)) {
-        // console.log("Received identical packet, skipping processing.");
-        return
-      }
-
-      // Check for scene transitions and handle Menu -> Gameplay transition
-      this.handleSceneTransition(YargCueData.currentScene)
-
-      const logData = {
-        currentScene: YargCueData.currentScene,
-        songSection: YargCueData.songSection,
-        beatsPerMinute: YargCueData.beatsPerMinute,
-        lightingCue: lightingCue,
-        guitarNotes: YargCueData.guitarNotes,
-        bassNotes: YargCueData.bassNotes,
-        drumNotes: YargCueData.drumNotes,
-        keysNotes: YargCueData.keysNotes,
-        postProcessing: YargCueData.postProcessing,
-        fogState: YargCueData.fogState,
-        beat: YargCueData.beat,
-        keyframe: YargCueData.keyframe,
-        performer: YargCueData.performer,
-        strobeState: YargCueData.strobeState,
-      }
-
-      // console.log("Listener Data:", logData);
-      if (this.lastLogData && !this.isDataEqual(this.lastLogData, logData)) {
-        this.lastLogData = logData
-        // console.log("\n", logData , ",")
-      }
-
-      this.lastLogData = logData
-      // Add to batch log buffer
-      // this.logBuffer.push(dataWithTimestamp);
-
-      // Track the beat:
-      switch (YargCueData.beat) {
-        case 'Strong':
-          // this.emit('handleBeat');
-          this.cueHandler.handleBeat()
-          break
-        case 'Measure':
-          //  this.emit('handleMeasure');
-          this.cueHandler.handleMeasure()
-          break
-      }
-
-      // Handle keyframe events
-      switch (YargCueData.keyframe) {
-        case 'First':
-        case 'Next':
-        case 'Previous':
-          this.cueHandler.handleKeyframe()
-          break
-      }
-
-      // Handle known lighting cue by emitting an event
-      const cueType = lightingCue //lightingCueMap[lightingCueValue];
-      if (cueType) {
-        //this.emit('handleCue', cueType, YargCueData);
-        this.cueHandler.handleCue(cueType, YargCueData)
-      } else {
-        console.warn(`Unknown lighting cue value received: ${lightingCue}`)
-      }
-
-      // Handle strobe state changes
-      if (YargCueData.strobeState && YargCueData.strobeState !== 'Strobe_Off') {
-        // Convert strobe state to cue type and handle it
-        let strobeCueType: CueType
-        switch (YargCueData.strobeState) {
-          case 'Strobe_Slow':
-            strobeCueType = CueType.Strobe_Slow
-            break
-          case 'Strobe_Medium':
-            strobeCueType = CueType.Strobe_Medium
-            break
-          case 'Strobe_Fast':
-            strobeCueType = CueType.Strobe_Fast
-            break
-          case 'Strobe_Fastest':
-            strobeCueType = CueType.Strobe_Fastest
-            break
-          default:
-            return // Unknown strobe state
-        }
-        this.cueHandler.handleCue(strobeCueType, YargCueData)
-      }
-
-      // Handle individual drum notes
-      YargCueData.drumNotes.forEach((note) => {
-        if (note !== DrumNoteType.None) {
-          this.cueHandler.handleDrumNote(note, YargCueData)
-        }
-      })
-
-      // Handle individual guitar notes
-      YargCueData.guitarNotes.forEach((note) => {
-        if (note !== InstrumentNoteType.None) {
-          this.cueHandler.handleGuitarNote(note, YargCueData)
-        }
-      })
-
-      // Handle individual bass notes
-      YargCueData.bassNotes.forEach((note) => {
-        if (note !== InstrumentNoteType.None) {
-          this.cueHandler.handleBassNote(note, YargCueData)
-        }
-      })
-
-      // Handle individual keys notes
-      YargCueData.keysNotes.forEach((note) => {
-        if (note !== InstrumentNoteType.None) {
-          this.cueHandler.handleKeysNote(note, YargCueData)
-        }
-      })
-
-      // Update lastData (exclude timestamp)
-      this.lastData = YargCueData
-
-      // Flush to disk periodically
-      /*
-      if (this.logBuffer.length >= this.flushThreshold) {
-        this.flushLogBuffer();
-      }
-        */
+      this.processCueData(YargCueData)
     } catch (error) {
       console.error('YARG Listener: Error during packet deserialization:', error)
+    }
+  }
+
+  /**
+   * Process one frame of cue data: beat/keyframe, lighting cue, strobe (including passive strobe-off),
+   * and instrument notes. Used by deserializePacket and by tests for passive strobe behaviour.
+   * Identical frames are forwarded at most 30 times per second; changed frames are forwarded immediately.
+   */
+  public processCueData(YargCueData: CueData): void {
+    const isIdentical = this.lastData !== null && this.isDataEqual(this.lastData, YargCueData)
+    if (isIdentical && Date.now() - this.lastForwardedIdenticalAt < IDENTICAL_FRAME_THROTTLE_MS) {
+      return
+    }
+
+    this.handleSceneTransition(YargCueData.currentScene)
+
+    const logData = {
+      currentScene: YargCueData.currentScene,
+      songSection: YargCueData.songSection,
+      beatsPerMinute: YargCueData.beatsPerMinute,
+      lightingCue: YargCueData.lightingCue,
+      guitarNotes: YargCueData.guitarNotes,
+      bassNotes: YargCueData.bassNotes,
+      drumNotes: YargCueData.drumNotes,
+      keysNotes: YargCueData.keysNotes,
+      postProcessing: YargCueData.postProcessing,
+      fogState: YargCueData.fogState,
+      beat: YargCueData.beat,
+      keyframe: YargCueData.keyframe,
+      performer: YargCueData.performer,
+      strobeState: YargCueData.strobeState,
+    }
+    if (this.lastLogData && !this.isDataEqual(this.lastLogData, logData)) {
+      this.lastLogData = logData
+    }
+    this.lastLogData = logData
+
+    switch (YargCueData.beat) {
+      case 'Strong':
+        this.cueHandler.handleBeat()
+        break
+      case 'Measure':
+        this.cueHandler.handleMeasure()
+        break
+    }
+
+    switch (YargCueData.keyframe) {
+      case 'First':
+        this.cueHandler.handleKeyframeFirst()
+        break
+      case 'Next':
+        this.cueHandler.handleKeyframeNext()
+        break
+      case 'Previous':
+        this.cueHandler.handleKeyframePrevious()
+        break
+    }
+
+    const cueType = YargCueData.lightingCue
+    if (cueType) {
+      this.cueHandler.handleCue(cueType as CueType, YargCueData)
+    } else {
+      console.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
+    }
+
+    const activeStrobeStates: StrobeState[] = [
+      'Strobe_Slow',
+      'Strobe_Medium',
+      'Strobe_Fast',
+      'Strobe_Fastest',
+    ]
+    const previousHadActiveStrobe =
+      this.lastData?.strobeState != null &&
+      this.lastData.strobeState !== 'Strobe_Off' &&
+      (activeStrobeStates as string[]).includes(this.lastData.strobeState)
+    const currentHasActiveStrobe =
+      YargCueData.strobeState != null &&
+      YargCueData.strobeState !== 'Strobe_Off' &&
+      (activeStrobeStates as string[]).includes(YargCueData.strobeState)
+
+    if (currentHasActiveStrobe) {
+      let strobeCueType: CueType
+      switch (YargCueData.strobeState) {
+        case 'Strobe_Slow':
+          strobeCueType = CueType.Strobe_Slow
+          break
+        case 'Strobe_Medium':
+          strobeCueType = CueType.Strobe_Medium
+          break
+        case 'Strobe_Fast':
+          strobeCueType = CueType.Strobe_Fast
+          break
+        case 'Strobe_Fastest':
+          strobeCueType = CueType.Strobe_Fastest
+          break
+        default:
+          strobeCueType = CueType.Strobe_Slow
+      }
+      this.cueHandler.handleCue(strobeCueType, YargCueData)
+    } else if (previousHadActiveStrobe) {
+      this.cueHandler.handleCue(CueType.Strobe_Off, YargCueData)
+    }
+
+    YargCueData.drumNotes.forEach((note) => {
+      if (note !== DrumNoteType.None) {
+        this.cueHandler.handleDrumNote(note, YargCueData)
+      }
+    })
+    YargCueData.guitarNotes.forEach((note) => {
+      if (note !== InstrumentNoteType.None) {
+        this.cueHandler.handleGuitarNote(note, YargCueData)
+      }
+    })
+    YargCueData.bassNotes.forEach((note) => {
+      if (note !== InstrumentNoteType.None) {
+        this.cueHandler.handleBassNote(note, YargCueData)
+      }
+    })
+    YargCueData.keysNotes.forEach((note) => {
+      if (note !== InstrumentNoteType.None) {
+        this.cueHandler.handleKeysNote(note, YargCueData)
+      }
+    })
+
+    this.lastData = YargCueData
+    if (isIdentical) {
+      this.lastForwardedIdenticalAt = Date.now()
     }
   }
 
@@ -514,7 +561,7 @@ export class YargNetworkListener extends EventEmitter {
    */
   private getCurrentScene(
     byteValue: number,
-  ): 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' {
+  ): 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' {
     switch (byteValue) {
       case SceneIndexByte.Menu:
         return 'Menu'
@@ -524,6 +571,8 @@ export class YargNetworkListener extends EventEmitter {
         return 'Score'
       case SceneIndexByte.Calibration:
         return 'Calibration'
+      case SceneIndexByte.Practice:
+        return 'Practice'
       default:
         return 'Unknown'
     }
@@ -592,32 +641,39 @@ export class YargNetworkListener extends EventEmitter {
    * @private
    */
   private getPostProcessing(byteValue: number): PostProcessing {
-    switch (byteValue) {
-      case PostProcessingByte.Default:
-        return 'Default'
-      case PostProcessingByte.Bloom:
-        return 'Bloom'
-      case PostProcessingByte.Bright:
-        return 'Bright'
-      case PostProcessingByte.Saturation:
-        return 'Saturation'
-      case PostProcessingByte.Contrast:
-        return 'Contrast'
-      case PostProcessingByte.Sharpness:
-        return 'Sharpness'
-      case PostProcessingByte.Vignette:
-        return 'Vignette'
-      case PostProcessingByte.ChromaticAberration:
-        return 'ChromaticAberration'
-      case PostProcessingByte.MotionBlur:
-        return 'MotionBlur'
-      case PostProcessingByte.DepthOfField:
-        return 'DepthOfField'
-      case PostProcessingByte.AmbientOcclusion:
-        return 'AmbientOcclusion'
-      default:
-        return 'Unknown'
+    const map: Record<number, PostProcessing> = {
+      [PostProcessingByte.Default]: 'Default',
+      [PostProcessingByte.Bloom]: 'Bloom',
+      [PostProcessingByte.Bright]: 'Bright',
+      [PostProcessingByte.Contrast]: 'Contrast',
+      [PostProcessingByte.Posterize]: 'Posterize',
+      [PostProcessingByte.PhotoNegative]: 'PhotoNegative',
+      [PostProcessingByte.Mirror]: 'Mirror',
+      [PostProcessingByte.BlackAndWhite]: 'BlackAndWhite',
+      [PostProcessingByte.SepiaTone]: 'SepiaTone',
+      [PostProcessingByte.SilverTone]: 'SilverTone',
+      [PostProcessingByte.Choppy_BlackAndWhite]: 'Choppy_BlackAndWhite',
+      [PostProcessingByte.PhotoNegative_RedAndBlack]: 'PhotoNegative_RedAndBlack',
+      [PostProcessingByte.Polarized_BlackAndWhite]: 'Polarized_BlackAndWhite',
+      [PostProcessingByte.Polarized_RedAndBlue]: 'Polarized_RedAndBlue',
+      [PostProcessingByte.Desaturated_Blue]: 'Desaturated_Blue',
+      [PostProcessingByte.Desaturated_Red]: 'Desaturated_Red',
+      [PostProcessingByte.Contrast_Red]: 'Contrast_Red',
+      [PostProcessingByte.Contrast_Green]: 'Contrast_Green',
+      [PostProcessingByte.Contrast_Blue]: 'Contrast_Blue',
+      [PostProcessingByte.Grainy_Film]: 'Grainy_Film',
+      [PostProcessingByte.Grainy_ChromaticAbberation]: 'Grainy_ChromaticAbberation',
+      [PostProcessingByte.Scanlines]: 'Scanlines',
+      [PostProcessingByte.Scanlines_BlackAndWhite]: 'Scanlines_BlackAndWhite',
+      [PostProcessingByte.Scanlines_Blue]: 'Scanlines_Blue',
+      [PostProcessingByte.Scanlines_Security]: 'Scanlines_Security',
+      [PostProcessingByte.Trails]: 'Trails',
+      [PostProcessingByte.Trails_Long]: 'Trails_Long',
+      [PostProcessingByte.Trails_Desaturated]: 'Trails_Desaturated',
+      [PostProcessingByte.Trails_Flickery]: 'Trails_Flickery',
+      [PostProcessingByte.Trails_Spacey]: 'Trails_Spacey',
     }
+    return map[byteValue] ?? 'Unknown'
   }
 
   /**
@@ -746,7 +802,9 @@ export class YargNetworkListener extends EventEmitter {
    * @returns A string description of the keyframe type
    * @private
    */
-  private getKeyframeDescription(byteValue: number): string {
+  private getKeyframeDescription(
+    byteValue: number,
+  ): 'Off' | 'First' | 'Next' | 'Previous' | 'Unknown' {
     switch (byteValue) {
       case KeyFrameByte.Off:
         return 'Off'
@@ -764,31 +822,26 @@ export class YargNetworkListener extends EventEmitter {
   /**
    * Compares two data objects for equality.
    * Performs a shallow comparison of all enumerable properties.
-   * Excludes the 'timestamp' property.
    * @param data1 First data object.
    * @param data2 Second data object.
-   * @returns True if all properties (excluding 'timestamp') are equal, false otherwise.
+   * @returns True if all properties are equal, false otherwise.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic log comparison
-  private isDataEqual(data1: Record<string, any>, data2: Record<string, any>): boolean {
-    const keys1 = Object.keys(data1)
-    const keys2 = Object.keys(data2)
+  private isDataEqual<T extends Record<string, unknown>>(data1: T, data2: T): boolean {
+    const keys1 = Object.keys(data1) as (keyof T)[]
+    const keys2 = Object.keys(data2) as (keyof T)[]
 
     if (keys1.length !== keys2.length) return false
 
     for (const key of keys1) {
-      // For array comparisons, perform a shallow comparison
-      if (Array.isArray(data1[key]) && Array.isArray(data2[key])) {
-        if (data1[key].length !== data2[key].length) return false
-        for (let i = 0; i < data1[key].length; i++) {
-          if (data1[key][i] !== data2[key][i]) {
-            return false
-          }
+      const value1 = data1[key]
+      const value2 = data2[key]
+      if (Array.isArray(value1) && Array.isArray(value2)) {
+        if (value1.length !== value2.length) return false
+        for (let i = 0; i < value1.length; i++) {
+          if (value1[i] !== value2[i]) return false
         }
       } else {
-        if (data1[key] !== data2[key]) {
-          return false
-        }
+        if (value1 !== value2) return false
       }
     }
     return true
@@ -838,7 +891,7 @@ export class YargNetworkListener extends EventEmitter {
    * @param currentScene The current scene from the YARG packet
    */
   private handleSceneTransition(
-    currentScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration',
+    currentScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice',
   ): void {
     // Check if we have a scene change
     if (this.lastScene !== null && this.lastScene !== currentScene) {
@@ -889,118 +942,3 @@ export class YargNetworkListener extends EventEmitter {
     this.stop()
   }
 }
-/*
-YALCY's Lighting Pattern Implementation
-
-
-Core Architecture
-YALCY implements a structured and hierarchical approach to lighting patterns:
-
-Base Class Structure:
-StageKitLighting: The base abstract class for all lighting patterns
-StageKitLightingCue: Inherits from StageKitLighting and serves as the parent class for specific lighting cues
-Primitive Patterns: Three core pattern types that implement different timing mechanisms:
-BeatPattern: Synchronizes with the music's beat
-ListenPattern: Responds to events (beats, keyframes, drum hits)
-TimedPattern: Uses fixed time intervals
-
-
-UDP Protocol Integration:
-YALCY receives lighting commands via UDP packets from YARG (the rhythm game)
-The UdpIntake class processes these packets and extracts lighting cue information
-Lighting cues are identified by byte values defined in UdpIntake.CueByte enum
-
-
-Hardware Control:
-The StageKitTalker class manages hardware communication
-LEDs are controlled through defined command IDs (e.g., RedLeds, BlueLeds)
-Fog and strobe effects have specific commands and states
-Lighting Primitives
-The three primitive pattern classes provide the foundation for all lighting effects:
-
-
-BeatPattern:
-Synchronized to the beat of the music
-Uses _cyclesPerBeat to determine timing
-Runs asynchronously and can be continuous or one-shot
-Follows a defined pattern list of color commands
-
-
-ListenPattern:
-
-Event-driven, responding to specific triggers
-Can listen for major beats, minor beats, drum hits, or "next" events
-Supports flash effects and inverse patterns
-Processes events by cycling through the pattern list
-
-
-TimedPattern:
-Uses absolute timing rather than beat-relative timing
-Runs a coroutine that cycles through the pattern list at fixed intervals
-Suitable for patterns that shouldn't vary with song tempo
-
-
-Lighting Cues Implementation
-YALCY implements a wide range of lighting cues, each with its own pattern and behavior:
-
-Basic Cues:
-
-NoCue: Disables all lighting
-Default: Simple default lighting pattern
-Intro: Introductory lighting pattern
-Beat-Synchronized Patterns:
-BigRockEnding: Randomly flashes lights in all colors
-LoopWarm/LoopCool: Cyclic patterns with warm or cool colors
-Harmony: Different patterns for large vs. small venues
-Sweep: Sweeping light patterns
-Complex Interactive Patterns:
-Dischord: Dynamic pattern with green spinning and blue blinking
-Silhouette/SilhouetteSpot: Silhouette lighting with vocal event handling
-Stomp: Responds to keyframe events for impactful lighting changes
-Effect-Specific Patterns:
-Blackout: Different blackout patterns
-FlareFast/FlareSlow: Quick or slow flare effects
-Frenzy: Intense, rapidly changing patterns
-
-
-Implementation Details
-LED Control:
-Each LED color (Red, Green, Blue, Yellow) has a corresponding command ID
-LED patterns use bit flags to control individual LEDs (Zero through Seven)
-Special constants like None and All provide convenient control
-
-Pattern Definition:
-Patterns are defined as arrays of tuples: (CommandId, byte)
-The byte value controls which specific LEDs are lit within a color group
-Bit manipulation allows for complex spatial patterns
-
-Venue-Specific Patterns:
-Many cues have different implementations for small vs. large venues
-The venue size is received via UDP and affects pattern selection
-
-Event System:
-YALCY uses an event-based system for beat synchronization
-Events include beat notifications, keyframes, and drum hits
-Patterns can subscribe to these events for precise timing
-
-Example Pattern Implementation
-Here's an example of how the BigRockEnding cue is implemented:
-}
-This creates a dramatic flashing pattern where each color flashes on for one beat and then is off for three beats, creating a dramatic "big rock ending" effect.
-
-
-LED Pattern Structure
-
-YALCY uses a bit-based approach for controlling individual LEDs:
-Bytes Zero through Seven represent individual LED bits (0b00000001 through 0b10000000)
-These can be combined with bitwise OR to create patterns (e.g., Zero | Four lights the first and fifth LEDs)
-The All constant (0b11111111) turns on all LEDs in a color group
-The None constant (0b00000000) turns off all LEDs in a color group
-This bit manipulation allows for precise control of spatial LED patterns.
-
-
-Communication with the Hardware
-The actual hardware communication happens through the UsbDeviceMonitor.SendReport() method, which takes:
-A command ID (e.g., RedLeds, FogOn)
-A data byte (which LEDs to control or other parameters)
-*/

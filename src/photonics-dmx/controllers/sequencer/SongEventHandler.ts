@@ -43,6 +43,30 @@ export class SongEventHandler implements ISongEventHandler {
   }
 
   /**
+   * Trigger a keyframe-first event (also fires generic keyframe for backward compatibility).
+   */
+  public onKeyframeFirst(): void {
+    this.handleEvent('keyframe')
+    this.handleEvent('keyframe-first')
+  }
+
+  /**
+   * Trigger a keyframe-next event (also fires generic keyframe for backward compatibility).
+   */
+  public onKeyframeNext(): void {
+    this.handleEvent('keyframe')
+    this.handleEvent('keyframe-next')
+  }
+
+  /**
+   * Trigger a keyframe-previous event (also fires generic keyframe for backward compatibility).
+   */
+  public onKeyframePrevious(): void {
+    this.handleEvent('keyframe')
+    this.handleEvent('keyframe-previous')
+  }
+
+  /**
    * Handle individual drum note events
    */
   public onDrumNote(noteType: DrumNoteType): void {
@@ -162,6 +186,9 @@ export class SongEventHandler implements ISongEventHandler {
       | 'beat'
       | 'measure'
       | 'keyframe'
+      | 'keyframe-first'
+      | 'keyframe-next'
+      | 'keyframe-previous'
       | 'drum-kick'
       | 'drum-red'
       | 'drum-yellow'
@@ -218,6 +245,9 @@ export class SongEventHandler implements ISongEventHandler {
             if (currentTransition.waitForConditionCount === 0) {
               this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
             }
+          } else if (currentTransition.waitForConditionCount === 0) {
+            // Count is explicitly 0: start transition immediately (no event like beat or keyframe consumed)
+            this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
           } else {
             // No count specified, start transition immediately
             this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
@@ -251,18 +281,26 @@ export class SongEventHandler implements ISongEventHandler {
                 activeEffect.state = 'idle'
               }
             }
-          } else {
-            // No count specified, move to next transition immediately
-            // Move to the next transition and immediately prepare it
+          } else if (currentTransition.waitUntilConditionCount === 0) {
+            // Count is explicitly 0: advance immediately (no beat consumed)
             activeEffect.currentTransitionIndex += 1
 
-            // Check if there's another transition and prepare it immediately
             if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
               const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
               activeEffect.state = 'idle'
               this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime)
             } else {
-              // If no more transitions, just set to idle
+              activeEffect.state = 'idle'
+            }
+          } else {
+            // No count specified, move to next transition immediately
+            activeEffect.currentTransitionIndex += 1
+
+            if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
+              const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
+              activeEffect.state = 'idle'
+              this.transitionEngine.prepareTransition(activeEffect, nextTransition, currentTime)
+            } else {
               activeEffect.state = 'idle'
             }
           }

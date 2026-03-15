@@ -2,16 +2,14 @@ import { CueData, CueType } from '../cues/types/cueTypes'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { BaseCueHandler } from './BaseCueHandler'
-import { INetCue } from '../cues/interfaces/INetCue'
+import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
 
 /**
  * YargCueHandler handles the cues called by the YARG network listener.
  *
- * The handler uses a registry system to manage multiple sets of cue implementations.
- * When a cue is triggered:
- * 1. If no group is active, a random group is selected
- * 2. The cue is executed using the active group's implementation
- * 3. If the active group doesn't implement the cue, falls back to the default group
+ * Cue selection is delegated to YargCueRegistry.getCueImplementation(cueType, trackMode), which uses
+ * active/enabled groups, consistency tracking, stage-kit preference when applicable,
+ * and default-group fallback when no active group implements the cue.
  *
  * Reminder: setEffect clears all running effects, regardless of layer.
  * Layer 0 will maintain its state though.
@@ -27,16 +25,15 @@ const STROBE_TYPES: CueType[] = [
 
 class YargCueHandler extends BaseCueHandler {
   private currentPrimaryCue: INetCue | null = null
-  private currentPrimaryCueType: CueType | null = null
   private currentSecondaryCue: INetCue | null = null
-  private currentSecondaryCueType: CueType | null = null
+  private currentStrobeCue: INetCue | null = null
 
-  constructor(
-    lightManager: DmxLightManager,
-    photonicsSequencer: ILightingController,
-    debouncePeriod: number,
-  ) {
-    super(lightManager, photonicsSequencer, debouncePeriod)
+  constructor(lightManager: DmxLightManager, photonicsSequencer: ILightingController) {
+    super(lightManager, photonicsSequencer)
+  }
+
+  public reset(): void {
+    super.reset()
   }
 
   /**
@@ -55,8 +52,6 @@ class YargCueHandler extends BaseCueHandler {
   }
 
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
-    if (!this.checkDebounce()) return
-
     // Update CueData with history and context information
     const historicCueData = this.addHistoryToCueData(cueType, parameters)
 
@@ -78,10 +73,9 @@ class YargCueHandler extends BaseCueHandler {
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Strobe_Off:
-        if (this.currentSecondaryCue) {
-          this.currentSecondaryCue.onStop?.()
-          this.currentSecondaryCue = null
-          this.currentSecondaryCueType = null
+        if (this.currentStrobeCue) {
+          this.currentStrobeCue.onStop?.()
+          this.currentStrobeCue = null
         }
         this.emit('cueHandled', historicCueData)
         return
@@ -104,33 +98,40 @@ class YargCueHandler extends BaseCueHandler {
     // Get implementation from registry
     // Use trackMode, defaulting to 'tracked' if not specified
     const trackMode = parameters.trackMode || 'tracked'
-    const cue = this.registry.getCueImplementation(cueType, trackMode)
+    const cue =
+      trackMode === 'simulated' && parameters.simulationCueGroup
+        ? this.registry.getCueImplementationFromGroup(
+            cueType,
+            parameters.simulationCueGroup,
+            trackMode,
+          )
+        : this.registry.getCueImplementation(cueType, trackMode)
 
     if (cue) {
       const incomingIsStrobe = STROBE_TYPES.includes(cueType)
+      const incomingIsSecondary = cue.style === CueStyle.Secondary
 
       if (incomingIsStrobe) {
-        // Strobes run on top of primary; track separately so we don't lose the primary cue reference.
-        if (this.currentSecondaryCueType !== cueType) {
-          if (this.currentSecondaryCue) {
-            this.currentSecondaryCue.onStop?.()
-            this.currentSecondaryCue = null
-            this.currentSecondaryCueType = null
-          }
-          this.currentSecondaryCue = cue
-          this.currentSecondaryCueType = cueType
+        // Strobes run on top of primary and secondary overlays; track separately so Strobe_Off only clears strobes.
+        if (this.currentStrobeCue && this.currentStrobeCue !== cue) {
+          this.currentStrobeCue.onStop?.()
+          this.currentStrobeCue = null
         }
+        this.currentStrobeCue = cue
+      } else if (incomingIsSecondary) {
+        // Non-strobe overlays run concurrently with primary and strobes, but replace the existing secondary overlay.
+        if (this.currentSecondaryCue && this.currentSecondaryCue !== cue) {
+          this.currentSecondaryCue.onStop?.()
+          this.currentSecondaryCue = null
+        }
+        this.currentSecondaryCue = cue
       } else {
-        // Non-strobe (primary) cue: stop previous primary only; leave secondary (strobe) untouched.
-        if (this.currentPrimaryCueType !== cueType) {
-          if (this.currentPrimaryCue) {
-            this.currentPrimaryCue.onStop?.()
-            this.currentPrimaryCue = null
-            this.currentPrimaryCueType = null
-          }
-          this.currentPrimaryCue = cue
-          this.currentPrimaryCueType = cueType
+        // Primary: stop previous primary when switching to a different cue instance (e.g. different group); leave secondary untouched.
+        if (this.currentPrimaryCue && this.currentPrimaryCue !== cue) {
+          this.currentPrimaryCue.onStop?.()
+          this.currentPrimaryCue = null
         }
+        this.currentPrimaryCue = cue
       }
 
       await cue.execute(historicCueData, this._sequencer, this._lightManager)
@@ -142,19 +143,21 @@ class YargCueHandler extends BaseCueHandler {
   }
 
   /**
-   * Stop the currently executing primary and secondary cues and call their onStop lifecycle methods.
-   * Used when transitioning to a new primary cue, on blackout, and by stopActiveCue().
+   * Stop all tracked cues (primary, secondary, strobe) and call their onStop lifecycle methods.
+   * Used for blackout, NoCue, and by stopActiveCue(); primary-to-primary transitions stop only the previous primary inline, not via this method.
    */
   private stopCurrentCue(): void {
     if (this.currentPrimaryCue) {
       this.currentPrimaryCue.onStop?.()
       this.currentPrimaryCue = null
-      this.currentPrimaryCueType = null
     }
     if (this.currentSecondaryCue) {
       this.currentSecondaryCue.onStop?.()
       this.currentSecondaryCue = null
-      this.currentSecondaryCueType = null
+    }
+    if (this.currentStrobeCue) {
+      this.currentStrobeCue.onStop?.()
+      this.currentStrobeCue = null
     }
   }
 
@@ -306,18 +309,20 @@ class YargCueHandler extends BaseCueHandler {
   }
 
   /**
-   * Clean up resources and call destroy lifecycle on any executing cue
+   * Clean up resources and call destroy lifecycle on any executing cue.
    */
   public shutdown(): void {
     if (this.currentPrimaryCue) {
       this.currentPrimaryCue.onDestroy?.()
       this.currentPrimaryCue = null
-      this.currentPrimaryCueType = null
     }
     if (this.currentSecondaryCue) {
       this.currentSecondaryCue.onDestroy?.()
       this.currentSecondaryCue = null
-      this.currentSecondaryCueType = null
+    }
+    if (this.currentStrobeCue) {
+      this.currentStrobeCue.onDestroy?.()
+      this.currentStrobeCue = null
     }
     super.shutdown()
   }

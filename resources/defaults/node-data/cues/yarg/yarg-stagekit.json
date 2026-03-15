@@ -4,7 +4,8 @@
   "group": {
     "id": "yarg-stagekit",
     "name": "StageKit",
-    "description": "Cues that mimic the original Stage Kit, but mapped to a DMX light array"
+    "description": "Cues that mimic the original Stage Kit, but mapped to a DMX light array",
+    "isStageKit": true
   },
   "cues": [
     {
@@ -111,9 +112,9 @@
           }
         },
         "viewport": {
-          "x": 601.367433720734,
-          "y": 153.21490721870214,
-          "zoom": 0.75
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       }
     },
@@ -217,9 +218,9 @@
           }
         },
         "viewport": {
-          "x": 604.7342335623689,
-          "y": 152.5196372452192,
-          "zoom": 0.75
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       }
     },
@@ -323,9 +324,9 @@
           }
         },
         "viewport": {
-          "x": 599.8486522261519,
-          "y": 155.2729174438864,
-          "zoom": 0.75
+          "x": 293.39635176984063,
+          "y": 174.23034915966474,
+          "zoom": 0.6704553503110334
         }
       }
     },
@@ -429,9 +430,9 @@
           }
         },
         "viewport": {
-          "x": 600.0368765748572,
-          "y": 150.58523950725794,
-          "zoom": 0.75
+          "x": 293.39635176984063,
+          "y": 174.23034915966474,
+          "zoom": 0.6704553503110334
         }
       }
     },
@@ -583,6 +584,10 @@
               "lowBrightness": {
                 "source": "literal",
                 "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "blue"
               }
             }
           }
@@ -627,9 +632,9 @@
           }
         },
         "viewport": {
-          "x": 106.98665447620238,
-          "y": 113.15281877469664,
-          "zoom": 1.2013724218780641
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
@@ -757,6 +762,14 @@
               "beatsPerCycle": {
                 "source": "literal",
                 "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -800,6 +813,14 @@
               "beatsPerCycle": {
                 "source": "literal",
                 "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -841,6 +862,14 @@
                 "value": 0
               },
               "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
                 "source": "literal",
                 "value": 1
               }
@@ -944,9 +973,9 @@
           }
         },
         "viewport": {
-          "x": 247.4636175154837,
-          "y": 20.745762149925213,
-          "zoom": 0.5
+          "x": 293.39635176984063,
+          "y": 174.23034915966474,
+          "zoom": 0.6704553503110334
         }
       },
       "variables": [
@@ -1097,6 +1126,18 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -1136,6 +1177,18 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -1175,6 +1228,18 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           }
@@ -1251,9 +1316,9 @@
           }
         },
         "viewport": {
-          "x": 313.51941556460224,
-          "y": 11.031059998553246,
-          "zoom": 0.75
+          "x": 293.39635176984063,
+          "y": 174.23034915966474,
+          "zoom": 0.6704553503110334
         }
       },
       "variables": [
@@ -1404,6 +1469,18 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -1443,6 +1520,18 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -1482,6 +1571,18 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           }
@@ -1541,7 +1642,7 @@
             "y": 377.9194411598146
           },
           "sk-warm-auto-red2-off": {
-            "x": -2.580136187374592,
+            "x": -0.9411691524078378,
             "y": 494.3094790093601
           },
           "sk-warm-auto-cw": {
@@ -1558,9 +1659,9 @@
           }
         },
         "viewport": {
-          "x": 308.81591778737493,
-          "y": 15.438006073702127,
-          "zoom": 0.75
+          "x": 99.39064130588463,
+          "y": 143.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
@@ -1711,6 +1812,18 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -1750,6 +1863,18 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -1789,6 +1914,18 @@
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           }
@@ -1856,7 +1993,7 @@
             "y": 120.51505118235946
           },
           "sk-warm-manual-cw2": {
-            "x": 514.3550924826413,
+            "x": 519.2719935875416,
             "y": 125.89385829493403
           },
           "sk-warm-manual-ccw": {
@@ -1865,9 +2002,9 @@
           }
         },
         "viewport": {
-          "x": 310.56392752588727,
-          "y": 15.62471271539107,
-          "zoom": 0.75
+          "x": 99.39064130588463,
+          "y": 143.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
@@ -2022,7 +2159,7 @@
               },
               "brightness": {
                 "source": "literal",
-                "value": "medium"
+                "value": "high"
               },
               "blendMode": {
                 "source": "literal",
@@ -2041,6 +2178,14 @@
                 "value": 0
               },
               "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
                 "source": "literal",
                 "value": 1
               }
@@ -2086,6 +2231,14 @@
               "beatsPerCycle": {
                 "source": "literal",
                 "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -2127,6 +2280,14 @@
                 "value": 0
               },
               "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
                 "source": "literal",
                 "value": 1
               }
@@ -2206,8 +2367,8 @@
             "y": 627.2153034992516
           },
           "sk-harmony-is-large": {
-            "x": 262.14697204343975,
-            "y": 130.60548834875226
+            "x": 263.7859390784065,
+            "y": 99.4651146843837
           },
           "sk-harmony-cyan": {
             "x": 518.5744954161346,
@@ -2223,9 +2384,9 @@
           }
         },
         "viewport": {
-          "x": 298.0572497870264,
-          "y": 115.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 342.35891566968445,
+          "y": 233.39840000585446,
+          "zoom": 0.7774015044605205
         }
       },
       "variables": [
@@ -2234,7 +2395,8 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "",
-          "isParameter": false
+          "isParameter": false,
+          "validValues": ["NoVenue", "Small", "Large"]
         },
         {
           "name": "allLights",
@@ -2321,6 +2483,28 @@
               "source": "literal",
               "value": 8
             }
+          },
+          {
+            "id": "sk-searchlights-beat-dur",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "beat-duration-ms",
+            "assignTo": "beatDurationMs"
+          },
+          {
+            "id": "sk-searchlights-step-dur",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatDurationMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "stepDurationMs"
           }
         ],
         "eventRaisers": [],
@@ -2357,13 +2541,21 @@
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "beat"
+                "value": "delay"
               },
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
               },
               "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "stepDurationMs"
+              },
+              "groupSize": {
                 "source": "literal",
                 "value": 1
               }
@@ -2400,13 +2592,21 @@
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "beat"
+                "value": "delay"
               },
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
               },
               "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "stepDurationMs"
+              },
+              "groupSize": {
                 "source": "literal",
                 "value": 1
               }
@@ -2423,6 +2623,14 @@
         {
           "from": "sk-searchlights-num",
           "to": "sk-searchlights-all"
+        },
+        {
+          "from": "sk-searchlights-all",
+          "to": "sk-searchlights-beat-dur"
+        },
+        {
+          "from": "sk-searchlights-beat-dur",
+          "to": "sk-searchlights-step-dur"
         },
         {
           "from": "event-sk-searchlights-called",
@@ -2462,6 +2670,14 @@
             "x": 256.4145216449624,
             "y": 203.6432303664177
           },
+          "sk-searchlights-beat-dur": {
+            "x": 256.4145216449624,
+            "y": 320
+          },
+          "sk-searchlights-step-dur": {
+            "x": 256.4145216449624,
+            "y": 436
+          },
           "sk-searchlights-has-red": {
             "x": 528.5939066428691,
             "y": 117.99012338370085
@@ -2476,9 +2692,9 @@
           }
         },
         "viewport": {
-          "x": 250.05724978702642,
-          "y": 99.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
@@ -2576,11 +2792,23 @@
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "beat"
+                "value": "delay"
               },
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 2
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
               }
             }
           },
@@ -2615,11 +2843,23 @@
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "beat"
+                "value": "delay"
               },
               "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 200
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
               }
             }
           }
@@ -2647,12 +2887,12 @@
       "layout": {
         "nodePositions": {
           "event-sk-score-start": {
-            "x": 5.233371516689658,
-            "y": -7.211720149964094
+            "x": -11.909252197584578,
+            "y": 29.35921044048763
           },
           "event-sk-score-called": {
-            "x": 268.3758735600859,
-            "y": -6.917502246797085
+            "x": 260.37598249342454,
+            "y": 15.93932937223525
           },
           "sk-score-all": {
             "x": -5.403018297627568,
@@ -2667,14 +2907,14 @@
             "y": 117.7390435449779
           },
           "sk-score-blue": {
-            "x": 511.24996094219387,
-            "y": 132.89378997310996
+            "x": 489.53597090411324,
+            "y": 136.3223147159647
           }
         },
         "viewport": {
-          "x": 410.30739650828764,
-          "y": 106.09155321586877,
-          "zoom": 0.75
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
@@ -2718,139 +2958,24 @@
             "id": "event-sk-strobe-slow-start",
             "type": "event",
             "eventType": "cue-started"
-          }
-        ],
-        "actions": [
-          {
-            "id": "action-sk-strobe-slow-white",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "white"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "max"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 70
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
           },
           {
-            "id": "action-sk-strobe-slow-black",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "variable",
-                "name": "interval"
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
+            "id": "event-sk-strobe-slow-called",
+            "type": "event",
+            "eventType": "cue-called"
           }
         ],
+        "actions": [],
         "logic": [
+          {
+            "id": "sk-strobe-slow-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
           {
             "id": "sk-strobe-slow-bpm",
             "type": "logic",
@@ -2874,7 +2999,7 @@
             "assignTo": "beatMs"
           },
           {
-            "id": "sk-strobe-slow-interval",
+            "id": "sk-strobe-slow-endwait",
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
@@ -2886,17 +3011,77 @@
               "source": "literal",
               "value": 8
             },
-            "assignTo": "interval"
+            "assignTo": "endWait"
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
-        "effectRaisers": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-slow-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 70
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
+            }
+          }
+        ],
         "notes": []
       },
       "connections": [
         {
           "from": "event-sk-strobe-slow-start",
+          "to": "sk-strobe-slow-setup"
+        },
+        {
+          "from": "sk-strobe-slow-setup",
           "to": "sk-strobe-slow-bpm"
         },
         {
@@ -2905,55 +3090,57 @@
         },
         {
           "from": "sk-strobe-slow-beat-ms",
-          "to": "sk-strobe-slow-interval"
+          "to": "sk-strobe-slow-endwait"
         },
         {
-          "from": "sk-strobe-slow-interval",
-          "to": "action-sk-strobe-slow-white"
-        },
-        {
-          "from": "action-sk-strobe-slow-white",
-          "to": "action-sk-strobe-slow-black"
-        },
-        {
-          "from": "action-sk-strobe-slow-black",
-          "to": "action-sk-strobe-slow-white"
+          "from": "event-sk-strobe-slow-called",
+          "to": "sk-strobe-slow-flash"
         }
       ],
       "layout": {
         "nodePositions": {
           "event-sk-strobe-slow-start": {
-            "x": 5.666995290666819,
-            "y": -5.967437744140625
+            "x": 5,
+            "y": -6
           },
-          "action-sk-strobe-slow-white": {
-            "x": 4.956674225628376,
-            "y": 505.3116079829633
+          "event-sk-strobe-slow-called": {
+            "x": 268,
+            "y": 2
           },
-          "action-sk-strobe-slow-black": {
-            "x": 283.45618326306544,
-            "y": 495.3312011702624
+          "sk-strobe-slow-setup": {
+            "x": 2,
+            "y": 124
           },
           "sk-strobe-slow-bpm": {
-            "x": -1.2915085460990667,
-            "y": 123.68237586691976
+            "x": -1,
+            "y": 248
           },
           "sk-strobe-slow-beat-ms": {
-            "x": -8.462054880335927,
-            "y": 248.1685901992023
+            "x": -8,
+            "y": 368
           },
-          "sk-strobe-slow-interval": {
-            "x": -11.532766956835985,
-            "y": 369.3868732601404
+          "sk-strobe-slow-endwait": {
+            "x": -11,
+            "y": 501
+          },
+          "sk-strobe-slow-flash": {
+            "x": 254,
+            "y": 121
           }
         },
         "viewport": {
-          "x": 347.3849101138853,
-          "y": 257.5929361026589,
-          "zoom": 0.7888141344914608
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
         {
           "name": "bpmVar",
           "type": "number",
@@ -2965,15 +3152,22 @@
           "name": "beatMs",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 500,
           "isParameter": false
         },
         {
-          "name": "interval",
+          "name": "endWait",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 125,
           "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
         }
       ]
     },
@@ -2989,139 +3183,24 @@
             "id": "event-sk-strobe-medium-start",
             "type": "event",
             "eventType": "cue-started"
-          }
-        ],
-        "actions": [
-          {
-            "id": "action-sk-strobe-medium-white",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "white"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "max"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 60
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
           },
           {
-            "id": "action-sk-strobe-medium-black",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "variable",
-                "name": "interval"
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
+            "id": "event-sk-strobe-medium-called",
+            "type": "event",
+            "eventType": "cue-called"
           }
         ],
+        "actions": [],
         "logic": [
+          {
+            "id": "sk-strobe-medium-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
           {
             "id": "sk-strobe-medium-bpm",
             "type": "logic",
@@ -3145,7 +3224,7 @@
             "assignTo": "beatMs"
           },
           {
-            "id": "sk-strobe-medium-interval",
+            "id": "sk-strobe-medium-endwait",
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
@@ -3157,17 +3236,77 @@
               "source": "literal",
               "value": 16
             },
-            "assignTo": "interval"
+            "assignTo": "endWait"
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
-        "effectRaisers": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-medium-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 60
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
+            }
+          }
+        ],
         "notes": []
       },
       "connections": [
         {
           "from": "event-sk-strobe-medium-start",
+          "to": "sk-strobe-medium-setup"
+        },
+        {
+          "from": "sk-strobe-medium-setup",
           "to": "sk-strobe-medium-bpm"
         },
         {
@@ -3176,55 +3315,57 @@
         },
         {
           "from": "sk-strobe-medium-beat-ms",
-          "to": "sk-strobe-medium-interval"
+          "to": "sk-strobe-medium-endwait"
         },
         {
-          "from": "sk-strobe-medium-interval",
-          "to": "action-sk-strobe-medium-white"
-        },
-        {
-          "from": "action-sk-strobe-medium-white",
-          "to": "action-sk-strobe-medium-black"
-        },
-        {
-          "from": "action-sk-strobe-medium-black",
-          "to": "action-sk-strobe-medium-white"
+          "from": "event-sk-strobe-medium-called",
+          "to": "sk-strobe-medium-flash"
         }
       ],
       "layout": {
         "nodePositions": {
           "event-sk-strobe-medium-start": {
-            "x": -5.285714540630579,
-            "y": 6.373385921120644
+            "x": 285.2032749512447,
+            "y": 50.83098895099704
           },
-          "action-sk-strobe-medium-white": {
-            "x": 0.9361506085842848,
-            "y": 501.95671858265996
+          "event-sk-strobe-medium-called": {
+            "x": 609.7187478746647,
+            "y": 126.22347255946829
           },
-          "action-sk-strobe-medium-black": {
-            "x": 320.4319642596623,
-            "y": 500.19557217777015
+          "sk-strobe-medium-setup": {
+            "x": 260,
+            "y": 120
           },
           "sk-strobe-medium-bpm": {
-            "x": -9.923248054459691,
-            "y": 118.6407208442688
+            "x": 232.13756040556495,
+            "y": 236.36665948264056
           },
           "sk-strobe-medium-beat-ms": {
-            "x": 5.02102704718709,
-            "y": 246.02116546034813
+            "x": 225.58169226569782,
+            "y": 336.34364861561335
           },
-          "sk-strobe-medium-interval": {
-            "x": -6.317980600520968,
-            "y": 382.33880672976375
+          "sk-strobe-medium-endwait": {
+            "x": 215.7478900558973,
+            "y": 457.62720920315405
+          },
+          "sk-strobe-medium-flash": {
+            "x": 517.3178244897824,
+            "y": 263.3009449369606
           }
         },
         "viewport": {
-          "x": 347.3849101138853,
-          "y": 257.5929361026589,
-          "zoom": 0.7888141344914608
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
         {
           "name": "bpmVar",
           "type": "number",
@@ -3236,15 +3377,22 @@
           "name": "beatMs",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 500,
           "isParameter": false
         },
         {
-          "name": "interval",
+          "name": "endWait",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 62,
           "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
         }
       ]
     },
@@ -3260,139 +3408,24 @@
             "id": "event-sk-strobe-fast-start",
             "type": "event",
             "eventType": "cue-started"
-          }
-        ],
-        "actions": [
-          {
-            "id": "action-sk-strobe-fast-white",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "white"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "max"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 50
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
           },
           {
-            "id": "action-sk-strobe-fast-black",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "strobe"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "variable",
-                "name": "interval"
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
+            "id": "event-sk-strobe-fast-called",
+            "type": "event",
+            "eventType": "cue-called"
           }
         ],
+        "actions": [],
         "logic": [
+          {
+            "id": "sk-strobe-fast-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
           {
             "id": "sk-strobe-fast-bpm",
             "type": "logic",
@@ -3416,7 +3449,7 @@
             "assignTo": "beatMs"
           },
           {
-            "id": "sk-strobe-fast-interval",
+            "id": "sk-strobe-fast-endwait",
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
@@ -3428,17 +3461,77 @@
               "source": "literal",
               "value": 32
             },
-            "assignTo": "interval"
+            "assignTo": "endWait"
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
-        "effectRaisers": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-fast-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 50
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
+            }
+          }
+        ],
         "notes": []
       },
       "connections": [
         {
           "from": "event-sk-strobe-fast-start",
+          "to": "sk-strobe-fast-setup"
+        },
+        {
+          "from": "sk-strobe-fast-setup",
           "to": "sk-strobe-fast-bpm"
         },
         {
@@ -3447,55 +3540,57 @@
         },
         {
           "from": "sk-strobe-fast-beat-ms",
-          "to": "sk-strobe-fast-interval"
+          "to": "sk-strobe-fast-endwait"
         },
         {
-          "from": "sk-strobe-fast-interval",
-          "to": "action-sk-strobe-fast-white"
-        },
-        {
-          "from": "action-sk-strobe-fast-white",
-          "to": "action-sk-strobe-fast-black"
-        },
-        {
-          "from": "action-sk-strobe-fast-black",
-          "to": "action-sk-strobe-fast-white"
+          "from": "event-sk-strobe-fast-called",
+          "to": "sk-strobe-fast-flash"
         }
       ],
       "layout": {
         "nodePositions": {
           "event-sk-strobe-fast-start": {
-            "x": -1.7065809778869152,
-            "y": 7.984691008925438
+            "x": 100,
+            "y": 100
           },
-          "action-sk-strobe-fast-white": {
-            "x": -68.86667310217331,
-            "y": 508.95465662837773
+          "event-sk-strobe-fast-called": {
+            "x": 440.90514327308756,
+            "y": 149.16901104900296
           },
-          "action-sk-strobe-fast-black": {
-            "x": 289.06912597636017,
-            "y": 498.3487086413279
+          "sk-strobe-fast-setup": {
+            "x": 141.9943734823928,
+            "y": 190.475582503571
           },
           "sk-strobe-fast-bpm": {
-            "x": -10.293420927599072,
-            "y": 119.08032855018973
+            "x": 223.94272523073118,
+            "y": 305.2032749512448
           },
           "sk-strobe-fast-beat-ms": {
-            "x": -11.375788561999798,
-            "y": 244.64896833524108
+            "x": 220.66479116079756,
+            "y": 405.18026408421747
           },
-          "sk-strobe-fast-interval": {
-            "x": -7.570198332890868,
-            "y": 382.8745437525213
+          "sk-strobe-fast-endwait": {
+            "x": 235.41549447549846,
+            "y": 560.8821324060605
+          },
+          "sk-strobe-fast-flash": {
+            "x": 441.9253408813112,
+            "y": 263.3009449369606
           }
         },
         "viewport": {
-          "x": 347.3849101138853,
-          "y": 257.5929361026589,
-          "zoom": 0.7888141344914608
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
         {
           "name": "bpmVar",
           "type": "number",
@@ -3507,15 +3602,22 @@
           "name": "beatMs",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 500,
           "isParameter": false
         },
         {
-          "name": "interval",
+          "name": "endWait",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 31,
           "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
         }
       ]
     },
@@ -3531,139 +3633,24 @@
             "id": "event-sk-strobe-fastest-start",
             "type": "event",
             "eventType": "cue-started"
-          }
-        ],
-        "actions": [
-          {
-            "id": "action-sk-strobe-fastest-white",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "white"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "max"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 40
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
           },
           {
-            "id": "action-sk-strobe-fastest-black",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "variable",
-                "name": "interval"
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 255
-            }
+            "id": "event-sk-strobe-fastest-called",
+            "type": "event",
+            "eventType": "cue-called"
           }
         ],
+        "actions": [],
         "logic": [
+          {
+            "id": "sk-strobe-fastest-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
           {
             "id": "sk-strobe-fastest-bpm",
             "type": "logic",
@@ -3687,7 +3674,7 @@
             "assignTo": "beatMs"
           },
           {
-            "id": "sk-strobe-fastest-interval",
+            "id": "sk-strobe-fastest-endwait",
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
@@ -3699,17 +3686,77 @@
               "source": "literal",
               "value": 64
             },
-            "assignTo": "interval"
+            "assignTo": "endWait"
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
-        "effectRaisers": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-fastest-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 40
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
+            }
+          }
+        ],
         "notes": []
       },
       "connections": [
         {
           "from": "event-sk-strobe-fastest-start",
+          "to": "sk-strobe-fastest-setup"
+        },
+        {
+          "from": "sk-strobe-fastest-setup",
           "to": "sk-strobe-fastest-bpm"
         },
         {
@@ -3718,55 +3765,57 @@
         },
         {
           "from": "sk-strobe-fastest-beat-ms",
-          "to": "sk-strobe-fastest-interval"
+          "to": "sk-strobe-fastest-endwait"
         },
         {
-          "from": "sk-strobe-fastest-interval",
-          "to": "action-sk-strobe-fastest-white"
-        },
-        {
-          "from": "action-sk-strobe-fastest-white",
-          "to": "action-sk-strobe-fastest-black"
-        },
-        {
-          "from": "action-sk-strobe-fastest-black",
-          "to": "action-sk-strobe-fastest-white"
+          "from": "event-sk-strobe-fastest-called",
+          "to": "sk-strobe-fastest-flash"
         }
       ],
       "layout": {
         "nodePositions": {
           "event-sk-strobe-fastest-start": {
-            "x": -1.3502389378845692,
-            "y": -4.577998001128435
+            "x": 100,
+            "y": 100
           },
-          "action-sk-strobe-fastest-white": {
-            "x": -2.2345848362892866,
-            "y": 492.05596428737044
+          "event-sk-strobe-fastest-called": {
+            "x": 535.96523130116,
+            "y": 93.44413186013298
           },
-          "action-sk-strobe-fastest-black": {
-            "x": 343.59426075052704,
-            "y": 484.32127647845687
+          "sk-strobe-fastest-setup": {
+            "x": 187.88545046146226,
+            "y": 197.03145064343823
           },
           "sk-strobe-fastest-bpm": {
-            "x": -3.132577456533909,
-            "y": 117.71241904050112
+            "x": 220.66479116079768,
+            "y": 301.9253408813113
           },
           "sk-strobe-fastest-beat-ms": {
-            "x": 9.976529885083437,
-            "y": 256.32200799137354
+            "x": 205.91408784609655,
+            "y": 428.12580257375237
           },
-          "sk-strobe-fastest-interval": {
-            "x": -1.0968803856521845,
-            "y": 372.43872198835015
+          "sk-strobe-fastest-endwait": {
+            "x": 204.2751208111299,
+            "y": 537.9365939165258
+          },
+          "sk-strobe-fastest-flash": {
+            "x": 510.7619563499153,
+            "y": 248.55024162225982
           }
         },
         "viewport": {
-          "x": 347.3849101138853,
-          "y": 257.5929361026589,
-          "zoom": 0.7888141344914608
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
         {
           "name": "bpmVar",
           "type": "number",
@@ -3778,15 +3827,22 @@
           "name": "beatMs",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 500,
           "isParameter": false
         },
         {
-          "name": "interval",
+          "name": "endWait",
           "type": "number",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": 15,
           "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
         }
       ]
     },
@@ -3812,6 +3868,11 @@
             "id": "event-sk-default-drum-red",
             "type": "event",
             "eventType": "drum-red"
+          },
+          {
+            "id": "event-8892f835-d819-4ebe-91d0-fd4dedc0f58c",
+            "type": "event",
+            "eventType": "cue-called"
           }
         ],
         "actions": [
@@ -4072,70 +4133,6 @@
             }
           },
           {
-            "id": "action-sk-default-yellow-off",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "transparent"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 0
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 200
-              },
-              "easing": "linear",
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 10
-            }
-          },
-          {
             "id": "action-sk-default-yellow-on",
             "type": "action",
             "effectType": "set-color",
@@ -4178,25 +4175,29 @@
               },
               "duration": {
                 "source": "literal",
-                "value": 100
+                "value": 0
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "none"
+                "value": "delay"
               },
               "waitUntilTime": {
                 "source": "literal",
-                "value": 0
+                "value": 200
               },
               "easing": "linear",
               "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 1
               }
             },
             "layer": {
               "source": "literal",
-              "value": 10
+              "value": 1
             }
           }
         ],
@@ -4262,25 +4263,157 @@
               "source": "literal",
               "value": "Small"
             }
+          },
+          {
+            "id": "logic-668f0f7a-f7e2-4cd5-b9bc-999507efeaf3",
+            "type": "logic",
+            "logicType": "conditional",
+            "label": "conditional",
+            "outputs": [],
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "venueSize"
+            },
+            "right": {
+              "source": "literal",
+              "value": "Small"
+            }
+          },
+          {
+            "id": "logic-ffb26ee2-28cd-4c89-bb25-18f8e248ed74",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "config-data",
+            "outputs": [],
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "logic-b6c0786b-6e8d-4a17-92a4-46d2a28c0662",
+            "type": "logic",
+            "logicType": "debugger",
+            "label": "debugger",
+            "outputs": [],
+            "message": {
+              "source": "literal",
+              "value": "Drum A fired, flash the lights to dark"
+            },
+            "variablesToLog": []
+          },
+          {
+            "id": "logic-40434612-430d-4ef1-b249-8a7dee3d7904",
+            "type": "logic",
+            "logicType": "debugger",
+            "label": "debugger",
+            "outputs": [],
+            "message": {
+              "source": "literal",
+              "value": "False debug"
+            },
+            "variablesToLog": []
+          },
+          {
+            "id": "logic-73dfe094-ce27-449b-a7ee-bb9adc56f0a4",
+            "type": "logic",
+            "logicType": "conditional",
+            "label": "conditional",
+            "outputs": [],
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "venueSize"
+            },
+            "right": {
+              "source": "literal",
+              "value": "Large"
+            }
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
-        "effectRaisers": [],
-        "notes": []
+        "effectRaisers": [
+          {
+            "id": "effect-raiser-0884a514-9a0a-49fd-bce1-e559a66c3736",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "label": "Raise Effect",
+            "outputs": [],
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 20
+              },
+              "color": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 200
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 50
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 100
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": [
+          {
+            "id": "notes-2f0424a5-32d8-4814-969e-fb20f2a0c5f9",
+            "type": "notes",
+            "label": "Notes",
+            "note": "Set colour is a *transition* from the existing light state\nto the one defined in the node.\n\nThis means a set-color of Yellow transitions the light from\nwhatever it was previously to Yellow.\n\nIn turn, that means Duration is how long this transition \nwill take - NOT how long the light will remain yellow.\n\nwaitUntilCondition / waitUntilTime is what defines how\nlong it remains yellow before we transition to the next\nnode/state.",
+            "style": "notes",
+            "title": "Understanding Delay vs. Duration - SetColor Yellow"
+          },
+          {
+            "id": "notes-keyframe",
+            "type": "notes",
+            "label": "Notes",
+            "note": "Large venues only. ",
+            "style": "notes",
+            "title": "Keyframe effects are used by "
+          }
+        ]
       },
       "connections": [
         {
-          "from": "event-sk-default-start",
-          "to": "sk-default-venue"
-        },
-        {
           "from": "sk-default-venue",
           "to": "sk-default-init-toggle"
-        },
-        {
-          "from": "event-sk-default-keyframe",
-          "to": "sk-default-flip"
         },
         {
           "from": "sk-default-flip",
@@ -4307,82 +4440,145 @@
           "fromPort": "false"
         },
         {
-          "from": "event-sk-default-drum-red",
-          "to": "sk-default-small-venue"
-        },
-        {
           "from": "sk-default-small-venue",
           "to": "action-sk-default-yellow-on",
           "fromPort": "true"
         },
         {
-          "from": "action-sk-default-yellow-on",
-          "to": "action-sk-default-yellow-off"
+          "from": "event-sk-default-drum-red",
+          "to": "logic-668f0f7a-f7e2-4cd5-b9bc-999507efeaf3"
+        },
+        {
+          "from": "event-8892f835-d819-4ebe-91d0-fd4dedc0f58c",
+          "to": "sk-default-small-venue"
+        },
+        {
+          "from": "event-sk-default-start",
+          "to": "logic-ffb26ee2-28cd-4c89-bb25-18f8e248ed74"
+        },
+        {
+          "from": "logic-ffb26ee2-28cd-4c89-bb25-18f8e248ed74",
+          "to": "sk-default-venue"
+        },
+        {
+          "from": "logic-668f0f7a-f7e2-4cd5-b9bc-999507efeaf3",
+          "to": "logic-b6c0786b-6e8d-4a17-92a4-46d2a28c0662",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-b6c0786b-6e8d-4a17-92a4-46d2a28c0662",
+          "to": "effect-raiser-0884a514-9a0a-49fd-bce1-e559a66c3736"
+        },
+        {
+          "from": "logic-668f0f7a-f7e2-4cd5-b9bc-999507efeaf3",
+          "to": "logic-40434612-430d-4ef1-b249-8a7dee3d7904",
+          "fromPort": "false"
+        },
+        {
+          "from": "event-sk-default-keyframe",
+          "to": "logic-73dfe094-ce27-449b-a7ee-bb9adc56f0a4"
+        },
+        {
+          "from": "logic-73dfe094-ce27-449b-a7ee-bb9adc56f0a4",
+          "to": "sk-default-flip",
+          "fromPort": "true"
         }
       ],
       "layout": {
         "nodePositions": {
           "event-sk-default-start": {
-            "x": 252.89043559879065,
-            "y": 4.005740936845541
+            "x": -109.27033583016237,
+            "y": -64.07195380216166
           },
           "event-sk-default-keyframe": {
-            "x": 518.6576696168631,
-            "y": 0.9477335810661316
+            "x": 206.13690365065077,
+            "y": 13.066291886004478
           },
           "event-sk-default-drum-red": {
-            "x": 781.3411926683038,
-            "y": 0.08342303708195686
+            "x": 960.4467009149414,
+            "y": -54.64028803452504
+          },
+          "event-8892f835-d819-4ebe-91d0-fd4dedc0f58c": {
+            "x": 466.72109571371686,
+            "y": -59.021437609827956
           },
           "action-sk-default-blue-inner": {
-            "x": 286.96310437934517,
-            "y": 625.2403077099771
+            "x": -50.90595368690941,
+            "y": 631.880130237033
           },
           "action-sk-default-red-outer": {
-            "x": 73.03081543308224,
-            "y": 503.7322467656794
+            "x": -156.25199811572435,
+            "y": 467.0155369544201
           },
           "action-sk-default-red-inner": {
-            "x": 587.2828334012943,
-            "y": 776.4008728783689
+            "x": 132.6257074213454,
+            "y": 757.4177660719896
           },
           "action-sk-default-blue-outer": {
-            "x": 776.4618769735271,
-            "y": 638.8094927492841
-          },
-          "action-sk-default-yellow-off": {
-            "x": 1177.7848287310546,
-            "y": 475.76228590659184
+            "x": 360.47404263620285,
+            "y": 622.40433871908
           },
           "action-sk-default-yellow-on": {
-            "x": 786.2865409422666,
-            "y": 254.38458167389035
+            "x": 471.73089915932064,
+            "y": 171.67114819291896
           },
           "sk-default-venue": {
-            "x": 271.8348946683109,
-            "y": 122.17959105223417
+            "x": -50.88753951972308,
+            "y": 139.93064784513672
           },
           "sk-default-init-toggle": {
-            "x": 259.1593510583043,
-            "y": 249.27183558791876
+            "x": -74.36137148856648,
+            "y": 277.8984060260166
           },
           "sk-default-flip": {
-            "x": 528.3104259949178,
-            "y": 117.85224476084113
+            "x": 208.40992240593312,
+            "y": 183.86929222528477
           },
           "sk-default-cond-toggle": {
-            "x": 522.191388675943,
-            "y": 256.27594703808427
+            "x": 206.97807195273128,
+            "y": 286.7426616656064
           },
           "sk-default-small-venue": {
-            "x": 779.6615361236036,
-            "y": 117.1725384555757
+            "x": 468.80383158634845,
+            "y": 32.229586452983256
+          },
+          "logic-668f0f7a-f7e2-4cd5-b9bc-999507efeaf3": {
+            "x": 962.8867786200323,
+            "y": 52.531198829738514
+          },
+          "logic-ffb26ee2-28cd-4c89-bb25-18f8e248ed74": {
+            "x": -125.4775399250982,
+            "y": 6.355685440174284
+          },
+          "logic-b6c0786b-6e8d-4a17-92a4-46d2a28c0662": {
+            "x": 914.5641367313785,
+            "y": 190.28606470927946
+          },
+          "logic-40434612-430d-4ef1-b249-8a7dee3d7904": {
+            "x": 1259.9156084801482,
+            "y": 195.3041912331895
+          },
+          "logic-73dfe094-ce27-449b-a7ee-bb9adc56f0a4": {
+            "x": 201.1509873638313,
+            "y": 74.55863532092144
+          },
+          "effect-raiser-0884a514-9a0a-49fd-bce1-e559a66c3736": {
+            "x": 1002.8868317091649,
+            "y": 330.6212846829537
+          },
+          "notes-2f0424a5-32d8-4814-969e-fb20f2a0c5f9": {
+            "x": 492.8418563249562,
+            "y": 305.91276494536316
+          },
+          "notes-keyframe": {
+            "x": 103.13815163754794,
+            "y": -64.03149971149406
           }
         },
         "viewport": {
-          "x": 115.05724978702642,
-          "y": 41.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 157.39635176984063,
+          "y": 105.23034915966474,
+          "zoom": 0.6704553503110334
         }
       },
       "variables": [
@@ -4391,7 +4587,8 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "",
-          "isParameter": false
+          "isParameter": false,
+          "validValues": ["NoVenue", "Small", "Large"]
         },
         {
           "name": "toggle",
@@ -4399,6 +4596,21 @@
           "scope": "cue",
           "initialValue": 0,
           "isParameter": false
+        },
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "description": "All lights for drum red flash",
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
         }
       ]
     },
@@ -4680,7 +4892,7 @@
             "logicType": "variable",
             "mode": "set",
             "varName": "color3",
-            "valueType": "string",
+            "valueType": "color",
             "value": {
               "source": "literal",
               "value": "yellow"
@@ -4704,7 +4916,7 @@
             "logicType": "variable",
             "mode": "set",
             "varName": "color3",
-            "valueType": "string",
+            "valueType": "color",
             "value": {
               "source": "literal",
               "value": "blue"
@@ -4747,10 +4959,6 @@
           "to": "sk-frenzy-set-large-2"
         },
         {
-          "from": "sk-frenzy-set-large-2",
-          "to": "action-sk-frenzy-c1"
-        },
-        {
           "from": "sk-frenzy-is-large",
           "to": "sk-frenzy-set-small",
           "fromPort": "false"
@@ -4758,10 +4966,6 @@
         {
           "from": "sk-frenzy-set-small",
           "to": "sk-frenzy-set-small-2"
-        },
-        {
-          "from": "sk-frenzy-set-small-2",
-          "to": "action-sk-frenzy-c1"
         },
         {
           "from": "action-sk-frenzy-c1",
@@ -4823,7 +5027,7 @@
             "y": 750.820196647197
           },
           "sk-frenzy-set-large-2": {
-            "x": -8.72585435025394,
+            "x": -7.086887315287072,
             "y": 874.8138165473938
           },
           "sk-frenzy-set-small": {
@@ -4836,9 +5040,9 @@
           }
         },
         "viewport": {
-          "x": 230.05724978702642,
-          "y": 50.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 299.3906413058846,
+          "y": -167.28137198583107,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
@@ -4868,7 +5072,8 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "",
-          "isParameter": false
+          "isParameter": false,
+          "validValues": ["NoVenue", "Small", "Large"]
         },
         {
           "name": "color1",
@@ -5434,9 +5639,9 @@
           }
         },
         "viewport": {
-          "x": 250.05724978702642,
-          "y": 99.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
@@ -5779,9 +5984,9 @@
           }
         },
         "viewport": {
-          "x": 250.05724978702642,
-          "y": 99.41351847885329,
-          "zoom": 0.641768312924964
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
@@ -5790,7 +5995,46 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "",
-          "isParameter": false
+          "isParameter": false,
+          "validValues": [
+            "BigRockEnding",
+            "Blackout_Fast",
+            "Blackout_Slow",
+            "Blackout_Spotlight",
+            "Chorus",
+            "Cool_Manual",
+            "Cool_Automatic",
+            "Default",
+            "Dischord",
+            "Flare_Fast",
+            "Flare_Slow",
+            "Frenzy",
+            "Harmony",
+            "Intro",
+            "Keyframe_First",
+            "Keyframe_Next",
+            "Keyframe_Previous",
+            "Menu",
+            "Score",
+            "Searchlights",
+            "Silhouettes",
+            "Silhouettes_Spotlight",
+            "Stomp",
+            "Strobe_Fastest",
+            "Strobe_Fast",
+            "Strobe_Medium",
+            "Strobe_Slow",
+            "Strobe_Off",
+            "Solo",
+            "Sweep",
+            "Verse",
+            "Warm_Automatic",
+            "Warm_Manual",
+            "NoCue",
+            "UnknownCue",
+            "Strobe",
+            "DisableAll"
+          ]
         },
         {
           "name": "skSsAllLights",
@@ -5898,6 +6142,14 @@
                 "value": 0
               },
               "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
                 "source": "literal",
                 "value": 1
               }
@@ -6161,8 +6413,8 @@
             "y": 538.9239606484771
           },
           "sk-dischord-blue": {
-            "x": 780.3543061758576,
-            "y": 126.96700783617791
+            "x": 781.8458298090661,
+            "y": 128.45853146938646
           },
           "sk-dischord-red": {
             "x": 1008.9466279498124,
@@ -6170,9 +6422,9 @@
           }
         },
         "viewport": {
-          "x": -103.39713887921016,
-          "y": 76.34135662234229,
-          "zoom": 0.8975100506672617
+          "x": 293.39635176984063,
+          "y": 174.23034915966474,
+          "zoom": 0.6704553503110334
         }
       },
       "variables": [
@@ -6188,7 +6440,8 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "",
-          "isParameter": false
+          "isParameter": false,
+          "validValues": ["NoVenue", "Small", "Large"]
         }
       ],
       "effects": [
@@ -6403,6 +6656,14 @@
               "betweenDelay": {
                 "source": "literal",
                 "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "transparent"
               }
             }
           },
@@ -6450,6 +6711,14 @@
               "betweenDelay": {
                 "source": "literal",
                 "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "transparent"
               }
             }
           },
@@ -6497,6 +6766,14 @@
               "betweenDelay": {
                 "source": "literal",
                 "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "transparent"
               }
             }
           },
@@ -6544,6 +6821,14 @@
               "betweenDelay": {
                 "source": "literal",
                 "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "transparent"
               }
             }
           }
@@ -6629,7 +6914,7 @@
           },
           "sk-sweep-half": {
             "x": 1.9642559476196766,
-            "y": 505.6993770636618
+            "y": 504.06041002869506
           },
           "sk-sweep-start-a": {
             "x": -10.08018851839006,
@@ -6652,12 +6937,12 @@
             "y": 278.77289498093
           },
           "sk-sweep-yellow-b": {
-            "x": 767.4848606057701,
+            "x": 769.1238276407369,
             "y": 275.37354491891733
           },
           "sk-sweep-blue": {
-            "x": 1051.3241444882005,
-            "y": 272.19370728899696
+            "x": 1052.9631115231673,
+            "y": 273.8326743239637
           },
           "sk-sweep-green": {
             "x": 1295.3996510617435,
@@ -6665,9 +6950,9 @@
           }
         },
         "viewport": {
-          "x": 96.9785996832843,
-          "y": 111.17505141781663,
-          "zoom": 0.6029559297177003
+          "x": 98.39064130588463,
+          "y": 143.71862801416893,
+          "zoom": 0.6101403985958002
         }
       },
       "variables": [
@@ -6683,7 +6968,8 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "",
-          "isParameter": false
+          "isParameter": false,
+          "validValues": ["NoVenue", "Small", "Large"]
         },
         {
           "name": "numLights",

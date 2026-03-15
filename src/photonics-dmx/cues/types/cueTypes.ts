@@ -99,35 +99,73 @@ export function isInstrumentEventTriggered(
 // Import RB3E types
 import { Rb3Difficulty, Rb3TrackType } from '../../listeners/RB3/rb3eTypes'
 
-export type SongSection = 'None' | 'Chorus' | 'Verse' | 'Unknown'
-export type PostProcessing =
-  | 'Default'
-  | 'Bloom'
-  | 'Bright'
-  | 'Saturation'
-  | 'Contrast'
-  | 'Sharpness'
-  | 'Vignette'
-  | 'ChromaticAberration'
-  | 'MotionBlur'
-  | 'DepthOfField'
-  | 'AmbientOcclusion'
-  | 'Unknown'
-export type Beat = 'Measure' | 'Strong' | 'Weak' | 'Off' | 'Unknown'
-export type StrobeState =
-  | 'Strobe_Fastest'
-  | 'Strobe_Fast'
-  | 'Strobe_Medium'
-  | 'Strobe_Slow'
-  | 'Strobe_Off'
-  | 'Unknown'
+/** Runtime arrays for CueData union types (single source of truth for property metadata and UI dropdowns). */
+export const VENUE_SIZES = ['NoVenue', 'Small', 'Large'] as const
+export const BEAT_TYPES = ['Measure', 'Strong', 'Weak', 'Off', 'Unknown'] as const
+export const SCENE_VALUES = [
+  'Unknown',
+  'Menu',
+  'Gameplay',
+  'Score',
+  'Calibration',
+  'Practice',
+] as const
+export const SONG_SECTIONS = ['None', 'Chorus', 'Verse', 'Unknown'] as const
+export const STROBE_STATES = [
+  'Strobe_Fastest',
+  'Strobe_Fast',
+  'Strobe_Medium',
+  'Strobe_Slow',
+  'Strobe_Off',
+  'Unknown',
+] as const
+export const PAUSE_STATES = ['Unpaused', 'AtMenu', 'Paused'] as const
+export const POST_PROCESSING_VALUES = [
+  'Default',
+  'Bloom',
+  'Bright',
+  'Contrast',
+  'Posterize',
+  'PhotoNegative',
+  'Mirror',
+  'BlackAndWhite',
+  'SepiaTone',
+  'SilverTone',
+  'Choppy_BlackAndWhite',
+  'PhotoNegative_RedAndBlack',
+  'Polarized_BlackAndWhite',
+  'Polarized_RedAndBlue',
+  'Desaturated_Blue',
+  'Desaturated_Red',
+  'Contrast_Red',
+  'Contrast_Green',
+  'Contrast_Blue',
+  'Grainy_Film',
+  'Grainy_ChromaticAbberation',
+  'Scanlines',
+  'Scanlines_BlackAndWhite',
+  'Scanlines_Blue',
+  'Scanlines_Security',
+  'Trails',
+  'Trails_Long',
+  'Trails_Desaturated',
+  'Trails_Flickery',
+  'Trails_Spacey',
+  'Unknown',
+] as const
+export const PLATFORM_VALUES = ['RB3E', 'Unknown', 'Windows', 'Linux', 'Mac'] as const
+
+export type SongSection = (typeof SONG_SECTIONS)[number]
+export type PostProcessing = (typeof POST_PROCESSING_VALUES)[number]
+export type Beat = (typeof BEAT_TYPES)[number]
+export type StrobeState = (typeof STROBE_STATES)[number]
 
 export type CueData = {
   datagramVersion: number
-  platform: 'RB3E' | 'Unknown' | 'Windows' | 'Linux' | 'Mac'
-  currentScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration'
-  pauseState: 'Unpaused' | 'AtMenu' | 'Paused'
-  venueSize: 'NoVenue' | 'Small' | 'Large'
+  platform: (typeof PLATFORM_VALUES)[number]
+  currentScene: (typeof SCENE_VALUES)[number]
+  pauseState: (typeof PAUSE_STATES)[number]
+  venueSize: (typeof VENUE_SIZES)[number]
   beatsPerMinute: number
   songSection: SongSection
   guitarNotes: InstrumentNoteType[]
@@ -143,9 +181,21 @@ export type CueData = {
   fogState: boolean
   strobeState: StrobeState
   performer: number
+  /** YARG: performer bitmask for spotlight (optional, YARG only). */
+  spotlight?: number
+  /** YARG: performer bitmask for singalong (optional, YARG only). */
+  singalong?: number
+  /** YARG: camera cut constraint flags (optional, when packet length >= 47). */
+  cameraCutConstraint?: number
+  /** YARG: camera cut priority (optional, when packet length >= 47). */
+  cameraCutPriority?: number
+  /** YARG: camera cut subject (optional, when packet length >= 47). */
+  cameraCutSubject?: number
   trackMode?: 'tracked' | 'autogen' | 'simulated'
+  /** When set with trackMode 'simulated', use this group for cue resolution instead of random active-group selection. */
+  simulationCueGroup?: string
   beat: Beat
-  keyframe: string
+  keyframe: 'Off' | 'First' | 'Next' | 'Previous' | 'Unknown'
   bonusEffect: boolean
 
   // Cue history and context
@@ -210,7 +260,7 @@ export const defaultCueData: CueData = {
   strobeState: 'Strobe_Off',
   performer: 0,
   beat: 'Unknown',
-  keyframe: 'Unknown',
+  keyframe: 'Off',
   bonusEffect: false,
 
   // Cue history defaults

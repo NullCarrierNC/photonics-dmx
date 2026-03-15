@@ -1,18 +1,26 @@
 import React from 'react'
-import type { VariableLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type {
+  VariableLogicNode,
+  NodeCueMode,
+} from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
 export interface VariableLogicEditorProps extends LogicEditorCommonProps {
   node: VariableLogicNode
+  /** When set, enables built-in event-option dropdown for valueType="event". */
+  activeMode?: NodeCueMode
 }
 
 const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
   node,
   availableVariables,
   updateNode,
+  activeMode,
 }) => {
   const showValue = node.mode !== 'get'
+  const selectedVariable = availableVariables.find((v) => v.name === node.varName)
+  const validLiteralsFromVariable = selectedVariable?.validValues
 
   return (
     <div className="space-y-2 text-xs">
@@ -84,6 +92,8 @@ const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
               | 'light-array'
               | 'event'
           }
+          validLiterals={validLiteralsFromVariable}
+          activeMode={activeMode}
           availableVariables={availableVariables}
         />
       )}

@@ -43,7 +43,10 @@ export function getYargEventCategories(): EventCategory[] {
         { value: 'beat', label: 'Beat' },
         { value: 'measure', label: 'Measure' },
         { value: 'half-beat', label: 'Half Beat' },
-        { value: 'keyframe', label: 'Keyframe' },
+        { value: 'keyframe', label: 'Keyframe (any)' },
+        { value: 'keyframe-first', label: 'Keyframe First' },
+        { value: 'keyframe-next', label: 'Keyframe Next' },
+        { value: 'keyframe-previous', label: 'Keyframe Previous' },
       ],
     },
     {

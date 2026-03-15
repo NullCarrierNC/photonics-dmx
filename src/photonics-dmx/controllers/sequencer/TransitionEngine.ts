@@ -46,6 +46,16 @@ export class TransitionEngine implements ITransitionEngine {
   }
 
   /**
+   * Computes total delay (ms) for delay-based waitUntil. When waitUntilConditionCount
+   * is set (e.g. from rotation effect phases), wait time is count * waitUntilTime so
+   * staggered per-light timing works. When undefined, treat as 1 step; when 0, advance immediately.
+   */
+  private computeDelayWaitTime(transition: EffectTransition): number {
+    const count = transition.waitUntilConditionCount ?? 1
+    return count > 0 ? count * transition.waitUntilTime : 0
+  }
+
+  /**
    * Helper method to ensure a LightEffectState has a lastEndState
    * @param effect The effect to ensure has lastEndState
    */
@@ -231,7 +241,7 @@ export class TransitionEngine implements ITransitionEngine {
       activeEffect.state = 'waitingUntil'
       activeEffect.transitionStartTime = currentTime
       if (transition.waitUntilCondition === 'delay') {
-        activeEffect.waitEndTime = currentTime + transition.waitUntilTime
+        activeEffect.waitEndTime = currentTime + this.computeDelayWaitTime(transition)
       } else {
         activeEffect.waitEndTime = currentTime
       }
@@ -292,9 +302,37 @@ export class TransitionEngine implements ITransitionEngine {
       transition.transform.easing,
     )
 
-    activeEffect.state = 'transitioning'
-    activeEffect.transitionStartTime = currentTime
-    activeEffect.waitEndTime = currentTime + transition.transform.duration
+    if (transition.transform.duration > 0) {
+      activeEffect.state = 'transitioning'
+      activeEffect.transitionStartTime = currentTime
+      activeEffect.waitEndTime = currentTime + transition.transform.duration
+    } else {
+      // Duration is 0 — snap to end colour immediately but defer completion to the next
+      // frame so the LTC has a chance to blend this layer before it is torn down.
+      activeEffect.lastEndState = color
+      activeEffect.state = 'waitingUntil'
+      if (transition.waitUntilCondition === 'none') {
+        // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
+        // next updateTransitions call, after the current frame's blend pass has run.
+      } else if (
+        transition.waitUntilCondition !== 'delay' &&
+        transition.waitUntilConditionCount === 0
+      ) {
+        // Event-type condition with count 0: advance immediately (no event like beat or keyframe needed).
+        activeEffect.currentTransitionIndex += 1
+        activeEffect.state = 'idle'
+        if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
+          const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
+          this.prepareTransition(activeEffect, nextTransition, currentTime)
+        }
+      } else if (transition.waitUntilCondition === 'delay') {
+        activeEffect.transitionStartTime = currentTime
+        activeEffect.waitEndTime = currentTime + this.computeDelayWaitTime(transition)
+      } else {
+        activeEffect.transitionStartTime = currentTime
+        activeEffect.waitEndTime = currentTime
+      }
+    }
   }
 
   /**
@@ -318,9 +356,19 @@ export class TransitionEngine implements ITransitionEngine {
       if (transition.waitUntilCondition === 'none') {
         activeEffect.currentTransitionIndex += 1
         activeEffect.state = 'idle'
+      } else if (
+        transition.waitUntilCondition !== 'delay' &&
+        transition.waitUntilConditionCount === 0
+      ) {
+        activeEffect.currentTransitionIndex += 1
+        activeEffect.state = 'idle'
+        if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
+          const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
+          this.prepareTransition(activeEffect, nextTransition, currentTime)
+        }
       } else if (transition.waitUntilCondition === 'delay') {
         activeEffect.transitionStartTime = currentTime
-        activeEffect.waitEndTime = currentTime + transition.waitUntilTime
+        activeEffect.waitEndTime = currentTime + this.computeDelayWaitTime(transition)
       } else {
         activeEffect.transitionStartTime = currentTime
         activeEffect.waitEndTime = currentTime
@@ -345,7 +393,10 @@ export class TransitionEngine implements ITransitionEngine {
         activeEffect.currentTransitionIndex += 1
         activeEffect.state = 'idle'
       }
-    } else if (transition.waitUntilCondition === 'none') {
+    } else if (
+      transition.waitUntilCondition === 'none' ||
+      transition.waitUntilConditionCount === 0
+    ) {
       activeEffect.currentTransitionIndex += 1
       activeEffect.state = 'idle'
     }

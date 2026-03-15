@@ -94,7 +94,7 @@ export class ControllerManager {
       getEffectsController: () => this.effectsController,
       getDmxLightManager: () => this.dmxLightManager!,
       ensureInitialized: () => this.init(),
-      createCueHandler: (dmx, eff, debounce) => new YargCueHandler(dmx, eff, debounce),
+      createCueHandler: (dmx, eff) => new YargCueHandler(dmx, eff),
       setCueHandler: (h) => {
         this.cueHandler = h
       },
@@ -150,6 +150,7 @@ export class ControllerManager {
     await copyDefaultData(process.resourcesPath, baseDir)
     await this.initializeEffectLoader() // Initialize effects BEFORE node cues
     await this.initializeNodeCueLoader()
+    this.applyYargEnabledGroupsFromConfig()
     await this.initializeListeners()
 
     this.isInitialized = true
@@ -278,6 +279,26 @@ export class ControllerManager {
     }
   }
 
+  /**
+   * Re-apply Yarg enabled groups from configuration after all groups are registered.
+   * Node cue groups are registered in initializeNodeCueLoader(), and each registerGroup()
+   * adds the group to enabled by default, which would overwrite a saved "disabled" preference.
+   * Calling this after the node cue loader ensures the persisted preference wins.
+   */
+  private applyYargEnabledGroupsFromConfig(): void {
+    const registry = YargCueRegistry.getInstance()
+    const registeredIds = registry.getAllGroups()
+    const enabledGroupIds = this.config.getEnabledCueGroups()
+
+    if (enabledGroupIds !== undefined) {
+      const restricted = enabledGroupIds.filter((id) => registeredIds.includes(id))
+      registry.setEnabledGroups(restricted)
+      console.log('CueRegistry enabled groups re-applied from config:', restricted)
+    }
+    // If no saved preference, leave registry as-is (all groups enabled from registerGroup);
+    // GET_ENABLED_CUE_GROUPS will default to all and persist when the UI first reads.
+  }
+
   private async initializeNodeCueLoader(): Promise<void> {
     if (this.nodeCueLoader) {
       return
@@ -336,14 +357,8 @@ export class ControllerManager {
   private async initializeListeners(): Promise<void> {
     if (!this.dmxLightManager || !this.effectsController) return
 
-    const debouncePeriod = this.config.getPreference('effectDebounce')
-
     // Create cue handler (default to YARG)
-    this.cueHandler = new YargCueHandler(
-      this.dmxLightManager,
-      this.effectsController,
-      debouncePeriod,
-    )
+    this.cueHandler = new YargCueHandler(this.dmxLightManager, this.effectsController)
   }
 
   /**
@@ -353,8 +368,9 @@ export class ControllerManager {
     effectId: string,
     venueSize?: 'NoVenue' | 'Small' | 'Large',
     bpm?: number,
+    cueGroup?: string,
   ): void {
-    this.testEffectRunner.startTestEffect(effectId, venueSize, bpm)
+    this.testEffectRunner.startTestEffect(effectId, venueSize, bpm, cueGroup)
   }
 
   /**

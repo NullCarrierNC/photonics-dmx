@@ -5,8 +5,24 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import { YargNodeCueDefinition, YargEventNode } from '../../types/nodeCueTypes'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
-import { VariableValue } from './executionTypes'
+import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
+
+/** Optional injected session: use these stores and callbacks instead of static stores
+ * (used by alternate hosts or tests that construct YargNodeCue with a custom session). */
+export interface YargNodeCueInjectedSession {
+  cueLevelVarStore: Map<string, VariableValue>
+  groupLevelVarStore: Map<string, VariableValue>
+  firstSubmissionUsesSetEffectRef: { use: boolean }
+  runtimeCallbacks?: NodeRuntimeCallbacks
+  /** When provided, engine uses this instead of reading/mutating the ref (explicit policy). */
+  consumeInitialClearPolicy?: () => boolean
+  /** When provided, engine calls this for context start/complete/cancel/blocked/running so caller can drive ExecutionStateMachine. */
+  onContextLifecycle?: (
+    contextId: string,
+    event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
+  ) => void
+}
 
 export class YargNodeCue implements INetCue {
   public readonly cueId: CueType
@@ -22,12 +38,19 @@ export class YargNodeCue implements INetCue {
   private cueStartedFired = false
   private executionEngine?: NodeExecutionEngine
   private effectRegistry: EffectRegistry
+  private readonly usesInjectedSession: boolean
+  private readonly runtimeCallbacks?: NodeRuntimeCallbacks
+  private readonly consumeInitialClearPolicy?: () => boolean
+  private readonly onContextLifecycle?: (
+    contextId: string,
+    event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
+  ) => void
 
   // Cue queuing state
   private isExecutingCueStarted = false
   private queuedParameters: CueData[] = []
 
-  // First run of Primary cue: first effect submission uses setEffect to clear state
+  // First run of Primary cue: first effect submission uses setEffect to clear state (not used when usesInjectedSession)
   private firstSubmissionUsesSetEffectRef = { use: false }
   private clearedForThisActivation = false
 
@@ -35,6 +58,7 @@ export class YargNodeCue implements INetCue {
     groupId: string,
     private readonly compiledCue: CompiledYargCue,
     effectRegistry?: EffectRegistry,
+    injectedSession?: YargNodeCueInjectedSession,
   ) {
     this.groupId = groupId
     const definition = compiledCue.definition as YargNodeCueDefinition
@@ -43,26 +67,24 @@ export class YargNodeCue implements INetCue {
     this.description = definition.description
     this.style = definition.style === 'secondary' ? CueStyle.Secondary : CueStyle.Primary
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
+    this.usesInjectedSession = !!injectedSession
+    this.runtimeCallbacks = injectedSession?.runtimeCallbacks
 
-    // Initialize cue-level variable store
-    const existingCueStore = YargNodeCue.cueLevelVarStores.get(this.id)
-    if (existingCueStore) {
-      this.cueLevelVarStore = existingCueStore
+    if (injectedSession) {
+      this.cueLevelVarStore = injectedSession.cueLevelVarStore
+      this.groupLevelVarStore = injectedSession.groupLevelVarStore
+      this.firstSubmissionUsesSetEffectRef = injectedSession.firstSubmissionUsesSetEffectRef
+      this.consumeInitialClearPolicy = injectedSession.consumeInitialClearPolicy
+      this.onContextLifecycle = injectedSession.onContextLifecycle
     } else {
-      this.cueLevelVarStore = new Map()
-      YargNodeCue.cueLevelVarStores.set(this.id, this.cueLevelVarStore)
+      const existingCueStore = YargNodeCue.cueLevelVarStores.get(this.id)
+      this.cueLevelVarStore = existingCueStore ?? new Map()
+      if (!existingCueStore) YargNodeCue.cueLevelVarStores.set(this.id, this.cueLevelVarStore)
+      const existingGroupStore = YargNodeCue.groupLevelVarStores.get(groupId)
+      this.groupLevelVarStore = existingGroupStore ?? new Map()
+      if (!existingGroupStore) YargNodeCue.groupLevelVarStores.set(groupId, this.groupLevelVarStore)
     }
 
-    // Initialize group-level variable store
-    const existingGroupStore = YargNodeCue.groupLevelVarStores.get(groupId)
-    if (existingGroupStore) {
-      this.groupLevelVarStore = existingGroupStore
-    } else {
-      this.groupLevelVarStore = new Map()
-      YargNodeCue.groupLevelVarStores.set(groupId, this.groupLevelVarStore)
-    }
-
-    // Initialize variables from registry definitions
     this.initializeVariables()
   }
 
@@ -86,6 +108,9 @@ export class YargNodeCue implements INetCue {
         this.effectRegistry,
         variableDefinitions,
         this.firstSubmissionUsesSetEffectRef,
+        this.runtimeCallbacks,
+        this.consumeInitialClearPolicy,
+        this.onContextLifecycle,
       )
     }
 
@@ -221,26 +246,30 @@ export class YargNodeCue implements INetCue {
 
   onStop(): void {
     if (this.executionEngine) {
-      // Primary cues: leave effects on the sequencer so the next cue's setEffect can
-      // transition from them instead of from black. Secondary cues: remove effects
-      // immediately since no subsequent setEffect will clean them up.
       const skipEffectRemoval = this.style === CueStyle.Primary
       this.executionEngine.cancelAll(skipEffectRemoval)
       this.executionEngine = undefined
     }
 
-    this.cueLevelVarStore.clear()
-    YargNodeCue.cueLevelVarStores.delete(this.id)
-    YargNodeCue.groupLevelVarStores.delete(this.groupId)
     this.cueStartedFired = false
-
-    // Reset queuing state
     this.isExecutingCueStarted = false
-    this.queuedParameters = []
+    this.queuedParameters.length = 0
 
-    // Next time this cue runs (Primary), first submission will use setEffect again
-    this.firstSubmissionUsesSetEffectRef.use = false
-    this.clearedForThisActivation = false
+    if (!this.usesInjectedSession) {
+      this.cueLevelVarStore.clear()
+      YargNodeCue.cueLevelVarStores.delete(this.id)
+      YargNodeCue.groupLevelVarStores.delete(this.groupId)
+      this.firstSubmissionUsesSetEffectRef.use = false
+      this.clearedForThisActivation = false
+    }
+  }
+
+  onPause(): void {
+    // Optional INetCue lifecycle; no-op for node cues
+  }
+
+  onDestroy(): void {
+    // Optional INetCue lifecycle; no-op for node cues
   }
 
   private initializeVariables(): void {

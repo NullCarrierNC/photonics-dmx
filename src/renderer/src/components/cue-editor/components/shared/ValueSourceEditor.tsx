@@ -1,7 +1,17 @@
 import React from 'react'
-import type { ValueSource } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type {
+  ValueSource,
+  NodeCueMode,
+} from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { isVariableSource } from './nodeEditorUtils'
-import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
+import {
+  COLOR_OPTIONS,
+  YARG_EVENT_OPTIONS,
+  AUDIO_EVENT_OPTIONS,
+} from '../../../../../../photonics-dmx/constants/options'
+import { CueType } from '../../../../../../photonics-dmx/cues/types/cueTypes'
+
+const CUE_TYPE_VALUES = Object.values(CueType) as string[]
 
 interface ValueSourceEditorProps {
   label: string
@@ -17,8 +27,15 @@ interface ValueSourceEditorProps {
     | 'event'
     | 'either'
   validLiterals?: string[]
-  availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
+  availableVariables: {
+    name: string
+    type: string
+    scope: 'cue' | 'cue-group'
+    validValues?: string[]
+  }[]
   integerOnly?: boolean // For number fields that should only accept integers
+  /** When set, enables built-in event-option fallback for expected="event" (yarg vs audio). */
+  activeMode?: NodeCueMode
 }
 
 const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
@@ -29,11 +46,18 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   validLiterals,
   availableVariables,
   integerOnly = false,
+  activeMode,
 }) => {
   const isLightArray = expected === 'light-array'
-  // For color type, use COLOR_OPTIONS if validLiterals not provided
-  const effectiveValidLiterals =
-    expected === 'color' && !validLiterals ? COLOR_OPTIONS : validLiterals
+  const effectiveValidLiterals = (() => {
+    if (validLiterals) return validLiterals
+    if (expected === 'color') return COLOR_OPTIONS
+    if (expected === 'cue-type') return CUE_TYPE_VALUES
+    if (expected === 'event' && activeMode) {
+      return activeMode === 'yarg' ? [...YARG_EVENT_OPTIONS] : [...AUDIO_EVENT_OPTIONS]
+    }
+    return undefined
+  })()
 
   const source = value ?? {
     source: 'literal',
@@ -43,13 +67,15 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
         : expected === 'string' ||
             expected === 'color' ||
             expected === 'event' ||
+            expected === 'cue-type' ||
             expected === 'either'
           ? ''
           : 0,
   }
   const isLiteral = source.source === 'literal'
   const isBoolean = expected === 'boolean'
-  const isString = expected === 'string' || expected === 'color' || expected === 'event'
+  const isString =
+    expected === 'string' || expected === 'color' || expected === 'event' || expected === 'cue-type'
   const allowTextInput = isString || expected === 'either'
 
   if (isLightArray) {

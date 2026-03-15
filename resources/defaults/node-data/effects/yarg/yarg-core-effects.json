@@ -44,8 +44,7 @@
           "scope": "cue",
           "initialValue": "max",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -53,8 +52,7 @@
           "scope": "cue",
           "initialValue": "replace",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "startCondition",
@@ -255,7 +253,8 @@
             "label": "Flash Entry",
             "outputs": []
           }
-        ]
+        ],
+        "notes": []
       },
       "connections": [
         {
@@ -283,9 +282,9 @@
           }
         },
         "viewport": {
-          "x": 602.194684883114,
-          "y": 104.8926346632652,
-          "zoom": 0.75
+          "x": 305.7802475781683,
+          "y": 101.77901268715408,
+          "zoom": 0.6020686906157078
         }
       }
     },
@@ -325,8 +324,7 @@
           "scope": "cue",
           "initialValue": "max",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -334,8 +332,7 @@
           "scope": "cue",
           "initialValue": "replace",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "sweepTime",
@@ -383,8 +380,33 @@
           "scope": "cue",
           "initialValue": "low",
           "description": "Brightness level to fade out to (same colour as sweep)",
+          "isParameter": true
+        },
+        {
+          "name": "lowColor",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "description": "Colour for inactive lights (transparent = off)",
           "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "validValues": [
+            "amber",
+            "black",
+            "blue",
+            "chartreuse",
+            "cyan",
+            "green",
+            "magenta",
+            "orange",
+            "purple",
+            "red",
+            "teal",
+            "transparent",
+            "vermilion",
+            "violet",
+            "white",
+            "yellow"
+          ]
         },
         {
           "name": "numLights",
@@ -625,7 +647,7 @@
             "color": {
               "name": {
                 "source": "variable",
-                "name": "color"
+                "name": "lowColor"
               },
               "brightness": {
                 "source": "variable",
@@ -689,7 +711,7 @@
             "color": {
               "name": {
                 "source": "variable",
-                "name": "color"
+                "name": "lowColor"
               },
               "brightness": {
                 "source": "variable",
@@ -1241,40 +1263,40 @@
             "y": 120
           },
           "sw-slot-time": {
-            "x": 0,
-            "y": 240
+            "x": -8,
+            "y": 238
           },
           "sw-overlap-factor": {
-            "x": 0,
-            "y": 360
+            "x": 8,
+            "y": 358
           },
           "sw-eff-delay-factor": {
-            "x": 0,
+            "x": -22,
             "y": 480
           },
           "sw-eff-slot": {
-            "x": 0,
-            "y": 600
+            "x": -22,
+            "y": 598
           },
           "sw-num-minus-one": {
-            "x": 0,
+            "x": 10,
             "y": 720
           },
           "sw-speedup-a": {
-            "x": 0,
+            "x": -4,
             "y": 840
           },
           "sw-speedup-b": {
-            "x": 0,
-            "y": 960
+            "x": -6,
+            "y": 950
           },
           "sw-add-hold": {
             "x": 0,
-            "y": 1080
+            "y": 1074
           },
           "sw-desired-fade": {
-            "x": 0,
-            "y": 1200
+            "x": -16,
+            "y": 1202
           },
           "sw-cond-scale": {
             "x": 689.1455299380652,
@@ -1321,8 +1343,8 @@
             "y": 907.0169514002991
           },
           "sw-base-portion": {
-            "x": 689.1455299380652,
-            "y": 1027.0169514002991
+            "x": 691.1455299380652,
+            "y": 1029.0169514002991
           },
           "sw-for-each": {
             "x": 689.1455299380652,
@@ -1342,8 +1364,8 @@
           }
         },
         "viewport": {
-          "x": 305.9636175154837,
-          "y": 20.745762149925213,
+          "x": 176.24858926931552,
+          "y": -293.47206852599345,
           "zoom": 0.5
         }
       }
@@ -1385,8 +1407,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -1394,8 +1415,7 @@
           "scope": "cue",
           "initialValue": "add",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "beatsPerCycle",
@@ -1418,7 +1438,7 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "beat",
-          "description": "Beat-like condition to count per phase (beat, keyframe)",
+          "description": "Event type to count per phase (beat, keyframe)",
           "isParameter": true
         },
         {
@@ -1430,7 +1450,30 @@
           "isParameter": true
         },
         {
+          "name": "waitUntilTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Ms to wait per phase when waitUntilCondition is delay",
+          "isParameter": true
+        },
+        {
+          "name": "groupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "Iterate in groups of this many lights (e.g. 2 for opposite pairs)",
+          "isParameter": true
+        },
+        {
           "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "numGroups",
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
@@ -1581,8 +1624,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -1649,8 +1692,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -1717,8 +1760,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -1747,6 +1790,23 @@
             "assignTo": "numLights"
           },
           {
+            "id": "rcw-num-groups",
+            "type": "logic",
+            "logicType": "math",
+            "label": "numGroups = numLights / groupSize",
+            "outputs": [],
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "variable",
+              "name": "groupSize"
+            },
+            "assignTo": "numGroups"
+          },
+          {
             "id": "rcw-phase2-count",
             "type": "logic",
             "logicType": "math",
@@ -1771,7 +1831,11 @@
             "outputs": [],
             "sourceVariable": "lights",
             "currentLightVariable": "currentLight",
-            "currentIndexVariable": "idx"
+            "currentIndexVariable": "idx",
+            "groupSize": {
+              "source": "variable",
+              "name": "groupSize"
+            }
           },
           {
             "id": "rcw-raw1",
@@ -1794,7 +1858,7 @@
             "id": "rcw-raw2",
             "type": "logic",
             "logicType": "math",
-            "label": "raw2 = raw1 + numLights",
+            "label": "raw2 = raw1 + numGroups",
             "outputs": [],
             "operator": "add",
             "left": {
@@ -1803,7 +1867,7 @@
             },
             "right": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "assignTo": "raw2"
           },
@@ -1811,7 +1875,7 @@
             "id": "rcw-steps-on",
             "type": "logic",
             "logicType": "math",
-            "label": "stepsOn = raw2 % numLights",
+            "label": "stepsOn = raw2 % numGroups",
             "outputs": [],
             "operator": "modulus",
             "left": {
@@ -1820,7 +1884,7 @@
             },
             "right": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "assignTo": "stepsOn"
           },
@@ -1828,12 +1892,12 @@
             "id": "rcw-num-minus",
             "type": "logic",
             "logicType": "math",
-            "label": "numMinus = numLights - stepsOn",
+            "label": "numMinus = numGroups - stepsOn",
             "outputs": [],
             "operator": "subtract",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "right": {
               "source": "variable",
@@ -1969,7 +2033,16 @@
             "outputs": []
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "notes-602af270-549c-43e5-939b-b9dae67901ed",
+            "type": "notes",
+            "label": "Notes",
+            "note": "For each normally increments by 1.\nGroup Size lets us increment by X, while also reducing\nthe number of iterations / X.\n\nE.g. groupSize 2 means for each step we iterate two\nlights instead of one, and halve the total number\nof iterations. \n\nThis is used by cues like Score to move groups of two\ndefined lights in a clockwise pattern.",
+            "style": "notes",
+            "title": "For Each Light & Group Size"
+          }
+        ]
       },
       "connections": [
         {
@@ -1978,6 +2051,10 @@
         },
         {
           "from": "rcw-num-lights",
+          "to": "rcw-num-groups"
+        },
+        {
+          "from": "rcw-num-groups",
           "to": "rcw-phase2-count"
         },
         {
@@ -2063,8 +2140,12 @@
             "y": 1071.5626748725772
           },
           "rcw-num-lights": {
-            "x": -0.913223572075367,
-            "y": 131.4937989860773
+            "x": 18.74771647610646,
+            "y": 21.49379898607731
+          },
+          "rcw-num-groups": {
+            "x": 51.56838946372727,
+            "y": 135.51311212236578
           },
           "rcw-phase2-count": {
             "x": -3.0710418429225683,
@@ -2084,7 +2165,7 @@
           },
           "rcw-steps-on": {
             "x": 7.073440158739686,
-            "y": 742.088372707367
+            "y": 740.4274326591853
           },
           "rcw-num-minus": {
             "x": -7.229431226849556,
@@ -2119,14 +2200,18 @@
             "y": 618.8741846941411
           },
           "rcw-listener": {
-            "x": 1.5539837032556534,
-            "y": 4.904221013188362
+            "x": -26.446016296744347,
+            "y": -91.09577898681164
+          },
+          "notes-602af270-549c-43e5-939b-b9dae67901ed": {
+            "x": -344.7859663395264,
+            "y": 292.680286774842
           }
         },
         "viewport": {
-          "x": 388.17912361963886,
-          "y": 140.507262670662,
-          "zoom": 0.5680563024139482
+          "x": 277.7802475781683,
+          "y": 53.779012687154136,
+          "zoom": 0.6020686906157078
         }
       }
     },
@@ -2167,8 +2252,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -2176,8 +2260,7 @@
           "scope": "cue",
           "initialValue": "add",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "beatsPerCycle",
@@ -2200,7 +2283,7 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "beat",
-          "description": "Beat-like condition to count per phase (beat, keyframe)",
+          "description": "Event type to count per phase (beat, keyframe)",
           "isParameter": true
         },
         {
@@ -2212,7 +2295,30 @@
           "isParameter": true
         },
         {
+          "name": "waitUntilTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Ms to wait per phase when waitUntilCondition is delay",
+          "isParameter": true
+        },
+        {
+          "name": "groupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "Iterate in groups of this many lights (e.g. 2 for opposite pairs)",
+          "isParameter": true
+        },
+        {
           "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "numGroups",
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
@@ -2363,8 +2469,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -2431,8 +2537,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -2499,8 +2605,8 @@
                 "name": "waitUntilCondition"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "waitUntilTime"
               },
               "waitUntilConditionCount": {
                 "source": "variable",
@@ -2529,6 +2635,23 @@
             "assignTo": "numLights"
           },
           {
+            "id": "rccw-num-groups",
+            "type": "logic",
+            "logicType": "math",
+            "label": "numGroups = numLights / groupSize",
+            "outputs": [],
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "variable",
+              "name": "groupSize"
+            },
+            "assignTo": "numGroups"
+          },
+          {
             "id": "rccw-phase2-count",
             "type": "logic",
             "logicType": "math",
@@ -2553,7 +2676,11 @@
             "outputs": [],
             "sourceVariable": "lights",
             "currentLightVariable": "currentLight",
-            "currentIndexVariable": "idx"
+            "currentIndexVariable": "idx",
+            "groupSize": {
+              "source": "variable",
+              "name": "groupSize"
+            }
           },
           {
             "id": "rccw-raw1",
@@ -2576,7 +2703,7 @@
             "id": "rccw-raw2",
             "type": "logic",
             "logicType": "math",
-            "label": "raw2 = raw1 + numLights",
+            "label": "raw2 = raw1 + numGroups",
             "outputs": [],
             "operator": "add",
             "left": {
@@ -2585,7 +2712,7 @@
             },
             "right": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "assignTo": "raw2"
           },
@@ -2593,7 +2720,7 @@
             "id": "rccw-steps-on",
             "type": "logic",
             "logicType": "math",
-            "label": "stepsOn = raw2 % numLights",
+            "label": "stepsOn = raw2 % numGroups",
             "outputs": [],
             "operator": "modulus",
             "left": {
@@ -2602,7 +2729,7 @@
             },
             "right": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "assignTo": "stepsOn"
           },
@@ -2610,12 +2737,12 @@
             "id": "rccw-num-minus",
             "type": "logic",
             "logicType": "math",
-            "label": "numMinus = numLights - stepsOn",
+            "label": "numMinus = numGroups - stepsOn",
             "outputs": [],
             "operator": "subtract",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "numGroups"
             },
             "right": {
               "source": "variable",
@@ -2760,6 +2887,10 @@
         },
         {
           "from": "rccw-num-lights",
+          "to": "rccw-num-groups"
+        },
+        {
+          "from": "rccw-num-groups",
           "to": "rccw-phase2-count"
         },
         {
@@ -2833,7 +2964,7 @@
       "layout": {
         "nodePositions": {
           "rccw-phase1": {
-            "x": 769.0779202487321,
+            "x": 770.7388602969137,
             "y": 657.3530418090522
           },
           "rccw-phase2": {
@@ -2845,16 +2976,20 @@
             "y": 1021.5539752580225
           },
           "rccw-num-lights": {
-            "x": 2.008732298389077,
-            "y": 120.35809352621436
+            "x": 40.00873229838908,
+            "y": 46.35809352621436
+          },
+          "rccw-num-groups": {
+            "x": 24,
+            "y": 142
           },
           "rccw-phase2-count": {
             "x": -7.79876465164125,
             "y": 247.88150107860565
           },
           "rccw-foreach": {
-            "x": -3.5803973637521267,
-            "y": 376.2959604561329
+            "x": 36.41960263624787,
+            "y": 348.2959604561329
           },
           "rccw-raw1": {
             "x": -10.539574367925525,
@@ -2870,7 +3005,7 @@
           },
           "rccw-num-minus": {
             "x": -3.4515810683369637,
-            "y": 882.8817504458129
+            "y": 881.2208103976311
           },
           "rccw-steps-off": {
             "x": -10.644707925617695,
@@ -2901,14 +3036,14 @@
             "y": 473.54141522571445
           },
           "rccw-listener": {
-            "x": 11.216093447059393,
-            "y": -6.859663091599941
+            "x": 9.216093447059393,
+            "y": -38.85966309159994
           }
         },
         "viewport": {
-          "x": 117.69980657852744,
-          "y": 51.99637341933817,
-          "zoom": 0.5
+          "x": 189.78024757816831,
+          "y": 41.779012687154136,
+          "zoom": 0.6020686906157078
         }
       }
     },
@@ -2949,8 +3084,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -2958,8 +3092,7 @@
           "scope": "cue",
           "initialValue": "add",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "beatsPerCycle",
@@ -3820,9 +3953,9 @@
           }
         },
         "viewport": {
-          "x": 261.33270331111913,
-          "y": 5.237163723918343,
-          "zoom": 0.5
+          "x": 208.50285877944998,
+          "y": -181.93599345146856,
+          "zoom": 0.557096825409666
         }
       }
     },
@@ -3887,8 +4020,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -3896,8 +4028,7 @@
           "scope": "cue",
           "initialValue": "replace",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         }
       ],
       "nodes": {
@@ -4287,9 +4418,9 @@
           }
         },
         "viewport": {
-          "x": 216.74115558414928,
-          "y": 170.90466820511764,
-          "zoom": 0.5617984168070286
+          "x": 143.50285877945,
+          "y": 181.0640065485314,
+          "zoom": 0.557096825409666
         }
       }
     },
@@ -4330,8 +4461,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -4339,8 +4469,7 @@
           "scope": "cue",
           "initialValue": "add",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "startOffset",
@@ -4355,7 +4484,7 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "beat",
-          "description": "Beat-like condition to count per phase",
+          "description": "Event type to count per phase",
           "isParameter": true
         },
         {
@@ -5020,7 +5149,7 @@
           },
           "rccw2-p3-count": {
             "x": 484.24397944658995,
-            "y": 575.3463621996343
+            "y": 573.6854221514525
           },
           "rccw2-group-layer": {
             "x": 498.1259575597942,
@@ -5032,9 +5161,9 @@
           }
         },
         "viewport": {
-          "x": 202.09786459127582,
-          "y": 202.64407504123437,
-          "zoom": 0.8111271555770423
+          "x": 275.7802475781683,
+          "y": -77.22098731284586,
+          "zoom": 0.6020686906157078
         }
       }
     },
@@ -5075,8 +5204,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness for the first colour",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "endColor",
@@ -5092,8 +5220,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness for the second colour",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -5101,8 +5228,7 @@
           "scope": "cue",
           "initialValue": "replace",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "duration",

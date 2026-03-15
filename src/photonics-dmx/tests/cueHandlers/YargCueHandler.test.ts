@@ -2,10 +2,11 @@ import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { CueData, CueType } from '../../cues/types/cueTypes'
-import { beforeEach, describe, jest, it, expect } from '@jest/globals'
+import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals'
 import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
 import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
+import { setNodeV2Enabled } from '../../cues/node/v2/nodeV2FeatureFlag'
 
 // Mock implementation for the test
 class MockCueImplementation implements INetCue {
@@ -38,7 +39,7 @@ class MockCueImplementation implements INetCue {
   }
 }
 
-// Strobe (secondary) cue mock for lifecycle tests
+// Strobe cue mock for lifecycle tests
 class MockStrobeCue implements INetCue {
   private _id: string
   executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
@@ -50,6 +51,60 @@ class MockStrobeCue implements INetCue {
     return this._id
   }
   description = 'Mock strobe for testing'
+  style = CueStyle.Secondary
+  async execute(): Promise<void> {
+    return this.executeMock()
+  }
+  onStop(): void {
+    this.onStopMock()
+  }
+  onPause(): void {
+    /* no-op */
+  }
+  onDestroy(): void {
+    /* no-op */
+  }
+}
+
+// Primary cue mock for rapid transition tests (Sweep -> Stomp -> Sweep)
+class MockPrimaryCue implements INetCue {
+  private _id: string
+  executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+  onStopMock = jest.fn()
+  constructor(public cueId: CueType) {
+    this._id = `mock-primary-${cueId}-${Math.random().toString(36).substring(2, 11)}`
+  }
+  get id(): string {
+    return this._id
+  }
+  description = 'Mock primary for testing'
+  style = CueStyle.Primary
+  async execute(): Promise<void> {
+    return this.executeMock()
+  }
+  onStop(): void {
+    this.onStopMock()
+  }
+  onPause(): void {
+    /* no-op */
+  }
+  onDestroy(): void {
+    /* no-op */
+  }
+}
+
+// Non-strobe overlay cue (tests handler uses cue.style for the secondary slot)
+class MockSecondaryNonStrobeCue implements INetCue {
+  private _id: string
+  executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+  onStopMock = jest.fn()
+  constructor(public cueId: CueType) {
+    this._id = `mock-secondary-${cueId}-${Math.random().toString(36).substring(2, 11)}`
+  }
+  get id(): string {
+    return this._id
+  }
+  description = 'Mock secondary (non-strobe) for testing'
   style = CueStyle.Secondary
   async execute(): Promise<void> {
     return this.executeMock()
@@ -108,9 +163,14 @@ describe('YargCueHandler', () => {
     mockSequencer = {
       addEffect: jest.fn(),
       setEffect: jest.fn(),
+      addEffectWithCallback: jest.fn(),
+      setEffectWithCallback: jest.fn(),
       addEffectUnblockedName: jest.fn(),
       setEffectUnblockedName: jest.fn(),
+      addEffectUnblockedNameWithCallback: jest.fn(),
+      setEffectUnblockedNameWithCallback: jest.fn(),
       removeEffect: jest.fn(),
+      removeEffectCallback: jest.fn(),
       removeAllEffects: jest.fn(),
       setState: jest.fn(),
       onBeat: jest.fn(),
@@ -126,8 +186,7 @@ describe('YargCueHandler', () => {
       shutdown: jest.fn(),
     } as any
 
-    // Use a shorter debounce period for testing
-    cueHandler = new YargCueHandler(mockLightManager, mockSequencer, 10)
+    cueHandler = new YargCueHandler(mockLightManager, mockSequencer)
   })
 
   describe('handleBeat', () => {
@@ -244,31 +303,17 @@ describe('YargCueHandler', () => {
       expect(cueHandledListener).toHaveBeenCalledWith(expect.objectContaining(expectedCoreData))
     })
 
-    it('should respect debounce period', async () => {
-      jest.useFakeTimers()
+    it('invokes handler for every cue (no debounce)', async () => {
       const cueHandledListener = jest.fn()
       cueHandler.on('cueHandled', cueHandledListener)
 
-      // Call handleCue twice within debounce period
       await cueHandler.handleCue(CueType.Default, mockCueData)
       await cueHandler.handleCue(CueType.Default, mockCueData)
 
-      // Should only emit once due to debounce
-      expect(cueHandledListener).toHaveBeenCalledTimes(1)
-
-      // Advance timers past debounce period
-      jest.advanceTimersByTime(20)
-
-      // Call handleCue again after debounce period
-      await cueHandler.handleCue(CueType.Default, mockCueData)
-
-      // Should emit again after debounce period
       expect(cueHandledListener).toHaveBeenCalledTimes(2)
-
-      jest.useRealTimers()
     })
 
-    it('Strobe_Off clears secondary so same strobe can re-activate (rapid Strobe_X -> Strobe_Off -> Strobe_X)', async () => {
+    it('Strobe_Off clears strobe so same strobe can re-activate (rapid Strobe_X -> Strobe_Off -> Strobe_X)', async () => {
       jest.useFakeTimers()
       await cueHandler.handleCue(CueType.Strobe_Fast, mockCueData)
       expect(mockStrobeCue.executeMock).toHaveBeenCalledTimes(1)
@@ -284,6 +329,240 @@ describe('YargCueHandler', () => {
       expect(mockStrobeCue.executeMock).toHaveBeenCalledTimes(2)
       expect(mockStrobeCue.onStopMock).toHaveBeenCalledTimes(1)
       jest.useRealTimers()
+    })
+
+    it('non-strobe cue with style Secondary uses the secondary slot and is not cleared by Strobe_Off', async () => {
+      jest.useFakeTimers()
+      const secondaryCue = new MockSecondaryNonStrobeCue(CueType.Chorus)
+      const styleGroup: ICueGroup = {
+        id: 'style-group',
+        name: 'Style test',
+        description: 'Secondary by style',
+        cues: new Map<CueType, INetCue>([[CueType.Chorus, secondaryCue]]),
+      }
+      registry.registerGroup(styleGroup)
+      registry.setDefaultGroup(styleGroup.id)
+      registry.deactivateGroup('mock-default')
+      registry.activateGroup(styleGroup.id)
+      const mockCueData: CueData = { beat: 'Strong', strobeState: 'Strobe_Off' } as CueData
+
+      await cueHandler.handleCue(CueType.Chorus, mockCueData)
+      expect(secondaryCue.executeMock).toHaveBeenCalledTimes(1)
+      expect(secondaryCue.onStopMock).not.toHaveBeenCalled()
+
+      jest.advanceTimersByTime(15)
+      await cueHandler.handleCue(CueType.Strobe_Off, mockCueData)
+      expect(secondaryCue.onStopMock).not.toHaveBeenCalled()
+      jest.useRealTimers()
+    })
+
+    it('primary, secondary, and strobe can all run concurrently', async () => {
+      setNodeV2Enabled(true)
+      const primaryCue = new MockPrimaryCue(CueType.Sweep)
+      const secondaryCue = new MockSecondaryNonStrobeCue(CueType.Chorus)
+      const strobeCue = new MockStrobeCue(CueType.Strobe_Slow)
+      const layeredGroup: ICueGroup = {
+        id: 'layered-group',
+        name: 'Layered',
+        description: 'Primary, secondary, and strobe layering',
+        cues: new Map<CueType, INetCue>([
+          [CueType.Sweep, primaryCue],
+          [CueType.Chorus, secondaryCue],
+          [CueType.Strobe_Slow, strobeCue],
+        ]),
+      }
+      registry.registerGroup(layeredGroup)
+      registry.setDefaultGroup(layeredGroup.id)
+      registry.deactivateGroup('mock-default')
+      registry.activateGroup(layeredGroup.id)
+      const layeredCueData: CueData = { beat: 'Strong', strobeState: 'Strobe_Off' } as CueData
+
+      await cueHandler.handleCue(CueType.Sweep, layeredCueData)
+      await cueHandler.handleCue(CueType.Chorus, layeredCueData)
+      await cueHandler.handleCue(CueType.Strobe_Slow, layeredCueData)
+
+      expect(primaryCue.executeMock).toHaveBeenCalledTimes(1)
+      expect(secondaryCue.executeMock).toHaveBeenCalledTimes(1)
+      expect(strobeCue.executeMock).toHaveBeenCalledTimes(1)
+      expect(primaryCue.onStopMock).not.toHaveBeenCalled()
+      expect(secondaryCue.onStopMock).not.toHaveBeenCalled()
+      expect(strobeCue.onStopMock).not.toHaveBeenCalled()
+      setNodeV2Enabled(null)
+    })
+
+    it('Strobe_Off only clears strobe, not secondary overlay', async () => {
+      setNodeV2Enabled(true)
+      jest.useFakeTimers()
+      const secondaryCue = new MockSecondaryNonStrobeCue(CueType.Chorus)
+      const strobeCue = new MockStrobeCue(CueType.Strobe_Slow)
+      const layeredGroup: ICueGroup = {
+        id: 'strobe-off-group',
+        name: 'Strobe Off',
+        description: 'Strobe off behavior',
+        cues: new Map<CueType, INetCue>([
+          [CueType.Chorus, secondaryCue],
+          [CueType.Strobe_Slow, strobeCue],
+        ]),
+      }
+      registry.registerGroup(layeredGroup)
+      registry.setDefaultGroup(layeredGroup.id)
+      registry.deactivateGroup('mock-default')
+      registry.activateGroup(layeredGroup.id)
+      const layeredCueData: CueData = { beat: 'Strong', strobeState: 'Strobe_Slow' } as CueData
+
+      await cueHandler.handleCue(CueType.Chorus, layeredCueData)
+      await cueHandler.handleCue(CueType.Strobe_Slow, layeredCueData)
+      jest.advanceTimersByTime(15)
+      await cueHandler.handleCue(CueType.Strobe_Off, layeredCueData)
+
+      expect(strobeCue.onStopMock).toHaveBeenCalledTimes(1)
+      expect(secondaryCue.onStopMock).not.toHaveBeenCalled()
+      jest.useRealTimers()
+      setNodeV2Enabled(null)
+    })
+
+    it('new secondary replaces old secondary but not primary or strobe', async () => {
+      setNodeV2Enabled(true)
+      const primaryCue = new MockPrimaryCue(CueType.Sweep)
+      const firstSecondary = new MockSecondaryNonStrobeCue(CueType.Chorus)
+      const secondSecondary = new MockSecondaryNonStrobeCue(CueType.Verse)
+      const strobeCue = new MockStrobeCue(CueType.Strobe_Slow)
+      const layeredGroup: ICueGroup = {
+        id: 'secondary-replace-group',
+        name: 'Secondary Replace',
+        description: 'Secondary replacement behavior',
+        cues: new Map<CueType, INetCue>([
+          [CueType.Sweep, primaryCue],
+          [CueType.Chorus, firstSecondary],
+          [CueType.Verse, secondSecondary],
+          [CueType.Strobe_Slow, strobeCue],
+        ]),
+      }
+      registry.registerGroup(layeredGroup)
+      registry.setDefaultGroup(layeredGroup.id)
+      registry.deactivateGroup('mock-default')
+      registry.activateGroup(layeredGroup.id)
+      const layeredCueData: CueData = { beat: 'Strong', strobeState: 'Strobe_Off' } as CueData
+
+      await cueHandler.handleCue(CueType.Sweep, layeredCueData)
+      await cueHandler.handleCue(CueType.Chorus, layeredCueData)
+      await cueHandler.handleCue(CueType.Strobe_Slow, layeredCueData)
+      await cueHandler.handleCue(CueType.Verse, layeredCueData)
+
+      expect(primaryCue.executeMock).toHaveBeenCalledTimes(1)
+      expect(firstSecondary.executeMock).toHaveBeenCalledTimes(1)
+      expect(secondSecondary.executeMock).toHaveBeenCalledTimes(1)
+      expect(strobeCue.executeMock).toHaveBeenCalledTimes(1)
+      expect(firstSecondary.onStopMock).toHaveBeenCalledTimes(1)
+      expect(primaryCue.onStopMock).not.toHaveBeenCalled()
+      expect(strobeCue.onStopMock).not.toHaveBeenCalled()
+      setNodeV2Enabled(null)
+    })
+
+    it('Strobe_Off is always processed and clears strobe (no debounce)', async () => {
+      setNodeV2Enabled(false)
+      await cueHandler.handleCue(CueType.Strobe_Fast, mockCueData)
+      expect(mockStrobeCue.executeMock).toHaveBeenCalledTimes(1)
+
+      await cueHandler.handleCue(CueType.Strobe_Off, mockCueData)
+      expect(mockStrobeCue.onStopMock).toHaveBeenCalledTimes(1)
+      setNodeV2Enabled(null)
+    })
+  })
+
+  /**
+   * Handler-level rapid-fire regression: no debounce, so every cue that reaches the handler is executed.
+   * Asserts rapid A -> B -> A and same-cue repeat behaviour using mock cues (not V2 runtime queue).
+   */
+  describe('rapid-fire (no debounce)', () => {
+    beforeEach(() => {
+      setNodeV2Enabled(true)
+    })
+    afterEach(() => {
+      setNodeV2Enabled(null)
+    })
+
+    it('Strobe_Slow -> Strobe_Off -> Strobe_Slow allows re-activation', async () => {
+      const strobeSlow = new MockStrobeCue(CueType.Strobe_Slow)
+      const v2Group: ICueGroup = {
+        id: 'v2-strobe-group',
+        name: 'v2-strobe',
+        description: 'V2 rapid-fire strobe test',
+        cues: new Map<CueType, INetCue>([[CueType.Strobe_Slow, strobeSlow]]),
+      }
+      registry.registerGroup(v2Group)
+      registry.setDefaultGroup(v2Group.id)
+      registry.activateGroup(v2Group.id)
+
+      const mockCueData: CueData = {
+        beat: 'Strong',
+        strobeState: 'Strobe_Slow',
+      } as CueData
+
+      await cueHandler.handleCue(CueType.Strobe_Slow, mockCueData)
+      expect(strobeSlow.executeMock).toHaveBeenCalledTimes(1)
+      expect(strobeSlow.onStopMock).not.toHaveBeenCalled()
+
+      await cueHandler.handleCue(CueType.Strobe_Off, mockCueData)
+      expect(strobeSlow.onStopMock).toHaveBeenCalledTimes(1)
+      expect(strobeSlow.executeMock).toHaveBeenCalledTimes(1)
+
+      await cueHandler.handleCue(CueType.Strobe_Slow, mockCueData)
+      expect(strobeSlow.executeMock).toHaveBeenCalledTimes(2)
+      expect(strobeSlow.onStopMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('Sweep -> Stomp -> Sweep allows rapid primary transition', async () => {
+      const sweepCue = new MockPrimaryCue(CueType.Sweep)
+      const stompCue = new MockPrimaryCue(CueType.Stomp)
+      const v2Group: ICueGroup = {
+        id: 'v2-primary-group',
+        name: 'v2-primary',
+        description: 'V2 rapid-fire primary test',
+        cues: new Map<CueType, INetCue>([
+          [CueType.Sweep, sweepCue],
+          [CueType.Stomp, stompCue],
+        ]),
+      }
+      registry.registerGroup(v2Group)
+      registry.setDefaultGroup(v2Group.id)
+      registry.activateGroup(v2Group.id)
+
+      const mockCueData: CueData = {
+        beat: 'Strong',
+        strobeState: 'Strobe_Off',
+      } as CueData
+
+      await cueHandler.handleCue(CueType.Sweep, mockCueData)
+      expect(sweepCue.executeMock).toHaveBeenCalledTimes(1)
+      expect(stompCue.executeMock).not.toHaveBeenCalled()
+
+      await cueHandler.handleCue(CueType.Stomp, mockCueData)
+      expect(sweepCue.onStopMock).toHaveBeenCalledTimes(1)
+      expect(stompCue.executeMock).toHaveBeenCalledTimes(1)
+
+      await cueHandler.handleCue(CueType.Sweep, mockCueData)
+      expect(stompCue.onStopMock).toHaveBeenCalledTimes(1)
+      expect(sweepCue.executeMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('repeated same-cue calls all reach execute (no debounce)', async () => {
+      const strobeSlow = new MockStrobeCue(CueType.Strobe_Slow)
+      const v2Group: ICueGroup = {
+        id: 'v2-same-cue-group',
+        name: 'v2-same-cue',
+        description: 'V2 same-cue repeat test',
+        cues: new Map<CueType, INetCue>([[CueType.Strobe_Slow, strobeSlow]]),
+      }
+      registry.registerGroup(v2Group)
+      registry.setDefaultGroup(v2Group.id)
+      registry.activateGroup(v2Group.id)
+      const mockCueData: CueData = { beat: 'Strong', strobeState: 'Strobe_Slow' } as CueData
+
+      await cueHandler.handleCue(CueType.Strobe_Slow, mockCueData)
+      await cueHandler.handleCue(CueType.Strobe_Slow, mockCueData)
+      await cueHandler.handleCue(CueType.Strobe_Slow, mockCueData)
+      expect(strobeSlow.executeMock).toHaveBeenCalledTimes(3)
     })
   })
 })

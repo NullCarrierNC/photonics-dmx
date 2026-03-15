@@ -226,6 +226,11 @@ export interface LightingPreferences {
 export const lightingPrefsAtom = atom<LightingPreferences>({})
 export const useComplexCuesAtom = atom<boolean>(false)
 
+/**
+ * When true, show node IDs in the Cue Editor graph and Selected Node inspector.
+ */
+export const showNodeIdsAtom = atom<boolean>(false)
+
 // Audio configuration atoms
 export const audioConfigAtom = atom((get) => {
   const prefs = get(lightingPrefsAtom)

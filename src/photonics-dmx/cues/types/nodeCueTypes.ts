@@ -17,6 +17,10 @@ export interface NodeCueGroupMeta {
   name: string
   description?: string
   variables?: VariableDefinition[]
+  /** When true, this group is set as the registry default (fallback) group after load. */
+  isDefault?: boolean
+  /** When true, this group is set as the registry stage-kit group after load. */
+  isStageKit?: boolean
 }
 
 export interface NodeLayoutMetadata {
@@ -183,8 +187,10 @@ export interface ShuffleLightsLogicNode extends BaseLogicNode {
 export interface ForEachLightLogicNode extends BaseLogicNode {
   logicType: 'for-each-light'
   sourceVariable: string // light-array to iterate
-  currentLightVariable: string // variable set to current TrackedLight[] (single light)
+  currentLightVariable: string // variable set to current TrackedLight[] (single light or group)
   currentIndexVariable: string // variable set to current index (number)
+  /** When set, iterate in chunks of this many lights (literal or variable). Omit for one light per iteration. */
+  groupSize?: ValueSource
 }
 
 export type LogicNode =

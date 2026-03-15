@@ -91,6 +91,40 @@ describe('ActionEffectFactory', () => {
     expect(effect).toBeNull()
   })
 
+  it('coerces delay + waitUntilTime 0 to none + 0 in built transition', () => {
+    const action: ActionNode = {
+      id: 'a1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      color: {
+        name: { source: 'literal', value: 'blue' },
+        brightness: { source: 'literal', value: 'medium' },
+        blendMode: { source: 'literal', value: 'replace' },
+      },
+      timing: createDefaultActionTiming(),
+    }
+    const effect = ActionEffectFactory.buildEffect({
+      action,
+      lights,
+      resolvedTiming: {
+        waitForCondition: 'none',
+        waitForTime: 0,
+        duration: 200,
+        waitUntilCondition: 'delay',
+        waitUntilTime: 0,
+      },
+      resolvedLayer: 0,
+    })
+    expect(effect).not.toBeNull()
+    expect(effect!.transitions.length).toBe(1)
+    expect(effect!.transitions[0].waitUntilCondition).toBe('none')
+    expect(effect!.transitions[0].waitUntilTime).toBe(0)
+  })
+
   it('buildEffect returns null when lights array is empty', () => {
     const action: ActionNode = {
       id: 'a1',

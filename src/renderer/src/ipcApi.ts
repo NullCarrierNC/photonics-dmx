@@ -253,7 +253,8 @@ export const startTestEffect = (
   effectId: string,
   venueSize?: 'NoVenue' | 'Small' | 'Large',
   bpm?: number,
-) => window.api.invoke(LIGHT.START_TEST_EFFECT, { effectId, venueSize, bpm })
+  cueGroup?: string,
+) => window.api.invoke(LIGHT.START_TEST_EFFECT, { effectId, venueSize, bpm, cueGroup })
 
 export const stopTestEffect = () => window.api.invoke(LIGHT.STOP_TEST_EFFECT, undefined)
 

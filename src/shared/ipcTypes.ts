@@ -283,6 +283,7 @@ export interface IpcInvokeMap {
       effectId: string
       venueSize?: 'NoVenue' | 'Small' | 'Large'
       bpm?: number
+      cueGroup?: string
     }
     response: IpcSuccessResult | IpcErrorResult
   }
