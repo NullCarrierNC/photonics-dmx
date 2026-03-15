@@ -72,6 +72,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   const keysClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const drumsClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const primaryClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const secondaryClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const labelForInstrumentNote = (note: InstrumentNoteType) => {
     switch (note) {
       case InstrumentNoteType.Green:
@@ -111,19 +114,23 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     }
   }
 
-  // Update primary/secondary cue display based on cue state changes
+  // Update primary/secondary cue display based on cue state changes; clear after 100ms when no cue firing (same delay as notes)
   useEffect(() => {
-    if (cueState?.cueType && cueState?.cueStyle) {
-      if (cueState.cueStyle === 'primary') {
-        // Clear secondary when a different primary cue starts (secondary cues are transient)
-        if (primaryCueName && primaryCueName !== cueState.cueType) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect -- sync display from IPC cue state
-          setSecondaryCueName('')
-        }
-        setPrimaryCueName(cueState.cueType)
-      } else if (cueState.cueStyle === 'secondary') {
-        setSecondaryCueName(cueState.cueType)
+    if (!cueState?.cueType || !cueState?.cueStyle) return
+    const { cueType, cueStyle } = cueState
+    if (cueStyle === 'primary') {
+      if (primaryCueName && primaryCueName !== cueType) {
+        clearTimeout(secondaryClearTimerRef.current ?? undefined)
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- sync display from IPC cue state
+        setSecondaryCueName('')
       }
+      clearTimeout(primaryClearTimerRef.current ?? undefined)
+      setPrimaryCueName(cueType)
+      primaryClearTimerRef.current = setTimeout(() => setPrimaryCueName(''), 200)
+    } else if (cueStyle === 'secondary') {
+      clearTimeout(secondaryClearTimerRef.current ?? undefined)
+      setSecondaryCueName(cueType)
+      secondaryClearTimerRef.current = setTimeout(() => setSecondaryCueName(''), 200)
     }
   }, [cueState, primaryCueName])
 
@@ -180,6 +187,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   useEffect(() => {
     if (!yargListenerEnabled && !simulationMode) {
       // Clear data when listener is disabled and not in simulation mode
+      clearTimeout(primaryClearTimerRef.current ?? undefined)
+      clearTimeout(secondaryClearTimerRef.current ?? undefined)
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when listener disabled
       setCurrentCueData(null)
       setPrimaryCueName('')
@@ -336,6 +345,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
       clearTimeout(bassClearTimerRef.current ?? undefined)
       clearTimeout(keysClearTimerRef.current ?? undefined)
       clearTimeout(drumsClearTimerRef.current ?? undefined)
+      clearTimeout(primaryClearTimerRef.current ?? undefined)
+      clearTimeout(secondaryClearTimerRef.current ?? undefined)
     }
   }, [yargListenerEnabled, simulationMode])
 
