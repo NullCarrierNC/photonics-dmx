@@ -25,12 +25,14 @@ const YargEnabledCueGroups: React.FC = () => {
       setLoading(true)
       const [all, enabled] = await Promise.all([getCueGroups(), getEnabledCueGroups()])
 
-      // Transform groups and add expanded state
-      const groupsWithDetails: GroupCueDetails[] = all.map((group: CueGroup) => ({
-        ...group,
-        cues: [],
-        isExpanded: false,
-      }))
+      // Transform groups and add expanded state; sort alphabetically by name
+      const groupsWithDetails: GroupCueDetails[] = all
+        .map((group: CueGroup) => ({
+          ...group,
+          cues: [],
+          isExpanded: false,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
 
       setAllGroups(groupsWithDetails)
       setEnabledGroupIds(enabled)
