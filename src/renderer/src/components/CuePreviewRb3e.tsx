@@ -252,7 +252,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
   }
 
   return (
-    <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
+    <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg mt-4 ${className}`}>
       <h3 className="text-lg font-semibold mb-3">{getTitle()}</h3>
 
       {currentCueData ? (
