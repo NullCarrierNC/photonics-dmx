@@ -66,6 +66,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   const prevMeasureRef = useRef<number | undefined>(undefined)
   const prevKeyframeRef = useRef<string | null>(null)
 
+  // Refs for instrument note clear timers so sustained notes stay solid (cancel previous timer on new packet)
+  const guitarClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bassClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const keysClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const drumsClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const labelForInstrumentNote = (note: InstrumentNoteType) => {
     switch (note) {
       case InstrumentNoteType.Green:
@@ -258,16 +264,15 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         prevKeyframeRef.current = cueData.keyframe
       }
 
-      // Handle instrument notes
+      // Handle instrument notes (ref-tracked timers so sustained notes stay solid; each new packet cancels previous clear)
       if (cueData.guitarNotes && cueData.guitarNotes.length > 0) {
         const guitarNotes = cueData.guitarNotes.filter((note) => note !== InstrumentNoteType.None)
+        clearTimeout(guitarClearTimerRef.current ?? undefined)
         setActiveInstrumentNotes((prev) => ({
           ...prev,
           guitar: new Set(guitarNotes.map((note) => note)),
         }))
-
-        // Clear guitar notes after 100ms
-        setTimeout(() => {
+        guitarClearTimerRef.current = setTimeout(() => {
           setActiveInstrumentNotes((prev) => ({
             ...prev,
             guitar: new Set<InstrumentNoteType>(),
@@ -277,13 +282,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
       if (cueData.bassNotes && cueData.bassNotes.length > 0) {
         const bassNotes = cueData.bassNotes.filter((note) => note !== InstrumentNoteType.None)
+        clearTimeout(bassClearTimerRef.current ?? undefined)
         setActiveInstrumentNotes((prev) => ({
           ...prev,
           bass: new Set(bassNotes.map((note) => note)),
         }))
-
-        // Clear bass notes after 100ms
-        setTimeout(() => {
+        bassClearTimerRef.current = setTimeout(() => {
           setActiveInstrumentNotes((prev) => ({
             ...prev,
             bass: new Set<InstrumentNoteType>(),
@@ -293,13 +297,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
       if (cueData.keysNotes && cueData.keysNotes.length > 0) {
         const keysNotes = cueData.keysNotes.filter((note) => note !== InstrumentNoteType.None)
+        clearTimeout(keysClearTimerRef.current ?? undefined)
         setActiveInstrumentNotes((prev) => ({
           ...prev,
           keys: new Set(keysNotes.map((note) => note)),
         }))
-
-        // Clear keys notes after 100ms
-        setTimeout(() => {
+        keysClearTimerRef.current = setTimeout(() => {
           setActiveInstrumentNotes((prev) => ({
             ...prev,
             keys: new Set<InstrumentNoteType>(),
@@ -309,13 +312,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
       if (cueData.drumNotes && cueData.drumNotes.length > 0) {
         const drumNotes = cueData.drumNotes.filter((note) => note !== DrumNoteType.None)
+        clearTimeout(drumsClearTimerRef.current ?? undefined)
         setActiveInstrumentNotes((prev) => ({
           ...prev,
           drums: new Set(drumNotes.map((note) => note)),
         }))
-
-        // Clear drum notes after 100ms
-        setTimeout(() => {
+        drumsClearTimerRef.current = setTimeout(() => {
           setActiveInstrumentNotes((prev) => ({
             ...prev,
             drums: new Set<DrumNoteType>(),
@@ -330,6 +332,10 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     return () => {
       setListenCueData(false)
       removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
+      clearTimeout(guitarClearTimerRef.current ?? undefined)
+      clearTimeout(bassClearTimerRef.current ?? undefined)
+      clearTimeout(keysClearTimerRef.current ?? undefined)
+      clearTimeout(drumsClearTimerRef.current ?? undefined)
     }
   }, [yargListenerEnabled, simulationMode])
 
