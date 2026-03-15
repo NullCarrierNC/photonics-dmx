@@ -51,6 +51,8 @@ export interface AppPreferences {
   knownYargCueGroups?: string[]
   enabledAudioCueGroups?: string[]
   cueConsistencyWindow: number
+  /** Cue group selection: 'withinSong' = can change during song; 'oncePerSong' = fixed at song start */
+  cueGroupSelectionMode: 'oncePerSong' | 'withinSong'
   clockRate: number
 
   // Frontend-specific preferences
@@ -111,6 +113,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledCueGroups: ['stagekit'],
   enabledAudioCueGroups: ['audio-spectrum'],
   cueConsistencyWindow: 60000,
+  cueGroupSelectionMode: 'withinSong',
   clockRate: 10, // 10ms (100 Hz) for smooth animations and strobe cues
   activeAudioCueType: BuiltInAudioCues.BasicLayered,
 
@@ -426,6 +429,20 @@ export class ConfigurationManager {
    */
   async setCueConsistencyWindow(windowMs: number): Promise<void> {
     await this.setPreference('cueConsistencyWindow', windowMs)
+  }
+
+  /**
+   * Gets the cue group selection mode preference
+   */
+  getCueGroupSelectionMode(): 'oncePerSong' | 'withinSong' {
+    return this.preferences.get().cueGroupSelectionMode ?? 'withinSong'
+  }
+
+  /**
+   * Sets the cue group selection mode preference
+   */
+  async setCueGroupSelectionMode(mode: 'oncePerSong' | 'withinSong'): Promise<void> {
+    await this.setPreference('cueGroupSelectionMode', mode)
   }
 
   /**

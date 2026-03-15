@@ -164,6 +164,47 @@ describe('YargNetworkListener', () => {
     })
   })
 
+  describe('scene transitions (song start / song end)', () => {
+    it('calls notifySongStart when transitioning Menu -> Gameplay', () => {
+      const notifySongStartSpy = jest.spyOn(cueHandler, 'notifySongStart')
+      const notifySongEndSpy = jest.spyOn(cueHandler, 'notifySongEnd')
+
+      listener.processCueData({ ...defaultCueData, currentScene: 'Menu' })
+      expect(notifySongStartSpy).not.toHaveBeenCalled()
+
+      listener.processCueData({ ...defaultCueData, currentScene: 'Gameplay' })
+      expect(notifySongStartSpy).toHaveBeenCalledTimes(1)
+      expect(notifySongEndSpy).not.toHaveBeenCalled()
+
+      notifySongStartSpy.mockRestore()
+      notifySongEndSpy.mockRestore()
+    })
+
+    it('calls notifySongEnd when transitioning Gameplay -> Score', () => {
+      const notifySongStartSpy = jest.spyOn(cueHandler, 'notifySongStart')
+      const notifySongEndSpy = jest.spyOn(cueHandler, 'notifySongEnd')
+
+      listener.processCueData({ ...defaultCueData, currentScene: 'Gameplay' })
+      expect(notifySongEndSpy).not.toHaveBeenCalled()
+
+      listener.processCueData({ ...defaultCueData, currentScene: 'Score' })
+      expect(notifySongEndSpy).toHaveBeenCalledTimes(1)
+
+      notifySongStartSpy.mockRestore()
+      notifySongEndSpy.mockRestore()
+    })
+
+    it('calls notifySongEnd when transitioning Gameplay -> Menu', () => {
+      const notifySongEndSpy = jest.spyOn(cueHandler, 'notifySongEnd')
+
+      listener.processCueData({ ...defaultCueData, currentScene: 'Gameplay' })
+      listener.processCueData({ ...defaultCueData, currentScene: 'Menu' })
+      expect(notifySongEndSpy).toHaveBeenCalledTimes(1)
+
+      notifySongEndSpy.mockRestore()
+    })
+  })
+
   describe('identical-frame throttling (30 Hz)', () => {
     const throttleMs = 1000 / 30
 

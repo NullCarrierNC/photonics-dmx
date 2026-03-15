@@ -257,6 +257,11 @@ export class ControllerManager {
     const consistencyWindow = this.config.getCueConsistencyWindow()
     registry.setCueConsistencyWindow(consistencyWindow)
     console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms')
+
+    // Load cue group selection mode from configuration
+    const selectionMode = this.config.getCueGroupSelectionMode()
+    registry.setCueGroupSelectionMode(selectionMode)
+    console.log('CueRegistry initialized with cue group selection mode:', selectionMode)
   }
 
   /**

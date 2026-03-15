@@ -900,6 +900,7 @@ export class YargNetworkListener extends EventEmitter {
       // Handle Menu -> Gameplay transition (song start)
       if (this.lastScene === 'Menu' && currentScene === 'Gameplay') {
         console.log('YARG: Song starting - triggering blackout to clear menu lighting')
+        this.cueHandler.notifySongStart()
         // Trigger a fast blackout to clear any menu lighting
         this.cueHandler.handleCue(CueType.Blackout_Fast, {
           datagramVersion: 0,
@@ -927,6 +928,11 @@ export class YargNetworkListener extends EventEmitter {
           keyframe: 'Off',
           bonusEffect: false,
         })
+      }
+
+      // Handle Gameplay -> other (song end)
+      if (this.lastScene === 'Gameplay' && currentScene !== 'Gameplay') {
+        this.cueHandler.notifySongEnd()
       }
     }
 

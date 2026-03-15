@@ -53,6 +53,20 @@ export abstract class BaseCueHandler extends EventEmitter {
   }
 
   /**
+   * Notify the registry that a song has started (e.g. Menu -> Gameplay). Used for once-per-song selection mode.
+   */
+  public notifySongStart(): void {
+    this.registry.onSongStart()
+  }
+
+  /**
+   * Notify the registry that the current song has ended (left Gameplay). Used for once-per-song selection mode.
+   */
+  public notifySongEnd(): void {
+    this.registry.onSongEnd()
+  }
+
+  /**
    * Handle a cue by delegating to the appropriate cue implementation
    * @param cueType The type of cue to handle
    * @param parameters The cue parameters

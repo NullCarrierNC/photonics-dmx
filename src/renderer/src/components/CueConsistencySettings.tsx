@@ -1,26 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { getCueConsistencyWindow, setCueConsistencyWindow } from '../ipcApi'
+import {
+  getCueConsistencyWindow,
+  setCueConsistencyWindow,
+  getCueGroupSelectionMode,
+  setCueGroupSelectionMode,
+} from '../ipcApi'
+
+type CueGroupSelectionMode = 'oncePerSong' | 'withinSong'
 
 const CueConsistencySettings: React.FC = () => {
   const [consistencyWindow, setConsistencyWindow] = useState(60000)
+  const [selectionMode, setSelectionMode] = useState<CueGroupSelectionMode>('withinSong')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    const loadConsistencyWindow = async () => {
+    const load = async () => {
       try {
-        const result = await getCueConsistencyWindow()
-        if (result.success) {
-          setConsistencyWindow(result.windowMs)
-        }
+        const [windowResult, modeResult] = await Promise.all([
+          getCueConsistencyWindow(),
+          getCueGroupSelectionMode(),
+        ])
+        if (windowResult.success) setConsistencyWindow(windowResult.windowMs)
+        if (modeResult.success) setSelectionMode(modeResult.mode)
       } catch (error) {
-        console.error('Failed to load consistency window:', error)
+        console.error('Failed to load cue consistency settings:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadConsistencyWindow()
+    load()
   }, [])
 
   const handleConsistencyWindowChange = useCallback(
@@ -71,10 +81,50 @@ const CueConsistencySettings: React.FC = () => {
         Prevents rapid randomization changes when the same cue is called within a short time window.
         This helps maintain visual consistency during rapid cue transitions. I.e. if Cue A from
         Group B was selected, each time Cue A is called within this window will use the same
-        implementation as the previous call.
+        implementation as the previous call. With &quot;Once Per Song&quot;, the cue group is chosen
+        when the song starts and stays fixed for the entire song.
       </p>
 
       <div className="space-y-4">
+        <div>
+          <label
+            htmlFor="cue-group-selection-mode"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Cue Group Selection Mode
+          </label>
+          <select
+            id="cue-group-selection-mode"
+            value={selectionMode}
+            onChange={async (e) => {
+              const mode = e.target.value as CueGroupSelectionMode
+              if (mode !== 'oncePerSong' && mode !== 'withinSong') return
+              setSelectionMode(mode)
+              if (isSaving) return
+              try {
+                setIsSaving(true)
+                const result = await setCueGroupSelectionMode(mode)
+                if (!result.success) {
+                  console.error('Failed to save cue group selection mode:', result.error)
+                  setSelectionMode(selectionMode)
+                }
+              } catch (error) {
+                console.error('Failed to save cue group selection mode:', error)
+                setSelectionMode(selectionMode)
+              } finally {
+                setIsSaving(false)
+              }
+            }}
+            className="block w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading || isSaving}>
+            <option value="withinSong">Within a Song</option>
+            <option value="oncePerSong">Once Per Song</option>
+          </select>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Within a Song: the cue group can change among enabled groups during the song (subject to
+            the consistency window). Once Per Song: the group is chosen when the song starts and
+            remains fixed for that song.
+          </p>
+        </div>
         <div>
           <label
             htmlFor="consistency-window"

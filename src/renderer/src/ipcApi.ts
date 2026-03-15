@@ -39,6 +39,12 @@ export const setCueConsistencyWindow = (windowMs: number) =>
 export const getCueConsistencyWindow = () =>
   window.api.invoke(LIGHT.GET_CUE_CONSISTENCY_WINDOW, undefined)
 
+export const getCueGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_CUE_GROUP_SELECTION_MODE, undefined)
+
+export const setCueGroupSelectionMode = (mode: 'oncePerSong' | 'withinSong') =>
+  window.api.invoke(LIGHT.SET_CUE_GROUP_SELECTION_MODE, mode)
+
 export const getConsistencyStatus = () => window.api.invoke(LIGHT.GET_CONSISTENCY_STATUS, undefined)
 
 // ---------------------------------------------------------------------------

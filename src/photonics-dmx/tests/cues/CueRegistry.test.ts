@@ -475,6 +475,130 @@ describe('YargCueRegistry', () => {
     })
   })
 
+  describe('cue group selection mode (once per song)', () => {
+    it('with oncePerSong mode, one group is selected for all cues in the song until onSongEnd', () => {
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
+      const group1: ICueGroup = {
+        id: 'group1',
+        name: 'group1',
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')],
+          [CueType.Verse, new MockCueImplementation('group1-verse')],
+        ]),
+      }
+      const group2: ICueGroup = {
+        id: 'group2',
+        name: 'group2',
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')],
+          [CueType.Verse, new MockCueImplementation('group2-verse')],
+        ]),
+      }
+      registry.registerGroup(group1)
+      registry.registerGroup(group2)
+      registry.setEnabledGroups(['group1', 'group2'])
+      registry.setActiveGroups(['group1', 'group2'])
+      registry.setCueGroupSelectionMode('oncePerSong')
+      registry.setCueConsistencyWindow(0)
+
+      registry.onSongStart()
+
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+      const lockedGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+
+      for (let i = 0; i < 3; i++) {
+        const cue = registry.getCueImplementation(CueType.Cool_Automatic)
+        expect(cue).toBeTruthy()
+        expect(cue!.id.includes(lockedGroupId)).toBe(true)
+      }
+
+      const verseCue = registry.getCueImplementation(CueType.Verse)
+      expect(verseCue).toBeTruthy()
+      expect(verseCue!.id.includes(lockedGroupId)).toBe(true)
+
+      registry.onSongEnd()
+
+      const afterEndCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(afterEndCue).toBeTruthy()
+    })
+
+    it('with oncePerSong mode, uses default group as fallback when locked group does not have the cue', () => {
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
+      const defaultGroup: ICueGroup = {
+        id: 'default',
+        name: 'default',
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('default-cool-auto')],
+          [CueType.Strobe_Fast, new MockCueImplementation('default-strobe-fast')],
+        ]),
+      }
+      const customGroup: ICueGroup = {
+        id: 'custom',
+        name: 'custom',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('custom-cool-auto')]]),
+      }
+      registry.registerGroup(defaultGroup)
+      registry.registerGroup(customGroup)
+      registry.setDefaultGroup('default')
+      registry.setEnabledGroups(['custom'])
+      registry.setActiveGroups(['custom'])
+      registry.setCueGroupSelectionMode('oncePerSong')
+      registry.setCueConsistencyWindow(0)
+
+      registry.onSongStart()
+
+      const coolCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(coolCue).toBeTruthy()
+      expect(coolCue!.id).toContain('custom-cool-auto')
+
+      const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast)
+      expect(strobeCue).toBeTruthy()
+      expect(strobeCue!.id).toContain('default-strobe-fast')
+    })
+
+    it('with withinSong mode, onSongStart and onSongEnd do not change time-window behaviour', () => {
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
+      const group1: ICueGroup = {
+        id: 'group1',
+        name: 'group1',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')]]),
+      }
+      const group2: ICueGroup = {
+        id: 'group2',
+        name: 'group2',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')]]),
+      }
+      registry.registerGroup(group1)
+      registry.registerGroup(group2)
+      registry.setEnabledGroups(['group1', 'group2'])
+      registry.setActiveGroups(['group1', 'group2'])
+      registry.setCueGroupSelectionMode('withinSong')
+      registry.setCueConsistencyWindow(2000)
+
+      registry.onSongStart()
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+      const firstGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+
+      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(secondCue).toBeTruthy()
+      const secondGroupId = secondCue!.id.includes('group1') ? 'group1' : 'group2'
+      expect(secondGroupId).toBe(firstGroupId)
+
+      registry.onSongEnd()
+      registry.setCueConsistencyWindow(0)
+      const thirdCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(thirdCue).toBeTruthy()
+    })
+  })
+
   describe('setEnabledGroups (enabled vs active separation)', () => {
     it('does not overwrite active groups when setting enabled groups', () => {
       registry.reset()

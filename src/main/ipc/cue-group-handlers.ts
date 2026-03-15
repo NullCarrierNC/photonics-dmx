@@ -220,6 +220,34 @@ export function setupCueGroupHandlers(
     }
   })
 
+  ipcMain.handle(
+    LIGHT.SET_CUE_GROUP_SELECTION_MODE,
+    async (_, mode: 'oncePerSong' | 'withinSong') => {
+      try {
+        if (mode !== 'oncePerSong' && mode !== 'withinSong') {
+          return ipcError(new Error('Invalid mode: must be "oncePerSong" or "withinSong"'))
+        }
+        await controllerManager.getConfig().setCueGroupSelectionMode(mode)
+        const registry = YargCueRegistry.getInstance()
+        registry.setCueGroupSelectionMode(mode)
+        return { success: true, mode }
+      } catch (error) {
+        console.error('Error setting cue group selection mode:', error)
+        return ipcError(error)
+      }
+    },
+  )
+
+  ipcMain.handle(LIGHT.GET_CUE_GROUP_SELECTION_MODE, async () => {
+    try {
+      const mode = controllerManager.getConfig().getCueGroupSelectionMode()
+      return { success: true, mode }
+    } catch (error) {
+      console.error('Error getting cue group selection mode:', error)
+      return ipcError(error)
+    }
+  })
+
   ipcMain.handle(LIGHT.GET_CONSISTENCY_STATUS, async () => {
     try {
       const registry = YargCueRegistry.getInstance()

@@ -70,6 +70,13 @@ export class YargCueRegistry {
   private lastCueExecutionTime: Map<CueType, number> = new Map()
   private lastCueGroupSelection: Map<CueType, { groupId: string; isFallback: boolean }> = new Map()
 
+  /** Cue group selection mode: withinSong = can change during song; oncePerSong = one group for all cues in the song */
+  private cueGroupSelectionMode: 'oncePerSong' | 'withinSong' = 'withinSong'
+  /** When true, use a single locked group for all cues until onSongEnd (once-per-song behaviour) */
+  private lockSelectionsForSong: boolean = false
+  /** When once-per-song lock is active, this is the single group used for every cue in the song (null until first cue request) */
+  private lockedGroupIdForSong: string | null = null
+
   /** Optional callback for sending cue state updates to frontend */
   private cueStateUpdateCallback: ((state: CueStateUpdate) => void) | null = null
 
@@ -130,7 +137,9 @@ export class YargCueRegistry {
     this.primaryCueCounter = 0
     this.secondaryCueCounter = 0
 
-    // Clear consistency tracking
+    // Clear consistency tracking and once-per-song lock
+    this.lockSelectionsForSong = false
+    this.lockedGroupIdForSong = null
     this.clearConsistencyTracking()
 
     console.log('CueRegistry reset to initial state')
@@ -274,6 +283,10 @@ export class YargCueRegistry {
       return null
     }
 
+    if (this.lockSelectionsForSong && this.lockedGroupIdForSong === null) {
+      this.lockedGroupIdForSong = tempSelection.groupId
+    }
+
     const tempCue = this.groups.get(tempSelection.groupId)!.cues.get(cueType)!
     if (tempCue.style === CueStyle.Primary) {
       return this.handlePrimaryCue(cueType, tempSelection, trackMode === 'autogen')
@@ -334,6 +347,43 @@ export class YargCueRegistry {
   }
 
   /**
+   * Set the cue group selection mode (once per song vs within a song).
+   */
+  public setCueGroupSelectionMode(mode: 'oncePerSong' | 'withinSong'): void {
+    this.cueGroupSelectionMode = mode
+    if (mode === 'withinSong') {
+      this.lockSelectionsForSong = false
+      this.lockedGroupIdForSong = null
+    }
+  }
+
+  /**
+   * Get the current cue group selection mode.
+   */
+  public getCueGroupSelectionMode(): 'oncePerSong' | 'withinSong' {
+    return this.cueGroupSelectionMode
+  }
+
+  /**
+   * Notify that a song has started (e.g. Menu -> Gameplay). When mode is oncePerSong, locks group selection for the song.
+   */
+  public onSongStart(): void {
+    if (this.cueGroupSelectionMode === 'oncePerSong') {
+      this.clearConsistencyTracking()
+      this.lockSelectionsForSong = true
+      this.lockedGroupIdForSong = null
+    }
+  }
+
+  /**
+   * Notify that the current song has ended (left Gameplay). Clears the once-per-song lock.
+   */
+  public onSongEnd(): void {
+    this.lockSelectionsForSong = false
+    this.lockedGroupIdForSong = null
+  }
+
+  /**
    * Check if a cue should use consistent group selection based on the consistency window.
    * @param cueType The type of cue to check
    * @param autoGen Whether the song is auto-generated (affects stage kit priority)
@@ -356,7 +406,23 @@ export class YargCueRegistry {
     const lastExecutionTime = this.lastCueExecutionTime.get(cueType)
     const lastSelection = this.lastCueGroupSelection.get(cueType)
 
-    //  console.log(`[Consistency] Checking ${cueType}: lastExecution=${lastExecutionTime}, lastSelection=${lastSelection ? lastSelection.groupId : 'none'}, window=${this.cueConsistencyWindow}ms`);
+    // Once-per-song lock: use the single locked group for all cues in the song
+    if (this.lockSelectionsForSong && this.lockedGroupIdForSong !== null) {
+      const lockedGroup = this.groups.get(this.lockedGroupIdForSong)
+      if (!lockedGroup || !this.activeGroups.has(this.lockedGroupIdForSong)) {
+        this.lockedGroupIdForSong = null
+        return null
+      }
+      if (lockedGroup.cues.has(cueType)) {
+        this.lastCueExecutionTime.set(cueType, now)
+        return { groupId: this.lockedGroupIdForSong, isFallback: false }
+      }
+      if (this.defaultGroup && this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
+        this.lastCueExecutionTime.set(cueType, now)
+        return { groupId: this.defaultGroup, isFallback: true }
+      }
+      return null
+    }
 
     // If we have a previous selection and it's within the consistency window, validate it's still available
     if (lastExecutionTime && lastSelection && now - lastExecutionTime < this.cueConsistencyWindow) {
