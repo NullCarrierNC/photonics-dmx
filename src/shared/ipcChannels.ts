@@ -85,6 +85,8 @@ export const LIGHT = {
   GET_CUE_SOURCE_GROUP: 'get-cue-source-group',
   SET_CUE_CONSISTENCY_WINDOW: 'set-cue-consistency-window',
   GET_CUE_CONSISTENCY_WINDOW: 'get-cue-consistency-window',
+  SET_CUE_GROUP_SELECTION_MODE: 'set-cue-group-selection-mode',
+  GET_CUE_GROUP_SELECTION_MODE: 'get-cue-group-selection-mode',
   GET_CONSISTENCY_STATUS: 'get-consistency-status',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
 } as const

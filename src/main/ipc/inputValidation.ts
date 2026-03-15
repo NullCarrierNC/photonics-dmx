@@ -328,6 +328,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'knownYargCueGroups',
   'enabledAudioCueGroups',
   'cueConsistencyWindow',
+  'cueGroupSelectionMode',
   'clockRate',
   'dmxOutputConfig',
   'stageKitPrefs',

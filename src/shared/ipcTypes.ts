@@ -374,6 +374,14 @@ export interface IpcInvokeMap {
     request: void
     response: { success: true; windowMs: number } | IpcErrorResult
   }
+  [LIGHT.SET_CUE_GROUP_SELECTION_MODE]: {
+    request: 'oncePerSong' | 'withinSong'
+    response: { success: true; mode: 'oncePerSong' | 'withinSong' } | IpcErrorResult
+  }
+  [LIGHT.GET_CUE_GROUP_SELECTION_MODE]: {
+    request: void
+    response: { success: true; mode: 'oncePerSong' | 'withinSong' } | IpcErrorResult
+  }
   [LIGHT.GET_CONSISTENCY_STATUS]: {
     request: void
     response: { success: true; status: unknown } | IpcErrorResult
