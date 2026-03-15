@@ -129,6 +129,9 @@ export const WAIT_CONDITIONS = [
   'measure',
   'half-beat',
   'keyframe',
+  'keyframe-first',
+  'keyframe-next',
+  'keyframe-previous',
   // Guitar events
   'guitar-open',
   'guitar-green',

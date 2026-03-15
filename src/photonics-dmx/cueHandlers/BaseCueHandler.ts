@@ -164,6 +164,18 @@ export abstract class BaseCueHandler extends EventEmitter {
     this._sequencer.onKeyframe()
   }
 
+  public handleKeyframeFirst(): void {
+    this._sequencer.onKeyframeFirst()
+  }
+
+  public handleKeyframeNext(): void {
+    this._sequencer.onKeyframeNext()
+  }
+
+  public handleKeyframePrevious(): void {
+    this._sequencer.onKeyframePrevious()
+  }
+
   public handleMeasure(): void {
     this._sequencer.onBeat()
     this._sequencer.onMeasure()

@@ -32,8 +32,7 @@
           "type": "string",
           "scope": "cue",
           "initialValue": "medium",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "layerValue",

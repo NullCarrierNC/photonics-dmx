@@ -202,6 +202,9 @@ export interface ISongEventHandler {
   onBeat(): void
   onMeasure(): void
   onKeyframe(): void
+  onKeyframeFirst(): void
+  onKeyframeNext(): void
+  onKeyframePrevious(): void
   onDrumNote(noteType: DrumNoteType): void
   onGuitarNote(noteType: InstrumentNoteType): void
   onBassNote(noteType: InstrumentNoteType): void
@@ -211,6 +214,9 @@ export interface ISongEventHandler {
       | 'beat'
       | 'measure'
       | 'keyframe'
+      | 'keyframe-first'
+      | 'keyframe-next'
+      | 'keyframe-previous'
       | 'drum-kick'
       | 'drum-red'
       | 'drum-yellow'
@@ -320,6 +326,9 @@ export interface ILightingController {
   onBeat(): void
   onMeasure(): void
   onKeyframe(): void
+  onKeyframeFirst(): void
+  onKeyframeNext(): void
+  onKeyframePrevious(): void
   onDrumNote(noteType: DrumNoteType): void
   onGuitarNote(noteType: InstrumentNoteType): void
   onBassNote(noteType: InstrumentNoteType): void

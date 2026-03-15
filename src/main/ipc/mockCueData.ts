@@ -5,7 +5,7 @@ export type MockCueDataOptions = {
   bpm?: number
   effectId?: string | null
   beat?: CueData['beat']
-  keyframe?: string
+  keyframe?: CueData['keyframe']
   /** When set with trackMode 'simulated', use this group for deterministic cue resolution. */
   simulationCueGroup?: string
 }
@@ -19,7 +19,7 @@ export function createMockCueData(options: MockCueDataOptions = {}): CueData {
     bpm = 120,
     effectId,
     beat = 'Unknown',
-    keyframe = 'Unknown',
+    keyframe = 'Off',
     simulationCueGroup,
   } = options
 

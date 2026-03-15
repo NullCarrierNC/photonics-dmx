@@ -54,7 +54,7 @@ describe('NodeExecutionEngine', () => {
     fogState: false,
     strobeState: 'Strobe_Off',
     performer: 0,
-    keyframe: '',
+    keyframe: 'Off',
     bonusEffect: false,
     beat: beat ?? 'Unknown',
   })

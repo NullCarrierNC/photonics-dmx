@@ -87,6 +87,9 @@ export function cueGraphPolicy(groupId: string, cueId: string): GraphExecutionPo
             cueData.keyframe === 'Previous'
           )
         }
+        if (eventType === 'keyframe-first') return cueData.keyframe === 'First'
+        if (eventType === 'keyframe-next') return cueData.keyframe === 'Next'
+        if (eventType === 'keyframe-previous') return cueData.keyframe === 'Previous'
         const instrumentResult = isInstrumentEventTriggered(
           eventType,
           cueData.guitarNotes,

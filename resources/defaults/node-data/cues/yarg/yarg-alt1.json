@@ -3573,7 +3573,7 @@
       "name": "Frenzy",
       "description": "Color cycling on beat, random red/green/blue/orange",
       "cueType": "Frenzy",
-      "style": "secondary",
+      "style": "primary",
       "nodes": {
         "events": [
           {
@@ -3808,9 +3808,9 @@
           }
         },
         "viewport": {
-          "x": 321.15487727073196,
-          "y": 139.66204963178205,
-          "zoom": 0.5
+          "x": 257.1383783177996,
+          "y": 86.84360849829238,
+          "zoom": 0.914666230601231
         }
       },
       "variables": [
@@ -3887,7 +3887,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 0
+                "value": 10
               },
               "color": {
                 "source": "literal",
@@ -3927,7 +3927,7 @@
               },
               "lowColor": {
                 "source": "literal",
-                "value": "transparent"
+                "value": "blue"
               }
             },
             "isPersistent": true
@@ -3936,10 +3936,6 @@
         "notes": []
       },
       "connections": [
-        {
-          "from": "y1-menu-event-start",
-          "to": "y1-menu-logic-front"
-        },
         {
           "from": "y1-menu-logic-front",
           "to": "y1-menu-logic-back"
@@ -3951,6 +3947,10 @@
         {
           "from": "y1-menu-event-called",
           "to": "y1-menu-action-sweep"
+        },
+        {
+          "from": "y1-menu-event-start",
+          "to": "y1-menu-logic-front"
         }
       ],
       "layout": {
@@ -3964,26 +3964,26 @@
             "y": 0.6877453289926052
           },
           "y1-menu-logic-front": {
-            "x": 8.875393141061068,
-            "y": 124.8340356759727
+            "x": 0.8753931410610676,
+            "y": 127.8340356759727
           },
           "y1-menu-logic-back": {
             "x": -3.1233117040246725,
-            "y": 245.26407020539045
+            "y": 295.26407020539045
           },
           "y1-menu-logic-concat": {
             "x": 6.734372204169631,
-            "y": 382.69804484397173
+            "y": 407.69804484397173
           },
           "y1-menu-action-sweep": {
             "x": 268.74377020448446,
-            "y": 128.1873038224876
+            "y": 103.18730382248759
           }
         },
         "viewport": {
-          "x": 321.15487727073196,
-          "y": 139.66204963178205,
-          "zoom": 0.5
+          "x": 364.3923280623276,
+          "y": 121.96273959707469,
+          "zoom": 0.75
         }
       },
       "variables": [

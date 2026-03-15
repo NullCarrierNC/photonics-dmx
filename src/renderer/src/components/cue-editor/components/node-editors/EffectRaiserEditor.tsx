@@ -15,6 +15,10 @@ const WELL_KNOWN_PARAM_OPTIONS: Record<string, readonly string[]> = {
   waitUntilCondition: WAIT_CONDITIONS_WITH_NONE_DELAY,
   waitForCondition: WAIT_CONDITIONS_WITH_NONE_DELAY,
   brightness: BRIGHTNESS_OPTIONS,
+  colorBrightness: BRIGHTNESS_OPTIONS,
+  lowBrightness: BRIGHTNESS_OPTIONS,
+  startBrightness: BRIGHTNESS_OPTIONS,
+  endBrightness: BRIGHTNESS_OPTIONS,
   blendMode: BLEND_MODE_OPTIONS,
 }
 

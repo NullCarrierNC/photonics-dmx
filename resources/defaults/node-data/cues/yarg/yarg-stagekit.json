@@ -2159,7 +2159,7 @@
               },
               "brightness": {
                 "source": "literal",
-                "value": "medium"
+                "value": "high"
               },
               "blendMode": {
                 "source": "literal",
@@ -2384,9 +2384,9 @@
           }
         },
         "viewport": {
-          "x": 306.3906413058846,
-          "y": 114.71862801416893,
-          "zoom": 0.6101403985958002
+          "x": 342.35891566968445,
+          "y": 233.39840000585446,
+          "zoom": 0.7774015044605205
         }
       },
       "variables": [
@@ -2483,6 +2483,28 @@
               "source": "literal",
               "value": 8
             }
+          },
+          {
+            "id": "sk-searchlights-beat-dur",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "beat-duration-ms",
+            "assignTo": "beatDurationMs"
+          },
+          {
+            "id": "sk-searchlights-step-dur",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatDurationMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "stepDurationMs"
           }
         ],
         "eventRaisers": [],
@@ -2519,7 +2541,7 @@
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "beat"
+                "value": "delay"
               },
               "waitUntilConditionCount": {
                 "source": "literal",
@@ -2530,8 +2552,8 @@
                 "value": 1
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "stepDurationMs"
               },
               "groupSize": {
                 "source": "literal",
@@ -2570,7 +2592,7 @@
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "beat"
+                "value": "delay"
               },
               "waitUntilConditionCount": {
                 "source": "literal",
@@ -2581,8 +2603,8 @@
                 "value": 1
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
+                "source": "variable",
+                "name": "stepDurationMs"
               },
               "groupSize": {
                 "source": "literal",
@@ -2601,6 +2623,14 @@
         {
           "from": "sk-searchlights-num",
           "to": "sk-searchlights-all"
+        },
+        {
+          "from": "sk-searchlights-all",
+          "to": "sk-searchlights-beat-dur"
+        },
+        {
+          "from": "sk-searchlights-beat-dur",
+          "to": "sk-searchlights-step-dur"
         },
         {
           "from": "event-sk-searchlights-called",
@@ -2639,6 +2669,14 @@
           "sk-searchlights-all": {
             "x": 256.4145216449624,
             "y": 203.6432303664177
+          },
+          "sk-searchlights-beat-dur": {
+            "x": 256.4145216449624,
+            "y": 320
+          },
+          "sk-searchlights-step-dur": {
+            "x": 256.4145216449624,
+            "y": 436
           },
           "sk-searchlights-has-red": {
             "x": 528.5939066428691,

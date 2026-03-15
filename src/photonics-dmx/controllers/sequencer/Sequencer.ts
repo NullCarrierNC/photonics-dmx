@@ -281,6 +281,27 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Trigger a keyframe-first event.
+   */
+  public onKeyframeFirst(): void {
+    this.eventHandler.onKeyframeFirst()
+  }
+
+  /**
+   * Trigger a keyframe-next event.
+   */
+  public onKeyframeNext(): void {
+    this.eventHandler.onKeyframeNext()
+  }
+
+  /**
+   * Trigger a keyframe-previous event.
+   */
+  public onKeyframePrevious(): void {
+    this.eventHandler.onKeyframePrevious()
+  }
+
+  /**
    * Handle individual drum note events
    */
   public onDrumNote(noteType: DrumNoteType): void {

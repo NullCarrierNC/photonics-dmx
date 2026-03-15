@@ -43,6 +43,30 @@ export class SongEventHandler implements ISongEventHandler {
   }
 
   /**
+   * Trigger a keyframe-first event (also fires generic keyframe for backward compatibility).
+   */
+  public onKeyframeFirst(): void {
+    this.handleEvent('keyframe')
+    this.handleEvent('keyframe-first')
+  }
+
+  /**
+   * Trigger a keyframe-next event (also fires generic keyframe for backward compatibility).
+   */
+  public onKeyframeNext(): void {
+    this.handleEvent('keyframe')
+    this.handleEvent('keyframe-next')
+  }
+
+  /**
+   * Trigger a keyframe-previous event (also fires generic keyframe for backward compatibility).
+   */
+  public onKeyframePrevious(): void {
+    this.handleEvent('keyframe')
+    this.handleEvent('keyframe-previous')
+  }
+
+  /**
    * Handle individual drum note events
    */
   public onDrumNote(noteType: DrumNoteType): void {
@@ -162,6 +186,9 @@ export class SongEventHandler implements ISongEventHandler {
       | 'beat'
       | 'measure'
       | 'keyframe'
+      | 'keyframe-first'
+      | 'keyframe-next'
+      | 'keyframe-previous'
       | 'drum-kick'
       | 'drum-red'
       | 'drum-yellow'

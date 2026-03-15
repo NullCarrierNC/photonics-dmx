@@ -44,8 +44,7 @@
           "scope": "cue",
           "initialValue": "max",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -53,8 +52,7 @@
           "scope": "cue",
           "initialValue": "replace",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "startCondition",
@@ -326,8 +324,7 @@
           "scope": "cue",
           "initialValue": "max",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -335,8 +332,7 @@
           "scope": "cue",
           "initialValue": "replace",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "sweepTime",
@@ -384,8 +380,7 @@
           "scope": "cue",
           "initialValue": "low",
           "description": "Brightness level to fade out to (same colour as sweep)",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "lowColor",
@@ -1412,8 +1407,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -1421,8 +1415,7 @@
           "scope": "cue",
           "initialValue": "add",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "beatsPerCycle",
@@ -1446,41 +1439,7 @@
           "scope": "cue",
           "initialValue": "beat",
           "description": "Event type to count per phase (beat, keyframe)",
-          "isParameter": true,
-          "validValues": [
-            "none",
-            "delay",
-            "beat",
-            "measure",
-            "half-beat",
-            "keyframe",
-            "guitar-open",
-            "guitar-green",
-            "guitar-red",
-            "guitar-yellow",
-            "guitar-blue",
-            "guitar-orange",
-            "bass-open",
-            "bass-green",
-            "bass-red",
-            "bass-yellow",
-            "bass-blue",
-            "bass-orange",
-            "keys-open",
-            "keys-green",
-            "keys-red",
-            "keys-yellow",
-            "keys-blue",
-            "keys-orange",
-            "drum-kick",
-            "drum-red",
-            "drum-yellow",
-            "drum-blue",
-            "drum-green",
-            "drum-yellow-cymbal",
-            "drum-blue-cymbal",
-            "drum-green-cymbal"
-          ]
+          "isParameter": true
         },
         {
           "name": "waitUntilConditionCount",
@@ -2293,8 +2252,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -2302,8 +2260,7 @@
           "scope": "cue",
           "initialValue": "add",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "beatsPerCycle",
@@ -2327,41 +2284,7 @@
           "scope": "cue",
           "initialValue": "beat",
           "description": "Event type to count per phase (beat, keyframe)",
-          "isParameter": true,
-          "validValues": [
-            "none",
-            "delay",
-            "beat",
-            "measure",
-            "half-beat",
-            "keyframe",
-            "guitar-open",
-            "guitar-green",
-            "guitar-red",
-            "guitar-yellow",
-            "guitar-blue",
-            "guitar-orange",
-            "bass-open",
-            "bass-green",
-            "bass-red",
-            "bass-yellow",
-            "bass-blue",
-            "bass-orange",
-            "keys-open",
-            "keys-green",
-            "keys-red",
-            "keys-yellow",
-            "keys-blue",
-            "keys-orange",
-            "drum-kick",
-            "drum-red",
-            "drum-yellow",
-            "drum-blue",
-            "drum-green",
-            "drum-yellow-cymbal",
-            "drum-blue-cymbal",
-            "drum-green-cymbal"
-          ]
+          "isParameter": true
         },
         {
           "name": "waitUntilConditionCount",
@@ -3161,8 +3084,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -3170,8 +3092,7 @@
           "scope": "cue",
           "initialValue": "add",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "beatsPerCycle",
@@ -3195,41 +3116,7 @@
           "scope": "cue",
           "initialValue": "beat",
           "description": "Beat-like condition to count per rotation phase",
-          "isParameter": true,
-          "validValues": [
-            "none",
-            "delay",
-            "beat",
-            "measure",
-            "half-beat",
-            "keyframe",
-            "guitar-open",
-            "guitar-green",
-            "guitar-red",
-            "guitar-yellow",
-            "guitar-blue",
-            "guitar-orange",
-            "bass-open",
-            "bass-green",
-            "bass-red",
-            "bass-yellow",
-            "bass-blue",
-            "bass-orange",
-            "keys-open",
-            "keys-green",
-            "keys-red",
-            "keys-yellow",
-            "keys-blue",
-            "keys-orange",
-            "drum-kick",
-            "drum-red",
-            "drum-yellow",
-            "drum-blue",
-            "drum-green",
-            "drum-yellow-cymbal",
-            "drum-blue-cymbal",
-            "drum-green-cymbal"
-          ]
+          "isParameter": true
         },
         {
           "name": "waitUntilConditionCount",
@@ -4133,8 +4020,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -4142,8 +4028,7 @@
           "scope": "cue",
           "initialValue": "replace",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         }
       ],
       "nodes": {
@@ -4576,8 +4461,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness level",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -4585,8 +4469,7 @@
           "scope": "cue",
           "initialValue": "add",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "startOffset",
@@ -4602,41 +4485,7 @@
           "scope": "cue",
           "initialValue": "beat",
           "description": "Event type to count per phase",
-          "isParameter": true,
-          "validValues": [
-            "none",
-            "delay",
-            "beat",
-            "measure",
-            "half-beat",
-            "keyframe",
-            "guitar-open",
-            "guitar-green",
-            "guitar-red",
-            "guitar-yellow",
-            "guitar-blue",
-            "guitar-orange",
-            "bass-open",
-            "bass-green",
-            "bass-red",
-            "bass-yellow",
-            "bass-blue",
-            "bass-orange",
-            "keys-open",
-            "keys-green",
-            "keys-red",
-            "keys-yellow",
-            "keys-blue",
-            "keys-orange",
-            "drum-kick",
-            "drum-red",
-            "drum-yellow",
-            "drum-blue",
-            "drum-green",
-            "drum-yellow-cymbal",
-            "drum-blue-cymbal",
-            "drum-green-cymbal"
-          ]
+          "isParameter": true
         },
         {
           "name": "waitUntilConditionCount",
@@ -5355,8 +5204,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness for the first colour",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "endColor",
@@ -5372,8 +5220,7 @@
           "scope": "cue",
           "initialValue": "medium",
           "description": "Brightness for the second colour",
-          "isParameter": true,
-          "validValues": ["low", "medium", "high", "max"]
+          "isParameter": true
         },
         {
           "name": "blendMode",
@@ -5381,8 +5228,7 @@
           "scope": "cue",
           "initialValue": "replace",
           "description": "Blend mode",
-          "isParameter": true,
-          "validValues": ["replace", "add", "multiply", "overlay"]
+          "isParameter": true
         },
         {
           "name": "duration",
