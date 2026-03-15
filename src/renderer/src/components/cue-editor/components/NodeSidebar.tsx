@@ -174,6 +174,7 @@ const NodeSidebar: React.FC<Props> = ({
             {selectedNode.data.kind === 'effect-raiser' && (
               <EffectRaiserEditor
                 node={selectedNode.data.payload as EffectRaiserNode}
+                activeMode={activeMode}
                 availableEffects={availableEffects}
                 availableVariables={availableVariables}
                 updateNode={(updates) => updateSelectedNode<EffectRaiserNode>(updates)}

@@ -63,6 +63,7 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <VariableLogicEditor
         node={node as VariableLogicNode}
+        activeMode={activeMode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

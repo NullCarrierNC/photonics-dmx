@@ -2,14 +2,29 @@ import React from 'react'
 import type {
   EffectRaiserNode,
   EffectDefinition,
+  NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import {
+  WAIT_CONDITIONS_WITH_NONE_DELAY,
+  BRIGHTNESS_OPTIONS,
+  BLEND_MODE_OPTIONS,
+} from '../../../../../../photonics-dmx/constants/options'
 import ValueSourceEditor from '../shared/ValueSourceEditor'
+
+const WELL_KNOWN_PARAM_OPTIONS: Record<string, readonly string[]> = {
+  waitUntilCondition: WAIT_CONDITIONS_WITH_NONE_DELAY,
+  waitForCondition: WAIT_CONDITIONS_WITH_NONE_DELAY,
+  brightness: BRIGHTNESS_OPTIONS,
+  blendMode: BLEND_MODE_OPTIONS,
+}
 
 interface EffectRaiserEditorProps {
   node: EffectRaiserNode
   availableEffects: { id: string; name: string; definition?: EffectDefinition }[]
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
   updateNode: (updates: Partial<EffectRaiserNode>) => void
+  /** When set, enables built-in event-option fallback for params with type "event". */
+  activeMode?: NodeCueMode
 }
 
 const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
@@ -17,6 +32,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
   availableEffects,
   availableVariables,
   updateNode,
+  activeMode,
 }) => {
   const selectedEffect = availableEffects.find((e) => e.id === node.effectId)
   const parameterVars = selectedEffect?.definition?.variables?.filter((v) => v.isParameter) ?? []
@@ -57,6 +73,11 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
           {parameterVars.map((param) => {
             const currentValue = node.parameterValues?.[param.name]
             const integerOnly = param.type === 'number' && param.name === 'paramLayer'
+            const validLiterals =
+              param.validValues ??
+              (WELL_KNOWN_PARAM_OPTIONS[param.name] != null
+                ? [...WELL_KNOWN_PARAM_OPTIONS[param.name]]
+                : undefined)
             return (
               <div key={param.name} className="space-y-1">
                 <ValueSourceEditor
@@ -77,7 +98,8 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
                       | 'light-array'
                       | 'event'
                   }
-                  validLiterals={param.validValues}
+                  validLiterals={validLiterals}
+                  activeMode={activeMode}
                   integerOnly={integerOnly}
                   availableVariables={availableVariables}
                 />
