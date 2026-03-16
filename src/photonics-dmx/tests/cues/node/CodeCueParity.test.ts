@@ -4,7 +4,7 @@
  * sustain behaviour matches the original code cues (one effect submission per execute).
  */
 
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import { beforeEach, describe, expect, it } from '@jest/globals'
 import { StrobeSlowCue } from '../../../cues/yarg/handlers/stagekit/StrobeSlowCue'
 import { StageKitFrenzyCue } from '../../../cues/yarg/handlers/stagekit/StageKitFrenzyCue'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
@@ -14,8 +14,7 @@ import type {
   ActionNode,
 } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
-import { YargNodeCueV2 } from '../../../cues/node/v2/YargNodeCueV2'
-import { setNodeV2Enabled } from '../../../cues/node/v2/nodeV2FeatureFlag'
+import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
 import type { NodeRuntimeCallbacks } from '../../../cues/node/runtime/executionTypes'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
@@ -168,11 +167,6 @@ describe('Parity with code cues', () => {
 
   beforeEach(() => {
     lightManager = new DmxLightManager(createMockLightingConfig())
-    setNodeV2Enabled(true)
-  })
-
-  afterEach(() => {
-    setNodeV2Enabled(null)
   })
 
   describe('Strobe (sustain: one flash per execute)', () => {
@@ -191,7 +185,7 @@ describe('Parity with code cues', () => {
       const { sequencer, recorded } = createRecordingSequencer()
       const def = sustainPatternCueDefinition()
       const compiled = NodeCueCompiler.compileYargCue(def)
-      const nodeCue = new YargNodeCueV2('group1', compiled, new EffectRegistry(), noopCallbacks)
+      const nodeCue = new YargNodeCue('group1', compiled, new EffectRegistry(), noopCallbacks)
       await nodeCue.execute(baseCueData, sequencer, lightManager)
       await nodeCue.execute(baseCueData, sequencer, lightManager)
       const setCalls = recorded.filter((c) => c.method === 'setEffect')
@@ -221,7 +215,7 @@ describe('Parity with code cues', () => {
       const { sequencer, recorded } = createRecordingSequencer()
       const def = cueCalledOnlyDefinition()
       const compiled = NodeCueCompiler.compileYargCue(def)
-      const nodeCue = new YargNodeCueV2('group1', compiled, new EffectRegistry(), noopCallbacks)
+      const nodeCue = new YargNodeCue('group1', compiled, new EffectRegistry(), noopCallbacks)
       await nodeCue.execute(baseCueData, sequencer, lightManager)
       await nodeCue.execute(baseCueData, sequencer, lightManager)
       const setCalls = recorded.filter((c) => c.method === 'setEffect')

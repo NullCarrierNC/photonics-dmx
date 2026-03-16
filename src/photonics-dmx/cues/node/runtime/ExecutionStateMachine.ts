@@ -1,10 +1,10 @@
 /**
- * Explicit execution state machine for V2 runs.
+ * Explicit execution state machine for graph runs.
  * Layered alongside the existing ExecutionContext-based runtime; provides testable lifecycle transitions (RUNNING, COMPLETED, CANCELLED).
  * Currently instantiated by GraphExecutionEngine per execution context when running cue graphs.
  */
 
-import { ExecutionPhase } from './types'
+import { ExecutionPhase } from './executionTypes'
 
 const VALID_TRANSITIONS: Partial<Record<ExecutionPhase, ExecutionPhase[]>> = {
   [ExecutionPhase.IDLE]: [ExecutionPhase.RUNNING],

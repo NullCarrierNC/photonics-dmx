@@ -14,7 +14,7 @@ NodeCueCompiler / EffectCompiler   (compile graph → CompiledYargCue / Compiled
     ↓
 YargCueRegistry / EffectRegistry   (register for dispatch)
     ↓
-NodeExecutionEngine / EffectExecutionEngine   (execute at runtime)
+YargNodeCue → GraphExecutionEngine → NodeExecutionEngine / EffectExecutionEngine   (execute at runtime)
     ↓
 Sequencer   (effects)
 ```
@@ -36,6 +36,7 @@ node/
 |------|------|
 | `NodeCueCompiler` | Compiles `YargNodeCueDefinition` / `AudioNodeCueDefinition` to `CompiledYargCue` / `CompiledAudioCue` |
 | `EffectCompiler` | Compiles `YargEffectDefinition` / `AudioEffectDefinition` to executable effect |
+| `GraphCompiler` | Facade that delegates to NodeCueCompiler and EffectCompiler for cues and effects |
 | `ActionEffectFactory` | Builds concrete Effect objects from ActionNode config (colour, timing, targets) |
 
 ### loader/
@@ -51,7 +52,12 @@ node/
 |------|------|
 | `NodeExecutionEngine` | Central execution: evaluates logic nodes, resolves values, dispatches actions to sequencer |
 | `EffectExecutionEngine` | Executes effect definitions (used when an Action references a reusable effect) |
-| `YargNodeCue` | Runtime cue instance for YARG; receives game events, drives NodeExecutionEngine |
+| `GraphExecutionEngine` | Unified engine for cue/effect graphs; wraps NodeExecutionEngine/EffectExecutionEngine, queuing, state machine |
+| `GraphExecutionPolicy` | Policy for GraphExecutionEngine (cue vs effect entry events, queuing, revisit) |
+| `CueSession` | Per-cue session state: variable stores, first-submission policy, cue-started flag |
+| `ExecutionStateMachine` | Lifecycle phases (IDLE, RUNNING, BLOCKED, COMPLETED, CANCELLED) per context |
+| `CompiledEffectIndex` | Cache of compiled effects for reuse across cues when loader provides it |
+| `YargNodeCue` | Runtime cue instance for YARG; receives game events, drives GraphExecutionEngine |
 | `AudioNodeCue` | Runtime cue instance for audio (early development) |
 | `ExecutionContext` | Per-execution state: variables, light arrays, beat/measure, etc. |
 | `EffectRegistry` | Maps effect IDs to compiled effect definitions |

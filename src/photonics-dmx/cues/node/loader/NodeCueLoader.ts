@@ -19,9 +19,7 @@ import { AudioCueRegistry, AudioCueGroup } from '../../registries/AudioCueRegist
 import type { ICueGroup } from '../../interfaces/INetCueGroup'
 import { INetCue } from '../../interfaces/INetCue'
 import { YargNodeCue } from '../runtime/YargNodeCue'
-import { YargNodeCueV2 } from '../v2/YargNodeCueV2'
-import { isNodeV2Enabled } from '../v2/nodeV2FeatureFlag'
-import { CompiledEffectIndex } from '../v2/CompiledEffectIndex'
+import { CompiledEffectIndex } from '../runtime/CompiledEffectIndex'
 import { AudioNodeCue } from '../runtime/AudioNodeCue'
 import { CueType } from '../../types/cueTypes'
 import { AudioCueType, BuiltInAudioCues } from '../../types/audioCueTypes'
@@ -53,7 +51,7 @@ export interface NodeCueLoadResult {
   errors: string[]
 }
 
-/** Optional host callbacks for node cue debug/error emission; used when the host provides them (e.g. V2 path). */
+/** Optional host callbacks for node cue debug/error emission; used when the host provides them. */
 export type NodeRuntimeCallbacks = import('../runtime/executionTypes').NodeRuntimeCallbacks
 
 interface NodeCueLoaderOptions {
@@ -61,9 +59,9 @@ interface NodeCueLoaderOptions {
   yargRegistry: YargCueRegistry
   audioRegistry: AudioCueRegistry
   effectLoader?: EffectLoader
-  /** When provided and V2 is enabled, passed to YargNodeCueV2 for debug/error emission. */
+  /** When provided, passed to YargNodeCue for debug/error emission. */
   getNodeRuntimeCallbacks?: () => NodeRuntimeCallbacks | undefined
-  /** When provided and V2 is enabled, compiled effects are cached here and reused across cues. */
+  /** When provided, compiled effects are cached here and reused across cues. */
   getCompiledEffectIndex?: () => CompiledEffectIndex | undefined
 }
 
@@ -346,15 +344,8 @@ export class NodeCueLoader extends EventEmitter {
         // Build effect registry for this cue
         const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
 
-        if (isNodeV2Enabled()) {
-          const callbacks = this.options.getNodeRuntimeCallbacks?.()
-          cueMap.set(
-            cue.cueType,
-            new YargNodeCueV2(file.group.id, compiled, effectRegistry, callbacks),
-          )
-        } else {
-          cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled, effectRegistry))
-        }
+        const callbacks = this.options.getNodeRuntimeCallbacks?.()
+        cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled, effectRegistry, callbacks))
       } catch (err) {
         console.warn(`Skipping cue '${cue.cueType}':`, err)
       }
@@ -491,7 +482,7 @@ export class NodeCueLoader extends EventEmitter {
       return registry
     }
 
-    const effectIndex = isNodeV2Enabled() ? this.options.getCompiledEffectIndex?.() : undefined
+    const effectIndex = this.options.getCompiledEffectIndex?.()
 
     for (const effectRef of effectReferences) {
       try {

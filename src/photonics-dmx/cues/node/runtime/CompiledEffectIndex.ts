@@ -1,9 +1,9 @@
 /**
  * Eager cache of compiled effects keyed by mode, effect file id, and effect id.
- * When V2 loader uses this, effects are compiled once and reused across cues.
+ * When the loader uses this, effects are compiled once and reused across cues.
  */
 
-import type { CompiledEffect } from '../runtime/EffectRegistry'
+import type { CompiledEffect } from './EffectRegistry'
 import type { NodeCueMode } from '../../types/nodeCueTypes'
 
 function indexKey(mode: NodeCueMode, effectFileId: string, effectId: string): string {
