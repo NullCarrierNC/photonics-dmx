@@ -1,9 +1,8 @@
 /**
- * Sequencer comparison behavior tests: run the same cue under V1 and V2 and assert sequencer
- * call sequences match. See docs/node-system-v2-analysis.md § Testing Strategy.
+ * Sequencer behavior tests: run node cues and assert sequencer call sequences.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import { beforeEach, describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
   YargNodeCueDefinition,
@@ -12,8 +11,6 @@ import type {
 } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
 import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
-import { YargNodeCueV2 } from '../../../cues/node/v2/YargNodeCueV2'
-import { setNodeV2Enabled } from '../../../cues/node/v2/nodeV2FeatureFlag'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
 import type { NodeRuntimeCallbacks } from '../../../cues/node/runtime/executionTypes'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
@@ -123,7 +120,7 @@ function cueDefinitionWithEventType(
   }
 }
 
-describe('V1 vs V2 validation behavior', () => {
+describe('Sequencer behavior', () => {
   let lightManager: DmxLightManager
   let cueDefinition: YargNodeCueDefinition
   let compiledCue: ReturnType<typeof NodeCueCompiler.compileYargCue>
@@ -134,62 +131,30 @@ describe('V1 vs V2 validation behavior', () => {
     compiledCue = NodeCueCompiler.compileYargCue(cueDefinition)
   })
 
-  afterEach(() => {
-    setNodeV2Enabled(null)
-  })
-
-  it('same cue produces same sequencer call sequence under V1 and V2', async () => {
-    const { sequencer: seqV1, recorded: recordedV1 } = createRecordingSequencer()
-    const { sequencer: seqV2, recorded: recordedV2 } = createRecordingSequencer()
+  it('cue produces expected sequencer call sequence', async () => {
+    const { sequencer, recorded } = createRecordingSequencer()
     const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
-
-    setNodeV2Enabled(false)
-    const cueV1 = new YargNodeCue('group1', compiledCue, new EffectRegistry(), {
-      cueLevelVarStore: new Map(),
-      groupLevelVarStore: new Map(),
-      firstSubmissionUsesSetEffectRef: { use: false },
-      runtimeCallbacks: noopCallbacks,
-    })
+    const cue = new YargNodeCue('group1', compiledCue, new EffectRegistry(), noopCallbacks)
     const params: CueData = {
       beat: 'Strong',
       strobeState: 'Strobe_Off',
     } as CueData
-    await cueV1.execute(params, seqV1, lightManager)
-
-    setNodeV2Enabled(true)
-    const cueV2 = new YargNodeCueV2('group1', compiledCue, new EffectRegistry(), noopCallbacks)
-    await cueV2.execute(params, seqV2, lightManager)
-
-    const normalize = (calls: RecordedCall[]) =>
-      calls.map((c) => ({ method: c.method, name: c.name }))
-    expect(normalize(recordedV2)).toEqual(normalize(recordedV1))
-    expect(recordedV1.length).toBeGreaterThan(0)
+    await cue.execute(params, sequencer, lightManager)
+    expect(recorded.length).toBeGreaterThan(0)
+    const methods = recorded.map((c) => c.method)
+    expect(methods.some((m) => m === 'setEffect' || m === 'addEffect')).toBe(true)
   })
 
-  it('cue-called-only cue produces same sequencer call sequence under V1 and V2', async () => {
+  it('cue-called-only cue produces expected sequencer call sequence', async () => {
     const def = cueCalledOnlyDefinition()
     const compiled = NodeCueCompiler.compileYargCue(def)
-    const { sequencer: seqV1, recorded: recordedV1 } = createRecordingSequencer()
-    const { sequencer: seqV2, recorded: recordedV2 } = createRecordingSequencer()
+    const { sequencer, recorded } = createRecordingSequencer()
     const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
-
-    setNodeV2Enabled(false)
-    const cueV1 = new YargNodeCue('group1', compiled, new EffectRegistry(), {
-      cueLevelVarStore: new Map(),
-      groupLevelVarStore: new Map(),
-      firstSubmissionUsesSetEffectRef: { use: false },
-      runtimeCallbacks: noopCallbacks,
-    })
+    const cue = new YargNodeCue('group1', compiled, new EffectRegistry(), noopCallbacks)
     const params: CueData = { beat: 'Strong', strobeState: 'Strobe_Off' } as CueData
-    await cueV1.execute(params, seqV1, lightManager)
-
-    setNodeV2Enabled(true)
-    const cueV2 = new YargNodeCueV2('group1', compiled, new EffectRegistry(), noopCallbacks)
-    await cueV2.execute(params, seqV2, lightManager)
-
-    const normalize = (calls: RecordedCall[]) =>
-      calls.map((c) => ({ method: c.method, name: c.name }))
-    expect(normalize(recordedV2)).toEqual(normalize(recordedV1))
-    expect(recordedV1.length).toBeGreaterThan(0)
+    await cue.execute(params, sequencer, lightManager)
+    expect(recorded.length).toBeGreaterThan(0)
+    const methods = recorded.map((c) => c.method)
+    expect(methods.some((m) => m === 'setEffect' || m === 'addEffect')).toBe(true)
   })
 })

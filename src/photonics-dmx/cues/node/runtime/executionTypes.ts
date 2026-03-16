@@ -45,3 +45,14 @@ export type EffectCompletionCallback = () => void
 export interface NodeRuntimeCallbacks {
   emit(channel: string, payload: unknown): void
 }
+
+/**
+ * Explicit high-level run state layered on top of the existing ExecutionContext-based runtime.
+ */
+export enum ExecutionPhase {
+  IDLE = 'IDLE',
+  RUNNING = 'RUNNING',
+  BLOCKED = 'BLOCKED',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}

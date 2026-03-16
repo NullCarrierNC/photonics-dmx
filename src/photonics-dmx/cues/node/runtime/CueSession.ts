@@ -1,15 +1,15 @@
 /**
- * Owns per-activation runtime state for a V2 node cue instance. Responsibilities:
+ * Owns per-activation runtime state for a node cue instance. Responsibilities:
  * - Cue- and group-level variable stores (shared with the execution engine).
  * - First-submission policy: whether the next effect submission should use setEffect (consumed once per activation).
  * - cue-started fired flag and lifecycle callback that drives ExecutionStateMachine per context (started/completed/cancelled).
- * - resetForStop(): clears cue-level state on stop; this instance's groupLevelVarStore is preserved so state can accumulate across activations of this cue (one CueSession per YargNodeCueV2 instance).
+ * - resetForStop(): clears cue-level state on stop; this instance's groupLevelVarStore is preserved so state can accumulate across activations of this cue (one CueSession per YargNodeCue instance).
  */
 
-import { VariableValue } from '../runtime/executionTypes'
+import { VariableValue } from './executionTypes'
 import type { VariableDefinition } from '../../types/nodeCueTypes'
 import { ExecutionStateMachine } from './ExecutionStateMachine'
-import { ExecutionPhase } from './types'
+import { ExecutionPhase } from './executionTypes'
 
 export type ContextLifecycleEvent = 'started' | 'completed' | 'cancelled'
 

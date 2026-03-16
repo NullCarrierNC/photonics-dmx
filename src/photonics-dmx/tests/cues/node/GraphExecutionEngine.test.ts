@@ -5,23 +5,23 @@
  */
 
 import { beforeEach, describe, expect, it } from '@jest/globals'
-import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
+import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
   YargNodeCueDefinition,
   YargEventNode,
   ActionNode,
   VariableDefinition,
-} from '../../../../cues/types/nodeCueTypes'
-import { CueType, DrumNoteType } from '../../../../cues/types/cueTypes'
-import { GraphExecutionEngine } from '../../../../cues/node/v2/GraphExecutionEngine'
-import { cueGraphPolicy } from '../../../../cues/node/v2/GraphExecutionPolicy'
-import { CueSession } from '../../../../cues/node/v2/CueSession'
-import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
-import { DmxLightManager } from '../../../../controllers/DmxLightManager'
-import { createMockLightingConfig } from '../../../helpers/testFixtures'
-import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
-import type { CueData } from '../../../../cues/types/cueTypes'
-import type { NodeRuntimeCallbacks } from '../../../../cues/node/runtime/executionTypes'
+} from '../../../cues/types/nodeCueTypes'
+import { CueType, DrumNoteType } from '../../../cues/types/cueTypes'
+import { GraphExecutionEngine } from '../../../cues/node/runtime/GraphExecutionEngine'
+import { cueGraphPolicy } from '../../../cues/node/runtime/GraphExecutionPolicy'
+import { CueSession } from '../../../cues/node/runtime/CueSession'
+import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
+import { DmxLightManager } from '../../../controllers/DmxLightManager'
+import { createMockLightingConfig } from '../../helpers/testFixtures'
+import type { ILightingController } from '../../../controllers/sequencer/interfaces'
+import type { CueData } from '../../../cues/types/cueTypes'
+import type { NodeRuntimeCallbacks } from '../../../cues/node/runtime/executionTypes'
 
 const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
 

@@ -1,20 +1,20 @@
 /**
- * V2 unified compilation facade. Delegates to NodeCueCompiler and EffectCompiler
+ * Unified compilation facade. Delegates to NodeCueCompiler and EffectCompiler
  * so one entry point can be used for cues and effects.
  */
 
-import { NodeCueCompiler } from '../compiler/NodeCueCompiler'
-import { EffectCompiler } from '../compiler/EffectCompiler'
-import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
-import type { CompiledYargEffect, CompiledAudioEffect } from '../compiler/EffectCompiler'
+import { NodeCueCompiler } from './NodeCueCompiler'
+import { EffectCompiler } from './EffectCompiler'
+import type { CompiledYargCue } from './NodeCueCompiler'
+import type { CompiledYargEffect, CompiledAudioEffect } from './EffectCompiler'
 import type {
   YargNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
 } from '../../types/nodeCueTypes'
 
-export { NodeCueCompilationError } from '../compiler/NodeCueCompiler'
-export { EffectCompilationError } from '../compiler/EffectCompiler'
+export { NodeCueCompilationError } from './NodeCueCompiler'
+export { EffectCompilationError } from './EffectCompiler'
 
 export class GraphCompiler {
   /** Compile a YARG cue definition (delegates to NodeCueCompiler). */

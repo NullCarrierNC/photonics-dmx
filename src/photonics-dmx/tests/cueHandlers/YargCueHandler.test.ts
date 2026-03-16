@@ -2,12 +2,10 @@ import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { CueData, CueType } from '../../cues/types/cueTypes'
-import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals'
+import { beforeEach, describe, jest, it, expect } from '@jest/globals'
 import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
 import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
-import { setNodeV2Enabled } from '../../cues/node/v2/nodeV2FeatureFlag'
-
 // Mock implementation for the test
 class MockCueImplementation implements INetCue {
   private _id: string
@@ -357,7 +355,6 @@ describe('YargCueHandler', () => {
     })
 
     it('primary, secondary, and strobe can all run concurrently', async () => {
-      setNodeV2Enabled(true)
       const primaryCue = new MockPrimaryCue(CueType.Sweep)
       const secondaryCue = new MockSecondaryNonStrobeCue(CueType.Chorus)
       const strobeCue = new MockStrobeCue(CueType.Strobe_Slow)
@@ -387,11 +384,9 @@ describe('YargCueHandler', () => {
       expect(primaryCue.onStopMock).not.toHaveBeenCalled()
       expect(secondaryCue.onStopMock).not.toHaveBeenCalled()
       expect(strobeCue.onStopMock).not.toHaveBeenCalled()
-      setNodeV2Enabled(null)
     })
 
     it('Strobe_Off only clears strobe, not secondary overlay', async () => {
-      setNodeV2Enabled(true)
       jest.useFakeTimers()
       const secondaryCue = new MockSecondaryNonStrobeCue(CueType.Chorus)
       const strobeCue = new MockStrobeCue(CueType.Strobe_Slow)
@@ -418,11 +413,9 @@ describe('YargCueHandler', () => {
       expect(strobeCue.onStopMock).toHaveBeenCalledTimes(1)
       expect(secondaryCue.onStopMock).not.toHaveBeenCalled()
       jest.useRealTimers()
-      setNodeV2Enabled(null)
     })
 
     it('new secondary replaces old secondary but not primary or strobe', async () => {
-      setNodeV2Enabled(true)
       const primaryCue = new MockPrimaryCue(CueType.Sweep)
       const firstSecondary = new MockSecondaryNonStrobeCue(CueType.Chorus)
       const secondSecondary = new MockSecondaryNonStrobeCue(CueType.Verse)
@@ -456,17 +449,14 @@ describe('YargCueHandler', () => {
       expect(firstSecondary.onStopMock).toHaveBeenCalledTimes(1)
       expect(primaryCue.onStopMock).not.toHaveBeenCalled()
       expect(strobeCue.onStopMock).not.toHaveBeenCalled()
-      setNodeV2Enabled(null)
     })
 
     it('Strobe_Off is always processed and clears strobe (no debounce)', async () => {
-      setNodeV2Enabled(false)
       await cueHandler.handleCue(CueType.Strobe_Fast, mockCueData)
       expect(mockStrobeCue.executeMock).toHaveBeenCalledTimes(1)
 
       await cueHandler.handleCue(CueType.Strobe_Off, mockCueData)
       expect(mockStrobeCue.onStopMock).toHaveBeenCalledTimes(1)
-      setNodeV2Enabled(null)
     })
   })
 
@@ -475,13 +465,6 @@ describe('YargCueHandler', () => {
    * Asserts rapid A -> B -> A and same-cue repeat behaviour using mock cues (not V2 runtime queue).
    */
   describe('rapid-fire (no debounce)', () => {
-    beforeEach(() => {
-      setNodeV2Enabled(true)
-    })
-    afterEach(() => {
-      setNodeV2Enabled(null)
-    })
-
     it('Strobe_Slow -> Strobe_Off -> Strobe_Slow allows re-activation', async () => {
       const strobeSlow = new MockStrobeCue(CueType.Strobe_Slow)
       const v2Group: ICueGroup = {
