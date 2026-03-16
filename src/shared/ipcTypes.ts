@@ -437,6 +437,10 @@ export interface IpcInvokeMap {
     request: void
     response: string
   }
+  [CONFIG.GET_VALIDATION_ERRORS]: {
+    request: void
+    response: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>
+  }
   [CONFIG.GET_PREFS]: {
     request: void
     response: AppPreferences

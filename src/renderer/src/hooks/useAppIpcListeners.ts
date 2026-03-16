@@ -6,7 +6,7 @@ import type { LightingPreferences } from '../atoms'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { AudioCaptureManager } from '../services/AudioCaptureManager'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAppVersion, getPrefs, saveLightLayout } from '../ipcApi'
+import { getAppVersion, getPrefs, getValidationErrors, saveLightLayout } from '../ipcApi'
 import type { CueStateUpdatePayload } from '../../../shared/ipcTypes'
 
 export interface UseAppIpcListenersParams {
@@ -22,6 +22,9 @@ export interface UseAppIpcListenersParams {
   handleSenderNetworkError: (data: { sender: string; error: string; autoDisabled: boolean }) => void
   handleCueStateUpdate: (cueState: CueStateUpdatePayload) => void
   handleSenderStartFailure: (data: { sender: string; error: string }) => void
+  handleCueValidationErrors: (
+    errors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>,
+  ) => void
   handleAudioEnable: (config: AudioConfig) => void | Promise<void>
   handleAudioDisable: (payload: undefined) => void
   handleAudioConfigUpdate: (config: AudioConfig | undefined) => void
@@ -46,6 +49,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     handleSenderNetworkError,
     handleCueStateUpdate,
     handleSenderStartFailure,
+    handleCueValidationErrors,
     handleAudioEnable,
     handleAudioDisable,
     handleAudioConfigUpdate,
@@ -137,6 +141,18 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     fetchAppVersion()
     loadPrefs()
 
+    const flushValidationErrors = async () => {
+      try {
+        const errors = await getValidationErrors()
+        if (errors.length > 0) {
+          handleCueValidationErrors(errors)
+        }
+      } catch (error) {
+        console.error('Failed to fetch validation errors:', error)
+      }
+    }
+    flushValidationErrors()
+
     addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
     addIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
     addIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, handleNodeCueRuntimeError)
@@ -182,6 +198,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     handleSenderNetworkError,
     handleCueStateUpdate,
     handleSenderStartFailure,
+    handleCueValidationErrors,
     handleAudioEnable,
     handleAudioDisable,
     handleAudioConfigUpdate,

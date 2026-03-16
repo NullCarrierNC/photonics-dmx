@@ -70,6 +70,8 @@ export class ControllerManager {
   private nodeCueLoader: NodeCueLoader | null = null
   private effectLoader: EffectLoader | null = null
 
+  private pendingValidationErrors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }> = []
+
   private readonly testEffectRunner: TestEffectRunner
   private readonly senderErrorHandler: (error: SenderError) => void
   private readonly listenerCoordinator: ListenerCoordinator
@@ -324,6 +326,7 @@ export class ControllerManager {
     console.log(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
     if (summary.failed > 0 && summary.errors.length > 0) {
       summary.errors.forEach((err) => console.error('[NodeCueLoader]', err))
+      this.pendingValidationErrors.push({ source: 'node-cue', errors: summary.errors })
     }
     await this.nodeCueLoader.startWatching()
 
@@ -342,6 +345,10 @@ export class ControllerManager {
 
     const summary = await this.effectLoader.loadAll()
     console.log(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
+    if (summary.failed > 0 && summary.errors.length > 0) {
+      summary.errors.forEach((err) => console.error('[EffectLoader]', err))
+      this.pendingValidationErrors.push({ source: 'effect', errors: summary.errors })
+    }
     await this.effectLoader.startWatching()
 
     this.effectLoader.on('changed', async (payload: EffectListSummary) => {
@@ -659,6 +666,12 @@ export class ControllerManager {
 
   public getIsInitialized(): boolean {
     return this.isInitialized
+  }
+
+  public flushValidationErrors(): Array<{ source: 'node-cue' | 'effect'; errors: string[] }> {
+    const errors = this.pendingValidationErrors
+    this.pendingValidationErrors = []
+    return errors
   }
 
   public getIsYargEnabled(): boolean {

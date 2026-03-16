@@ -165,6 +165,11 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     return app.getVersion()
   })
 
+  // Get and clear buffered validation errors from cue/effect load (before window existed)
+  ipcMain.handle(CONFIG.GET_VALIDATION_ERRORS, () => {
+    return controllerManager.flushValidationErrors()
+  })
+
   // Get app preferences
   ipcMain.handle(CONFIG.GET_PREFS, async () => {
     return controllerManager.getConfig().getAllPreferences()

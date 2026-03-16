@@ -182,6 +182,8 @@ export const openCueEditorWindow = () => window.api.invoke(WINDOW.OPEN_CUE_EDITO
 
 export const getAppVersion = () => window.api.invoke(CONFIG.GET_APP_VERSION, undefined)
 
+export const getValidationErrors = () => window.api.invoke(CONFIG.GET_VALIDATION_ERRORS, undefined)
+
 // ---------------------------------------------------------------------------
 // System status
 // ---------------------------------------------------------------------------
