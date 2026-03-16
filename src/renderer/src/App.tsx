@@ -101,6 +101,20 @@ export const App = (): JSX.Element => {
     [showToast],
   )
 
+  const handleCueValidationErrors = useCallback(
+    (errors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>): void => {
+      for (const { source, errors: messages } of errors) {
+        const label = source === 'node-cue' ? 'Cue file' : 'Effect file'
+        const message =
+          messages.length === 1
+            ? `${label} validation failed: ${messages[0]}`
+            : `${label} validation failed (${messages.length} files): ${messages.join('; ')}`
+        showToast(message, 'error', 7000)
+      }
+    },
+    [showToast],
+  )
+
   // Handler for cue state updates
   const handleCueStateUpdate = useCallback(
     (cueState: CueStateUpdatePayload): void => {
@@ -348,6 +362,7 @@ export const App = (): JSX.Element => {
     handleSenderNetworkError,
     handleCueStateUpdate,
     handleSenderStartFailure,
+    handleCueValidationErrors,
     handleAudioEnable,
     handleAudioDisable,
     handleAudioConfigUpdate,

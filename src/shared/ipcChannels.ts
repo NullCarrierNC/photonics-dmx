@@ -104,6 +104,7 @@ export const CONFIG = {
   SAVE_DMX_RIG: 'save-dmx-rig',
   DELETE_DMX_RIG: 'delete-dmx-rig',
   GET_APP_VERSION: 'get-app-version',
+  GET_VALIDATION_ERRORS: 'get-validation-errors',
   GET_PREFS: 'get-prefs',
   SAVE_PREFS: 'save-prefs',
   GET_ENABLED_CUE_GROUPS: 'get-enabled-cue-groups',
