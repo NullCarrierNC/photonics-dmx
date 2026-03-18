@@ -277,7 +277,6 @@ export function useCueFileIO({
     }
   }, [
     clearLastFilePath,
-    clearLastFilePathForMode,
     editorDoc,
     loadCueIntoFlow,
     onSaveError,
