@@ -56,42 +56,43 @@ const AUDIO_TRIGGER_SAVE_DEFAULTS = {
 function normalizeAudioEventForSave(
   event: YargEventNode | AudioEventNodeUnion,
 ): YargEventNode | AudioEventNodeUnion {
-  const e = event as Record<string, unknown>
-  if (e.eventType !== 'audio-trigger') {
-    if (
-      e.eventType === 'none' ||
-      e.eventType === 'delay' ||
-      e.eventType === 'audio-beat' ||
-      e.eventType === 'audio-energy'
-    ) {
-      return {
-        id: e.id,
-        type: 'event',
-        eventType: e.eventType,
-        triggerMode: (e.triggerMode as 'edge' | 'level') ?? 'edge',
-        ...(e.label != null && { label: e.label as string }),
-        ...(e.outputs != null && { outputs: e.outputs as string[] }),
-        ...(e.threshold != null && { threshold: e.threshold as number }),
-      } as AudioEventNode
+  if ('frequencyRange' in event && event.eventType === 'audio-trigger') {
+    const t = event
+    return {
+      id: t.id,
+      type: 'event' as const,
+      eventType: 'audio-trigger' as const,
+      frequencyRange: t.frequencyRange ?? AUDIO_TRIGGER_SAVE_DEFAULTS.frequencyRange,
+      sensitivity: t.sensitivity ?? AUDIO_TRIGGER_SAVE_DEFAULTS.sensitivity,
+      balance: t.balance ?? AUDIO_TRIGGER_SAVE_DEFAULTS.balance,
+      color: t.color ?? AUDIO_TRIGGER_SAVE_DEFAULTS.color,
+      nodeLabel: t.nodeLabel ?? AUDIO_TRIGGER_SAVE_DEFAULTS.nodeLabel,
+      outputs:
+        Array.isArray(t.outputs) && t.outputs.length === 3
+          ? (t.outputs as ['enter', 'during', 'exit'])
+          : ([...AUDIO_TRIGGER_SAVE_DEFAULTS.outputs] as ['enter', 'during', 'exit']),
+      ...(t.label != null && { label: t.label }),
     }
-    return event
   }
-  const t = event as Partial<AudioTriggerNode>
-  return {
-    id: t.id ?? e.id,
-    type: 'event',
-    eventType: 'audio-trigger',
-    frequencyRange: t.frequencyRange ?? AUDIO_TRIGGER_SAVE_DEFAULTS.frequencyRange,
-    sensitivity: t.sensitivity ?? AUDIO_TRIGGER_SAVE_DEFAULTS.sensitivity,
-    balance: t.balance ?? AUDIO_TRIGGER_SAVE_DEFAULTS.balance,
-    color: t.color ?? AUDIO_TRIGGER_SAVE_DEFAULTS.color,
-    nodeLabel: t.nodeLabel ?? AUDIO_TRIGGER_SAVE_DEFAULTS.nodeLabel,
-    outputs:
-      Array.isArray(t.outputs) && t.outputs.length === 3
-        ? (t.outputs as ['enter', 'during', 'exit'])
-        : AUDIO_TRIGGER_SAVE_DEFAULTS.outputs,
-    ...(t.label != null && { label: t.label }),
-  } as AudioTriggerNode
+  if (
+    'triggerMode' in event &&
+    (event.eventType === 'none' ||
+      event.eventType === 'delay' ||
+      event.eventType === 'audio-beat' ||
+      event.eventType === 'audio-energy')
+  ) {
+    const e = event
+    return {
+      id: e.id,
+      type: 'event' as const,
+      eventType: e.eventType,
+      triggerMode: e.triggerMode ?? 'edge',
+      ...(e.label != null && { label: e.label }),
+      ...(e.outputs != null && { outputs: e.outputs }),
+      ...(e.threshold != null && { threshold: e.threshold }),
+    }
+  }
+  return event
 }
 
 function buildEventNodes(

@@ -12,6 +12,9 @@ export interface AudioLightingData {
   /** Detected BPM (beats per minute), or null if not detected */
   bpm: number | null
 
+  /** Confidence in current BPM estimate (0–1), when available */
+  bpmConfidence?: number
+
   /** Whether a beat was detected in this frame */
   beatDetected: boolean
 
