@@ -3,6 +3,7 @@ import { useAtomValue } from 'jotai'
 import type {
   ActionNode,
   AudioEventNode,
+  AudioEventNodeUnion,
   EventRaiserNode,
   EventListenerNode,
   EffectRaiserNode,
@@ -62,7 +63,7 @@ type Props = {
   updateSelectedNode: <
     T extends
       | YargEventNode
-      | AudioEventNode
+      | AudioEventNodeUnion
       | ActionNode
       | LogicNode
       | EventRaiserNode
@@ -199,10 +200,10 @@ const NodeSidebar: React.FC<Props> = ({
             )}
             {selectedNode.data.kind === 'event' && (
               <EventNodeEditor
-                node={selectedNode.data.payload as YargEventNode | AudioEventNode}
+                node={selectedNode.data.payload as YargEventNode | AudioEventNodeUnion}
                 activeMode={activeMode}
                 updateYargNode={(updates) => updateSelectedNode<YargEventNode>(updates)}
-                updateAudioNode={(updates) => updateSelectedNode<AudioEventNode>(updates)}
+                updateAudioNode={(updates) => updateSelectedNode<AudioEventNodeUnion>(updates)}
               />
             )}
             {selectedNode.data.kind === 'logic' && (

@@ -55,7 +55,7 @@ export const YARG_CUE_DATA_PROPERTY_MAP = new Map<string, CueDataPropertyMeta>(
   YARG_CUE_DATA_PROPERTY_META.map((m) => [m.id, m]),
 )
 
-/** Audio cue data properties have numeric/boolean types; no constrained string enums in the current schema. */
+/** Audio cue data properties: global frame data and trigger-specific context. */
 export const AUDIO_CUE_DATA_PROPERTY_META: CueDataPropertyMeta[] = [
   { id: 'cue-name', label: 'Cue Name', type: 'string' },
   { id: 'cue-type-id', label: 'Cue Type ID', type: 'string' },
@@ -65,12 +65,18 @@ export const AUDIO_CUE_DATA_PROPERTY_META: CueDataPropertyMeta[] = [
   { id: 'bpm', label: 'BPM', type: 'number' },
   { id: 'beat-detected', label: 'Beat Detected', type: 'boolean' },
   { id: 'energy', label: 'Energy', type: 'number' },
-  { id: 'freq-range1', label: 'Frequency Range 1', type: 'number' },
-  { id: 'freq-range2', label: 'Frequency Range 2', type: 'number' },
-  { id: 'freq-range3', label: 'Frequency Range 3', type: 'number' },
-  { id: 'freq-range4', label: 'Frequency Range 4', type: 'number' },
-  { id: 'freq-range5', label: 'Frequency Range 5', type: 'number' },
   { id: 'enabled-band-count', label: 'Enabled Band Count', type: 'number' },
+  { id: 'audio-amplitude', label: 'Amplitude', type: 'number' },
+  { id: 'audio-energy', label: 'Energy', type: 'number' },
+  { id: 'audio-peak-frequency', label: 'Peak Frequency (Hz)', type: 'number' },
+  { id: 'audio-bpm', label: 'BPM', type: 'number' },
+  { id: 'audio-beat-detected', label: 'Beat Detected', type: 'boolean' },
+  { id: 'audio-overall-level', label: 'Overall Level', type: 'number' },
+  { id: 'trigger-level', label: 'Trigger Level', type: 'number' },
+  { id: 'trigger-frequency-min', label: 'Trigger Freq Min', type: 'number' },
+  { id: 'trigger-frequency-max', label: 'Trigger Freq Max', type: 'number' },
+  { id: 'trigger-peak-frequency', label: 'Trigger Peak Freq (Hz)', type: 'number' },
+  { id: 'trigger-band-amplitude', label: 'Trigger Band Amplitude', type: 'number' },
 ]
 
 /** Lookup map: property id -> metadata */

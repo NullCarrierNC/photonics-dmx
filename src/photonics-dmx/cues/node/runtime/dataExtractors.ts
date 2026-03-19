@@ -113,18 +113,30 @@ export function extractAudioCueDataValue(
       return cueData.audioData.beatDetected
     case 'energy':
       return cueData.audioData.energy
-    case 'freq-range1':
-      return cueData.audioData.frequencyBands.range1
-    case 'freq-range2':
-      return cueData.audioData.frequencyBands.range2
-    case 'freq-range3':
-      return cueData.audioData.frequencyBands.range3
-    case 'freq-range4':
-      return cueData.audioData.frequencyBands.range4
-    case 'freq-range5':
-      return cueData.audioData.frequencyBands.range5
     case 'enabled-band-count':
       return cueData.enabledBandCount
+    case 'audio-amplitude':
+      return cueData.audioData.amplitude ?? cueData.audioData.overallLevel
+    case 'audio-energy':
+      return cueData.audioData.energy
+    case 'audio-peak-frequency':
+      return cueData.audioData.peakFrequency ?? 0
+    case 'audio-bpm':
+      return cueData.audioData.bpm ?? 0
+    case 'audio-beat-detected':
+      return cueData.audioData.beatDetected
+    case 'audio-overall-level':
+      return cueData.audioData.overallLevel
+    case 'trigger-level':
+      return cueData.triggerContext?.triggerLevel ?? 0
+    case 'trigger-frequency-min':
+      return cueData.triggerContext?.triggerFrequencyMin ?? 0
+    case 'trigger-frequency-max':
+      return cueData.triggerContext?.triggerFrequencyMax ?? 0
+    case 'trigger-peak-frequency':
+      return cueData.triggerContext?.triggerPeakFrequency ?? 0
+    case 'trigger-band-amplitude':
+      return cueData.triggerContext?.triggerBandAmplitude ?? 0
     default:
       return 0
   }

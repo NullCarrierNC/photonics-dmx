@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAtomValue } from 'jotai'
-import { audioDataAtom, audioConfigAtom } from '../atoms'
+import { audioDataAtom } from '../atoms'
 import type { Color } from '../../../photonics-dmx/types'
 
 // Map Color type to RGB values for preview bars (matches AudioColorMapping.tsx)
@@ -27,9 +27,6 @@ interface CuePreviewAudioProps {
   className?: string
 }
 
-const THREE_BAND_IDS = ['range1', 'range3', 'range4']
-const FOUR_BAND_IDS = ['range1', 'range2', 'range3', 'range4']
-
 type PreviewRange = {
   id: string
   name: string
@@ -42,7 +39,6 @@ type PreviewRange = {
 const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
   const audioData = useAtomValue(audioDataAtom)
-  const audioConfig = useAtomValue(audioConfigAtom)
   const [showBeatPulse, setShowBeatPulse] = useState(false)
 
   const defaultRanges: PreviewRange[] = [
@@ -88,21 +84,14 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
     },
   ]
 
-  const configuredRanges = (audioConfig?.frequencyBands?.ranges as PreviewRange[]) || defaultRanges
-  const configuredBandCount = audioConfig?.frequencyBands?.bandCount ?? 4
-  const displayRanges =
-    configuredBandCount === 3
-      ? configuredRanges.filter((range) => THREE_BAND_IDS.includes(range.id))
-      : configuredBandCount === 4
-        ? configuredRanges.filter((range) => FOUR_BAND_IDS.includes(range.id))
-        : configuredRanges
-
+  const displayRanges = defaultRanges
+  const energy = audioData?.energy ?? audioData?.overallLevel ?? 0
   const bandValuesById: Record<string, number> = {
-    range1: audioData?.frequencyBands?.range1 || 0,
-    range2: audioData?.frequencyBands?.range2 || 0,
-    range3: audioData?.frequencyBands?.range3 || 0,
-    range4: audioData?.frequencyBands?.range4 || 0,
-    range5: audioData?.frequencyBands?.range5 || 0,
+    range1: energy,
+    range2: energy * 0.85,
+    range3: energy * 0.7,
+    range4: energy * 0.55,
+    range5: energy * 0.4,
   }
 
   // Track beat detection for pulse animation (show for 200ms after beat)
@@ -127,7 +116,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
     )
   }
 
-  const { energy, bpm } = audioData
+  const bpm = audioData.bpm
 
   return (
     <div className={`p-4 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>

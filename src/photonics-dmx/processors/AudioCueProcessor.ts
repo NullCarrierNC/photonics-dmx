@@ -3,7 +3,7 @@ import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes'
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { ILightingController } from '../controllers/sequencer/interfaces'
-import { AudioCueType, BuiltInAudioCues } from '../cues/types/audioCueTypes'
+import { AudioCueType } from '../cues/types/audioCueTypes'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { getIntensityScale } from '../cues/audio/utils/bandUtils'
 
@@ -85,10 +85,9 @@ export class AudioCueProcessor {
       this.sequencer.onBeat()
     }
 
-    const bandCount = this.getEnabledBandCount()
     const processedData =
       this.config.linearResponse === false ? this.applyDiscreteResponse(data) : data
-    this.cueHandler.handleAudioData(processedData, this.config, this.currentCueType, bandCount)
+    this.cueHandler.handleAudioData(processedData, this.config, this.currentCueType, 0)
   }
 
   /**
@@ -165,12 +164,7 @@ export class AudioCueProcessor {
       return allCueTypes[0]
     }
 
-    // Absolute fallback
-    return BuiltInAudioCues.BasicLayered
-  }
-
-  private getEnabledBandCount(): number {
-    return this.config.frequencyBands?.bandCount ?? 4
+    return ''
   }
 
   private applyDiscreteResponse(audioData: AudioLightingData): AudioLightingData {
@@ -179,13 +173,6 @@ export class AudioCueProcessor {
       ...audioData,
       overallLevel: mapValue(audioData.overallLevel),
       energy: mapValue(audioData.energy),
-      frequencyBands: {
-        range1: mapValue(audioData.frequencyBands.range1),
-        range2: mapValue(audioData.frequencyBands.range2),
-        range3: mapValue(audioData.frequencyBands.range3),
-        range4: mapValue(audioData.frequencyBands.range4),
-        range5: mapValue(audioData.frequencyBands.range5),
-      },
     }
   }
 }

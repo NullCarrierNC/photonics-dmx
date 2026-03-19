@@ -5,7 +5,7 @@ import { ILightingController } from '../../photonics-dmx/controllers/sequencer/i
 import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor'
 import { AudioConfig, AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes'
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
 
 export interface AudioControllerDeps {
@@ -137,7 +137,7 @@ export class AudioController {
     if (fallback.length > 0) {
       return fallback[0]
     }
-    return BuiltInAudioCues.BasicLayered
+    return ''
   }
 
   public setActiveAudioCueType(cueType: AudioCueType): { success: boolean; error?: string } {

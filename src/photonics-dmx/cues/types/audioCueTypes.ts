@@ -1,45 +1,22 @@
 import { AudioLightingData, AudioConfig } from '../../listeners/Audio/AudioTypes'
 
 /**
- * Audio cue types for audio-reactive lighting.
- * Built-in cues are enumerated constants while user-defined cues can use any string identifier.
- */
-export enum BuiltInAudioCues {
-  BasicLayered = 'BasicLayered',
-  SpectrumCue = 'SpectrumCue',
-  PulseChaser = 'PulseChaser',
-  BeatSplitPulse = 'BeatSplitPulse',
-  BassSnareRipple = 'BassSnareRipple',
-  EnergyStrobePulse = 'EnergyStrobePulse',
-  MirrorBandBounce = 'MirrorBandBounce',
-  BandShell = 'BandShell',
-  PrismSweep = 'PrismSweep',
-  TrebleSpark = 'TrebleSpark',
-  SubHarmonicWave = 'SubHarmonicWave',
-  SpectrumStepper = 'SpectrumStepper',
-  BeatSpectrumMorph = 'BeatSpectrumMorph',
-  TriadCascade = 'TriadCascade',
-  AuroraDrift = 'AuroraDrift',
-  TempoFlutter = 'TempoFlutter',
-  DynamicSurge = 'DynamicSurge',
-  LinearLightOrgan = 'LinearLightOrgan',
-  SplitLightOrgan = 'SplitLightOrgan',
-  StackedLightOrgan = 'StackedLightOrgan',
-  DiagonalLightOrgan = 'DiagonalLightOrgan',
-  GatedLightOrgan = 'GatedLightOrgan',
-}
-
-/**
- * AudioCueType is a free-form string so user-authored cues can
+ * AudioCueType is a free-form string so user-authored (node-based) cues can
  * register arbitrary identifiers from the node editor.
  */
 export type AudioCueType = string
 
-export type BuiltInAudioCueType = `${BuiltInAudioCues}`
-
-export const builtInAudioCueList: BuiltInAudioCueType[] = Object.values(
-  BuiltInAudioCues,
-) as BuiltInAudioCueType[]
+/**
+ * Context injected when execution was started from an AudioTriggerNode output path.
+ * Used by cue-data getter nodes to read trigger-specific values.
+ */
+export interface TriggerContext {
+  triggerLevel: number
+  triggerFrequencyMin: number
+  triggerFrequencyMax: number
+  triggerPeakFrequency: number
+  triggerBandAmplitude: number
+}
 
 /**
  * Audio cue data structure passed to cue implementations
@@ -59,4 +36,7 @@ export interface AudioCueData {
 
   /** Execution count for this cue */
   executionCount: number
+
+  /** Set when execution was started from an AudioTriggerNode (enter/during/exit path) */
+  triggerContext?: TriggerContext
 }

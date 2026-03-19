@@ -300,7 +300,7 @@ export interface YargNodeCueDefinition extends BaseCueDefinition {
 
 export interface AudioNodeCueDefinition extends BaseCueDefinition {
   cueTypeId: string
-  nodes: NodeGraph<AudioEventNode, ActionNode>
+  nodes: NodeGraph<AudioEventNodeUnion, ActionNode>
 }
 
 export interface YargNodeCueFile {
@@ -332,22 +332,28 @@ export interface YargEventNode extends BaseEventNode {
   eventType: YargEventType
 }
 
-export type AudioEventType =
-  | 'none'
-  | 'delay'
-  | 'audio-beat'
-  | 'audio-range1'
-  | 'audio-range2'
-  | 'audio-range3'
-  | 'audio-range4'
-  | 'audio-range5'
-  | 'audio-energy'
+export type AudioEventType = 'none' | 'delay' | 'audio-beat' | 'audio-energy' | 'audio-trigger'
 
 export interface AudioEventNode extends BaseEventNode {
   eventType: AudioEventType
   threshold?: number
   triggerMode: 'edge' | 'level'
 }
+
+export type AudioTriggerBalance = 'left' | 'right' | 'stereo'
+
+export interface AudioTriggerNode extends BaseEventNode {
+  type: 'event'
+  eventType: 'audio-trigger'
+  frequencyRange: { minHz: number; maxHz: number }
+  sensitivity: number
+  balance: AudioTriggerBalance
+  color: string
+  nodeLabel: string
+  outputs: ['enter', 'during', 'exit']
+}
+
+export type AudioEventNodeUnion = AudioEventNode | AudioTriggerNode
 
 export const NODE_EFFECT_TYPES = ['set-color', 'blackout'] as const
 

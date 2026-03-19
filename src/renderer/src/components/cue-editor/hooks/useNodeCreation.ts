@@ -319,7 +319,10 @@ const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCre
         position: pos,
         data: {
           kind: 'event',
-          label: defaultOption.label,
+          label:
+            nodeMode === 'audio' && defaultOption.value === 'audio-trigger'
+              ? 'Audio Trigger'
+              : defaultOption.label,
           payload:
             nodeMode === 'yarg'
               ? {
@@ -327,13 +330,25 @@ const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCre
                   type: 'event',
                   eventType: defaultOption.value as YargEventNode['eventType'],
                 }
-              : {
-                  id: newEventId,
-                  type: 'event',
-                  eventType: defaultOption.value as AudioEventNode['eventType'],
-                  threshold: 0.5,
-                  triggerMode: 'edge',
-                },
+              : defaultOption.value === 'audio-trigger'
+                ? {
+                    id: newEventId,
+                    type: 'event',
+                    eventType: 'audio-trigger',
+                    frequencyRange: { minHz: 120, maxHz: 500 },
+                    sensitivity: 0.5,
+                    balance: 'stereo',
+                    color: '#60a5fa',
+                    nodeLabel: 'Audio Trigger',
+                    outputs: ['enter', 'during', 'exit'],
+                  }
+                : {
+                    id: newEventId,
+                    type: 'event',
+                    eventType: defaultOption.value as AudioEventNode['eventType'],
+                    threshold: 0.5,
+                    triggerMode: 'edge',
+                  },
         },
       }
       setNodes((nds) => [...nds, newNode])

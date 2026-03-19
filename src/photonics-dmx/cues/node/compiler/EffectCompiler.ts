@@ -1,6 +1,6 @@
 import {
   ActionNode,
-  AudioEventNode,
+  AudioEventNodeUnion,
   AudioEffectDefinition,
   BaseEventNode,
   BaseEffectDefinition,
@@ -36,7 +36,7 @@ export interface CompiledEffect<TEvent extends BaseEventNode> {
 }
 
 export type CompiledYargEffect = CompiledEffect<YargEventNode>
-export type CompiledAudioEffect = CompiledEffect<AudioEventNode>
+export type CompiledAudioEffect = CompiledEffect<AudioEventNodeUnion>
 
 export class EffectCompiler {
   public static compileYargEffect(definition: YargEffectDefinition): CompiledYargEffect {

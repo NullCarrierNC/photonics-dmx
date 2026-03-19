@@ -259,11 +259,13 @@ export class NodeExecutionEngine {
    * @param eventNode The event node to start execution from
    * @param parameters The cue data parameters
    * @param onComplete Optional callback fired when this execution context completes
+   * @param options Optional: fromPort filters outgoing edges to only the given port (e.g. 'enter', 'during', 'exit' for AudioTriggerNode)
    */
   public startExecutionWithCallback(
     eventNode: BaseEventNode,
     parameters: CueData,
     onComplete?: () => void,
+    options?: { fromPort?: string },
   ): void {
     try {
       const context = new ExecutionContext(
@@ -300,9 +302,12 @@ export class NodeExecutionEngine {
       this.emitNodeExecution('activated', eventNode.id)
       this.emitNodeExecution('deactivated', eventNode.id)
 
-      // Get outgoing edges from event node and start execution
+      // Get outgoing edges from event node; filter by fromPort when provided (e.g. AudioTriggerNode enter/during/exit)
       const { adjacency } = this.compiledCue
-      const outgoing = adjacency.get(eventNode.id) ?? []
+      let outgoing = adjacency.get(eventNode.id) ?? []
+      if (options?.fromPort !== undefined) {
+        outgoing = outgoing.filter((conn) => conn.fromPort === options.fromPort)
+      }
       const nextNodes = outgoing.map((conn) => conn.to)
 
       if (nextNodes.length > 0) {

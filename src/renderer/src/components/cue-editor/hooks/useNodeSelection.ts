@@ -3,6 +3,8 @@ import type { ReactFlowInstance } from 'reactflow'
 import type {
   ActionNode,
   AudioEventNode,
+  AudioEventNodeUnion,
+  AudioTriggerNode,
   EventListenerNode,
   EventRaiserNode,
   LogicNode,
@@ -156,7 +158,7 @@ export function useNodeSelection({
     <
       T extends
         | YargEventNode
-        | AudioEventNode
+        | AudioEventNodeUnion
         | ActionNode
         | LogicNode
         | EventRaiserNode
@@ -174,10 +176,13 @@ export function useNodeSelection({
           const nextPayload = { ...node.data.payload, ...updates } as T
           const label = (() => {
             switch (node.data.kind) {
-              case 'event':
-                return activeMode === 'yarg'
-                  ? (nextPayload as YargEventNode).eventType
-                  : (nextPayload as AudioEventNode).eventType
+              case 'event': {
+                if (activeMode === 'yarg') return (nextPayload as YargEventNode).eventType
+                const audioPayload = nextPayload as AudioEventNodeUnion
+                return audioPayload.eventType === 'audio-trigger'
+                  ? (audioPayload as AudioTriggerNode).nodeLabel
+                  : (audioPayload as AudioEventNode).eventType
+              }
               case 'action':
                 return (nextPayload as ActionNode).effectType
               case 'logic':

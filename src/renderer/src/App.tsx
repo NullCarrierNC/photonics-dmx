@@ -282,7 +282,6 @@ export const App = (): JSX.Element => {
           sensitivity: config.sensitivity,
           beatDetection: config.beatDetection,
           smoothing: config.smoothing,
-          frequencyBands: config.frequencyBands,
           enabled: config.enabled,
           linearResponse: config.linearResponse,
           // Preserve fields that exist in frontend but not in backend config

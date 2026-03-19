@@ -98,6 +98,13 @@ export const audioListenerEnabledAtom = atom<boolean>(false)
  */
 export const audioDataAtom = atom<AudioLightingData | null>(null)
 
+/**
+ * Live Monitor toggle in Cue Editor (audio mode).
+ * When true, the Cue Editor window captures audio and sends it to the main process
+ * so trigger nodes can be evaluated in real time.
+ */
+export const liveMonitorEnabledAtom = atom<boolean>(false)
+
 export const isSenderErrorAtom = atom<boolean>(false)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error message or serialized error
 export const senderErrorAtom = atom<any>('')
@@ -205,18 +212,6 @@ export interface LightingPreferences {
     smoothing: {
       enabled: boolean
       alpha: number
-    }
-    frequencyBands: {
-      bandCount: number
-      ranges: Array<{
-        id: string
-        name: string
-        minHz: number
-        maxHz: number
-        color: string
-        brightness: 'low' | 'medium' | 'high' | 'max'
-        sensitivity: number
-      }>
     }
     enabled: boolean
     linearResponse?: boolean

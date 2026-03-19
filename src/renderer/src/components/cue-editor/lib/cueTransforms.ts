@@ -2,8 +2,10 @@ import type { Edge, ReactFlowInstance } from 'reactflow'
 import type {
   ActionNode,
   AudioEventNode,
+  AudioEventNodeUnion,
   AudioNodeCueDefinition,
   AudioEffectDefinition,
+  AudioTriggerNode,
   Connection,
   EventRaiserNode,
   EventListenerNode,
@@ -42,8 +44,58 @@ const DEFAULT_POS = {
 
 type NodePositions = Record<string, { x: number; y: number }>
 
+const AUDIO_TRIGGER_SAVE_DEFAULTS = {
+  frequencyRange: { minHz: 120, maxHz: 500 } as const,
+  sensitivity: 0.5,
+  balance: 'stereo' as const,
+  color: '#60a5fa',
+  nodeLabel: 'Audio Trigger',
+  outputs: ['enter', 'during', 'exit'] as const,
+}
+
+function normalizeAudioEventForSave(
+  event: YargEventNode | AudioEventNodeUnion,
+): YargEventNode | AudioEventNodeUnion {
+  const e = event as Record<string, unknown>
+  if (e.eventType !== 'audio-trigger') {
+    if (
+      e.eventType === 'none' ||
+      e.eventType === 'delay' ||
+      e.eventType === 'audio-beat' ||
+      e.eventType === 'audio-energy'
+    ) {
+      return {
+        id: e.id,
+        type: 'event',
+        eventType: e.eventType,
+        triggerMode: (e.triggerMode as 'edge' | 'level') ?? 'edge',
+        ...(e.label != null && { label: e.label as string }),
+        ...(e.outputs != null && { outputs: e.outputs as string[] }),
+        ...(e.threshold != null && { threshold: e.threshold as number }),
+      } as AudioEventNode
+    }
+    return event
+  }
+  const t = event as Partial<AudioTriggerNode>
+  return {
+    id: t.id ?? e.id,
+    type: 'event',
+    eventType: 'audio-trigger',
+    frequencyRange: t.frequencyRange ?? AUDIO_TRIGGER_SAVE_DEFAULTS.frequencyRange,
+    sensitivity: t.sensitivity ?? AUDIO_TRIGGER_SAVE_DEFAULTS.sensitivity,
+    balance: t.balance ?? AUDIO_TRIGGER_SAVE_DEFAULTS.balance,
+    color: t.color ?? AUDIO_TRIGGER_SAVE_DEFAULTS.color,
+    nodeLabel: t.nodeLabel ?? AUDIO_TRIGGER_SAVE_DEFAULTS.nodeLabel,
+    outputs:
+      Array.isArray(t.outputs) && t.outputs.length === 3
+        ? (t.outputs as ['enter', 'during', 'exit'])
+        : AUDIO_TRIGGER_SAVE_DEFAULTS.outputs,
+    ...(t.label != null && { label: t.label }),
+  } as AudioTriggerNode
+}
+
 function buildEventNodes(
-  events: (YargEventNode | AudioEventNode)[],
+  events: (YargEventNode | AudioEventNodeUnion)[],
   nodePositions: NodePositions,
   mode: NodeCueMode,
 ): EditorNode[] {
@@ -56,7 +108,9 @@ function buildEventNodes(
       label:
         mode === 'yarg'
           ? getYargEventLabel((event as YargEventNode).eventType)
-          : getAudioEventLabel((event as AudioEventNode).eventType),
+          : event.eventType === 'audio-trigger'
+            ? (event as AudioTriggerNode).nodeLabel
+            : getAudioEventLabel((event as AudioEventNode).eventType),
       payload: event,
     },
   }))
@@ -192,7 +246,7 @@ function connectionsToEdges(connections: ConnectionInput[]): Edge[] {
 
 /** Payloads extracted from flow nodes/edges for cue or effect document. */
 export type NodeGraphPayloads = {
-  events: (YargEventNode | AudioEventNode)[]
+  events: (YargEventNode | AudioEventNodeUnion)[]
   actions: ActionNode[]
   logic: LogicNode[]
   eventRaisers: EventRaiserNode[]
@@ -243,7 +297,9 @@ function flowToNodesAndConnections(
   const notesNodes = nodes.filter((n) => n.data.kind === 'notes')
 
   const payload: NodeGraphPayloads = {
-    events: eventNodes.map((n) => n.data.payload) as (YargEventNode | AudioEventNode)[],
+    events: eventNodes.map((n) =>
+      normalizeAudioEventForSave(n.data.payload as YargEventNode | AudioEventNodeUnion),
+    ) as (YargEventNode | AudioEventNodeUnion)[],
     actions: actionNodes.map((n) => n.data.payload as ActionNode),
     logic: logicNodes.map((n) => n.data.payload as LogicNode),
     eventRaisers: eventRaiserNodes.map((n) => n.data.payload as EventRaiserNode),

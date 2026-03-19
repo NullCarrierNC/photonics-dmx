@@ -373,7 +373,6 @@ const AUDIO_CONFIG_KEYS = new Set([
   'sensitivity',
   'beatDetection',
   'smoothing',
-  'frequencyBands',
   'enabled',
 ])
 

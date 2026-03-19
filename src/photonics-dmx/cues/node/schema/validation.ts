@@ -41,7 +41,9 @@ import { AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY } from '../../../constants/options'
 // All event types for YARG event nodes (includes system events + song events)
 const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENT_TYPES_SOURCE]
 
-const AUDIO_EVENT_TYPES: AudioEventType[] = [...AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY]
+const AUDIO_EVENT_TYPES: AudioEventType[] = AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY.filter(
+  (t) => t !== 'audio-trigger',
+)
 
 const LOGIC_COMPARATORS: LogicComparator[] = ['>', '>=', '<', '<=', '==', '!=']
 const MATH_OPERATORS: MathOperator[] = ['add', 'subtract', 'multiply', 'divide', 'modulus']
@@ -659,6 +661,47 @@ const audioEventSchema: JSONSchemaType<AudioEventNode> = {
   },
 }
 
+const audioTriggerSchema = {
+  type: 'object' as const,
+  required: [
+    'id',
+    'type',
+    'eventType',
+    'frequencyRange',
+    'sensitivity',
+    'balance',
+    'color',
+    'nodeLabel',
+    'outputs',
+  ],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'event' },
+    eventType: { type: 'string', const: 'audio-trigger' },
+    label: { type: 'string', nullable: true },
+    frequencyRange: {
+      type: 'object',
+      required: ['minHz', 'maxHz'],
+      additionalProperties: false,
+      properties: {
+        minHz: { type: 'number', minimum: 120, maximum: 20000 },
+        maxHz: { type: 'number', minimum: 120, maximum: 20000 },
+      },
+    },
+    sensitivity: { type: 'number', minimum: 0, maximum: 1 },
+    balance: { type: 'string', enum: ['left', 'right', 'stereo'] },
+    color: { type: 'string', minLength: 1 },
+    nodeLabel: { type: 'string' },
+    outputs: {
+      type: 'array',
+      items: { type: 'string', enum: ['enter', 'during', 'exit'] },
+      minItems: 3,
+      maxItems: 3,
+    },
+  },
+} as any
+
 const connectionSchema: JSONSchemaType<{
   from: string
   to: string
@@ -813,7 +856,7 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
         events: {
           type: 'array',
           minItems: 1,
-          items: audioEventSchema,
+          items: { anyOf: [audioEventSchema, audioTriggerSchema] } as any,
         },
         actions: {
           type: 'array',

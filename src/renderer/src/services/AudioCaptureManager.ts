@@ -16,75 +16,12 @@ import { sendAudioData } from '../ipcApi'
 
 const store = getDefaultStore()
 
-// Default frequency ranges (matching DEFAULT_RANGES in AudioColorMapping)
-const DEFAULT_RANGES: Array<{
-  id: string
-  name: string
-  minHz: number
-  maxHz: number
-  color: string
-  brightness: 'low' | 'medium' | 'high' | 'max'
-  sensitivity: number
-}> = [
-  {
-    id: 'range1',
-    name: 'Bass',
-    minHz: 20,
-    maxHz: 220,
-    color: 'red',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-  {
-    id: 'range2',
-    name: 'Lower-Mids',
-    minHz: 220,
-    maxHz: 800,
-    color: 'blue',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-  {
-    id: 'range3',
-    name: 'Upper-Mids',
-    minHz: 800,
-    maxHz: 2500,
-    color: 'yellow',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-  {
-    id: 'range4',
-    name: 'Highs',
-    minHz: 2500,
-    maxHz: 6000,
-    color: 'green',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-  {
-    id: 'range5',
-    name: 'Air',
-    minHz: 6000,
-    maxHz: 20000,
-    color: 'cyan',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-]
-
-const DEFAULT_BAND_COUNT = 4 as AudioConfig['frequencyBands']['bandCount']
-
 const DEFAULT_CONFIG: AudioConfig = {
   fftSize: 2048,
   sensitivity: 1.0,
   smoothing: {
     enabled: true,
     alpha: 0.7,
-  },
-  frequencyBands: {
-    bandCount: DEFAULT_BAND_COUNT,
-    ranges: DEFAULT_RANGES,
   },
   beatDetection: {
     threshold: 0.3,
@@ -93,6 +30,9 @@ const DEFAULT_CONFIG: AudioConfig = {
   },
   enabled: false,
 }
+
+const BASS_MIN_HZ = 20
+const BASS_MAX_HZ = 220
 
 export class AudioCaptureManager {
   private audioContext: AudioContext | null = null
@@ -103,8 +43,6 @@ export class AudioCaptureManager {
   private config: AudioConfig
   private isCapturing = false
 
-  // Smoothing state - store per range
-  private smoothedRanges: Map<string, number> = new Map()
   private smoothedEnergy = 0
 
   // Beat detection state
@@ -135,18 +73,7 @@ export class AudioCaptureManager {
   private readonly VALUE_CHANGE_THRESHOLD = 0.01 // Only update if values changed by >1%
 
   constructor(config?: Partial<AudioConfig>) {
-    // Merge with defaults, ensuring frequencyBands.ranges exists
-    this.config = {
-      ...DEFAULT_CONFIG,
-      ...config,
-      frequencyBands: config?.frequencyBands?.ranges
-        ? {
-            bandCount: (config.frequencyBands.bandCount ??
-              DEFAULT_BAND_COUNT) as AudioConfig['frequencyBands']['bandCount'],
-            ranges: config.frequencyBands.ranges,
-          }
-        : DEFAULT_CONFIG.frequencyBands,
-    }
+    this.config = { ...DEFAULT_CONFIG, ...config }
     console.log('AudioCaptureManager initialized')
   }
 
@@ -267,7 +194,6 @@ export class AudioCaptureManager {
     this.isCapturing = false
 
     // Reset state
-    this.smoothedRanges.clear()
     this.smoothedEnergy = 0
     this.energyHistory = []
     this.recentEnergyHistory = []
@@ -312,15 +238,10 @@ export class AudioCaptureManager {
       console.log(`Updated FFT size to ${config.fftSize}`)
     }
 
-    // Log config update for debugging
     console.log('AudioCaptureManager configuration updated:', {
       sensitivity: config.sensitivity !== undefined ? config.sensitivity : 'unchanged',
       smoothing: config.smoothing !== undefined ? config.smoothing : 'unchanged',
       beatDetection: config.beatDetection !== undefined ? config.beatDetection : 'unchanged',
-      frequencyBands:
-        config.frequencyBands !== undefined
-          ? `ranges: ${config.frequencyBands.ranges.length}`
-          : 'unchanged',
       fftSize: config.fftSize !== undefined ? config.fftSize : 'unchanged',
     })
   }
@@ -332,11 +253,11 @@ export class AudioCaptureManager {
   private analyzeAudio(): void {
     if (!this.analyser || !this.isCapturing) return
 
-    // Get frequency data from analyser (built-in FFT!)
+    // Get frequency data from analyser (built-in FFT)
     const dataArray = new Uint8Array(this.analyser.frequencyBinCount)
     this.analyser.getByteFrequencyData(dataArray)
 
-    // Calculate frequency bands
+    // Calculate frequency bands and include raw FFT data (byte data is linear 0-255, IPC-safe)
     const audioData = this.calculateFrequencyBands(dataArray)
 
     // Always send to main process via IPC (full frame rate)
@@ -362,11 +283,7 @@ export class AudioCaptureManager {
       this.frameCounter = 0
       console.log('Audio Capture Active:', {
         energy: audioData.energy.toFixed(3),
-        range1: audioData.frequencyBands.range1.toFixed(3),
-        range2: audioData.frequencyBands.range2.toFixed(3),
-        range3: audioData.frequencyBands.range3.toFixed(3),
-        range4: audioData.frequencyBands.range4.toFixed(3),
-        range5: audioData.frequencyBands.range5.toFixed(3),
+        overallLevel: audioData.overallLevel.toFixed(3),
         beat: audioData.beatDetected ? 'YES' : 'no',
       })
     }
@@ -394,33 +311,8 @@ export class AudioCaptureManager {
       return true
     }
 
-    // Check if frequency bands changed significantly
-    const range1Diff = Math.abs(
-      newData.frequencyBands.range1 - this.lastAudioData.frequencyBands.range1,
-    )
-    const range2Diff = Math.abs(
-      newData.frequencyBands.range2 - this.lastAudioData.frequencyBands.range2,
-    )
-    const range3Diff = Math.abs(
-      newData.frequencyBands.range3 - this.lastAudioData.frequencyBands.range3,
-    )
-    const range4Diff = Math.abs(
-      newData.frequencyBands.range4 - this.lastAudioData.frequencyBands.range4,
-    )
-    const range5Diff = Math.abs(
-      newData.frequencyBands.range5 - this.lastAudioData.frequencyBands.range5,
-    )
     const energyDiff = Math.abs(newData.energy - this.lastAudioData.energy)
-
-    // Update if any value changed by more than threshold
-    return (
-      range1Diff > this.VALUE_CHANGE_THRESHOLD ||
-      range2Diff > this.VALUE_CHANGE_THRESHOLD ||
-      range3Diff > this.VALUE_CHANGE_THRESHOLD ||
-      range4Diff > this.VALUE_CHANGE_THRESHOLD ||
-      range5Diff > this.VALUE_CHANGE_THRESHOLD ||
-      energyDiff > this.VALUE_CHANGE_THRESHOLD
-    )
+    return energyDiff > this.VALUE_CHANGE_THRESHOLD
   }
 
   /**
@@ -436,58 +328,23 @@ export class AudioCaptureManager {
     const fftSize = this.analyser.fftSize
     const binSize = sampleRate / fftSize
 
-    // Get configured ranges (default to DEFAULT_RANGES if not set)
-    const ranges = this.config.frequencyBands?.ranges || DEFAULT_RANGES
-
-    // Calculate energy for each configured range
-    const rangeEnergies: Map<string, number> = new Map()
-    for (const range of ranges) {
-      const energy = this.getEnergyInRange(frequencyData, binSize, range.minHz, range.maxHz)
-      rangeEnergies.set(range.id, energy)
-    }
-
-    // Calculate overall energy
+    // Overall energy (0-1)
     let totalEnergy = 0
     for (let i = 0; i < frequencyData.length; i++) {
       totalEnergy += frequencyData[i]
     }
     const overallEnergy = Math.min((totalEnergy / frequencyData.length / 255) * 2, 1.0)
-
-    // Apply global sensitivity first, then per-range sensitivity
-    const scaledEnergies: Map<string, number> = new Map()
-    for (const range of ranges) {
-      const energy = rangeEnergies.get(range.id) || 0
-      // Apply global sensitivity first
-      const globallyScaled = energy * this.config.sensitivity
-      // Then apply per-range sensitivity (0-1 multiplier)
-      const rangeSensitivity = range.sensitivity ?? 1.0
-      scaledEnergies.set(range.id, Math.min(globallyScaled * rangeSensitivity, 1.0))
-    }
     const scaledEnergy = Math.min(overallEnergy * this.config.sensitivity, 1.0)
 
-    // Apply smoothing if enabled
-    const finalEnergies: Map<string, number> = new Map()
     let finalEnergy = scaledEnergy
-
     if (this.config.smoothing.enabled) {
       const alpha = this.config.smoothing.alpha
-      for (const [rangeId, scaledEnergy] of scaledEnergies.entries()) {
-        const previousSmoothed = this.smoothedRanges.get(rangeId) || 0
-        const smoothed = alpha * scaledEnergy + (1 - alpha) * previousSmoothed
-        this.smoothedRanges.set(rangeId, smoothed)
-        finalEnergies.set(rangeId, smoothed)
-      }
       this.smoothedEnergy = alpha * scaledEnergy + (1 - alpha) * this.smoothedEnergy
       finalEnergy = this.smoothedEnergy
-    } else {
-      // No smoothing - use scaled values directly
-      for (const [rangeId, scaledEnergy] of scaledEnergies.entries()) {
-        finalEnergies.set(rangeId, scaledEnergy)
-      }
     }
 
-    // Beat detection
-    const bassEnergy = finalEnergies.get('range1') || 0
+    // Bass energy for beat detection (20-220 Hz)
+    const bassEnergy = this.getEnergyInRange(frequencyData, binSize, BASS_MIN_HZ, BASS_MAX_HZ)
     const { beatDetected, bpm } = this.detectBeat({
       finalEnergy,
       bassEnergy,
@@ -495,31 +352,37 @@ export class AudioCaptureManager {
       binSize,
     })
 
-    // Calculate overall level (RMS of all ranges)
-    const rangeValues = Array.from(finalEnergies.values())
-    const sumOfSquares = rangeValues.reduce((sum, val) => sum + val * val, 0)
-    const overallLevel = Math.sqrt(sumOfSquares / rangeValues.length)
-
+    const overallLevel = finalEnergy
     this.frameIndex++
 
-    // Map final energies to range1-range5 structure
-    // Ensure we always have exactly 5 ranges (use 0 if range not configured)
-    const frequencyBands = {
-      range1: finalEnergies.get('range1') || 0,
-      range2: finalEnergies.get('range2') || 0,
-      range3: finalEnergies.get('range3') || 0,
-      range4: finalEnergies.get('range4') || 0,
-      range5: finalEnergies.get('range5') || 0,
+    // Peak frequency: bin with max magnitude -> Hz
+    let peakBin = 0
+    let maxVal = 0
+    for (let i = 0; i < frequencyData.length; i++) {
+      if (frequencyData[i] > maxVal) {
+        maxVal = frequencyData[i]
+        peakBin = i
+      }
     }
+    const peakFrequency = peakBin * binSize
 
-    // Return processed audio data
+    // Amplitude: overall normalized level (same as overallLevel for compatibility)
+    const amplitude = overallLevel
+
+    // IPC-safe raw FFT data (byte data 0-255) for per-node band computation in main process
+    const rawFrequencyData = Array.from(frequencyData)
+
     return {
       timestamp: Date.now(),
       overallLevel,
       bpm,
       beatDetected,
-      frequencyBands,
       energy: finalEnergy,
+      rawFrequencyData,
+      sampleRate,
+      fftSize,
+      peakFrequency,
+      amplitude,
     }
   }
 
