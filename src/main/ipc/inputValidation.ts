@@ -372,10 +372,60 @@ const AUDIO_CONFIG_KEYS = new Set([
   'deviceId',
   'fftSize',
   'sensitivity',
+  'bands',
   'beatDetection',
   'smoothing',
   'enabled',
 ])
+
+/**
+ * Validates a single audio band definition
+ */
+function validateAudioBand(band: unknown): ValidationResult<Record<string, unknown>> {
+  if (!isPlainObject(band)) {
+    return { ok: false, error: 'Audio band must be an object' }
+  }
+
+  const bandObj = band as Record<string, unknown>
+
+  // Validate id
+  if (!isNonEmptyString(bandObj.id)) {
+    return { ok: false, error: 'Audio band id must be a non-empty string' }
+  }
+
+  // Validate name
+  if (!isNonEmptyString(bandObj.name)) {
+    return { ok: false, error: 'Audio band name must be a non-empty string' }
+  }
+
+  // Validate minHz
+  const minHzResult = validateNumberInRange(bandObj.minHz, 20, 20000, 'Audio band minHz')
+  if (!minHzResult.ok) return minHzResult
+
+  // Validate maxHz
+  const maxHzResult = validateNumberInRange(bandObj.maxHz, 20, 20000, 'Audio band maxHz')
+  if (!maxHzResult.ok) return maxHzResult
+
+  // Validate minHz < maxHz
+  if (minHzResult.value >= maxHzResult.value) {
+    return { ok: false, error: 'Audio band minHz must be less than maxHz' }
+  }
+
+  // Validate gain
+  const gainResult = validateNumberInRange(bandObj.gain, 0.1, 5.0, 'Audio band gain')
+  if (!gainResult.ok) return gainResult
+
+  return {
+    ok: true,
+    value: {
+      id: bandObj.id,
+      name: bandObj.name,
+      minHz: minHzResult.value,
+      maxHz: maxHzResult.value,
+      gain: gainResult.value,
+    },
+  }
+}
 
 /**
  * Validates an audio configuration update payload, stripping unknown keys.
@@ -390,7 +440,27 @@ export function validateAudioConfigPayload(
   const cleaned: Record<string, unknown> = {}
   for (const key of Object.keys(data)) {
     if (AUDIO_CONFIG_KEYS.has(key)) {
-      cleaned[key] = data[key]
+      // Special validation for bands array
+      if (key === 'bands') {
+        if (!Array.isArray(data[key])) {
+          return { ok: false, error: 'Audio bands must be an array' }
+        }
+        const bandsArray = data[key] as unknown[]
+        if (bandsArray.length !== 5) {
+          return { ok: false, error: 'Audio bands must contain exactly 5 bands' }
+        }
+        const validatedBands: Record<string, unknown>[] = []
+        for (let i = 0; i < bandsArray.length; i++) {
+          const bandResult = validateAudioBand(bandsArray[i])
+          if (!bandResult.ok) {
+            return { ok: false, error: `Audio band ${i + 1}: ${bandResult.error}` }
+          }
+          validatedBands.push(bandResult.value)
+        }
+        cleaned[key] = validatedBands
+      } else {
+        cleaned[key] = data[key]
+      }
     }
   }
 

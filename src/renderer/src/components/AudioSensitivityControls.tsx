@@ -60,11 +60,11 @@ const AudioSensitivityControls: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Sensitivity
+            Global Sensitivity
           </label>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Adjust the sensitivity/gain multiplier for audio input. Higher values make the lights
-            more reactive.
+            Adjust the global sensitivity: acts as again multiplier for audio input. This is applied
+            to all frequency bands.
           </p>
         </div>
         <div className="flex items-center space-x-2">

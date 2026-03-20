@@ -204,6 +204,13 @@ export interface LightingPreferences {
     fftSize: number
     updateIntervalMs?: number
     sensitivity: number
+    bands?: Array<{
+      id: string
+      name: string
+      minHz: number
+      maxHz: number
+      gain: number
+    }>
     beatDetection: {
       threshold: number
       decayRate: number

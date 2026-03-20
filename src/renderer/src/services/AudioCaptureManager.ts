@@ -10,6 +10,7 @@
  */
 
 import { AudioLightingData, AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { BeatDetector } from '../../../photonics-dmx/listeners/Audio/BeatDetector'
 import { extractAll } from '../../../photonics-dmx/listeners/Audio/SpectralFeatureExtractor'
 import { MelBandAnalyser } from '../../../photonics-dmx/listeners/Audio/MelBandAnalyser'
@@ -25,6 +26,7 @@ const store = getDefaultStore()
 const DEFAULT_CONFIG: AudioConfig = {
   fftSize: 2048,
   sensitivity: 1.0,
+  bands: DEFAULT_AUDIO_BANDS,
   smoothing: {
     enabled: true,
     alpha: 0.7,
@@ -60,6 +62,12 @@ export class AudioCaptureManager {
   private melBandAnalyser: MelBandAnalyser | null = null
   private keyDetector: KeyDetector
   private frameIndex = 0
+
+  // Cached bin-to-band mapping for efficient per-band gain application
+  // Maps bin index to band index (0-4) or -1 if no band matches
+  private binToBandMap: Int8Array | null = null
+  // Cached band gains array (indexed by band index 0-4)
+  private bandGains: number[] = [1.0, 1.0, 1.0, 1.0, 1.0]
 
   // Debug logging (log status every ~60 frames ≈ 1 second at 60fps)
   private frameCounter = 0
@@ -121,6 +129,9 @@ export class AudioCaptureManager {
         24,
       )
       this.keyDetector.reset()
+
+      // Build bin-to-band mapping now that we have audio context
+      this.rebuildBinToBandMap()
 
       // Start analysis loop
       this.analyzeAudio()
@@ -230,6 +241,52 @@ export class AudioCaptureManager {
   }
 
   /**
+   * Rebuild bin-to-band mapping cache
+   * Called when bands config changes or when audio context is initialized
+   */
+  private rebuildBinToBandMap(): void {
+    if (!this.audioContext || !this.analyser) {
+      this.binToBandMap = null
+      return
+    }
+
+    const sampleRate = this.audioContext.sampleRate
+    const fftSize = this.analyser.fftSize
+    const binSize = sampleRate / fftSize
+    const binCount = this.analyser.frequencyBinCount
+
+    // Create mapping array
+    this.binToBandMap = new Int8Array(binCount)
+    this.binToBandMap.fill(-1) // -1 means no band matches
+
+    // Extract band gains for quick lookup
+    this.bandGains = this.config.bands.map((band) => band.gain)
+
+    // For each bin, find which band it belongs to
+    for (let binIndex = 0; binIndex < binCount; binIndex++) {
+      // Calculate centre frequency of this bin
+      const centreFreq = binIndex * binSize
+
+      // Find matching band (minHz <= centreFreq < maxHz)
+      for (let bandIndex = 0; bandIndex < this.config.bands.length; bandIndex++) {
+        const band = this.config.bands[bandIndex]
+        if (centreFreq >= band.minHz && centreFreq < band.maxHz) {
+          this.binToBandMap[binIndex] = bandIndex
+          break
+        }
+      }
+      // If no band matches (e.g., sub-20 Hz), binToBandMap[binIndex] remains -1
+    }
+
+    console.log('Rebuilt bin-to-band mapping', {
+      binCount,
+      sampleRate,
+      fftSize,
+      binSize: binSize.toFixed(2),
+    })
+  }
+
+  /**
    * Update configuration
    * This is called when config changes while audio is running
    */
@@ -245,7 +302,14 @@ export class AudioCaptureManager {
         this.analyser.fftSize,
         24,
       )
+      // Rebuild mapping since FFT size changed
+      this.rebuildBinToBandMap()
       console.log(`Updated FFT size to ${config.fftSize}`)
+    }
+
+    // Rebuild mapping if bands changed
+    if (config.bands) {
+      this.rebuildBinToBandMap()
     }
 
     if (config.beatDetection) {
@@ -254,6 +318,7 @@ export class AudioCaptureManager {
 
     console.log('AudioCaptureManager configuration updated:', {
       sensitivity: config.sensitivity !== undefined ? config.sensitivity : 'unchanged',
+      bands: config.bands !== undefined ? 'updated' : 'unchanged',
       smoothing: config.smoothing !== undefined ? config.smoothing : 'unchanged',
       beatDetection: config.beatDetection !== undefined ? config.beatDetection : 'unchanged',
       fftSize: config.fftSize !== undefined ? config.fftSize : 'unchanged',
@@ -437,10 +502,32 @@ export class AudioCaptureManager {
     const amplitude = overallLevel
 
     // IPC-safe raw FFT data (byte data 0-255) for per-node band computation in main process
-    // Apply global sensitivity to rawFrequencyData so audio-trigger nodes respect the global setting
-    const rawFrequencyData = Array.from(frequencyData).map((bin) =>
-      Math.min(Math.round(bin * this.config.sensitivity), 255),
-    )
+    // Apply global sensitivity and per-band gain multipliers
+    // Gain pipeline: raw bin * globalSensitivity * bandGain
+    const rawFrequencyData = new Array<number>(frequencyData.length)
+    if (this.binToBandMap && this.binToBandMap.length === frequencyData.length) {
+      // Use cached bin-to-band mapping for efficient lookup
+      for (let i = 0; i < frequencyData.length; i++) {
+        const bin = frequencyData[i]
+        const bandIndex = this.binToBandMap[i]
+        if (bandIndex >= 0 && bandIndex < this.bandGains.length) {
+          // Apply global sensitivity * band gain
+          rawFrequencyData[i] = Math.min(
+            Math.round(bin * this.config.sensitivity * this.bandGains[bandIndex]),
+            255,
+          )
+        } else {
+          // No band matches (e.g., sub-20 Hz bins) - apply global sensitivity only
+          rawFrequencyData[i] = Math.min(Math.round(bin * this.config.sensitivity), 255)
+        }
+      }
+    } else {
+      // Fallback: if mapping not available, apply global sensitivity only
+      // This should only happen briefly during initialization
+      for (let i = 0; i < frequencyData.length; i++) {
+        rawFrequencyData[i] = Math.min(Math.round(frequencyData[i] * this.config.sensitivity), 255)
+      }
+    }
 
     const spectral = extractAll(frequencyData, timeDomainData, binSize, sampleRate)
 

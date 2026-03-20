@@ -58,6 +58,22 @@ export interface AudioLightingData {
 }
 
 /**
+ * Frequency band definition for audio analysis
+ */
+export interface AudioBandDefinition {
+  /** Unique identifier for the band */
+  id: string
+  /** Display name for the band */
+  name: string
+  /** Minimum frequency in Hz (20-20000) */
+  minHz: number
+  /** Maximum frequency in Hz (20-20000, must be > minHz) */
+  maxHz: number
+  /** Per-band gain multiplier (0.1-5.0, default: 1.0) */
+  gain: number
+}
+
+/**
  * Audio configuration interface
  * Controls how audio input is processed and mapped to lighting
  */
@@ -70,6 +86,9 @@ export interface AudioConfig {
 
   /** Sensitivity/gain multiplier (default: 1.0, range: 0.1-5.0) */
   sensitivity: number
+
+  /** Frequency band definitions (exactly 5 bands) */
+  bands: AudioBandDefinition[]
 
   /** Beat detection settings */
   beatDetection: {

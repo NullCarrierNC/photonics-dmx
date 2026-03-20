@@ -2,6 +2,7 @@ import React from 'react'
 import AudioToggle from '../components/AudioToggle'
 import AudioDeviceSelector from '../components/AudioDeviceSelector'
 import AudioSensitivityControls from '../components/AudioSensitivityControls'
+import AudioBandSettings from '../components/AudioBandSettings'
 import AudioBeatDetection from '../components/AudioBeatDetection'
 import AudioSmoothingSettings from '../components/AudioSmoothingSettings'
 import AudioLinearResponseToggle from '../components/AudioLinearResponseToggle'
@@ -34,6 +35,13 @@ const AudioSettings: React.FC = () => {
           Audio Sensitivity
         </h2>
         <AudioSensitivityControls />
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 dark:border-gray-700">
+        <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
+          Frequency Bands
+        </h2>
+        <AudioBandSettings />
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 dark:border-gray-700">

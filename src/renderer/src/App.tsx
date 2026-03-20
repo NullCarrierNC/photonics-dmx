@@ -280,6 +280,7 @@ export const App = (): JSX.Element => {
           // Update all compatible fields from config (exclude deviceId which has type mismatch)
           fftSize: config.fftSize,
           sensitivity: config.sensitivity,
+          bands: config.bands ? [...config.bands] : prev.audioConfig?.bands,
           beatDetection: config.beatDetection,
           smoothing: config.smoothing,
           enabled: config.enabled,

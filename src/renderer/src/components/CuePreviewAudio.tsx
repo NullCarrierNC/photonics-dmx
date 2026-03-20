@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useAtomValue } from 'jotai'
-import { audioDataAtom } from '../atoms'
+import { audioDataAtom, audioConfigAtom } from '../atoms'
 import type { Color } from '../../../photonics-dmx/types'
 import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy'
+import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 
 // Map Color type to RGB values for preview bars (matches AudioColorMapping.tsx)
 const COLOR_TO_RGB: Record<Color, string> = {
@@ -36,84 +37,69 @@ type PreviewRange = {
   minHz: number
   maxHz: number
   color: Color
-  brightness: 'low' | 'medium' | 'high' | 'max'
 }
 
 /** Minimum time the beat indicator stays lit so transient single-frame triggers remain visible. */
 const MIN_BEAT_INDICATOR_MS = 280
 
+// Fixed colour palette for bands (by index)
+const BAND_COLORS: Color[] = ['red', 'orange', 'yellow', 'green', 'cyan']
+
 const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showTitle = true }) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
   const audioData = useAtomValue(audioDataAtom)
+  const audioConfig = useAtomValue(audioConfigAtom)
   const [showBeatPulse, setShowBeatPulse] = useState(false)
   const hideBeatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const defaultRanges: PreviewRange[] = [
-    {
-      id: 'range1',
-      name: 'Bass',
-      minHz: 20,
-      maxHz: 220,
-      color: 'red' as Color,
-      brightness: 'medium' as const,
-    },
-    {
-      id: 'range2',
-      name: 'Lower-Mids',
-      minHz: 220,
-      maxHz: 800,
-      color: 'orange' as Color,
-      brightness: 'medium' as const,
-    },
-    {
-      id: 'range3',
-      name: 'Upper-Mids',
-      minHz: 800,
-      maxHz: 2500,
-      color: 'yellow' as Color,
-      brightness: 'medium' as const,
-    },
-    {
-      id: 'range4',
-      name: 'Highs',
-      minHz: 2500,
-      maxHz: 6000,
-      color: 'green' as Color,
-      brightness: 'medium' as const,
-    },
-    {
-      id: 'range5',
-      name: 'Air',
-      minHz: 6000,
-      maxHz: 20000,
-      color: 'cyan' as Color,
-      brightness: 'medium' as const,
-    },
-  ]
+  // Map band definitions from config to PreviewRange format
+  const displayRanges: PreviewRange[] = useMemo(() => {
+    if (!audioConfig?.bands) {
+      return DEFAULT_AUDIO_BANDS.map((band, index) => ({
+        id: band.id,
+        name: band.name,
+        minHz: band.minHz,
+        maxHz: band.maxHz,
+        color: (BAND_COLORS[index] || 'white') as Color,
+      }))
+    }
+    return audioConfig.bands.map((band, index) => ({
+      id: band.id,
+      name: band.name,
+      minHz: band.minHz,
+      maxHz: band.maxHz,
+      color: (BAND_COLORS[index] || 'white') as Color,
+    }))
+  }, [audioConfig])
 
-  const displayRanges = defaultRanges
   const energy = audioData?.energy ?? audioData?.overallLevel ?? 0
   const bandValuesById: Record<string, number> = useMemo(() => {
     const raw = audioData?.rawFrequencyData
     const sr = audioData?.sampleRate
     const fft = audioData?.fftSize
+    const bands = audioConfig?.bands || DEFAULT_AUDIO_BANDS
+
     if (raw?.length && sr != null && fft != null) {
-      return {
-        range1: getBandEnergy(raw, sr, fft, 20, 220),
-        range2: getBandEnergy(raw, sr, fft, 220, 800),
-        range3: getBandEnergy(raw, sr, fft, 800, 2500),
-        range4: getBandEnergy(raw, sr, fft, 2500, 6000),
-        range5: getBandEnergy(raw, sr, fft, 6000, 20000),
+      // Calculate energy for each band using its configured frequency range
+      const values: Record<string, number> = {}
+      for (const band of bands) {
+        values[band.id] = getBandEnergy(raw, sr, fft, band.minHz, band.maxHz)
       }
+      return values
     }
-    return {
-      range1: energy,
-      range2: energy * 0.85,
-      range3: energy * 0.7,
-      range4: energy * 0.55,
-      range5: energy * 0.4,
-    }
-  }, [audioData?.rawFrequencyData, audioData?.sampleRate, audioData?.fftSize, energy])
+    // Fallback: use energy with decreasing multipliers
+    const fallback: Record<string, number> = {}
+    bands.forEach((band, index) => {
+      fallback[band.id] = energy * (1.0 - index * 0.15)
+    })
+    return fallback
+  }, [
+    audioData?.rawFrequencyData,
+    audioData?.sampleRate,
+    audioData?.fftSize,
+    audioConfig?.bands,
+    energy,
+  ])
 
   // Beat indicator: minimum hold time via ref timer so single-frame beats stay visible.
   // Do not clear when beatDetected goes false on the next frame — that caused flicker.
@@ -196,9 +182,6 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showT
                 <div className="flex items-center gap-2">
                   <span className="text-gray-600 dark:text-gray-300 font-medium">{range.name}</span>
                   <span className="text-gray-500 dark:text-gray-400">({frequencyLabel})</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                    {range.brightness}
-                  </span>
                 </div>
                 <span className="text-gray-600 dark:text-gray-300 font-mono">
                   {(bandValue * 100).toFixed(0)}%
