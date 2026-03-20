@@ -2,15 +2,20 @@ import { BrowserWindow, shell, screen } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import type { ControllerManager } from './controllers/ControllerManager'
+import { RENDERER_RECEIVE } from '../shared/ipcChannels'
+import type { AudioLightingData } from '../photonics-dmx/listeners/Audio/AudioTypes'
 
 export class WindowManager {
   private mainWindow: BrowserWindow | null = null
   private cueEditorWindow: BrowserWindow | null = null
+  private audioPreviewWindow: BrowserWindow | null = null
   private controllerManager: ControllerManager | null = null
   private resizeTimeout: NodeJS.Timeout | null = null
   private moveTimeout: NodeJS.Timeout | null = null
   private cueEditorResizeTimeout: NodeJS.Timeout | null = null
   private cueEditorMoveTimeout: NodeJS.Timeout | null = null
+  private audioPreviewResizeTimeout: NodeJS.Timeout | null = null
+  private audioPreviewMoveTimeout: NodeJS.Timeout | null = null
 
   /**
    * Sets the controller manager for accessing preferences
@@ -24,7 +29,7 @@ export class WindowManager {
    */
   private async saveWindowState(
     window: BrowserWindow,
-    preferenceKey: 'windowState' | 'cueEditorWindowState',
+    preferenceKey: 'windowState' | 'cueEditorWindowState' | 'audioPreviewWindowState',
   ): Promise<void> {
     if (window.isDestroyed() || !this.controllerManager) {
       return
@@ -97,6 +102,28 @@ export class WindowManager {
     this.cueEditorMoveTimeout = setTimeout(() => {
       if (this.cueEditorWindow) {
         this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
+      }
+    }, 500)
+  }
+
+  private debouncedSaveAudioPreviewResize(): void {
+    if (this.audioPreviewResizeTimeout) {
+      clearTimeout(this.audioPreviewResizeTimeout)
+    }
+    this.audioPreviewResizeTimeout = setTimeout(() => {
+      if (this.audioPreviewWindow) {
+        this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
+      }
+    }, 500)
+  }
+
+  private debouncedSaveAudioPreviewMove(): void {
+    if (this.audioPreviewMoveTimeout) {
+      clearTimeout(this.audioPreviewMoveTimeout)
+    }
+    this.audioPreviewMoveTimeout = setTimeout(() => {
+      if (this.audioPreviewWindow) {
+        this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
       }
     }, 500)
   }
@@ -309,6 +336,107 @@ export class WindowManager {
   }
 
   /**
+   * Forwards analysed audio to the Audio Preview window (single target; avoids duplicate capture).
+   */
+  public broadcastAudioMirror(data: AudioLightingData): void {
+    if (this.audioPreviewWindow && !this.audioPreviewWindow.isDestroyed()) {
+      this.audioPreviewWindow.webContents.send(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, data)
+    }
+  }
+
+  /**
+   * Creates the audio preview window
+   */
+  private createAudioPreviewWindow(): BrowserWindow {
+    let windowState = {
+      width: 560,
+      height: 420,
+      x: undefined as number | undefined,
+      y: undefined as number | undefined,
+    }
+
+    if (this.controllerManager) {
+      const savedState = this.controllerManager.getConfig().getPreference('audioPreviewWindowState')
+      if (savedState) {
+        windowState = {
+          width: savedState.width || 560,
+          height: savedState.height || 420,
+          x: savedState.x,
+          y: savedState.y,
+        }
+      }
+    }
+
+    const validatedBounds = this.validateWindowBounds({
+      width: windowState.width,
+      height: windowState.height,
+      x: windowState.x ?? 0,
+      y: windowState.y ?? 0,
+    })
+
+    this.audioPreviewWindow = new BrowserWindow({
+      width: validatedBounds.width,
+      height: validatedBounds.height,
+      x: validatedBounds.x,
+      y: validatedBounds.y,
+      title: 'Audio Preview - Photonics',
+      show: false,
+      autoHideMenuBar: false,
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    })
+
+    this.audioPreviewWindow.on('resized', () => {
+      this.debouncedSaveAudioPreviewResize()
+    })
+
+    this.audioPreviewWindow.on('moved', () => {
+      this.debouncedSaveAudioPreviewMove()
+    })
+
+    this.audioPreviewWindow.on('ready-to-show', () => {
+      this.audioPreviewWindow?.show()
+    })
+
+    this.audioPreviewWindow.on('closed', () => {
+      this.audioPreviewWindow = null
+    })
+
+    this.audioPreviewWindow.webContents.setWindowOpenHandler((details) => {
+      shell.openExternal(details.url)
+      return { action: 'deny' }
+    })
+
+    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+      this.audioPreviewWindow.loadURL(
+        `${process.env['ELECTRON_RENDERER_URL']}?window=audio-preview`,
+      )
+    } else {
+      this.audioPreviewWindow.loadFile(join(__dirname, '../renderer/index.html'), {
+        query: { window: 'audio-preview' },
+      })
+    }
+
+    return this.audioPreviewWindow
+  }
+
+  /**
+   * Opens the audio preview window (focuses existing)
+   */
+  public openAudioPreviewWindow(): BrowserWindow {
+    if (this.audioPreviewWindow && !this.audioPreviewWindow.isDestroyed()) {
+      this.audioPreviewWindow.focus()
+      return this.audioPreviewWindow
+    }
+
+    return this.createAudioPreviewWindow()
+  }
+
+  /**
    * Checks if there are any open windows
    */
   public hasWindows(): boolean {
@@ -333,6 +461,9 @@ export class WindowManager {
     if (this.cueEditorWindow && !this.cueEditorWindow.isDestroyed()) {
       await this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
     }
+    if (this.audioPreviewWindow && !this.audioPreviewWindow.isDestroyed()) {
+      await this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
+    }
 
     // Clear any pending timeouts
     if (this.resizeTimeout) {
@@ -351,6 +482,14 @@ export class WindowManager {
       clearTimeout(this.cueEditorMoveTimeout)
       this.cueEditorMoveTimeout = null
     }
+    if (this.audioPreviewResizeTimeout) {
+      clearTimeout(this.audioPreviewResizeTimeout)
+      this.audioPreviewResizeTimeout = null
+    }
+    if (this.audioPreviewMoveTimeout) {
+      clearTimeout(this.audioPreviewMoveTimeout)
+      this.audioPreviewMoveTimeout = null
+    }
 
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.close()
@@ -361,5 +500,10 @@ export class WindowManager {
       this.cueEditorWindow.close()
     }
     this.cueEditorWindow = null
+
+    if (this.audioPreviewWindow && !this.audioPreviewWindow.isDestroyed()) {
+      this.audioPreviewWindow.close()
+    }
+    this.audioPreviewWindow = null
   }
 }

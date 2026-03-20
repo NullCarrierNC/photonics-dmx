@@ -95,6 +95,12 @@ export interface AppPreferences {
     x?: number
     y?: number
   }
+  audioPreviewWindowState?: {
+    width: number
+    height: number
+    x?: number
+    y?: number
+  }
 }
 
 /**
@@ -158,6 +164,10 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   cueEditorWindowState: {
     width: 1200,
     height: 900,
+  },
+  audioPreviewWindowState: {
+    width: 560,
+    height: 420,
   },
 }
 

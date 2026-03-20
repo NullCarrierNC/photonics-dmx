@@ -26,6 +26,8 @@ const COLOR_TO_RGB: Record<Color, string> = {
 
 interface CuePreviewAudioProps {
   className?: string
+  /** When false, omit the in-card "Audio Preview" heading (page supplies the title). */
+  showTitle?: boolean
 }
 
 type PreviewRange = {
@@ -40,7 +42,7 @@ type PreviewRange = {
 /** Minimum time the beat indicator stays lit so transient single-frame triggers remain visible. */
 const MIN_BEAT_INDICATOR_MS = 280
 
-const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => {
+const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showTitle = true }) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
   const audioData = useAtomValue(audioDataAtom)
   const [showBeatPulse, setShowBeatPulse] = useState(false)
@@ -160,7 +162,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
   if (!audioData) {
     return (
       <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
-        <h3 className="text-lg font-semibold mb-1">Audio Preview</h3>
+        {showTitle && <h3 className="text-lg font-semibold mb-1">Audio Preview</h3>}
         <p className="text-gray-500 dark:text-gray-400">Waiting for audio data...</p>
       </div>
     )
@@ -170,14 +172,16 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
 
   return (
     <div className={`p-4 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold">Audio Preview</h3>
-        {bpm && (
-          <div className="text-sm font-mono bg-gray-300 dark:bg-gray-600 px-2 py-1 rounded">
-            {bpm.toFixed(0)} BPM
-          </div>
-        )}
-      </div>
+      {(showTitle || bpm != null) && (
+        <div className={`flex items-center mb-3 ${showTitle ? 'justify-between' : 'justify-end'}`}>
+          {showTitle && <h3 className="text-lg font-semibold">Audio Preview</h3>}
+          {bpm != null && (
+            <div className="text-sm font-mono bg-gray-300 dark:bg-gray-600 px-2 py-1 rounded">
+              {bpm.toFixed(0)} BPM
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Frequency Bars */}
       <div className="space-y-2 mb-4">

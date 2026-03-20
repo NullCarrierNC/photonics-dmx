@@ -18,4 +18,16 @@ export function setupWindowHandlers(ipcMain: IpcMain, windowManager: WindowManag
       }
     }
   })
+
+  ipcMain.handle(WINDOW.OPEN_AUDIO_PREVIEW, () => {
+    try {
+      windowManager.openAudioPreviewWindow()
+      return { success: true }
+    } catch (error) {
+      console.error('Failed to open audio preview window:', error)
+      return {
+        ...ipcError(error),
+      }
+    }
+  })
 }

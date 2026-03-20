@@ -1,3 +1,6 @@
+import * as fs from 'fs'
+import * as path from 'path'
+import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import {
   validateYargNodeCueFile,
   validateAudioNodeCueFile,
@@ -772,6 +775,21 @@ describe('Node cue validation', () => {
       })
       expect(result.valid).toBe(true)
     })
+  })
+
+  it('validates bundled audio-70s-light-organs.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/audio/audio-70s-light-organs.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateAudioNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+      }
+    }
   })
 
   describe('Effect file validation', () => {

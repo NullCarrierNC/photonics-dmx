@@ -21,8 +21,13 @@ export class AudioController {
   private audioProcessor: AudioCueProcessor | null = null
   private isAudioEnabled = false
   private audioDataHandler: AudioDataHandler | null = null
+  private broadcastAudioMirror: ((data: AudioLightingData) => void) | null = null
 
   constructor(private readonly deps: AudioControllerDeps) {}
+
+  public setBroadcastAudioMirror(fn: ((data: AudioLightingData) => void) | null): void {
+    this.broadcastAudioMirror = fn
+  }
 
   public async enableAudio(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
     if (!isInitialized) {
@@ -56,9 +61,11 @@ export class AudioController {
         this.audioDataHandler = null
       }
       this.audioDataHandler = (_: unknown, data: unknown) => {
+        const lightingData = data as AudioLightingData
         if (this.audioProcessor && this.isAudioEnabled) {
-          this.audioProcessor.processAudioData(data as AudioLightingData)
+          this.audioProcessor.processAudioData(lightingData)
         }
+        this.broadcastAudioMirror?.(lightingData)
       }
       ipcMain.on(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)

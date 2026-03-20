@@ -27,7 +27,6 @@ import {
   simulateInstrumentNote,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
-import AudioCueSelectorPanel from '@renderer/components/AudioCueSelectorPanel'
 
 type CueRegistryType = 'YARG' | 'RB3E'
 
@@ -428,10 +427,17 @@ const CueSimulation: React.FC = () => {
           Simulation Settings
         </h2>
         {isAudioReactiveEnabled ? (
-          <p className="t text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            When Reactive Audio mode is enabled you can select which audio-reactive cue is used to
-            drive the DMX output.
-          </p>
+          <div className="text-sm text-gray-700 dark:text-gray-300 mb-1">
+            <p className="mb-2">
+              Reactive Audio mode is enabled. Cue Simulation does not apply when using
+              audio-reactive lighting.
+            </p>
+            <p>
+              To choose which audio-reactive cue drives the DMX output and view live preview, use{' '}
+              <strong>DMX Preview</strong>. Lighting will follow real-time audio analysis from your
+              microphone or system audio input.
+            </p>
+          </div>
         ) : (
           <>
             <div className="flex flex-wrap gap-4 mb-4">
@@ -490,8 +496,6 @@ const CueSimulation: React.FC = () => {
           </>
         )}
       </div>
-
-      {isAudioReactiveEnabled && <AudioCueSelectorPanel className="mt-2" />}
 
       {!isAudioReactiveEnabled && (
         <>

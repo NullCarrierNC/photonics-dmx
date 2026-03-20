@@ -11,9 +11,11 @@ import { getAudioEnabled, setAudioEnabled, disableYarg, disableRb3 } from '../ip
 
 interface AudioToggleProps {
   disabled?: boolean
+  /** Overrides default wrapper layout (e.g. Audio Preview header row). */
+  className?: string
 }
 
-const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
+const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
   const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom)
   const [isYargEnabled, setIsYargEnabled] = useAtom(yargListenerEnabledAtom)
   const [isRb3Enabled, setIsRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
@@ -92,7 +94,7 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
   }
 
   return (
-    <div className="flex items-center mb-4 w-[190px] justify-between">
+    <div className={`flex items-center justify-between ${className ?? 'mb-4 w-[190px]'}`}>
       <label
         className={`mr-4 text-lg font-semibold ${
           isYargEnabled || isRb3Enabled || disabled

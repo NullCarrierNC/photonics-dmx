@@ -180,6 +180,10 @@ export interface IpcInvokeMap {
     request: void
     response: IpcSuccessResult | IpcErrorResult
   }
+  [WINDOW.OPEN_AUDIO_PREVIEW]: {
+    request: void
+    response: IpcSuccessResult | IpcErrorResult
+  }
 
   // ---- Shell ----
   [SHELL.SHOW_ITEM_IN_FOLDER]: {
@@ -576,6 +580,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_DISABLE]: undefined
   [RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED]: { enabled: boolean }
   [RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE]: AudioConfig | undefined
+  [RENDERER_RECEIVE.AUDIO_DATA_MIRROR]: AudioLightingData
   [RENDERER_RECEIVE.CUE_STATE_UPDATE]: CueStateUpdatePayload
   [RENDERER_RECEIVE.DMX_VALUES]: { universeBuffer: Record<number, number> }
   [RENDERER_RECEIVE.CUE_HANDLED]: CueData

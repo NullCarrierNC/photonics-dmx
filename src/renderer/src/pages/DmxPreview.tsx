@@ -7,11 +7,14 @@ import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggl
 import CuePreview from '@renderer/components/CuePreview'
 import ActiveGroupsSelector from '@renderer/components/ActiveCueGroupsSelector'
 import DmxRigSelector from '@renderer/components/DmxRigSelector'
+import AudioCueSelectorPanel from '@renderer/components/AudioCueSelectorPanel'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
+import { useCuePreviewInputPlatform } from '@renderer/hooks/useCuePreviewInputPlatform'
 
 const DmxPreview: React.FC = () => {
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
   const { selectedRig, rigConfig, dmxValues } = useDmxPreview()
+  const platform = useCuePreviewInputPlatform()
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
@@ -34,6 +37,9 @@ const DmxPreview: React.FC = () => {
       <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
 
       <hr className="my-6 border-gray-200 dark:border-gray-600" />
+
+      {/* Audio Reactive Cue Selector - shown when Audio is the active input platform */}
+      {platform === 'AUDIO' && <AudioCueSelectorPanel className="mb-4" />}
 
       {selectedRig !== null && rigConfig !== null && (
         <>

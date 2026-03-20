@@ -83,6 +83,15 @@ export const validateColorString = (colorString: string): Color => {
   return normalizedColor in colorMap ? normalizedColor : 'white'
 }
 
+/**
+ * CSS `background-color` for cue-editor node previews. Palette names like `amber` and `vermilion`
+ * are not valid CSS named colours; map from the same colorMap used for DMX output.
+ */
+export const getPaletteColorCssRgb = (color: Color): string => {
+  const c = colorMap[color]
+  return `rgb(${c.r}, ${c.g}, ${c.b})`
+}
+
 export const getColor = (
   color: Color,
   brightness: Brightness,

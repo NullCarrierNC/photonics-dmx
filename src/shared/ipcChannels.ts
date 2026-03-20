@@ -32,6 +32,7 @@ export const EFFECTS = {
 // ---- Window ----
 export const WINDOW = {
   OPEN_CUE_EDITOR: 'open-cue-editor-window',
+  OPEN_AUDIO_PREVIEW: 'open-audio-preview-window',
 } as const
 
 // ---- Shell ----
@@ -148,6 +149,8 @@ export const RENDERER_RECEIVE = {
   /** Broadcast after SET_AUDIO_ENABLED so all windows sync Enable Audio UI (e.g. Live Monitor in Cue Editor). */
   AUDIO_ENABLED_CHANGED: 'audio:enabled-changed',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
+  /** Mirrored AudioLightingData for Audio Preview window (main process → single target window). */
+  AUDIO_DATA_MIRROR: 'audio:data-mirror',
   CUE_STATE_UPDATE: 'cue-state-update',
   DMX_VALUES: 'dmx-values',
   CUE_HANDLED: 'cue-handled',

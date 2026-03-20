@@ -340,6 +340,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'leftMenuCollapsed',
   'windowState',
   'cueEditorWindowState',
+  'audioPreviewWindowState',
 ])
 
 /**

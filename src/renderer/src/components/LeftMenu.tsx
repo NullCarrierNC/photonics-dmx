@@ -12,10 +12,11 @@ import {
   FiChevronRight,
   FiExternalLink,
 } from 'react-icons/fi'
+import { MdGraphicEq } from 'react-icons/md'
 import { useAtom, useSetAtom } from 'jotai'
 import { Pages } from './../types'
 import { currentPageAtom } from './../atoms'
-import { openCueEditorWindow } from '../ipcApi'
+import { openCueEditorWindow, openAudioPreviewWindow } from '../ipcApi'
 
 interface LeftMenuProps {
   isDarkMode: boolean
@@ -40,6 +41,10 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
   const handleCueEditorClick = () => {
     openCueEditorWindow()
+  }
+
+  const handleAudioPreviewClick = () => {
+    openAudioPreviewWindow()
   }
 
   const buttonClasses = (menuName: Pages) =>
@@ -136,6 +141,20 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           title={isCollapsed ? 'Audio Settings' : undefined}>
           <FiVolume2 className="text-xl" />
           {!isCollapsed && <span className="text-[12pt]">Audio Settings</span>}
+        </button>
+
+        {/* Audio Preview — separate window (no main route; never show as selected) */}
+        <button
+          onClick={handleAudioPreviewClick}
+          className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-2'} p-2 hover:text-gray-400 text-gray-800 dark:text-gray-300`}
+          title={isCollapsed ? 'Audio Preview' : undefined}>
+          <MdGraphicEq className="text-xl" />
+          {!isCollapsed && (
+            <span className="text-[12pt] flex items-center gap-1">
+              Audio Preview
+              <FiExternalLink className="text-[10pt]" />
+            </span>
+          )}
         </button>
 
         {/* About */}
