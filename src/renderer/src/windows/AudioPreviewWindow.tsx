@@ -6,7 +6,7 @@ import { useAudioPreviewMirror } from '../hooks/useAudioPreviewMirror'
 
 const AudioPreviewWindow: React.FC = () => {
   useEffect(() => {
-    document.title = 'Audio Preview - Photonics'
+    document.title = 'Spectrum Analyzer - Photonics'
   }, [])
 
   useAudioPreviewMirror()

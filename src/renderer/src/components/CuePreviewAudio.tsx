@@ -162,7 +162,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showT
   if (!audioData) {
     return (
       <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
-        {showTitle && <h3 className="text-lg font-semibold mb-1">Audio Preview</h3>}
+        {showTitle && <h3 className="text-lg font-semibold mb-1">Spectrum Analyzer</h3>}
         <p className="text-gray-500 dark:text-gray-400">Waiting for audio data...</p>
       </div>
     )
@@ -174,7 +174,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showT
     <div className={`p-4 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
       {(showTitle || bpm != null) && (
         <div className={`flex items-center mb-3 ${showTitle ? 'justify-between' : 'justify-end'}`}>
-          {showTitle && <h3 className="text-lg font-semibold">Audio Preview</h3>}
+          {showTitle && <h3 className="text-lg font-semibold">Spectrum Analyzer</h3>}
           {bpm != null && (
             <div className="text-sm font-mono bg-gray-300 dark:bg-gray-600 px-2 py-1 rounded">
               {bpm.toFixed(0)} BPM

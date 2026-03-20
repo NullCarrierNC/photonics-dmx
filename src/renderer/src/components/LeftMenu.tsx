@@ -56,14 +56,14 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
   return (
     <div className={`flex flex-col w-full h-full ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-      <div className="flex flex-col space-y-4 flex-grow w-full">
+      <div className="flex flex-col space-y-2 flex-grow w-full">
         {/* Status Button */}
         <button
           onClick={() => handleMenuClick(Pages.Status)}
           className={buttonClasses(Pages.Status)}
           title={isCollapsed ? 'Status' : undefined}>
           <FiActivity className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">Status</span>}
+          {!isCollapsed && <span className="text-[10pt]">Status</span>}
         </button>
 
         {/* My Lights Button */}
@@ -72,7 +72,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           className={buttonClasses(Pages.MyLights)}
           title={isCollapsed ? 'My Lights' : undefined}>
           <FaLightbulb className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">My Lights</span>}
+          {!isCollapsed && <span className="text-[10pt]">My Lights</span>}
         </button>
 
         {/* Light Layout Button */}
@@ -81,7 +81,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           className={buttonClasses(Pages.LightLayout)}
           title={isCollapsed ? 'Light Layout' : undefined}>
           <FiLayout className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">Light Layout</span>}
+          {!isCollapsed && <span className="text-[10pt]">Light Layout</span>}
         </button>
 
         {/* Cue Preview Button */}
@@ -90,7 +90,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           className={buttonClasses(Pages.CuePreview)}
           title={isCollapsed ? 'DMX Preview' : undefined}>
           <FaPlay className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">DMX Preview</span>}
+          {!isCollapsed && <span className="text-[10pt]">DMX Preview</span>}
         </button>
 
         {/* Cue Simulation Button */}
@@ -99,7 +99,39 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           className={buttonClasses(Pages.CueSimulation)}
           title={isCollapsed ? 'Cue Simulation' : undefined}>
           <FaInfinity className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">Cue Simulation</span>}
+          {!isCollapsed && <span className="text-[10pt]">Cue Simulation</span>}
+        </button>
+
+        {/* Preferences */}
+        <button
+          onClick={() => handleMenuClick(Pages.Preferences)}
+          className={buttonClasses(Pages.Preferences)}
+          title={isCollapsed ? 'Preferences' : undefined}>
+          <FiSliders className="text-xl" />
+          {!isCollapsed && <span className="text-[10pt]">Preferences</span>}
+        </button>
+
+        {/* Audio Settings */}
+        <button
+          onClick={() => handleMenuClick(Pages.AudioSettings)}
+          className={buttonClasses(Pages.AudioSettings)}
+          title={isCollapsed ? 'Audio Settings' : undefined}>
+          <FiVolume2 className="text-xl" />
+          {!isCollapsed && <span className="text-[10pt]">Audio Settings</span>}
+        </button>
+
+        {/* Audio Preview — separate window (no main route; never show as selected) */}
+        <button
+          onClick={handleAudioPreviewClick}
+          className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-2'} p-2 hover:text-gray-400 text-gray-800 dark:text-gray-300`}
+          title={isCollapsed ? 'Audio Preview' : undefined}>
+          <MdGraphicEq className="text-xl" />
+          {!isCollapsed && (
+            <span className="text-[10pt] flex items-center gap-1">
+              Spectrum Analyzer
+              <FiExternalLink className="text-[10pt]" />
+            </span>
+          )}
         </button>
 
         {/* Cue Editor Button */}
@@ -109,7 +141,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           title={isCollapsed ? 'Cue Editor' : undefined}>
           <FiPenTool className="text-xl" />
           {!isCollapsed && (
-            <span className="text-[12pt] flex items-center gap-1">
+            <span className="text-[10pt] flex items-center gap-1">
               Cue Editor
               <FiExternalLink className="text-[10pt]" />
             </span>
@@ -122,39 +154,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           className={buttonClasses(Pages.NetworkDebug)}
           title={isCollapsed ? 'Network Debug' : undefined}>
           <FiCpu className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">Network Debug</span>}
-        </button>
-
-        {/* Preferences */}
-        <button
-          onClick={() => handleMenuClick(Pages.Preferences)}
-          className={buttonClasses(Pages.Preferences)}
-          title={isCollapsed ? 'Preferences' : undefined}>
-          <FiSliders className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">Preferences</span>}
-        </button>
-
-        {/* Audio Settings */}
-        <button
-          onClick={() => handleMenuClick(Pages.AudioSettings)}
-          className={buttonClasses(Pages.AudioSettings)}
-          title={isCollapsed ? 'Audio Settings' : undefined}>
-          <FiVolume2 className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">Audio Settings</span>}
-        </button>
-
-        {/* Audio Preview — separate window (no main route; never show as selected) */}
-        <button
-          onClick={handleAudioPreviewClick}
-          className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-2'} p-2 hover:text-gray-400 text-gray-800 dark:text-gray-300`}
-          title={isCollapsed ? 'Audio Preview' : undefined}>
-          <MdGraphicEq className="text-xl" />
-          {!isCollapsed && (
-            <span className="text-[12pt] flex items-center gap-1">
-              Audio Preview
-              <FiExternalLink className="text-[10pt]" />
-            </span>
-          )}
+          {!isCollapsed && <span className="text-[10pt]">Network Debug</span>}
         </button>
 
         {/* About */}
@@ -163,7 +163,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           className={buttonClasses(Pages.About)}
           title={isCollapsed ? 'About' : undefined}>
           <FiInfo className="text-xl" />
-          {!isCollapsed && <span className="text-[12pt]">About</span>}
+          {!isCollapsed && <span className="text-[10pt]">About</span>}
         </button>
       </div>
 

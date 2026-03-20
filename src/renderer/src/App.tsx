@@ -368,7 +368,7 @@ export const App = (): JSX.Element => {
     audioCaptureManagerRef,
   })
 
-  const sidebarWidth = isLeftMenuCollapsed ? 80 : 208
+  const sidebarWidth = isLeftMenuCollapsed ? 80 : 218
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-black dark:text-gray-200">
