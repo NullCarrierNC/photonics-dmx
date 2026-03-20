@@ -31,6 +31,30 @@ export interface AudioLightingData {
   peakFrequency?: number
   /** Overall signal amplitude (0.0-1.0) */
   amplitude?: number
+
+  /** Spectral centroid 0–1 (perceived brightness, normalised against Nyquist) */
+  spectralCentroid?: number
+  /** Spectral flatness 0–1 (noise vs tonal) */
+  spectralFlatness?: number
+  /** Spectral rolloff 0–1 (normalised frequency below which 85% energy sits) */
+  spectralRolloff?: number
+  /** Spectral crest 0–1 (peakiness) */
+  spectralCrest?: number
+  /** Spectral spread 0–1 (bandwidth around centroid) */
+  spectralSpread?: number
+  /** High-frequency content onset 0–1 (percussive detection) */
+  hfcOnset?: number
+  /** Zero-crossing rate 0–1 (percussive vs sustained) */
+  zeroCrossingRate?: number
+
+  /** Mel band energies (perceptually spaced), normalised 0–1 */
+  melBands?: number[]
+  /** 12 pitch class energies (C=0 … B=11), normalised max 1 */
+  chromagram?: number[]
+  /** Detected key e.g. "C major", "A minor" */
+  detectedKey?: string
+  /** Key detection confidence 0–1 */
+  detectedKeyStrength?: number
 }
 
 /**

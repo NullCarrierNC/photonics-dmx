@@ -36,15 +36,26 @@ const AudioToggle = ({ disabled = false }: AudioToggleProps) => {
       setIsAudioEnabled(false)
     }
 
-    const cleanup = registerIpcListener(
+    const handleAudioEnabledChanged = (payload: { enabled: boolean }) => {
+      setIsAudioEnabled(payload.enabled)
+    }
+
+    const cleanupRestarted = registerIpcListener(
       RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
       handleControllersRestarted,
+    )
+    const cleanupEnabledChanged = registerIpcListener(
+      RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED,
+      handleAudioEnabledChanged,
     )
 
     // Initialize on mount
     initializeState()
 
-    return cleanup
+    return () => {
+      cleanupRestarted()
+      cleanupEnabledChanged()
+    }
   }, [setIsAudioEnabled])
 
   const handleToggle = async () => {

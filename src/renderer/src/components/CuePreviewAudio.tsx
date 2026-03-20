@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useAtomValue } from 'jotai'
 import { audioDataAtom } from '../atoms'
 import type { Color } from '../../../photonics-dmx/types'
+import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy'
 
 // Map Color type to RGB values for preview bars (matches AudioColorMapping.tsx)
 const COLOR_TO_RGB: Record<Color, string> = {
@@ -36,10 +37,14 @@ type PreviewRange = {
   brightness: 'low' | 'medium' | 'high' | 'max'
 }
 
+/** Minimum time the beat indicator stays lit so transient single-frame triggers remain visible. */
+const MIN_BEAT_INDICATOR_MS = 280
+
 const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
   const audioData = useAtomValue(audioDataAtom)
   const [showBeatPulse, setShowBeatPulse] = useState(false)
+  const hideBeatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const defaultRanges: PreviewRange[] = [
     {
@@ -55,7 +60,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
       name: 'Lower-Mids',
       minHz: 220,
       maxHz: 800,
-      color: 'blue' as Color,
+      color: 'orange' as Color,
       brightness: 'medium' as const,
     },
     {
@@ -86,26 +91,71 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
 
   const displayRanges = defaultRanges
   const energy = audioData?.energy ?? audioData?.overallLevel ?? 0
-  const bandValuesById: Record<string, number> = {
-    range1: energy,
-    range2: energy * 0.85,
-    range3: energy * 0.7,
-    range4: energy * 0.55,
-    range5: energy * 0.4,
-  }
-
-  // Track beat detection for pulse animation (show for 200ms after beat)
-  useEffect(() => {
-    if (audioData?.beatDetected) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- pulse visibility for 200ms after beat
-      setShowBeatPulse(true)
-      const timer = setTimeout(() => setShowBeatPulse(false), 200)
-      return () => clearTimeout(timer)
+  const bandValuesById: Record<string, number> = useMemo(() => {
+    const raw = audioData?.rawFrequencyData
+    const sr = audioData?.sampleRate
+    const fft = audioData?.fftSize
+    if (raw?.length && sr != null && fft != null) {
+      return {
+        range1: getBandEnergy(raw, sr, fft, 20, 220),
+        range2: getBandEnergy(raw, sr, fft, 220, 800),
+        range3: getBandEnergy(raw, sr, fft, 800, 2500),
+        range4: getBandEnergy(raw, sr, fft, 2500, 6000),
+        range5: getBandEnergy(raw, sr, fft, 6000, 20000),
+      }
     }
-    return
-  }, [audioData?.beatDetected])
+    return {
+      range1: energy,
+      range2: energy * 0.85,
+      range3: energy * 0.7,
+      range4: energy * 0.55,
+      range5: energy * 0.4,
+    }
+  }, [audioData?.rawFrequencyData, audioData?.sampleRate, audioData?.fftSize, energy])
 
-  const showPulse = Boolean(audioData?.beatDetected || showBeatPulse)
+  // Beat indicator: minimum hold time via ref timer so single-frame beats stay visible.
+  // Do not clear when beatDetected goes false on the next frame — that caused flicker.
+  // Clear immediately only when there is no audio data (capture stopped).
+  useEffect(() => {
+    const clearHideTimer = () => {
+      if (hideBeatTimerRef.current) {
+        clearTimeout(hideBeatTimerRef.current)
+        hideBeatTimerRef.current = null
+      }
+    }
+
+    if (!audioData) {
+      clearHideTimer()
+      queueMicrotask(() => {
+        setShowBeatPulse(false)
+      })
+      return
+    }
+
+    if (audioData.beatDetected) {
+      clearHideTimer()
+      hideBeatTimerRef.current = setTimeout(() => {
+        setShowBeatPulse(false)
+        hideBeatTimerRef.current = null
+      }, MIN_BEAT_INDICATOR_MS)
+      queueMicrotask(() => {
+        setShowBeatPulse(true)
+      })
+    }
+    // Do not clear the hide timer when beatDetected goes false — that would cancel the minimum hold.
+  }, [audioData])
+
+  useEffect(
+    () => () => {
+      if (hideBeatTimerRef.current) {
+        clearTimeout(hideBeatTimerRef.current)
+        hideBeatTimerRef.current = null
+      }
+    },
+    [],
+  )
+
+  const showPulse = showBeatPulse
 
   if (!audioData) {
     return (
@@ -181,15 +231,20 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
       </div>
 
       {/* Beat Indicator */}
-      <div className="flex items-center space-x-2">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Beat Detected:</span>
-        <div
-          className={`w-16 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-200 ${
-            showPulse
-              ? 'bg-white border-gray-300 text-black'
-              : 'bg-gray-800 border-gray-600 text-white'
+      <div className="flex items-center gap-3">
+        <span
+          className={`text-sm font-semibold transition-colors duration-200 ${
+            showPulse ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-500'
           }`}>
-          {showPulse ? 'BEAT' : 'OFF'}
+          Beat detected
+        </span>
+        <div
+          className={`min-w-[5.5rem] h-9 px-2 rounded-lg border-2 flex items-center justify-center text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
+            showPulse
+              ? 'bg-amber-400 border-amber-600 text-gray-900 shadow-[0_0_12px_rgba(251,191,36,0.65)] ring-2 ring-amber-300/80 dark:bg-amber-500 dark:border-amber-400 dark:text-gray-950 dark:shadow-[0_0_16px_rgba(251,191,36,0.5)]'
+              : 'bg-gray-200 border-gray-400 text-gray-500 dark:bg-gray-900 dark:border-gray-600 dark:text-gray-500'
+          }`}>
+          {showPulse ? 'Beat' : 'None'}
         </div>
       </div>
     </div>

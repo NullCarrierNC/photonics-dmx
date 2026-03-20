@@ -18,6 +18,7 @@ const EventNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) 
   if (data.kind !== 'event') return null
   const eventPayload = data.payload as {
     eventType: string
+    label?: string
     frequencyRange?: { minHz: number; maxHz: number }
     nodeLabel?: string
     color?: string
@@ -47,7 +48,13 @@ const EventNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) 
           <span role="img" aria-label="event">
             ⚡
           </span>
-          <span>{trigger ? trigger.nodeLabel : `Event · ${eventType}`}</span>
+          <span>
+            {trigger
+              ? trigger.nodeLabel
+              : eventPayload.label?.trim()
+                ? eventPayload.label.trim()
+                : `Event · ${eventType}`}
+          </span>
         </span>
         {trigger?.frequencyRange && (
           <span className="text-[10px] font-normal opacity-90" style={FONT_COURIER_NEW}>

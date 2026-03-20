@@ -19,6 +19,15 @@ export interface TriggerContext {
 }
 
 /**
+ * Context injected when execution was started from a non-trigger audio event (edge mode).
+ * Used by cue-data getter nodes to read the raw feature value at fire time.
+ */
+export interface EventContext {
+  /** Raw 0–1 source value at edge-fire time */
+  eventRawValue: number
+}
+
+/**
  * Audio cue data structure passed to cue implementations
  */
 export interface AudioCueData {
@@ -39,4 +48,7 @@ export interface AudioCueData {
 
   /** Set when execution was started from an AudioTriggerNode (enter/during/exit path) */
   triggerContext?: TriggerContext
+
+  /** Set when execution was started from a non-trigger audio event (edge mode) */
+  eventContext?: EventContext
 }

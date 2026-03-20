@@ -5,25 +5,124 @@ import type {
   AudioEventType,
   AudioEventNodeUnion,
   AudioTriggerNode,
-  AudioTriggerBalance,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { YargEventType } from '../../../../../../photonics-dmx/types'
 import { YARG_EVENT_OPTIONS_CATEGORIZED, AUDIO_EVENT_OPTIONS } from '../../lib/options'
 
-const AUDIO_TRIGGER_BALANCE_OPTIONS: { value: AudioTriggerBalance; label: string }[] = [
-  { value: 'left', label: 'Left' },
-  { value: 'stereo', label: 'Stereo' },
-  { value: 'right', label: 'Right' },
-]
+/** Documentation for each audio event type: what it does and when to use it. */
+const AUDIO_EVENT_TYPE_DOCS: Record<AudioEventType, { description: string; bestUsedFor: string }> =
+  {
+    'none': {
+      description: 'No event (placeholder or action timing only).',
+      bestUsedFor: 'Action wait conditions; not used as a graph entry point.',
+    },
+    'delay': {
+      description: 'Time-based delay (used for action timing).',
+      bestUsedFor: 'Action wait conditions; not used as a graph entry point.',
+    },
+    'audio-beat': {
+      description: 'Fires when the in-app beat detector detects a beat (onset + tempo gating).',
+      bestUsedFor: 'Kick/snare-style triggers, BPM-locked effects, and general rhythm response.',
+    },
+    'audio-energy': {
+      description:
+        'Overall energy level (0–1) of the audio. Use threshold and edge/level mode to gate or scale.',
+      bestUsedFor:
+        'Volume-reactive intensity, gates that open when the room gets loud, or level-based fading.',
+    },
+    'audio-trigger': {
+      description:
+        'Band trigger: fires when energy in a configurable frequency range exceeds the threshold (power level 0–1). Has enter, during, and exit phases.',
+      bestUsedFor:
+        'Reacting to specific instruments or frequency bands (e.g. bass, vocals, hi-hat) without affecting the rest of the mix.',
+    },
+    'audio-centroid': {
+      description:
+        'Spectral centroid (0–1): perceived brightness of the sound. Higher = more high-frequency content.',
+      bestUsedFor:
+        'Mapping brightness to colour temperature or intensity; “brighter” sounds drive cooler or stronger looks.',
+    },
+    'audio-flatness': {
+      description:
+        'Spectral flatness (0–1): noise-like (1) vs tonal (0). Tonal = pitched; flat = noise or unpitched.',
+      bestUsedFor:
+        'Differentiating vocals/instruments from noise or percussion; texture-based colour or intensity changes.',
+    },
+    'audio-hfc': {
+      description:
+        'High-frequency content (0–1): weighted emphasis on higher bins. Strong on transients and cymbals.',
+      bestUsedFor:
+        'Hi-hat/cymbal hits, percussion accents, and transient-heavy material without triggering on every beat.',
+    },
+  }
+
+/** Documentation for non-trigger audio event properties (threshold, trigger mode). */
+const AUDIO_EVENT_PROPERTY_DOCS = {
+  threshold: {
+    description:
+      'Value (0–1) that the event source is compared against. In edge mode the event fires when the value crosses above this; in level mode the output is active while the value is at or above it.',
+    bestUsedFor:
+      'Tune to avoid false triggers (raise) or to catch quieter hits (lower). Start around 0.4–0.6 and adjust to the room.',
+  },
+  triggerMode: {
+    edge: {
+      description: 'Fires once when the value crosses above the threshold (rising edge).',
+      bestUsedFor: 'Discrete hits: beats, kicks, claps. One trigger per peak.',
+    },
+    level: {
+      description:
+        'Output is active while the value is at or above the threshold; intensity can scale with how far above the threshold.',
+      bestUsedFor:
+        'Continuous response: hold effects while loud, or scale effect strength with level.',
+    },
+  },
+} as const
+
+/** Documentation for audio-trigger node properties. */
+const AUDIO_TRIGGER_PROPERTY_DOCS = {
+  label: {
+    description: 'Display name shown on the trigger node in the canvas.',
+    bestUsedFor: 'Identifying triggers at a glance (e.g. “Bass”, “Vocals”, “Hi-hat”).',
+  },
+  frequencyRange: {
+    description:
+      'Min and max frequency (Hz) defining the band. Energy is summed only in this range (20–20000 Hz).',
+    bestUsedFor:
+      'Targeting instruments: e.g. 80–250 bass, 250–2000 vocals, 2000–8000 hi-hat/cymbals.',
+  },
+  threshold: {
+    description:
+      'Power level (0–1) the band energy must exceed to trigger. Higher = needs more energy to fire. Matches the Audio Preview EQ bar scale.',
+    bestUsedFor:
+      'Reduce false triggers by raising; catch quieter parts of the mix by lowering. Align with the EQ bar for the same band (e.g. 50% = fires when bar passes 50%).',
+  },
+  hysteresis: {
+    description:
+      'Release margin below threshold. Trigger deactivates when energy drops below (threshold − hysteresis). Prevents chatter.',
+    bestUsedFor: 'Stopping rapid enter/exit when the signal hovers near the threshold.',
+  },
+  holdMs: {
+    description: 'Minimum time (ms) the trigger stays active after entering. 0 = no minimum hold.',
+    bestUsedFor: 'Avoiding flicker from very short transients.',
+  },
+  color: {
+    description: 'Colour used for the trigger node on the canvas (visual only).',
+    bestUsedFor: 'Quickly telling triggers apart by band or purpose.',
+  },
+} as const
+
+const DOC_BLOCK_CLASS =
+  'mt-1 mb-2.5 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400'
 
 const DEFAULT_TRIGGER_COLOR = '#60a5fa'
 
 const AUDIO_TRIGGER_DEFAULTS: Omit<AudioTriggerNode, 'id' | 'type'> = {
   eventType: 'audio-trigger',
   frequencyRange: { minHz: 120, maxHz: 500 },
-  sensitivity: 0.5,
-  balance: 'stereo',
+  threshold: 0.5,
+  hysteresis: 0.05,
+  holdMs: 0,
   color: DEFAULT_TRIGGER_COLOR,
   nodeLabel: 'Audio Trigger',
   outputs: ['enter', 'during', 'exit'],
@@ -91,6 +190,18 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
                 </option>
               ))}
         </select>
+        {activeMode === 'audio' && AUDIO_EVENT_TYPE_DOCS[eventType as AudioEventType] && (
+          <div className="mt-1.5 mb-2.5 rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-[10px] text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
+            <p className="font-medium text-gray-700 dark:text-gray-300">What it does</p>
+            <p className="mt-0.5">
+              {AUDIO_EVENT_TYPE_DOCS[eventType as AudioEventType].description}
+            </p>
+            <p className="mt-1 font-medium text-gray-700 dark:text-gray-300">Best used for</p>
+            <p className="mt-0.5">
+              {AUDIO_EVENT_TYPE_DOCS[eventType as AudioEventType].bestUsedFor}
+            </p>
+          </div>
+        )}
       </label>
       {activeMode === 'audio' && isTrigger && trigger && (
         <>
@@ -103,13 +214,19 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               onChange={(e) => updateAudioNode({ nodeLabel: e.target.value })}
               placeholder="Audio Trigger"
             />
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_TRIGGER_PROPERTY_DOCS.label.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.label.bestUsedFor}
+              </span>
+            </div>
           </label>
           <label className="flex flex-col font-medium">
             Frequency range (Hz)
             <div className="mt-1 flex gap-1">
               <input
                 type="number"
-                min={120}
+                min={20}
                 max={20000}
                 step={10}
                 className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
@@ -127,7 +244,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               <span className="self-center">–</span>
               <input
                 type="number"
-                min={120}
+                min={20}
                 max={20000}
                 step={10}
                 className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
@@ -143,34 +260,73 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
                 }
               />
             </div>
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_TRIGGER_PROPERTY_DOCS.frequencyRange.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.frequencyRange.bestUsedFor}
+              </span>
+            </div>
           </label>
           <label className="flex flex-col font-medium">
-            Sensitivity
+            Threshold
             <input
               type="range"
               min={0}
               max={1}
               step={0.05}
               className="mt-1"
-              value={trigger.sensitivity ?? 0.5}
-              onChange={(e) => updateAudioNode({ sensitivity: Number(e.target.value) })}
+              value={trigger.threshold ?? 0.5}
+              onChange={(e) => updateAudioNode({ threshold: Number(e.target.value) })}
             />
             <span className="text-[10px] text-gray-500 dark:text-gray-400">
-              {(trigger.sensitivity ?? 0.5).toFixed(2)}
+              {(trigger.threshold ?? 0.5).toFixed(2)}
             </span>
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_TRIGGER_PROPERTY_DOCS.threshold.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.threshold.bestUsedFor}
+              </span>
+            </div>
           </label>
           <label className="flex flex-col font-medium">
-            Balance
-            <select
+            Hysteresis
+            <input
+              type="range"
+              min={0}
+              max={0.5}
+              step={0.01}
+              className="mt-1"
+              value={trigger.hysteresis ?? 0}
+              onChange={(e) => updateAudioNode({ hysteresis: Number(e.target.value) })}
+            />
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+              {(trigger.hysteresis ?? 0).toFixed(2)}
+            </span>
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_TRIGGER_PROPERTY_DOCS.hysteresis.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.hysteresis.bestUsedFor}
+              </span>
+            </div>
+          </label>
+          <label className="flex flex-col font-medium">
+            Hold time (ms)
+            <input
+              type="number"
+              min={0}
+              step={10}
               className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={trigger.balance ?? 'stereo'}
-              onChange={(e) => updateAudioNode({ balance: e.target.value as AudioTriggerBalance })}>
-              {AUDIO_TRIGGER_BALANCE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              value={trigger.holdMs ?? 0}
+              onChange={(e) =>
+                updateAudioNode({ holdMs: Math.max(0, Number(e.target.value) || 0) })
+              }
+            />
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_TRIGGER_PROPERTY_DOCS.holdMs.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.holdMs.bestUsedFor}
+              </span>
+            </div>
           </label>
           <label className="flex flex-col font-medium">
             Colour
@@ -188,22 +344,54 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
                 onChange={(e) => updateAudioNode({ color: e.target.value })}
               />
             </div>
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_TRIGGER_PROPERTY_DOCS.color.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.color.bestUsedFor}
+              </span>
+            </div>
           </label>
         </>
       )}
       {activeMode === 'audio' && !isTrigger && (
         <>
           <label className="flex flex-col font-medium">
+            Label
+            <input
+              type="text"
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={(node as AudioEventNode).label ?? ''}
+              onChange={(e) => updateAudioNode({ label: e.target.value || undefined })}
+              placeholder="e.g. Kick, Brightness"
+            />
+            <div className={DOC_BLOCK_CLASS}>
+              Display name shown on the event node in the canvas.
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: Identifying events at a glance when you have multiple of the same
+                type.
+              </span>
+            </div>
+          </label>
+          <label className="flex flex-col font-medium">
             Threshold
             <input
-              type="number"
+              type="range"
               min={0}
               max={1}
               step={0.05}
-              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              className="mt-1"
               value={(node as AudioEventNode).threshold ?? 0.5}
-              onChange={(event) => updateAudioNode({ threshold: Number(event.target.value) })}
+              onChange={(e) => updateAudioNode({ threshold: Number(e.target.value) })}
             />
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+              {((node as AudioEventNode).threshold ?? 0.5).toFixed(2)}
+            </span>
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_EVENT_PROPERTY_DOCS.threshold.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_EVENT_PROPERTY_DOCS.threshold.bestUsedFor}
+              </span>
+            </div>
           </label>
           <label className="flex flex-col font-medium">
             Trigger Mode
@@ -218,6 +406,36 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               <option value="edge">Edge</option>
               <option value="level">Level</option>
             </select>
+            <div className={DOC_BLOCK_CLASS}>
+              {(node as AudioEventNode).triggerMode === 'level'
+                ? AUDIO_EVENT_PROPERTY_DOCS.triggerMode.level.description
+                : AUDIO_EVENT_PROPERTY_DOCS.triggerMode.edge.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for:{' '}
+                {(node as AudioEventNode).triggerMode === 'level'
+                  ? AUDIO_EVENT_PROPERTY_DOCS.triggerMode.level.bestUsedFor
+                  : AUDIO_EVENT_PROPERTY_DOCS.triggerMode.edge.bestUsedFor}
+              </span>
+            </div>
+          </label>
+          <label className="flex flex-col font-medium">
+            Cooldown (ms)
+            <input
+              type="number"
+              min={0}
+              step={10}
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={(node as AudioEventNode).cooldownMs ?? 0}
+              onChange={(e) =>
+                updateAudioNode({ cooldownMs: Math.max(0, Number(e.target.value) || 0) })
+              }
+            />
+            <div className={DOC_BLOCK_CLASS}>
+              Minimum time (ms) before this event can fire again after a trigger. 0 = no limit.
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: Smoothing out noisy peaks in energy, HFC, or centroid events.
+              </span>
+            </div>
           </label>
         </>
       )}

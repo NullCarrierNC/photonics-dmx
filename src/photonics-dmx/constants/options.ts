@@ -76,7 +76,14 @@ export const YARG_EVENT_OPTIONS: YargEventType[] = YARG_EVENT_TYPES.filter(
  */
 export const WAIT_CONDITIONS_WITH_NONE_DELAY: WaitCondition[] = [...WAIT_CONDITIONS]
 
-export const AUDIO_EVENT_OPTIONS: AudioEventType[] = ['audio-beat', 'audio-energy', 'audio-trigger']
+export const AUDIO_EVENT_OPTIONS: AudioEventType[] = [
+  'audio-beat',
+  'audio-energy',
+  'audio-trigger',
+  'audio-centroid',
+  'audio-flatness',
+  'audio-hfc',
+]
 
 export const AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY: (AudioEventType | 'none' | 'delay')[] = [
   'none',

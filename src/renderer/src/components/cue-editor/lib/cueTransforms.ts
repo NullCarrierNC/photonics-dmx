@@ -46,8 +46,7 @@ type NodePositions = Record<string, { x: number; y: number }>
 
 const AUDIO_TRIGGER_SAVE_DEFAULTS = {
   frequencyRange: { minHz: 120, maxHz: 500 } as const,
-  sensitivity: 0.5,
-  balance: 'stereo' as const,
+  threshold: 0.5,
   color: '#60a5fa',
   nodeLabel: 'Audio Trigger',
   outputs: ['enter', 'during', 'exit'] as const,
@@ -57,14 +56,18 @@ function normalizeAudioEventForSave(
   event: YargEventNode | AudioEventNodeUnion,
 ): YargEventNode | AudioEventNodeUnion {
   if ('frequencyRange' in event && event.eventType === 'audio-trigger') {
-    const t = event
+    const t = event as AudioTriggerNode & { sensitivity?: number }
+    const threshold =
+      t.threshold ??
+      (t.sensitivity != null ? 1 - t.sensitivity : AUDIO_TRIGGER_SAVE_DEFAULTS.threshold)
     return {
       id: t.id,
       type: 'event' as const,
       eventType: 'audio-trigger' as const,
       frequencyRange: t.frequencyRange ?? AUDIO_TRIGGER_SAVE_DEFAULTS.frequencyRange,
-      sensitivity: t.sensitivity ?? AUDIO_TRIGGER_SAVE_DEFAULTS.sensitivity,
-      balance: t.balance ?? AUDIO_TRIGGER_SAVE_DEFAULTS.balance,
+      threshold,
+      hysteresis: t.hysteresis ?? 0,
+      holdMs: t.holdMs ?? 0,
       color: t.color ?? AUDIO_TRIGGER_SAVE_DEFAULTS.color,
       nodeLabel: t.nodeLabel ?? AUDIO_TRIGGER_SAVE_DEFAULTS.nodeLabel,
       outputs:
@@ -79,7 +82,10 @@ function normalizeAudioEventForSave(
     (event.eventType === 'none' ||
       event.eventType === 'delay' ||
       event.eventType === 'audio-beat' ||
-      event.eventType === 'audio-energy')
+      event.eventType === 'audio-energy' ||
+      event.eventType === 'audio-centroid' ||
+      event.eventType === 'audio-flatness' ||
+      event.eventType === 'audio-hfc')
   ) {
     const e = event
     return {
@@ -90,6 +96,7 @@ function normalizeAudioEventForSave(
       ...(e.label != null && { label: e.label }),
       ...(e.outputs != null && { outputs: e.outputs }),
       ...(e.threshold != null && { threshold: e.threshold }),
+      ...(e.cooldownMs != null && { cooldownMs: e.cooldownMs }),
     }
   }
   return event

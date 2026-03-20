@@ -574,6 +574,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.CONTROLLERS_RESTARTED]: undefined
   [RENDERER_RECEIVE.AUDIO_ENABLE]: AudioConfig
   [RENDERER_RECEIVE.AUDIO_DISABLE]: undefined
+  [RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED]: { enabled: boolean }
   [RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE]: AudioConfig | undefined
   [RENDERER_RECEIVE.CUE_STATE_UPDATE]: CueStateUpdatePayload
   [RENDERER_RECEIVE.DMX_VALUES]: { universeBuffer: Record<number, number> }

@@ -11,6 +11,11 @@
 
 import { AudioLightingData, AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { BeatDetector } from '../../../photonics-dmx/listeners/Audio/BeatDetector'
+import { extractAll } from '../../../photonics-dmx/listeners/Audio/SpectralFeatureExtractor'
+import { MelBandAnalyser } from '../../../photonics-dmx/listeners/Audio/MelBandAnalyser'
+import { computeChromagram } from '../../../photonics-dmx/listeners/Audio/ChromaAnalyser'
+import { KeyDetector } from '../../../photonics-dmx/listeners/Audio/KeyDetector'
+import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy'
 import { getDefaultStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
 import { sendAudioData } from '../ipcApi'
@@ -52,6 +57,8 @@ export class AudioCaptureManager {
   private lastFrameTime = 0
 
   private beatDetector: BeatDetector
+  private melBandAnalyser: MelBandAnalyser | null = null
+  private keyDetector: KeyDetector
   private frameIndex = 0
 
   // Debug logging (log status every ~60 frames ≈ 1 second at 60fps)
@@ -67,6 +74,7 @@ export class AudioCaptureManager {
   constructor(config?: Partial<AudioConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config }
     this.beatDetector = new BeatDetector(this.config.beatDetection)
+    this.keyDetector = new KeyDetector()
     console.log('AudioCaptureManager initialized')
   }
 
@@ -107,6 +115,12 @@ export class AudioCaptureManager {
       this.isCapturing = true
       this.frameIndex = 0
       this.beatDetector.reset()
+      this.melBandAnalyser = new MelBandAnalyser(
+        this.audioContext.sampleRate,
+        this.analyser.fftSize,
+        24,
+      )
+      this.keyDetector.reset()
 
       // Start analysis loop
       this.analyzeAudio()
@@ -185,6 +199,7 @@ export class AudioCaptureManager {
     }
 
     this.analyser = null
+    this.melBandAnalyser = null
     this.isCapturing = false
 
     // Reset state
@@ -225,6 +240,11 @@ export class AudioCaptureManager {
     // Update analyser if active and FFT size changed
     if (this.analyser && config.fftSize && config.fftSize !== oldConfig.fftSize) {
       this.analyser.fftSize = config.fftSize
+      this.melBandAnalyser = new MelBandAnalyser(
+        this.audioContext!.sampleRate,
+        this.analyser.fftSize,
+        24,
+      )
       console.log(`Updated FFT size to ${config.fftSize}`)
     }
 
@@ -257,22 +277,31 @@ export class AudioCaptureManager {
     // Get frequency data from analyser (built-in FFT)
     const dataArray = new Uint8Array(this.analyser.frequencyBinCount)
     this.analyser.getByteFrequencyData(dataArray)
+    const timeDomainArray = new Float32Array(this.analyser.fftSize)
+    this.analyser.getFloatTimeDomainData(timeDomainArray)
 
     // Calculate frequency bands and include raw FFT data (byte data is linear 0-255, IPC-safe)
-    const audioData = this.calculateFrequencyBands(dataArray)
+    const audioData = this.calculateFrequencyBands(dataArray, timeDomainArray)
 
     // Always send to main process via IPC (full frame rate)
     sendAudioData(audioData)
 
-    // Throttle UI updates
+    // Throttle UI updates (preview EQ, etc.)
     this.uiUpdateCounter++
     const shouldUpdateUI = this.uiUpdateCounter >= this.UI_UPDATE_THROTTLE
 
-    if (shouldUpdateUI) {
-      this.uiUpdateCounter = 0
+    // Beat is often a single frame; never skip pushing beat edge to the preview atom
+    const beatChanged =
+      this.lastAudioData != null && audioData.beatDetected !== this.lastAudioData.beatDetected
 
-      // Only update atom if values changed significantly to avoid unnecessary re-renders
-      if (this.shouldUpdateAtom(audioData)) {
+    if (shouldUpdateUI || beatChanged) {
+      if (shouldUpdateUI) {
+        this.uiUpdateCounter = 0
+      }
+
+      const pushToPreviewAtom = beatChanged || (shouldUpdateUI && this.shouldUpdateAtom(audioData))
+
+      if (pushToPreviewAtom) {
         store.set(audioDataAtom, audioData)
         this.lastAudioData = audioData
       }
@@ -311,15 +340,44 @@ export class AudioCaptureManager {
     if (newData.bpm !== this.lastAudioData.bpm) return true
     if ((newData.bpmConfidence ?? 0) !== (this.lastAudioData.bpmConfidence ?? 0)) return true
 
+    // Check overall energy change
     const energyDiff = Math.abs(newData.energy - this.lastAudioData.energy)
-    return energyDiff > this.VALUE_CHANGE_THRESHOLD
+    if (energyDiff > this.VALUE_CHANGE_THRESHOLD) return true
+
+    // Check if rawFrequencyData changed (for EQ preview bars)
+    // Sample a few bins to detect changes without full array comparison
+    const newRaw = newData.rawFrequencyData
+    const oldRaw = this.lastAudioData.rawFrequencyData
+    if (newRaw && oldRaw && newRaw.length === oldRaw.length) {
+      // Sample bins at low, mid, and high frequencies to detect changes
+      const sampleIndices = [
+        0, // First bin (lowest frequency)
+        Math.floor(newRaw.length / 2), // Middle bin
+        newRaw.length - 1, // Last bin (highest frequency)
+      ]
+      for (const idx of sampleIndices) {
+        const diff = Math.abs(newRaw[idx] - oldRaw[idx])
+        if (diff > 2) {
+          // Changed by more than 2 units (out of 255) - significant enough to update
+          return true
+        }
+      }
+    } else if (newRaw !== oldRaw) {
+      // Array reference changed or length mismatch - update
+      return true
+    }
+
+    return false
   }
 
   /**
    * Calculate frequency bands from FFT data
    * Dynamically calculates energy for all configured frequency ranges
    */
-  private calculateFrequencyBands(frequencyData: Uint8Array): AudioLightingData {
+  private calculateFrequencyBands(
+    frequencyData: Uint8Array,
+    timeDomainData: Float32Array,
+  ): AudioLightingData {
     if (!this.audioContext || !this.analyser) {
       throw new Error('Audio context not initialized')
     }
@@ -344,8 +402,14 @@ export class AudioCaptureManager {
       displayEnergy = this.smoothedEnergy
     }
 
-    // Bass energy for beat detection (20-220 Hz)
-    const bassEnergy = this.getEnergyInRange(frequencyData, binSize, BASS_MIN_HZ, BASS_MAX_HZ)
+    // Bass energy for beat detection (20-220 Hz); same algorithm as EQ preview and trigger nodes
+    const bassEnergy = getBandEnergy(
+      Array.from(frequencyData),
+      sampleRate,
+      fftSize,
+      BASS_MIN_HZ,
+      BASS_MAX_HZ,
+    )
     // Beat detection uses unscaled analysis energy; timing from frame-based internal time
     const { beatDetected, bpm, bpmConfidence } = this.beatDetector.processFrame(
       scaledEnergy,
@@ -373,7 +437,17 @@ export class AudioCaptureManager {
     const amplitude = overallLevel
 
     // IPC-safe raw FFT data (byte data 0-255) for per-node band computation in main process
-    const rawFrequencyData = Array.from(frequencyData)
+    // Apply global sensitivity to rawFrequencyData so audio-trigger nodes respect the global setting
+    const rawFrequencyData = Array.from(frequencyData).map((bin) =>
+      Math.min(Math.round(bin * this.config.sensitivity), 255),
+    )
+
+    const spectral = extractAll(frequencyData, timeDomainData, binSize, sampleRate)
+
+    const melBands = this.melBandAnalyser?.computeMelBands(frequencyData).map((v) => Math.min(1, v))
+
+    const chromagram = computeChromagram(frequencyData, binSize)
+    const keyResult = this.keyDetector.detect(chromagram)
 
     return {
       timestamp: Date.now(),
@@ -387,30 +461,12 @@ export class AudioCaptureManager {
       bpmConfidence,
       peakFrequency,
       amplitude,
+      ...spectral,
+      melBands,
+      chromagram,
+      detectedKey: keyResult.key,
+      detectedKeyStrength: keyResult.strength,
     }
-  }
-
-  /**
-   * Get energy level in a specific frequency range
-   */
-  private getEnergyInRange(
-    frequencyData: Uint8Array,
-    binSize: number,
-    startHz: number,
-    endHz: number,
-  ): number {
-    const startBin = Math.floor(startHz / binSize)
-    const endBin = Math.ceil(endHz / binSize)
-
-    let energy = 0
-    let count = 0
-
-    for (let i = startBin; i < Math.min(endBin, frequencyData.length); i++) {
-      energy += frequencyData[i] / 255 // Normalize to 0-1
-      count++
-    }
-
-    return count > 0 ? Math.min(energy / count, 1.0) : 0
   }
 
   /**

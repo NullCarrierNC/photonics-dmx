@@ -145,6 +145,8 @@ export const RENDERER_RECEIVE = {
   CONTROLLERS_RESTARTED: 'controllers-restarted',
   AUDIO_ENABLE: 'audio:enable',
   AUDIO_DISABLE: 'audio:disable',
+  /** Broadcast after SET_AUDIO_ENABLED so all windows sync Enable Audio UI (e.g. Live Monitor in Cue Editor). */
+  AUDIO_ENABLED_CHANGED: 'audio:enabled-changed',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
   CUE_STATE_UPDATE: 'cue-state-update',
   DMX_VALUES: 'dmx-values',

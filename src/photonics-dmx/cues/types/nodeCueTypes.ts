@@ -332,22 +332,34 @@ export interface YargEventNode extends BaseEventNode {
   eventType: YargEventType
 }
 
-export type AudioEventType = 'none' | 'delay' | 'audio-beat' | 'audio-energy' | 'audio-trigger'
+export type AudioEventType =
+  | 'none'
+  | 'delay'
+  | 'audio-beat'
+  | 'audio-energy'
+  | 'audio-trigger'
+  | 'audio-centroid'
+  | 'audio-flatness'
+  | 'audio-hfc'
 
 export interface AudioEventNode extends BaseEventNode {
   eventType: AudioEventType
   threshold?: number
   triggerMode: 'edge' | 'level'
+  /** Minimum ms between edge triggers; 0 = no limit */
+  cooldownMs?: number
 }
-
-export type AudioTriggerBalance = 'left' | 'right' | 'stereo'
 
 export interface AudioTriggerNode extends BaseEventNode {
   type: 'event'
   eventType: 'audio-trigger'
   frequencyRange: { minHz: number; maxHz: number }
-  sensitivity: number
-  balance: AudioTriggerBalance
+  /** Power level (0-1) the band energy must exceed to trigger. Higher = needs more energy to fire. */
+  threshold: number
+  /** Hysteresis margin (0-1). Release when level drops below threshold - hysteresis. Omitted = 0. */
+  hysteresis?: number
+  /** Minimum ms the trigger stays active after entering. 0 = no minimum hold. */
+  holdMs?: number
   color: string
   nodeLabel: string
   outputs: ['enter', 'during', 'exit']

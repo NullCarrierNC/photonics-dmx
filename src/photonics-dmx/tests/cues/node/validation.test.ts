@@ -117,6 +117,35 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('validates audio cue with audio-hfc event type', () => {
+    const definition: AudioNodeCueDefinition = {
+      id: 'hfc-cue',
+      name: 'HFC Cue',
+      cueTypeId: 'custom-audio',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-hfc',
+            threshold: 0.4,
+            triggerMode: 'level',
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [definition],
+    })
+    expect(result.valid).toBe(true)
+  })
+
   it('validates audio cue with audio-trigger event (full trigger shape)', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'trigger-cue',
@@ -129,8 +158,9 @@ describe('Node cue validation', () => {
             type: 'event',
             eventType: 'audio-trigger',
             frequencyRange: { minHz: 120, maxHz: 500 },
-            sensitivity: 0.5,
-            balance: 'stereo',
+            threshold: 0.5,
+            hysteresis: 0.05,
+            holdMs: 0,
             color: '#60a5fa',
             nodeLabel: 'Audio Trigger',
             outputs: ['enter', 'during', 'exit'],
@@ -176,6 +206,103 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('validates audio-trigger with frequency range at 20 Hz minimum (matches schema and runtime clamp)', () => {
+    const definition: AudioNodeCueDefinition = {
+      id: 'trigger-low-hz',
+      name: 'Low Hz',
+      cueTypeId: 'custom-audio',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-trigger',
+            frequencyRange: { minHz: 20, maxHz: 200 },
+            threshold: 0.4,
+            color: '#60a5fa',
+            nodeLabel: 'Sub',
+            outputs: ['enter', 'during', 'exit'],
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [definition],
+    })
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects audio-trigger when minHz is below schema minimum (20 Hz)', () => {
+    const definition: AudioNodeCueDefinition = {
+      id: 'bad-hz',
+      name: 'Bad Hz',
+      cueTypeId: 'custom-audio',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-trigger',
+            frequencyRange: { minHz: 19, maxHz: 200 },
+            threshold: 0.4,
+            color: '#60a5fa',
+            nodeLabel: 'X',
+            outputs: ['enter', 'during', 'exit'],
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [definition],
+    })
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects audio-trigger when hysteresis is out of range', () => {
+    const definition: AudioNodeCueDefinition = {
+      id: 'bad-hyst',
+      name: 'Bad Hyst',
+      cueTypeId: 'custom-audio',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-trigger',
+            frequencyRange: { minHz: 100, maxHz: 500 },
+            threshold: 0.5,
+            hysteresis: 1.5,
+            color: '#60a5fa',
+            nodeLabel: 'T',
+            outputs: ['enter', 'during', 'exit'],
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [definition],
+    })
+    expect(result.valid).toBe(false)
+  })
+
   it('rejects audio-trigger event missing required trigger fields', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'bad-trigger-cue',
@@ -187,7 +314,7 @@ describe('Node cue validation', () => {
             id: 'event-1',
             type: 'event',
             eventType: 'audio-trigger',
-            // missing frequencyRange, sensitivity, balance, color, nodeLabel, outputs
+            // missing frequencyRange, threshold, color, nodeLabel, outputs
           } as any,
         ],
         actions: [],

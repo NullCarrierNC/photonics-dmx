@@ -69,9 +69,8 @@ const AudioSensitivityControls: React.FC = () => {
         </div>
         <div className="flex items-center space-x-2">
           <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
-            {sensitivity.toFixed(1)}
+            {sensitivity.toFixed(1)}x
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">/ 5.0</span>
         </div>
       </div>
 

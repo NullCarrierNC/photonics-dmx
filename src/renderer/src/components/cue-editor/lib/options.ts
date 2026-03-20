@@ -30,7 +30,9 @@ const EASING_OPTIONS = [
 // Event options for EVENT NODES - includes system events (cue-started, cue-called)
 const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENTS_BASE]
 const YARG_EVENT_OPTIONS = withDefaultLabels(YARG_EVENT_TYPES)
-const AUDIO_EVENT_OPTIONS = withDefaultLabels(AUDIO_EVENTS_BASE)
+const AUDIO_EVENT_OPTIONS = [...withDefaultLabels(AUDIO_EVENTS_BASE)].sort((a, b) =>
+  a.label.localeCompare(b.label),
+)
 
 // Categorized YARG event options - derived from shared constants
 const YARG_EVENT_OPTIONS_CATEGORIZED = getYargEventCategories()

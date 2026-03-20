@@ -1,5 +1,5 @@
 import { IAudioCue } from '../../interfaces/IAudioCue'
-import { AudioCueData, AudioCueType, TriggerContext } from '../../types/audioCueTypes'
+import { AudioCueData, AudioCueType, EventContext, TriggerContext } from '../../types/audioCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { calculateActionDuration, CompiledAudioCue } from '../compiler/NodeCueCompiler'
@@ -17,6 +17,7 @@ import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { UninitializedVariableError } from './valueResolver'
 import { VariableValue } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
+import { getBandEnergy } from '../../../listeners/Audio/bandEnergy'
 
 interface AudioEventState {
   previousValue: number
@@ -47,6 +48,9 @@ export class AudioNodeCue implements IAudioCue {
 
   private readonly eventStates = new Map<string, AudioEventState>()
   private readonly triggerPhase = new Map<string, 'idle' | 'active'>()
+  /** Timestamp (ms) when trigger entered active phase; used for holdMs */
+  private readonly triggerEnterTime = new Map<string, number>()
+  private readonly lastTriggerTime = new Map<string, number>()
   private readonly activeLevelEffects = new Map<string, number>()
   private static cueLevelVarStores = new Map<string, Map<string, VariableValue>>()
   private static groupLevelVarStores = new Map<string, Map<string, VariableValue>>()
@@ -124,9 +128,17 @@ export class AudioNodeCue implements IAudioCue {
       if (evaluation.mode === 'edge') {
         if (!evaluation.triggered) continue
 
-        // Use execution engine for edge-triggered events
+        const cooldownMs = (event as AudioEventNode).cooldownMs ?? 0
+        if (cooldownMs > 0) {
+          const now = Date.now()
+          const last = this.lastTriggerTime.get(event.id) ?? 0
+          if (now - last < cooldownMs) continue
+          this.lastTriggerTime.set(event.id, now)
+        }
+
+        const eventContext: EventContext = { eventRawValue: evaluation.intensity }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extended cue payload shape
-        const cueData = { ...data } as any
+        const cueData = { ...data, eventContext } as any
         this.executionEngine.startExecution(event, cueData)
       } else {
         // Level-triggered events use continuous state management
@@ -197,6 +209,8 @@ export class AudioNodeCue implements IAudioCue {
 
     this.eventStates.clear()
     this.triggerPhase.clear()
+    this.triggerEnterTime.clear()
+    this.lastTriggerTime.clear()
     this.activeLevelEffects.clear()
     this.cueLevelVarStore.clear()
     AudioNodeCue.cueLevelVarStores.delete(this.id)
@@ -209,6 +223,8 @@ export class AudioNodeCue implements IAudioCue {
 
     this.eventStates.clear()
     this.triggerPhase.clear()
+    this.triggerEnterTime.clear()
+    this.lastTriggerTime.clear()
     this.activeLevelEffects.clear()
     this.cueLevelVarStore.clear()
     AudioNodeCue.cueLevelVarStores.delete(this.id)
@@ -241,29 +257,6 @@ export class AudioNodeCue implements IAudioCue {
   }
 
   /**
-   * Compute normalized energy (0-1) in a frequency range from raw FFT byte data.
-   */
-  private getEnergyInRange(
-    rawData: number[],
-    sampleRate: number,
-    fftSize: number,
-    minHz: number,
-    maxHz: number,
-  ): number {
-    if (!rawData.length || sampleRate <= 0 || fftSize <= 0) return 0
-    const binSize = sampleRate / fftSize
-    const startBin = Math.floor(minHz / binSize)
-    const endBin = Math.min(Math.ceil(maxHz / binSize), rawData.length)
-    let energy = 0
-    let count = 0
-    for (let i = startBin; i < endBin; i++) {
-      energy += rawData[i] / 255
-      count++
-    }
-    return count > 0 ? clamp(energy / count, 0, 1) : 0
-  }
-
-  /**
    * Find peak frequency in Hz within a range from raw FFT data.
    */
   private getPeakFrequencyInRange(
@@ -292,13 +285,15 @@ export class AudioNodeCue implements IAudioCue {
     const { rawFrequencyData, sampleRate, fftSize } = data.audioData
     if (!rawFrequencyData?.length || sampleRate == null || fftSize == null) return
 
-    const { frequencyRange, sensitivity } = trigger
-    const minHz = clamp(frequencyRange.minHz, 120, 20000)
-    const maxHz = clamp(frequencyRange.maxHz, 120, 20000)
-    // Invert so higher UI sensitivity = lower threshold = easier to trigger
-    const threshold = 1 - clamp(sensitivity, 0, 1)
+    const { frequencyRange, threshold } = trigger
+    const minHz = clamp(frequencyRange.minHz, 20, 20000)
+    const maxHz = clamp(frequencyRange.maxHz, 20, 20000)
+    const triggerThreshold = clamp(threshold, 0, 1)
+    const hysteresis = clamp(trigger.hysteresis ?? 0, 0, 1)
+    const holdMs = Math.max(0, trigger.holdMs ?? 0)
+    const releaseThreshold = Math.max(0, triggerThreshold - hysteresis)
 
-    const bandEnergy = this.getEnergyInRange(rawFrequencyData, sampleRate, fftSize, minHz, maxHz)
+    const bandEnergy = getBandEnergy(rawFrequencyData, sampleRate, fftSize, minHz, maxHz)
     const level = bandEnergy
     const peakFreq = this.getPeakFrequencyInRange(
       rawFrequencyData,
@@ -309,7 +304,17 @@ export class AudioNodeCue implements IAudioCue {
     )
 
     const phase = this.triggerPhase.get(trigger.id) ?? 'idle'
-    const nowActive = level >= threshold
+    const now = Date.now()
+    const enterTime = this.triggerEnterTime.get(trigger.id) ?? 0
+
+    let shouldBeActive: boolean
+    if (phase === 'idle') {
+      shouldBeActive = level >= triggerThreshold
+    } else if (level >= releaseThreshold) {
+      shouldBeActive = true
+    } else {
+      shouldBeActive = now - enterTime < holdMs
+    }
 
     const triggerContext: TriggerContext = {
       triggerLevel: level,
@@ -319,9 +324,10 @@ export class AudioNodeCue implements IAudioCue {
       triggerBandAmplitude: bandEnergy,
     }
 
-    if (!nowActive) {
+    if (!shouldBeActive) {
       if (phase === 'active') {
         this.triggerPhase.set(trigger.id, 'idle')
+        this.triggerEnterTime.delete(trigger.id)
         const cueData: AudioCueData = { ...data, triggerContext }
         this.executionEngine!.startExecutionWithCallback(
           trigger,
@@ -335,6 +341,7 @@ export class AudioNodeCue implements IAudioCue {
 
     if (phase === 'idle') {
       this.triggerPhase.set(trigger.id, 'active')
+      this.triggerEnterTime.set(trigger.id, now)
       const cueData: AudioCueData = { ...data, triggerContext }
       this.executionEngine!.startExecutionWithCallback(
         trigger,
@@ -402,6 +409,12 @@ export class AudioNodeCue implements IAudioCue {
         return clamp(audioData.energy ?? 0, 0, 1)
       case 'audio-trigger':
         return 0
+      case 'audio-centroid':
+        return clamp(audioData.spectralCentroid ?? 0, 0, 1)
+      case 'audio-flatness':
+        return clamp(audioData.spectralFlatness ?? 0, 0, 1)
+      case 'audio-hfc':
+        return clamp(audioData.hfcOnset ?? 0, 0, 1)
       default:
         return 0
     }
