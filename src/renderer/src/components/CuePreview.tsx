@@ -6,6 +6,8 @@ import CuePreviewAudio from './CuePreviewAudio'
 
 interface CuePreviewProps {
   className?: string
+  /** When true (DMX Preview + audio platform), show sensitivity/noise floor under the spectrum analyzer. */
+  showAudioQuickControls?: boolean
   showBeatIndicator?: boolean
   showMeasureIndicator?: boolean
   showKeyframeIndicator?: boolean
@@ -16,6 +18,7 @@ interface CuePreviewProps {
 
 const CuePreview: React.FC<CuePreviewProps> = ({
   className = '',
+  showAudioQuickControls = false,
   showBeatIndicator = false,
   showMeasureIndicator = false,
   showKeyframeIndicator = false,
@@ -41,7 +44,7 @@ const CuePreview: React.FC<CuePreviewProps> = ({
       />
     )
   } else if (platform === 'AUDIO') {
-    return <CuePreviewAudio className={className} />
+    return <CuePreviewAudio className={className} showAudioQuickControls={showAudioQuickControls} />
   }
 
   // Default state when no platform is detected yet

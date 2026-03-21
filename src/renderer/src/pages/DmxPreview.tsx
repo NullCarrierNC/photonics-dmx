@@ -44,7 +44,10 @@ const DmxPreview: React.FC = () => {
       {selectedRig !== null && rigConfig !== null && (
         <>
           <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
-          <CuePreview />
+          <CuePreview
+            className={platform === 'AUDIO' ? 'mt-6' : ''}
+            showAudioQuickControls={platform === 'AUDIO'}
+          />
           <LightsDmxChannelsPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
         </>
       )}

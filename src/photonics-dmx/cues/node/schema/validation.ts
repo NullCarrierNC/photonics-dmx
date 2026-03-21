@@ -659,6 +659,8 @@ const audioEventSchema: JSONSchemaType<AudioEventNode> = {
     threshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
     triggerMode: { type: 'string', enum: ['edge', 'level'] },
     cooldownMs: { type: 'number', nullable: true, minimum: 0 },
+    useOnsetGating: { type: 'boolean', nullable: true },
+    onsetThreshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
   },
 }
 

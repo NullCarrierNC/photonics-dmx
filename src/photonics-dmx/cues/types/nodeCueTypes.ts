@@ -348,6 +348,13 @@ export interface AudioEventNode extends BaseEventNode {
   triggerMode: 'edge' | 'level'
   /** Minimum ms between edge triggers; 0 = no limit */
   cooldownMs?: number
+  /**
+   * When true (edge mode only), also require max per-band onset strength >= onsetThreshold.
+   * Used to tighten beat/HFC-style events against weak or duplicate edges.
+   */
+  useOnsetGating?: boolean
+  /** Minimum onset strength (0–1) when useOnsetGating is true. Default 0.3 */
+  onsetThreshold?: number
 }
 
 /** Optional min/max range for a single spectral gate (0–1 feature values). */

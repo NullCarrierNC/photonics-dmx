@@ -438,7 +438,18 @@ export class AudioNodeCue implements IAudioCue {
     const currentValue = clamp(this.getEventValue(event.eventType, data), 0, 1)
 
     if (event.triggerMode === 'edge') {
-      const triggered = state.previousValue < threshold && currentValue >= threshold
+      let triggered = state.previousValue < threshold && currentValue >= threshold
+      if (triggered && event.useOnsetGating) {
+        const bandOnsets = data.audioData.bandOnsets
+        const onsetThreshold = clamp(event.onsetThreshold ?? 0.3, 0, 1)
+        let maxOnset = 0
+        if (bandOnsets && Object.keys(bandOnsets).length > 0) {
+          maxOnset = Math.max(...Object.values(bandOnsets))
+        }
+        if (maxOnset < onsetThreshold) {
+          triggered = false
+        }
+      }
       state.previousValue = currentValue
       state.active = triggered
       return {

@@ -5,6 +5,7 @@ import type { Color } from '../../../photonics-dmx/types'
 import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy'
 import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { EQ_BAND_COLORS } from '../lib/audioEqBandColors'
+import AudioSensitivityControls from './AudioSensitivityControls'
 
 // Map Color type to RGB values for preview bars (matches AudioColorMapping.tsx)
 const COLOR_TO_RGB: Record<Color, string> = {
@@ -30,6 +31,8 @@ interface CuePreviewAudioProps {
   className?: string
   /** When false, omit the in-card "Audio Preview" heading (page supplies the title). */
   showTitle?: boolean
+  /** DMX Preview: show Global Sensitivity / Noise Floor under the spectrum (same as Audio Settings). */
+  showAudioQuickControls?: boolean
 }
 
 type PreviewRange = {
@@ -43,7 +46,11 @@ type PreviewRange = {
 /** Minimum time the beat indicator stays lit so transient single-frame triggers remain visible. */
 const MIN_BEAT_INDICATOR_MS = 280
 
-const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showTitle = true }) => {
+const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({
+  className = '',
+  showTitle = true,
+  showAudioQuickControls = false,
+}) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
   const audioData = useAtomValue(audioDataAtom)
   const audioConfig = useAtomValue(audioConfigAtom)
@@ -168,7 +175,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showT
       )}
 
       {/* Frequency Bars */}
-      <div className="space-y-2 mb-4">
+      <div className={showAudioQuickControls ? 'space-y-2' : 'space-y-2 mb-4'}>
         {displayRanges.map((range) => {
           const bandValue = bandValuesById[range.id] || 0
           const colorRgb = COLOR_TO_RGB[range.color as Color] || COLOR_TO_RGB.white
@@ -214,6 +221,12 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showT
           </div>
         </div>
       </div>
+
+      {showAudioQuickControls && (
+        <div className="border-t border-gray-300 dark:border-gray-600 pt-4 mt-4">
+          <AudioSensitivityControls compact />
+        </div>
+      )}
 
       {/* Beat Indicator */}
       <div className="flex items-center gap-3">
