@@ -41,6 +41,9 @@ type AudioEventEvaluation = EdgeEvaluation | LevelEvaluation
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
 
+/** EMA weight for per-trigger band energy; reduces FFT frame-to-frame jitter */
+const BAND_ENERGY_SMOOTH_ALPHA = 0.45
+
 function checkSpectralGateRange(
   range: { min?: number; max?: number } | undefined,
   value: number,
@@ -76,6 +79,8 @@ export class AudioNodeCue implements IAudioCue {
   private readonly triggerEnterTime = new Map<string, number>()
   private readonly lastTriggerTime = new Map<string, number>()
   private readonly activeLevelEffects = new Map<string, number>()
+  /** Smoothed band energy per audio-trigger node id (EMA of getBandEnergy) */
+  private readonly smoothedBandEnergy = new Map<string, number>()
   private static cueLevelVarStores = new Map<string, Map<string, VariableValue>>()
   private static groupLevelVarStores = new Map<string, Map<string, VariableValue>>()
   private cueLevelVarStore: Map<string, VariableValue>
@@ -238,6 +243,7 @@ export class AudioNodeCue implements IAudioCue {
     this.triggerEnterTime.clear()
     this.lastTriggerTime.clear()
     this.activeLevelEffects.clear()
+    this.smoothedBandEnergy.clear()
     this.cueLevelVarStore.clear()
     AudioNodeCue.cueLevelVarStores.delete(this.id)
   }
@@ -252,6 +258,7 @@ export class AudioNodeCue implements IAudioCue {
     this.triggerEnterTime.clear()
     this.lastTriggerTime.clear()
     this.activeLevelEffects.clear()
+    this.smoothedBandEnergy.clear()
     this.cueLevelVarStore.clear()
     AudioNodeCue.cueLevelVarStores.delete(this.id)
   }
@@ -321,7 +328,10 @@ export class AudioNodeCue implements IAudioCue {
     const releaseThreshold = Math.max(0, triggerThreshold - hysteresis)
 
     const bandEnergy = getBandEnergy(rawFrequencyData, sampleRate, fftSize, minHz, maxHz)
-    const level = bandEnergy
+    const prevSmoothed = this.smoothedBandEnergy.get(trigger.id) ?? bandEnergy
+    const smoothedEnergy =
+      BAND_ENERGY_SMOOTH_ALPHA * bandEnergy + (1 - BAND_ENERGY_SMOOTH_ALPHA) * prevSmoothed
+    this.smoothedBandEnergy.set(trigger.id, smoothedEnergy)
     const peakFreq = this.getPeakFrequencyInRange(
       rawFrequencyData,
       sampleRate,
@@ -359,8 +369,8 @@ export class AudioNodeCue implements IAudioCue {
 
     let energyActive: boolean
     if (phase === 'idle') {
-      energyActive = level >= triggerThreshold
-    } else if (level >= releaseThreshold) {
+      energyActive = bandEnergy >= triggerThreshold
+    } else if (bandEnergy >= releaseThreshold) {
       energyActive = true
     } else {
       energyActive = now - enterTime < holdMs
@@ -369,11 +379,11 @@ export class AudioNodeCue implements IAudioCue {
     const shouldBeActive = energyActive && spectralOk && onsetOk
 
     const triggerContext: TriggerContext = {
-      triggerLevel: level,
+      triggerLevel: smoothedEnergy,
       triggerFrequencyMin: minHz,
       triggerFrequencyMax: maxHz,
       triggerPeakFrequency: peakFreq,
-      triggerBandAmplitude: bandEnergy,
+      triggerBandAmplitude: smoothedEnergy,
     }
     if (matchedBandId != null) {
       triggerContext.triggerMatchedBandId = matchedBandId
