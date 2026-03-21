@@ -72,6 +72,7 @@ export class AudioNodeCue implements IAudioCue {
   public readonly id: string
   public readonly cueType: AudioCueType
   public readonly description: string
+  public readonly name: string
 
   private readonly eventStates = new Map<string, AudioEventState>()
   private readonly triggerPhase = new Map<string, 'idle' | 'active'>()
@@ -96,6 +97,7 @@ export class AudioNodeCue implements IAudioCue {
     const definition = compiledCue.definition as AudioNodeCueDefinition
     this.id = `${groupId}:${definition.id}`
     this.cueType = definition.cueTypeId
+    this.name = definition.name || definition.id
     this.description = definition.description || definition.name || 'Node-based audio cue'
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
 

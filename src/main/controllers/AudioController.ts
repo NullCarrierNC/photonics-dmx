@@ -198,7 +198,7 @@ export class AudioController {
       group.cues.forEach((cue) => {
         cueMap.set(cue.cueType, {
           id: cue.cueType,
-          label: cue.id,
+          label: cue.name,
           description: cue.description,
           groupId: group.id,
           groupName: group.name,

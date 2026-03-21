@@ -15,6 +15,9 @@ export interface IAudioCue {
   /** Description of the cue effect's appearance */
   description: string
 
+  /** Display name from the cue file (editor Cue Name) */
+  name: string
+
   /**
    * Execute the cue with the given audio data
    * @param data The audio cue data
