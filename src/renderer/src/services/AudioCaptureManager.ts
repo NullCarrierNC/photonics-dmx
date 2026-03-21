@@ -26,6 +26,7 @@ const store = getDefaultStore()
 const DEFAULT_CONFIG: AudioConfig = {
   fftSize: 2048,
   sensitivity: 1.0,
+  noiseFloor: 0,
   bands: DEFAULT_AUDIO_BANDS,
   smoothing: {
     enabled: true,
@@ -451,10 +452,22 @@ export class AudioCaptureManager {
     const fftSize = this.analyser.fftSize
     const binSize = sampleRate / fftSize
 
+    // Apply noise floor gate: zero out bins below threshold
+    const noiseFloor = this.config.noiseFloor ?? 0
+    let gatedData: Uint8Array
+    if (noiseFloor > 0) {
+      gatedData = new Uint8Array(frequencyData.length)
+      for (let i = 0; i < frequencyData.length; i++) {
+        gatedData[i] = frequencyData[i] >= noiseFloor ? frequencyData[i] : 0
+      }
+    } else {
+      gatedData = frequencyData
+    }
+
     // Overall energy (0-1)
     let totalEnergy = 0
-    for (let i = 0; i < frequencyData.length; i++) {
-      totalEnergy += frequencyData[i]
+    for (let i = 0; i < gatedData.length; i++) {
+      totalEnergy += gatedData[i]
     }
     const overallEnergy = Math.min((totalEnergy / frequencyData.length / 255) * 2, 1.0)
     const scaledEnergy = Math.min(overallEnergy * this.config.sensitivity, 1.0)
@@ -469,7 +482,7 @@ export class AudioCaptureManager {
 
     // Bass energy for beat detection (20-220 Hz); same algorithm as EQ preview and trigger nodes
     const bassEnergy = getBandEnergy(
-      Array.from(frequencyData),
+      Array.from(gatedData),
       sampleRate,
       fftSize,
       BASS_MIN_HZ,
@@ -479,7 +492,7 @@ export class AudioCaptureManager {
     const { beatDetected, bpm, bpmConfidence } = this.beatDetector.processFrame(
       scaledEnergy,
       bassEnergy,
-      frequencyData,
+      gatedData,
       binSize,
       this.internalTime,
     )
@@ -490,9 +503,9 @@ export class AudioCaptureManager {
     // Peak frequency: bin with max magnitude -> Hz
     let peakBin = 0
     let maxVal = 0
-    for (let i = 0; i < frequencyData.length; i++) {
-      if (frequencyData[i] > maxVal) {
-        maxVal = frequencyData[i]
+    for (let i = 0; i < gatedData.length; i++) {
+      if (gatedData[i] > maxVal) {
+        maxVal = gatedData[i]
         peakBin = i
       }
     }
@@ -504,11 +517,11 @@ export class AudioCaptureManager {
     // IPC-safe raw FFT data (byte data 0-255) for per-node band computation in main process
     // Apply global sensitivity and per-band gain multipliers
     // Gain pipeline: raw bin * globalSensitivity * bandGain
-    const rawFrequencyData = new Array<number>(frequencyData.length)
-    if (this.binToBandMap && this.binToBandMap.length === frequencyData.length) {
+    const rawFrequencyData = new Array<number>(gatedData.length)
+    if (this.binToBandMap && this.binToBandMap.length === gatedData.length) {
       // Use cached bin-to-band mapping for efficient lookup
-      for (let i = 0; i < frequencyData.length; i++) {
-        const bin = frequencyData[i]
+      for (let i = 0; i < gatedData.length; i++) {
+        const bin = gatedData[i]
         const bandIndex = this.binToBandMap[i]
         if (bandIndex >= 0 && bandIndex < this.bandGains.length) {
           // Apply global sensitivity * band gain
@@ -524,16 +537,16 @@ export class AudioCaptureManager {
     } else {
       // Fallback: if mapping not available, apply global sensitivity only
       // This should only happen briefly during initialization
-      for (let i = 0; i < frequencyData.length; i++) {
-        rawFrequencyData[i] = Math.min(Math.round(frequencyData[i] * this.config.sensitivity), 255)
+      for (let i = 0; i < gatedData.length; i++) {
+        rawFrequencyData[i] = Math.min(Math.round(gatedData[i] * this.config.sensitivity), 255)
       }
     }
 
-    const spectral = extractAll(frequencyData, timeDomainData, binSize, sampleRate)
+    const spectral = extractAll(gatedData, timeDomainData, binSize, sampleRate)
 
-    const melBands = this.melBandAnalyser?.computeMelBands(frequencyData).map((v) => Math.min(1, v))
+    const melBands = this.melBandAnalyser?.computeMelBands(gatedData).map((v) => Math.min(1, v))
 
-    const chromagram = computeChromagram(frequencyData, binSize)
+    const chromagram = computeChromagram(gatedData, binSize)
     const keyResult = this.keyDetector.detect(chromagram)
 
     return {

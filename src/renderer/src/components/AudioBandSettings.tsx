@@ -124,7 +124,7 @@ const AudioBandSettings: React.FC = () => {
         Configure the frequency ranges and per-band gain multipliers. Per-band gain is applied on
         top of the global sensitivity. This allows you to adjust the sensitivity of each band, eg to
         increase the sensitivity of the upper mids and highs while lowering the sensitivity of the
-        bass.
+        bass. Use the spectrum analyzer to see how the bands are being affected.
       </p>
 
       <div className="space-y-4">

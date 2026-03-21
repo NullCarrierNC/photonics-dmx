@@ -372,6 +372,7 @@ const AUDIO_CONFIG_KEYS = new Set([
   'deviceId',
   'fftSize',
   'sensitivity',
+  'noiseFloor',
   'bands',
   'beatDetection',
   'smoothing',

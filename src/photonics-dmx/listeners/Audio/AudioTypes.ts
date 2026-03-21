@@ -87,6 +87,10 @@ export interface AudioConfig {
   /** Sensitivity/gain multiplier (default: 1.0, range: 0.1-5.0) */
   sensitivity: number
 
+  /** Noise floor gate threshold (0-255 raw FFT value, default: 0 = disabled).
+   *  Bins below this level are zeroed before any gain or analysis is applied. */
+  noiseFloor: number
+
   /** Frequency band definitions (exactly 5 bands) */
   bands: AudioBandDefinition[]
 

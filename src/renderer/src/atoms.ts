@@ -204,6 +204,7 @@ export interface LightingPreferences {
     fftSize: number
     updateIntervalMs?: number
     sensitivity: number
+    noiseFloor?: number
     bands?: Array<{
       id: string
       name: string

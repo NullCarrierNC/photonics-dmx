@@ -51,6 +51,7 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   deviceId: undefined, // undefined = use system default device
   fftSize: 2048,
   sensitivity: 1.0,
+  noiseFloor: 0,
   bands: DEFAULT_AUDIO_BANDS,
   beatDetection: {
     threshold: 0.3,
