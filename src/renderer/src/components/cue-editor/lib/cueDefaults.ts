@@ -76,6 +76,7 @@ export const buildDefaultAudioTrigger = (id?: string): AudioTriggerNode => ({
   threshold: 0.5,
   hysteresis: 0.05,
   holdMs: 0,
+  smoothing: 0.45,
   spectralGates: undefined,
   color: DEFAULT_TRIGGER_COLOR,
   nodeLabel: 'Audio Trigger',

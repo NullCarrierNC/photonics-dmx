@@ -395,6 +395,8 @@ export interface AudioTriggerNode extends BaseEventNode {
   hysteresis?: number
   /** Minimum ms the trigger stays active after entering. 0 = no minimum hold. */
   holdMs?: number
+  /** Energy smoothing (0–1). 0 = raw/immediate, 1 = maximum smoothing (slow response). Default 0.45. */
+  smoothing?: number
   /** Optional spectral conditions (flatness, ZCR, HFC, crest). AND with band energy. */
   spectralGates?: AudioTriggerSpectralGates
   /** When true, also require per-band onset strength above onsetThreshold for the matched band */

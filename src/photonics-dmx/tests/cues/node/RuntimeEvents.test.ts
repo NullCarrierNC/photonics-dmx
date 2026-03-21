@@ -184,7 +184,7 @@ describe('Runtime Event System', () => {
       engine.startExecution(systemEvent, createCueData())
 
       // Verify action was triggered via listener (synchronously)
-      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalled()
+      expect(mockSequencer.addEffect).toHaveBeenCalled()
     })
 
     it('should continue immediately after raising event (non-blocking)', () => {
@@ -285,7 +285,7 @@ describe('Runtime Event System', () => {
       engine.startExecution(systemEvent, createCueData())
 
       // Both actions should be triggered (synchronously)
-      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(2)
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -394,7 +394,7 @@ describe('Runtime Event System', () => {
       engine.startExecution(systemEvent, createCueData())
 
       // Both listeners should trigger their actions (synchronously)
-      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(2)
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -503,7 +503,7 @@ describe('Runtime Event System', () => {
 
       // Only listener1 should trigger (listening to event1) - synchronously
       // listener2 should not trigger (listening to event2, which wasn't raised)
-      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -673,7 +673,7 @@ describe('Runtime Event System', () => {
       engine.startExecution(cueStartedEvent, createCueData())
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(1)
       expect(firstSubmissionRef.use).toBe(false)
-      expect(mockSequencer.addEffectUnblockedName).not.toHaveBeenCalled()
+      expect(mockSequencer.addEffect).not.toHaveBeenCalled()
       // Clearing is done inside setEffect; node code must not call removeAllEffects directly (avoids black flash)
       expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
     })
@@ -729,7 +729,7 @@ describe('Runtime Event System', () => {
       )
       engine.startExecution(cueStartedEvent, createCueData())
       expect(mockSequencer.setEffectUnblockedName).not.toHaveBeenCalled()
-      expect(mockSequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
     })
 
     it('YargNodeCue (Primary): first execute uses setEffect, second uses addEffect, after onStop first again uses setEffect', async () => {
@@ -786,13 +786,12 @@ describe('Runtime Event System', () => {
       await cue.execute(cueData, mockSequencer, mockLightManager)
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(1)
       expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
-      const addEffectAfterFirst = (mockSequencer.addEffectUnblockedName as jest.Mock).mock.calls
-        .length
+      const addEffectAfterFirst = (mockSequencer.addEffect as jest.Mock).mock.calls.length
       expect(addEffectAfterFirst).toBeGreaterThanOrEqual(0)
 
       await cue.execute(cueData, mockSequencer, mockLightManager)
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(1)
-      expect((mockSequencer.addEffectUnblockedName as jest.Mock).mock.calls.length).toBeGreaterThan(
+      expect((mockSequencer.addEffect as jest.Mock).mock.calls.length).toBeGreaterThan(
         addEffectAfterFirst,
       )
 
@@ -898,7 +897,7 @@ describe('Runtime Event System', () => {
 
       await cue.execute(cueData, mockSequencer, mockLightManager)
       const setCalls = (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length
-      const addCalls = (mockSequencer.addEffectUnblockedName as jest.Mock).mock.calls.length
+      const addCalls = (mockSequencer.addEffect as jest.Mock).mock.calls.length
       expect(setCalls + addCalls).toBeGreaterThanOrEqual(1)
     })
 

@@ -114,6 +114,12 @@ const AUDIO_TRIGGER_PROPERTY_DOCS = {
     description: 'Minimum time (ms) the trigger stays active after entering. 0 = no minimum hold.',
     bestUsedFor: 'Avoiding flicker from very short transients.',
   },
+  smoothing: {
+    description:
+      'Band energy smoothing (0–1). 0 = raw/immediate response; 1 = maximum smoothing (slow, analogue-style response).',
+    bestUsedFor:
+      'Vintage light organ look: raise; beat detection or strobes: lower. Uses higher values for smoother, less flickery brightness.',
+  },
   color: {
     description: 'Colour used for the trigger node on the canvas (visual only).',
     bestUsedFor: 'Quickly telling triggers apart by band or purpose.',
@@ -131,6 +137,7 @@ const AUDIO_TRIGGER_DEFAULTS: Omit<AudioTriggerNode, 'id' | 'type'> = {
   threshold: 0.5,
   hysteresis: 0.05,
   holdMs: 0,
+  smoothing: 0.45,
   spectralGates: undefined,
   color: DEFAULT_TRIGGER_COLOR,
   nodeLabel: 'Audio Trigger',
@@ -423,6 +430,27 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               {AUDIO_TRIGGER_PROPERTY_DOCS.holdMs.description}
               <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
                 Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.holdMs.bestUsedFor}
+              </span>
+            </div>
+          </label>
+          <label className="flex flex-col font-medium">
+            Energy smoothing
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              className="mt-1"
+              value={trigger.smoothing ?? 0.45}
+              onChange={(e) => patchTrigger({ smoothing: Number(e.target.value) })}
+            />
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+              {(trigger.smoothing ?? 0.45).toFixed(2)}
+            </span>
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_TRIGGER_PROPERTY_DOCS.smoothing.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.smoothing.bestUsedFor}
               </span>
             </div>
           </label>

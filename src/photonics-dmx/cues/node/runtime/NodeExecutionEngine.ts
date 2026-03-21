@@ -98,7 +98,7 @@ export class NodeExecutionEngine {
   private eventListeners: Map<string, EventListenerNode[]> = new Map()
   private effectRegistry: EffectRegistry
   private activeEffectEngines: Map<string, EffectExecutionEngine> = new Map()
-  /** Effect names and layers submitted via addEffectUnblockedName/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
+  /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
   /** Node IDs that have emitted 'activated' but not yet 'deactivated', so cancelAll can flush them. */
   private pendingActivations: Set<string> = new Set()
@@ -613,7 +613,7 @@ export class NodeExecutionEngine {
           if (useSetEffect) {
             this.sequencer.setEffectUnblockedName(effectName, effect)
           } else {
-            this.sequencer.addEffectUnblockedName(effectName, effect)
+            this.sequencer.addEffect(effectName, effect)
           }
           this.emitNodeExecution('deactivated', actionNode.id)
           this.continueToNextNodes(actionNode.id, context)

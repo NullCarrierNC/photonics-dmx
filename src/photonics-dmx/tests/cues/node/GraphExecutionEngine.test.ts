@@ -235,11 +235,11 @@ describe('GraphExecutionEngine', () => {
 
       engine.startCueRun(params, { hasCueStartedFired: false })
       expect(sequencer.setEffectUnblockedName).toHaveBeenCalledTimes(1)
-      expect(sequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
+      expect(sequencer.addEffect).toHaveBeenCalledTimes(1)
 
       engine.startCueRun(params, { hasCueStartedFired: true })
       expect(sequencer.setEffectUnblockedName).toHaveBeenCalledTimes(1)
-      expect(sequencer.addEffectUnblockedName).toHaveBeenCalledTimes(2)
+      expect(sequencer.addEffect).toHaveBeenCalledTimes(2)
     })
 
     it('when run is active, second startCueRun queues and replaces previous queue', async () => {
@@ -390,7 +390,7 @@ describe('GraphExecutionEngine', () => {
 
       expect(sequencer.setEffectUnblockedNameWithCallback).toHaveBeenCalledTimes(1)
       await jest.runAllTimersAsync()
-      expect(sequencer.addEffectUnblockedName).toHaveBeenCalledTimes(1)
+      expect(sequencer.addEffect).toHaveBeenCalledTimes(1)
       jest.useRealTimers()
     })
   })

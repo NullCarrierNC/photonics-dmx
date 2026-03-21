@@ -726,6 +726,7 @@ const audioTriggerSchema = {
     threshold: { type: 'number', minimum: 0, maximum: 1 },
     hysteresis: { type: 'number', minimum: 0, maximum: 1, nullable: true },
     holdMs: { type: 'number', minimum: 0, nullable: true },
+    smoothing: { type: 'number', minimum: 0, maximum: 1, nullable: true },
     spectralGates: audioTriggerSpectralGatesSchema,
     useOnsetGating: { type: 'boolean', nullable: true },
     onsetThreshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },

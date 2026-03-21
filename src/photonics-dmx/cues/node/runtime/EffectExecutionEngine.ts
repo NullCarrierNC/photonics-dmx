@@ -56,7 +56,7 @@ export class EffectExecutionEngine {
   private eventListeners: Map<string, EventListenerNode[]> = new Map()
   private callerCueData: CueData | AudioCueData // Cue data from caller
   private onIdleCallback?: () => void // Called when all contexts complete
-  /** Effect names and layers submitted via addEffectUnblockedNameWithCallback, for cancelAll to remove. */
+  /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
   /** Callback-backed effects still running in sequencer for this engine instance. */
   private pendingCallbackEffects: Set<string> = new Set()
@@ -423,7 +423,7 @@ export class EffectExecutionEngine {
         if (useSetEffect) {
           this.sequencer.setEffectUnblockedName(effectName, effect)
         } else {
-          this.sequencer.addEffectUnblockedName(effectName, effect)
+          this.sequencer.addEffect(effectName, effect)
         }
         this.emitNodeExecution('deactivated', action.id)
         this.continueToNextNodes(action.id, context)

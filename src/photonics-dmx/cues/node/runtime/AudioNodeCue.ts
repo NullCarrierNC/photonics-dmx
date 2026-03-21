@@ -41,8 +41,8 @@ type AudioEventEvaluation = EdgeEvaluation | LevelEvaluation
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
 
-/** EMA weight for per-trigger band energy; reduces FFT frame-to-frame jitter */
-const BAND_ENERGY_SMOOTH_ALPHA = 0.45
+/** Default energy smoothing (0–1) when trigger.smoothing is omitted */
+const DEFAULT_EMA_SMOOTHING = 0.45
 
 function checkSpectralGateRange(
   range: { min?: number; max?: number } | undefined,
@@ -328,9 +328,10 @@ export class AudioNodeCue implements IAudioCue {
     const releaseThreshold = Math.max(0, triggerThreshold - hysteresis)
 
     const bandEnergy = getBandEnergy(rawFrequencyData, sampleRate, fftSize, minHz, maxHz)
+    const smoothing = clamp(trigger.smoothing ?? DEFAULT_EMA_SMOOTHING, 0, 1)
+    const alpha = 1 - smoothing
     const prevSmoothed = this.smoothedBandEnergy.get(trigger.id) ?? bandEnergy
-    const smoothedEnergy =
-      BAND_ENERGY_SMOOTH_ALPHA * bandEnergy + (1 - BAND_ENERGY_SMOOTH_ALPHA) * prevSmoothed
+    const smoothedEnergy = alpha * bandEnergy + (1 - alpha) * prevSmoothed
     this.smoothedBandEnergy.set(trigger.id, smoothedEnergy)
     const peakFreq = this.getPeakFrequencyInRange(
       rawFrequencyData,
