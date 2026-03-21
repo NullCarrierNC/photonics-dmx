@@ -123,6 +123,8 @@ export class AudioNodeCue implements IAudioCue {
   ): Promise<void> {
     const tasks: Promise<unknown>[] = []
 
+    this.initializeVariables()
+
     // Initialize execution engine if not already created
     if (!this.executionEngine) {
       const definition = this.compiledCue.definition as AudioNodeCueDefinition
