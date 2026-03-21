@@ -42,8 +42,17 @@ type PreviewRange = {
 /** Minimum time the beat indicator stays lit so transient single-frame triggers remain visible. */
 const MIN_BEAT_INDICATOR_MS = 280
 
-// Fixed colour palette for bands (by index)
-const BAND_COLORS: Color[] = ['red', 'orange', 'yellow', 'green', 'cyan']
+// Fixed colour palette for bands (by index, 8 bands)
+const BAND_COLORS: Color[] = [
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'cyan',
+  'blue',
+  'purple',
+  'magenta',
+]
 
 const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showTitle = true }) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)

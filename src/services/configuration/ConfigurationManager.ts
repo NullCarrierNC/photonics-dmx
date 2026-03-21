@@ -167,7 +167,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   },
   audioPreviewWindowState: {
     width: 560,
-    height: 420,
+    height: 480,
   },
 }
 

@@ -25,7 +25,7 @@ export interface AudioLightingData {
   rawFrequencyData?: number[]
   /** Sample rate in Hz, needed to map bins to Hz */
   sampleRate?: number
-  /** FFT size (e.g. 2048), needed to compute bin width */
+  /** FFT size (e.g. 4096), needed to compute bin width */
   fftSize?: number
   /** Dominant frequency in Hz for this frame */
   peakFrequency?: number
@@ -81,17 +81,17 @@ export interface AudioConfig {
   /** Audio input device ID (string from MediaDeviceInfo.deviceId, undefined = default) */
   deviceId?: string
 
-  /** FFT size (default: 2048, must be power of 2) */
+  /** FFT size (default: 4096, must be power of 2) */
   fftSize: number
 
   /** Sensitivity/gain multiplier (default: 1.0, range: 0.1-5.0) */
   sensitivity: number
 
-  /** Noise floor gate threshold (0-255 raw FFT value, default: 0 = disabled).
+  /** Noise floor gate threshold (0-255 raw FFT value, default: 50).
    *  Bins below this level are zeroed before any gain or analysis is applied. */
   noiseFloor: number
 
-  /** Frequency band definitions (exactly 5 bands) */
+  /** Frequency band definitions (exactly 8 bands) */
   bands: AudioBandDefinition[]
 
   /** Beat detection settings */

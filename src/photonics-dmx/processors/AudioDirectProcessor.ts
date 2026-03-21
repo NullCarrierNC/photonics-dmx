@@ -36,13 +36,17 @@ import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes'
 import { getColor, validateColorString } from '../helpers/dmxHelpers'
 import { Color, TrackedLight } from '../types'
 
+/** One colour per frequency band (8 bands). */
 const DEFAULT_DIRECT_RANGES = [
   { color: 'red', brightness: 'medium' as const },
+  { color: 'orange', brightness: 'medium' as const },
+  { color: 'yellow', brightness: 'medium' as const },
   { color: 'green', brightness: 'medium' as const },
-  { color: 'blue', brightness: 'medium' as const },
+  { color: 'chartreuse', brightness: 'medium' as const },
   { color: 'cyan', brightness: 'medium' as const },
-  { color: 'amber', brightness: 'medium' as const },
-]
+  { color: 'blue', brightness: 'medium' as const },
+  { color: 'violet', brightness: 'medium' as const },
+] as const
 
 export class AudioDirectProcessor {
   private isActive = false
@@ -114,22 +118,11 @@ export class AudioDirectProcessor {
     this.mapFrequencyBandsToLights(bands, energy, beatDetected)
   }
 
-  /** Derive a simple 3-band (bass/mids/highs) from energy when raw FFT is not used */
-  private deriveBandsFromData(data: AudioLightingData): {
-    range1: number
-    range2: number
-    range3: number
-    range4: number
-    range5: number
-  } {
+  /** Derive per-band intensities from overall energy when raw FFT is not used */
+  private deriveBandsFromData(data: AudioLightingData): number[] {
     const e = data.energy
-    return {
-      range1: e,
-      range2: e * 0.85,
-      range3: e * 0.7,
-      range4: e * 0.55,
-      range5: e * 0.4,
-    }
+    const factors = [1, 0.92, 0.85, 0.78, 0.7, 0.62, 0.52, 0.42]
+    return factors.map((f) => e * f)
   }
 
   /**
@@ -156,13 +149,7 @@ export class AudioDirectProcessor {
    * - Each range's brightness is respected independently
    */
   private mapFrequencyBandsToLights(
-    frequencyBands: {
-      range1: number
-      range2: number
-      range3: number
-      range4: number
-      range5: number
-    },
+    frequencyBands: readonly number[],
     energy: number,
     beatDetected: boolean,
   ): void {
@@ -173,13 +160,7 @@ export class AudioDirectProcessor {
 
     const numLights = lights.length
 
-    const bandValues = [
-      frequencyBands.range1,
-      frequencyBands.range2,
-      frequencyBands.range3,
-      frequencyBands.range4,
-      frequencyBands.range5,
-    ]
+    const bandValues = [...frequencyBands]
 
     // Distribute lights based on overall energy
     const activeLightCount = Math.ceil(numLights * energy)
@@ -200,7 +181,9 @@ export class AudioDirectProcessor {
       }
     } else {
       // No energy - no lights
-      lightsPerRange.push(0, 0, 0, 0, 0)
+      for (let i = 0; i < DEFAULT_DIRECT_RANGES.length; i++) {
+        lightsPerRange.push(0)
+      }
     }
 
     const ranges = DEFAULT_DIRECT_RANGES

@@ -377,6 +377,7 @@ const AUDIO_CONFIG_KEYS = new Set([
   'beatDetection',
   'smoothing',
   'enabled',
+  'linearResponse',
 ])
 
 /**
@@ -447,8 +448,8 @@ export function validateAudioConfigPayload(
           return { ok: false, error: 'Audio bands must be an array' }
         }
         const bandsArray = data[key] as unknown[]
-        if (bandsArray.length !== 5) {
-          return { ok: false, error: 'Audio bands must contain exactly 5 bands' }
+        if (bandsArray.length !== 8) {
+          return { ok: false, error: 'Audio bands must contain exactly 8 bands' }
         }
         const validatedBands: Record<string, unknown>[] = []
         for (let i = 0; i < bandsArray.length; i++) {

@@ -1,45 +1,10 @@
 import { AudioConfig, AudioBandDefinition } from './AudioTypes'
+import { RHYTHM_GAME_BANDS } from './AudioBandPresets'
 
 /**
- * Default frequency band definitions (5-band split)
+ * Default frequency band definitions (8-band Rhythm Game preset — shipped default).
  */
-export const DEFAULT_AUDIO_BANDS: AudioBandDefinition[] = [
-  {
-    id: 'bass',
-    name: 'Bass',
-    minHz: 20,
-    maxHz: 220,
-    gain: 1.0,
-  },
-  {
-    id: 'lower-mids',
-    name: 'Lower-Mids',
-    minHz: 220,
-    maxHz: 800,
-    gain: 1.0,
-  },
-  {
-    id: 'upper-mids',
-    name: 'Upper-Mids',
-    minHz: 800,
-    maxHz: 2500,
-    gain: 1.0,
-  },
-  {
-    id: 'highs',
-    name: 'Highs',
-    minHz: 2500,
-    maxHz: 6000,
-    gain: 1.0,
-  },
-  {
-    id: 'air',
-    name: 'Air',
-    minHz: 6000,
-    maxHz: 20000,
-    gain: 1.0,
-  },
-]
+export const DEFAULT_AUDIO_BANDS: AudioBandDefinition[] = RHYTHM_GAME_BANDS.map((b) => ({ ...b }))
 
 /**
  * Default audio configuration for Web Audio API
@@ -49,9 +14,9 @@ export const DEFAULT_AUDIO_BANDS: AudioBandDefinition[] = [
  */
 export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   deviceId: undefined, // undefined = use system default device
-  fftSize: 2048,
+  fftSize: 4096,
   sensitivity: 1.0,
-  noiseFloor: 0,
+  noiseFloor: 50,
   bands: DEFAULT_AUDIO_BANDS,
   beatDetection: {
     threshold: 0.3,

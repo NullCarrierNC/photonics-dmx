@@ -54,8 +54,8 @@ export class AudioCueProcessor {
     this.cueHandler.stop()
 
     // Clear all audio-related effects
-    // Remove effects from layers 0-4 (the frequency range layers)
-    for (let layer = 0; layer < 5; layer++) {
+    // Remove effects from layers 0-7 (frequency band layers)
+    for (let layer = 0; layer < 8; layer++) {
       this.sequencer.removeEffectByLayer(layer, true)
     }
 
@@ -87,7 +87,12 @@ export class AudioCueProcessor {
 
     const processedData =
       this.config.linearResponse === false ? this.applyDiscreteResponse(data) : data
-    this.cueHandler.handleAudioData(processedData, this.config, this.currentCueType, 0)
+    this.cueHandler.handleAudioData(
+      processedData,
+      this.config,
+      this.currentCueType,
+      this.config.bands.length,
+    )
   }
 
   /**

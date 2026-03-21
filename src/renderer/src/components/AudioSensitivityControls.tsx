@@ -3,7 +3,7 @@ import { getAudioConfig, saveAudioConfig } from '../ipcApi'
 
 const AudioSensitivityControls: React.FC = () => {
   const [sensitivity, setSensitivity] = useState(1.0)
-  const [noiseFloor, setNoiseFloor] = useState(0)
+  const [noiseFloor, setNoiseFloor] = useState(50)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -12,7 +12,7 @@ const AudioSensitivityControls: React.FC = () => {
       try {
         const config = await getAudioConfig()
         setSensitivity(config?.sensitivity ?? 1.0)
-        setNoiseFloor(config?.noiseFloor ?? 0)
+        setNoiseFloor(config?.noiseFloor ?? 50)
       } catch (error) {
         console.error('Failed to load audio sensitivity:', error)
       } finally {
@@ -70,13 +70,13 @@ const AudioSensitivityControls: React.FC = () => {
         console.error('Failed to save noise floor:', result.error)
         // Revert on failure
         const config = await getAudioConfig()
-        setNoiseFloor(config?.noiseFloor ?? 0)
+        setNoiseFloor(config?.noiseFloor ?? 50)
       }
     } catch (error) {
       console.error('Failed to save noise floor:', error)
       // Revert on failure
       const config = await getAudioConfig()
-      setNoiseFloor(config?.noiseFloor ?? 0)
+      setNoiseFloor(config?.noiseFloor ?? 50)
     } finally {
       setIsSaving(false)
     }

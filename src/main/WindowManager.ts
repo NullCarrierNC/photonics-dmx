@@ -350,7 +350,7 @@ export class WindowManager {
   private createAudioPreviewWindow(): BrowserWindow {
     let windowState = {
       width: 560,
-      height: 420,
+      height: 584,
       x: undefined as number | undefined,
       y: undefined as number | undefined,
     }
@@ -360,7 +360,7 @@ export class WindowManager {
       if (savedState) {
         windowState = {
           width: savedState.width || 560,
-          height: savedState.height || 420,
+          height: savedState.height || 584,
           x: savedState.x,
           y: savedState.y,
         }

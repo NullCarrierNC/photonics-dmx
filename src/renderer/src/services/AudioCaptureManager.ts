@@ -24,9 +24,9 @@ import { sendAudioData } from '../ipcApi'
 const store = getDefaultStore()
 
 const DEFAULT_CONFIG: AudioConfig = {
-  fftSize: 2048,
+  fftSize: 4096,
   sensitivity: 1.0,
-  noiseFloor: 0,
+  noiseFloor: 50,
   bands: DEFAULT_AUDIO_BANDS,
   smoothing: {
     enabled: true,
@@ -65,10 +65,10 @@ export class AudioCaptureManager {
   private frameIndex = 0
 
   // Cached bin-to-band mapping for efficient per-band gain application
-  // Maps bin index to band index (0-4) or -1 if no band matches
+  // Maps bin index to band index (0-7) or -1 if no band matches
   private binToBandMap: Int8Array | null = null
-  // Cached band gains array (indexed by band index 0-4)
-  private bandGains: number[] = [1.0, 1.0, 1.0, 1.0, 1.0]
+  // Cached band gains array (indexed by band index 0-7)
+  private bandGains: number[] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
   // Debug logging (log status every ~60 frames ≈ 1 second at 60fps)
   private frameCounter = 0
@@ -453,7 +453,7 @@ export class AudioCaptureManager {
     const binSize = sampleRate / fftSize
 
     // Apply noise floor gate: zero out bins below threshold
-    const noiseFloor = this.config.noiseFloor ?? 0
+    const noiseFloor = this.config.noiseFloor ?? 50
     let gatedData: Uint8Array
     if (noiseFloor > 0) {
       gatedData = new Uint8Array(frequencyData.length)
