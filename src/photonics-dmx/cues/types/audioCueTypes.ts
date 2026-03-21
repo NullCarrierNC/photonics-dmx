@@ -16,6 +16,14 @@ export interface TriggerContext {
   triggerFrequencyMax: number
   triggerPeakFrequency: number
   triggerBandAmplitude: number
+  /** Config band id with best Hz overlap to the trigger range, when resolved */
+  triggerMatchedBandId?: string
+  /** Per-band features for the matched band (when available) */
+  triggerBandFlatness?: number
+  triggerBandCrest?: number
+  triggerBandCentroid?: number
+  /** Per-band onset strength for the matched band (when available) */
+  triggerBandOnset?: number
 }
 
 /**

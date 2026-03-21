@@ -55,6 +55,19 @@ export interface AudioLightingData {
   detectedKey?: string
   /** Key detection confidence 0–1 */
   detectedKeyStrength?: number
+
+  /** Per-band spectral features, keyed by band id (matches audio config bands) */
+  bandSpectralFeatures?: Record<
+    string,
+    {
+      flatness: number
+      crest: number
+      centroid: number
+    }
+  >
+
+  /** Per-band onset strength (0–1), keyed by band id */
+  bandOnsets?: Record<string, number>
 }
 
 /**

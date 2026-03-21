@@ -77,6 +77,30 @@ export const AUDIO_CUE_DATA_PROPERTY_META: CueDataPropertyMeta[] = [
   { id: 'trigger-frequency-max', label: 'Trigger Freq Max', type: 'number' },
   { id: 'trigger-peak-frequency', label: 'Trigger Peak Freq (Hz)', type: 'number' },
   { id: 'trigger-band-amplitude', label: 'Trigger Band Amplitude', type: 'number' },
+  {
+    id: 'trigger-band-flatness',
+    label: 'Trigger Band Flatness (matched band)',
+    type: 'number',
+    category: 'trigger',
+  },
+  {
+    id: 'trigger-band-crest',
+    label: 'Trigger Band Crest (matched band)',
+    type: 'number',
+    category: 'trigger',
+  },
+  {
+    id: 'trigger-band-centroid',
+    label: 'Trigger Band Centroid (matched band)',
+    type: 'number',
+    category: 'trigger',
+  },
+  {
+    id: 'trigger-band-onset',
+    label: 'Trigger Band Onset (matched band)',
+    type: 'number',
+    category: 'trigger',
+  },
   { id: 'event-raw-value', label: 'Event Raw Value', type: 'number', category: 'event' },
   {
     id: 'spectral-centroid',

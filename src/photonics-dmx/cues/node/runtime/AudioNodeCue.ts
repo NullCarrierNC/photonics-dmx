@@ -7,6 +7,7 @@ import { ActionEffectFactory } from '../compiler/ActionEffectFactory'
 import {
   AudioEventNode,
   AudioTriggerNode,
+  AudioTriggerSpectralGates,
   LogicNode,
   ValueSource,
   AudioNodeCueDefinition,
@@ -17,8 +18,7 @@ import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { UninitializedVariableError } from './valueResolver'
 import { VariableValue } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
-import { getBandEnergy } from '../../../listeners/Audio/bandEnergy'
-
+import { findBestMatchingBandId, getBandEnergy } from '../../../listeners/Audio/bandEnergy'
 interface AudioEventState {
   previousValue: number
   active: boolean
@@ -40,6 +40,30 @@ type AudioEventEvaluation = EdgeEvaluation | LevelEvaluation
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
+
+function checkSpectralGateRange(
+  range: { min?: number; max?: number } | undefined,
+  value: number,
+): boolean {
+  if (range === undefined) return true
+  if (range.min !== undefined && value < range.min) return false
+  if (range.max !== undefined && value > range.max) return false
+  return true
+}
+
+function spectralGatesPass(
+  gates: AudioTriggerSpectralGates,
+  flatness: number,
+  zcr: number,
+  hfc: number,
+  crest: number,
+): boolean {
+  if (!checkSpectralGateRange(gates.flatness, flatness)) return false
+  if (!checkSpectralGateRange(gates.zeroCrossingRate, zcr)) return false
+  if (!checkSpectralGateRange(gates.hfcOnset, hfc)) return false
+  if (!checkSpectralGateRange(gates.crest, crest)) return false
+  return true
+}
 
 export class AudioNodeCue implements IAudioCue {
   public readonly id: string
@@ -282,7 +306,8 @@ export class AudioNodeCue implements IAudioCue {
   }
 
   private executeAudioTriggerNode(trigger: AudioTriggerNode, data: AudioCueData): void {
-    const { rawFrequencyData, sampleRate, fftSize } = data.audioData
+    const audioData = data.audioData
+    const { rawFrequencyData, sampleRate, fftSize } = audioData
     if (!rawFrequencyData?.length || sampleRate == null || fftSize == null) return
 
     const { frequencyRange, threshold } = trigger
@@ -303,18 +328,43 @@ export class AudioNodeCue implements IAudioCue {
       maxHz,
     )
 
+    const matchedBandId = findBestMatchingBandId(data.config.bands, minHz, maxHz)
+    const bandFeat =
+      matchedBandId != null ? audioData.bandSpectralFeatures?.[matchedBandId] : undefined
+    const flatnessForGate = bandFeat?.flatness ?? audioData.spectralFlatness ?? 0
+    const crestForGate = bandFeat?.crest ?? audioData.spectralCrest ?? 0
+    const zcrGlobal = audioData.zeroCrossingRate ?? 0
+    const hfcGlobal = audioData.hfcOnset ?? 0
+
+    const gates = trigger.spectralGates
+    const spectralOk =
+      gates == null
+        ? true
+        : spectralGatesPass(gates, flatnessForGate, zcrGlobal, hfcGlobal, crestForGate)
+
+    const onsetThreshold = clamp(trigger.onsetThreshold ?? 0.3, 0, 1)
+    let onsetOk = true
+    if (trigger.useOnsetGating) {
+      if (matchedBandId != null && audioData.bandOnsets) {
+        const o = audioData.bandOnsets[matchedBandId] ?? 0
+        onsetOk = o >= onsetThreshold
+      }
+    }
+
     const phase = this.triggerPhase.get(trigger.id) ?? 'idle'
     const now = Date.now()
     const enterTime = this.triggerEnterTime.get(trigger.id) ?? 0
 
-    let shouldBeActive: boolean
+    let energyActive: boolean
     if (phase === 'idle') {
-      shouldBeActive = level >= triggerThreshold
+      energyActive = level >= triggerThreshold
     } else if (level >= releaseThreshold) {
-      shouldBeActive = true
+      energyActive = true
     } else {
-      shouldBeActive = now - enterTime < holdMs
+      energyActive = now - enterTime < holdMs
     }
+
+    const shouldBeActive = energyActive && spectralOk && onsetOk
 
     const triggerContext: TriggerContext = {
       triggerLevel: level,
@@ -322,6 +372,17 @@ export class AudioNodeCue implements IAudioCue {
       triggerFrequencyMax: maxHz,
       triggerPeakFrequency: peakFreq,
       triggerBandAmplitude: bandEnergy,
+    }
+    if (matchedBandId != null) {
+      triggerContext.triggerMatchedBandId = matchedBandId
+    }
+    if (bandFeat) {
+      triggerContext.triggerBandFlatness = bandFeat.flatness
+      triggerContext.triggerBandCrest = bandFeat.crest
+      triggerContext.triggerBandCentroid = bandFeat.centroid
+    }
+    if (matchedBandId != null && audioData.bandOnsets) {
+      triggerContext.triggerBandOnset = audioData.bandOnsets[matchedBandId] ?? 0
     }
 
     if (!shouldBeActive) {

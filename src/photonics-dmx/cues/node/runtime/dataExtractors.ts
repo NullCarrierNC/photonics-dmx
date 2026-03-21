@@ -137,6 +137,14 @@ export function extractAudioCueDataValue(
       return cueData.triggerContext?.triggerPeakFrequency ?? 0
     case 'trigger-band-amplitude':
       return cueData.triggerContext?.triggerBandAmplitude ?? 0
+    case 'trigger-band-flatness':
+      return cueData.triggerContext?.triggerBandFlatness ?? cueData.audioData.spectralFlatness ?? 0
+    case 'trigger-band-crest':
+      return cueData.triggerContext?.triggerBandCrest ?? cueData.audioData.spectralCrest ?? 0
+    case 'trigger-band-centroid':
+      return cueData.triggerContext?.triggerBandCentroid ?? 0
+    case 'trigger-band-onset':
+      return cueData.triggerContext?.triggerBandOnset ?? 0
     case 'event-raw-value':
       return cueData.eventContext?.eventRawValue ?? 0
     case 'spectral-centroid':

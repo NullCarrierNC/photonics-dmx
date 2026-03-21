@@ -167,6 +167,63 @@ export function zeroCrossingRate(timeDomainData: Float32Array): number {
 /**
  * Extract all spectral features for one frame.
  */
+export interface BandSpectralFeatures {
+  /** 0–1, noise vs tonal within this band */
+  flatness: number
+  /** 0–1, peakiness within this band */
+  crest: number
+  /** 0–1, centre of energy within this band (normalised between bandMinHz and bandMaxHz) */
+  centroid: number
+}
+
+/**
+ * Flatness, crest, and centroid for an FFT slice [startBin, endBin).
+ * Centroid is the energy-weighted mean frequency in Hz, mapped to 0–1 across the band Hz span.
+ */
+function fftSlice(
+  data: Uint8Array | number[],
+  startBin: number,
+  endBin: number,
+): Uint8Array | number[] {
+  if (data instanceof Uint8Array) {
+    return data.subarray(startBin, endBin)
+  }
+  return data.slice(startBin, endBin)
+}
+
+export function extractBandFeatures(
+  data: Uint8Array | number[],
+  binSize: number,
+  startBin: number,
+  endBin: number,
+  bandMinHz: number,
+  bandMaxHz: number,
+): BandSpectralFeatures {
+  const len = Math.max(0, endBin - startBin)
+  if (len === 0) {
+    return { flatness: 0, crest: 0, centroid: 0 }
+  }
+  const slice = fftSlice(data, startBin, endBin)
+  const flatness = spectralFlatness(slice)
+  const crest = spectralCrest(slice)
+
+  let sumMag = 0
+  let sumFreqMag = 0
+  for (let i = 0; i < len; i++) {
+    const mag = (slice[i] ?? 0) / 255
+    const freq = (startBin + i + 0.5) * binSize
+    sumMag += mag
+    sumFreqMag += freq * mag
+  }
+  const span = bandMaxHz - bandMinHz
+  if (sumMag < EPSILON || span <= EPSILON) {
+    return { flatness, crest, centroid: 0 }
+  }
+  const centroidHz = sumFreqMag / sumMag
+  const centroid = Math.min(1, Math.max(0, (centroidHz - bandMinHz) / span))
+  return { flatness, crest, centroid }
+}
+
 export function extractAll(
   frequencyData: Uint8Array | number[],
   timeDomainData: Float32Array | null,

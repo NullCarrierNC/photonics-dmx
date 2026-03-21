@@ -26,7 +26,7 @@ import {
   type EffectRaiserNode,
   type EffectEventListenerNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { createId, buildDefaultAction } from '../lib/cueDefaults'
+import { createId, buildDefaultAction, buildDefaultAudioTrigger } from '../lib/cueDefaults'
 import type { EditorNode, EventOption, NotesVariant } from '../lib/types'
 import { getDefaultEventOption } from '../lib/options'
 
@@ -331,18 +331,7 @@ const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCre
                   eventType: defaultOption.value as YargEventNode['eventType'],
                 }
               : defaultOption.value === 'audio-trigger'
-                ? {
-                    id: newEventId,
-                    type: 'event',
-                    eventType: 'audio-trigger',
-                    frequencyRange: { minHz: 120, maxHz: 500 },
-                    threshold: 0.5,
-                    hysteresis: 0.05,
-                    holdMs: 0,
-                    color: '#60a5fa',
-                    nodeLabel: 'Audio Trigger',
-                    outputs: ['enter', 'during', 'exit'],
-                  }
+                ? buildDefaultAudioTrigger(newEventId)
                 : {
                     id: newEventId,
                     type: 'event',

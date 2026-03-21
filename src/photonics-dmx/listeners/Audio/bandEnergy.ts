@@ -27,3 +27,33 @@ export function getBandEnergy(
   }
   return count > 0 ? Math.min(Math.max(energy / count, 0), 1) : 0
 }
+
+/**
+ * Picks the configured band whose Hz range overlaps the trigger range most (by overlap / trigger span).
+ * Returns null if overlap is below minOverlapRatio of the trigger span.
+ */
+export function findBestMatchingBandId(
+  bands: readonly { id: string; minHz: number; maxHz: number }[],
+  triggerMinHz: number,
+  triggerMaxHz: number,
+  minOverlapRatio = 0.25,
+): string | null {
+  const t0 = Math.min(triggerMinHz, triggerMaxHz)
+  const t1 = Math.max(triggerMinHz, triggerMaxHz)
+  const triggerSpan = t1 - t0
+  if (triggerSpan <= 0) return null
+
+  let bestId: string | null = null
+  let bestScore = -1
+  for (const band of bands) {
+    const lo = Math.max(t0, band.minHz)
+    const hi = Math.min(t1, band.maxHz)
+    const overlap = Math.max(0, hi - lo)
+    const score = overlap / triggerSpan
+    if (score > bestScore) {
+      bestScore = score
+      bestId = band.id
+    }
+  }
+  return bestScore >= minOverlapRatio ? bestId : null
+}

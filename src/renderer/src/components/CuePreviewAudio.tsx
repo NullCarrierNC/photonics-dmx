@@ -4,6 +4,7 @@ import { audioDataAtom, audioConfigAtom } from '../atoms'
 import type { Color } from '../../../photonics-dmx/types'
 import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy'
 import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
+import { EQ_BAND_COLORS } from '../lib/audioEqBandColors'
 
 // Map Color type to RGB values for preview bars (matches AudioColorMapping.tsx)
 const COLOR_TO_RGB: Record<Color, string> = {
@@ -42,18 +43,6 @@ type PreviewRange = {
 /** Minimum time the beat indicator stays lit so transient single-frame triggers remain visible. */
 const MIN_BEAT_INDICATOR_MS = 280
 
-// Fixed colour palette for bands (by index, 8 bands)
-const BAND_COLORS: Color[] = [
-  'red',
-  'orange',
-  'yellow',
-  'green',
-  'cyan',
-  'blue',
-  'purple',
-  'magenta',
-]
-
 const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showTitle = true }) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
   const audioData = useAtomValue(audioDataAtom)
@@ -69,7 +58,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showT
         name: band.name,
         minHz: band.minHz,
         maxHz: band.maxHz,
-        color: (BAND_COLORS[index] || 'white') as Color,
+        color: (EQ_BAND_COLORS[index] || 'white') as Color,
       }))
     }
     return audioConfig.bands.map((band, index) => ({
@@ -77,7 +66,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '', showT
       name: band.name,
       minHz: band.minHz,
       maxHz: band.maxHz,
-      color: (BAND_COLORS[index] || 'white') as Color,
+      color: (EQ_BAND_COLORS[index] || 'white') as Color,
     }))
   }, [audioConfig])
 

@@ -350,6 +350,34 @@ export interface AudioEventNode extends BaseEventNode {
   cooldownMs?: number
 }
 
+/** Optional min/max range for a single spectral gate (0–1 feature values). */
+export interface SpectralGateRange {
+  min?: number
+  max?: number
+}
+
+/** When set, all defined sub-gates must pass (AND). Omitted sub-gates are ignored. */
+export interface AudioTriggerSpectralGates {
+  /** Spectral flatness (0–1). 0 = tonal, 1 = noise */
+  flatness?: SpectralGateRange
+  /** Zero-crossing rate (0–1). Low = sustained, high = percussive */
+  zeroCrossingRate?: SpectralGateRange
+  /** HFC onset (0–1). Higher = more percussive / transient */
+  hfcOnset?: SpectralGateRange
+  /** Spectral crest (0–1). Higher = peakier / more tonal */
+  crest?: SpectralGateRange
+}
+
+export type AudioTriggerInstrumentPresetId =
+  | 'sub-bass'
+  | 'kick'
+  | 'snare'
+  | 'bass-guitar'
+  | 'electric-guitar'
+  | 'vocals'
+  | 'hi-hat-cymbals'
+  | 'full-kit'
+
 export interface AudioTriggerNode extends BaseEventNode {
   type: 'event'
   eventType: 'audio-trigger'
@@ -360,6 +388,16 @@ export interface AudioTriggerNode extends BaseEventNode {
   hysteresis?: number
   /** Minimum ms the trigger stays active after entering. 0 = no minimum hold. */
   holdMs?: number
+  /** Optional spectral conditions (flatness, ZCR, HFC, crest). AND with band energy. */
+  spectralGates?: AudioTriggerSpectralGates
+  /** When true, also require per-band onset strength above onsetThreshold for the matched band */
+  useOnsetGating?: boolean
+  /** Minimum onset strength (0–1) when useOnsetGating is true. Default 0.3 */
+  onsetThreshold?: number
+  /** Last-applied instrument preset (for editor display) */
+  appliedTriggerPreset?: AudioTriggerInstrumentPresetId
+  /** True when the user changed fields after applying a preset */
+  triggerPresetDirty?: boolean
   color: string
   nodeLabel: string
   outputs: ['enter', 'during', 'exit']

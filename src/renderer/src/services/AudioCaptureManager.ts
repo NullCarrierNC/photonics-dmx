@@ -12,7 +12,14 @@
 import { AudioLightingData, AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { BeatDetector } from '../../../photonics-dmx/listeners/Audio/BeatDetector'
-import { extractAll } from '../../../photonics-dmx/listeners/Audio/SpectralFeatureExtractor'
+import {
+  extractAll,
+  extractBandFeatures,
+} from '../../../photonics-dmx/listeners/Audio/SpectralFeatureExtractor'
+import {
+  MultibandOnsetDetector,
+  type BandOnsetConfig,
+} from '../../../photonics-dmx/listeners/Audio/MultibandOnsetDetector'
 import { MelBandAnalyser } from '../../../photonics-dmx/listeners/Audio/MelBandAnalyser'
 import { computeChromagram } from '../../../photonics-dmx/listeners/Audio/ChromaAnalyser'
 import { KeyDetector } from '../../../photonics-dmx/listeners/Audio/KeyDetector'
@@ -60,6 +67,7 @@ export class AudioCaptureManager {
   private lastFrameTime = 0
 
   private beatDetector: BeatDetector
+  private multibandOnset: MultibandOnsetDetector
   private melBandAnalyser: MelBandAnalyser | null = null
   private keyDetector: KeyDetector
   private frameIndex = 0
@@ -83,6 +91,7 @@ export class AudioCaptureManager {
   constructor(config?: Partial<AudioConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config }
     this.beatDetector = new BeatDetector(this.config.beatDetection)
+    this.multibandOnset = new MultibandOnsetDetector([])
     this.keyDetector = new KeyDetector()
     console.log('AudioCaptureManager initialized')
   }
@@ -124,6 +133,7 @@ export class AudioCaptureManager {
       this.isCapturing = true
       this.frameIndex = 0
       this.beatDetector.reset()
+      this.multibandOnset.reset()
       this.melBandAnalyser = new MelBandAnalyser(
         this.audioContext.sampleRate,
         this.analyser.fftSize,
@@ -219,6 +229,7 @@ export class AudioCaptureManager {
     this.internalTime = 0
     this.lastFrameTime = 0
     this.beatDetector.reset()
+    this.multibandOnset.reset()
     this.frameIndex = 0
     this.uiUpdateCounter = 0
     this.lastAudioData = null
@@ -278,6 +289,13 @@ export class AudioCaptureManager {
       }
       // If no band matches (e.g., sub-20 Hz), binToBandMap[binIndex] remains -1
     }
+
+    const onsetConfigs: BandOnsetConfig[] = this.config.bands.map((band) => ({
+      id: band.id,
+      startBin: Math.floor(band.minHz / binSize),
+      endBin: Math.min(Math.ceil(band.maxHz / binSize), binCount),
+    }))
+    this.multibandOnset.reconfigure(onsetConfigs)
 
     console.log('Rebuilt bin-to-band mapping', {
       binCount,
@@ -544,6 +562,25 @@ export class AudioCaptureManager {
 
     const spectral = extractAll(gatedData, timeDomainData, binSize, sampleRate)
 
+    const bandSpectralFeatures: Record<
+      string,
+      { flatness: number; crest: number; centroid: number }
+    > = {}
+    for (const band of this.config.bands) {
+      const startBin = Math.floor(band.minHz / binSize)
+      const endBin = Math.min(Math.ceil(band.maxHz / binSize), gatedData.length)
+      bandSpectralFeatures[band.id] = extractBandFeatures(
+        gatedData,
+        binSize,
+        startBin,
+        endBin,
+        band.minHz,
+        band.maxHz,
+      )
+    }
+
+    const bandOnsets = this.multibandOnset.processFrame(gatedData)
+
     const melBands = this.melBandAnalyser?.computeMelBands(gatedData).map((v) => Math.min(1, v))
 
     const chromagram = computeChromagram(gatedData, binSize)
@@ -562,6 +599,8 @@ export class AudioCaptureManager {
       peakFrequency,
       amplitude,
       ...spectral,
+      bandSpectralFeatures,
+      bandOnsets,
       melBands,
       chromagram,
       detectedKey: keyResult.key,

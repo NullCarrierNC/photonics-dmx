@@ -662,6 +662,38 @@ const audioEventSchema: JSONSchemaType<AudioEventNode> = {
   },
 }
 
+const spectralGateRangeSchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    min: { type: 'number', minimum: 0, maximum: 1 },
+    max: { type: 'number', minimum: 0, maximum: 1 },
+  },
+}
+
+const audioTriggerSpectralGatesSchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  nullable: true,
+  properties: {
+    flatness: spectralGateRangeSchema,
+    zeroCrossingRate: spectralGateRangeSchema,
+    hfcOnset: spectralGateRangeSchema,
+    crest: spectralGateRangeSchema,
+  },
+}
+
+const audioTriggerInstrumentPresetIds = [
+  'sub-bass',
+  'kick',
+  'snare',
+  'bass-guitar',
+  'electric-guitar',
+  'vocals',
+  'hi-hat-cymbals',
+  'full-kit',
+] as const
+
 const audioTriggerSchema = {
   type: 'object' as const,
   required: [
@@ -692,6 +724,15 @@ const audioTriggerSchema = {
     threshold: { type: 'number', minimum: 0, maximum: 1 },
     hysteresis: { type: 'number', minimum: 0, maximum: 1, nullable: true },
     holdMs: { type: 'number', minimum: 0, nullable: true },
+    spectralGates: audioTriggerSpectralGatesSchema,
+    useOnsetGating: { type: 'boolean', nullable: true },
+    onsetThreshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
+    appliedTriggerPreset: {
+      type: 'string',
+      nullable: true,
+      enum: [...audioTriggerInstrumentPresetIds],
+    },
+    triggerPresetDirty: { type: 'boolean', nullable: true },
     color: { type: 'string', minLength: 1 },
     nodeLabel: { type: 'string' },
     outputs: {
