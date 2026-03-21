@@ -41,7 +41,7 @@ export type BlendMode = 'replace' | 'add' | 'multiply' | 'overlay'
 /**
  * Represents brightness levels for lights
  */
-export type Brightness = 'low' | 'medium' | 'high' | 'max'
+export type Brightness = 'low' | 'medium' | 'high' | 'max' | 'linear'
 
 /**
  * Interface representing RGB, Intensity, Pan/Tilt values for a light

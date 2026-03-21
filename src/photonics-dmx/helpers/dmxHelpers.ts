@@ -46,7 +46,7 @@ export const getGlobalBrightnessConfig = (): {
  * Generates an RGBIP object based on the specified color and brightness.
  *
  * @param color - The base color from the color wheel, 'white', 'black', or 'transparent'.
- * @param brightness - The brightness level ('low', 'medium', 'high', 'max'). Ignored for black/transparent.
+ * @param brightness - The brightness level ('low', 'medium', 'high', 'max', 'linear'). Ignored for black/transparent.
  * @param blendMode - The blend mode for color mixing
  * @returns An RGBIP object with the specified color and brightness.
  */
@@ -97,8 +97,7 @@ export const getColor = (
   brightness: Brightness,
   blendMode: BlendMode = 'replace',
 ): RGBIO => {
-  // Use global brightness config or fall back to defaults
-  const defaultBrightnessMap: { [key in typeof brightness]: number } = {
+  const defaultBrightnessMap: Record<Exclude<Brightness, 'linear'>, number> = {
     low: 40,
     medium: 100,
     high: 180,
@@ -130,6 +129,18 @@ export const getColor = (
   }
 
   const selectedColor = colorMap[color]
+
+  if (brightness === 'linear') {
+    return {
+      red: selectedColor.r,
+      green: selectedColor.g,
+      blue: selectedColor.b,
+      intensity: 255,
+      opacity: 1.0,
+      blendMode,
+    }
+  }
+
   const selectedIntensity = brightnessMap[brightness]
 
   // Construct the RGBIP object

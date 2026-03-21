@@ -30,7 +30,7 @@ export const COLOR_OPTIONS: Color[] = [
   'yellow',
 ]
 
-export const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max']
+export const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max', 'linear']
 
 export const BLEND_MODE_OPTIONS: BlendMode[] = ['replace', 'add', 'multiply', 'overlay']
 

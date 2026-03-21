@@ -152,7 +152,7 @@ export function resolveColor(source: ValueSource, context: ExecutionContext): Co
  */
 export function resolveBrightness(source: ValueSource, context: ExecutionContext): Brightness {
   const value = resolveValue('string', source, context)
-  const valid: Brightness[] = ['low', 'medium', 'high', 'max']
+  const valid: Brightness[] = ['low', 'medium', 'high', 'max', 'linear']
   return valid.includes(value as Brightness) ? (value as Brightness) : 'medium'
 }
 
