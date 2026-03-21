@@ -15,6 +15,13 @@ export class TransitionEngine implements ITransitionEngine {
   private effectManager!: IEffectManager
 
   /**
+   * When an effect on layer > 0 finishes with no successor, removal of its LTC layer
+   * state is deferred to the next frame so a cue-called / beat that runs later in the
+   * same tick can start a new effect without a one-frame black gap.
+   */
+  private _pendingLayerRemovals: Array<{ layer: number; lightId: string }> = []
+
+  /**
    * @constructor
    * @param lightTransitionController The underlying transition controller
    * @param layerManager The layer manager instance
@@ -99,6 +106,16 @@ export class TransitionEngine implements ITransitionEngine {
   public updateTransitions(frame?: FrameContext): void {
     const currentTime = frame?.frameStartTime ?? this.getCurrentTime()
 
+    for (const { layer, lightId } of this._pendingLayerRemovals) {
+      const hasNewEffect = this.layerManager.getActiveEffect(layer, lightId) !== undefined
+      const hasQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId) !== undefined
+      if (!hasNewEffect && !hasQueuedEffect) {
+        this.lightTransitionController.removeLightLayer(lightId, layer)
+        this.layerManager.clearLayerStates(layer)
+      }
+    }
+    this._pendingLayerRemovals = []
+
     const effectsToRemove: Array<{ layer: number; lightId: string }> = []
 
     // Process ALL light effects using the SAME currentTime
@@ -166,10 +183,8 @@ export class TransitionEngine implements ITransitionEngine {
       }
 
       if (!startedQueuedEffect && !newEffectStarted) {
-        // Only if there's no next effect, remove transitions for non-base layers
         if (layer > 0) {
-          this.lightTransitionController.removeLightLayer(lightId, layer)
-          this.layerManager.clearLayerStates(layer)
+          this._pendingLayerRemovals.push({ layer, lightId })
         }
       }
     }
