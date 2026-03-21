@@ -1,6 +1,9 @@
 /**
  * In-process graph layout (prettier) for node cues/effects.
  * Ported from scripts/node-graph-prettier.mjs. Applies positions in-memory only.
+ *
+ * Vertical spacing uses per-row max estimated node heights; parallel chain segments
+ * in the same layout group are packed into a sqrt grid when multiple segments share one group.
  */
 
 // ─── Types (minimal shape matching cue/effect nodes + connections) ─────────────
@@ -39,12 +42,17 @@ interface ConnectionInput {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const X_STEP = 260
-const Y_STEP = 100
+/** Minimum vertical pitch when row has no nodes (should not happen); also floors tiny estimates */
+const Y_STEP_MIN = 80
+const ROW_GAP = 20
 const JITTER_X = 12
 const JITTER_Y = 8
 const NOTES_Y_OFFSET = -160
 const WRAP_DEPTH = 10
 const GROUP_GAP = 1.5
+/** Padding between packed segment bounding boxes (same group) */
+const SEG_PACK_H = 32
+const SEG_PACK_V = 32
 
 const EVENT_TYPE_ORDER: Record<string, number> = {
   'cue-started': 0,
@@ -81,6 +89,159 @@ function hashStr(s: string): number {
     h = Math.imul(h, 0x01000193)
   }
   return h >>> 0
+}
+
+// ─── Node size estimates (layout only; matches React node rough dimensions) ───
+
+function estimateNodeSize(meta: NodeMeta): { w: number; h: number } {
+  const { type, eventType, logicType } = meta
+  if (type === 'notes') return { w: 200, h: 80 }
+  if (type === 'action') return { w: 180, h: 128 }
+  if (type === 'event' || type === 'effect-listener') {
+    if (eventType === 'audio-trigger') return { w: 180, h: 132 }
+    return { w: 160, h: 72 }
+  }
+  if (type === 'logic') {
+    const lt = logicType ?? ''
+    if (lt === 'conditional' || lt === 'for-each-light') return { w: 200, h: 110 }
+    if (lt === 'cue-data' || lt === 'config-data') return { w: 200, h: 96 }
+    return { w: 180, h: 88 }
+  }
+  return { w: 150, h: 80 }
+}
+
+function buildRowBaselineStarts(
+  groupOf: Map<string, number>,
+  layerInGroup: Map<string, number>,
+  nodeMap: Map<string, NodeMeta>,
+): Map<number, Map<number, number>> {
+  const maxLayerByGroup = new Map<number, number>()
+  for (const id of groupOf.keys()) {
+    const g = groupOf.get(id) ?? 0
+    const lg = layerInGroup.get(id) ?? 0
+    maxLayerByGroup.set(g, Math.max(maxLayerByGroup.get(g) ?? 0, lg))
+  }
+
+  const baselineStarts = new Map<number, Map<number, number>>()
+
+  for (const [g, maxLg] of maxLayerByGroup) {
+    const rowHeights: number[] = []
+    for (let lg = 0; lg <= maxLg; lg++) {
+      let maxH = 0
+      for (const id of groupOf.keys()) {
+        if ((groupOf.get(id) ?? 0) !== g) continue
+        if ((layerInGroup.get(id) ?? 0) !== lg) continue
+        const h = estimateNodeSize(nodeMap.get(id)!).h
+        if (h > maxH) maxH = h
+      }
+      rowHeights.push(Math.max(maxH, Y_STEP_MIN))
+    }
+
+    const baseline = new Map<number, number>()
+    let y = 0
+    for (let lg = 0; lg <= maxLg; lg++) {
+      baseline.set(lg, y)
+      y += rowHeights[lg] + ROW_GAP
+    }
+    baselineStarts.set(g, baseline)
+  }
+
+  return baselineStarts
+}
+
+function packSegmentsInGroups(
+  positions: NodePositions,
+  nodeMap: Map<string, NodeMeta>,
+  groupOf: Map<string, number>,
+  chainSegs: Map<string, number>,
+  graphNodeIds: Set<string>,
+): void {
+  const nodesBySegment = new Map<number, string[]>()
+  for (const id of graphNodeIds) {
+    const seg = chainSegs.get(id)
+    if (seg === undefined) continue
+    if (!nodesBySegment.has(seg)) nodesBySegment.set(seg, [])
+    nodesBySegment.get(seg)!.push(id)
+  }
+
+  const skipSegment = new Set<number>()
+  for (const [seg, ids] of nodesBySegment) {
+    const groups = new Set(ids.map((id) => groupOf.get(id) ?? 0))
+    if (groups.size !== 1) skipSegment.add(seg)
+  }
+
+  const segmentsByGroup = new Map<number, number[]>()
+  for (const [seg, ids] of nodesBySegment) {
+    if (skipSegment.has(seg)) continue
+    const g = groupOf.get(ids[0]) ?? 0
+    if (!segmentsByGroup.has(g)) segmentsByGroup.set(g, [])
+    segmentsByGroup.get(g)!.push(seg)
+  }
+
+  for (const [, segIds] of segmentsByGroup) {
+    if (segIds.length < 2) continue
+
+    const sortedSegs = [...segIds].sort((a, b) => {
+      const idsA = nodesBySegment.get(a)!
+      const idsB = nodesBySegment.get(b)!
+      let minYa = Infinity
+      let minYb = Infinity
+      let minXa = Infinity
+      let minXb = Infinity
+      for (const id of idsA) {
+        const p = positions[id]
+        minYa = Math.min(minYa, p.y)
+        minXa = Math.min(minXa, p.x)
+      }
+      for (const id of idsB) {
+        const p = positions[id]
+        minYb = Math.min(minYb, p.y)
+        minXb = Math.min(minXb, p.x)
+      }
+      return minYa - minYb || minXa - minXb
+    })
+
+    const S = sortedSegs.length
+    const chainsPerRow = Math.max(1, Math.ceil(Math.sqrt(S)))
+    const bboxes = new Map<number, { minX: number; minY: number; maxX: number; maxY: number }>()
+    let maxW = 0
+    let maxH = 0
+    for (const seg of sortedSegs) {
+      const ids = nodesBySegment.get(seg)!
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const id of ids) {
+        const p = positions[id]
+        const { w, h } = estimateNodeSize(nodeMap.get(id)!)
+        minX = Math.min(minX, p.x)
+        minY = Math.min(minY, p.y)
+        maxX = Math.max(maxX, p.x + w)
+        maxY = Math.max(maxY, p.y + h)
+      }
+      bboxes.set(seg, { minX, minY, maxX, maxY })
+      maxW = Math.max(maxW, maxX - minX)
+      maxH = Math.max(maxH, maxY - minY)
+    }
+
+    const cellW = maxW + SEG_PACK_H
+    const cellH = maxH + SEG_PACK_V
+
+    sortedSegs.forEach((seg, i) => {
+      const row = Math.floor(i / chainsPerRow)
+      const col = i % chainsPerRow
+      const targetX = col * cellW
+      const targetY = row * cellH
+      const bb = bboxes.get(seg)!
+      const dx = targetX - bb.minX
+      const dy = targetY - bb.minY
+      for (const id of nodesBySegment.get(seg)!) {
+        const p = positions[id]
+        positions[id] = { x: p.x + dx, y: p.y + dy }
+      }
+    })
+  }
 }
 
 // ─── Graph building ───────────────────────────────────────────────────────────
@@ -419,6 +580,8 @@ function computePositions(
   cols: Map<string, number>,
   graphId: string,
   existingPositions: NodePositions = {},
+  chainSegs: Map<string, number>,
+  graphNodeIds: Set<string>,
 ): NodePositions {
   const positions: NodePositions = {}
 
@@ -442,6 +605,8 @@ function computePositions(
     groupOffsetX[g + 1] = groupOffsetX[g] + (width + GROUP_GAP) * X_STEP
   }
 
+  const baselineStarts = buildRowBaselineStarts(groupOf, layerInGroup, nodeMap)
+
   for (const [id, meta] of nodeMap.entries()) {
     if (meta.type === 'notes') {
       const existing = existingPositions[id]
@@ -461,10 +626,13 @@ function computePositions(
     const rng = makeRng(hashStr(graphId + id))
     const { dx, dy } = jitter(rng, JITTER_X, JITTER_Y)
 
+    const rowBaseline = baselineStarts.get(group)?.get(layer) ?? 0
     const x = (groupOffsetX[group] ?? 0) + colNorm * X_STEP + dx
-    const y = layer * Y_STEP + dy
+    const y = rowBaseline + dy
     positions[id] = { x, y }
   }
+
+  packSegmentsInGroups(positions, nodeMap, groupOf, chainSegs, graphNodeIds)
 
   return positions
 }
@@ -529,6 +697,8 @@ export function layoutGraph(
   const cols = assignColumns(graphNodeMap, graphOutEdges, graphInEdges, layers)
   resolveCollisions(groupOf, layerInGroup, cols)
 
+  const graphNodeIds = new Set(graphNodeMap.keys())
+
   const positions = computePositions(
     nodeMap,
     groupOf,
@@ -536,6 +706,8 @@ export function layoutGraph(
     cols,
     graphId,
     existingPositions,
+    chainSegs,
+    graphNodeIds,
   )
   const graphPositions = Object.fromEntries(
     Object.entries(positions).filter(([id]) => !noteSet.has(id)),
