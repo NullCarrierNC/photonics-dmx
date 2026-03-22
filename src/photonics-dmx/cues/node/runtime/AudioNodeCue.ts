@@ -88,6 +88,8 @@ export class AudioNodeCue implements IAudioCue {
   private groupLevelVarStore: Map<string, VariableValue>
   private executionEngine?: NodeExecutionEngine
   private effectRegistry: EffectRegistry
+  /** True after `cue-started` events have run for this activation; reset in onStop/onDestroy. */
+  private cueStartedFired = false
 
   constructor(
     groupId: string,
@@ -149,7 +151,21 @@ export class AudioNodeCue implements IAudioCue {
       )
     }
 
+    if (!this.cueStartedFired) {
+      for (const event of this.compiledCue.eventMap.values()) {
+        if (event.eventType !== 'cue-started') continue
+        const eventContext: EventContext = { eventRawValue: 1 }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extended cue payload shape
+        const cueData = { ...data, eventContext } as any
+        this.executionEngine.startExecution(event, cueData)
+      }
+      this.cueStartedFired = true
+    }
+
     for (const event of this.compiledCue.eventMap.values()) {
+      if (event.eventType === 'cue-started') {
+        continue
+      }
       if (event.eventType === 'audio-trigger') {
         this.executeAudioTriggerNode(event as AudioTriggerNode, data)
         continue
@@ -240,6 +256,7 @@ export class AudioNodeCue implements IAudioCue {
       this.executionEngine.cancelAll()
     }
 
+    this.cueStartedFired = false
     this.eventStates.clear()
     this.triggerPhase.clear()
     this.triggerEnterTime.clear()
@@ -255,6 +272,7 @@ export class AudioNodeCue implements IAudioCue {
       this.executionEngine.cancelAll()
     }
 
+    this.cueStartedFired = false
     this.eventStates.clear()
     this.triggerPhase.clear()
     this.triggerEnterTime.clear()
@@ -490,6 +508,8 @@ export class AudioNodeCue implements IAudioCue {
   private getEventValue(eventType: AudioEventNode['eventType'], data: AudioCueData): number {
     const { audioData } = data
     switch (eventType) {
+      case 'cue-started':
+        return 0
       case 'audio-beat':
         return audioData.beatDetected ? 1 : 0
       case 'audio-energy':

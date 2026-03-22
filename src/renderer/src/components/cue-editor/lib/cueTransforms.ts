@@ -86,6 +86,7 @@ function normalizeAudioEventForSave(
     'triggerMode' in event &&
     (event.eventType === 'none' ||
       event.eventType === 'delay' ||
+      event.eventType === 'cue-started' ||
       event.eventType === 'audio-beat' ||
       event.eventType === 'audio-energy' ||
       event.eventType === 'audio-centroid' ||

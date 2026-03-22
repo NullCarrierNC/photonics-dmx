@@ -1,4 +1,7 @@
-import type { NodeCueMode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type {
+  AudioEventType,
+  NodeCueMode,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { WaitCondition, YargEventType } from '../../../../../photonics-dmx/types'
 import {
   AUDIO_EVENT_OPTIONS as AUDIO_EVENTS_BASE,
@@ -30,9 +33,16 @@ const EASING_OPTIONS = [
 // Event options for EVENT NODES - includes system events (cue-started, cue-called)
 const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENTS_BASE]
 const YARG_EVENT_OPTIONS = withDefaultLabels(YARG_EVENT_TYPES)
-const AUDIO_EVENT_OPTIONS = [...withDefaultLabels(AUDIO_EVENTS_BASE)].sort((a, b) =>
-  a.label.localeCompare(b.label),
-)
+const AUDIO_EVENT_LABELS: Partial<Record<AudioEventType, string>> = {
+  'cue-started': 'Cue Started (once per lifecycle)',
+}
+
+const AUDIO_EVENT_OPTIONS = [...withDefaultLabels(AUDIO_EVENTS_BASE)]
+  .map((o) => ({
+    ...o,
+    label: AUDIO_EVENT_LABELS[o.value as AudioEventType] ?? o.label,
+  }))
+  .sort((a, b) => a.label.localeCompare(b.label))
 
 // Categorized YARG event options - derived from shared constants
 const YARG_EVENT_OPTIONS_CATEGORIZED = getYargEventCategories()

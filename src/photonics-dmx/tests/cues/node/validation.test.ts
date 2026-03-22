@@ -120,6 +120,71 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('validates audio node cue with cue-started event type', () => {
+    const definition: AudioNodeCueDefinition = {
+      id: 'audio-cue-started',
+      name: 'Cue Started Setup',
+      cueTypeId: 'custom-audio',
+      nodes: {
+        events: [
+          {
+            id: 'ev-start',
+            type: 'event',
+            eventType: 'cue-started',
+            threshold: 0.5,
+            triggerMode: 'edge',
+          },
+          {
+            id: 'ev-beat',
+            type: 'event',
+            eventType: 'audio-beat',
+            threshold: 0.5,
+            triggerMode: 'edge',
+          },
+        ],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
+            },
+            color: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
+            },
+            timing: {
+              waitForCondition: { source: 'literal', value: 'none' },
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 100 },
+              waitUntilCondition: { source: 'literal', value: 'none' },
+              waitUntilTime: { source: 'literal', value: 0 },
+              easing: 'linear',
+              level: { source: 'literal', value: 1 },
+            },
+          },
+        ],
+      },
+      connections: [
+        { from: 'ev-start', to: 'action-1' },
+        { from: 'ev-beat', to: 'action-1' },
+      ],
+      layout: { nodePositions: {} },
+    }
+
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'audio-group', name: 'Audio Group' },
+      cues: [definition],
+    })
+
+    expect(result.valid).toBe(true)
+  })
+
   it('validates audio cue with audio-hfc event type', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'hfc-cue',
@@ -792,6 +857,21 @@ describe('Node cue validation', () => {
     }
   })
 
+  it('validates bundled audio-stagekit.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/audio/audio-stagekit.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateAudioNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+      }
+    }
+  })
+
   describe('Effect file validation', () => {
     it('validates a minimal YARG effect file', () => {
       const result = validateYargEffectFile({
@@ -862,6 +942,17 @@ describe('Node cue validation', () => {
       })
       expect(validYarg.valid).toBe(true)
       expect(validYarg.mode).toBe('yarg')
+    })
+
+    it('validates bundled audio-stagekit-effects.json', () => {
+      const filePath = path.join(
+        __dirname,
+        '../../../../../resources/defaults/node-data/effects/audio/audio-stagekit-effects.json',
+      )
+      const raw = fs.readFileSync(filePath, 'utf8')
+      const result = validateEffectFile(JSON.parse(raw))
+      expect(result.valid).toBe(true)
+      expect(result.mode).toBe('audio')
     })
   })
 })

@@ -335,6 +335,7 @@ export interface YargEventNode extends BaseEventNode {
 export type AudioEventType =
   | 'none'
   | 'delay'
+  | 'cue-started'
   | 'audio-beat'
   | 'audio-energy'
   | 'audio-trigger'

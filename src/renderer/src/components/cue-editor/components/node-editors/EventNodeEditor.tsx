@@ -29,6 +29,12 @@ const AUDIO_EVENT_TYPE_DOCS: Record<AudioEventType, { description: string; bestU
       description: 'Time-based delay (used for action timing).',
       bestUsedFor: 'Action wait conditions; not used as a graph entry point.',
     },
+    'cue-started': {
+      description:
+        'Runs once when the cue becomes active (first audio execute). Use for setup; not amplitude-driven.',
+      bestUsedFor:
+        'One-time initialization: config-data, math offsets, and variables before beat-driven effect raisers.',
+    },
     'audio-beat': {
       description: 'Fires when the in-app beat detector detects a beat (onset + tempo gating).',
       bestUsedFor: 'Kick/snare-style triggers, BPM-locked effects, and general rhythm response.',
