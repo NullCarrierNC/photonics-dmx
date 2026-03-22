@@ -11,6 +11,10 @@ import type {
 } from '../../photonics-dmx/types'
 import { ConfigStrobeType } from '../../photonics-dmx/types'
 import type { AppPreferences } from '../../services/configuration/ConfigurationManager'
+import {
+  AUDIO_BAND_GAIN_MAX,
+  AUDIO_BAND_GAIN_MIN,
+} from '../../photonics-dmx/listeners/Audio/AudioTypes'
 
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
@@ -414,7 +418,12 @@ function validateAudioBand(band: unknown): ValidationResult<Record<string, unkno
   }
 
   // Validate gain
-  const gainResult = validateNumberInRange(bandObj.gain, 0.1, 5.0, 'Audio band gain')
+  const gainResult = validateNumberInRange(
+    bandObj.gain,
+    AUDIO_BAND_GAIN_MIN,
+    AUDIO_BAND_GAIN_MAX,
+    'Audio band gain',
+  )
   if (!gainResult.ok) return gainResult
 
   return {

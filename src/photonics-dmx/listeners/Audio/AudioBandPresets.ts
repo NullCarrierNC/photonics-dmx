@@ -36,6 +36,8 @@ function bandsFromHz(ranges: readonly { minHz: number; maxHz: number }[]): Audio
   }))
 }
 
+const RHYTHM_GAME_DEFAULT_GAINS = [1, 0.7, 0.9, 2.8, 4.6, 4.8, 5.4, 7] as const
+
 /** Shipped default: Rock Band / Guitar Hero style instrument lanes. */
 export const RHYTHM_GAME_BANDS: AudioBandDefinition[] = bandsFromHz([
   { minHz: 20, maxHz: 50 },
@@ -46,7 +48,10 @@ export const RHYTHM_GAME_BANDS: AudioBandDefinition[] = bandsFromHz([
   { minHz: 2800, maxHz: 5500 },
   { minHz: 5500, maxHz: 11000 },
   { minHz: 11000, maxHz: 20000 },
-])
+]).map((band, i) => ({
+  ...band,
+  gain: RHYTHM_GAME_DEFAULT_GAINS[i]!,
+}))
 
 const GENERAL_BANDS: AudioBandDefinition[] = bandsFromHz([
   { minHz: 20, maxHz: 60 },

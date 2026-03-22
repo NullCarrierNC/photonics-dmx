@@ -201,14 +201,9 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             Global Sensitivity
           </label>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Adjust the global sensitivity: acts as again multiplier for audio input. This is applied
-            to all frequency bands.
+            Adjust the global sensitivity: acts as a global gain for audio input. This is applied to
+            all frequency bands.
           </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
-            {sensitivity.toFixed(1)}x
-          </span>
         </div>
       </div>
 
@@ -253,11 +248,6 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
               Audio signal below this level is treated as silence. Increase to filter out background
               noise.
             </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[4rem] text-right">
-              {noiseFloor} / 255
-            </span>
           </div>
         </div>
 

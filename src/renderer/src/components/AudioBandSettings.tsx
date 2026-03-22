@@ -7,7 +7,11 @@ import {
   matchAudioBandPresetId,
   type AudioBandPresetId,
 } from '../../../photonics-dmx/listeners/Audio/AudioBandPresets'
-import type { AudioBandDefinition } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import {
+  AUDIO_BAND_GAIN_MAX,
+  AUDIO_BAND_GAIN_MIN,
+  type AudioBandDefinition,
+} from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 
 const PRESET_OPTIONS = AUDIO_BAND_PRESETS.map((p) => ({ id: p.id, label: p.label }))
 
@@ -70,7 +74,7 @@ const AudioBandSettings: React.FC = () => {
   }
 
   const handleGainChange = (index: number, value: number) => {
-    const clamped = Math.max(0.1, Math.min(5.0, value))
+    const clamped = Math.max(AUDIO_BAND_GAIN_MIN, Math.min(AUDIO_BAND_GAIN_MAX, value))
     const newBands = bands.map((b, i) => (i === index ? { ...b, gain: clamped } : b))
     setBands(newBands)
   }
@@ -174,14 +178,14 @@ const AudioBandSettings: React.FC = () => {
               <label
                 className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap shrink-0 sm:pt-0.5"
                 htmlFor={`audio-band-gain-${band.id}`}>
-                Gain multiplier
+                Gain
               </label>
               <div className="flex flex-1 items-center gap-3 min-w-0">
                 <input
                   id={`audio-band-gain-${band.id}`}
                   type="range"
-                  min="0.1"
-                  max="5.0"
+                  min={String(AUDIO_BAND_GAIN_MIN)}
+                  max={String(AUDIO_BAND_GAIN_MAX)}
                   step="0.1"
                   value={band.gain}
                   onChange={(e) => handleGainSliderChange(index, e)}
@@ -190,21 +194,21 @@ const AudioBandSettings: React.FC = () => {
                   aria-label={`${band.name} gain multiplier`}
                   className="flex-1 min-w-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                   style={{
-                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((band.gain - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb ${((band.gain - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb 100%)`,
+                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((band.gain - AUDIO_BAND_GAIN_MIN) / (AUDIO_BAND_GAIN_MAX - AUDIO_BAND_GAIN_MIN)) * 100}%, #e5e7eb ${((band.gain - AUDIO_BAND_GAIN_MIN) / (AUDIO_BAND_GAIN_MAX - AUDIO_BAND_GAIN_MIN)) * 100}%, #e5e7eb 100%)`,
                   }}
                 />
-                <span className="text-sm text-gray-600 dark:text-gray-400 font-mono shrink-0 w-12 text-right tabular-nums">
-                  {band.gain.toFixed(1)}x
-                </span>
                 <input
                   type="number"
-                  min="0.1"
-                  max="5.0"
+                  min={String(AUDIO_BAND_GAIN_MIN)}
+                  max={String(AUDIO_BAND_GAIN_MAX)}
                   step="0.1"
                   value={band.gain}
                   onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0.1
-                    handleGainChange(index, Math.max(0.1, Math.min(5.0, value)))
+                    const value = parseFloat(e.target.value) || AUDIO_BAND_GAIN_MIN
+                    handleGainChange(
+                      index,
+                      Math.max(AUDIO_BAND_GAIN_MIN, Math.min(AUDIO_BAND_GAIN_MAX, value)),
+                    )
                   }}
                   onBlur={() => handleGainBlur()}
                   disabled={isSaving}

@@ -70,6 +70,12 @@ export interface AudioLightingData {
   bandOnsets?: Record<string, number>
 }
 
+/** Minimum value for per-band gain multiplier (Audio Settings frequency bands). */
+export const AUDIO_BAND_GAIN_MIN = 0.1
+
+/** Maximum value for per-band gain multiplier (Audio Settings frequency bands). */
+export const AUDIO_BAND_GAIN_MAX = 10
+
 /**
  * Frequency band definition for audio analysis
  */
@@ -82,7 +88,7 @@ export interface AudioBandDefinition {
   minHz: number
   /** Maximum frequency in Hz (20-20000, must be > minHz) */
   maxHz: number
-  /** Per-band gain multiplier (0.1-5.0, default: 1.0) */
+  /** Per-band gain multiplier (AUDIO_BAND_GAIN_MIN–AUDIO_BAND_GAIN_MAX) */
   gain: number
 }
 
