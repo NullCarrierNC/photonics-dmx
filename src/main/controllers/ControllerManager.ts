@@ -332,6 +332,7 @@ export class ControllerManager {
 
     this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {
       sendToAllWindows(RENDERER_RECEIVE.NODE_CUES_CHANGED, payload)
+      this.refreshAudioCueSelection()
     })
   }
 

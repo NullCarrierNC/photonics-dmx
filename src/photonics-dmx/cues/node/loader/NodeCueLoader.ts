@@ -288,6 +288,16 @@ export class NodeCueLoader extends EventEmitter {
     mode: NodeCueMode,
     file: NodeCueFile,
   ): Promise<void> {
+    let wasAudioGroupEnabled = false
+    if (mode === 'audio') {
+      const existing = this.fileRegistrations.get(filePath)
+      if (existing) {
+        wasAudioGroupEnabled = this.options.audioRegistry
+          .getEnabledGroups()
+          .includes(existing.groupId)
+      }
+    }
+
     this.unregisterFile(filePath)
 
     if (mode === 'yarg') {
@@ -303,6 +313,9 @@ export class NodeCueLoader extends EventEmitter {
     } else {
       const group = await this.buildAudioGroup(file as AudioNodeCueFile)
       this.options.audioRegistry.registerGroup(group)
+      if (wasAudioGroupEnabled) {
+        this.options.audioRegistry.enableGroup(group.id)
+      }
       file.cues.forEach((cue) => this.customAudioCueTypes.add(cue.cueTypeId))
     }
 

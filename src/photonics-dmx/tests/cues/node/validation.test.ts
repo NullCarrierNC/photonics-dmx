@@ -929,6 +929,46 @@ describe('Node cue validation', () => {
     }
   })
 
+  it('audio stagekit rotation effect raisers are persistent (seamless loop at wrap)', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/audio/audio-stagekit.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const data = JSON.parse(raw) as {
+      cues: Array<{
+        id: string
+        nodes?: {
+          effectRaisers?: Array<{
+            id: string
+            effectId?: string
+            isPersistent?: boolean
+          }>
+        }
+      }>
+    }
+    const cueIds = [
+      'cue-sk-audio-cool-auto',
+      'cue-sk-audio-warm-auto',
+      'cue-sk-audio-harmony',
+      'cue-sk-audio-searchlights',
+      'cue-sk-audio-score',
+    ]
+    for (const cueId of cueIds) {
+      const cue = data.cues.find((c) => c.id === cueId)
+      expect(cue).toBeDefined()
+      const raisers = cue!.nodes?.effectRaisers ?? []
+      for (const r of raisers) {
+        if (
+          r.effectId === 'effect-audio-rotation-cw' ||
+          r.effectId === 'effect-audio-rotation-ccw'
+        ) {
+          expect(r.isPersistent).toBe(true)
+        }
+      }
+    }
+  })
+
   describe('Effect file validation', () => {
     it('validates a minimal YARG effect file', () => {
       const result = validateYargEffectFile({
