@@ -386,7 +386,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               type="range"
               min={0}
               max={1}
-              step={0.05}
+              step={0.01}
               className="mt-1"
               value={trigger.threshold ?? 0.5}
               onChange={(e) => patchTrigger({ threshold: Number(e.target.value) })}
@@ -445,7 +445,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               type="range"
               min={0}
               max={1}
-              step={0.05}
+              step={0.01}
               className="mt-1"
               value={trigger.smoothing ?? 0.45}
               onChange={(e) => patchTrigger({ smoothing: Number(e.target.value) })}
@@ -556,7 +556,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
                               type="range"
                               min={0}
                               max={1}
-                              step={0.05}
+                              step={0.01}
                               className="mt-0.5"
                               value={range.min ?? 0}
                               onChange={(e) =>
@@ -578,7 +578,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
                               type="range"
                               min={0}
                               max={1}
-                              step={0.05}
+                              step={0.01}
                               className="mt-0.5"
                               value={range.max ?? 1}
                               onChange={(e) =>
@@ -630,7 +630,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
                   type="range"
                   min={0}
                   max={1}
-                  step={0.05}
+                  step={0.01}
                   className="mt-1"
                   value={trigger.onsetThreshold ?? 0.3}
                   onChange={(e) => patchTrigger({ onsetThreshold: Number(e.target.value) })}
@@ -712,7 +712,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               type="range"
               min={0}
               max={1}
-              step={0.05}
+              step={0.01}
               className="mt-1"
               value={(node as AudioEventNode).threshold ?? 0.5}
               onChange={(e) => updateAudioNode({ threshold: Number(e.target.value) })}
