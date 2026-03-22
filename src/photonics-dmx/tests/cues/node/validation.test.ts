@@ -185,6 +185,63 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('validates audio node cue with style primary and secondary', () => {
+    const primaryDef: AudioNodeCueDefinition = {
+      id: 'audio-primary-style',
+      name: 'Primary',
+      cueTypeId: 'custom-primary',
+      style: 'primary',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-beat',
+            threshold: 0.5,
+            triggerMode: 'edge',
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const secondaryDef: AudioNodeCueDefinition = {
+      id: 'audio-secondary-style',
+      name: 'Secondary',
+      cueTypeId: 'custom-secondary',
+      style: 'secondary',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-beat',
+            threshold: 0.5,
+            triggerMode: 'edge',
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const r1 = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [primaryDef],
+    })
+    const r2 = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [secondaryDef],
+    })
+    expect(r1.valid).toBe(true)
+    expect(r2.valid).toBe(true)
+  })
+
   it('validates audio cue with audio-hfc event type', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'hfc-cue',

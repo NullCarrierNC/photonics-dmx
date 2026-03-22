@@ -893,6 +893,7 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
     name: { type: 'string', minLength: 1 },
     description: { type: 'string', nullable: true },
     cueTypeId: { type: 'string', minLength: 1 },
+    style: { type: 'string', nullable: true, enum: ['primary', 'secondary'] },
     nodes: {
       type: 'object',
       required: ['events', 'actions'],

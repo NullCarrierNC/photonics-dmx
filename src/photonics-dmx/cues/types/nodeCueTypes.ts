@@ -300,6 +300,8 @@ export interface YargNodeCueDefinition extends BaseCueDefinition {
 
 export interface AudioNodeCueDefinition extends BaseCueDefinition {
   cueTypeId: string
+  /** Layering: primary replaces base look (first submission uses setEffect); secondary adds on top (addEffect). Defaults to primary when omitted. */
+  style?: 'primary' | 'secondary'
   nodes: NodeGraph<AudioEventNodeUnion, ActionNode>
 }
 

@@ -90,6 +90,11 @@ export class AudioNodeCue implements IAudioCue {
   private effectRegistry: EffectRegistry
   /** True after `cue-started` events have run for this activation; reset in onStop/onDestroy. */
   private cueStartedFired = false
+  /**
+   * When `use` is true, the next graph effect submission uses setEffect (clears sequencer). Primary cues
+   * set this before running cue-started; secondary cues never set it.
+   */
+  private readonly firstSubmissionUsesSetEffectRef = { use: false }
 
   constructor(
     groupId: string,
@@ -125,6 +130,11 @@ export class AudioNodeCue implements IAudioCue {
     this.initializeVariables()
   }
 
+  get style(): 'primary' | 'secondary' {
+    const s = (this.compiledCue.definition as AudioNodeCueDefinition).style
+    return s === 'secondary' ? 'secondary' : 'primary'
+  }
+
   async execute(
     data: AudioCueData,
     sequencer: ILightingController,
@@ -148,10 +158,17 @@ export class AudioNodeCue implements IAudioCue {
         this.groupLevelVarStore,
         this.effectRegistry,
         variableDefinitions,
+        this.firstSubmissionUsesSetEffectRef,
       )
     }
 
     if (!this.cueStartedFired) {
+      const hasCueStarted = [...this.compiledCue.eventMap.values()].some(
+        (e) => e.eventType === 'cue-started',
+      )
+      if (hasCueStarted && this.style === 'primary') {
+        this.firstSubmissionUsesSetEffectRef.use = true
+      }
       for (const event of this.compiledCue.eventMap.values()) {
         if (event.eventType !== 'cue-started') continue
         const eventContext: EventContext = { eventRawValue: 1 }
@@ -252,8 +269,9 @@ export class AudioNodeCue implements IAudioCue {
   }
 
   onStop(): void {
+    const skipEffectRemoval = this.style === 'primary'
     if (this.executionEngine) {
-      this.executionEngine.cancelAll()
+      this.executionEngine.cancelAll(skipEffectRemoval)
     }
 
     this.cueStartedFired = false
@@ -268,8 +286,9 @@ export class AudioNodeCue implements IAudioCue {
   }
 
   onDestroy(): void {
+    const skipEffectRemoval = this.style === 'primary'
     if (this.executionEngine) {
-      this.executionEngine.cancelAll()
+      this.executionEngine.cancelAll(skipEffectRemoval)
     }
 
     this.cueStartedFired = false
