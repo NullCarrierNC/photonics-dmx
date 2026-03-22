@@ -7,8 +7,8 @@ interface AudioSensitivityControlsProps {
 }
 
 const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ compact = false }) => {
-  const [sensitivity, setSensitivity] = useState(1.0)
-  const [noiseFloor, setNoiseFloor] = useState(50)
+  const [sensitivity, setSensitivity] = useState(2.5)
+  const [noiseFloor, setNoiseFloor] = useState(60)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -16,8 +16,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
     const loadConfig = async () => {
       try {
         const config = await getAudioConfig()
-        setSensitivity(config?.sensitivity ?? 1.0)
-        setNoiseFloor(config?.noiseFloor ?? 50)
+        setSensitivity(config?.sensitivity ?? 2.5)
+        setNoiseFloor(config?.noiseFloor ?? 60)
       } catch (error) {
         console.error('Failed to load audio sensitivity:', error)
       } finally {
@@ -41,13 +41,13 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
         console.error('Failed to save audio sensitivity:', result.error)
         // Revert on failure
         const config = await getAudioConfig()
-        setSensitivity(config?.sensitivity ?? 1.0)
+        setSensitivity(config?.sensitivity ?? 2.5)
       }
     } catch (error) {
       console.error('Failed to save audio sensitivity:', error)
       // Revert on failure
       const config = await getAudioConfig()
-      setSensitivity(config?.sensitivity ?? 1.0)
+      setSensitivity(config?.sensitivity ?? 2.5)
     } finally {
       setIsSaving(false)
     }
@@ -75,13 +75,13 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
         console.error('Failed to save noise floor:', result.error)
         // Revert on failure
         const config = await getAudioConfig()
-        setNoiseFloor(config?.noiseFloor ?? 50)
+        setNoiseFloor(config?.noiseFloor ?? 60)
       }
     } catch (error) {
       console.error('Failed to save noise floor:', error)
       // Revert on failure
       const config = await getAudioConfig()
-      setNoiseFloor(config?.noiseFloor ?? 50)
+      setNoiseFloor(config?.noiseFloor ?? 60)
     } finally {
       setIsSaving(false)
     }

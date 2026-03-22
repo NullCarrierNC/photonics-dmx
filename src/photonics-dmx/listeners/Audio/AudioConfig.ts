@@ -15,8 +15,8 @@ export const DEFAULT_AUDIO_BANDS: AudioBandDefinition[] = RHYTHM_GAME_BANDS.map(
 export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   deviceId: undefined, // undefined = use system default device
   fftSize: 4096,
-  sensitivity: 1.0,
-  noiseFloor: 50,
+  sensitivity: 2.5,
+  noiseFloor: 60,
   bands: DEFAULT_AUDIO_BANDS,
   beatDetection: {
     threshold: 0.3,

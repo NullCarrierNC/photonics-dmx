@@ -103,10 +103,10 @@ export interface AudioConfig {
   /** FFT size (default: 4096, must be power of 2) */
   fftSize: number
 
-  /** Sensitivity/gain multiplier (default: 1.0, range: 0.1-5.0) */
+  /** Sensitivity/gain multiplier (default: 2.5, range: 0.1-5.0) */
   sensitivity: number
 
-  /** Noise floor gate threshold (0-255 raw FFT value, default: 50).
+  /** Noise floor gate threshold (0-255 raw FFT value, default: 60).
    *  Bins below this level are zeroed before any gain or analysis is applied. */
   noiseFloor: number
 

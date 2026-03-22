@@ -10,7 +10,9 @@
  */
 
 import { AudioLightingData, AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
-import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
+import DEFAULT_AUDIO_CONFIG, {
+  DEFAULT_AUDIO_BANDS,
+} from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { BeatDetector } from '../../../photonics-dmx/listeners/Audio/BeatDetector'
 import {
   extractAll,
@@ -32,8 +34,8 @@ const store = getDefaultStore()
 
 const DEFAULT_CONFIG: AudioConfig = {
   fftSize: 4096,
-  sensitivity: 1.0,
-  noiseFloor: 50,
+  sensitivity: DEFAULT_AUDIO_CONFIG.sensitivity,
+  noiseFloor: DEFAULT_AUDIO_CONFIG.noiseFloor,
   bands: DEFAULT_AUDIO_BANDS,
   smoothing: {
     enabled: true,
@@ -471,7 +473,7 @@ export class AudioCaptureManager {
     const binSize = sampleRate / fftSize
 
     // Apply noise floor gate: zero out bins below threshold
-    const noiseFloor = this.config.noiseFloor ?? 50
+    const noiseFloor = this.config.noiseFloor ?? DEFAULT_AUDIO_CONFIG.noiseFloor
     let gatedData: Uint8Array
     if (noiseFloor > 0) {
       gatedData = new Uint8Array(frequencyData.length)
