@@ -111,6 +111,7 @@ const createDefaultCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeC
   return {
     ...base,
     cueTypeId: 'custom-audio-cue',
+    style: 'primary',
   } as AudioNodeCueDefinition
 }
 
@@ -142,6 +143,7 @@ const createBlankCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeCue
   return {
     ...base,
     cueTypeId: 'custom-audio-cue',
+    style: 'primary',
   } as AudioNodeCueDefinition
 }
 
