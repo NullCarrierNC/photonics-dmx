@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
+import { useAtomValue } from 'jotai'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import type { Layout } from 'react-resizable-panels'
 import 'reactflow/dist/style.css'
@@ -53,7 +54,9 @@ import {
   getAudioCueDataPropertyMeta,
   getYargCueDataPropertyMeta,
 } from '../../../photonics-dmx/constants/cueDataPropertyMeta'
-import { readEffectFile, showItemInFolder } from '../ipcApi'
+import { readEffectFile, showItemInFolder, getAudioConfig, setAudioEnabled } from '../ipcApi'
+import { liveMonitorEnabledAtom } from '../atoms'
+import { AudioCaptureManager } from '../services/AudioCaptureManager'
 
 type EditorCueOrEffect =
   | YargNodeCueDefinition
@@ -165,6 +168,41 @@ const CueEditor: React.FC = () => {
   const loadCueIntoFlowRef = useRef<(cue: EditorCueOrEffect) => void>(() => {})
   const getUpdatedDocumentRef = useRef<() => NodeCueFile | EffectFile | null>(() => null)
   const flowWrapperRef = useRef<HTMLDivElement | null>(null)
+  const liveMonitorEnabled = useAtomValue(liveMonitorEnabledAtom)
+  const liveMonitorManagerRef = useRef<AudioCaptureManager | null>(null)
+
+  useEffect(() => {
+    if (!liveMonitorEnabled) {
+      if (liveMonitorManagerRef.current) {
+        liveMonitorManagerRef.current.stop()
+        liveMonitorManagerRef.current = null
+      }
+      return
+    }
+    let cancelled = false
+    setAudioEnabled(true)
+      .then(() => {
+        if (cancelled) return
+        return getAudioConfig()
+      })
+      .then((config) => {
+        if (cancelled || !config) return
+        const manager = new AudioCaptureManager(config)
+        liveMonitorManagerRef.current = manager
+        return manager.start()
+      })
+      .catch((err) => {
+        if (!cancelled) console.error('Live Monitor: failed to start audio capture', err)
+      })
+    return () => {
+      cancelled = true
+      if (liveMonitorManagerRef.current) {
+        liveMonitorManagerRef.current.stop()
+        liveMonitorManagerRef.current = null
+      }
+      setAudioEnabled(false).catch(() => {})
+    }
+  }, [liveMonitorEnabled])
 
   const loadCueIntoFlowProxy = useCallback(
     (cue: EditorCueOrEffect) => loadCueIntoFlowRef.current(cue),

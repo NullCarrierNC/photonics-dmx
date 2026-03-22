@@ -30,7 +30,7 @@ export const COLOR_OPTIONS: Color[] = [
   'yellow',
 ]
 
-export const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max']
+export const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max', 'linear']
 
 export const BLEND_MODE_OPTIONS: BlendMode[] = ['replace', 'add', 'multiply', 'overlay']
 
@@ -77,13 +77,13 @@ export const YARG_EVENT_OPTIONS: YargEventType[] = YARG_EVENT_TYPES.filter(
 export const WAIT_CONDITIONS_WITH_NONE_DELAY: WaitCondition[] = [...WAIT_CONDITIONS]
 
 export const AUDIO_EVENT_OPTIONS: AudioEventType[] = [
+  'cue-started',
   'audio-beat',
-  'audio-range1',
-  'audio-range2',
-  'audio-range3',
-  'audio-range4',
-  'audio-range5',
   'audio-energy',
+  'audio-trigger',
+  'audio-centroid',
+  'audio-flatness',
+  'audio-hfc',
 ]
 
 export const AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY: (AudioEventType | 'none' | 'delay')[] = [

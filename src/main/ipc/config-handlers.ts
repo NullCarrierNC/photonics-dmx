@@ -482,6 +482,8 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
         await controllerManager.disableAudio()
       }
 
+      sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED, { enabled })
+
       return { success: true }
     } catch (error) {
       console.error('Error setting audio enabled state:', error)

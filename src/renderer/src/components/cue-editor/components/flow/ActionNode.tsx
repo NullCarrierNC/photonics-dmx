@@ -8,6 +8,10 @@ import type {
   ActionNode as ActionPayload,
   ValueSource,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import {
+  getPaletteColorCssRgb,
+  validateColorString,
+} from '../../../../../../photonics-dmx/helpers/dmxHelpers'
 
 const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) => {
   const action = data.payload as ActionPayload
@@ -73,8 +77,12 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected })
     ? 'shadow-[0_0_18px_16px_rgba(59,130,246,0.8)] ring-[5px] ring-blue-400'
     : ''
 
-  // When transparent is selected, use semi-transparent black (50%) for the node UI so it remains visible
-  const bgColorForNode = colorName === 'transparent' ? 'rgba(0,0,0,0.5)' : colorName
+  // When transparent is selected, use semi-transparent black (50%) for the node UI so it remains visible.
+  // Otherwise use RGB from the palette map — names like `amber` are not valid CSS colour keywords.
+  const bgColorForNode =
+    colorName === 'transparent'
+      ? 'rgba(0,0,0,0.5)'
+      : getPaletteColorCssRgb(validateColorString(colorName))
   const textColorForNode = colorName === 'transparent' ? '#f9fafb' : textColor
 
   return (

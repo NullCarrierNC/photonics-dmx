@@ -1,0 +1,446 @@
+{
+  "version": 1,
+  "mode": "audio",
+  "group": {
+    "id": "audio-core-effects",
+    "name": "Audio Core Effects",
+    "description": "Reusable audio-reactive effects composed from set-color primitives"
+  },
+  "effects": [
+    {
+      "id": "effect-audio-flash",
+      "mode": "audio",
+      "name": "Audio Flash",
+      "description": "Flashes a colour on target groups with fade-in, hold, and fade-out.",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "group",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "front,back",
+          "description": "Target light groups (comma-separated)",
+          "isParameter": true
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "all",
+          "description": "Light pattern filter",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "color",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "white",
+          "description": "Flash colour",
+          "isParameter": true
+        },
+        {
+          "name": "brightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "max",
+          "description": "Brightness level",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "add",
+          "description": "Blend mode for flash-in",
+          "isParameter": true
+        },
+        {
+          "name": "fadeInMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 30,
+          "description": "Fade-in duration (ms)",
+          "isParameter": true
+        },
+        {
+          "name": "holdMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 40,
+          "description": "Hold at peak (ms)",
+          "isParameter": true
+        },
+        {
+          "name": "fadeOutMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 100,
+          "description": "Fade-out duration (ms)",
+          "isParameter": true
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "audio-flash-in",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "group"
+              },
+              "filter": {
+                "source": "variable",
+                "name": "filter"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "fadeInMs"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "holdMs"
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          },
+          {
+            "id": "audio-flash-out",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "group"
+              },
+              "filter": {
+                "source": "variable",
+                "name": "filter"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "fadeOutMs"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "easeOut",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "audio-flash-listener",
+            "type": "effect-listener",
+            "label": "Flash entry",
+            "outputs": []
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "audio-flash-listener",
+          "to": "audio-flash-in"
+        },
+        {
+          "from": "audio-flash-in",
+          "to": "audio-flash-out"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "audio-flash-in": {
+            "x": -50.27107051387429,
+            "y": 94.49938719471288
+          },
+          "audio-flash-out": {
+            "x": -15.301891257986426,
+            "y": 234.30423751845956
+          },
+          "audio-flash-listener": {
+            "x": -10.505303313955665,
+            "y": -7.780826821923256
+          }
+        },
+        "viewport": {
+          "x": 605.1776979644783,
+          "y": 110.55372098879889,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "effect-audio-color-set",
+      "mode": "audio",
+      "name": "Audio Color Set",
+      "description": "Single colour transition on target groups (enter/exit style).",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "group",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "front",
+          "description": "Target light groups (comma-separated)",
+          "isParameter": true
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "all",
+          "description": "Light pattern filter",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "color",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "blue",
+          "description": "Colour name",
+          "isParameter": true
+        },
+        {
+          "name": "brightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "high",
+          "description": "Brightness level",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "replace",
+          "description": "Blend mode",
+          "isParameter": true
+        },
+        {
+          "name": "opacity",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "Opacity (0 = off)",
+          "isParameter": true
+        },
+        {
+          "name": "durationMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 200,
+          "description": "Transition duration (ms)",
+          "isParameter": true
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "audio-color-set-action",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "group"
+              },
+              "filter": {
+                "source": "variable",
+                "name": "filter"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "opacity"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "durationMs"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "audio-color-set-listener",
+            "type": "effect-listener",
+            "label": "Color set entry",
+            "outputs": []
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "audio-color-set-listener",
+          "to": "audio-color-set-action"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "audio-color-set-action": {
+            "x": -16,
+            "y": 102
+          },
+          "audio-color-set-listener": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "viewport": {
+          "x": 327.0155016527948,
+          "y": 133.92301014018517,
+          "zoom": 0.5
+        }
+      }
+    }
+  ],
+  "bundled": true
+}

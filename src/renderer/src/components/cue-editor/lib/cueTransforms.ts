@@ -2,8 +2,10 @@ import type { Edge, ReactFlowInstance } from 'reactflow'
 import type {
   ActionNode,
   AudioEventNode,
+  AudioEventNodeUnion,
   AudioNodeCueDefinition,
   AudioEffectDefinition,
+  AudioTriggerNode,
   Connection,
   EventRaiserNode,
   EventListenerNode,
@@ -42,8 +44,72 @@ const DEFAULT_POS = {
 
 type NodePositions = Record<string, { x: number; y: number }>
 
+const AUDIO_TRIGGER_SAVE_DEFAULTS = {
+  frequencyRange: { minHz: 120, maxHz: 500 } as const,
+  threshold: 0.5,
+  color: '#60a5fa',
+  nodeLabel: 'Audio Trigger',
+  outputs: ['enter', 'during', 'exit'] as const,
+}
+
+function normalizeAudioEventForSave(
+  event: YargEventNode | AudioEventNodeUnion,
+): YargEventNode | AudioEventNodeUnion {
+  if ('frequencyRange' in event && event.eventType === 'audio-trigger') {
+    const t = event as AudioTriggerNode & { sensitivity?: number }
+    const threshold =
+      t.threshold ??
+      (t.sensitivity != null ? 1 - t.sensitivity : AUDIO_TRIGGER_SAVE_DEFAULTS.threshold)
+    return {
+      id: t.id,
+      type: 'event' as const,
+      eventType: 'audio-trigger' as const,
+      frequencyRange: t.frequencyRange ?? AUDIO_TRIGGER_SAVE_DEFAULTS.frequencyRange,
+      threshold,
+      hysteresis: t.hysteresis ?? 0,
+      holdMs: t.holdMs ?? 0,
+      color: t.color ?? AUDIO_TRIGGER_SAVE_DEFAULTS.color,
+      nodeLabel: t.nodeLabel ?? AUDIO_TRIGGER_SAVE_DEFAULTS.nodeLabel,
+      outputs:
+        Array.isArray(t.outputs) && t.outputs.length === 3
+          ? (t.outputs as ['enter', 'during', 'exit'])
+          : ([...AUDIO_TRIGGER_SAVE_DEFAULTS.outputs] as ['enter', 'during', 'exit']),
+      ...(t.spectralGates != null && { spectralGates: t.spectralGates }),
+      ...(t.useOnsetGating != null && { useOnsetGating: t.useOnsetGating }),
+      ...(t.onsetThreshold != null && { onsetThreshold: t.onsetThreshold }),
+      ...(t.appliedTriggerPreset != null && { appliedTriggerPreset: t.appliedTriggerPreset }),
+      ...(t.triggerPresetDirty != null && { triggerPresetDirty: t.triggerPresetDirty }),
+      ...(t.label != null && { label: t.label }),
+    }
+  }
+  if (
+    'triggerMode' in event &&
+    (event.eventType === 'none' ||
+      event.eventType === 'delay' ||
+      event.eventType === 'cue-started' ||
+      event.eventType === 'audio-beat' ||
+      event.eventType === 'audio-energy' ||
+      event.eventType === 'audio-centroid' ||
+      event.eventType === 'audio-flatness' ||
+      event.eventType === 'audio-hfc')
+  ) {
+    const e = event
+    return {
+      id: e.id,
+      type: 'event' as const,
+      eventType: e.eventType,
+      triggerMode: e.triggerMode ?? 'edge',
+      ...(e.label != null && { label: e.label }),
+      ...(e.outputs != null && { outputs: e.outputs }),
+      ...(e.threshold != null && { threshold: e.threshold }),
+      ...(e.cooldownMs != null && { cooldownMs: e.cooldownMs }),
+    }
+  }
+  return event
+}
+
 function buildEventNodes(
-  events: (YargEventNode | AudioEventNode)[],
+  events: (YargEventNode | AudioEventNodeUnion)[],
   nodePositions: NodePositions,
   mode: NodeCueMode,
 ): EditorNode[] {
@@ -56,7 +122,9 @@ function buildEventNodes(
       label:
         mode === 'yarg'
           ? getYargEventLabel((event as YargEventNode).eventType)
-          : getAudioEventLabel((event as AudioEventNode).eventType),
+          : event.eventType === 'audio-trigger'
+            ? (event as AudioTriggerNode).nodeLabel
+            : getAudioEventLabel((event as AudioEventNode).eventType),
       payload: event,
     },
   }))
@@ -192,7 +260,7 @@ function connectionsToEdges(connections: ConnectionInput[]): Edge[] {
 
 /** Payloads extracted from flow nodes/edges for cue or effect document. */
 export type NodeGraphPayloads = {
-  events: (YargEventNode | AudioEventNode)[]
+  events: (YargEventNode | AudioEventNodeUnion)[]
   actions: ActionNode[]
   logic: LogicNode[]
   eventRaisers: EventRaiserNode[]
@@ -243,7 +311,9 @@ function flowToNodesAndConnections(
   const notesNodes = nodes.filter((n) => n.data.kind === 'notes')
 
   const payload: NodeGraphPayloads = {
-    events: eventNodes.map((n) => n.data.payload) as (YargEventNode | AudioEventNode)[],
+    events: eventNodes.map((n) =>
+      normalizeAudioEventForSave(n.data.payload as YargEventNode | AudioEventNodeUnion),
+    ) as (YargEventNode | AudioEventNodeUnion)[],
     actions: actionNodes.map((n) => n.data.payload as ActionNode),
     logic: logicNodes.map((n) => n.data.payload as LogicNode),
     eventRaisers: eventRaiserNodes.map((n) => n.data.payload as EventRaiserNode),

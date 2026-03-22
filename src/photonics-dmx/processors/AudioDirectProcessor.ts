@@ -36,8 +36,19 @@ import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes'
 import { getColor, validateColorString } from '../helpers/dmxHelpers'
 import { Color, TrackedLight } from '../types'
 
+/** One colour per frequency band (8 bands). */
+const DEFAULT_DIRECT_RANGES = [
+  { color: 'red', brightness: 'medium' as const },
+  { color: 'orange', brightness: 'medium' as const },
+  { color: 'yellow', brightness: 'medium' as const },
+  { color: 'green', brightness: 'medium' as const },
+  { color: 'chartreuse', brightness: 'medium' as const },
+  { color: 'cyan', brightness: 'medium' as const },
+  { color: 'blue', brightness: 'medium' as const },
+  { color: 'violet', brightness: 'medium' as const },
+] as const
+
 export class AudioDirectProcessor {
-  private config: AudioConfig
   private isActive = false
 
   // Track which lights are currently active
@@ -46,17 +57,15 @@ export class AudioDirectProcessor {
   constructor(
     private lightManager: DmxLightManager,
     private photonicsSequencer: ILightingController,
-    audioConfig: AudioConfig,
+    _audioConfig: AudioConfig,
   ) {
     console.log('AudioDirectProcessor: Constructor called with dependencies:', {
       lightManagerType: lightManager.constructor.name,
       photonicsSequencerType: photonicsSequencer.constructor.name,
-      audioConfig,
     })
 
     this.lightManager = lightManager
     this.photonicsSequencer = photonicsSequencer
-    this.config = audioConfig
 
     console.log('AudioDirectProcessor initialized')
   }
@@ -89,10 +98,9 @@ export class AudioDirectProcessor {
   }
 
   /**
-   * Update configuration
+   * Update configuration (no-op; frequency bands are derived from audio data)
    */
-  public updateConfig(config: AudioConfig): void {
-    this.config = config
+  public updateConfig(_config: AudioConfig): void {
     console.log('AudioDirectProcessor: Configuration updated')
   }
 
@@ -105,10 +113,16 @@ export class AudioDirectProcessor {
       return
     }
 
-    const { frequencyBands, energy, beatDetected } = data
+    const { energy, beatDetected } = data
+    const bands = this.deriveBandsFromData(data)
+    this.mapFrequencyBandsToLights(bands, energy, beatDetected)
+  }
 
-    // Map frequency bands to lights
-    this.mapFrequencyBandsToLights(frequencyBands, energy, beatDetected)
+  /** Derive per-band intensities from overall energy when raw FFT is not used */
+  private deriveBandsFromData(data: AudioLightingData): number[] {
+    const e = data.energy
+    const factors = [1, 0.92, 0.85, 0.78, 0.7, 0.62, 0.52, 0.42]
+    return factors.map((f) => e * f)
   }
 
   /**
@@ -135,13 +149,7 @@ export class AudioDirectProcessor {
    * - Each range's brightness is respected independently
    */
   private mapFrequencyBandsToLights(
-    frequencyBands: {
-      range1: number
-      range2: number
-      range3: number
-      range4: number
-      range5: number
-    },
+    frequencyBands: readonly number[],
     energy: number,
     beatDetected: boolean,
   ): void {
@@ -152,20 +160,7 @@ export class AudioDirectProcessor {
 
     const numLights = lights.length
 
-    // Get configured ranges
-    const ranges = this.config.frequencyBands?.ranges || []
-    if (ranges.length === 0) {
-      return
-    }
-
-    // Get frequency band values in order
-    const bandValues = [
-      frequencyBands.range1,
-      frequencyBands.range2,
-      frequencyBands.range3,
-      frequencyBands.range4,
-      frequencyBands.range5,
-    ]
+    const bandValues = [...frequencyBands]
 
     // Distribute lights based on overall energy
     const activeLightCount = Math.ceil(numLights * energy)
@@ -186,22 +181,21 @@ export class AudioDirectProcessor {
       }
     } else {
       // No energy - no lights
-      lightsPerRange.fill(0)
+      for (let i = 0; i < DEFAULT_DIRECT_RANGES.length; i++) {
+        lightsPerRange.push(0)
+      }
     }
 
-    // Create a map: lightIndex -> Array of {range, color, brightness, intensity}
-    // This allows us to handle overlapping ranges
+    const ranges = DEFAULT_DIRECT_RANGES
     const lightAssignments: Map<
       number,
       Array<{
-        range: (typeof ranges)[0]
         color: Color
         brightness: 'low' | 'medium' | 'high' | 'max'
         intensity: number
       }>
     > = new Map()
 
-    // Distribute lights for each range
     let currentOffset = 0
     for (let rangeIndex = 0; rangeIndex < ranges.length; rangeIndex++) {
       const range = ranges[rangeIndex]
@@ -224,7 +218,6 @@ export class AudioDirectProcessor {
             lightAssignments.set(lightIndex, [])
           }
           lightAssignments.get(lightIndex)!.push({
-            range,
             color,
             brightness,
             intensity: bandIntensity,

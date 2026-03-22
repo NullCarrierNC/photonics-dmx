@@ -3,7 +3,7 @@ import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes'
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { ILightingController } from '../controllers/sequencer/interfaces'
-import { AudioCueType, BuiltInAudioCues } from '../cues/types/audioCueTypes'
+import { AudioCueType } from '../cues/types/audioCueTypes'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { getIntensityScale } from '../cues/audio/utils/bandUtils'
 
@@ -17,7 +17,8 @@ export class AudioCueProcessor {
   private config: AudioConfig
   private isActive = false
   private cueHandler: AudioCueHandler
-  private currentCueType: AudioCueType
+  private currentPrimaryCueType: AudioCueType
+  private currentSecondaryCueType: AudioCueType | null
   private registry: AudioCueRegistry
 
   constructor(
@@ -25,11 +26,14 @@ export class AudioCueProcessor {
     private sequencer: ILightingController,
     audioConfig: AudioConfig,
     preferredCueType?: AudioCueType,
+    preferredSecondaryCueType?: AudioCueType | null,
   ) {
     this.config = audioConfig
     this.registry = AudioCueRegistry.getInstance()
-    this.currentCueType = this.selectActiveCueType(preferredCueType)
+    this.currentPrimaryCueType = this.selectActiveCueType(preferredCueType)
+    this.currentSecondaryCueType = preferredSecondaryCueType ?? null
     this.cueHandler = new AudioCueHandler(lightManager, sequencer)
+    this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType)
   }
 
   /**
@@ -41,7 +45,12 @@ export class AudioCueProcessor {
       return
     }
     this.isActive = true
-    console.log('AudioCueProcessor: Started with cue:', this.currentCueType)
+    console.log(
+      'AudioCueProcessor: Started with primary:',
+      this.currentPrimaryCueType,
+      'secondary:',
+      this.currentSecondaryCueType,
+    )
   }
 
   /**
@@ -54,8 +63,8 @@ export class AudioCueProcessor {
     this.cueHandler.stop()
 
     // Clear all audio-related effects
-    // Remove effects from layers 0-4 (the frequency range layers)
-    for (let layer = 0; layer < 5; layer++) {
+    // Remove effects from layers 0-7 (frequency band layers)
+    for (let layer = 0; layer < 8; layer++) {
       this.sequencer.removeEffectByLayer(layer, true)
     }
 
@@ -85,10 +94,17 @@ export class AudioCueProcessor {
       this.sequencer.onBeat()
     }
 
-    const bandCount = this.getEnabledBandCount()
     const processedData =
       this.config.linearResponse === false ? this.applyDiscreteResponse(data) : data
-    this.cueHandler.handleAudioData(processedData, this.config, this.currentCueType, bandCount)
+    void this.cueHandler
+      .handleAudioData(
+        processedData,
+        this.config,
+        this.currentPrimaryCueType,
+        this.currentSecondaryCueType,
+        this.config.bands.length,
+      )
+      .catch((err) => console.error('AudioCueProcessor: handleAudioData error', err))
   }
 
   /**
@@ -111,15 +127,27 @@ export class AudioCueProcessor {
    * Re-evaluate which cue type should be active based on enabled audio cue groups
    */
   public refreshCueSelection(): void {
-    const selected = this.selectActiveCueType(this.currentCueType)
-    if (selected !== this.currentCueType) {
-      console.log(`AudioCueProcessor: Switching cue from ${this.currentCueType} to ${selected}`)
-      this.currentCueType = selected
+    const selected = this.selectActiveCueType(this.currentPrimaryCueType)
+    if (selected !== this.currentPrimaryCueType) {
+      console.log(
+        `AudioCueProcessor: Switching primary cue from ${this.currentPrimaryCueType} to ${selected}`,
+      )
+      this.currentPrimaryCueType = selected
     }
+    if (
+      this.currentSecondaryCueType &&
+      !this.registry.getCueImplementation(this.currentSecondaryCueType)
+    ) {
+      console.log(
+        `AudioCueProcessor: Clearing unavailable secondary ${this.currentSecondaryCueType}`,
+      )
+      this.currentSecondaryCueType = null
+    }
+    this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType)
   }
 
   /**
-   * Force a specific cue type when it is available
+   * Force the primary cue type when it is available
    */
   public setActiveCueType(cueType: AudioCueType): boolean {
     const cue = this.registry.getCueImplementation(cueType)
@@ -128,19 +156,49 @@ export class AudioCueProcessor {
       return false
     }
 
-    if (this.currentCueType !== cueType) {
-      this.cueHandler.clearCurrentCue()
-      console.log(`AudioCueProcessor: Active cue set to ${cueType}`)
-      this.currentCueType = cueType
+    if (this.currentPrimaryCueType !== cueType) {
+      this.currentPrimaryCueType = cueType
+      this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType)
+      console.log(`AudioCueProcessor: Active primary cue set to ${cueType}`)
     }
     return true
   }
 
   /**
-   * Current cue type being executed
+   * Optional overlay or strobe; null clears the secondary and strobe slots.
+   */
+  public setActiveSecondaryCueType(cueType: AudioCueType | null): boolean {
+    if (cueType == null || cueType === '') {
+      if (this.currentSecondaryCueType != null) {
+        this.currentSecondaryCueType = null
+        this.cueHandler.syncSlots(this.currentPrimaryCueType, null)
+      }
+      return true
+    }
+    const cue = this.registry.getCueImplementation(cueType)
+    if (!cue) {
+      console.warn(
+        `AudioCueProcessor: Requested secondary cue ${cueType} is not available in enabled groups`,
+      )
+      return false
+    }
+    if (this.currentSecondaryCueType !== cueType) {
+      this.currentSecondaryCueType = cueType
+      this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType)
+      console.log(`AudioCueProcessor: Active secondary cue set to ${cueType}`)
+    }
+    return true
+  }
+
+  /**
+   * Primary cue type being executed (base look)
    */
   public getCurrentCueType(): AudioCueType {
-    return this.currentCueType
+    return this.currentPrimaryCueType
+  }
+
+  public getSecondaryCueType(): AudioCueType | null {
+    return this.currentSecondaryCueType
   }
 
   /**
@@ -165,12 +223,7 @@ export class AudioCueProcessor {
       return allCueTypes[0]
     }
 
-    // Absolute fallback
-    return BuiltInAudioCues.BasicLayered
-  }
-
-  private getEnabledBandCount(): number {
-    return this.config.frequencyBands?.bandCount ?? 4
+    return ''
   }
 
   private applyDiscreteResponse(audioData: AudioLightingData): AudioLightingData {
@@ -179,13 +232,6 @@ export class AudioCueProcessor {
       ...audioData,
       overallLevel: mapValue(audioData.overallLevel),
       energy: mapValue(audioData.energy),
-      frequencyBands: {
-        range1: mapValue(audioData.frequencyBands.range1),
-        range2: mapValue(audioData.frequencyBands.range2),
-        range3: mapValue(audioData.frequencyBands.range3),
-        range4: mapValue(audioData.frequencyBands.range4),
-        range5: mapValue(audioData.frequencyBands.range5),
-      },
     }
   }
 }

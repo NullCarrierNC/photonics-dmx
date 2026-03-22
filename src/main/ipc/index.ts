@@ -30,4 +30,8 @@ export function setupIpcHandlers(
   setupEffectHandlers(ipcMain, controllerManager)
   setupShellHandlers(ipcMain)
   setupWindowHandlers(ipcMain, windowManager)
+
+  controllerManager.setAudioMirrorBroadcaster((data) => {
+    windowManager.broadcastAudioMirror(data)
+  })
 }

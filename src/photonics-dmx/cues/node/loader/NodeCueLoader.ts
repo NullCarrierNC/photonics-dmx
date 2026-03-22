@@ -22,7 +22,7 @@ import { YargNodeCue } from '../runtime/YargNodeCue'
 import { CompiledEffectIndex } from '../runtime/CompiledEffectIndex'
 import { AudioNodeCue } from '../runtime/AudioNodeCue'
 import { CueType } from '../../types/cueTypes'
-import { AudioCueType, BuiltInAudioCues } from '../../types/audioCueTypes'
+import { AudioCueType } from '../../types/audioCueTypes'
 import { IAudioCue } from '../../interfaces/IAudioCue'
 import { EffectRegistry } from '../runtime/EffectRegistry'
 import { EffectCompiler } from '../compiler/EffectCompiler'
@@ -207,7 +207,6 @@ export class NodeCueLoader extends EventEmitter {
 
     const registryTypes = new Set(this.options.audioRegistry.getAvailableCueTypes(true))
     this.customAudioCueTypes.forEach((type) => registryTypes.add(type))
-    Object.values(BuiltInAudioCues).forEach((type) => registryTypes.add(type))
     return Array.from(registryTypes)
   }
 
@@ -289,6 +288,16 @@ export class NodeCueLoader extends EventEmitter {
     mode: NodeCueMode,
     file: NodeCueFile,
   ): Promise<void> {
+    let wasAudioGroupEnabled = false
+    if (mode === 'audio') {
+      const existing = this.fileRegistrations.get(filePath)
+      if (existing) {
+        wasAudioGroupEnabled = this.options.audioRegistry
+          .getEnabledGroups()
+          .includes(existing.groupId)
+      }
+    }
+
     this.unregisterFile(filePath)
 
     if (mode === 'yarg') {
@@ -304,6 +313,9 @@ export class NodeCueLoader extends EventEmitter {
     } else {
       const group = await this.buildAudioGroup(file as AudioNodeCueFile)
       this.options.audioRegistry.registerGroup(group)
+      if (wasAudioGroupEnabled) {
+        this.options.audioRegistry.enableGroup(group.id)
+      }
       file.cues.forEach((cue) => this.customAudioCueTypes.add(cue.cueTypeId))
     }
 

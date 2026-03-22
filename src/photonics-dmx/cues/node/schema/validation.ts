@@ -41,7 +41,9 @@ import { AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY } from '../../../constants/options'
 // All event types for YARG event nodes (includes system events + song events)
 const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENT_TYPES_SOURCE]
 
-const AUDIO_EVENT_TYPES: AudioEventType[] = [...AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY]
+const AUDIO_EVENT_TYPES: AudioEventType[] = AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY.filter(
+  (t) => t !== 'audio-trigger',
+)
 
 const LOGIC_COMPARATORS: LogicComparator[] = ['>', '>=', '<', '<=', '==', '!=']
 const MATH_OPERATORS: MathOperator[] = ['add', 'subtract', 'multiply', 'divide', 'modulus']
@@ -656,8 +658,94 @@ const audioEventSchema: JSONSchemaType<AudioEventNode> = {
     eventType: { type: 'string', enum: AUDIO_EVENT_TYPES },
     threshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
     triggerMode: { type: 'string', enum: ['edge', 'level'] },
+    cooldownMs: { type: 'number', nullable: true, minimum: 0 },
+    useOnsetGating: { type: 'boolean', nullable: true },
+    onsetThreshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
   },
 }
+
+const spectralGateRangeSchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    min: { type: 'number', minimum: 0, maximum: 1 },
+    max: { type: 'number', minimum: 0, maximum: 1 },
+  },
+}
+
+const audioTriggerSpectralGatesSchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  nullable: true,
+  properties: {
+    flatness: spectralGateRangeSchema,
+    zeroCrossingRate: spectralGateRangeSchema,
+    hfcOnset: spectralGateRangeSchema,
+    crest: spectralGateRangeSchema,
+  },
+}
+
+const audioTriggerInstrumentPresetIds = [
+  'sub-bass',
+  'kick',
+  'snare',
+  'bass-guitar',
+  'electric-guitar',
+  'vocals',
+  'hi-hat-cymbals',
+  'full-kit',
+] as const
+
+const audioTriggerSchema = {
+  type: 'object' as const,
+  required: [
+    'id',
+    'type',
+    'eventType',
+    'frequencyRange',
+    'threshold',
+    'color',
+    'nodeLabel',
+    'outputs',
+  ],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'event' },
+    eventType: { type: 'string', const: 'audio-trigger' },
+    label: { type: 'string', nullable: true },
+    frequencyRange: {
+      type: 'object',
+      required: ['minHz', 'maxHz'],
+      additionalProperties: false,
+      properties: {
+        minHz: { type: 'number', minimum: 20, maximum: 20000 },
+        maxHz: { type: 'number', minimum: 20, maximum: 20000 },
+      },
+    },
+    threshold: { type: 'number', minimum: 0, maximum: 1 },
+    hysteresis: { type: 'number', minimum: 0, maximum: 1, nullable: true },
+    holdMs: { type: 'number', minimum: 0, nullable: true },
+    smoothing: { type: 'number', minimum: 0, maximum: 1, nullable: true },
+    spectralGates: audioTriggerSpectralGatesSchema,
+    useOnsetGating: { type: 'boolean', nullable: true },
+    onsetThreshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },
+    appliedTriggerPreset: {
+      type: 'string',
+      nullable: true,
+      enum: [...audioTriggerInstrumentPresetIds],
+    },
+    triggerPresetDirty: { type: 'boolean', nullable: true },
+    color: { type: 'string', minLength: 1 },
+    nodeLabel: { type: 'string' },
+    outputs: {
+      type: 'array',
+      items: { type: 'string', enum: ['enter', 'during', 'exit'] },
+      minItems: 3,
+      maxItems: 3,
+    },
+  },
+} as any
 
 const connectionSchema: JSONSchemaType<{
   from: string
@@ -805,6 +893,7 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
     name: { type: 'string', minLength: 1 },
     description: { type: 'string', nullable: true },
     cueTypeId: { type: 'string', minLength: 1 },
+    style: { type: 'string', nullable: true, enum: ['primary', 'secondary'] },
     nodes: {
       type: 'object',
       required: ['events', 'actions'],
@@ -813,7 +902,8 @@ const audioCueSchema: JSONSchemaType<AudioNodeCueDefinition> = {
         events: {
           type: 'array',
           minItems: 1,
-          items: audioEventSchema,
+          // audio-trigger first: same shape is rejected by audioEventSchema (wrong enum, extra props, missing triggerMode)
+          items: { anyOf: [audioTriggerSchema, audioEventSchema] } as any,
         },
         actions: {
           type: 'array',
@@ -1151,10 +1241,40 @@ export const validateYargNodeCueFile = (
   }
 }
 
+/**
+ * Migrates audio node cue file payload for backward compatibility (e.g. strip removed properties).
+ * Returns a clone with deprecated fields removed so schema validation passes.
+ */
+function migrateAudioNodeCueFile(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || !Array.isArray((value as { cues?: unknown }).cues)) {
+    return value
+  }
+  const file = value as { cues: Array<{ nodes?: { events?: unknown[] } }> }
+  const migratedCues = file.cues.map((cue) => {
+    const events = cue.nodes?.events
+    if (!Array.isArray(events)) return cue
+    const migratedEvents = events.map((event) => {
+      if (
+        event &&
+        typeof event === 'object' &&
+        (event as { eventType?: string }).eventType === 'audio-trigger' &&
+        'balance' in event
+      ) {
+        const { balance: _removed, ...rest } = event as { balance?: unknown; [k: string]: unknown }
+        return rest
+      }
+      return event
+    })
+    return { ...cue, nodes: { ...cue.nodes, events: migratedEvents } }
+  })
+  return { ...file, cues: migratedCues }
+}
+
 export const validateAudioNodeCueFile = (
   value: unknown,
 ): NodeCueValidationResult<AudioNodeCueFile> => {
-  if (!validateAudioSchema(value)) {
+  const migrated = migrateAudioNodeCueFile(value)
+  if (!validateAudioSchema(migrated)) {
     return {
       valid: false,
       errors: formatErrors(validateAudioSchema.errors as DefinedError[]),
@@ -1163,9 +1283,10 @@ export const validateAudioNodeCueFile = (
   }
 
   const semanticErrors: string[] = []
+  const data = migrated as AudioNodeCueFile
 
   // Check for duplicate group-level variable names
-  const groupVariables = value.group.variables ?? []
+  const groupVariables = data.group.variables ?? []
   const groupVarNames = new Set<string>()
   for (const varDef of groupVariables) {
     if (groupVarNames.has(varDef.name)) {
@@ -1174,7 +1295,7 @@ export const validateAudioNodeCueFile = (
     groupVarNames.add(varDef.name)
   }
 
-  for (const cue of value.cues) {
+  for (const cue of data.cues) {
     // Check for duplicate cue-level variable names
     const cueVariables = cue.variables ?? []
     const cueVarNames = new Set<string>()
@@ -1208,7 +1329,7 @@ export const validateAudioNodeCueFile = (
 
   return {
     valid: true,
-    data: value,
+    data,
     errors: [],
     mode: 'audio',
   }

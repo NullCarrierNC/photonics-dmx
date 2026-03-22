@@ -1,11 +1,13 @@
 import { IAudioCue } from '../../interfaces/IAudioCue'
-import { AudioCueData, AudioCueType } from '../../types/audioCueTypes'
+import { AudioCueData, AudioCueType, EventContext, TriggerContext } from '../../types/audioCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { calculateActionDuration, CompiledAudioCue } from '../compiler/NodeCueCompiler'
 import { ActionEffectFactory } from '../compiler/ActionEffectFactory'
 import {
   AudioEventNode,
+  AudioTriggerNode,
+  AudioTriggerSpectralGates,
   LogicNode,
   ValueSource,
   AudioNodeCueDefinition,
@@ -16,7 +18,7 @@ import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { UninitializedVariableError } from './valueResolver'
 import { VariableValue } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
-
+import { findBestMatchingBandId, getBandEnergy } from '../../../listeners/Audio/bandEnergy'
 interface AudioEventState {
   previousValue: number
   active: boolean
@@ -39,19 +41,60 @@ type AudioEventEvaluation = EdgeEvaluation | LevelEvaluation
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
 
+/** Default energy smoothing (0–1) when trigger.smoothing is omitted */
+const DEFAULT_EMA_SMOOTHING = 0.45
+
+function checkSpectralGateRange(
+  range: { min?: number; max?: number } | undefined,
+  value: number,
+): boolean {
+  if (range === undefined) return true
+  if (range.min !== undefined && value < range.min) return false
+  if (range.max !== undefined && value > range.max) return false
+  return true
+}
+
+function spectralGatesPass(
+  gates: AudioTriggerSpectralGates,
+  flatness: number,
+  zcr: number,
+  hfc: number,
+  crest: number,
+): boolean {
+  if (!checkSpectralGateRange(gates.flatness, flatness)) return false
+  if (!checkSpectralGateRange(gates.zeroCrossingRate, zcr)) return false
+  if (!checkSpectralGateRange(gates.hfcOnset, hfc)) return false
+  if (!checkSpectralGateRange(gates.crest, crest)) return false
+  return true
+}
+
 export class AudioNodeCue implements IAudioCue {
   public readonly id: string
   public readonly cueType: AudioCueType
   public readonly description: string
+  public readonly name: string
 
   private readonly eventStates = new Map<string, AudioEventState>()
+  private readonly triggerPhase = new Map<string, 'idle' | 'active'>()
+  /** Timestamp (ms) when trigger entered active phase; used for holdMs */
+  private readonly triggerEnterTime = new Map<string, number>()
+  private readonly lastTriggerTime = new Map<string, number>()
   private readonly activeLevelEffects = new Map<string, number>()
+  /** Smoothed band energy per audio-trigger node id (EMA of getBandEnergy) */
+  private readonly smoothedBandEnergy = new Map<string, number>()
   private static cueLevelVarStores = new Map<string, Map<string, VariableValue>>()
   private static groupLevelVarStores = new Map<string, Map<string, VariableValue>>()
   private cueLevelVarStore: Map<string, VariableValue>
   private groupLevelVarStore: Map<string, VariableValue>
   private executionEngine?: NodeExecutionEngine
   private effectRegistry: EffectRegistry
+  /** True after `cue-started` events have run for this activation; reset in onStop/onDestroy. */
+  private cueStartedFired = false
+  /**
+   * When `use` is true, the next graph effect submission uses setEffect (clears sequencer). Primary cues
+   * set this before running cue-started; secondary cues never set it.
+   */
+  private readonly firstSubmissionUsesSetEffectRef = { use: false }
 
   constructor(
     groupId: string,
@@ -61,6 +104,7 @@ export class AudioNodeCue implements IAudioCue {
     const definition = compiledCue.definition as AudioNodeCueDefinition
     this.id = `${groupId}:${definition.id}`
     this.cueType = definition.cueTypeId
+    this.name = definition.name || definition.id
     this.description = definition.description || definition.name || 'Node-based audio cue'
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
 
@@ -86,12 +130,19 @@ export class AudioNodeCue implements IAudioCue {
     this.initializeVariables()
   }
 
+  get style(): 'primary' | 'secondary' {
+    const s = (this.compiledCue.definition as AudioNodeCueDefinition).style
+    return s === 'secondary' ? 'secondary' : 'primary'
+  }
+
   async execute(
     data: AudioCueData,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
   ): Promise<void> {
     const tasks: Promise<unknown>[] = []
+
+    this.initializeVariables()
 
     // Initialize execution engine if not already created
     if (!this.executionEngine) {
@@ -107,20 +158,53 @@ export class AudioNodeCue implements IAudioCue {
         this.groupLevelVarStore,
         this.effectRegistry,
         variableDefinitions,
+        this.firstSubmissionUsesSetEffectRef,
       )
     }
 
+    if (!this.cueStartedFired) {
+      const hasCueStarted = [...this.compiledCue.eventMap.values()].some(
+        (e) => e.eventType === 'cue-started',
+      )
+      if (hasCueStarted && this.style === 'primary') {
+        this.firstSubmissionUsesSetEffectRef.use = true
+      }
+      for (const event of this.compiledCue.eventMap.values()) {
+        if (event.eventType !== 'cue-started') continue
+        const eventContext: EventContext = { eventRawValue: 1 }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extended cue payload shape
+        const cueData = { ...data, eventContext } as any
+        this.executionEngine.startExecution(event, cueData)
+      }
+      this.cueStartedFired = true
+    }
+
     for (const event of this.compiledCue.eventMap.values()) {
+      if (event.eventType === 'cue-started') {
+        continue
+      }
+      if (event.eventType === 'audio-trigger') {
+        this.executeAudioTriggerNode(event as AudioTriggerNode, data)
+        continue
+      }
       const state = this.getEventState(event.id)
-      const evaluation = this.evaluateEvent(event, data, state)
+      const evaluation = this.evaluateEvent(event as AudioEventNode, data, state)
       const effectKey = this.effectKey(event.id)
 
       if (evaluation.mode === 'edge') {
         if (!evaluation.triggered) continue
 
-        // Use execution engine for edge-triggered events
+        const cooldownMs = (event as AudioEventNode).cooldownMs ?? 0
+        if (cooldownMs > 0) {
+          const now = Date.now()
+          const last = this.lastTriggerTime.get(event.id) ?? 0
+          if (now - last < cooldownMs) continue
+          this.lastTriggerTime.set(event.id, now)
+        }
+
+        const eventContext: EventContext = { eventRawValue: evaluation.intensity }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extended cue payload shape
-        const cueData = { ...data } as any
+        const cueData = { ...data, eventContext } as any
         this.executionEngine.startExecution(event, cueData)
       } else {
         // Level-triggered events use continuous state management
@@ -185,23 +269,35 @@ export class AudioNodeCue implements IAudioCue {
   }
 
   onStop(): void {
+    const skipEffectRemoval = this.style === 'primary'
     if (this.executionEngine) {
-      this.executionEngine.cancelAll()
+      this.executionEngine.cancelAll(skipEffectRemoval)
     }
 
+    this.cueStartedFired = false
     this.eventStates.clear()
+    this.triggerPhase.clear()
+    this.triggerEnterTime.clear()
+    this.lastTriggerTime.clear()
     this.activeLevelEffects.clear()
+    this.smoothedBandEnergy.clear()
     this.cueLevelVarStore.clear()
     AudioNodeCue.cueLevelVarStores.delete(this.id)
   }
 
   onDestroy(): void {
+    const skipEffectRemoval = this.style === 'primary'
     if (this.executionEngine) {
-      this.executionEngine.cancelAll()
+      this.executionEngine.cancelAll(skipEffectRemoval)
     }
 
+    this.cueStartedFired = false
     this.eventStates.clear()
+    this.triggerPhase.clear()
+    this.triggerEnterTime.clear()
+    this.lastTriggerTime.clear()
     this.activeLevelEffects.clear()
+    this.smoothedBandEnergy.clear()
     this.cueLevelVarStore.clear()
     AudioNodeCue.cueLevelVarStores.delete(this.id)
   }
@@ -232,6 +328,152 @@ export class AudioNodeCue implements IAudioCue {
     }
   }
 
+  /**
+   * Find peak frequency in Hz within a range from raw FFT data.
+   */
+  private getPeakFrequencyInRange(
+    rawData: number[],
+    sampleRate: number,
+    fftSize: number,
+    minHz: number,
+    maxHz: number,
+  ): number {
+    if (!rawData.length || sampleRate <= 0 || fftSize <= 0) return 0
+    const binSize = sampleRate / fftSize
+    const startBin = Math.floor(minHz / binSize)
+    const endBin = Math.min(Math.ceil(maxHz / binSize), rawData.length)
+    let peakBin = startBin
+    let maxVal = 0
+    for (let i = startBin; i < endBin; i++) {
+      if (rawData[i] > maxVal) {
+        maxVal = rawData[i]
+        peakBin = i
+      }
+    }
+    return peakBin * binSize
+  }
+
+  private executeAudioTriggerNode(trigger: AudioTriggerNode, data: AudioCueData): void {
+    const audioData = data.audioData
+    const { rawFrequencyData, sampleRate, fftSize } = audioData
+    if (!rawFrequencyData?.length || sampleRate == null || fftSize == null) return
+
+    const { frequencyRange, threshold } = trigger
+    const minHz = clamp(frequencyRange.minHz, 20, 20000)
+    const maxHz = clamp(frequencyRange.maxHz, 20, 20000)
+    const triggerThreshold = clamp(threshold, 0, 1)
+    const hysteresis = clamp(trigger.hysteresis ?? 0, 0, 1)
+    const holdMs = Math.max(0, trigger.holdMs ?? 0)
+    const releaseThreshold = Math.max(0, triggerThreshold - hysteresis)
+
+    const bandEnergy = getBandEnergy(rawFrequencyData, sampleRate, fftSize, minHz, maxHz)
+    const smoothing = clamp(trigger.smoothing ?? DEFAULT_EMA_SMOOTHING, 0, 1)
+    const alpha = 1 - smoothing
+    const prevSmoothed = this.smoothedBandEnergy.get(trigger.id) ?? bandEnergy
+    const smoothedEnergy = alpha * bandEnergy + (1 - alpha) * prevSmoothed
+    this.smoothedBandEnergy.set(trigger.id, smoothedEnergy)
+    const peakFreq = this.getPeakFrequencyInRange(
+      rawFrequencyData,
+      sampleRate,
+      fftSize,
+      minHz,
+      maxHz,
+    )
+
+    const matchedBandId = findBestMatchingBandId(data.config.bands, minHz, maxHz)
+    const bandFeat =
+      matchedBandId != null ? audioData.bandSpectralFeatures?.[matchedBandId] : undefined
+    const flatnessForGate = bandFeat?.flatness ?? audioData.spectralFlatness ?? 0
+    const crestForGate = bandFeat?.crest ?? audioData.spectralCrest ?? 0
+    const zcrGlobal = audioData.zeroCrossingRate ?? 0
+    const hfcGlobal = audioData.hfcOnset ?? 0
+
+    const gates = trigger.spectralGates
+    const spectralOk =
+      gates == null
+        ? true
+        : spectralGatesPass(gates, flatnessForGate, zcrGlobal, hfcGlobal, crestForGate)
+
+    const onsetThreshold = clamp(trigger.onsetThreshold ?? 0.3, 0, 1)
+    let onsetOk = true
+    if (trigger.useOnsetGating) {
+      if (matchedBandId != null && audioData.bandOnsets) {
+        const o = audioData.bandOnsets[matchedBandId] ?? 0
+        onsetOk = o >= onsetThreshold
+      }
+    }
+
+    const phase = this.triggerPhase.get(trigger.id) ?? 'idle'
+    const now = Date.now()
+    const enterTime = this.triggerEnterTime.get(trigger.id) ?? 0
+
+    let energyActive: boolean
+    if (phase === 'idle') {
+      energyActive = bandEnergy >= triggerThreshold
+    } else if (bandEnergy >= releaseThreshold) {
+      energyActive = true
+    } else {
+      energyActive = now - enterTime < holdMs
+    }
+
+    const shouldBeActive = energyActive && spectralOk && onsetOk
+
+    const triggerContext: TriggerContext = {
+      triggerLevel: smoothedEnergy,
+      triggerFrequencyMin: minHz,
+      triggerFrequencyMax: maxHz,
+      triggerPeakFrequency: peakFreq,
+      triggerBandAmplitude: smoothedEnergy,
+    }
+    if (matchedBandId != null) {
+      triggerContext.triggerMatchedBandId = matchedBandId
+    }
+    if (bandFeat) {
+      triggerContext.triggerBandFlatness = bandFeat.flatness
+      triggerContext.triggerBandCrest = bandFeat.crest
+      triggerContext.triggerBandCentroid = bandFeat.centroid
+    }
+    if (matchedBandId != null && audioData.bandOnsets) {
+      triggerContext.triggerBandOnset = audioData.bandOnsets[matchedBandId] ?? 0
+    }
+
+    if (!shouldBeActive) {
+      if (phase === 'active') {
+        this.triggerPhase.set(trigger.id, 'idle')
+        this.triggerEnterTime.delete(trigger.id)
+        const cueData: AudioCueData = { ...data, triggerContext }
+        this.executionEngine!.startExecutionWithCallback(
+          trigger,
+          cueData as unknown as import('../../types/cueTypes').CueData,
+          undefined,
+          { fromPort: 'exit' },
+        )
+      }
+      return
+    }
+
+    if (phase === 'idle') {
+      this.triggerPhase.set(trigger.id, 'active')
+      this.triggerEnterTime.set(trigger.id, now)
+      const cueData: AudioCueData = { ...data, triggerContext }
+      this.executionEngine!.startExecutionWithCallback(
+        trigger,
+        cueData as unknown as import('../../types/cueTypes').CueData,
+        undefined,
+        { fromPort: 'enter' },
+      )
+    }
+
+    this.triggerPhase.set(trigger.id, 'active')
+    const cueDataDuring: AudioCueData = { ...data, triggerContext }
+    this.executionEngine!.startExecutionWithCallback(
+      trigger,
+      cueDataDuring as unknown as import('../../types/cueTypes').CueData,
+      undefined,
+      { fromPort: 'during' },
+    )
+  }
+
   private getEventState(eventId: string): AudioEventState {
     if (!this.eventStates.has(eventId)) {
       this.eventStates.set(eventId, { previousValue: 0, active: false })
@@ -248,7 +490,18 @@ export class AudioNodeCue implements IAudioCue {
     const currentValue = clamp(this.getEventValue(event.eventType, data), 0, 1)
 
     if (event.triggerMode === 'edge') {
-      const triggered = state.previousValue < threshold && currentValue >= threshold
+      let triggered = state.previousValue < threshold && currentValue >= threshold
+      if (triggered && event.useOnsetGating) {
+        const bandOnsets = data.audioData.bandOnsets
+        const onsetThreshold = clamp(event.onsetThreshold ?? 0.3, 0, 1)
+        let maxOnset = 0
+        if (bandOnsets && Object.keys(bandOnsets).length > 0) {
+          maxOnset = Math.max(...Object.values(bandOnsets))
+        }
+        if (maxOnset < onsetThreshold) {
+          triggered = false
+        }
+      }
       state.previousValue = currentValue
       state.active = triggered
       return {
@@ -274,20 +527,20 @@ export class AudioNodeCue implements IAudioCue {
   private getEventValue(eventType: AudioEventNode['eventType'], data: AudioCueData): number {
     const { audioData } = data
     switch (eventType) {
+      case 'cue-started':
+        return 0
       case 'audio-beat':
         return audioData.beatDetected ? 1 : 0
       case 'audio-energy':
         return clamp(audioData.energy ?? 0, 0, 1)
-      case 'audio-range1':
-        return clamp(audioData.frequencyBands.range1 ?? 0, 0, 1)
-      case 'audio-range2':
-        return clamp(audioData.frequencyBands.range2 ?? 0, 0, 1)
-      case 'audio-range3':
-        return clamp(audioData.frequencyBands.range3 ?? 0, 0, 1)
-      case 'audio-range4':
-        return clamp(audioData.frequencyBands.range4 ?? 0, 0, 1)
-      case 'audio-range5':
-        return clamp(audioData.frequencyBands.range5 ?? 0, 0, 1)
+      case 'audio-trigger':
+        return 0
+      case 'audio-centroid':
+        return clamp(audioData.spectralCentroid ?? 0, 0, 1)
+      case 'audio-flatness':
+        return clamp(audioData.spectralFlatness ?? 0, 0, 1)
+      case 'audio-hfc':
+        return clamp(audioData.hfcOnset ?? 0, 0, 1)
       default:
         return 0
     }

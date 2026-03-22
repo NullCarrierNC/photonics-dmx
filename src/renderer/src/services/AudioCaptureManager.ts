@@ -10,81 +10,36 @@
  */
 
 import { AudioLightingData, AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import DEFAULT_AUDIO_CONFIG, {
+  DEFAULT_AUDIO_BANDS,
+} from '../../../photonics-dmx/listeners/Audio/AudioConfig'
+import { BeatDetector } from '../../../photonics-dmx/listeners/Audio/BeatDetector'
+import {
+  extractAll,
+  extractBandFeatures,
+} from '../../../photonics-dmx/listeners/Audio/SpectralFeatureExtractor'
+import {
+  MultibandOnsetDetector,
+  type BandOnsetConfig,
+} from '../../../photonics-dmx/listeners/Audio/MultibandOnsetDetector'
+import { MelBandAnalyser } from '../../../photonics-dmx/listeners/Audio/MelBandAnalyser'
+import { computeChromagram } from '../../../photonics-dmx/listeners/Audio/ChromaAnalyser'
+import { KeyDetector } from '../../../photonics-dmx/listeners/Audio/KeyDetector'
+import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy'
 import { getDefaultStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
 import { sendAudioData } from '../ipcApi'
 
 const store = getDefaultStore()
 
-// Default frequency ranges (matching DEFAULT_RANGES in AudioColorMapping)
-const DEFAULT_RANGES: Array<{
-  id: string
-  name: string
-  minHz: number
-  maxHz: number
-  color: string
-  brightness: 'low' | 'medium' | 'high' | 'max'
-  sensitivity: number
-}> = [
-  {
-    id: 'range1',
-    name: 'Bass',
-    minHz: 20,
-    maxHz: 220,
-    color: 'red',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-  {
-    id: 'range2',
-    name: 'Lower-Mids',
-    minHz: 220,
-    maxHz: 800,
-    color: 'blue',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-  {
-    id: 'range3',
-    name: 'Upper-Mids',
-    minHz: 800,
-    maxHz: 2500,
-    color: 'yellow',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-  {
-    id: 'range4',
-    name: 'Highs',
-    minHz: 2500,
-    maxHz: 6000,
-    color: 'green',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-  {
-    id: 'range5',
-    name: 'Air',
-    minHz: 6000,
-    maxHz: 20000,
-    color: 'cyan',
-    brightness: 'medium',
-    sensitivity: 1.0,
-  },
-]
-
-const DEFAULT_BAND_COUNT = 4 as AudioConfig['frequencyBands']['bandCount']
-
 const DEFAULT_CONFIG: AudioConfig = {
-  fftSize: 2048,
-  sensitivity: 1.0,
+  fftSize: 4096,
+  sensitivity: DEFAULT_AUDIO_CONFIG.sensitivity,
+  noiseFloor: DEFAULT_AUDIO_CONFIG.noiseFloor,
+  bands: DEFAULT_AUDIO_BANDS,
   smoothing: {
     enabled: true,
     alpha: 0.7,
-  },
-  frequencyBands: {
-    bandCount: DEFAULT_BAND_COUNT,
-    ranges: DEFAULT_RANGES,
   },
   beatDetection: {
     threshold: 0.3,
@@ -93,6 +48,9 @@ const DEFAULT_CONFIG: AudioConfig = {
   },
   enabled: false,
 }
+
+const BASS_MIN_HZ = 20
+const BASS_MAX_HZ = 220
 
 export class AudioCaptureManager {
   private audioContext: AudioContext | null = null
@@ -103,26 +61,24 @@ export class AudioCaptureManager {
   private config: AudioConfig
   private isCapturing = false
 
-  // Smoothing state - store per range
-  private smoothedRanges: Map<string, number> = new Map()
+  /** Smoothed energy for display only; not used for beat thresholds */
   private smoothedEnergy = 0
 
-  // Beat detection state
-  private lastBeatTime = 0
-  private energyHistory: number[] = []
-  private readonly ENERGY_HISTORY_SIZE = 43 // ~1 second at 60fps
-  private bassEnergyHistory: number[] = []
-  private spectralFluxHistory: number[] = []
-  private readonly SPECTRAL_HISTORY_SIZE = 86 // ~1.5 seconds of history for adaptive thresholding
-  private previousSpectrum: Float32Array | null = null
-  private readonly MINIMUM_ENERGY_FOR_BEAT = 0.05
-  private readonly MAX_BEAT_FREQUENCY = 2000 // Focus spectral flux on content under 2kHz
-  private recentEnergyHistory: number[] = []
-  private readonly SHORT_ENERGY_HISTORY_SIZE = 12 // ~200ms window
+  /** Monotonic time advanced by frame deltas for beat timing (avoids rAF/clock jitter) */
+  private internalTime = 0
+  private lastFrameTime = 0
+
+  private beatDetector: BeatDetector
+  private multibandOnset: MultibandOnsetDetector
+  private melBandAnalyser: MelBandAnalyser | null = null
+  private keyDetector: KeyDetector
   private frameIndex = 0
-  private beatTimestamps: number[] = [] // Track actual beat times for BPM calculation
-  private readonly MAX_BEAT_HISTORY = 8 // Keep last 8 beats for BPM averaging
-  private currentBpm: number | null = null // Stable BPM value
+
+  // Cached bin-to-band mapping for efficient per-band gain application
+  // Maps bin index to band index (0-7) or -1 if no band matches
+  private binToBandMap: Int8Array | null = null
+  // Cached band gains array (indexed by band index 0-7)
+  private bandGains: number[] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
   // Debug logging (log status every ~60 frames ≈ 1 second at 60fps)
   private frameCounter = 0
@@ -135,18 +91,10 @@ export class AudioCaptureManager {
   private readonly VALUE_CHANGE_THRESHOLD = 0.01 // Only update if values changed by >1%
 
   constructor(config?: Partial<AudioConfig>) {
-    // Merge with defaults, ensuring frequencyBands.ranges exists
-    this.config = {
-      ...DEFAULT_CONFIG,
-      ...config,
-      frequencyBands: config?.frequencyBands?.ranges
-        ? {
-            bandCount: (config.frequencyBands.bandCount ??
-              DEFAULT_BAND_COUNT) as AudioConfig['frequencyBands']['bandCount'],
-            ranges: config.frequencyBands.ranges,
-          }
-        : DEFAULT_CONFIG.frequencyBands,
-    }
+    this.config = { ...DEFAULT_CONFIG, ...config }
+    this.beatDetector = new BeatDetector(this.config.beatDetection)
+    this.multibandOnset = new MultibandOnsetDetector([])
+    this.keyDetector = new KeyDetector()
     console.log('AudioCaptureManager initialized')
   }
 
@@ -186,6 +134,17 @@ export class AudioCaptureManager {
 
       this.isCapturing = true
       this.frameIndex = 0
+      this.beatDetector.reset()
+      this.multibandOnset.reset()
+      this.melBandAnalyser = new MelBandAnalyser(
+        this.audioContext.sampleRate,
+        this.analyser.fftSize,
+        24,
+      )
+      this.keyDetector.reset()
+
+      // Build bin-to-band mapping now that we have audio context
+      this.rebuildBinToBandMap()
 
       // Start analysis loop
       this.analyzeAudio()
@@ -264,19 +223,16 @@ export class AudioCaptureManager {
     }
 
     this.analyser = null
+    this.melBandAnalyser = null
     this.isCapturing = false
 
     // Reset state
-    this.smoothedRanges.clear()
     this.smoothedEnergy = 0
-    this.energyHistory = []
-    this.recentEnergyHistory = []
-    this.bassEnergyHistory = []
-    this.spectralFluxHistory = []
-    this.previousSpectrum = null
+    this.internalTime = 0
+    this.lastFrameTime = 0
+    this.beatDetector.reset()
+    this.multibandOnset.reset()
     this.frameIndex = 0
-    this.beatTimestamps = []
-    this.currentBpm = null
     this.uiUpdateCounter = 0
     this.lastAudioData = null
 
@@ -299,6 +255,59 @@ export class AudioCaptureManager {
   }
 
   /**
+   * Rebuild bin-to-band mapping cache
+   * Called when bands config changes or when audio context is initialized
+   */
+  private rebuildBinToBandMap(): void {
+    if (!this.audioContext || !this.analyser) {
+      this.binToBandMap = null
+      return
+    }
+
+    const sampleRate = this.audioContext.sampleRate
+    const fftSize = this.analyser.fftSize
+    const binSize = sampleRate / fftSize
+    const binCount = this.analyser.frequencyBinCount
+
+    // Create mapping array
+    this.binToBandMap = new Int8Array(binCount)
+    this.binToBandMap.fill(-1) // -1 means no band matches
+
+    // Extract band gains for quick lookup
+    this.bandGains = this.config.bands.map((band) => band.gain)
+
+    // For each bin, find which band it belongs to
+    for (let binIndex = 0; binIndex < binCount; binIndex++) {
+      // Calculate centre frequency of this bin
+      const centreFreq = binIndex * binSize
+
+      // Find matching band (minHz <= centreFreq < maxHz)
+      for (let bandIndex = 0; bandIndex < this.config.bands.length; bandIndex++) {
+        const band = this.config.bands[bandIndex]
+        if (centreFreq >= band.minHz && centreFreq < band.maxHz) {
+          this.binToBandMap[binIndex] = bandIndex
+          break
+        }
+      }
+      // If no band matches (e.g., sub-20 Hz), binToBandMap[binIndex] remains -1
+    }
+
+    const onsetConfigs: BandOnsetConfig[] = this.config.bands.map((band) => ({
+      id: band.id,
+      startBin: Math.floor(band.minHz / binSize),
+      endBin: Math.min(Math.ceil(band.maxHz / binSize), binCount),
+    }))
+    this.multibandOnset.reconfigure(onsetConfigs)
+
+    console.log('Rebuilt bin-to-band mapping', {
+      binCount,
+      sampleRate,
+      fftSize,
+      binSize: binSize.toFixed(2),
+    })
+  }
+
+  /**
    * Update configuration
    * This is called when config changes while audio is running
    */
@@ -309,18 +318,30 @@ export class AudioCaptureManager {
     // Update analyser if active and FFT size changed
     if (this.analyser && config.fftSize && config.fftSize !== oldConfig.fftSize) {
       this.analyser.fftSize = config.fftSize
+      this.melBandAnalyser = new MelBandAnalyser(
+        this.audioContext!.sampleRate,
+        this.analyser.fftSize,
+        24,
+      )
+      // Rebuild mapping since FFT size changed
+      this.rebuildBinToBandMap()
       console.log(`Updated FFT size to ${config.fftSize}`)
     }
 
-    // Log config update for debugging
+    // Rebuild mapping if bands changed
+    if (config.bands) {
+      this.rebuildBinToBandMap()
+    }
+
+    if (config.beatDetection) {
+      this.beatDetector.updateConfig(config.beatDetection)
+    }
+
     console.log('AudioCaptureManager configuration updated:', {
       sensitivity: config.sensitivity !== undefined ? config.sensitivity : 'unchanged',
+      bands: config.bands !== undefined ? 'updated' : 'unchanged',
       smoothing: config.smoothing !== undefined ? config.smoothing : 'unchanged',
       beatDetection: config.beatDetection !== undefined ? config.beatDetection : 'unchanged',
-      frequencyBands:
-        config.frequencyBands !== undefined
-          ? `ranges: ${config.frequencyBands.ranges.length}`
-          : 'unchanged',
       fftSize: config.fftSize !== undefined ? config.fftSize : 'unchanged',
     })
   }
@@ -328,29 +349,45 @@ export class AudioCaptureManager {
   /**
    * Main analysis loop - runs at ~60fps
    * UI updates are throttled to 30fps to reduce React re-rendering
+   * Beat timing uses frame-duration-based monotonic time to reduce jitter.
    */
   private analyzeAudio(): void {
     if (!this.analyser || !this.isCapturing) return
 
-    // Get frequency data from analyser (built-in FFT!)
+    const now = performance.now()
+    if (this.lastFrameTime > 0) {
+      this.internalTime += now - this.lastFrameTime
+    }
+    this.lastFrameTime = now
+
+    // Get frequency data from analyser (built-in FFT)
     const dataArray = new Uint8Array(this.analyser.frequencyBinCount)
     this.analyser.getByteFrequencyData(dataArray)
+    const timeDomainArray = new Float32Array(this.analyser.fftSize)
+    this.analyser.getFloatTimeDomainData(timeDomainArray)
 
-    // Calculate frequency bands
-    const audioData = this.calculateFrequencyBands(dataArray)
+    // Calculate frequency bands and include raw FFT data (byte data is linear 0-255, IPC-safe)
+    const audioData = this.calculateFrequencyBands(dataArray, timeDomainArray)
 
     // Always send to main process via IPC (full frame rate)
     sendAudioData(audioData)
 
-    // Throttle UI updates
+    // Throttle UI updates (preview EQ, etc.)
     this.uiUpdateCounter++
     const shouldUpdateUI = this.uiUpdateCounter >= this.UI_UPDATE_THROTTLE
 
-    if (shouldUpdateUI) {
-      this.uiUpdateCounter = 0
+    // Beat is often a single frame; never skip pushing beat edge to the preview atom
+    const beatChanged =
+      this.lastAudioData != null && audioData.beatDetected !== this.lastAudioData.beatDetected
 
-      // Only update atom if values changed significantly to avoid unnecessary re-renders
-      if (this.shouldUpdateAtom(audioData)) {
+    if (shouldUpdateUI || beatChanged) {
+      if (shouldUpdateUI) {
+        this.uiUpdateCounter = 0
+      }
+
+      const pushToPreviewAtom = beatChanged || (shouldUpdateUI && this.shouldUpdateAtom(audioData))
+
+      if (pushToPreviewAtom) {
         store.set(audioDataAtom, audioData)
         this.lastAudioData = audioData
       }
@@ -362,11 +399,7 @@ export class AudioCaptureManager {
       this.frameCounter = 0
       console.log('Audio Capture Active:', {
         energy: audioData.energy.toFixed(3),
-        range1: audioData.frequencyBands.range1.toFixed(3),
-        range2: audioData.frequencyBands.range2.toFixed(3),
-        range3: audioData.frequencyBands.range3.toFixed(3),
-        range4: audioData.frequencyBands.range4.toFixed(3),
-        range5: audioData.frequencyBands.range5.toFixed(3),
+        overallLevel: audioData.overallLevel.toFixed(3),
         beat: audioData.beatDetected ? 'YES' : 'no',
       })
     }
@@ -389,45 +422,48 @@ export class AudioCaptureManager {
       return true
     }
 
-    // Always update if BPM changed
-    if (newData.bpm !== this.lastAudioData.bpm) {
+    // Always update if BPM or BPM confidence changed
+    if (newData.bpm !== this.lastAudioData.bpm) return true
+    if ((newData.bpmConfidence ?? 0) !== (this.lastAudioData.bpmConfidence ?? 0)) return true
+
+    // Check overall energy change
+    const energyDiff = Math.abs(newData.energy - this.lastAudioData.energy)
+    if (energyDiff > this.VALUE_CHANGE_THRESHOLD) return true
+
+    // Check if rawFrequencyData changed (for EQ preview bars)
+    // Sample a few bins to detect changes without full array comparison
+    const newRaw = newData.rawFrequencyData
+    const oldRaw = this.lastAudioData.rawFrequencyData
+    if (newRaw && oldRaw && newRaw.length === oldRaw.length) {
+      // Sample bins at low, mid, and high frequencies to detect changes
+      const sampleIndices = [
+        0, // First bin (lowest frequency)
+        Math.floor(newRaw.length / 2), // Middle bin
+        newRaw.length - 1, // Last bin (highest frequency)
+      ]
+      for (const idx of sampleIndices) {
+        const diff = Math.abs(newRaw[idx] - oldRaw[idx])
+        if (diff > 2) {
+          // Changed by more than 2 units (out of 255) - significant enough to update
+          return true
+        }
+      }
+    } else if (newRaw !== oldRaw) {
+      // Array reference changed or length mismatch - update
       return true
     }
 
-    // Check if frequency bands changed significantly
-    const range1Diff = Math.abs(
-      newData.frequencyBands.range1 - this.lastAudioData.frequencyBands.range1,
-    )
-    const range2Diff = Math.abs(
-      newData.frequencyBands.range2 - this.lastAudioData.frequencyBands.range2,
-    )
-    const range3Diff = Math.abs(
-      newData.frequencyBands.range3 - this.lastAudioData.frequencyBands.range3,
-    )
-    const range4Diff = Math.abs(
-      newData.frequencyBands.range4 - this.lastAudioData.frequencyBands.range4,
-    )
-    const range5Diff = Math.abs(
-      newData.frequencyBands.range5 - this.lastAudioData.frequencyBands.range5,
-    )
-    const energyDiff = Math.abs(newData.energy - this.lastAudioData.energy)
-
-    // Update if any value changed by more than threshold
-    return (
-      range1Diff > this.VALUE_CHANGE_THRESHOLD ||
-      range2Diff > this.VALUE_CHANGE_THRESHOLD ||
-      range3Diff > this.VALUE_CHANGE_THRESHOLD ||
-      range4Diff > this.VALUE_CHANGE_THRESHOLD ||
-      range5Diff > this.VALUE_CHANGE_THRESHOLD ||
-      energyDiff > this.VALUE_CHANGE_THRESHOLD
-    )
+    return false
   }
 
   /**
    * Calculate frequency bands from FFT data
    * Dynamically calculates energy for all configured frequency ranges
    */
-  private calculateFrequencyBands(frequencyData: Uint8Array): AudioLightingData {
+  private calculateFrequencyBands(
+    frequencyData: Uint8Array,
+    timeDomainData: Float32Array,
+  ): AudioLightingData {
     if (!this.audioContext || !this.analyser) {
       throw new Error('Audio context not initialized')
     }
@@ -436,290 +472,142 @@ export class AudioCaptureManager {
     const fftSize = this.analyser.fftSize
     const binSize = sampleRate / fftSize
 
-    // Get configured ranges (default to DEFAULT_RANGES if not set)
-    const ranges = this.config.frequencyBands?.ranges || DEFAULT_RANGES
-
-    // Calculate energy for each configured range
-    const rangeEnergies: Map<string, number> = new Map()
-    for (const range of ranges) {
-      const energy = this.getEnergyInRange(frequencyData, binSize, range.minHz, range.maxHz)
-      rangeEnergies.set(range.id, energy)
+    // Apply noise floor gate: zero out bins below threshold
+    const noiseFloor = this.config.noiseFloor ?? DEFAULT_AUDIO_CONFIG.noiseFloor
+    let gatedData: Uint8Array
+    if (noiseFloor > 0) {
+      gatedData = new Uint8Array(frequencyData.length)
+      for (let i = 0; i < frequencyData.length; i++) {
+        gatedData[i] = frequencyData[i] >= noiseFloor ? frequencyData[i] : 0
+      }
+    } else {
+      gatedData = frequencyData
     }
 
-    // Calculate overall energy
+    // Overall energy (0-1)
     let totalEnergy = 0
-    for (let i = 0; i < frequencyData.length; i++) {
-      totalEnergy += frequencyData[i]
+    for (let i = 0; i < gatedData.length; i++) {
+      totalEnergy += gatedData[i]
     }
     const overallEnergy = Math.min((totalEnergy / frequencyData.length / 255) * 2, 1.0)
-
-    // Apply global sensitivity first, then per-range sensitivity
-    const scaledEnergies: Map<string, number> = new Map()
-    for (const range of ranges) {
-      const energy = rangeEnergies.get(range.id) || 0
-      // Apply global sensitivity first
-      const globallyScaled = energy * this.config.sensitivity
-      // Then apply per-range sensitivity (0-1 multiplier)
-      const rangeSensitivity = range.sensitivity ?? 1.0
-      scaledEnergies.set(range.id, Math.min(globallyScaled * rangeSensitivity, 1.0))
-    }
     const scaledEnergy = Math.min(overallEnergy * this.config.sensitivity, 1.0)
 
-    // Apply smoothing if enabled
-    const finalEnergies: Map<string, number> = new Map()
-    let finalEnergy = scaledEnergy
-
+    // Display: optional smoothing for overall level (never modified by beat decay)
+    let displayEnergy = scaledEnergy
     if (this.config.smoothing.enabled) {
       const alpha = this.config.smoothing.alpha
-      for (const [rangeId, scaledEnergy] of scaledEnergies.entries()) {
-        const previousSmoothed = this.smoothedRanges.get(rangeId) || 0
-        const smoothed = alpha * scaledEnergy + (1 - alpha) * previousSmoothed
-        this.smoothedRanges.set(rangeId, smoothed)
-        finalEnergies.set(rangeId, smoothed)
-      }
       this.smoothedEnergy = alpha * scaledEnergy + (1 - alpha) * this.smoothedEnergy
-      finalEnergy = this.smoothedEnergy
-    } else {
-      // No smoothing - use scaled values directly
-      for (const [rangeId, scaledEnergy] of scaledEnergies.entries()) {
-        finalEnergies.set(rangeId, scaledEnergy)
-      }
+      displayEnergy = this.smoothedEnergy
     }
 
-    // Beat detection
-    const bassEnergy = finalEnergies.get('range1') || 0
-    const { beatDetected, bpm } = this.detectBeat({
-      finalEnergy,
+    // Bass energy for beat detection (20-220 Hz); same algorithm as EQ preview and trigger nodes
+    const bassEnergy = getBandEnergy(
+      Array.from(gatedData),
+      sampleRate,
+      fftSize,
+      BASS_MIN_HZ,
+      BASS_MAX_HZ,
+    )
+    // Beat detection uses unscaled analysis energy; timing from frame-based internal time
+    const { beatDetected, bpm, bpmConfidence } = this.beatDetector.processFrame(
+      scaledEnergy,
       bassEnergy,
-      spectrumData: frequencyData,
+      gatedData,
       binSize,
-    })
+      this.internalTime,
+    )
 
-    // Calculate overall level (RMS of all ranges)
-    const rangeValues = Array.from(finalEnergies.values())
-    const sumOfSquares = rangeValues.reduce((sum, val) => sum + val * val, 0)
-    const overallLevel = Math.sqrt(sumOfSquares / rangeValues.length)
-
+    const overallLevel = displayEnergy
     this.frameIndex++
 
-    // Map final energies to range1-range5 structure
-    // Ensure we always have exactly 5 ranges (use 0 if range not configured)
-    const frequencyBands = {
-      range1: finalEnergies.get('range1') || 0,
-      range2: finalEnergies.get('range2') || 0,
-      range3: finalEnergies.get('range3') || 0,
-      range4: finalEnergies.get('range4') || 0,
-      range5: finalEnergies.get('range5') || 0,
+    // Peak frequency: bin with max magnitude -> Hz
+    let peakBin = 0
+    let maxVal = 0
+    for (let i = 0; i < gatedData.length; i++) {
+      if (gatedData[i] > maxVal) {
+        maxVal = gatedData[i]
+        peakBin = i
+      }
+    }
+    const peakFrequency = peakBin * binSize
+
+    // Amplitude: overall normalized level (same as overallLevel for compatibility)
+    const amplitude = overallLevel
+
+    // IPC-safe raw FFT data (byte data 0-255) for per-node band computation in main process
+    // Apply global sensitivity and per-band gain multipliers
+    // Gain pipeline: raw bin * globalSensitivity * bandGain
+    const rawFrequencyData = new Array<number>(gatedData.length)
+    if (this.binToBandMap && this.binToBandMap.length === gatedData.length) {
+      // Use cached bin-to-band mapping for efficient lookup
+      for (let i = 0; i < gatedData.length; i++) {
+        const bin = gatedData[i]
+        const bandIndex = this.binToBandMap[i]
+        if (bandIndex >= 0 && bandIndex < this.bandGains.length) {
+          // Apply global sensitivity * band gain
+          rawFrequencyData[i] = Math.min(
+            Math.round(bin * this.config.sensitivity * this.bandGains[bandIndex]),
+            255,
+          )
+        } else {
+          // No band matches (e.g., sub-20 Hz bins) - apply global sensitivity only
+          rawFrequencyData[i] = Math.min(Math.round(bin * this.config.sensitivity), 255)
+        }
+      }
+    } else {
+      // Fallback: if mapping not available, apply global sensitivity only
+      // This should only happen briefly during initialization
+      for (let i = 0; i < gatedData.length; i++) {
+        rawFrequencyData[i] = Math.min(Math.round(gatedData[i] * this.config.sensitivity), 255)
+      }
     }
 
-    // Return processed audio data
+    const spectral = extractAll(gatedData, timeDomainData, binSize, sampleRate)
+
+    const bandSpectralFeatures: Record<
+      string,
+      { flatness: number; crest: number; centroid: number }
+    > = {}
+    for (const band of this.config.bands) {
+      const startBin = Math.floor(band.minHz / binSize)
+      const endBin = Math.min(Math.ceil(band.maxHz / binSize), gatedData.length)
+      bandSpectralFeatures[band.id] = extractBandFeatures(
+        gatedData,
+        binSize,
+        startBin,
+        endBin,
+        band.minHz,
+        band.maxHz,
+      )
+    }
+
+    const bandOnsets = this.multibandOnset.processFrame(gatedData)
+
+    const melBands = this.melBandAnalyser?.computeMelBands(gatedData).map((v) => Math.min(1, v))
+
+    const chromagram = computeChromagram(gatedData, binSize)
+    const keyResult = this.keyDetector.detect(chromagram)
+
     return {
       timestamp: Date.now(),
       overallLevel,
       bpm,
       beatDetected,
-      frequencyBands,
-      energy: finalEnergy,
+      energy: displayEnergy,
+      rawFrequencyData,
+      sampleRate,
+      fftSize,
+      bpmConfidence,
+      peakFrequency,
+      amplitude,
+      ...spectral,
+      bandSpectralFeatures,
+      bandOnsets,
+      melBands,
+      chromagram,
+      detectedKey: keyResult.key,
+      detectedKeyStrength: keyResult.strength,
     }
-  }
-
-  /**
-   * Get energy level in a specific frequency range
-   */
-  private getEnergyInRange(
-    frequencyData: Uint8Array,
-    binSize: number,
-    startHz: number,
-    endHz: number,
-  ): number {
-    const startBin = Math.floor(startHz / binSize)
-    const endBin = Math.ceil(endHz / binSize)
-
-    let energy = 0
-    let count = 0
-
-    for (let i = startBin; i < Math.min(endBin, frequencyData.length); i++) {
-      energy += frequencyData[i] / 255 // Normalize to 0-1
-      count++
-    }
-
-    return count > 0 ? Math.min(energy / count, 1.0) : 0
-  }
-
-  /**
-   * Detect beats in the audio using adaptive energy + spectral flux analysis
-   */
-  private detectBeat(params: {
-    finalEnergy: number
-    bassEnergy: number
-    spectrumData: Uint8Array
-    binSize: number
-  }): { beatDetected: boolean; bpm: number | null } {
-    const { finalEnergy, bassEnergy, spectrumData, binSize } = params
-
-    // Maintain energy history (used for adaptive threshold)
-    this.energyHistory.push(finalEnergy)
-    if (this.energyHistory.length > this.ENERGY_HISTORY_SIZE) {
-      this.energyHistory.shift()
-    }
-    const energyStats = this.computeStats(this.energyHistory)
-
-    // Maintain short-term energy window (captures quick punches)
-    this.recentEnergyHistory.push(finalEnergy)
-    if (this.recentEnergyHistory.length > this.SHORT_ENERGY_HISTORY_SIZE) {
-      this.recentEnergyHistory.shift()
-    }
-    const shortEnergyStats = this.computeStats(this.recentEnergyHistory)
-
-    // Track bass history separately so low-frequency punches can trigger beats even when mids/highs dominate
-    this.bassEnergyHistory.push(bassEnergy)
-    if (this.bassEnergyHistory.length > this.ENERGY_HISTORY_SIZE) {
-      this.bassEnergyHistory.shift()
-    }
-    const avgBass =
-      this.bassEnergyHistory.length > 0
-        ? this.bassEnergyHistory.reduce((sum, value) => sum + value, 0) /
-          this.bassEnergyHistory.length
-        : 0
-
-    // Compute spectral flux (positive changes in spectrum focused on <2kHz)
-    const spectralFlux = this.computeSpectralFlux(spectrumData, binSize)
-    const fluxStats = this.computeStats(this.spectralFluxHistory)
-    const fluxSensitivity = 0.35 + this.config.beatDetection.threshold * 0.6 // lower threshold => smaller multiplier
-    const fluxThreshold = fluxStats.mean + fluxStats.stdDev * fluxSensitivity
-    const hasFluxHistory = fluxStats.count >= 4
-    const fluxGate = hasFluxHistory ? spectralFlux > fluxThreshold : false
-
-    // Update spectral flux history after computing gate
-    this.spectralFluxHistory.push(spectralFlux)
-    if (this.spectralFluxHistory.length > this.SPECTRAL_HISTORY_SIZE) {
-      this.spectralFluxHistory.shift()
-    }
-
-    // Adaptive thresholds for energy & bass
-    const dynamicEnergyMultiplier = 0.35 + this.config.beatDetection.threshold * 0.45
-    const dynamicEnergyThreshold = energyStats.mean + energyStats.stdDev * dynamicEnergyMultiplier
-    const minEnergyGate = Math.max(this.MINIMUM_ENERGY_FOR_BEAT, dynamicEnergyThreshold)
-    const energyGate = finalEnergy > minEnergyGate
-
-    const bassMultiplier = 1 + this.config.beatDetection.threshold * 0.75
-    const bassBaseline = avgBass > 0 ? avgBass * bassMultiplier : this.MINIMUM_ENERGY_FOR_BEAT * 0.5
-    const bassGate = bassEnergy > bassBaseline
-
-    // Capture short, sharp increases in energy to avoid missing transient beats
-    const shortTermGate =
-      shortEnergyStats.count >= 4
-        ? finalEnergy > shortEnergyStats.mean * (1.05 + this.config.beatDetection.threshold * 0.3)
-        : false
-
-    const previousEnergy =
-      this.energyHistory.length > 1
-        ? this.energyHistory[this.energyHistory.length - 2]
-        : finalEnergy
-    const energyDelta = finalEnergy - previousEnergy
-    const derivativeGate =
-      energyDelta > energyStats.stdDev * (0.3 + this.config.beatDetection.threshold * 0.25) + 0.01
-
-    const combinedEnergyGate = energyGate || shortTermGate || derivativeGate
-
-    // Final detection: spectral onset + (overall energy OR bass punch) + debounce
-    let beatDetected = false
-    const now = Date.now()
-    const timeSinceLastBeat = now - this.lastBeatTime
-
-    if (
-      ((fluxGate && (combinedEnergyGate || bassGate)) ||
-        ((shortTermGate || derivativeGate) && bassGate)) &&
-      timeSinceLastBeat > this.config.beatDetection.minInterval
-    ) {
-      beatDetected = true
-      this.lastBeatTime = now
-
-      // Track beat timestamp for BPM calculation
-      this.beatTimestamps.push(now)
-      if (this.beatTimestamps.length > this.MAX_BEAT_HISTORY) {
-        this.beatTimestamps.shift()
-      }
-
-      // Calculate BPM from intervals between beats
-      if (this.beatTimestamps.length >= 4) {
-        const intervals: number[] = []
-        for (let i = 1; i < this.beatTimestamps.length; i++) {
-          intervals.push(this.beatTimestamps[i] - this.beatTimestamps[i - 1])
-        }
-        const avgInterval =
-          intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length
-        const calculatedBpm = Math.round(60000 / avgInterval)
-        if (calculatedBpm >= 40 && calculatedBpm <= 200) {
-          this.currentBpm = calculatedBpm
-        }
-      }
-    }
-
-    if (this.config.smoothing.enabled) {
-      this.smoothedEnergy *= this.config.beatDetection.decayRate
-    }
-
-    return { beatDetected, bpm: this.currentBpm }
-  }
-
-  /**
-   * Compute spectral flux focused on low-frequency bins
-   */
-  private computeSpectralFlux(spectrumData: Uint8Array, binSize: number): number {
-    const invByteMax = 1 / 255
-    const length = spectrumData.length
-    const hadPrevious = this.previousSpectrum && this.previousSpectrum.length === length
-
-    if (!hadPrevious) {
-      this.previousSpectrum = new Float32Array(length)
-    }
-
-    if (!hadPrevious || !this.previousSpectrum) {
-      for (let i = 0; i < length; i++) {
-        this.previousSpectrum![i] = spectrumData[i] * invByteMax
-      }
-      return 0
-    }
-
-    const maxBin = Math.min(length, Math.max(1, Math.floor(this.MAX_BEAT_FREQUENCY / binSize)))
-    let flux = 0
-
-    for (let i = 0; i < maxBin; i++) {
-      const current = spectrumData[i] * invByteMax
-      const diff = current - this.previousSpectrum[i]
-      if (diff > 0) {
-        const emphasis = 1 - (i / maxBin) * 0.4 // weight bass slightly higher
-        flux += diff * emphasis
-      }
-      this.previousSpectrum[i] = current
-    }
-
-    // Keep remaining bins in sync to avoid stale data if FFT window changes
-    for (let i = maxBin; i < length; i++) {
-      this.previousSpectrum[i] = spectrumData[i] * invByteMax
-    }
-
-    return flux
-  }
-
-  /**
-   * Utility to compute mean & std dev for adaptive thresholds
-   */
-  private computeStats(values: number[]): { mean: number; stdDev: number; count: number } {
-    const count = values.length
-    if (count === 0) {
-      return { mean: 0, stdDev: 0, count }
-    }
-
-    const mean = values.reduce((sum, value) => sum + value, 0) / count
-    const variance =
-      values.reduce((sum, value) => {
-        const diff = value - mean
-        return sum + diff * diff
-      }, 0) / count
-
-    return { mean, stdDev: Math.sqrt(variance), count }
   }
 
   /**

@@ -1,7 +1,7 @@
 import type { Node } from 'reactflow'
 import type {
   ActionNode,
-  AudioEventNode,
+  AudioEventNodeUnion,
   EventRaiserNode,
   EventListenerNode,
   LogicNode,
@@ -28,7 +28,7 @@ export type EditorNodeData = {
     | 'notes'
   payload:
     | YargEventNode
-    | AudioEventNode
+    | AudioEventNodeUnion
     | ActionNode
     | LogicNode
     | EventRaiserNode

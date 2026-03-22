@@ -5,7 +5,7 @@ import { ILightingController } from '../../photonics-dmx/controllers/sequencer/i
 import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor'
 import { AudioConfig, AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes'
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
 
 export interface AudioControllerDeps {
@@ -21,8 +21,13 @@ export class AudioController {
   private audioProcessor: AudioCueProcessor | null = null
   private isAudioEnabled = false
   private audioDataHandler: AudioDataHandler | null = null
+  private broadcastAudioMirror: ((data: AudioLightingData) => void) | null = null
 
   constructor(private readonly deps: AudioControllerDeps) {}
+
+  public setBroadcastAudioMirror(fn: ((data: AudioLightingData) => void) | null): void {
+    this.broadcastAudioMirror = fn
+  }
 
   public async enableAudio(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
     if (!isInitialized) {
@@ -56,9 +61,11 @@ export class AudioController {
         this.audioDataHandler = null
       }
       this.audioDataHandler = (_: unknown, data: unknown) => {
+        const lightingData = data as AudioLightingData
         if (this.audioProcessor && this.isAudioEnabled) {
-          this.audioProcessor.processAudioData(data as AudioLightingData)
+          this.audioProcessor.processAudioData(lightingData)
         }
+        this.broadcastAudioMirror?.(lightingData)
       }
       ipcMain.on(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)
@@ -137,7 +144,7 @@ export class AudioController {
     if (fallback.length > 0) {
       return fallback[0]
     }
-    return BuiltInAudioCues.BasicLayered
+    return ''
   }
 
   public setActiveAudioCueType(cueType: AudioCueType): { success: boolean; error?: string } {
@@ -191,7 +198,7 @@ export class AudioController {
       group.cues.forEach((cue) => {
         cueMap.set(cue.cueType, {
           id: cue.cueType,
-          label: cue.id,
+          label: cue.name,
           description: cue.description,
           groupId: group.id,
           groupName: group.name,

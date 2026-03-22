@@ -46,7 +46,7 @@ const AudioBeatDetection: React.FC = () => {
 
   return (
     <div className="space-y-1">
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
         Configure how beats (bass kicks, snare hits) are detected. Lower threshold = more sensitive,
         higher = less sensitive.
       </p>

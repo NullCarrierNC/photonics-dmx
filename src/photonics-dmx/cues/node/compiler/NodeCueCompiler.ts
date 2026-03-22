@@ -1,7 +1,7 @@
 import {
   ActionNode,
   ActionTimingConfig,
-  AudioEventNode,
+  AudioEventNodeUnion,
   AudioNodeCueDefinition,
   BaseEventNode,
   Connection,
@@ -39,7 +39,7 @@ export interface CompiledNodeCue<TEvent extends BaseEventNode> {
 }
 
 export type CompiledYargCue = CompiledNodeCue<YargEventNode>
-export type CompiledAudioCue = CompiledNodeCue<AudioEventNode>
+export type CompiledAudioCue = CompiledNodeCue<AudioEventNodeUnion>
 
 const getActionTiming = (action: ActionNode): ActionTimingConfig => ({
   ...createDefaultActionTiming(),

@@ -300,7 +300,9 @@ export interface YargNodeCueDefinition extends BaseCueDefinition {
 
 export interface AudioNodeCueDefinition extends BaseCueDefinition {
   cueTypeId: string
-  nodes: NodeGraph<AudioEventNode, ActionNode>
+  /** Layering: primary replaces base look (first submission uses setEffect); secondary adds on top (addEffect). Defaults to primary when omitted. */
+  style?: 'primary' | 'secondary'
+  nodes: NodeGraph<AudioEventNodeUnion, ActionNode>
 }
 
 export interface YargNodeCueFile {
@@ -335,19 +337,85 @@ export interface YargEventNode extends BaseEventNode {
 export type AudioEventType =
   | 'none'
   | 'delay'
+  | 'cue-started'
   | 'audio-beat'
-  | 'audio-range1'
-  | 'audio-range2'
-  | 'audio-range3'
-  | 'audio-range4'
-  | 'audio-range5'
   | 'audio-energy'
+  | 'audio-trigger'
+  | 'audio-centroid'
+  | 'audio-flatness'
+  | 'audio-hfc'
 
 export interface AudioEventNode extends BaseEventNode {
   eventType: AudioEventType
   threshold?: number
   triggerMode: 'edge' | 'level'
+  /** Minimum ms between edge triggers; 0 = no limit */
+  cooldownMs?: number
+  /**
+   * When true (edge mode only), also require max per-band onset strength >= onsetThreshold.
+   * Used to tighten beat/HFC-style events against weak or duplicate edges.
+   */
+  useOnsetGating?: boolean
+  /** Minimum onset strength (0–1) when useOnsetGating is true. Default 0.3 */
+  onsetThreshold?: number
 }
+
+/** Optional min/max range for a single spectral gate (0–1 feature values). */
+export interface SpectralGateRange {
+  min?: number
+  max?: number
+}
+
+/** When set, all defined sub-gates must pass (AND). Omitted sub-gates are ignored. */
+export interface AudioTriggerSpectralGates {
+  /** Spectral flatness (0–1). 0 = tonal, 1 = noise */
+  flatness?: SpectralGateRange
+  /** Zero-crossing rate (0–1). Low = sustained, high = percussive */
+  zeroCrossingRate?: SpectralGateRange
+  /** HFC onset (0–1). Higher = more percussive / transient */
+  hfcOnset?: SpectralGateRange
+  /** Spectral crest (0–1). Higher = peakier / more tonal */
+  crest?: SpectralGateRange
+}
+
+export type AudioTriggerInstrumentPresetId =
+  | 'sub-bass'
+  | 'kick'
+  | 'snare'
+  | 'bass-guitar'
+  | 'electric-guitar'
+  | 'vocals'
+  | 'hi-hat-cymbals'
+  | 'full-kit'
+
+export interface AudioTriggerNode extends BaseEventNode {
+  type: 'event'
+  eventType: 'audio-trigger'
+  frequencyRange: { minHz: number; maxHz: number }
+  /** Power level (0-1) the band energy must exceed to trigger. Higher = needs more energy to fire. */
+  threshold: number
+  /** Hysteresis margin (0-1). Release when level drops below threshold - hysteresis. Omitted = 0. */
+  hysteresis?: number
+  /** Minimum ms the trigger stays active after entering. 0 = no minimum hold. */
+  holdMs?: number
+  /** Energy smoothing (0–1). 0 = raw/immediate, 1 = maximum smoothing (slow response). Default 0.45. */
+  smoothing?: number
+  /** Optional spectral conditions (flatness, ZCR, HFC, crest). AND with band energy. */
+  spectralGates?: AudioTriggerSpectralGates
+  /** When true, also require per-band onset strength above onsetThreshold for the matched band */
+  useOnsetGating?: boolean
+  /** Minimum onset strength (0–1) when useOnsetGating is true. Default 0.3 */
+  onsetThreshold?: number
+  /** Last-applied instrument preset (for editor display) */
+  appliedTriggerPreset?: AudioTriggerInstrumentPresetId
+  /** True when the user changed fields after applying a preset */
+  triggerPresetDirty?: boolean
+  color: string
+  nodeLabel: string
+  outputs: ['enter', 'during', 'exit']
+}
+
+export type AudioEventNodeUnion = AudioEventNode | AudioTriggerNode
 
 export const NODE_EFFECT_TYPES = ['set-color', 'blackout'] as const
 

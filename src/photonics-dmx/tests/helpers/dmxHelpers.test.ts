@@ -86,5 +86,19 @@ describe('dmxHelpers brightness configuration', () => {
       expect(highResult.intensity).toBe(100)
       expect(maxResult.intensity).toBe(150)
     })
+
+    it('should map linear to full intensity (255) regardless of global brightness config', () => {
+      const config = {
+        low: 10,
+        medium: 50,
+        high: 100,
+        max: 150,
+      }
+
+      setGlobalBrightnessConfig(config)
+      const linearResult = getColor('red', 'linear')
+
+      expect(linearResult.intensity).toBe(255)
+    })
   })
 })

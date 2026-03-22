@@ -213,9 +213,94 @@ describe('TransitionEngine', () => {
       transitionEngine.setEffectManager(mockEffectManager)
       transitionEngine.updateTransitions()
 
+      // Deferred removal: first frame only queues; second frame applies removals for lights with no successor.
+      expect(lightTransitionController.removeLightLayer).not.toHaveBeenCalled()
+      transitionEngine.updateTransitions()
+
       expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith('light1', layer)
       expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith('light2', layer)
       expect(lightTransitionController.removeLightLayer).not.toHaveBeenCalledWith('light3', layer)
+    })
+
+    it('defers removeLightLayer for layer > 0 until the next frame', () => {
+      const mockActiveEffect = createMockActiveEffect({
+        currentTransitionIndex: 1,
+        transitions: [createMockEffectTransition()],
+        layer: 1,
+      })
+      const activeEffectsMap = new Map<number, Map<string, LightEffectState>>()
+      const lightMap = new Map<string, LightEffectState>()
+      lightMap.set('test-light-1', mockActiveEffect)
+      activeEffectsMap.set(1, lightMap)
+      layerManager.getActiveEffects.mockReturnValue(activeEffectsMap)
+      layerManager.getActiveEffect.mockImplementation((l: number, lightId: string) =>
+        activeEffectsMap.get(l)?.get(lightId),
+      )
+      layerManager.removeActiveEffect.mockImplementation((l: number, lightId: string) => {
+        activeEffectsMap.get(l)?.delete(lightId)
+      })
+      layerManager.getQueuedEffect.mockReturnValue(undefined)
+
+      transitionEngine.updateTransitions()
+
+      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1, 'test-light-1')
+      expect(lightTransitionController.removeLightLayer).not.toHaveBeenCalled()
+
+      transitionEngine.updateTransitions()
+
+      expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith('test-light-1', 1)
+      expect(layerManager.clearLayerStates).toHaveBeenCalledWith(1)
+    })
+
+    it('skips deferred removeLightLayer when a new effect is active on the next frame', () => {
+      const layer = 5
+      const completedEffect = createMockActiveEffect({
+        lightId: 'l1',
+        layer,
+        currentTransitionIndex: 1,
+        transitions: [createMockEffectTransition({ layer })],
+      })
+      const replacementEffect = createMockActiveEffect({
+        name: 'replacement',
+        lightId: 'l1',
+        layer,
+        currentTransitionIndex: 0,
+        state: 'idle',
+        transitions: [createMockEffectTransition({ layer })],
+      })
+
+      const activeEffectsMap = new Map<number, Map<string, LightEffectState>>()
+      const layerMap = new Map<string, LightEffectState>()
+      layerMap.set('l1', completedEffect)
+      activeEffectsMap.set(layer, layerMap)
+
+      let simulateReplacementOnNextFrame = false
+      layerManager.getActiveEffects.mockReturnValue(activeEffectsMap)
+      layerManager.getActiveEffect.mockImplementation((l: number, lightId: string) => {
+        if (simulateReplacementOnNextFrame && l === layer && lightId === 'l1') {
+          return replacementEffect
+        }
+        return activeEffectsMap.get(l)?.get(lightId)
+      })
+      layerManager.removeActiveEffect.mockImplementation((l: number, lightId: string) => {
+        activeEffectsMap.get(l)?.delete(lightId)
+      })
+      layerManager.getQueuedEffect.mockReturnValue(undefined)
+
+      const mockEffectManager = {
+        onLightEffectComplete: jest.fn(),
+        startNextEffectInQueue: jest.fn().mockReturnValue(false),
+      } as unknown as IEffectManager
+
+      transitionEngine.setEffectManager(mockEffectManager)
+      transitionEngine.updateTransitions()
+
+      expect(lightTransitionController.removeLightLayer).not.toHaveBeenCalled()
+
+      simulateReplacementOnNextFrame = true
+      transitionEngine.updateTransitions()
+
+      expect(lightTransitionController.removeLightLayer).not.toHaveBeenCalled()
     })
   })
 

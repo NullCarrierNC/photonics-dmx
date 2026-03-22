@@ -1,45 +1,39 @@
 import { AudioLightingData, AudioConfig } from '../../listeners/Audio/AudioTypes'
 
 /**
- * Audio cue types for audio-reactive lighting.
- * Built-in cues are enumerated constants while user-defined cues can use any string identifier.
- */
-export enum BuiltInAudioCues {
-  BasicLayered = 'BasicLayered',
-  SpectrumCue = 'SpectrumCue',
-  PulseChaser = 'PulseChaser',
-  BeatSplitPulse = 'BeatSplitPulse',
-  BassSnareRipple = 'BassSnareRipple',
-  EnergyStrobePulse = 'EnergyStrobePulse',
-  MirrorBandBounce = 'MirrorBandBounce',
-  BandShell = 'BandShell',
-  PrismSweep = 'PrismSweep',
-  TrebleSpark = 'TrebleSpark',
-  SubHarmonicWave = 'SubHarmonicWave',
-  SpectrumStepper = 'SpectrumStepper',
-  BeatSpectrumMorph = 'BeatSpectrumMorph',
-  TriadCascade = 'TriadCascade',
-  AuroraDrift = 'AuroraDrift',
-  TempoFlutter = 'TempoFlutter',
-  DynamicSurge = 'DynamicSurge',
-  LinearLightOrgan = 'LinearLightOrgan',
-  SplitLightOrgan = 'SplitLightOrgan',
-  StackedLightOrgan = 'StackedLightOrgan',
-  DiagonalLightOrgan = 'DiagonalLightOrgan',
-  GatedLightOrgan = 'GatedLightOrgan',
-}
-
-/**
- * AudioCueType is a free-form string so user-authored cues can
+ * AudioCueType is a free-form string so user-authored (node-based) cues can
  * register arbitrary identifiers from the node editor.
  */
 export type AudioCueType = string
 
-export type BuiltInAudioCueType = `${BuiltInAudioCues}`
+/**
+ * Context injected when execution was started from an AudioTriggerNode output path.
+ * Used by cue-data getter nodes to read trigger-specific values.
+ */
+export interface TriggerContext {
+  triggerLevel: number
+  triggerFrequencyMin: number
+  triggerFrequencyMax: number
+  triggerPeakFrequency: number
+  triggerBandAmplitude: number
+  /** Config band id with best Hz overlap to the trigger range, when resolved */
+  triggerMatchedBandId?: string
+  /** Per-band features for the matched band (when available) */
+  triggerBandFlatness?: number
+  triggerBandCrest?: number
+  triggerBandCentroid?: number
+  /** Per-band onset strength for the matched band (when available) */
+  triggerBandOnset?: number
+}
 
-export const builtInAudioCueList: BuiltInAudioCueType[] = Object.values(
-  BuiltInAudioCues,
-) as BuiltInAudioCueType[]
+/**
+ * Context injected when execution was started from a non-trigger audio event (edge mode).
+ * Used by cue-data getter nodes to read the raw feature value at fire time.
+ */
+export interface EventContext {
+  /** Raw 0–1 source value at edge-fire time */
+  eventRawValue: number
+}
 
 /**
  * Audio cue data structure passed to cue implementations
@@ -51,7 +45,7 @@ export interface AudioCueData {
   /** Audio configuration */
   config: AudioConfig
 
-  /** Number of enabled bands (3 or 5) currently active */
+  /** Number of configured frequency bands (8) */
   enabledBandCount: number
 
   /** Timestamp of the cue execution */
@@ -59,4 +53,10 @@ export interface AudioCueData {
 
   /** Execution count for this cue */
   executionCount: number
+
+  /** Set when execution was started from an AudioTriggerNode (enter/during/exit path) */
+  triggerContext?: TriggerContext
+
+  /** Set when execution was started from a non-trigger audio event (edge mode) */
+  eventContext?: EventContext
 }

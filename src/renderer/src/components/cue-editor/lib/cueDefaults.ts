@@ -10,6 +10,7 @@ import {
   type YargNodeCueDefinition,
   type YargNodeCueFile,
   type AudioEventNode,
+  type AudioTriggerNode,
   type EffectFile,
   type EffectMode,
   type EffectGroupMeta,
@@ -65,6 +66,23 @@ const buildDefaultAudioEvent = (): AudioEventNode => ({
   triggerMode: 'edge',
 })
 
+const DEFAULT_TRIGGER_COLOR = '#60a5fa'
+
+export const buildDefaultAudioTrigger = (id?: string): AudioTriggerNode => ({
+  id: id ?? `event-${createId()}`,
+  type: 'event',
+  eventType: 'audio-trigger',
+  frequencyRange: { minHz: 120, maxHz: 500 },
+  threshold: 0.5,
+  hysteresis: 0.05,
+  holdMs: 0,
+  smoothing: 0.45,
+  spectralGates: undefined,
+  color: DEFAULT_TRIGGER_COLOR,
+  nodeLabel: 'Audio Trigger',
+  outputs: ['enter', 'during', 'exit'],
+})
+
 const createDefaultCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeCueDefinition => {
   const eventNode = mode === 'yarg' ? buildDefaultYargEvent() : buildDefaultAudioEvent()
   const actionNode = buildDefaultAction()
@@ -93,6 +111,7 @@ const createDefaultCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeC
   return {
     ...base,
     cueTypeId: 'custom-audio-cue',
+    style: 'primary',
   } as AudioNodeCueDefinition
 }
 
@@ -124,6 +143,7 @@ const createBlankCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeCue
   return {
     ...base,
     cueTypeId: 'custom-audio-cue',
+    style: 'primary',
   } as AudioNodeCueDefinition
 }
 

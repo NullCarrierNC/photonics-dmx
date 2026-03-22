@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useAtomValue } from 'jotai'
 import { audioDataAtom, audioConfigAtom } from '../atoms'
 import type { Color } from '../../../photonics-dmx/types'
+import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy'
+import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
+import { EQ_BAND_COLORS } from '../lib/audioEqBandColors'
+import AudioSensitivityControls from './AudioSensitivityControls'
 
 // Map Color type to RGB values for preview bars (matches AudioColorMapping.tsx)
 const COLOR_TO_RGB: Record<Color, string> = {
@@ -25,10 +29,11 @@ const COLOR_TO_RGB: Record<Color, string> = {
 
 interface CuePreviewAudioProps {
   className?: string
+  /** When false, omit the in-card "Audio Preview" heading (page supplies the title). */
+  showTitle?: boolean
+  /** DMX Preview: show Global Sensitivity / Noise Floor under the spectrum (same as Audio Settings). */
+  showAudioQuickControls?: boolean
 }
-
-const THREE_BAND_IDS = ['range1', 'range3', 'range4']
-const FOUR_BAND_IDS = ['range1', 'range2', 'range3', 'range4']
 
 type PreviewRange = {
   id: string
@@ -36,112 +41,141 @@ type PreviewRange = {
   minHz: number
   maxHz: number
   color: Color
-  brightness: 'low' | 'medium' | 'high' | 'max'
 }
 
-const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => {
+/** Minimum time the beat indicator stays lit so transient single-frame triggers remain visible. */
+const MIN_BEAT_INDICATOR_MS = 280
+
+const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({
+  className = '',
+  showTitle = true,
+  showAudioQuickControls = false,
+}) => {
   // Read audio data from atom (no IPC needed - data stays in renderer!)
   const audioData = useAtomValue(audioDataAtom)
   const audioConfig = useAtomValue(audioConfigAtom)
   const [showBeatPulse, setShowBeatPulse] = useState(false)
+  const hideBeatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const defaultRanges: PreviewRange[] = [
-    {
-      id: 'range1',
-      name: 'Bass',
-      minHz: 20,
-      maxHz: 220,
-      color: 'red' as Color,
-      brightness: 'medium' as const,
-    },
-    {
-      id: 'range2',
-      name: 'Lower-Mids',
-      minHz: 220,
-      maxHz: 800,
-      color: 'blue' as Color,
-      brightness: 'medium' as const,
-    },
-    {
-      id: 'range3',
-      name: 'Upper-Mids',
-      minHz: 800,
-      maxHz: 2500,
-      color: 'yellow' as Color,
-      brightness: 'medium' as const,
-    },
-    {
-      id: 'range4',
-      name: 'Highs',
-      minHz: 2500,
-      maxHz: 6000,
-      color: 'green' as Color,
-      brightness: 'medium' as const,
-    },
-    {
-      id: 'range5',
-      name: 'Air',
-      minHz: 6000,
-      maxHz: 20000,
-      color: 'cyan' as Color,
-      brightness: 'medium' as const,
-    },
-  ]
-
-  const configuredRanges = (audioConfig?.frequencyBands?.ranges as PreviewRange[]) || defaultRanges
-  const configuredBandCount = audioConfig?.frequencyBands?.bandCount ?? 4
-  const displayRanges =
-    configuredBandCount === 3
-      ? configuredRanges.filter((range) => THREE_BAND_IDS.includes(range.id))
-      : configuredBandCount === 4
-        ? configuredRanges.filter((range) => FOUR_BAND_IDS.includes(range.id))
-        : configuredRanges
-
-  const bandValuesById: Record<string, number> = {
-    range1: audioData?.frequencyBands?.range1 || 0,
-    range2: audioData?.frequencyBands?.range2 || 0,
-    range3: audioData?.frequencyBands?.range3 || 0,
-    range4: audioData?.frequencyBands?.range4 || 0,
-    range5: audioData?.frequencyBands?.range5 || 0,
-  }
-
-  // Track beat detection for pulse animation (show for 200ms after beat)
-  useEffect(() => {
-    if (audioData?.beatDetected) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- pulse visibility for 200ms after beat
-      setShowBeatPulse(true)
-      const timer = setTimeout(() => setShowBeatPulse(false), 200)
-      return () => clearTimeout(timer)
+  // Map band definitions from config to PreviewRange format
+  const displayRanges: PreviewRange[] = useMemo(() => {
+    if (!audioConfig?.bands) {
+      return DEFAULT_AUDIO_BANDS.map((band, index) => ({
+        id: band.id,
+        name: band.name,
+        minHz: band.minHz,
+        maxHz: band.maxHz,
+        color: (EQ_BAND_COLORS[index] || 'white') as Color,
+      }))
     }
-    return
-  }, [audioData?.beatDetected])
+    return audioConfig.bands.map((band, index) => ({
+      id: band.id,
+      name: band.name,
+      minHz: band.minHz,
+      maxHz: band.maxHz,
+      color: (EQ_BAND_COLORS[index] || 'white') as Color,
+    }))
+  }, [audioConfig])
 
-  const showPulse = Boolean(audioData?.beatDetected || showBeatPulse)
+  const energy = audioData?.energy ?? audioData?.overallLevel ?? 0
+  const bandValuesById: Record<string, number> = useMemo(() => {
+    const raw = audioData?.rawFrequencyData
+    const sr = audioData?.sampleRate
+    const fft = audioData?.fftSize
+    const bands = audioConfig?.bands || DEFAULT_AUDIO_BANDS
+
+    if (raw?.length && sr != null && fft != null) {
+      // Calculate energy for each band using its configured frequency range
+      const values: Record<string, number> = {}
+      for (const band of bands) {
+        values[band.id] = getBandEnergy(raw, sr, fft, band.minHz, band.maxHz)
+      }
+      return values
+    }
+    // Fallback: use energy with decreasing multipliers
+    const fallback: Record<string, number> = {}
+    bands.forEach((band, index) => {
+      fallback[band.id] = energy * (1.0 - index * 0.15)
+    })
+    return fallback
+  }, [
+    audioData?.rawFrequencyData,
+    audioData?.sampleRate,
+    audioData?.fftSize,
+    audioConfig?.bands,
+    energy,
+  ])
+
+  // Beat indicator: minimum hold time via ref timer so single-frame beats stay visible.
+  // Do not clear when beatDetected goes false on the next frame — that caused flicker.
+  // Clear immediately only when there is no audio data (capture stopped).
+  useEffect(() => {
+    const clearHideTimer = () => {
+      if (hideBeatTimerRef.current) {
+        clearTimeout(hideBeatTimerRef.current)
+        hideBeatTimerRef.current = null
+      }
+    }
+
+    if (!audioData) {
+      clearHideTimer()
+      queueMicrotask(() => {
+        setShowBeatPulse(false)
+      })
+      return
+    }
+
+    if (audioData.beatDetected) {
+      clearHideTimer()
+      hideBeatTimerRef.current = setTimeout(() => {
+        setShowBeatPulse(false)
+        hideBeatTimerRef.current = null
+      }, MIN_BEAT_INDICATOR_MS)
+      queueMicrotask(() => {
+        setShowBeatPulse(true)
+      })
+    }
+    // Do not clear the hide timer when beatDetected goes false — that would cancel the minimum hold.
+  }, [audioData])
+
+  useEffect(
+    () => () => {
+      if (hideBeatTimerRef.current) {
+        clearTimeout(hideBeatTimerRef.current)
+        hideBeatTimerRef.current = null
+      }
+    },
+    [],
+  )
+
+  const showPulse = showBeatPulse
 
   if (!audioData) {
     return (
       <div className={`p-3 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
-        <h3 className="text-lg font-semibold mb-1">Audio Preview</h3>
+        {showTitle && <h3 className="text-lg font-semibold mb-1">Spectrum Analyzer</h3>}
         <p className="text-gray-500 dark:text-gray-400">Waiting for audio data...</p>
       </div>
     )
   }
 
-  const { energy, bpm } = audioData
+  const bpm = audioData.bpm
 
   return (
     <div className={`p-4 bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold">Audio Preview</h3>
-        {bpm && (
-          <div className="text-sm font-mono bg-gray-300 dark:bg-gray-600 px-2 py-1 rounded">
-            {bpm.toFixed(0)} BPM
-          </div>
-        )}
-      </div>
+      {(showTitle || bpm != null) && (
+        <div className={`flex items-center mb-3 ${showTitle ? 'justify-between' : 'justify-end'}`}>
+          {showTitle && <h3 className="text-lg font-semibold">Spectrum Analyzer</h3>}
+          {bpm != null && (
+            <div className="text-sm font-mono bg-gray-300 dark:bg-gray-600 px-2 py-1 rounded">
+              {bpm.toFixed(0)} BPM
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Frequency Bars */}
-      <div className="space-y-2 mb-4">
+      <div className={showAudioQuickControls ? 'space-y-2' : 'space-y-2 mb-4'}>
         {displayRanges.map((range) => {
           const bandValue = bandValuesById[range.id] || 0
           const colorRgb = COLOR_TO_RGB[range.color as Color] || COLOR_TO_RGB.white
@@ -153,9 +187,6 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
                 <div className="flex items-center gap-2">
                   <span className="text-gray-600 dark:text-gray-300 font-medium">{range.name}</span>
                   <span className="text-gray-500 dark:text-gray-400">({frequencyLabel})</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                    {range.brightness}
-                  </span>
                 </div>
                 <span className="text-gray-600 dark:text-gray-300 font-mono">
                   {(bandValue * 100).toFixed(0)}%
@@ -191,16 +222,27 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({ className = '' }) => 
         </div>
       </div>
 
+      {showAudioQuickControls && (
+        <div className="border-t border-gray-300 dark:border-gray-600 pt-4 mt-4">
+          <AudioSensitivityControls compact />
+        </div>
+      )}
+
       {/* Beat Indicator */}
-      <div className="flex items-center space-x-2">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Beat Detected:</span>
-        <div
-          className={`w-16 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-200 ${
-            showPulse
-              ? 'bg-white border-gray-300 text-black'
-              : 'bg-gray-800 border-gray-600 text-white'
+      <div className="flex items-center gap-3">
+        <span
+          className={`text-sm font-semibold transition-colors duration-200 ${
+            showPulse ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-500'
           }`}>
-          {showPulse ? 'BEAT' : 'OFF'}
+          Beat detected
+        </span>
+        <div
+          className={`min-w-[5.5rem] h-9 px-2 rounded-lg border-2 flex items-center justify-center text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
+            showPulse
+              ? 'bg-amber-400 border-amber-600 text-gray-900 shadow-[0_0_12px_rgba(251,191,36,0.65)] ring-2 ring-amber-300/80 dark:bg-amber-500 dark:border-amber-400 dark:text-gray-950 dark:shadow-[0_0_16px_rgba(251,191,36,0.5)]'
+              : 'bg-gray-200 border-gray-400 text-gray-500 dark:bg-gray-900 dark:border-gray-600 dark:text-gray-500'
+          }`}>
+          {showPulse ? 'Beat' : 'None'}
         </div>
       </div>
     </div>

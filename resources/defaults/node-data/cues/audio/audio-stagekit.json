@@ -1,0 +1,3528 @@
+{
+  "version": 1,
+  "mode": "audio",
+  "group": {
+    "id": "audio-stagekit",
+    "name": "Stage Kit Audio",
+    "description": "Audio-reactive versions of Stage Kit lighting cues (no game event data)."
+  },
+  "cues": [
+    {
+      "id": "cue-sk-audio-intro",
+      "name": "Intro",
+      "description": "Blue wash on front driven by overall audio level.",
+      "cueTypeId": "audio-sk-intro",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Band amplitude for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-cue-sk-audio-intro-trig",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 20000
+            },
+            "threshold": 0.02,
+            "hysteresis": 0.015,
+            "holdMs": 80,
+            "color": "#888888",
+            "nodeLabel": "Audio",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Audio"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-cue-sk-audio-intro",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-cue-sk-audio-intro-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-0057684b-af9b-433e-84fa-e4307984ebb3",
+            "type": "logic",
+            "logicType": "math",
+            "label": "math",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 3
+            },
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-cue-sk-audio-intro-trig",
+          "to": "logic-cue-sk-audio-intro-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-cue-sk-audio-intro-level",
+          "to": "logic-0057684b-af9b-433e-84fa-e4307984ebb3"
+        },
+        {
+          "from": "logic-0057684b-af9b-433e-84fa-e4307984ebb3",
+          "to": "act-cue-sk-audio-intro"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-cue-sk-audio-intro-trig": {
+            "x": 9.727431720122695,
+            "y": 0.14345770329236984
+          },
+          "act-cue-sk-audio-intro": {
+            "x": -9.513935622852443,
+            "y": 318.1837670489549
+          },
+          "logic-cue-sk-audio-intro-level": {
+            "x": -0.5550161644196123,
+            "y": 98.23762070911948
+          },
+          "logic-0057684b-af9b-433e-84fa-e4307984ebb3": {
+            "x": 4.647112154230854,
+            "y": 206.3270396244768
+          }
+        },
+        "viewport": {
+          "x": 312.53845481634863,
+          "y": 162.07353503958007,
+          "zoom": 0.7557599641581135
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-silhouettes",
+      "name": "Silhouettes",
+      "description": "Green on front and back, amplitude-driven.",
+      "cueTypeId": "audio-sk-silhouettes",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Band amplitude for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-cue-sk-audio-silhouettes-trig",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 20000
+            },
+            "threshold": 0.02,
+            "hysteresis": 0.015,
+            "holdMs": 80,
+            "color": "#888888",
+            "nodeLabel": "Audio",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Audio"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-cue-sk-audio-silhouettes",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-cue-sk-audio-silhouettes-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-32bcd592-234a-49f5-8184-3958a2350937",
+            "type": "logic",
+            "logicType": "math",
+            "label": "math",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 6
+            },
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-cue-sk-audio-silhouettes-trig",
+          "to": "logic-cue-sk-audio-silhouettes-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-cue-sk-audio-silhouettes-level",
+          "to": "logic-32bcd592-234a-49f5-8184-3958a2350937"
+        },
+        {
+          "from": "logic-32bcd592-234a-49f5-8184-3958a2350937",
+          "to": "act-cue-sk-audio-silhouettes"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-cue-sk-audio-silhouettes-trig": {
+            "x": 11.435407966375351,
+            "y": -5.798313196748495
+          },
+          "act-cue-sk-audio-silhouettes": {
+            "x": -18.550072477809522,
+            "y": 301.5570763503846
+          },
+          "logic-cue-sk-audio-silhouettes-level": {
+            "x": -7.153092151310432,
+            "y": 114.02382404068595
+          },
+          "logic-32bcd592-234a-49f5-8184-3958a2350937": {
+            "x": -0.3408781503915179,
+            "y": 212.04426542398033
+          }
+        },
+        "viewport": {
+          "x": 312.53845481634863,
+          "y": 162.0735350395801,
+          "zoom": 0.7557599641581135
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-flare-fast",
+      "name": "Flare Fast",
+      "description": "Additive blue on all lights.",
+      "cueTypeId": "audio-sk-flare-fast",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Band amplitude for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-cue-sk-audio-flare-fast-trig",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 20000
+            },
+            "threshold": 0.02,
+            "hysteresis": 0.015,
+            "holdMs": 80,
+            "color": "#888888",
+            "nodeLabel": "Audio",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Audio"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-cue-sk-audio-flare-fast",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-cue-sk-audio-flare-fast-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-a54d1a43-0f65-45c4-aeb0-6a2a909099d7",
+            "type": "logic",
+            "logicType": "math",
+            "label": "math",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 5
+            },
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-cue-sk-audio-flare-fast-trig",
+          "to": "logic-cue-sk-audio-flare-fast-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-cue-sk-audio-flare-fast-level",
+          "to": "logic-a54d1a43-0f65-45c4-aeb0-6a2a909099d7"
+        },
+        {
+          "from": "logic-a54d1a43-0f65-45c4-aeb0-6a2a909099d7",
+          "to": "act-cue-sk-audio-flare-fast"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-cue-sk-audio-flare-fast-trig": {
+            "x": 10.83816522359848,
+            "y": -3.8558204993605614
+          },
+          "act-cue-sk-audio-flare-fast": {
+            "x": -26.16236006335987,
+            "y": 298.0919989080222
+          },
+          "logic-cue-sk-audio-flare-fast-level": {
+            "x": 1.477622477795279,
+            "y": 102.56532155337902
+          },
+          "logic-a54d1a43-0f65-45c4-aeb0-6a2a909099d7": {
+            "x": 11.198845644459908,
+            "y": 200.62559905695002
+          }
+        },
+        "viewport": {
+          "x": 312.53845481634863,
+          "y": 162.07353503958007,
+          "zoom": 0.7557599641581135
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-flare-slow",
+      "name": "Flare Slow",
+      "description": "White replace on all lights.",
+      "cueTypeId": "audio-sk-flare-slow",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Band amplitude for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-cue-sk-audio-flare-slow-trig",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 20000
+            },
+            "threshold": 0.02,
+            "hysteresis": 0.015,
+            "holdMs": 80,
+            "color": "#888888",
+            "nodeLabel": "Audio",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Audio"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-cue-sk-audio-flare-slow",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-cue-sk-audio-flare-slow-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-4d371bfa-cb3b-46dd-9b4a-01bbff74d8cf",
+            "type": "logic",
+            "logicType": "math",
+            "label": "math",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 3
+            },
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-cue-sk-audio-flare-slow-trig",
+          "to": "logic-cue-sk-audio-flare-slow-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-cue-sk-audio-flare-slow-level",
+          "to": "logic-4d371bfa-cb3b-46dd-9b4a-01bbff74d8cf"
+        },
+        {
+          "from": "logic-4d371bfa-cb3b-46dd-9b4a-01bbff74d8cf",
+          "to": "act-cue-sk-audio-flare-slow"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-cue-sk-audio-flare-slow-trig": {
+            "x": 13,
+            "y": -22
+          },
+          "act-cue-sk-audio-flare-slow": {
+            "x": -21.314751282722455,
+            "y": 292.7403516066751
+          },
+          "logic-cue-sk-audio-flare-slow-level": {
+            "x": 0,
+            "y": 90
+          },
+          "logic-4d371bfa-cb3b-46dd-9b4a-01bbff74d8cf": {
+            "x": 11.729631290358725,
+            "y": 186.4193824825477
+          }
+        },
+        "viewport": {
+          "x": 312.53845481634863,
+          "y": 162.07353503958007,
+          "zoom": 0.7557599641581135
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-cool-auto",
+      "name": "Cool Automatic",
+      "description": "Two blue CW rotations and one green CCW, beat-synced (audio beat).",
+      "cueTypeId": "audio-sk-cool-auto",
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "greenOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "blue2Offset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_cool_auto-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
+          {
+            "id": "ev-sk_audio_cool_auto-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk_audio_cool_auto-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk_audio_cool_auto-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk_audio_cool_auto-green-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "greenOffset"
+          },
+          {
+            "id": "sk_audio_cool_auto-blue2-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "blue2Offset"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_cool_auto-cw1",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk_audio_cool_auto-cw2",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 2
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "blue2Offset"
+              }
+            }
+          },
+          {
+            "id": "sk_audio_cool_auto-ccw",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "greenOffset"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_cool_auto-start",
+          "to": "sk_audio_cool_auto-num"
+        },
+        {
+          "from": "sk_audio_cool_auto-num",
+          "to": "sk_audio_cool_auto-all"
+        },
+        {
+          "from": "sk_audio_cool_auto-all",
+          "to": "sk_audio_cool_auto-green-off"
+        },
+        {
+          "from": "sk_audio_cool_auto-green-off",
+          "to": "sk_audio_cool_auto-blue2-off"
+        },
+        {
+          "from": "ev-sk_audio_cool_auto-beat",
+          "to": "sk_audio_cool_auto-cw1"
+        },
+        {
+          "from": "ev-sk_audio_cool_auto-beat",
+          "to": "sk_audio_cool_auto-cw2"
+        },
+        {
+          "from": "ev-sk_audio_cool_auto-beat",
+          "to": "sk_audio_cool_auto-ccw"
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-rotation-cw",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-audio-rotation-ccw",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Rotation CCW"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_cool_auto-start": {
+            "x": 2.7185937675337186,
+            "y": 26.66666666666663
+          },
+          "ev-sk_audio_cool_auto-beat": {
+            "x": 425.1531551976999,
+            "y": -4
+          },
+          "sk_audio_cool_auto-num": {
+            "x": 0,
+            "y": 103.13102739304304
+          },
+          "sk_audio_cool_auto-all": {
+            "x": -2.8468448023001542,
+            "y": 215.03302324190736
+          },
+          "sk_audio_cool_auto-green-off": {
+            "x": 15.420290490612388,
+            "y": 334.2777684703469
+          },
+          "sk_audio_cool_auto-blue2-off": {
+            "x": 17.762923082336783,
+            "y": 437.34417252615094
+          },
+          "sk_audio_cool_auto-cw1": {
+            "x": 594.3063103953997,
+            "y": 60.000000000000114
+          },
+          "sk_audio_cool_auto-cw2": {
+            "x": 215.99999999999994,
+            "y": 185.34417252615106
+          },
+          "sk_audio_cool_auto-ccw": {
+            "x": 439.81982186436653,
+            "y": 382.6775058594843
+          }
+        },
+        "viewport": {
+          "x": 305.39821838833745,
+          "y": 134.2054870095694,
+          "zoom": 1.0097512975966862
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-warm-auto",
+      "name": "Warm Automatic",
+      "description": "Two red CW and one yellow CCW, beat-synced.",
+      "cueTypeId": "audio-sk-warm-auto",
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "yellowOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "red2Offset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_warm_auto-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
+          {
+            "id": "ev-sk_audio_warm_auto-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk_audio_warm_auto-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk_audio_warm_auto-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk_audio_warm_auto-yellow-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "yellowOffset"
+          },
+          {
+            "id": "sk_audio_warm_auto-red2-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "red2Offset"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_warm_auto-cw1",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk_audio_warm_auto-cw2",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 2
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "red2Offset"
+              }
+            }
+          },
+          {
+            "id": "sk_audio_warm_auto-ccw",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "yellowOffset"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_warm_auto-start",
+          "to": "sk_audio_warm_auto-num"
+        },
+        {
+          "from": "sk_audio_warm_auto-num",
+          "to": "sk_audio_warm_auto-all"
+        },
+        {
+          "from": "sk_audio_warm_auto-all",
+          "to": "sk_audio_warm_auto-yellow-off"
+        },
+        {
+          "from": "sk_audio_warm_auto-yellow-off",
+          "to": "sk_audio_warm_auto-red2-off"
+        },
+        {
+          "from": "ev-sk_audio_warm_auto-beat",
+          "to": "sk_audio_warm_auto-cw1"
+        },
+        {
+          "from": "ev-sk_audio_warm_auto-beat",
+          "to": "sk_audio_warm_auto-cw2"
+        },
+        {
+          "from": "ev-sk_audio_warm_auto-beat",
+          "to": "sk_audio_warm_auto-ccw"
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-rotation-cw",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-audio-rotation-ccw",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Rotation CCW"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_warm_auto-start": {
+            "x": 245.77300138026476,
+            "y": 0
+          },
+          "ev-sk_audio_warm_auto-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "sk_audio_warm_auto-num": {
+            "x": 243.35890743136406,
+            "y": 86.61377192288637
+          },
+          "sk_audio_warm_auto-all": {
+            "x": 241.6308434382081,
+            "y": 201.56523140519857
+          },
+          "sk_audio_warm_auto-yellow-off": {
+            "x": 254.7962476015091,
+            "y": 311.1842255704105
+          },
+          "sk_audio_warm_auto-red2-off": {
+            "x": 263.4820883857708,
+            "y": 418.5339926419159
+          },
+          "sk_audio_warm_auto-cw1": {
+            "x": -193.03582322845858,
+            "y": 152
+          },
+          "sk_audio_warm_auto-cw2": {
+            "x": -109.33333333333337,
+            "y": 543.8673259752493
+          },
+          "sk_audio_warm_auto-ccw": {
+            "x": 138.14875505243742,
+            "y": 546.5339926419158
+          }
+        },
+        "viewport": {
+          "x": 358.38843371067196,
+          "y": 123.54975275928155,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-harmony",
+      "name": "Harmony",
+      "description": "6+ lights: yellow and red CW; fewer: cyan CW.",
+      "cueTypeId": "audio-sk-harmony",
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "yellowOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "redOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "isLargeVenue",
+          "type": "boolean",
+          "scope": "cue",
+          "initialValue": false
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_harmony-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
+          {
+            "id": "ev-sk_audio_harmony-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk_audio_harmony-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk_audio_harmony-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk_audio_harmony-yellow-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 3
+            },
+            "assignTo": "yellowOffset"
+          },
+          {
+            "id": "sk_audio_harmony-red-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "redOffset"
+          },
+          {
+            "id": "sk_audio_harmony-is-large",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": ">=",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 6
+            }
+          },
+          {
+            "id": "sk_audio_harmony-set-large-true",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "isLargeVenue",
+            "valueType": "boolean",
+            "value": {
+              "source": "literal",
+              "value": true
+            }
+          },
+          {
+            "id": "sk_audio_harmony-set-large-false",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "isLargeVenue",
+            "valueType": "boolean",
+            "value": {
+              "source": "literal",
+              "value": false
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_harmony-yellow",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "yellowOffset"
+              }
+            }
+          },
+          {
+            "id": "sk_audio_harmony-red",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "redOffset"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_harmony-start",
+          "to": "sk_audio_harmony-num"
+        },
+        {
+          "from": "sk_audio_harmony-num",
+          "to": "sk_audio_harmony-all"
+        },
+        {
+          "from": "sk_audio_harmony-all",
+          "to": "sk_audio_harmony-yellow-off"
+        },
+        {
+          "from": "sk_audio_harmony-yellow-off",
+          "to": "sk_audio_harmony-red-off"
+        },
+        {
+          "from": "sk_audio_harmony-red-off",
+          "to": "sk_audio_harmony-is-large"
+        },
+        {
+          "from": "sk_audio_harmony-is-large",
+          "to": "sk_audio_harmony-set-large-true",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk_audio_harmony-is-large",
+          "to": "sk_audio_harmony-set-large-false",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk_audio_harmony-yellow",
+          "to": "sk_audio_harmony-red"
+        },
+        {
+          "from": "ev-sk_audio_harmony-beat",
+          "to": "sk_audio_harmony-yellow"
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-rotation-cw",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Rotation CW"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_harmony-start": {
+            "x": 245.29335105605423,
+            "y": 0
+          },
+          "ev-sk_audio_harmony-beat": {
+            "x": 609.3011180954622,
+            "y": -9.661187703292171
+          },
+          "sk_audio_harmony-num": {
+            "x": 247.80544858053327,
+            "y": 88.50356255844235
+          },
+          "sk_audio_harmony-all": {
+            "x": 254.14447612315416,
+            "y": 227.9766534306109
+          },
+          "sk_audio_harmony-yellow-off": {
+            "x": 262.1902850046754,
+            "y": 342.3400446847081
+          },
+          "sk_audio_harmony-red-off": {
+            "x": 260.51651660725474,
+            "y": 442.6101787760854
+          },
+          "sk_audio_harmony-is-large": {
+            "x": 243.07223806157708,
+            "y": 558.487892087549
+          },
+          "sk_audio_harmony-set-large-true": {
+            "x": 136.99153041057082,
+            "y": 700.487892087549
+          },
+          "sk_audio_harmony-set-large-false": {
+            "x": 370.91887988154383,
+            "y": 698.6589143694282
+          },
+          "sk_audio_harmony-yellow": {
+            "x": 587.2712887896716,
+            "y": 75.20708613929582
+          },
+          "sk_audio_harmony-red": {
+            "x": 606.628922487376,
+            "y": 398.7999057534871
+          }
+        },
+        "viewport": {
+          "x": 217.26640588667397,
+          "y": 124.01831617697113,
+          "zoom": 0.6121681962001025
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-searchlights",
+      "name": "Searchlights",
+      "description": "Yellow CCW; red CCW offset when 8+ lights. Step timing from BPM.",
+      "cueTypeId": "audio-sk-searchlights",
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 500
+        },
+        {
+          "name": "stepDurationMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 125
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_search-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
+          {
+            "id": "ev-sk_audio_search-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk_audio_search-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk_audio_search-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk_audio_search-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk_audio_search-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk_audio_search-step",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "stepDurationMs"
+          },
+          {
+            "id": "sk_audio_search-has-red",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": ">=",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 8
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_search-yellow-lo",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "stepDurationMs"
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk_audio_search-yellow-hi",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "stepDurationMs"
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk_audio_search-red",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 20
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "stepDurationMs"
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_search-start",
+          "to": "sk_audio_search-num"
+        },
+        {
+          "from": "sk_audio_search-num",
+          "to": "sk_audio_search-all"
+        },
+        {
+          "from": "sk_audio_search-all",
+          "to": "sk_audio_search-bpm"
+        },
+        {
+          "from": "sk_audio_search-bpm",
+          "to": "sk_audio_search-beat-ms"
+        },
+        {
+          "from": "sk_audio_search-beat-ms",
+          "to": "sk_audio_search-step"
+        },
+        {
+          "from": "ev-sk_audio_search-beat",
+          "to": "sk_audio_search-has-red"
+        },
+        {
+          "from": "sk_audio_search-has-red",
+          "to": "sk_audio_search-yellow-lo",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk_audio_search-has-red",
+          "to": "sk_audio_search-yellow-hi",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk_audio_search-yellow-hi",
+          "to": "sk_audio_search-red"
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-rotation-ccw",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Rotation CCW"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_search-start": {
+            "x": 244.13214888982475,
+            "y": 0
+          },
+          "ev-sk_audio_search-beat": {
+            "x": 673.4747620048464,
+            "y": -1.997229332202096
+          },
+          "sk_audio_search-num": {
+            "x": 256.2642977796495,
+            "y": 96.92081585153937
+          },
+          "sk_audio_search-all": {
+            "x": 252.62435857765377,
+            "y": 217.6948039419949
+          },
+          "sk_audio_search-bpm": {
+            "x": 250.574344355613,
+            "y": 343.43702977895737
+          },
+          "sk_audio_search-beat-ms": {
+            "x": 245.38993933051825,
+            "y": 451.226941421628
+          },
+          "sk_audio_search-step": {
+            "x": 247.9673219565302,
+            "y": 564.8682108595967
+          },
+          "sk_audio_search-has-red": {
+            "x": 667.0745969554872,
+            "y": 103.66030290154276
+          },
+          "sk_audio_search-yellow-lo": {
+            "x": 679.0579729486996,
+            "y": 590.9984322461
+          },
+          "sk_audio_search-yellow-hi": {
+            "x": 512.0812862338961,
+            "y": 244.87098152739463
+          },
+          "sk_audio_search-red": {
+            "x": 447.20674584531196,
+            "y": 600.9912878255313
+          }
+        },
+        "viewport": {
+          "x": 242.65004698206258,
+          "y": 122.9137284089096,
+          "zoom": 0.5006936278556674
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-score",
+      "name": "Score",
+      "description": "Yellow CW on opposite pairs, blue CCW on individuals (delay stepping).",
+      "cueTypeId": "audio-sk-score",
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "pairedLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_score-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
+          {
+            "id": "ev-sk_audio_score-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk_audio_score-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk_audio_score-pairs",
+            "type": "logic",
+            "logicType": "create-pairs",
+            "pairType": "opposite",
+            "sourceVariable": "allLights",
+            "assignTo": "pairedLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_score-yellow",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "pairedLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 2
+              }
+            }
+          },
+          {
+            "id": "sk_audio_score-blue",
+            "type": "effect-raiser",
+            "isPersistent": true,
+            "effectId": "effect-audio-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 20
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 200
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_score-start",
+          "to": "sk_audio_score-all"
+        },
+        {
+          "from": "sk_audio_score-all",
+          "to": "sk_audio_score-pairs"
+        },
+        {
+          "from": "ev-sk_audio_score-beat",
+          "to": "sk_audio_score-yellow"
+        },
+        {
+          "from": "ev-sk_audio_score-beat",
+          "to": "sk_audio_score-blue"
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-rotation-cw",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-audio-rotation-ccw",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Rotation CCW"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_score-start": {
+            "x": 0,
+            "y": 0
+          },
+          "ev-sk_audio_score-beat": {
+            "x": 241.25826222263277,
+            "y": 0
+          },
+          "sk_audio_score-all": {
+            "x": 9.258262222632766,
+            "y": 96.49054297059774
+          },
+          "sk_audio_score-pairs": {
+            "x": 10.501299625262618,
+            "y": 218.0081649683416
+          },
+          "sk_audio_score-yellow": {
+            "x": 429.25826222263277,
+            "y": 215.34149830167496
+          },
+          "sk_audio_score-blue": {
+            "x": 198.66666666666674,
+            "y": 215.34149830167496
+          }
+        },
+        "viewport": {
+          "x": 509.5281516665127,
+          "y": 73.2469381368719,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-strobe-slow",
+      "name": "Strobe Slow",
+      "description": "White flash on strobes (fade 30/120/350 ms).",
+      "cueTypeId": "audio-sk-strobe-slow",
+      "effects": [
+        {
+          "effectId": "effect-audio-flash",
+          "effectFileId": "audio-core-effects",
+          "name": "Audio Flash"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_strobe_slow-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_strobe_slow-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-flash",
+            "parameterValues": {
+              "group": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "fadeInMs": {
+                "source": "literal",
+                "value": 30
+              },
+              "holdMs": {
+                "source": "literal",
+                "value": 120
+              },
+              "fadeOutMs": {
+                "source": "literal",
+                "value": 350
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_strobe_slow-beat",
+          "to": "sk_audio_strobe_slow-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_strobe_slow-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "sk_audio_strobe_slow-flash": {
+            "x": 0,
+            "y": 120
+          }
+        },
+        "viewport": {
+          "x": 230.73773330066086,
+          "y": 55.1045950032684,
+          "zoom": 0.5
+        }
+      },
+      "style": "secondary"
+    },
+    {
+      "id": "cue-sk-audio-strobe-medium",
+      "name": "Strobe Medium",
+      "description": "White flash on strobes (fade 20/80/200 ms).",
+      "cueTypeId": "audio-sk-strobe-medium",
+      "effects": [
+        {
+          "effectId": "effect-audio-flash",
+          "effectFileId": "audio-core-effects",
+          "name": "Audio Flash"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_strobe_medium-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_strobe_medium-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-flash",
+            "parameterValues": {
+              "group": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "fadeInMs": {
+                "source": "literal",
+                "value": 20
+              },
+              "holdMs": {
+                "source": "literal",
+                "value": 80
+              },
+              "fadeOutMs": {
+                "source": "literal",
+                "value": 200
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_strobe_medium-beat",
+          "to": "sk_audio_strobe_medium-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_strobe_medium-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "sk_audio_strobe_medium-flash": {
+            "x": 0,
+            "y": 120
+          }
+        },
+        "viewport": {
+          "x": 230.73773330066086,
+          "y": 55.1045950032684,
+          "zoom": 0.5
+        }
+      },
+      "style": "secondary"
+    },
+    {
+      "id": "cue-sk-audio-strobe-fast",
+      "name": "Strobe Fast",
+      "description": "White flash on strobes (fade 15/40/100 ms).",
+      "cueTypeId": "audio-sk-strobe-fast",
+      "effects": [
+        {
+          "effectId": "effect-audio-flash",
+          "effectFileId": "audio-core-effects",
+          "name": "Audio Flash"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_strobe_fast-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_strobe_fast-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-flash",
+            "parameterValues": {
+              "group": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "fadeInMs": {
+                "source": "literal",
+                "value": 15
+              },
+              "holdMs": {
+                "source": "literal",
+                "value": 40
+              },
+              "fadeOutMs": {
+                "source": "literal",
+                "value": 100
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_strobe_fast-beat",
+          "to": "sk_audio_strobe_fast-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_strobe_fast-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "sk_audio_strobe_fast-flash": {
+            "x": 0,
+            "y": 120
+          }
+        },
+        "viewport": {
+          "x": 230.73773330066086,
+          "y": 55.1045950032684,
+          "zoom": 0.5
+        }
+      },
+      "style": "secondary"
+    },
+    {
+      "id": "cue-sk-audio-strobe-fastest",
+      "name": "Strobe Fastest",
+      "description": "White flash on strobes (fade 10/25/50 ms).",
+      "cueTypeId": "audio-sk-strobe-fastest",
+      "effects": [
+        {
+          "effectId": "effect-audio-flash",
+          "effectFileId": "audio-core-effects",
+          "name": "Audio Flash"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_strobe_fastest-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_strobe_fastest-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-flash",
+            "parameterValues": {
+              "group": {
+                "source": "literal",
+                "value": "strobe"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "fadeInMs": {
+                "source": "literal",
+                "value": 10
+              },
+              "holdMs": {
+                "source": "literal",
+                "value": 25
+              },
+              "fadeOutMs": {
+                "source": "literal",
+                "value": 50
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_strobe_fastest-beat",
+          "to": "sk_audio_strobe_fastest-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_strobe_fastest-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "sk_audio_strobe_fastest-flash": {
+            "x": 0,
+            "y": 120
+          }
+        },
+        "viewport": {
+          "x": 230.73773330066086,
+          "y": 55.1045950032684,
+          "zoom": 0.5
+        }
+      },
+      "style": "secondary"
+    },
+    {
+      "id": "cue-sk-audio-frenzy",
+      "name": "Frenzy",
+      "description": "Random colour on front/back every beat.",
+      "cueTypeId": "audio-sk-frenzy",
+      "variables": [
+        {
+          "name": "pickColor",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "red"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_frenzy-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [
+          {
+            "id": "sk_audio_frenzy-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "pickColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 80
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk_audio_frenzy-rand",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-choice",
+            "choices": ["red", "green", "blue", "yellow", "amber", "purple", "cyan", "orange"],
+            "assignTo": "pickColor"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_frenzy-beat",
+          "to": "sk_audio_frenzy-rand"
+        },
+        {
+          "from": "sk_audio_frenzy-rand",
+          "to": "sk_audio_frenzy-act"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_frenzy-beat": {
+            "x": 7.091081354767084,
+            "y": -7.724432356655598
+          },
+          "sk_audio_frenzy-act": {
+            "x": 1.9767930340021849,
+            "y": 212.97701089829206
+          },
+          "sk_audio_frenzy-rand": {
+            "x": -6.614389775320888,
+            "y": 95.40596650540829
+          }
+        },
+        "viewport": {
+          "x": 599.8212406577077,
+          "y": 123.03028304688632,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-menu",
+      "name": "Menu",
+      "description": "Low blue base then blue sweep across all lights (2000ms).",
+      "cueTypeId": "audio-sk-menu",
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-sweep-color",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Sweep Colour"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_menu-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
+          {
+            "id": "ev-sk_audio_menu-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [
+          {
+            "id": "sk_audio_menu-base",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 200
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "sk_audio_menu-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_menu-sweep",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-sweep-color",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 10
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "blue"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_menu-start",
+          "to": "sk_audio_menu-base"
+        },
+        {
+          "from": "ev-sk_audio_menu-beat",
+          "to": "sk_audio_menu-all"
+        },
+        {
+          "from": "sk_audio_menu-all",
+          "to": "sk_audio_menu-sweep"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_menu-start": {
+            "x": 0,
+            "y": 0
+          },
+          "ev-sk_audio_menu-beat": {
+            "x": 255.32802124135196,
+            "y": 0
+          },
+          "sk_audio_menu-base": {
+            "x": -19.250237529476465,
+            "y": 113.1929272351166
+          },
+          "sk_audio_menu-all": {
+            "x": 237.9146157093346,
+            "y": 102.60605194419622
+          },
+          "sk_audio_menu-sweep": {
+            "x": 234.9573078546673,
+            "y": 242.37830698117614
+          }
+        },
+        "viewport": {
+          "x": 305.39821838833745,
+          "y": 134.2054870095694,
+          "zoom": 1.0097512975966862
+        }
+      }
+    },
+    {
+      "id": "cue-sk-audio-sweep",
+      "name": "Sweep",
+      "description": "6+ lights: red diagonal sweep. Fewer: layered colour sweeps.",
+      "cueTypeId": "audio-sk-sweep",
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-diagonal-sweep",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Diagonal Sweep"
+        },
+        {
+          "effectId": "effect-audio-sweep-color",
+          "effectFileId": "audio-stagekit-effects",
+          "name": "Sweep Colour"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-sk_audio_sweep-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
+          {
+            "id": "ev-sk_audio_sweep-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.35
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk_audio_sweep-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk_audio_sweep-len",
+            "type": "logic",
+            "logicType": "array-length",
+            "sourceVariable": "allLights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk_audio_sweep-is-large",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": ">=",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 6
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk_audio_sweep-diag",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-diagonal-sweep",
+            "parameterValues": {
+              "allLights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "colorName": {
+                "source": "literal",
+                "value": "red"
+              },
+              "colorBrightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "layerValue": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          },
+          {
+            "id": "sk_audio_sweep-ya",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-sweep-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              }
+            }
+          },
+          {
+            "id": "sk_audio_sweep-yb",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-sweep-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              }
+            }
+          },
+          {
+            "id": "sk_audio_sweep-blue",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-sweep-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 10
+              },
+              "color": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              }
+            }
+          },
+          {
+            "id": "sk_audio_sweep-green",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-sweep-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 0
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 0
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 15
+              },
+              "color": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-sk_audio_sweep-start",
+          "to": "sk_audio_sweep-all"
+        },
+        {
+          "from": "sk_audio_sweep-all",
+          "to": "sk_audio_sweep-len"
+        },
+        {
+          "from": "ev-sk_audio_sweep-beat",
+          "to": "sk_audio_sweep-is-large"
+        },
+        {
+          "from": "sk_audio_sweep-is-large",
+          "to": "sk_audio_sweep-diag",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk_audio_sweep-is-large",
+          "to": "sk_audio_sweep-ya",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk_audio_sweep-ya",
+          "to": "sk_audio_sweep-yb"
+        },
+        {
+          "from": "sk_audio_sweep-yb",
+          "to": "sk_audio_sweep-blue"
+        },
+        {
+          "from": "sk_audio_sweep-blue",
+          "to": "sk_audio_sweep-green"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-sk_audio_sweep-start": {
+            "x": 445.4948535111931,
+            "y": 1.866065983073554
+          },
+          "ev-sk_audio_sweep-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "sk_audio_sweep-all": {
+            "x": 445.88487697739276,
+            "y": 93.62683475797041
+          },
+          "sk_audio_sweep-len": {
+            "x": 439.64866119410965,
+            "y": 230.58275137876137
+          },
+          "sk_audio_sweep-is-large": {
+            "x": 17.30993092060089,
+            "y": 94.83435932919383
+          },
+          "sk_audio_sweep-diag": {
+            "x": -128.25501074737383,
+            "y": 224.39431503249386
+          },
+          "sk_audio_sweep-ya": {
+            "x": 127.65480618642141,
+            "y": 208.09917707439467
+          },
+          "sk_audio_sweep-yb": {
+            "x": -41.38816972102245,
+            "y": 542.8240898947145
+          },
+          "sk_audio_sweep-blue": {
+            "x": 215.7674495294508,
+            "y": 855.1767509741796
+          },
+          "sk_audio_sweep-green": {
+            "x": -42.84406243892431,
+            "y": 1147.7766438348158
+          }
+        },
+        "viewport": {
+          "x": 446.87787643657333,
+          "y": 59.0367041918704,
+          "zoom": 0.5358867312681463
+        }
+      }
+    }
+  ],
+  "bundled": true
+}

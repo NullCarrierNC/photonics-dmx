@@ -280,9 +280,10 @@ export const App = (): JSX.Element => {
           // Update all compatible fields from config (exclude deviceId which has type mismatch)
           fftSize: config.fftSize,
           sensitivity: config.sensitivity,
+          noiseFloor: config.noiseFloor,
+          bands: config.bands ? [...config.bands] : prev.audioConfig?.bands,
           beatDetection: config.beatDetection,
           smoothing: config.smoothing,
-          frequencyBands: config.frequencyBands,
           enabled: config.enabled,
           linearResponse: config.linearResponse,
           // Preserve fields that exist in frontend but not in backend config
@@ -369,7 +370,7 @@ export const App = (): JSX.Element => {
     audioCaptureManagerRef,
   })
 
-  const sidebarWidth = isLeftMenuCollapsed ? 80 : 208
+  const sidebarWidth = isLeftMenuCollapsed ? 80 : 218
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-black dark:text-gray-200">

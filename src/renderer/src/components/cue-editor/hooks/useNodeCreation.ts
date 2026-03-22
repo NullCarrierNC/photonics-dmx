@@ -26,7 +26,7 @@ import {
   type EffectRaiserNode,
   type EffectEventListenerNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { createId, buildDefaultAction } from '../lib/cueDefaults'
+import { createId, buildDefaultAction, buildDefaultAudioTrigger } from '../lib/cueDefaults'
 import type { EditorNode, EventOption, NotesVariant } from '../lib/types'
 import { getDefaultEventOption } from '../lib/options'
 
@@ -319,7 +319,10 @@ const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCre
         position: pos,
         data: {
           kind: 'event',
-          label: defaultOption.label,
+          label:
+            nodeMode === 'audio' && defaultOption.value === 'audio-trigger'
+              ? 'Audio Trigger'
+              : defaultOption.label,
           payload:
             nodeMode === 'yarg'
               ? {
@@ -327,13 +330,15 @@ const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCre
                   type: 'event',
                   eventType: defaultOption.value as YargEventNode['eventType'],
                 }
-              : {
-                  id: newEventId,
-                  type: 'event',
-                  eventType: defaultOption.value as AudioEventNode['eventType'],
-                  threshold: 0.5,
-                  triggerMode: 'edge',
-                },
+              : defaultOption.value === 'audio-trigger'
+                ? buildDefaultAudioTrigger(newEventId)
+                : {
+                    id: newEventId,
+                    type: 'event',
+                    eventType: defaultOption.value as AudioEventNode['eventType'],
+                    threshold: 0.5,
+                    triggerMode: 'edge',
+                  },
         },
       }
       setNodes((nds) => [...nds, newNode])

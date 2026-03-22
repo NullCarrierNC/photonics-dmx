@@ -15,6 +15,12 @@ export interface IAudioCue {
   /** Description of the cue effect's appearance */
   description: string
 
+  /** Display name from the cue file (editor Cue Name) */
+  name: string
+
+  /** Primary replaces the base look; secondary layers with addEffect (see audio runtime). */
+  style?: 'primary' | 'secondary'
+
   /**
    * Execute the cue with the given audio data
    * @param data The audio cue data

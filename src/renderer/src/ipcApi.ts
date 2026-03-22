@@ -176,6 +176,8 @@ export const setClockRate = (clockRate: number) =>
 
 export const openCueEditorWindow = () => window.api.invoke(WINDOW.OPEN_CUE_EDITOR, undefined)
 
+export const openAudioPreviewWindow = () => window.api.invoke(WINDOW.OPEN_AUDIO_PREVIEW, undefined)
+
 // ---------------------------------------------------------------------------
 // App information
 // ---------------------------------------------------------------------------

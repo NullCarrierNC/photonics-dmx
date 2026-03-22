@@ -516,7 +516,7 @@ describe('EffectExecutionEngine', () => {
           submitted.push(effectArg)
         },
       )
-      mockSequencer.addEffectUnblockedName.mockImplementation((_name, effectArg) => {
+      mockSequencer.addEffect.mockImplementation((_name, effectArg) => {
         submitted.push(effectArg)
         return true
       })
@@ -791,7 +791,7 @@ describe('EffectExecutionEngine', () => {
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (name, effectArg, _callback) => captureEffect(name, effectArg),
       )
-      mockSequencer.addEffectUnblockedName.mockImplementation((name, effectArg) => {
+      mockSequencer.addEffect.mockImplementation((name, effectArg) => {
         captureEffect(name, effectArg)
         return true
       })
@@ -999,10 +999,10 @@ describe('EffectExecutionEngine', () => {
 
       await engine.triggerEffect(createCueData())
 
-      // Verify action was executed via internal event (engine may use addEffectUnblockedName or addEffectUnblockedNameWithCallback)
+      // Verify action was executed via internal event (engine may use addEffect or addEffectUnblockedNameWithCallback)
       expect(
         mockSequencer.addEffectUnblockedNameWithCallback.mock.calls.length +
-          mockSequencer.addEffectUnblockedName.mock.calls.length,
+          mockSequencer.addEffect.mock.calls.length,
       ).toBeGreaterThanOrEqual(1)
     })
   })

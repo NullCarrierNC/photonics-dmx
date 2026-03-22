@@ -164,10 +164,10 @@ describe('Node cue logic runtime', () => {
     const compiled = NodeCueCompiler.compileYargCue(definition)
     const cue = new YargNodeCue('group-1', compiled)
 
-    const addEffectUnblockedName = jest.fn().mockReturnValue(true)
+    const addEffect = jest.fn()
 
     const sequencer = {
-      addEffectUnblockedName,
+      addEffect,
       setEffectUnblockedName: jest.fn().mockReturnValue(true),
       addEffectUnblockedNameWithCallback: jest
         .fn()
@@ -223,7 +223,7 @@ describe('Node cue logic runtime', () => {
     expect(buildEffectSpy).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: expect.objectContaining({ id: 'action-false' }) }),
     )
-    expect(addEffectUnblockedName).toHaveBeenCalledTimes(1)
+    expect(addEffect).toHaveBeenCalledTimes(1)
   })
 
   describe('shuffle-lights', () => {
@@ -236,6 +236,7 @@ describe('Node cue logic runtime', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
       const mockSequencer = {
+        addEffect: jest.fn(),
         addEffectUnblockedName: jest.fn().mockReturnValue(true),
         setEffectUnblockedName: jest.fn().mockReturnValue(true),
         addEffectUnblockedNameWithCallback: jest
@@ -311,6 +312,7 @@ describe('Node cue logic runtime', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
       const mockSequencer = {
+        addEffect: jest.fn(),
         addEffectUnblockedName: jest.fn().mockReturnValue(true),
         setEffectUnblockedName: jest.fn().mockReturnValue(true),
         addEffectUnblockedNameWithCallback: jest
@@ -384,6 +386,7 @@ describe('Node cue logic runtime', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
       const mockSequencer = {
+        addEffect: jest.fn(),
         addEffectUnblockedName: jest.fn().mockReturnValue(true),
         setEffectUnblockedName: jest.fn().mockReturnValue(true),
         addEffectUnblockedNameWithCallback: jest
@@ -448,6 +451,7 @@ describe('Node cue logic runtime', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
       const mockSequencer = {
+        addEffect: jest.fn(),
         addEffectUnblockedName: jest.fn().mockReturnValue(true),
         setEffectUnblockedName: jest.fn().mockReturnValue(true),
         addEffectUnblockedNameWithCallback: jest
@@ -506,6 +510,7 @@ describe('Node cue logic runtime', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
       const mockSequencer = {
+        addEffect: jest.fn(),
         addEffectUnblockedName: jest.fn().mockReturnValue(true),
         setEffectUnblockedName: jest.fn().mockReturnValue(true),
         addEffectUnblockedNameWithCallback: jest
@@ -569,6 +574,7 @@ describe('Node cue logic runtime', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
       const mockSequencer = {
+        addEffect: jest.fn(),
         addEffectUnblockedName: jest.fn().mockReturnValue(true),
         setEffectUnblockedName: jest.fn().mockReturnValue(true),
         addEffectUnblockedNameWithCallback: jest
@@ -643,9 +649,9 @@ describe('Node cue logic runtime', () => {
 
   describe('debugger', () => {
     it('execution passes through and downstream action fires', () => {
-      const addEffectUnblockedName = jest.fn().mockReturnValue(true)
+      const addEffect = jest.fn()
       const mockSequencer = {
-        addEffectUnblockedName,
+        addEffect,
         setEffectUnblockedName: jest.fn().mockReturnValue(true),
         addEffectUnblockedNameWithCallback: jest
           .fn()
@@ -697,7 +703,7 @@ describe('Node cue logic runtime', () => {
       )
       engine.startExecution(eventNode, createCueData('Strong'))
 
-      expect(addEffectUnblockedName).toHaveBeenCalledTimes(1)
+      expect(addEffect).toHaveBeenCalledTimes(1)
     })
   })
 })

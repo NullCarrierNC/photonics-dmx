@@ -10,7 +10,7 @@ import { LightingConfiguration, ConfigStrobeType } from '../../photonics-dmx/typ
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
-import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import { AudioConfig, AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock'
 import { app } from 'electron'
 import { sendToAllWindows } from '../utils/windowUtils'
@@ -332,6 +332,7 @@ export class ControllerManager {
 
     this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {
       sendToAllWindows(RENDERER_RECEIVE.NODE_CUES_CHANGED, payload)
+      this.refreshAudioCueSelection()
     })
   }
 
@@ -838,5 +839,12 @@ export class ControllerManager {
    */
   public getIsAudioEnabled(): boolean {
     return this.audioController.getIsAudioEnabled()
+  }
+
+  /**
+   * Routes analysed audio frames to the Audio Preview window (wired from IPC setup).
+   */
+  public setAudioMirrorBroadcaster(fn: (data: AudioLightingData) => void): void {
+    this.audioController.setBroadcastAudioMirror(fn)
   }
 }

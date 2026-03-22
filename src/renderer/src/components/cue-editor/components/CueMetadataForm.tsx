@@ -167,14 +167,28 @@ const CueMetadataForm: React.FC<Props> = ({
             </>
           )}
           {!isEffectMode && activeMode === 'audio' && (
-            <label className="flex flex-col font-medium">
-              Cue Identifier
-              <input
-                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                value={(currentCue as AudioNodeCueDefinition).cueTypeId}
-                onChange={(event) => onCueMetadataChange({ cueTypeId: event.target.value })}
-              />
-            </label>
+            <>
+              <label className="flex flex-col font-medium">
+                Cue Identifier
+                <input
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={(currentCue as AudioNodeCueDefinition).cueTypeId}
+                  onChange={(event) => onCueMetadataChange({ cueTypeId: event.target.value })}
+                />
+              </label>
+              <label className="flex flex-col font-medium">
+                Cue Style
+                <select
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={(currentCue as AudioNodeCueDefinition).style ?? 'primary'}
+                  onChange={(event) =>
+                    onCueMetadataChange({ style: event.target.value as 'primary' | 'secondary' })
+                  }>
+                  <option value="primary">Primary</option>
+                  <option value="secondary">Secondary</option>
+                </select>
+              </label>
+            </>
           )}
         </div>
       )}

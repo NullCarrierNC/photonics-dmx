@@ -390,7 +390,11 @@ export class LightTransitionController {
             green: this.interpolate(startState.green, endState.green, easedProgress),
             blue: this.interpolate(startState.blue, endState.blue, easedProgress),
             intensity: this.interpolate(startState.intensity, endState.intensity, easedProgress),
-            opacity: endState.opacity,
+            opacity: this.interpolateFloat(
+              startState.opacity ?? 1.0,
+              endState.opacity ?? 1.0,
+              easedProgress,
+            ),
             blendMode: endState.blendMode,
           }
 
@@ -541,6 +545,12 @@ export class LightTransitionController {
   private interpolate(start: number, end: number, t: number): number {
     // Using Math.max to ensure the result is never negative
     return Math.max(0, Math.round(start + (end - start) * t))
+  }
+
+  /** Interpolate 0–1 float channels (e.g. opacity) without integer rounding */
+  private interpolateFloat(start: number, end: number, t: number): number {
+    const v = start + (end - start) * t
+    return Math.max(0, Math.min(1, v))
   }
 
   /**

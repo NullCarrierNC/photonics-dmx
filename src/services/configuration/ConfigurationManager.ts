@@ -10,7 +10,7 @@ import {
 } from '../../photonics-dmx/types'
 
 import type { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import { AudioCueType, BuiltInAudioCues } from '../../photonics-dmx/cues/types/audioCueTypes'
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
 
 /**
@@ -95,6 +95,12 @@ export interface AppPreferences {
     x?: number
     y?: number
   }
+  audioPreviewWindowState?: {
+    width: number
+    height: number
+    x?: number
+    y?: number
+  }
 }
 
 /**
@@ -111,11 +117,11 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
   enabledCueGroups: ['stagekit'],
-  enabledAudioCueGroups: ['audio-spectrum'],
+  enabledAudioCueGroups: [],
   cueConsistencyWindow: 60000,
   cueGroupSelectionMode: 'withinSong',
   clockRate: 10, // 10ms (100 Hz) for smooth animations and strobe cues
-  activeAudioCueType: BuiltInAudioCues.BasicLayered,
+  activeAudioCueType: '' as AudioCueType,
 
   // Brightness configuration defaults
   brightness: {
@@ -158,6 +164,10 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   cueEditorWindowState: {
     width: 1200,
     height: 900,
+  },
+  audioPreviewWindowState: {
+    width: 560,
+    height: 480,
   },
 }
 
