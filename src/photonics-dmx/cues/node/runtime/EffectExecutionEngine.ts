@@ -56,6 +56,8 @@ export class EffectExecutionEngine {
   private eventListeners: Map<string, EventListenerNode[]> = new Map()
   private callerCueData: CueData | AudioCueData // Cue data from caller
   private onIdleCallback?: () => void // Called when all contexts complete
+  /** Prevents re-entrant onIdleCallback when triggerEffect completes synchronously (e.g. persistent raiser re-trigger). */
+  private firingIdle = false
   /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
   /** Callback-backed effects still running in sequencer for this engine instance. */
@@ -84,7 +86,13 @@ export class EffectExecutionEngine {
       this.activeContexts.size === 0 &&
       this.pendingCallbackEffects.size === 0
     ) {
-      this.onIdleCallback()
+      if (this.firingIdle) return
+      this.firingIdle = true
+      try {
+        this.onIdleCallback()
+      } finally {
+        this.firingIdle = false
+      }
     }
   }
 

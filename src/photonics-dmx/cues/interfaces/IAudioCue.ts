@@ -18,8 +18,8 @@ export interface IAudioCue {
   /** Display name from the cue file (editor Cue Name) */
   name: string
 
-  /** Primary replaces the base look; secondary layers with addEffect (see audio runtime). */
-  style?: 'primary' | 'secondary'
+  /** Primary = base look; secondary/strobe = overlay. Strobe is for strobe-only cues (Game Mode filters these from primary rotation). */
+  style?: 'primary' | 'secondary' | 'strobe'
 
   /**
    * Execute the cue with the given audio data

@@ -3,7 +3,11 @@ import { ConfigurationManager } from '../../services/configuration/Configuration
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
 import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor'
-import { AudioConfig, AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import {
+  AudioConfig,
+  AudioGameModeConfig,
+  AudioLightingData,
+} from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
@@ -54,8 +58,13 @@ export class AudioController {
         audioConfig,
         preferredCueType,
       )
-      this.deps.config.setActiveAudioCueType(this.audioProcessor.getCurrentCueType())
       this.audioProcessor.start()
+      const gameMode = this.deps.config.getAudioGameModeConfig()
+      if (gameMode.enabled) {
+        this.audioProcessor.enableGameMode(gameMode)
+      } else {
+        await this.deps.config.setActiveAudioCueType(this.audioProcessor.getManualPrimaryCueType())
+      }
       if (this.audioDataHandler) {
         ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
         this.audioDataHandler = null
@@ -123,7 +132,29 @@ export class AudioController {
   public refreshAudioCueSelection(): void {
     if (this.audioProcessor) {
       this.audioProcessor.refreshCueSelection()
-      this.deps.config.setActiveAudioCueType(this.audioProcessor.getCurrentCueType())
+      if (!this.deps.config.getAudioGameModeConfig().enabled) {
+        void this.deps.config.setActiveAudioCueType(this.audioProcessor.getManualPrimaryCueType())
+      }
+    }
+  }
+
+  public getAudioGameModeConfig(): AudioGameModeConfig {
+    return this.deps.config.getAudioGameModeConfig()
+  }
+
+  public async setAudioGameModeConfig(config: AudioGameModeConfig): Promise<void> {
+    await this.deps.config.setAudioGameModeConfig(config)
+    if (!this.audioProcessor || !this.isAudioEnabled) {
+      return
+    }
+    if (config.enabled) {
+      if (this.audioProcessor.isGameModeEnabled()) {
+        this.audioProcessor.updateGameModeConfig(config)
+      } else {
+        this.audioProcessor.enableGameMode(config)
+      }
+    } else if (this.audioProcessor.isGameModeEnabled()) {
+      this.audioProcessor.disableGameMode()
     }
   }
 
@@ -211,5 +242,9 @@ export class AudioController {
 
   public getIsAudioEnabled(): boolean {
     return this.isAudioEnabled
+  }
+
+  public isAudioGameModeActive(): boolean {
+    return this.audioProcessor?.isGameModeEnabled() ?? false
   }
 }

@@ -298,10 +298,13 @@ export interface YargNodeCueDefinition extends BaseCueDefinition {
   nodes: NodeGraph<YargEventNode, ActionNode>
 }
 
+/** Layering for audio node cues: primary = base look; secondary/strobe = overlay (addEffect). Strobe is excluded from Game Mode primary rotation. */
+export type AudioCueLayerStyle = 'primary' | 'secondary' | 'strobe'
+
 export interface AudioNodeCueDefinition extends BaseCueDefinition {
   cueTypeId: string
-  /** Layering: primary replaces base look (first submission uses setEffect); secondary adds on top (addEffect). Defaults to primary when omitted. */
-  style?: 'primary' | 'secondary'
+  /** Defaults to primary when omitted. Strobe uses the same runtime layering as secondary. */
+  style?: AudioCueLayerStyle
   nodes: NodeGraph<AudioEventNodeUnion, ActionNode>
 }
 

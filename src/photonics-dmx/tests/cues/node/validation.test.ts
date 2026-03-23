@@ -242,6 +242,36 @@ describe('Node cue validation', () => {
     expect(r2.valid).toBe(true)
   })
 
+  it('validates audio node cue with style strobe', () => {
+    const strobeDef: AudioNodeCueDefinition = {
+      id: 'audio-strobe-style',
+      name: 'Strobe',
+      cueTypeId: 'custom-strobe',
+      style: 'strobe',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-beat',
+            threshold: 0.5,
+            triggerMode: 'edge',
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [strobeDef],
+    })
+    expect(result.valid).toBe(true)
+  })
+
   it('validates audio cue with audio-hfc event type', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'hfc-cue',

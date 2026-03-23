@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
 import type {
+  AudioCueLayerStyle,
   AudioNodeCueDefinition,
   NodeCueMode,
   NodeCueGroupMeta,
@@ -22,7 +23,9 @@ type Props = {
   activeMode: NodeCueMode
   editorMode: EditorMode
   onGroupChange: (updates: Partial<NodeCueGroupMeta | EffectGroupMeta>) => void
-  onCueMetadataChange: (updates: Partial<YargNodeCueDefinition & AudioNodeCueDefinition>) => void
+  onCueMetadataChange: (
+    updates: Partial<YargNodeCueDefinition> | Partial<AudioNodeCueDefinition>,
+  ) => void
   onEffectMetadataChange?: (
     updates: Partial<YargEffectDefinition> & Partial<AudioEffectDefinition>,
   ) => void
@@ -182,10 +185,11 @@ const CueMetadataForm: React.FC<Props> = ({
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={(currentCue as AudioNodeCueDefinition).style ?? 'primary'}
                   onChange={(event) =>
-                    onCueMetadataChange({ style: event.target.value as 'primary' | 'secondary' })
+                    onCueMetadataChange({ style: event.target.value as AudioCueLayerStyle })
                   }>
                   <option value="primary">Primary</option>
                   <option value="secondary">Secondary</option>
+                  <option value="strobe">Strobe</option>
                 </select>
               </label>
             </>

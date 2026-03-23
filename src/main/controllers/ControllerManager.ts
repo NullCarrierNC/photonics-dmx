@@ -10,7 +10,11 @@ import { LightingConfiguration, ConfigStrobeType } from '../../photonics-dmx/typ
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
-import { AudioConfig, AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import {
+  AudioConfig,
+  AudioGameModeConfig,
+  AudioLightingData,
+} from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock'
 import { app } from 'electron'
 import { sendToAllWindows } from '../utils/windowUtils'
@@ -839,6 +843,18 @@ export class ControllerManager {
    */
   public getIsAudioEnabled(): boolean {
     return this.audioController.getIsAudioEnabled()
+  }
+
+  public getAudioGameModeConfig(): AudioGameModeConfig {
+    return this.audioController.getAudioGameModeConfig()
+  }
+
+  public async setAudioGameModeConfig(config: AudioGameModeConfig): Promise<void> {
+    await this.audioController.setAudioGameModeConfig(config)
+  }
+
+  public isAudioGameModeActive(): boolean {
+    return this.audioController.isAudioGameModeActive()
   }
 
   /**

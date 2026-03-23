@@ -15,6 +15,7 @@ import {
   validateOptionalStringArray,
   validatePreferencesPayload,
   validateAudioConfigPayload,
+  validateAudioGameModePayload,
 } from './inputValidation'
 
 /**
@@ -322,6 +323,26 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     } catch (error) {
       console.error('Error setting active audio cue:', error)
       return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_AUDIO_GAME_MODE, async () => {
+    return controllerManager.getAudioGameModeConfig()
+  })
+
+  ipcMain.handle(CONFIG.SET_AUDIO_GAME_MODE, async (_, updates: unknown) => {
+    try {
+      const base = controllerManager.getAudioGameModeConfig()
+      const validation = validateAudioGameModePayload(updates, base)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      await controllerManager.setAudioGameModeConfig(validation.value)
+      sendToAllWindows(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, validation.value)
+      return { success: true, config: validation.value }
+    } catch (error) {
+      console.error('Error setting audio game mode:', error)
+      return { ...ipcError(error), success: false }
     }
   })
 

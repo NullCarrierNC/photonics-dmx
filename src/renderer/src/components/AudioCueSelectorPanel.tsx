@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAudioEnabled, getAudioReactiveCues, setActiveAudioCue } from '../ipcApi'
+import {
+  getAudioEnabled,
+  getAudioGameMode,
+  getAudioReactiveCues,
+  setActiveAudioCue,
+} from '../ipcApi'
 
 interface AudioCueOption {
   id: string
@@ -34,6 +39,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [gameModeEnabled, setGameModeEnabled] = useState(false)
 
   const loadCueState = useCallback(async (silent = false) => {
     try {
@@ -42,6 +48,13 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       }
       const enabled = await getAudioEnabled()
       setAudioEnabled(enabled)
+
+      try {
+        const gm = await getAudioGameMode()
+        setGameModeEnabled(gm.enabled)
+      } catch {
+        setGameModeEnabled(false)
+      }
 
       if (!enabled) {
         setAvailableCues([])
@@ -92,11 +105,13 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, handleAudioEvent)
 
     return () => {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, handleAudioEvent)
     }
   }, [loadCueState])
 
@@ -208,8 +223,22 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         </span>
       </div>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Choose which audio-reactive cue drives the DMX output while Audio Reactive mode is active.
+        When game mode is enabled, cues are cycled randomly through your enabled audio cue groups.
+        When disabled you can select the cue manually.
       </p>
+
+      {gameModeEnabled && audioEnabled && (
+        <p className="text-sm text-amber-800 dark:text-amber-200 mb-4 rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-3 py-2">
+          Game Mode cycles randomly through cues from your enabled audio cue groups. Cues switch on
+          the beat after each random duration window (see Audio Settings → Game Mode).
+          {activeCue && (
+            <>
+              {' '}
+              <strong>Active cue:</strong> {selectedCue?.label || activeCue}
+            </>
+          )}
+        </p>
+      )}
 
       {error && (
         <div className="mb-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-700 dark:bg-red-900 dark:text-red-100">
@@ -244,7 +273,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
                 className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
                 value={selectedGroupId || ''}
                 onChange={(event) => handleGroupChange(event.target.value)}
-                disabled={saving || groupOptions.length === 0}>
+                disabled={saving || groupOptions.length === 0 || gameModeEnabled}>
                 <option value="" disabled>
                   {groupOptions.length === 0 ? 'No groups available' : 'Choose a group'}
                 </option>
@@ -264,7 +293,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
                 className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
                 value={selectedCueId || activeCue || ''}
                 onChange={(event) => handleCueChange(event.target.value)}
-                disabled={saving || cuesForSelectedGroup.length === 0}>
+                disabled={saving || cuesForSelectedGroup.length === 0 || gameModeEnabled}>
                 <option value="" disabled>
                   {cuesForSelectedGroup.length === 0 ? 'No cues for this group' : 'Choose a cue'}
                 </option>

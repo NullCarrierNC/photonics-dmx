@@ -120,6 +120,8 @@ export const CONFIG = {
   SET_ENABLED_AUDIO_CUE_GROUPS: 'set-enabled-audio-cue-groups',
   GET_AUDIO_REACTIVE_CUES: 'get-audio-reactive-cues',
   SET_ACTIVE_AUDIO_CUE: 'set-active-audio-cue',
+  GET_AUDIO_GAME_MODE: 'get-audio-game-mode',
+  SET_AUDIO_GAME_MODE: 'set-audio-game-mode',
   GET_STAGE_KIT_PRIORITY: 'get-stage-kit-priority',
   SET_STAGE_KIT_PRIORITY: 'set-stage-kit-priority',
 } as const
@@ -149,6 +151,7 @@ export const RENDERER_RECEIVE = {
   /** Broadcast after SET_AUDIO_ENABLED so all windows sync Enable Audio UI (e.g. Live Monitor in Cue Editor). */
   AUDIO_ENABLED_CHANGED: 'audio:enabled-changed',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
+  AUDIO_GAME_MODE_UPDATE: 'audio:game-mode-update',
   /** Mirrored AudioLightingData for Audio Preview window (main process → single target window). */
   AUDIO_DATA_MIRROR: 'audio:data-mirror',
   CUE_STATE_UPDATE: 'cue-state-update',

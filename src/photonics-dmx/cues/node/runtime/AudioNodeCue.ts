@@ -10,6 +10,7 @@ import {
   AudioTriggerSpectralGates,
   LogicNode,
   ValueSource,
+  AudioCueLayerStyle,
   AudioNodeCueDefinition,
 } from '../../types/nodeCueTypes'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -130,9 +131,12 @@ export class AudioNodeCue implements IAudioCue {
     this.initializeVariables()
   }
 
-  get style(): 'primary' | 'secondary' {
+  get style(): AudioCueLayerStyle {
     const s = (this.compiledCue.definition as AudioNodeCueDefinition).style
-    return s === 'secondary' ? 'secondary' : 'primary'
+    if (s === 'secondary' || s === 'strobe') {
+      return s
+    }
+    return 'primary'
   }
 
   async execute(
