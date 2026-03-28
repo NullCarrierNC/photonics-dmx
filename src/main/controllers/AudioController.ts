@@ -58,6 +58,18 @@ export class AudioController {
         audioConfig,
         preferredCueType,
       )
+      this.audioProcessor.setOnStrobeStateChange((active) => {
+        const secondaryCueType = this.audioProcessor?.getEffectiveSecondaryCueType() ?? null
+        this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_STROBE_STATE, {
+          active,
+          secondaryCueType,
+        })
+      })
+      this.audioProcessor.setOnGameModeCueChange((activeCueType) => {
+        this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE, {
+          activeCueType,
+        })
+      })
       this.audioProcessor.start()
       const gameMode = this.deps.config.getAudioGameModeConfig()
       if (gameMode.enabled) {
@@ -111,6 +123,8 @@ export class AudioController {
       this.audioDataHandler = null
     }
     if (this.audioProcessor) {
+      this.audioProcessor.setOnStrobeStateChange(null)
+      this.audioProcessor.setOnGameModeCueChange(null)
       this.audioProcessor.shutdown()
       this.audioProcessor = null
     }
@@ -156,6 +170,13 @@ export class AudioController {
     } else if (this.audioProcessor.isGameModeEnabled()) {
       this.audioProcessor.disableGameMode()
     }
+  }
+
+  public getActiveSecondaryCueType(): AudioCueType | null {
+    if (this.audioProcessor) {
+      return this.audioProcessor.getEffectiveSecondaryCueType()
+    }
+    return null
   }
 
   public getActiveAudioCueType(): AudioCueType {

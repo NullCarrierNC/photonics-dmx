@@ -152,6 +152,10 @@ export const RENDERER_RECEIVE = {
   AUDIO_ENABLED_CHANGED: 'audio:enabled-changed',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
   AUDIO_GAME_MODE_UPDATE: 'audio:game-mode-update',
+  /** Game Mode primary cue changed (main process → renderer). */
+  AUDIO_GAME_MODE_CUE_CHANGE: 'audio:game-mode-cue-change',
+  /** Strobe cue firing state (main process → renderer, on transitions). */
+  AUDIO_STROBE_STATE: 'audio:strobe-state',
   /** Mirrored AudioLightingData for Audio Preview window (main process → single target window). */
   AUDIO_DATA_MIRROR: 'audio:data-mirror',
   CUE_STATE_UPDATE: 'cue-state-update',

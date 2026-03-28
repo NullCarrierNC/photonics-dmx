@@ -507,6 +507,7 @@ export interface IpcInvokeMap {
       | {
           success: true
           activeCueType: AudioCueType
+          secondaryCueType: AudioCueType | null
           cues: Array<{
             id: AudioCueType
             label: string
@@ -516,7 +517,7 @@ export interface IpcInvokeMap {
             groupDescription: string
           }>
         }
-      | (IpcErrorResult & { activeCueType: null; cues: [] })
+      | (IpcErrorResult & { activeCueType: null; secondaryCueType: null; cues: [] })
   }
   [CONFIG.SET_ACTIVE_AUDIO_CUE]: {
     request: AudioCueType
@@ -597,6 +598,11 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED]: { enabled: boolean }
   [RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE]: AudioConfig | undefined
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE]: AudioGameModeConfig
+  [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
+  [RENDERER_RECEIVE.AUDIO_STROBE_STATE]: {
+    active: boolean
+    secondaryCueType: string | null
+  }
   [RENDERER_RECEIVE.AUDIO_DATA_MIRROR]: AudioLightingData
   [RENDERER_RECEIVE.CUE_STATE_UPDATE]: CueStateUpdatePayload
   [RENDERER_RECEIVE.DMX_VALUES]: { universeBuffer: Record<number, number> }

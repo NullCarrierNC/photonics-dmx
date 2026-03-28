@@ -38,6 +38,7 @@ export class AudioGameModeManager {
   private primaryCue: AudioCueType = ''
   private pendingSwitch = false
   private switchDeadlineMs = 0
+  private onCueSwitch: ((cueType: AudioCueType) => void) | null = null
 
   constructor(initialConfig: AudioGameModeConfig) {
     this.config = { ...initialConfig }
@@ -57,6 +58,11 @@ export class AudioGameModeManager {
     }
     this.pendingSwitch = false
     this.scheduleNextSwitch()
+    this.onCueSwitch?.(this.primaryCue)
+  }
+
+  public setOnCueSwitch(cb: ((cueType: AudioCueType) => void) | null): void {
+    this.onCueSwitch = cb
   }
 
   public stop(): void {
@@ -100,6 +106,7 @@ export class AudioGameModeManager {
   }
 
   private switchToNextCue(): void {
+    const prev = this.primaryCue
     let pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes())
     if (pool.length === 0) {
       pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes(true))
@@ -109,12 +116,18 @@ export class AudioGameModeManager {
       const fallbackAny = any.length > 0 ? any : this.registry.getAvailableCueTypes(true)
       const others = fallbackAny.filter((id) => id !== this.primaryCue)
       this.primaryCue = (others.length > 0 ? pickRandom(others) : fallbackAny[0]) ?? this.primaryCue
+      if (this.primaryCue !== prev) {
+        this.onCueSwitch?.(this.primaryCue)
+      }
       return
     }
 
     const others = pool.filter((id) => id !== this.primaryCue)
     if (others.length > 0) {
       this.primaryCue = pickRandom(others) ?? this.primaryCue
+    }
+    if (this.primaryCue !== prev) {
+      this.onCueSwitch?.(this.primaryCue)
     }
   }
 }

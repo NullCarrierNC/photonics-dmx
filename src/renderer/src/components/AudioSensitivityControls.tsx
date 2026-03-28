@@ -337,7 +337,6 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             className={numberClassName}
             aria-label="Strobe probability percent"
           />
-          <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0">%</span>
         </div>
       </div>
     )

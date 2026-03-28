@@ -223,6 +223,9 @@ export interface LightingPreferences {
     }
     enabled: boolean
     linearResponse?: boolean
+    strobeEnabled?: boolean
+    strobeTriggerThreshold?: number
+    strobeProbability?: number
   }
 }
 

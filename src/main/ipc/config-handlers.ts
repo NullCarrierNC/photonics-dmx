@@ -297,9 +297,11 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     try {
       const cues = controllerManager.getAudioCueOptions()
       const activeCueType = controllerManager.getActiveAudioCueType()
+      const secondaryCueType = controllerManager.getActiveSecondaryCueType()
       return {
         success: true,
         activeCueType,
+        secondaryCueType,
         cues,
       }
     } catch (error) {
@@ -307,6 +309,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return {
         ...ipcError(error),
         activeCueType: null,
+        secondaryCueType: null,
         cues: [],
       }
     }

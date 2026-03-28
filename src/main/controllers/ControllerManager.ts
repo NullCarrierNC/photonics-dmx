@@ -818,6 +818,13 @@ export class ControllerManager {
   }
 
   /**
+   * Secondary cue driving the overlay slot (manual secondary or active strobe cue).
+   */
+  public getActiveSecondaryCueType(): AudioCueType | null {
+    return this.audioController.getActiveSecondaryCueType()
+  }
+
+  /**
    * Persist and apply a new audio cue selection
    */
   public setActiveAudioCueType(cueType: AudioCueType): { success: boolean; error?: string } {
