@@ -242,6 +242,36 @@ describe('Node cue validation', () => {
     expect(r2.valid).toBe(true)
   })
 
+  it('validates audio node cue with style strobe', () => {
+    const strobeDef: AudioNodeCueDefinition = {
+      id: 'audio-strobe-style',
+      name: 'Strobe',
+      cueTypeId: 'custom-strobe',
+      style: 'strobe',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-beat',
+            threshold: 0.5,
+            triggerMode: 'edge',
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [strobeDef],
+    })
+    expect(result.valid).toBe(true)
+  })
+
   it('validates audio cue with audio-hfc event type', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'hfc-cue',
@@ -929,6 +959,36 @@ describe('Node cue validation', () => {
     }
   })
 
+  it('validates bundled audio-disco.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/audio/audio-disco.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateAudioNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+      }
+    }
+  })
+
+  it('validates bundled audio-rock.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/audio/audio-rock.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateAudioNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+      }
+    }
+  })
+
   it('audio stagekit rotation effect raisers are persistent (seamless loop at wrap)', () => {
     const filePath = path.join(
       __dirname,
@@ -953,6 +1013,7 @@ describe('Node cue validation', () => {
       'cue-sk-audio-harmony',
       'cue-sk-audio-searchlights',
       'cue-sk-audio-score',
+      'cue-sk-audio-sweep',
     ]
     for (const cueId of cueIds) {
       const cue = data.cues.find((c) => c.id === cueId)
@@ -961,7 +1022,9 @@ describe('Node cue validation', () => {
       for (const r of raisers) {
         if (
           r.effectId === 'effect-audio-rotation-cw' ||
-          r.effectId === 'effect-audio-rotation-ccw'
+          r.effectId === 'effect-audio-rotation-ccw' ||
+          r.effectId === 'effect-audio-diagonal-sweep' ||
+          r.effectId === 'effect-audio-sweep-color'
         ) {
           expect(r.isPersistent).toBe(true)
         }

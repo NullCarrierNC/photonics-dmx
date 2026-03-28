@@ -79,22 +79,14 @@ const AudioSmoothingSettings: React.FC = () => {
 
       {enabled && (
         <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Smoothing Factor (Alpha)
-              </label>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Higher values = less smoothing (more responsive), lower values = more smoothing
-                (less flicker)
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
-                {alpha.toFixed(2)}
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">/ 0.95</span>
-            </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Smoothing Factor (Alpha)
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Higher values = less smoothing (more responsive), lower values = more smoothing (less
+              flicker)
+            </p>
           </div>
 
           <div className="flex items-center space-x-4">

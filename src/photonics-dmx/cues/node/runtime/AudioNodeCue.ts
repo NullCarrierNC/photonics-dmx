@@ -10,6 +10,7 @@ import {
   AudioTriggerSpectralGates,
   LogicNode,
   ValueSource,
+  AudioCueLayerStyle,
   AudioNodeCueDefinition,
 } from '../../types/nodeCueTypes'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -130,9 +131,12 @@ export class AudioNodeCue implements IAudioCue {
     this.initializeVariables()
   }
 
-  get style(): 'primary' | 'secondary' {
+  get style(): AudioCueLayerStyle {
     const s = (this.compiledCue.definition as AudioNodeCueDefinition).style
-    return s === 'secondary' ? 'secondary' : 'primary'
+    if (s === 'secondary' || s === 'strobe') {
+      return s
+    }
+    return 'primary'
   }
 
   async execute(
@@ -249,9 +253,10 @@ export class AudioNodeCue implements IAudioCue {
           })
 
           if (effect) {
-            tasks.push(sequencer.setEffect(effectKey, effect))
             // Extract layer from ValueSource or use default
             const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
+            sequencer.removeEffect(effectKey, layer)
+            sequencer.addEffect(effectKey, effect)
             this.activeLevelEffects.set(effectKey, layer)
           }
         } else if (this.activeLevelEffects.has(effectKey)) {

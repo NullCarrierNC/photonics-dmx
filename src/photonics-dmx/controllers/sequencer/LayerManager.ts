@@ -19,9 +19,9 @@ import { RGBIO, TrackedLight } from '../../types'
  * - Layer 0: Base layer (preserved by design)
  * - Layers 1-99: Standard effect layers
  * - Layers 100+: High priority "flash" layers
- * - Layers 200: Blackout layers
+ * - Layer 200: Strobe effects
  * - Layers 201-254: Reserved for future use
- * - Layer 255: Strobe effects
+ * - Layer 255: Blackout layer
  *
  */
 export class LayerManager implements ILayerManager {
@@ -30,7 +30,7 @@ export class LayerManager implements ILayerManager {
   // Per-light queue tracking: Map<layer, Map<lightId, QueuedEffect>>
   private _effectQueue: Map<number, Map<string, QueuedEffect>> = new Map()
   private _layerLastUsed: Map<number, number> = new Map()
-  private _blackoutLayersUnder: number = 200
+  private _blackoutLayersUnder: number = 255
   private _lightTransitionController: LightTransitionController
 
   // New property for storing layer states

@@ -1079,6 +1079,77 @@ describe('EffectExecutionEngine', () => {
     })
   })
 
+  describe('maybeFireIdle re-entrancy (persistent re-trigger)', () => {
+    const createSyncMinimalEffect = (): YargEffectDefinition => ({
+      id: 'sync-idle-effect',
+      mode: 'yarg',
+      name: 'Sync Idle Effect',
+      description: '',
+      variables: [],
+      nodes: {
+        events: [],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
+            },
+            color: {
+              name: { source: 'literal', value: 'white' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
+            },
+            timing: {
+              waitForCondition: { source: 'literal', value: 'none' },
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 100 },
+              waitUntilCondition: { source: 'literal', value: 'none' },
+              waitUntilTime: { source: 'literal', value: 0 },
+              easing: 'linear',
+              level: { source: 'literal', value: 1 },
+            },
+            layer: { source: 'literal', value: 0 },
+          },
+        ],
+        logic: [],
+        eventRaisers: [],
+        eventListeners: [],
+        effectListeners: [
+          {
+            id: 'listener-1',
+            type: 'effect-listener',
+            label: 'Entry',
+            outputs: ['action-1'],
+          },
+        ],
+      },
+      connections: [{ from: 'listener-1', to: 'action-1' }],
+      layout: { nodePositions: {} },
+    })
+
+    it('does not stack overflow when onIdle re-triggers triggerEffect synchronously', () => {
+      const compiledEffect = EffectCompiler.compile(createSyncMinimalEffect())
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        {},
+        createCueData(),
+      )
+      const cueData = createCueData()
+      const onIdle = jest.fn(() => {
+        engine.triggerEffect(cueData)
+      })
+      engine.setOnIdle(onIdle)
+
+      expect(() => engine.triggerEffect(cueData)).not.toThrow()
+      expect(onIdle).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('Idle gating for callback-backed effects', () => {
     const createForEachBlockingEffect = (): YargEffectDefinition => ({
       id: 'for-each-blocking-effect',

@@ -9,7 +9,11 @@ import {
   DmxRigsConfig,
 } from '../../photonics-dmx/types'
 
-import type { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import {
+  type AudioConfig,
+  type AudioGameModeConfig,
+  DEFAULT_AUDIO_GAME_MODE,
+} from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
 
@@ -74,6 +78,7 @@ export interface AppPreferences {
   allowMultipleActiveRigs?: boolean
   audioConfig?: AudioConfig
   activeAudioCueType?: AudioCueType
+  audioGameMode?: AudioGameModeConfig
   simulationSettings?: {
     registryType: 'YARG' | 'RB3E'
     groupId: string
@@ -122,6 +127,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   cueGroupSelectionMode: 'withinSong',
   clockRate: 10, // 10ms (100 Hz) for smooth animations and strobe cues
   activeAudioCueType: '' as AudioCueType,
+  audioGameMode: DEFAULT_AUDIO_GAME_MODE,
 
   // Brightness configuration defaults
   brightness: {
@@ -576,6 +582,23 @@ export class ConfigurationManager {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stripped audio config shape
     await this.setPreference('audioConfig', configToSave as any)
+  }
+
+  /**
+   * Game Mode settings for audio-reactive automatic cue cycling
+   */
+  getAudioGameModeConfig(): AudioGameModeConfig {
+    const saved = this.preferences.get().audioGameMode
+    return saved ? { ...DEFAULT_AUDIO_GAME_MODE, ...saved } : DEFAULT_AUDIO_GAME_MODE
+  }
+
+  async setAudioGameModeConfig(config: AudioGameModeConfig): Promise<void> {
+    await this.setPreference('audioGameMode', config)
+  }
+
+  async updateAudioGameModeConfig(updates: Partial<AudioGameModeConfig>): Promise<void> {
+    const merged = { ...this.getAudioGameModeConfig(), ...updates }
+    await this.setPreference('audioGameMode', merged)
   }
 
   // DMX Rigs Methods

@@ -26,6 +26,7 @@ import type {
   AudioCueType,
   AppPreferences,
   AudioConfig,
+  AudioGameModeConfig,
   AudioLightingData,
 } from '../../shared/ipcTypes'
 
@@ -151,6 +152,11 @@ export const getAudioReactiveCues = () =>
 
 export const setActiveAudioCue = (cueType: AudioCueType) =>
   window.api.invoke(CONFIG.SET_ACTIVE_AUDIO_CUE, cueType)
+
+export const getAudioGameMode = () => window.api.invoke(CONFIG.GET_AUDIO_GAME_MODE, undefined)
+
+export const setAudioGameMode = (updates: Partial<AudioGameModeConfig>) =>
+  window.api.invoke(CONFIG.SET_AUDIO_GAME_MODE, updates)
 
 // ---------------------------------------------------------------------------
 // Stage kit

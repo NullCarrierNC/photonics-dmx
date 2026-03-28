@@ -1842,7 +1842,7 @@
             },
             "right": {
               "source": "literal",
-              "value": 4
+              "value": 2
             },
             "assignTo": "stepDurationMs"
           },
@@ -2033,20 +2033,12 @@
           "to": "sk_audio_search-all"
         },
         {
-          "from": "sk_audio_search-all",
-          "to": "sk_audio_search-bpm"
-        },
-        {
           "from": "sk_audio_search-bpm",
           "to": "sk_audio_search-beat-ms"
         },
         {
           "from": "sk_audio_search-beat-ms",
           "to": "sk_audio_search-step"
-        },
-        {
-          "from": "ev-sk_audio_search-beat",
-          "to": "sk_audio_search-has-red"
         },
         {
           "from": "sk_audio_search-has-red",
@@ -2061,6 +2053,14 @@
         {
           "from": "sk_audio_search-yellow-hi",
           "to": "sk_audio_search-red"
+        },
+        {
+          "from": "ev-sk_audio_search-beat",
+          "to": "sk_audio_search-bpm"
+        },
+        {
+          "from": "sk_audio_search-step",
+          "to": "sk_audio_search-has-red"
         }
       ],
       "effects": [
@@ -2077,8 +2077,8 @@
             "y": 0
           },
           "ev-sk_audio_search-beat": {
-            "x": 673.4747620048464,
-            "y": -1.997229332202096
+            "x": 6.400165049359202,
+            "y": 0
           },
           "sk_audio_search-num": {
             "x": 256.2642977796495,
@@ -2086,41 +2086,41 @@
           },
           "sk_audio_search-all": {
             "x": 252.62435857765377,
-            "y": 217.6948039419949
+            "y": 203.6948039419949
           },
           "sk_audio_search-bpm": {
-            "x": 250.574344355613,
-            "y": 343.43702977895737
+            "x": 6.17585077509284,
+            "y": 107.45930749177933
           },
           "sk_audio_search-beat-ms": {
-            "x": 245.38993933051825,
-            "y": 451.226941421628
+            "x": 0.9914457499980927,
+            "y": 215.24921913444996
           },
           "sk_audio_search-step": {
-            "x": 247.9673219565302,
-            "y": 564.8682108595967
+            "x": 3.5688283760100603,
+            "y": 336.8904885724187
           },
           "sk_audio_search-has-red": {
-            "x": 667.0745969554872,
-            "y": 103.66030290154276
+            "x": 0,
+            "y": 445.65753223374486
           },
           "sk_audio_search-yellow-lo": {
-            "x": 679.0579729486996,
-            "y": 590.9984322461
+            "x": 0,
+            "y": 587.6575322337449
           },
           "sk_audio_search-yellow-hi": {
-            "x": 512.0812862338961,
-            "y": 244.87098152739463
+            "x": -253.65997738825774,
+            "y": 635.6575322337449
           },
           "sk_audio_search-red": {
-            "x": 447.20674584531196,
-            "y": 600.9912878255313
+            "x": -167.8678511101752,
+            "y": 1060.8445051985482
           }
         },
         "viewport": {
-          "x": 242.65004698206258,
-          "y": 122.9137284089096,
-          "zoom": 0.5006936278556674
+          "x": 324.2653269514224,
+          "y": -131.7180619090458,
+          "zoom": 1.1180327900991907
         }
       }
     },
@@ -2386,6 +2386,7 @@
             "id": "sk_audio_strobe_slow-flash",
             "type": "effect-raiser",
             "effectId": "effect-audio-flash",
+            "isPersistent": true,
             "parameterValues": {
               "group": {
                 "source": "literal",
@@ -2397,7 +2398,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 0
+                "value": 200
               },
               "color": {
                 "source": "literal",
@@ -2446,12 +2447,12 @@
           }
         },
         "viewport": {
-          "x": 230.73773330066086,
-          "y": 55.1045950032684,
-          "zoom": 0.5
+          "x": 375.12874555611984,
+          "y": 35.77272727272725,
+          "zoom": 1.9984763839512443
         }
       },
-      "style": "secondary"
+      "style": "strobe"
     },
     {
       "id": "cue-sk-audio-strobe-medium",
@@ -2485,6 +2486,7 @@
             "id": "sk_audio_strobe_medium-flash",
             "type": "effect-raiser",
             "effectId": "effect-audio-flash",
+            "isPersistent": true,
             "parameterValues": {
               "group": {
                 "source": "literal",
@@ -2496,7 +2498,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 0
+                "value": 200
               },
               "color": {
                 "source": "literal",
@@ -2545,12 +2547,12 @@
           }
         },
         "viewport": {
-          "x": 230.73773330066086,
-          "y": 55.1045950032684,
-          "zoom": 0.5
+          "x": 375.12874555611984,
+          "y": 35.77272727272725,
+          "zoom": 1.9984763839512443
         }
       },
-      "style": "secondary"
+      "style": "strobe"
     },
     {
       "id": "cue-sk-audio-strobe-fast",
@@ -2584,6 +2586,7 @@
             "id": "sk_audio_strobe_fast-flash",
             "type": "effect-raiser",
             "effectId": "effect-audio-flash",
+            "isPersistent": true,
             "parameterValues": {
               "group": {
                 "source": "literal",
@@ -2595,7 +2598,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 0
+                "value": 200
               },
               "color": {
                 "source": "literal",
@@ -2644,12 +2647,12 @@
           }
         },
         "viewport": {
-          "x": 230.73773330066086,
-          "y": 55.1045950032684,
-          "zoom": 0.5
+          "x": 375.12874555611984,
+          "y": 35.77272727272725,
+          "zoom": 1.9984763839512443
         }
       },
-      "style": "secondary"
+      "style": "strobe"
     },
     {
       "id": "cue-sk-audio-strobe-fastest",
@@ -2683,6 +2686,7 @@
             "id": "sk_audio_strobe_fastest-flash",
             "type": "effect-raiser",
             "effectId": "effect-audio-flash",
+            "isPersistent": true,
             "parameterValues": {
               "group": {
                 "source": "literal",
@@ -2694,7 +2698,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 0
+                "value": 200
               },
               "color": {
                 "source": "literal",
@@ -2743,12 +2747,12 @@
           }
         },
         "viewport": {
-          "x": 230.73773330066086,
-          "y": 55.1045950032684,
-          "zoom": 0.5
+          "x": 375.12874555611984,
+          "y": 35.77272727272725,
+          "zoom": 1.9984763839512443
         }
       },
-      "style": "secondary"
+      "style": "strobe"
     },
     {
       "id": "cue-sk-audio-frenzy",
@@ -3066,14 +3070,14 @@
       "connections": [
         {
           "from": "ev-sk_audio_menu-start",
-          "to": "sk_audio_menu-base"
-        },
-        {
-          "from": "ev-sk_audio_menu-beat",
           "to": "sk_audio_menu-all"
         },
         {
           "from": "sk_audio_menu-all",
+          "to": "sk_audio_menu-base"
+        },
+        {
+          "from": "ev-sk_audio_menu-beat",
           "to": "sk_audio_menu-sweep"
         }
       ],
@@ -3088,22 +3092,22 @@
             "y": 0
           },
           "sk_audio_menu-base": {
-            "x": -19.250237529476465,
-            "y": 113.1929272351166
+            "x": -45.188653877200124,
+            "y": 206.2134548269534
           },
           "sk_audio_menu-all": {
-            "x": 237.9146157093346,
-            "y": 102.60605194419622
+            "x": -20.575119617980988,
+            "y": 88.29520154545207
           },
           "sk_audio_menu-sweep": {
-            "x": 234.9573078546673,
-            "y": 242.37830698117614
+            "x": 237.64059230443183,
+            "y": 112.68622524255761
           }
         },
         "viewport": {
-          "x": 305.39821838833745,
-          "y": 134.2054870095694,
-          "zoom": 1.0097512975966862
+          "x": 174.26532695142242,
+          "y": 95.28193809095421,
+          "zoom": 1.1180327900991907
         }
       }
     },
@@ -3194,6 +3198,7 @@
           {
             "id": "sk_audio_sweep-diag",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-diagonal-sweep",
             "parameterValues": {
               "allLights": {
@@ -3217,6 +3222,7 @@
           {
             "id": "sk_audio_sweep-ya",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-sweep-color",
             "parameterValues": {
               "lights": {
@@ -3272,6 +3278,7 @@
           {
             "id": "sk_audio_sweep-yb",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-sweep-color",
             "parameterValues": {
               "lights": {
@@ -3327,6 +3334,7 @@
           {
             "id": "sk_audio_sweep-blue",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-sweep-color",
             "parameterValues": {
               "lights": {
@@ -3382,6 +3390,7 @@
           {
             "id": "sk_audio_sweep-green",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-sweep-color",
             "parameterValues": {
               "lights": {

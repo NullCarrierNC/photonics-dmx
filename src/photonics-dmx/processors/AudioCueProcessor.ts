@@ -1,6 +1,8 @@
-import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes'
+import { AudioLightingData, AudioConfig, AudioGameModeConfig } from '../listeners/Audio/AudioTypes'
 
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
+import { pickStrobeCueType } from './audioStrobeHelpers'
+import { AudioGameModeManager } from './AudioGameModeManager'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { AudioCueType } from '../cues/types/audioCueTypes'
@@ -20,6 +22,11 @@ export class AudioCueProcessor {
   private currentPrimaryCueType: AudioCueType
   private currentSecondaryCueType: AudioCueType | null
   private registry: AudioCueRegistry
+  private gameModeManager: AudioGameModeManager | null = null
+  private strobeActive = false
+  private strobeCueType: AudioCueType | null = null
+  private onStrobeStateChange: ((active: boolean) => void) | null = null
+  private onGameModeCueChange: ((cueType: AudioCueType) => void) | null = null
 
   constructor(
     lightManager: DmxLightManager,
@@ -33,7 +40,7 @@ export class AudioCueProcessor {
     this.currentPrimaryCueType = this.selectActiveCueType(preferredCueType)
     this.currentSecondaryCueType = preferredSecondaryCueType ?? null
     this.cueHandler = new AudioCueHandler(lightManager, sequencer)
-    this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType)
+    this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType, null)
   }
 
   /**
@@ -60,6 +67,13 @@ export class AudioCueProcessor {
     if (!this.isActive) return
 
     this.isActive = false
+    if (this.strobeActive) {
+      this.strobeActive = false
+      this.strobeCueType = null
+      this.onStrobeStateChange?.(false)
+    } else {
+      this.strobeCueType = null
+    }
     this.cueHandler.stop()
 
     // Clear all audio-related effects
@@ -96,12 +110,26 @@ export class AudioCueProcessor {
 
     const processedData =
       this.config.linearResponse === false ? this.applyDiscreteResponse(data) : data
+
+    if (this.gameModeManager) {
+      this.gameModeManager.processFrame(processedData)
+    }
+
+    const primary = this.gameModeManager
+      ? this.gameModeManager.getActivePrimaryCue()
+      : this.currentPrimaryCueType
+    const baseSecondary = this.gameModeManager ? null : this.currentSecondaryCueType
+
+    this.evaluateStrobe(processedData)
+    const strobe = this.strobeActive && this.strobeCueType ? this.strobeCueType : null
+
     void this.cueHandler
       .handleAudioData(
         processedData,
         this.config,
-        this.currentPrimaryCueType,
-        this.currentSecondaryCueType,
+        primary,
+        baseSecondary,
+        strobe,
         this.config.bands.length,
       )
       .catch((err) => console.error('AudioCueProcessor: handleAudioData error', err))
@@ -118,15 +146,69 @@ export class AudioCueProcessor {
    * Shutdown and cleanup
    */
   public shutdown(): void {
+    this.disableGameMode()
     this.stop()
     this.cueHandler.destroy()
     console.log('AudioCueProcessor: Shutdown complete')
   }
 
   /**
+   * Enables Game Mode: automatic primary cue cycling (managed by AudioGameModeManager).
+   */
+  public enableGameMode(config: AudioGameModeConfig): void {
+    this.disableGameMode()
+    this.gameModeManager = new AudioGameModeManager(config)
+    this.gameModeManager.setOnCueSwitch((cueType) => {
+      this.onGameModeCueChange?.(cueType)
+    })
+    this.gameModeManager.start()
+    this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null)
+    console.log('AudioCueProcessor: Game Mode enabled')
+  }
+
+  /**
+   * Disables Game Mode and restores manual primary/secondary cue slots.
+   */
+  public disableGameMode(): void {
+    if (!this.gameModeManager) {
+      return
+    }
+    this.gameModeManager.setOnCueSwitch(null)
+    this.gameModeManager.stop()
+    this.gameModeManager = null
+    this.cueHandler.syncSlots(
+      this.currentPrimaryCueType,
+      this.currentSecondaryCueType,
+      this.getStrobeSlotSyncType(),
+    )
+    console.log('AudioCueProcessor: Game Mode disabled')
+  }
+
+  public updateGameModeConfig(config: AudioGameModeConfig): void {
+    this.gameModeManager?.updateConfig(config)
+  }
+
+  public isGameModeEnabled(): boolean {
+    return this.gameModeManager != null
+  }
+
+  /**
+   * Manual primary cue (preferences / manual mode); not the running Game Mode cue.
+   */
+  public getManualPrimaryCueType(): AudioCueType {
+    return this.currentPrimaryCueType
+  }
+
+  /**
    * Re-evaluate which cue type should be active based on enabled audio cue groups
    */
   public refreshCueSelection(): void {
+    if (this.gameModeManager) {
+      this.gameModeManager.start()
+      this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null)
+      return
+    }
+
     const selected = this.selectActiveCueType(this.currentPrimaryCueType)
     if (selected !== this.currentPrimaryCueType) {
       console.log(
@@ -143,7 +225,11 @@ export class AudioCueProcessor {
       )
       this.currentSecondaryCueType = null
     }
-    this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType)
+    this.cueHandler.syncSlots(
+      this.currentPrimaryCueType,
+      this.currentSecondaryCueType,
+      this.getStrobeSlotSyncType(),
+    )
   }
 
   /**
@@ -158,20 +244,30 @@ export class AudioCueProcessor {
 
     if (this.currentPrimaryCueType !== cueType) {
       this.currentPrimaryCueType = cueType
-      this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType)
-      console.log(`AudioCueProcessor: Active primary cue set to ${cueType}`)
+      if (!this.gameModeManager) {
+        this.cueHandler.syncSlots(
+          this.currentPrimaryCueType,
+          this.currentSecondaryCueType,
+          this.getStrobeSlotSyncType(),
+        )
+        console.log(`AudioCueProcessor: Active primary cue set to ${cueType}`)
+      }
     }
     return true
   }
 
   /**
-   * Optional overlay or strobe; null clears the secondary and strobe slots.
+   * Optional overlay; null clears the secondary slot (strobe slot is unchanged).
    */
   public setActiveSecondaryCueType(cueType: AudioCueType | null): boolean {
+    if (this.gameModeManager) {
+      this.currentSecondaryCueType = cueType
+      return true
+    }
     if (cueType == null || cueType === '') {
       if (this.currentSecondaryCueType != null) {
         this.currentSecondaryCueType = null
-        this.cueHandler.syncSlots(this.currentPrimaryCueType, null)
+        this.cueHandler.syncSlots(this.currentPrimaryCueType, null, this.getStrobeSlotSyncType())
       }
       return true
     }
@@ -184,7 +280,11 @@ export class AudioCueProcessor {
     }
     if (this.currentSecondaryCueType !== cueType) {
       this.currentSecondaryCueType = cueType
-      this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType)
+      this.cueHandler.syncSlots(
+        this.currentPrimaryCueType,
+        this.currentSecondaryCueType,
+        this.getStrobeSlotSyncType(),
+      )
       console.log(`AudioCueProcessor: Active secondary cue set to ${cueType}`)
     }
     return true
@@ -194,11 +294,49 @@ export class AudioCueProcessor {
    * Primary cue type being executed (base look)
    */
   public getCurrentCueType(): AudioCueType {
+    if (this.gameModeManager) {
+      return this.gameModeManager.getActivePrimaryCue()
+    }
     return this.currentPrimaryCueType
   }
 
   public getSecondaryCueType(): AudioCueType | null {
+    if (this.gameModeManager) {
+      return null
+    }
     return this.currentSecondaryCueType
+  }
+
+  /**
+   * Manual secondary overlay cue (not strobes). Null in Game Mode.
+   */
+  public getEffectiveSecondaryCueType(): AudioCueType | null {
+    if (this.gameModeManager) {
+      return null
+    }
+    return this.currentSecondaryCueType
+  }
+
+  /**
+   * Energy-triggered strobe cue type when strobing; null otherwise.
+   */
+  public getEffectiveStrobeCueType(): AudioCueType | null {
+    if (this.strobeActive && this.strobeCueType) {
+      return this.strobeCueType
+    }
+    return null
+  }
+
+  private getStrobeSlotSyncType(): AudioCueType | null {
+    return this.strobeActive && this.strobeCueType ? this.strobeCueType : null
+  }
+
+  public setOnStrobeStateChange(cb: ((active: boolean) => void) | null): void {
+    this.onStrobeStateChange = cb
+  }
+
+  public setOnGameModeCueChange(cb: ((cueType: AudioCueType) => void) | null): void {
+    this.onGameModeCueChange = cb
   }
 
   /**
@@ -232,6 +370,45 @@ export class AudioCueProcessor {
       ...audioData,
       overallLevel: mapValue(audioData.overallLevel),
       energy: mapValue(audioData.energy),
+    }
+  }
+
+  private evaluateStrobe(audioData: AudioLightingData): void {
+    const strobeBefore = this.strobeActive
+
+    if (!this.config.strobeEnabled) {
+      if (this.strobeActive) {
+        this.strobeCueType = null
+        this.strobeActive = false
+      }
+      if (strobeBefore !== this.strobeActive) {
+        this.onStrobeStateChange?.(this.strobeActive)
+      }
+      return
+    }
+
+    const energy = audioData.energy
+    const above = energy > this.config.strobeTriggerThreshold
+
+    if (above && !this.strobeActive) {
+      const prob = this.config.strobeProbability ?? 100
+      if (prob < 100 && Math.random() * 100 >= prob) {
+        return
+      }
+      const available = this.registry.getAvailableCueTypes()
+      const all = available.length > 0 ? available : this.registry.getAvailableCueTypes(true)
+      const chosen = pickStrobeCueType(this.registry, all)
+      if (chosen && this.registry.getCueImplementation(chosen)) {
+        this.strobeCueType = chosen
+        this.strobeActive = true
+      }
+    } else if (!above && this.strobeActive) {
+      this.strobeCueType = null
+      this.strobeActive = false
+    }
+
+    if (strobeBefore !== this.strobeActive) {
+      this.onStrobeStateChange?.(this.strobeActive)
     }
   }
 }

@@ -2,23 +2,23 @@ import type { AudioBandDefinition } from './AudioTypes'
 
 /** Canonical 8-band ids and display names (same for every preset; only Hz ranges change). */
 export const BAND_IDS = [
-  'sub-bass',
+  'sub',
   'kick',
   'bass',
   'low-mid',
   'mid',
-  'upper-mid',
+  'presence',
   'high',
   'air',
 ] as const
 
 export const BAND_NAMES = [
-  'Sub Bass',
+  'Sub',
   'Kick',
   'Bass',
   'Low Mid',
   'Mid',
-  'Upper Mid',
+  'Presence',
   'High',
   'Air',
 ] as const
@@ -42,12 +42,12 @@ const RHYTHM_GAME_DEFAULT_GAINS = [1, 0.7, 0.9, 2.8, 4.6, 4.8, 5.4, 7] as const
 export const RHYTHM_GAME_BANDS: AudioBandDefinition[] = bandsFromHz([
   { minHz: 20, maxHz: 50 },
   { minHz: 50, maxHz: 130 },
-  { minHz: 130, maxHz: 400 },
-  { minHz: 400, maxHz: 1000 },
-  { minHz: 1000, maxHz: 2800 },
-  { minHz: 2800, maxHz: 5500 },
-  { minHz: 5500, maxHz: 11000 },
-  { minHz: 11000, maxHz: 20000 },
+  { minHz: 130, maxHz: 250 },
+  { minHz: 250, maxHz: 1000 },
+  { minHz: 1000, maxHz: 2500 },
+  { minHz: 2500, maxHz: 5000 },
+  { minHz: 5000, maxHz: 10000 },
+  { minHz: 10000, maxHz: 20000 },
 ]).map((band, i) => ({
   ...band,
   gain: RHYTHM_GAME_DEFAULT_GAINS[i]!,

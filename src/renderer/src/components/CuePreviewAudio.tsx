@@ -229,7 +229,7 @@ const CuePreviewAudio: React.FC<CuePreviewAudioProps> = ({
       )}
 
       {/* Beat Indicator */}
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center gap-3 ${showAudioQuickControls ? 'mt-6' : ''}`}>
         <span
           className={`text-sm font-semibold transition-colors duration-200 ${
             showPulse ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-500'

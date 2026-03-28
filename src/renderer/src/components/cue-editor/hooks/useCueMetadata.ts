@@ -40,7 +40,7 @@ export function useCueMetadata({
   )
 
   const updateCueMetadata = useCallback(
-    (updates: Partial<YargNodeCueDefinition & AudioNodeCueDefinition>) => {
+    (updates: Partial<YargNodeCueDefinition> | Partial<AudioNodeCueDefinition>) => {
       if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return
       const cueFile = editorDoc.file as NodeCueFile
       const updatedCues = cueFile.cues.map((cue) =>

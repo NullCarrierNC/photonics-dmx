@@ -115,7 +115,8 @@ const AudioBandSettings: React.FC = () => {
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
         The gain multiplier will let you increase or decrease the sensitivity of each band. This is
         useful if your mic is not as sensitive across all frequencies. Use the spectrum analyzer to
-        tune gains — you don&apos;t want bands constantly peaking.
+        tune gains — you don&apos;t want bands constantly peaking, but you also want to see activity
+        across all bands.
       </p>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
         {/* Narrow column: ~half the width of a 50% flex column (select stays visually half-width vs old layout) */}

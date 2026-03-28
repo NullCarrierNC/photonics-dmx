@@ -136,4 +136,29 @@ export interface AudioConfig {
 
   /** Whether to treat cue brightness as linear (true) or discrete DMX steps (false) */
   linearResponse?: boolean
+
+  /** When true, secondary slot uses a strobe cue when total energy exceeds the threshold */
+  strobeEnabled: boolean
+  /** Normalised total energy (0–1) required to activate the strobe secondary cue */
+  strobeTriggerThreshold: number
+  /** Probability (0–100 %) that the strobe fires when the threshold is exceeded (default: 100) */
+  strobeProbability: number
+}
+
+/**
+ * Settings for audio-reactive Game Mode (automatic cue cycling).
+ */
+export interface AudioGameModeConfig {
+  /** When true, cues cycle automatically instead of using the manual selection */
+  enabled: boolean
+  /** Minimum seconds before the next cue switch is scheduled */
+  cueDurationMin: number
+  /** Maximum seconds before the next cue switch is scheduled */
+  cueDurationMax: number
+}
+
+export const DEFAULT_AUDIO_GAME_MODE: AudioGameModeConfig = {
+  enabled: false,
+  cueDurationMin: 5,
+  cueDurationMax: 20,
 }

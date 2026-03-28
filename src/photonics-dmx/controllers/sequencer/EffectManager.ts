@@ -173,7 +173,7 @@ export class EffectManager implements IEffectManager {
    * @param isPersistent If true, the effect re-queues itself after completing
    */
   public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 200) {
+    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
       console.warn('Add cancelling blackout')
       this.systemEffects.cancelBlackout()
     }
@@ -263,7 +263,7 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 200) {
+    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
       console.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
       return false
     }
@@ -422,7 +422,7 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 200) {
+    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
       console.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
       return false
     }

@@ -14,6 +14,7 @@ import type { AppPreferences } from '../../services/configuration/ConfigurationM
 import {
   AUDIO_BAND_GAIN_MAX,
   AUDIO_BAND_GAIN_MIN,
+  type AudioGameModeConfig,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
@@ -340,6 +341,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'allowMultipleActiveRigs',
   'audioConfig',
   'activeAudioCueType',
+  'audioGameMode',
   'simulationSettings',
   'leftMenuCollapsed',
   'windowState',
@@ -382,6 +384,9 @@ const AUDIO_CONFIG_KEYS = new Set([
   'smoothing',
   'enabled',
   'linearResponse',
+  'strobeEnabled',
+  'strobeTriggerThreshold',
+  'strobeProbability',
 ])
 
 /**
@@ -469,6 +474,24 @@ export function validateAudioConfigPayload(
           validatedBands.push(bandResult.value)
         }
         cleaned[key] = validatedBands
+      } else if (key === 'strobeEnabled') {
+        const v = data[key]
+        if (typeof v !== 'boolean') {
+          return { ok: false, error: 'strobeEnabled must be a boolean' }
+        }
+        cleaned[key] = v
+      } else if (key === 'strobeTriggerThreshold') {
+        const t = validateNumberInRange(data[key], 0, 1, 'strobeTriggerThreshold')
+        if (!t.ok) {
+          return t
+        }
+        cleaned[key] = t.value
+      } else if (key === 'strobeProbability') {
+        const t = validateNumberInRange(data[key], 0, 100, 'strobeProbability')
+        if (!t.ok) {
+          return t
+        }
+        cleaned[key] = t.value
       } else {
         cleaned[key] = data[key]
       }
@@ -480,4 +503,61 @@ export function validateAudioConfigPayload(
   }
 
   return { ok: true, value: cleaned }
+}
+
+const AUDIO_GAME_MODE_KEYS = new Set(['enabled', 'cueDurationMin', 'cueDurationMax'])
+
+/**
+ * Validates a partial game mode update, merges onto `base`, returns full config.
+ */
+export function validateAudioGameModePayload(
+  data: unknown,
+  base: AudioGameModeConfig,
+): ValidationResult<AudioGameModeConfig> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'Game mode payload must be an object' }
+  }
+
+  const merged: AudioGameModeConfig = { ...base }
+
+  let hadValidKey = false
+  for (const key of Object.keys(data)) {
+    if (!AUDIO_GAME_MODE_KEYS.has(key)) {
+      continue
+    }
+    hadValidKey = true
+    const v = data[key]
+    switch (key) {
+      case 'enabled':
+        if (typeof v !== 'boolean') {
+          return { ok: false, error: `${key} must be a boolean` }
+        }
+        merged[key] = v
+        break
+      case 'cueDurationMin':
+      case 'cueDurationMax': {
+        const n = Number(v)
+        if (!Number.isFinite(n) || n <= 0) {
+          return { ok: false, error: `${key} must be a positive number` }
+        }
+        merged[key] = n
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  if (!hadValidKey) {
+    return { ok: false, error: 'Game mode payload contains no valid keys' }
+  }
+
+  if (merged.cueDurationMin > merged.cueDurationMax) {
+    return {
+      ok: false,
+      error: 'cueDurationMin must be less than or equal to cueDurationMax',
+    }
+  }
+
+  return { ok: true, value: merged }
 }

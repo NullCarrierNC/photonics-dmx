@@ -1,7 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAudioEnabled, getAudioReactiveCues, setActiveAudioCue } from '../ipcApi'
+import {
+  getAudioEnabled,
+  getAudioGameMode,
+  getAudioReactiveCues,
+  setActiveAudioCue,
+} from '../ipcApi'
 
 interface AudioCueOption {
   id: string
@@ -15,6 +20,7 @@ interface AudioCueOption {
 interface CueStateResponse {
   success: boolean
   activeCueType?: string | null
+  secondaryCueType?: string | null
   cues?: AudioCueOption[]
   error?: string
 }
@@ -25,15 +31,23 @@ interface AudioCueSelectorPanelProps {
 
 const DROPDOWN_WIDTH = 'min-w-[220px] md:w-[240px]'
 
+/** Minimum time the strobe-firing indicator stays visible after an inactive edge. */
+const MIN_STROBE_DISPLAY_MS = 200
+
 const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className = '' }) => {
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [availableCues, setAvailableCues] = useState<AudioCueOption[]>([])
   const [activeCue, setActiveCue] = useState<string | null>(null)
+  const [secondaryCueType, setSecondaryCueType] = useState<string | null>(null)
   const [selectedCueId, setSelectedCueId] = useState<string>('')
   const [selectedGroupId, setSelectedGroupId] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [gameModeEnabled, setGameModeEnabled] = useState(false)
+  const [strobeFiringDisplay, setStrobeFiringDisplay] = useState(false)
+  const [strobeCueType, setStrobeCueType] = useState<string | null>(null)
+  const strobeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadCueState = useCallback(async (silent = false) => {
     try {
@@ -43,9 +57,18 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       const enabled = await getAudioEnabled()
       setAudioEnabled(enabled)
 
+      try {
+        const gm = await getAudioGameMode()
+        setGameModeEnabled(gm.enabled)
+      } catch {
+        setGameModeEnabled(false)
+      }
+
       if (!enabled) {
         setAvailableCues([])
         setActiveCue(null)
+        setSecondaryCueType(null)
+        setStrobeCueType(null)
         setSelectedCueId('')
         setSelectedGroupId('')
         setError(null)
@@ -65,12 +88,14 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         const initialGroupId =
           sortedCues.find((cue) => cue.id === initialCueId)?.groupId ?? sortedCues[0]?.groupId ?? ''
         setActiveCue(initialCueId || null)
+        setSecondaryCueType(response.secondaryCueType ?? null)
         setSelectedCueId(initialCueId || '')
         setSelectedGroupId(initialGroupId || '')
         setError(null)
       } else {
         setAvailableCues([])
         setActiveCue(null)
+        setSecondaryCueType(null)
         setSelectedCueId('')
         setSelectedGroupId('')
         setError(response?.error || 'Unable to load audio cue state')
@@ -92,13 +117,54 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, handleAudioEvent)
 
     return () => {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, handleAudioEvent)
     }
   }, [loadCueState])
+
+  useEffect(() => {
+    const handleGameModeCueChange = (payload: { activeCueType: string }) => {
+      setActiveCue(payload.activeCueType || null)
+    }
+    addIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE, handleGameModeCueChange)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE, handleGameModeCueChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    const clearHideTimer = () => {
+      if (strobeHideTimerRef.current) {
+        clearTimeout(strobeHideTimerRef.current)
+        strobeHideTimerRef.current = null
+      }
+    }
+
+    const handleStrobeState = (payload: { active: boolean; strobeCueType: string | null }) => {
+      setStrobeCueType(payload.strobeCueType)
+      if (payload.active) {
+        clearHideTimer()
+        setStrobeFiringDisplay(true)
+      } else {
+        clearHideTimer()
+        strobeHideTimerRef.current = setTimeout(() => {
+          setStrobeFiringDisplay(false)
+          strobeHideTimerRef.current = null
+        }, MIN_STROBE_DISPLAY_MS)
+      }
+    }
+
+    addIpcListener(RENDERER_RECEIVE.AUDIO_STROBE_STATE, handleStrobeState)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_STROBE_STATE, handleStrobeState)
+      clearHideTimer()
+    }
+  }, [])
 
   const groupOptions = useMemo(() => {
     const map = new Map<string, { id: string; name: string; description?: string }>()
@@ -158,6 +224,18 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     [availableCues, selectedCueId, activeCue],
   )
 
+  const activeCueForGameMode = useMemo(
+    () => (activeCue ? availableCues.find((cue) => cue.id === activeCue) : undefined),
+    [availableCues, activeCue],
+  )
+
+  const secondaryCueForGameMode = useMemo(() => {
+    if (!secondaryCueType) {
+      return undefined
+    }
+    return availableCues.find((cue) => cue.id === secondaryCueType)
+  }, [availableCues, secondaryCueType])
+
   const handleCueChange = async (cueId: string) => {
     setSelectedCueId(cueId)
 
@@ -208,7 +286,8 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         </span>
       </div>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Choose which audio-reactive cue drives the DMX output while Audio Reactive mode is active.
+        When game mode is enabled, cues are cycled randomly through your enabled audio cue groups.
+        When disabled you can select the cue manually.
       </p>
 
       {error && (
@@ -235,67 +314,120 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
 
       {audioEnabled && !loading && availableCues.length > 0 && (
         <div className="space-y-4">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div className={`${DROPDOWN_WIDTH}`}>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Audio Cue Group
-              </label>
-              <select
-                className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-                value={selectedGroupId || ''}
-                onChange={(event) => handleGroupChange(event.target.value)}
-                disabled={saving || groupOptions.length === 0}>
-                <option value="" disabled>
-                  {groupOptions.length === 0 ? 'No groups available' : 'Choose a group'}
-                </option>
-                {groupOptions.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className={`${DROPDOWN_WIDTH}`}>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Audio Cue
-              </label>
-              <select
-                className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-                value={selectedCueId || activeCue || ''}
-                onChange={(event) => handleCueChange(event.target.value)}
-                disabled={saving || cuesForSelectedGroup.length === 0}>
-                <option value="" disabled>
-                  {cuesForSelectedGroup.length === 0 ? 'No cues for this group' : 'Choose a cue'}
-                </option>
-                {cuesForSelectedGroup.map((cue) => (
-                  <option key={cue.id} value={cue.id}>
-                    {cue.label || cue.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {(selectedGroupInfo || selectedCue) && (
-            <div className="">
-              {selectedGroupInfo && (
-                <div>
-                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    <strong>Group Description:</strong>{' '}
-                    {selectedGroupInfo.description || 'No description available for this group.'}
+          {gameModeEnabled ? (
+            <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                  Current cue
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <div className="grid w-full min-w-[36rem] grid-cols-4 gap-3 sm:gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-gray-200">Cue group</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {activeCueForGameMode?.groupName ?? '—'}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-gray-200">Primary cue</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {activeCueForGameMode?.label ?? activeCue ?? '—'}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-gray-200">Secondary cue</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {secondaryCueForGameMode?.label ?? secondaryCueType ?? 'None'}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-gray-200">Strobe</p>
+                    <p
+                      className={`text-sm ${
+                        strobeFiringDisplay
+                          ? 'text-gray-900 dark:text-white'
+                          : 'text-gray-500 dark:text-gray-400'
+                      }`}>
+                      {strobeFiringDisplay
+                        ? strobeCueType
+                          ? availableCues.find((c) => c.id === strobeCueType)?.label ??
+                            strobeCueType
+                          : 'Active'
+                        : 'Inactive'}
+                    </p>
                   </div>
                 </div>
-              )}
-              {selectedCue && (
-                <div>
-                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    <strong>Cue Description:</strong>{' '}
-                    {selectedCue.description || 'No description available for this cue.'}
-                  </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-4 md:flex-row">
+                <div className={`${DROPDOWN_WIDTH}`}>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Audio Cue Group
+                  </label>
+                  <select
+                    className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
+                    value={selectedGroupId || ''}
+                    onChange={(event) => handleGroupChange(event.target.value)}
+                    disabled={saving || groupOptions.length === 0}>
+                    <option value="" disabled>
+                      {groupOptions.length === 0 ? 'No groups available' : 'Choose a group'}
+                    </option>
+                    {groupOptions.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={`${DROPDOWN_WIDTH}`}>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Audio Cue
+                  </label>
+                  <select
+                    className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
+                    value={selectedCueId || activeCue || ''}
+                    onChange={(event) => handleCueChange(event.target.value)}
+                    disabled={saving || cuesForSelectedGroup.length === 0}>
+                    <option value="" disabled>
+                      {cuesForSelectedGroup.length === 0
+                        ? 'No cues for this group'
+                        : 'Choose a cue'}
+                    </option>
+                    {cuesForSelectedGroup.map((cue) => (
+                      <option key={cue.id} value={cue.id}>
+                        {cue.label || cue.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {(selectedGroupInfo || selectedCue) && (
+                <div className="">
+                  {selectedGroupInfo && (
+                    <div>
+                      <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        <strong>Group Description:</strong>{' '}
+                        {selectedGroupInfo.description ||
+                          'No description available for this group.'}
+                      </div>
+                    </div>
+                  )}
+                  {selectedCue && (
+                    <div>
+                      <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        <strong>Cue Description:</strong>{' '}
+                        {selectedCue.description || 'No description available for this cue.'}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       )}

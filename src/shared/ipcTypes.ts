@@ -52,7 +52,11 @@ export type {
   DmxRig,
   SenderConfig,
 } from '../photonics-dmx/types'
-export type { AudioConfig, AudioLightingData } from '../photonics-dmx/listeners/Audio/AudioTypes'
+export type {
+  AudioConfig,
+  AudioGameModeConfig,
+  AudioLightingData,
+} from '../photonics-dmx/listeners/Audio/AudioTypes'
 
 import type {
   NodeCueFile,
@@ -77,7 +81,11 @@ import type {
   DmxRig,
   SenderConfig,
 } from '../photonics-dmx/types'
-import type { AudioConfig, AudioLightingData } from '../photonics-dmx/listeners/Audio/AudioTypes'
+import type {
+  AudioConfig,
+  AudioGameModeConfig,
+  AudioLightingData,
+} from '../photonics-dmx/listeners/Audio/AudioTypes'
 
 // ---------------------------------------------------------------------------
 // Shared response shapes
@@ -499,6 +507,7 @@ export interface IpcInvokeMap {
       | {
           success: true
           activeCueType: AudioCueType
+          secondaryCueType: AudioCueType | null
           cues: Array<{
             id: AudioCueType
             label: string
@@ -508,11 +517,19 @@ export interface IpcInvokeMap {
             groupDescription: string
           }>
         }
-      | (IpcErrorResult & { activeCueType: null; cues: [] })
+      | (IpcErrorResult & { activeCueType: null; secondaryCueType: null; cues: [] })
   }
   [CONFIG.SET_ACTIVE_AUDIO_CUE]: {
     request: AudioCueType
     response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_AUDIO_GAME_MODE]: {
+    request: void
+    response: AudioGameModeConfig
+  }
+  [CONFIG.SET_AUDIO_GAME_MODE]: {
+    request: Partial<AudioGameModeConfig>
+    response: { success: true; config: AudioGameModeConfig } | (IpcErrorResult & { success: false })
   }
   [CONFIG.GET_STAGE_KIT_PRIORITY]: {
     request: void
@@ -580,6 +597,12 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_DISABLE]: undefined
   [RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED]: { enabled: boolean }
   [RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE]: AudioConfig | undefined
+  [RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE]: AudioGameModeConfig
+  [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
+  [RENDERER_RECEIVE.AUDIO_STROBE_STATE]: {
+    active: boolean
+    strobeCueType: string | null
+  }
   [RENDERER_RECEIVE.AUDIO_DATA_MIRROR]: AudioLightingData
   [RENDERER_RECEIVE.CUE_STATE_UPDATE]: CueStateUpdatePayload
   [RENDERER_RECEIVE.DMX_VALUES]: { universeBuffer: Record<number, number> }
