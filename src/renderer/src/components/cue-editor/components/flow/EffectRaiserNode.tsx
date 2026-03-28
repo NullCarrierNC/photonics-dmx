@@ -63,7 +63,7 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selec
       className={`px-3 py-2 rounded-lg border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-xs shadow-sm min-w-[140px] max-w-[200px] ${selectedStyles}`}>
       <Handle type="target" position={Position.Top} />
       <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-1 font-semibold text-cyan-800 dark:text-cyan-100">
+        <div className="flex flex-wrap items-center gap-1 font-semibold text-cyan-800 dark:text-cyan-100">
           <span role="img" aria-label="raise effect">
             ✨
           </span>
@@ -76,6 +76,13 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selec
               'Raise Effect'
             )}
           </span>
+          {raiserPayload.isPersistent && (
+            <span
+              className="text-[9px] text-cyan-600 dark:text-cyan-400"
+              title="Persistent (loops)">
+              ↻ Loop
+            </span>
+          )}
         </div>
         {hasParams && (
           <div className="mt-1 pt-1 border-t border-cyan-300 dark:border-cyan-700 space-y-0.5">

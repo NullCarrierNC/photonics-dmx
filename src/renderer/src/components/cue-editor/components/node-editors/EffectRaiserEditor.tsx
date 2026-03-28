@@ -66,6 +66,19 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
         Triggers the selected effect. Configure parameter values below.
       </p>
 
+      <label className="flex items-center gap-2 font-medium cursor-pointer">
+        <input
+          type="checkbox"
+          checked={node.isPersistent ?? false}
+          onChange={(e) => updateNode({ isPersistent: e.target.checked })}
+          className="rounded"
+        />
+        Persistent (loop)
+      </label>
+      <p className="text-[10px] text-gray-500">
+        When enabled, the effect automatically re-triggers when it completes.
+      </p>
+
       {/* Parameter Values Configuration */}
       {parameterVars.length === 0 ? (
         <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-800 rounded text-[10px] text-gray-500">

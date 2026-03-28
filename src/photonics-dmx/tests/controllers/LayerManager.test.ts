@@ -330,7 +330,7 @@ describe('LayerManager', () => {
       const threshold = layerManager.getBlackoutLayersUnder()
 
       // Verify it matches the expected value
-      expect(threshold).toBe(200)
+      expect(threshold).toBe(255)
     })
   })
 })

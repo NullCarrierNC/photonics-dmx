@@ -2386,6 +2386,7 @@
             "id": "sk_audio_strobe_slow-flash",
             "type": "effect-raiser",
             "effectId": "effect-audio-flash",
+            "isPersistent": true,
             "parameterValues": {
               "group": {
                 "source": "literal",
@@ -2397,7 +2398,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 0
+                "value": 200
               },
               "color": {
                 "source": "literal",
@@ -2446,9 +2447,9 @@
           }
         },
         "viewport": {
-          "x": 416.0426451728768,
-          "y": 25.027137848574796,
-          "zoom": 0.6972136478965566
+          "x": 375.12874555611984,
+          "y": 35.77272727272725,
+          "zoom": 1.9984763839512443
         }
       },
       "style": "strobe"
@@ -2485,6 +2486,7 @@
             "id": "sk_audio_strobe_medium-flash",
             "type": "effect-raiser",
             "effectId": "effect-audio-flash",
+            "isPersistent": true,
             "parameterValues": {
               "group": {
                 "source": "literal",
@@ -2496,7 +2498,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 0
+                "value": 200
               },
               "color": {
                 "source": "literal",
@@ -2545,9 +2547,9 @@
           }
         },
         "viewport": {
-          "x": 416.0426451728768,
-          "y": 25.027137848574796,
-          "zoom": 0.6972136478965566
+          "x": 375.12874555611984,
+          "y": 35.77272727272725,
+          "zoom": 1.9984763839512443
         }
       },
       "style": "strobe"
@@ -2584,6 +2586,7 @@
             "id": "sk_audio_strobe_fast-flash",
             "type": "effect-raiser",
             "effectId": "effect-audio-flash",
+            "isPersistent": true,
             "parameterValues": {
               "group": {
                 "source": "literal",
@@ -2595,7 +2598,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 0
+                "value": 200
               },
               "color": {
                 "source": "literal",
@@ -2644,9 +2647,9 @@
           }
         },
         "viewport": {
-          "x": 416.0426451728768,
-          "y": 25.027137848574796,
-          "zoom": 0.6972136478965566
+          "x": 375.12874555611984,
+          "y": 35.77272727272725,
+          "zoom": 1.9984763839512443
         }
       },
       "style": "strobe"
@@ -2683,6 +2686,7 @@
             "id": "sk_audio_strobe_fastest-flash",
             "type": "effect-raiser",
             "effectId": "effect-audio-flash",
+            "isPersistent": true,
             "parameterValues": {
               "group": {
                 "source": "literal",
@@ -2694,7 +2698,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 0
+                "value": 200
               },
               "color": {
                 "source": "literal",
@@ -2743,9 +2747,9 @@
           }
         },
         "viewport": {
-          "x": 416.0426451728768,
-          "y": 25.027137848574796,
-          "zoom": 0.6972136478965566
+          "x": 375.12874555611984,
+          "y": 35.77272727272725,
+          "zoom": 1.9984763839512443
         }
       },
       "style": "strobe"

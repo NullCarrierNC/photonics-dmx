@@ -259,7 +259,7 @@ describe('EffectManager', () => {
       )
     })
 
-    it('should cancel blackout if adding an effect below layer 200', () => {
+    it('should cancel blackout if adding an effect below blackout threshold (255)', () => {
       // Mock blackout active state
       systemEffects.isBlackoutActive.mockReturnValue(true)
 
@@ -269,7 +269,7 @@ describe('EffectManager', () => {
         transitions: [
           {
             lights: [createMockTrackedLight()],
-            layer: 1, // Below 200
+            layer: 1, // Below blackout threshold
             waitForCondition: 'none',
             waitForTime: 0,
             transform: {

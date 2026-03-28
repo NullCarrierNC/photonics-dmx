@@ -64,7 +64,7 @@ describe('SystemEffectsController', () => {
 
     layerManager = {
       cleanupUnusedLayers: jest.fn(),
-      getBlackoutLayersUnder: jest.fn().mockReturnValue(200),
+      getBlackoutLayersUnder: jest.fn().mockReturnValue(255),
       getActiveEffects: jest.fn().mockReturnValue(new Map()),
     } as unknown as jest.Mocked<LayerManager>
 
@@ -122,7 +122,7 @@ describe('SystemEffectsController', () => {
       // and directly call the methods on the controller to simulate the effects
       lightTransitionController.setTransition(
         'moving-head-1',
-        200,
+        255,
         createMockRGBIP(),
         createMockRGBIP({ red: 0, green: 0, blue: 0, intensity: 0 }),
         blackoutDuration,
@@ -131,7 +131,7 @@ describe('SystemEffectsController', () => {
 
       lightTransitionController.setTransition(
         'rgb-fixture-1',
-        200,
+        255,
         createMockRGBIP(),
         createMockRGBIP({ red: 0, green: 0, blue: 0, intensity: 0 }),
         blackoutDuration,
@@ -144,7 +144,7 @@ describe('SystemEffectsController', () => {
       // Verify setTransition was called for each light
       expect(lightTransitionController.setTransition).toHaveBeenCalledWith(
         'moving-head-1',
-        200, // Blackout layer
+        255, // Blackout layer
         expect.any(Object), // startState
         expect.objectContaining({
           red: 0,
@@ -158,7 +158,7 @@ describe('SystemEffectsController', () => {
 
       expect(lightTransitionController.setTransition).toHaveBeenCalledWith(
         'rgb-fixture-1',
-        200, // Blackout layer
+        255, // Blackout layer
         expect.any(Object), // startState
         expect.objectContaining({
           red: 0,
@@ -182,20 +182,20 @@ describe('SystemEffectsController', () => {
       ;(systemEffectsController as any).isBlackingOut = false
 
       // Simulate removing transitions by layer
-      lightTransitionController.removeTransitionsByLayer(200)
+      lightTransitionController.removeTransitionsByLayer(255)
 
       // Verify blackout is no longer active
       expect(systemEffectsController.isBlackoutActive()).toBe(false)
 
       // Verify transitions were cleared
-      expect(lightTransitionController.removeTransitionsByLayer).toHaveBeenCalledWith(200)
+      expect(lightTransitionController.removeTransitionsByLayer).toHaveBeenCalledWith(255)
     })
   })
 
   describe('getBlackoutLayersUnder', () => {
     it('should return the correct blackout layer threshold', () => {
       // Verify getBlackoutLayersUnder returns the expected value
-      expect(systemEffectsController.getBlackoutLayersUnder()).toBe(200)
+      expect(systemEffectsController.getBlackoutLayersUnder()).toBe(255)
     })
   })
 })

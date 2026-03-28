@@ -10,7 +10,7 @@ export class SystemEffectsController implements ISystemEffectsController {
   private lightTransitionController: LightTransitionController
   private layerManager: ILayerManager
   private isBlackingOut: boolean = false
-  private _blackoutLayersUnder: number = 200
+  private _blackoutLayersUnder: number = 255
 
   // Callback for blackout completion events (both immediate and timed)
   private onBlackoutCompleteCallback: (() => void) | null = null
@@ -43,10 +43,10 @@ export class SystemEffectsController implements ISystemEffectsController {
 
   /**
    * Initiates a blackout effect that visually fades out all lights.
-   * If called, we set isBlackingOut and schedule a transition on layer 200,
+   * If called, we set isBlackingOut and schedule a transition on layer 255,
    * then clear all active effects after the fade completes.
-   * As it's on layer 200 with a high priority, it will override all other effects below.
-   * Effects over 200, such as strobes, will continue to operate as normal.
+   * As it's on layer 255 with a high priority, it will override all other effects below,
+   * including strobe effects on layer 200.
    *
    * @param duration The duration of the blackout fade in milliseconds.
    * @returns A promise that resolves when the blackout is complete.
@@ -81,8 +81,8 @@ export class SystemEffectsController implements ISystemEffectsController {
     try {
       const allLightIds = this.lightTransitionController.getAllLightIds()
       if (allLightIds.length > 0) {
-        // Use maximum layer to override everything
-        const blackoutLayer = 200
+        // Use maximum layer to override everything (including strobe on layer 200)
+        const blackoutLayer = 255
 
         // Set transitions for all lights
         const transitionPromises = allLightIds.map((lightId) => {
@@ -190,13 +190,13 @@ export class SystemEffectsController implements ISystemEffectsController {
 
   /**
    * Cancels a blackout mid-fade.
-   * We remove transitions from layer 200 so new effects can override.
+   * We remove transitions from the blackout layer so new effects can override.
    */
   public cancelBlackout(): void {
     if (this.isBlackingOut) {
       console.warn('Cancelling in-progress blackout.')
       this.isBlackingOut = false
-      this.lightTransitionController.removeTransitionsByLayer(200)
+      this.lightTransitionController.removeTransitionsByLayer(255)
     }
   }
 

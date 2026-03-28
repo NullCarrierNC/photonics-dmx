@@ -13,14 +13,10 @@ const AudioGameModeSettings: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [cueDurationMin, setCueDurationMin] = useState(5)
   const [cueDurationMax, setCueDurationMax] = useState(20)
-  const [strobeEnabled, setStrobeEnabled] = useState(false)
-  const [strobeTriggerThreshold, setStrobeTriggerThreshold] = useState(0.8)
 
   const applyConfig = useCallback((config: AudioGameModeConfig) => {
     setCueDurationMin(config.cueDurationMin)
     setCueDurationMax(config.cueDurationMax)
-    setStrobeEnabled(config.strobeEnabled)
-    setStrobeTriggerThreshold(config.strobeTriggerThreshold)
   }, [])
 
   useEffect(() => {
@@ -146,49 +142,6 @@ const AudioGameModeSettings: React.FC = () => {
           </div>
         </div>
       </div>
-
-      <div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            className="form-checkbox h-5 w-5 rounded text-blue-600"
-            checked={strobeEnabled}
-            disabled={saving}
-            onChange={(e) => {
-              const next = e.target.checked
-              setStrobeEnabled(next)
-              void persist({ strobeEnabled: next })
-            }}
-          />
-          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
-            Strobe enabled
-          </span>
-        </label>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 ml-7">
-          When total audio energy exceeds the threshold, a strobe cue is used on the secondary slot.
-        </p>
-      </div>
-
-      {strobeEnabled && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Strobe trigger threshold ({strobeTriggerThreshold.toFixed(2)})
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            className="w-full max-w-md"
-            value={strobeTriggerThreshold}
-            disabled={saving}
-            onChange={(e) => setStrobeTriggerThreshold(Number(e.target.value))}
-            onMouseUp={() => void persist({ strobeTriggerThreshold })}
-            onTouchEnd={() => void persist({ strobeTriggerThreshold })}
-            onBlur={() => void persist({ strobeTriggerThreshold })}
-          />
-        </div>
-      )}
     </div>
   )
 }

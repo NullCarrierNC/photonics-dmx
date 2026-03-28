@@ -1,6 +1,6 @@
 import type { AudioGameModeConfig, AudioLightingData } from '../listeners/Audio/AudioTypes'
-import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { IAudioCue } from '../cues/interfaces/IAudioCue'
+import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { AudioCueType } from '../cues/types/audioCueTypes'
 
 function randomInRange(minSec: number, maxSec: number): number {
@@ -30,29 +30,14 @@ function filterPrimaryRotationPool(
 }
 
 /**
- * Picks the first strobe-style cue in stable alphabetical order by id.
- */
-function pickStrobeCueType(
-  registry: AudioCueRegistry,
-  available: AudioCueType[],
-): AudioCueType | null {
-  const tagged = available
-    .filter((t) => isStrobeStyleCue(registry, t))
-    .sort((a, b) => a.localeCompare(b))
-  return tagged.length > 0 ? tagged[0] : null
-}
-
-/**
- * Drives automatic primary cue cycling and optional strobe secondary cues for audio Game Mode.
+ * Drives automatic primary cue cycling for audio Game Mode.
  */
 export class AudioGameModeManager {
   private config: AudioGameModeConfig
   private registry = AudioCueRegistry.getInstance()
   private primaryCue: AudioCueType = ''
-  private secondaryCue: AudioCueType | null = null
   private pendingSwitch = false
   private switchDeadlineMs = 0
-  private strobeActive = false
 
   constructor(initialConfig: AudioGameModeConfig) {
     this.config = { ...initialConfig }
@@ -72,14 +57,10 @@ export class AudioGameModeManager {
     }
     this.pendingSwitch = false
     this.scheduleNextSwitch()
-    this.secondaryCue = null
-    this.strobeActive = false
   }
 
   public stop(): void {
     this.pendingSwitch = false
-    this.secondaryCue = null
-    this.strobeActive = false
   }
 
   public updateConfig(config: AudioGameModeConfig): void {
@@ -96,10 +77,6 @@ export class AudioGameModeManager {
     return this.primaryCue
   }
 
-  public getActiveSecondaryCue(): AudioCueType | null {
-    return this.secondaryCue
-  }
-
   /**
    * Run once per audio frame before cue execution.
    */
@@ -114,8 +91,6 @@ export class AudioGameModeManager {
       this.pendingSwitch = false
       this.scheduleNextSwitch()
     }
-
-    this.evaluateStrobe(audioData)
   }
 
   private scheduleNextSwitch(): void {
@@ -140,32 +115,6 @@ export class AudioGameModeManager {
     const others = pool.filter((id) => id !== this.primaryCue)
     if (others.length > 0) {
       this.primaryCue = pickRandom(others) ?? this.primaryCue
-    }
-  }
-
-  private evaluateStrobe(audioData: AudioLightingData): void {
-    if (!this.config.strobeEnabled) {
-      if (this.secondaryCue !== null) {
-        this.secondaryCue = null
-        this.strobeActive = false
-      }
-      return
-    }
-
-    const energy = audioData.energy
-    const above = energy > this.config.strobeTriggerThreshold
-
-    if (above && !this.strobeActive) {
-      const available = this.registry.getAvailableCueTypes()
-      const all = available.length > 0 ? available : this.registry.getAvailableCueTypes(true)
-      const chosen = pickStrobeCueType(this.registry, all)
-      if (chosen && this.registry.getCueImplementation(chosen)) {
-        this.secondaryCue = chosen
-        this.strobeActive = true
-      }
-    } else if (!above && this.strobeActive) {
-      this.secondaryCue = null
-      this.strobeActive = false
     }
   }
 }

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import type { AudioConfig } from '../../../shared/ipcTypes'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAudioConfig, saveAudioConfig } from '../ipcApi'
+import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 
 interface AudioSensitivityControlsProps {
   /** Omit long helper copy (e.g. DMX Preview quick controls). */
@@ -9,6 +12,8 @@ interface AudioSensitivityControlsProps {
 const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ compact = false }) => {
   const [sensitivity, setSensitivity] = useState(2.5)
   const [noiseFloor, setNoiseFloor] = useState(60)
+  const [strobeEnabled, setStrobeEnabled] = useState(false)
+  const [strobeTriggerThreshold, setStrobeTriggerThreshold] = useState(0.8)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -18,6 +23,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
         const config = await getAudioConfig()
         setSensitivity(config?.sensitivity ?? 2.5)
         setNoiseFloor(config?.noiseFloor ?? 60)
+        setStrobeEnabled(config?.strobeEnabled ?? false)
+        setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
       } catch (error) {
         console.error('Failed to load audio sensitivity:', error)
       } finally {
@@ -26,6 +33,18 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
     }
 
     loadConfig()
+  }, [])
+
+  useEffect(() => {
+    const onConfigUpdate = (config: AudioConfig | undefined) => {
+      if (!config) return
+      setSensitivity(config.sensitivity ?? 2.5)
+      setNoiseFloor(config.noiseFloor ?? 60)
+      setStrobeEnabled(config.strobeEnabled ?? false)
+      setStrobeTriggerThreshold(config.strobeTriggerThreshold ?? 0.8)
+    }
+    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onConfigUpdate)
+    return () => removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onConfigUpdate)
   }, [])
 
   const handleSensitivityChange = async (value: number) => {
@@ -96,12 +115,39 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
     handleNoiseFloorChange(noiseFloor)
   }
 
+  const persistStrobe = async (
+    updates: Partial<Pick<AudioConfig, 'strobeEnabled' | 'strobeTriggerThreshold'>>,
+  ) => {
+    if (isSaving) return
+    try {
+      setIsSaving(true)
+      const result = await saveAudioConfig(updates)
+      if (!result.success) {
+        console.error('Failed to save strobe settings:', result.error)
+        const config = await getAudioConfig()
+        setStrobeEnabled(config?.strobeEnabled ?? false)
+        setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
+      }
+    } catch (error) {
+      console.error('Failed to save strobe settings:', error)
+      const config = await getAudioConfig()
+      setStrobeEnabled(config?.strobeEnabled ?? false)
+      setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const sensitivityRangeStyle = {
     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb 100%)`,
   } as const
 
   const noiseFloorRangeStyle = {
     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(noiseFloor / 255) * 100}%, #e5e7eb ${(noiseFloor / 255) * 100}%, #e5e7eb 100%)`,
+  } as const
+
+  const strobeTriggerRangeStyle = {
+    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeTriggerThreshold * 100}%, #e5e7eb ${strobeTriggerThreshold * 100}%, #e5e7eb 100%)`,
   } as const
 
   const rangeClassName =
@@ -116,7 +162,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
           <label
             htmlFor="audio-compact-sensitivity"
             className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
-            Global Sensitivity
+            Global Gain
           </label>
           <input
             id="audio-compact-sensitivity"
@@ -131,9 +177,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             className={rangeClassName}
             style={sensitivityRangeStyle}
           />
-          <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0 tabular-nums w-9 text-right">
-            {sensitivity.toFixed(1)}x
-          </span>
+
           <input
             type="number"
             min="0.1"
@@ -170,9 +214,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             className={rangeClassName}
             style={noiseFloorRangeStyle}
           />
-          <span className="text-sm text-gray-600 dark:text-gray-400 shrink-0 tabular-nums w-[3.25rem] text-right">
-            {noiseFloor} / 255
-          </span>
+
           <input
             type="number"
             min="0"
@@ -188,6 +230,66 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             className={numberClassName}
             aria-label="Noise floor numeric"
           />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
+            Strobe
+          </span>
+          <input
+            type="checkbox"
+            id="audio-compact-strobe-enabled"
+            className="form-checkbox h-5 w-5 rounded text-blue-600 shrink-0"
+            checked={strobeEnabled}
+            disabled={isLoading || isSaving}
+            onChange={(e) => {
+              const next = e.target.checked
+              setStrobeEnabled(next)
+              void persistStrobe({ strobeEnabled: next })
+            }}
+            aria-label="Strobe"
+          />
+          {strobeEnabled && (
+            <>
+              <label
+                htmlFor="audio-compact-strobe-threshold"
+                className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
+                Threshold
+              </label>
+              <input
+                id="audio-compact-strobe-threshold"
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={strobeTriggerThreshold}
+                onChange={(e) => setStrobeTriggerThreshold(Number(e.target.value))}
+                onMouseUp={() => void persistStrobe({ strobeTriggerThreshold })}
+                onTouchEnd={() => void persistStrobe({ strobeTriggerThreshold })}
+                disabled={isLoading || isSaving}
+                className={rangeClassName}
+                style={strobeTriggerRangeStyle}
+              />
+
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                value={strobeTriggerThreshold}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value)
+                  if (Number.isFinite(value)) {
+                    setStrobeTriggerThreshold(Math.max(0, Math.min(1, value)))
+                  }
+                }}
+                onBlur={() => void persistStrobe({ strobeTriggerThreshold })}
+                disabled={isLoading || isSaving}
+                className={numberClassName}
+                aria-label="Strobe sensitivity numeric"
+              />
+            </>
+          )}
         </div>
       </div>
     )
@@ -280,6 +382,52 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>
+      </div>
+
+      <div className="space-y-1 pt-2 border-t border-gray-200 dark:border-gray-600">
+        <div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="form-checkbox h-5 w-5 rounded text-blue-600"
+              checked={strobeEnabled}
+              disabled={isLoading || isSaving}
+              onChange={(e) => {
+                const next = e.target.checked
+                setStrobeEnabled(next)
+                void persistStrobe({ strobeEnabled: next })
+              }}
+            />
+            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+              Strobe enabled
+            </span>
+          </label>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 ml-7">
+            When total audio energy exceeds the threshold, a strobe cue is used on the secondary
+            slot.
+          </p>
+        </div>
+
+        {strobeEnabled && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Strobe trigger threshold ({strobeTriggerThreshold.toFixed(2)})
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              className="w-full max-w-md flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+              value={strobeTriggerThreshold}
+              disabled={isLoading || isSaving}
+              onChange={(e) => setStrobeTriggerThreshold(Number(e.target.value))}
+              onMouseUp={() => void persistStrobe({ strobeTriggerThreshold })}
+              onTouchEnd={() => void persistStrobe({ strobeTriggerThreshold })}
+              onBlur={() => void persistStrobe({ strobeTriggerThreshold })}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

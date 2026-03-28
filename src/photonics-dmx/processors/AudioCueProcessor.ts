@@ -1,6 +1,7 @@
 import { AudioLightingData, AudioConfig, AudioGameModeConfig } from '../listeners/Audio/AudioTypes'
 
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
+import { pickStrobeCueType } from './audioStrobeHelpers'
 import { AudioGameModeManager } from './AudioGameModeManager'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { ILightingController } from '../controllers/sequencer/interfaces'
@@ -22,6 +23,8 @@ export class AudioCueProcessor {
   private currentSecondaryCueType: AudioCueType | null
   private registry: AudioCueRegistry
   private gameModeManager: AudioGameModeManager | null = null
+  private strobeActive = false
+  private strobeCueType: AudioCueType | null = null
 
   constructor(
     lightManager: DmxLightManager,
@@ -62,6 +65,8 @@ export class AudioCueProcessor {
     if (!this.isActive) return
 
     this.isActive = false
+    this.strobeActive = false
+    this.strobeCueType = null
     this.cueHandler.stop()
 
     // Clear all audio-related effects
@@ -106,9 +111,10 @@ export class AudioCueProcessor {
     const primary = this.gameModeManager
       ? this.gameModeManager.getActivePrimaryCue()
       : this.currentPrimaryCueType
-    const secondary = this.gameModeManager
-      ? this.gameModeManager.getActiveSecondaryCue()
-      : this.currentSecondaryCueType
+    const baseSecondary = this.gameModeManager ? null : this.currentSecondaryCueType
+
+    this.evaluateStrobe(processedData)
+    const secondary = this.strobeActive && this.strobeCueType ? this.strobeCueType : baseSecondary
 
     void this.cueHandler
       .handleAudioData(processedData, this.config, primary, secondary, this.config.bands.length)
@@ -133,16 +139,13 @@ export class AudioCueProcessor {
   }
 
   /**
-   * Enables Game Mode: automatic cue cycling and optional strobes (managed by AudioGameModeManager).
+   * Enables Game Mode: automatic primary cue cycling (managed by AudioGameModeManager).
    */
   public enableGameMode(config: AudioGameModeConfig): void {
     this.disableGameMode()
     this.gameModeManager = new AudioGameModeManager(config)
     this.gameModeManager.start()
-    this.cueHandler.syncSlots(
-      this.gameModeManager.getActivePrimaryCue(),
-      this.gameModeManager.getActiveSecondaryCue(),
-    )
+    this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null)
     console.log('AudioCueProcessor: Game Mode enabled')
   }
 
@@ -180,10 +183,7 @@ export class AudioCueProcessor {
   public refreshCueSelection(): void {
     if (this.gameModeManager) {
       this.gameModeManager.start()
-      this.cueHandler.syncSlots(
-        this.gameModeManager.getActivePrimaryCue(),
-        this.gameModeManager.getActiveSecondaryCue(),
-      )
+      this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null)
       return
     }
 
@@ -268,7 +268,7 @@ export class AudioCueProcessor {
 
   public getSecondaryCueType(): AudioCueType | null {
     if (this.gameModeManager) {
-      return this.gameModeManager.getActiveSecondaryCue()
+      return null
     }
     return this.currentSecondaryCueType
   }
@@ -304,6 +304,32 @@ export class AudioCueProcessor {
       ...audioData,
       overallLevel: mapValue(audioData.overallLevel),
       energy: mapValue(audioData.energy),
+    }
+  }
+
+  private evaluateStrobe(audioData: AudioLightingData): void {
+    if (!this.config.strobeEnabled) {
+      if (this.strobeActive) {
+        this.strobeCueType = null
+        this.strobeActive = false
+      }
+      return
+    }
+
+    const energy = audioData.energy
+    const above = energy > this.config.strobeTriggerThreshold
+
+    if (above && !this.strobeActive) {
+      const available = this.registry.getAvailableCueTypes()
+      const all = available.length > 0 ? available : this.registry.getAvailableCueTypes(true)
+      const chosen = pickStrobeCueType(this.registry, all)
+      if (chosen && this.registry.getCueImplementation(chosen)) {
+        this.strobeCueType = chosen
+        this.strobeActive = true
+      }
+    } else if (!above && this.strobeActive) {
+      this.strobeCueType = null
+      this.strobeActive = false
     }
   }
 }
