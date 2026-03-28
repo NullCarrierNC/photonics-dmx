@@ -1952,10 +1952,10 @@
             "hysteresis": 0.04,
             "holdMs": 200,
             "color": "#ff0000",
-            "nodeLabel": "Sub Bass",
+            "nodeLabel": "Sub",
             "outputs": ["enter", "during", "exit"],
             "triggerPresetDirty": true,
-            "label": "Sub Bass"
+            "label": "Sub"
           },
           {
             "id": "ev-70s-e8-kick",
@@ -1979,7 +1979,7 @@
             "eventType": "audio-trigger",
             "frequencyRange": {
               "minHz": 130,
-              "maxHz": 400
+              "maxHz": 250
             },
             "threshold": 0.14,
             "hysteresis": 0.04,
@@ -1994,7 +1994,7 @@
             "type": "event",
             "eventType": "audio-trigger",
             "frequencyRange": {
-              "minHz": 400,
+              "minHz": 250,
               "maxHz": 1000
             },
             "threshold": 0.1,
@@ -2011,7 +2011,7 @@
             "eventType": "audio-trigger",
             "frequencyRange": {
               "minHz": 1000,
-              "maxHz": 2800
+              "maxHz": 2500
             },
             "threshold": 0.08,
             "hysteresis": 0.05,
@@ -2022,28 +2022,28 @@
             "label": "Mid"
           },
           {
-            "id": "ev-70s-e8-upper-mid",
+            "id": "ev-70s-e8-presence",
             "type": "event",
             "eventType": "audio-trigger",
             "frequencyRange": {
-              "minHz": 2800,
-              "maxHz": 5500
+              "minHz": 2500,
+              "maxHz": 5000
             },
             "threshold": 0.06,
             "hysteresis": 0.05,
             "holdMs": 150,
             "color": "#0000ff",
-            "nodeLabel": "Upper Mid",
+            "nodeLabel": "Presence",
             "outputs": ["enter", "during", "exit"],
-            "label": "Upper Mid"
+            "label": "Presence"
           },
           {
             "id": "ev-70s-e8-high",
             "type": "event",
             "eventType": "audio-trigger",
             "frequencyRange": {
-              "minHz": 5500,
-              "maxHz": 11000
+              "minHz": 5000,
+              "maxHz": 10000
             },
             "threshold": 0.05,
             "hysteresis": 0.05,
@@ -2058,7 +2058,7 @@
             "type": "event",
             "eventType": "audio-trigger",
             "frequencyRange": {
-              "minHz": 11000,
+              "minHz": 10000,
               "maxHz": 20000
             },
             "threshold": 0,
@@ -2393,7 +2393,7 @@
             }
           },
           {
-            "id": "act-70s-e8-upper-mid-on",
+            "id": "act-70s-e8-presence-on",
             "type": "action",
             "effectType": "set-color",
             "target": {
@@ -2622,7 +2622,7 @@
             "assignTo": "bandLevel"
           },
           {
-            "id": "logic-70s-e8-upper-mid-level",
+            "id": "logic-70s-e8-presence-level",
             "type": "logic",
             "logicType": "cue-data",
             "dataProperty": "trigger-band-amplitude",
@@ -2695,13 +2695,13 @@
           "to": "act-70s-e8-mid-on"
         },
         {
-          "from": "ev-70s-e8-upper-mid",
-          "to": "logic-70s-e8-upper-mid-level",
+          "from": "ev-70s-e8-presence",
+          "to": "logic-70s-e8-presence-level",
           "fromPort": "during"
         },
         {
-          "from": "logic-70s-e8-upper-mid-level",
-          "to": "act-70s-e8-upper-mid-on"
+          "from": "logic-70s-e8-presence-level",
+          "to": "act-70s-e8-presence-on"
         },
         {
           "from": "ev-70s-e8-high",
@@ -2744,7 +2744,7 @@
             "x": 4.352432940155268,
             "y": 0
           },
-          "ev-70s-e8-upper-mid": {
+          "ev-70s-e8-presence": {
             "x": 256.2193627487868,
             "y": 440.4738164059818
           },
@@ -2776,7 +2776,7 @@
             "x": 7.885924749076366,
             "y": 280.4738164059818
           },
-          "act-70s-e8-upper-mid-on": {
+          "act-70s-e8-presence-on": {
             "x": 254.89540915749967,
             "y": 696.1682388931513
           },
@@ -2808,7 +2808,7 @@
             "x": 0,
             "y": 158.3109258748591
           },
-          "logic-70s-e8-upper-mid-level": {
+          "logic-70s-e8-presence-level": {
             "x": 269.638587532565,
             "y": 591.5607329681516
           },
