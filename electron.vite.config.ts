@@ -1,6 +1,6 @@
-import { resolve } from 'path';
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
-import react from '@vitejs/plugin-react';
+import { resolve } from 'path'
+import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
@@ -27,19 +27,19 @@ export default defineConfig({
           entryFileNames: (chunkInfo) => {
             // Main entry should be index.js for electron-vite
             if (chunkInfo.name === 'index') {
-              return 'index.js';
+              return 'index.js'
             }
             // Put worker files in a workers subdirectory
             if (chunkInfo.name.startsWith('workers/')) {
-              return `workers/${chunkInfo.name.replace('workers/', '')}.js`;
+              return `workers/${chunkInfo.name.replace('workers/', '')}.js`
             }
-            return '[name].js';
+            return '[name].js'
           },
         },
       },
     },
     publicDir: 'static',
-    assetsInclude: ['**/*.json']
+    assetsInclude: ['**/*.json'],
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
@@ -58,4 +58,4 @@ export default defineConfig({
     },
     plugins: [react()],
   },
-});
+})

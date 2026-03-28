@@ -2,9 +2,16 @@ import { app, BrowserWindow } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { Application } from './application'
 
-// Global error handling
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error)
+// Global reference to application for error handling
+let applicationInstance: Application | null = null
+
+// Global error handling: delegate network sender errors to ControllerManager for unified handling
+process.on('uncaughtException', (error: unknown) => {
+  const handled =
+    applicationInstance?.getControllerManager()?.handleUncaughtException(error) ?? false
+  if (!handled) {
+    console.error('Uncaught exception:', error)
+  }
 })
 
 // Global unhandled promise rejection handling
@@ -14,17 +21,18 @@ process.on('unhandledRejection', (reason, _promise) => {
 
 // Create application instance
 const application = new Application()
+applicationInstance = application // Store reference for error handling
 
 // Handle clean shutdown on process signals
 process.on('SIGINT', async () => {
   console.log('Received SIGINT signal, shutting down gracefully...')
-  
+
   // Set a hard timeout to force exit after 2 seconds
   const forceExitTimeout = setTimeout(() => {
     console.error('Forced exit due to shutdown timeout!')
     process.exit(1)
   }, 2000)
-  
+
   try {
     await application.shutdown()
     clearTimeout(forceExitTimeout)
@@ -38,13 +46,13 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   console.log('Received SIGTERM signal, shutting down gracefully...')
-  
+
   // Set a hard timeout to force exit after 2 seconds
   const forceExitTimeout = setTimeout(() => {
     console.error('Forced exit due to shutdown timeout!')
     process.exit(1)
   }, 2000)
-  
+
   try {
     await application.shutdown()
     clearTimeout(forceExitTimeout)
@@ -63,12 +71,12 @@ app.whenReady().then(() => {
 
   // Set app name
   app.name = 'Photonics'
-  
+
   // Initialize application
-  application.init().catch(err => {
+  application.init().catch((err) => {
     console.error('Failed to initialize application:', err)
   })
-  
+
   // Default session handlers
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
@@ -91,7 +99,7 @@ app.on('activate', () => {
 app.on('before-quit', async (event) => {
   // Prevent the default quit behavior
   event.preventDefault()
-  
+
   // Perform our graceful shutdown
   console.log('Application is shutting down, cleaning up resources...')
   try {

@@ -1,25 +1,28 @@
-import { CueData, CueType } from '../../../cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { Effect } from '../../../../types';
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { Effect } from '../../../../types'
 
-export class StompCue implements ICue {
-  id = 'default-stomp';
-  cueId = CueType.Stomp;
-  description = 'White flash effect on front lights triggered by keyframe';
-  style = CueStyle.Secondary;
+export class StompCue implements INetCue {
+  id = 'default-stomp'
+  cueId = CueType.Stomp
+  description = 'White flash effect on front lights triggered by keyframe'
+  style = CueStyle.Secondary
 
-  
-  async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const white = getColor('white', 'high', 'add');
-    const transparent = getColor('transparent', 'medium', 'add');
-    const lights = lightManager.getLights(['front'], 'all');
+  async execute(
+    _parameters: CueData,
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const white = getColor('white', 'high', 'add')
+    const transparent = getColor('transparent', 'medium', 'add')
+    const lights = lightManager.getLights(['front'], 'all')
 
     const stompEffect: Effect = {
-      id: "stomp-flash",
-      description: "White flash on keyframe with slower fade out.",
+      id: 'stomp-flash',
+      description: 'White flash on keyframe with slower fade out.',
       transitions: [
         {
           lights: lights,
@@ -32,7 +35,7 @@ export class StompCue implements ICue {
             duration: 0,
           },
           waitUntilCondition: 'keyframe',
-          waitUntilTime: 0
+          waitUntilTime: 0,
         },
         {
           lights: lights,
@@ -45,7 +48,7 @@ export class StompCue implements ICue {
             duration: 10,
           },
           waitUntilCondition: 'delay',
-          waitUntilTime: 0
+          waitUntilTime: 0,
         },
         {
           lights: lights,
@@ -58,7 +61,7 @@ export class StompCue implements ICue {
             duration: 10,
           },
           waitUntilCondition: 'delay',
-          waitUntilTime: 160
+          waitUntilTime: 160,
         },
         {
           lights: lights,
@@ -71,16 +74,15 @@ export class StompCue implements ICue {
             duration: 200,
           },
           waitUntilCondition: 'none',
-          waitUntilTime: 0
-        }
-      ]
-    };
+          waitUntilTime: 0,
+        },
+      ],
+    }
 
-    sequencer.addEffect('stomp', stompEffect);
+    sequencer.addEffect('stomp', stompEffect)
   }
 
-  onStop(): void {
-  }
+  onStop(): void {}
 
   onPause(): void {
     // Pause handled by effect system
@@ -89,4 +91,4 @@ export class StompCue implements ICue {
   onDestroy(): void {
     // Cleanup handled by effect system
   }
-} 
+}

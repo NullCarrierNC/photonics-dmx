@@ -1,0 +1,1053 @@
+{
+  "version": 1,
+  "mode": "yarg",
+  "group": {
+    "id": "yarg-stagekit-effects",
+    "name": "StageKit Effects",
+    "description": "Reusable effects for StageKit node cues"
+  },
+  "effects": [
+    {
+      "id": "effect-diagonal-sweep",
+      "name": "Diagonal Sweep",
+      "description": "Two CCW rotations offset by half ring for diagonal pair stepping on beat",
+      "mode": "yarg",
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": true
+        },
+        {
+          "name": "colorName",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "red",
+          "isParameter": true
+        },
+        {
+          "name": "colorBrightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "isParameter": true
+        },
+        {
+          "name": "layerValue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": true
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "halfOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "startA",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "startB",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "currentLight",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "idx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "aTemp1",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "aTemp2",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "aTemp3",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "aStepsUntil",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "aStepsAfter",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bTemp1",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bTemp2",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bTemp3",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bStepsUntil",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bStepsAfter",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "action-a-wait-before",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "aStepsUntil"
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layerValue"
+            }
+          },
+          {
+            "id": "action-a-active",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colorName"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "colorBrightness"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layerValue"
+            }
+          },
+          {
+            "id": "action-a-wait-after",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "aStepsAfter"
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layerValue"
+            }
+          },
+          {
+            "id": "action-b-wait-before",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "bStepsUntil"
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layerValue"
+            }
+          },
+          {
+            "id": "action-b-active",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colorName"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "colorBrightness"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layerValue"
+            }
+          },
+          {
+            "id": "action-b-wait-after",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "bStepsAfter"
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layerValue"
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "diag-array-len",
+            "type": "logic",
+            "logicType": "array-length",
+            "sourceVariable": "allLights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "diag-half",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "halfOffset"
+          },
+          {
+            "id": "diag-start-a",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "startA"
+          },
+          {
+            "id": "diag-start-b",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "startA"
+            },
+            "right": {
+              "source": "variable",
+              "name": "halfOffset"
+            },
+            "assignTo": "startB"
+          },
+          {
+            "id": "diag-for-each-a",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "allLights",
+            "currentLightVariable": "currentLight",
+            "currentIndexVariable": "idx"
+          },
+          {
+            "id": "diag-for-each-b",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "allLights",
+            "currentLightVariable": "currentLight",
+            "currentIndexVariable": "idx"
+          },
+          {
+            "id": "diag-a-t1",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "startA"
+            },
+            "right": {
+              "source": "variable",
+              "name": "idx"
+            },
+            "assignTo": "aTemp1"
+          },
+          {
+            "id": "diag-a-t2",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "aTemp1"
+            },
+            "right": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "assignTo": "aTemp2"
+          },
+          {
+            "id": "diag-a-mod",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "aTemp2"
+            },
+            "right": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "assignTo": "aStepsUntil"
+          },
+          {
+            "id": "diag-a-ta",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "variable",
+              "name": "aStepsUntil"
+            },
+            "assignTo": "aTemp3"
+          },
+          {
+            "id": "diag-a-sa",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "aTemp3"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "aStepsAfter"
+          },
+          {
+            "id": "diag-a-cond",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": ">",
+            "left": {
+              "source": "variable",
+              "name": "aStepsUntil"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "diag-b-t1",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "startB"
+            },
+            "right": {
+              "source": "variable",
+              "name": "idx"
+            },
+            "assignTo": "bTemp1"
+          },
+          {
+            "id": "diag-b-t2",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "bTemp1"
+            },
+            "right": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "assignTo": "bTemp2"
+          },
+          {
+            "id": "diag-b-mod",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "bTemp2"
+            },
+            "right": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "assignTo": "bStepsUntil"
+          },
+          {
+            "id": "diag-b-ta",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "variable",
+              "name": "bStepsUntil"
+            },
+            "assignTo": "bTemp3"
+          },
+          {
+            "id": "diag-b-sa",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "bTemp3"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "bStepsAfter"
+          },
+          {
+            "id": "diag-b-cond",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": ">",
+            "left": {
+              "source": "variable",
+              "name": "bStepsUntil"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "diag-sweep-listener",
+            "type": "effect-listener",
+            "label": "Effect Entry",
+            "outputs": []
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "diag-sweep-listener",
+          "to": "diag-array-len"
+        },
+        {
+          "from": "diag-array-len",
+          "to": "diag-half"
+        },
+        {
+          "from": "diag-half",
+          "to": "diag-start-a"
+        },
+        {
+          "from": "diag-start-a",
+          "to": "diag-start-b"
+        },
+        {
+          "from": "diag-start-b",
+          "to": "diag-for-each-a"
+        },
+        {
+          "from": "diag-start-b",
+          "to": "diag-for-each-b"
+        },
+        {
+          "from": "diag-for-each-a",
+          "to": "diag-a-t1",
+          "fromPort": "each"
+        },
+        {
+          "from": "diag-a-t1",
+          "to": "diag-a-t2"
+        },
+        {
+          "from": "diag-a-t2",
+          "to": "diag-a-mod"
+        },
+        {
+          "from": "diag-a-mod",
+          "to": "diag-a-ta"
+        },
+        {
+          "from": "diag-a-ta",
+          "to": "diag-a-sa"
+        },
+        {
+          "from": "diag-a-sa",
+          "to": "diag-a-cond"
+        },
+        {
+          "from": "diag-a-cond",
+          "to": "action-a-wait-before",
+          "fromPort": "true"
+        },
+        {
+          "from": "action-a-wait-before",
+          "to": "action-a-active"
+        },
+        {
+          "from": "diag-a-cond",
+          "to": "action-a-active",
+          "fromPort": "false"
+        },
+        {
+          "from": "action-a-active",
+          "to": "action-a-wait-after"
+        },
+        {
+          "from": "diag-for-each-b",
+          "to": "diag-b-t1",
+          "fromPort": "each"
+        },
+        {
+          "from": "diag-b-t1",
+          "to": "diag-b-t2"
+        },
+        {
+          "from": "diag-b-t2",
+          "to": "diag-b-mod"
+        },
+        {
+          "from": "diag-b-mod",
+          "to": "diag-b-ta"
+        },
+        {
+          "from": "diag-b-ta",
+          "to": "diag-b-sa"
+        },
+        {
+          "from": "diag-b-sa",
+          "to": "diag-b-cond"
+        },
+        {
+          "from": "diag-b-cond",
+          "to": "action-b-wait-before",
+          "fromPort": "true"
+        },
+        {
+          "from": "action-b-wait-before",
+          "to": "action-b-active"
+        },
+        {
+          "from": "diag-b-cond",
+          "to": "action-b-active",
+          "fromPort": "false"
+        },
+        {
+          "from": "action-b-active",
+          "to": "action-b-wait-after"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "diag-sweep-listener": {
+            "x": 0,
+            "y": 0
+          },
+          "diag-array-len": {
+            "x": 0,
+            "y": 120
+          },
+          "diag-half": {
+            "x": 0,
+            "y": 240
+          },
+          "diag-start-a": {
+            "x": 0,
+            "y": 360
+          },
+          "diag-start-b": {
+            "x": 0,
+            "y": 480
+          },
+          "diag-for-each-a": {
+            "x": -280,
+            "y": 600
+          },
+          "diag-a-t1": {
+            "x": -280,
+            "y": 720
+          },
+          "diag-a-t2": {
+            "x": -280,
+            "y": 840
+          },
+          "diag-a-mod": {
+            "x": -280,
+            "y": 960
+          },
+          "diag-a-ta": {
+            "x": -280,
+            "y": 1080
+          },
+          "diag-a-sa": {
+            "x": -280,
+            "y": 1200
+          },
+          "diag-a-cond": {
+            "x": -280,
+            "y": 1320
+          },
+          "action-a-wait-before": {
+            "x": -500,
+            "y": 1440
+          },
+          "action-a-active": {
+            "x": -280,
+            "y": 1560
+          },
+          "action-a-wait-after": {
+            "x": -280,
+            "y": 1680
+          },
+          "diag-for-each-b": {
+            "x": 280,
+            "y": 600
+          },
+          "diag-b-t1": {
+            "x": 280,
+            "y": 720
+          },
+          "diag-b-t2": {
+            "x": 280,
+            "y": 840
+          },
+          "diag-b-mod": {
+            "x": 280,
+            "y": 960
+          },
+          "diag-b-ta": {
+            "x": 280,
+            "y": 1080
+          },
+          "diag-b-sa": {
+            "x": 280,
+            "y": 1200
+          },
+          "diag-b-cond": {
+            "x": 280,
+            "y": 1320
+          },
+          "action-b-wait-before": {
+            "x": 500,
+            "y": 1440
+          },
+          "action-b-active": {
+            "x": 280,
+            "y": 1560
+          },
+          "action-b-wait-after": {
+            "x": 280,
+            "y": 1680
+          }
+        },
+        "viewport": {
+          "x": 500,
+          "y": 0,
+          "zoom": 0.75
+        }
+      }
+    }
+  ],
+  "bundled": true
+}

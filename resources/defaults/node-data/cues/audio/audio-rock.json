@@ -1,0 +1,1236 @@
+{
+  "version": 1,
+  "mode": "audio",
+  "group": {
+    "id": "audio-rock",
+    "name": "Rock",
+    "description": "Audio-reactive rock concert lighting: power-chord washes, drum isolation, arena strobes, and saturated metal walls"
+  },
+  "cues": [
+    {
+      "id": "cue-rock-power-chord",
+      "name": "Power Chord Wash",
+      "description": "Amber warmth from bass guitar (60–300 Hz) on layer 0; red electric guitar (300–3000 Hz) on layer 1. Additive washes across front and back.",
+      "cueTypeId": "audio-rock-power-chord",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-rock-pc-bass",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 60,
+              "maxHz": 300
+            },
+            "threshold": 0.09,
+            "hysteresis": 0.04,
+            "holdMs": 170,
+            "color": "#ffaa00",
+            "nodeLabel": "Bass guitar",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Bass guitar"
+          },
+          {
+            "id": "ev-rock-pc-guitar",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 300,
+              "maxHz": 3000
+            },
+            "threshold": 0.07,
+            "hysteresis": 0.05,
+            "holdMs": 140,
+            "color": "#ff0000",
+            "nodeLabel": "Electric guitar",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Electric guitar"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-rock-pc-amber",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "amber"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "act-rock-pc-red",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-rock-pc-bass",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-rock-pc-guitar",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-rock-pc-bass",
+          "to": "logic-rock-pc-bass",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-rock-pc-bass",
+          "to": "act-rock-pc-amber"
+        },
+        {
+          "from": "ev-rock-pc-guitar",
+          "to": "logic-rock-pc-guitar",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-rock-pc-guitar",
+          "to": "act-rock-pc-red"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-rock-pc-bass": {
+            "x": 236.95068638399243,
+            "y": 0
+          },
+          "ev-rock-pc-guitar": {
+            "x": 16.77339055761695,
+            "y": 0
+          },
+          "act-rock-pc-amber": {
+            "x": 245.22043115831912,
+            "y": 260.2860305160284
+          },
+          "act-rock-pc-red": {
+            "x": -52.62472261674702,
+            "y": 271.6809688682357
+          },
+          "logic-rock-pc-bass": {
+            "x": 232,
+            "y": 144.21102882176638
+          },
+          "logic-rock-pc-guitar": {
+            "x": 0,
+            "y": 146.70288599282503
+          }
+        },
+        "viewport": {
+          "x": 508.04233831563033,
+          "y": 97.6196366744116,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-rock-kick-snare",
+      "name": "Kick & Snare Punch",
+      "description": "Kick (spectral gate) on front half-1 red; snare (onset-gated) on front half-2 yellow; hi-hat/cymbal band on back cyan.",
+      "cueTypeId": "audio-rock-kick-snare",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-rock-ks-kick",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 30,
+              "maxHz": 120
+            },
+            "threshold": 0.07,
+            "hysteresis": 0.04,
+            "holdMs": 120,
+            "color": "#cc0000",
+            "nodeLabel": "Kick",
+            "outputs": ["enter", "during", "exit"],
+            "spectralGates": {
+              "flatness": {
+                "max": 0.35
+              }
+            },
+            "triggerPresetDirty": true,
+            "label": "Kick"
+          },
+          {
+            "id": "ev-rock-ks-snare",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 150,
+              "maxHz": 400
+            },
+            "threshold": 0.07,
+            "hysteresis": 0.04,
+            "holdMs": 100,
+            "color": "#ffff00",
+            "nodeLabel": "Snare",
+            "outputs": ["enter", "during", "exit"],
+            "useOnsetGating": true,
+            "onsetThreshold": 0.15,
+            "triggerPresetDirty": true,
+            "label": "Snare"
+          },
+          {
+            "id": "ev-rock-ks-hat",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 6000,
+              "maxHz": 16000
+            },
+            "threshold": 0.03,
+            "hysteresis": 0.03,
+            "holdMs": 200,
+            "color": "#00ffff",
+            "nodeLabel": "Hi-hat / cymbals",
+            "outputs": ["enter", "during", "exit"],
+            "triggerPresetDirty": true,
+            "label": "Hi-hat / cymbals"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-rock-ks-kick",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "half-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-rock-ks-snare",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "half-2"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-rock-ks-hat",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "cyan"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-rock-ks-kick",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-rock-ks-kick-mul",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-rock-ks-snare",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-rock-ks-snare-mul",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-rock-ks-hat",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-rock-ks-hat-mul",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "bandLevel"
+            },
+            "right": {
+              "source": "literal",
+              "value": 3
+            },
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-rock-ks-kick",
+          "to": "logic-rock-ks-kick",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-rock-ks-kick",
+          "to": "logic-rock-ks-kick-mul"
+        },
+        {
+          "from": "logic-rock-ks-kick-mul",
+          "to": "act-rock-ks-kick"
+        },
+        {
+          "from": "ev-rock-ks-snare",
+          "to": "logic-rock-ks-snare",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-rock-ks-snare",
+          "to": "logic-rock-ks-snare-mul"
+        },
+        {
+          "from": "logic-rock-ks-snare-mul",
+          "to": "act-rock-ks-snare"
+        },
+        {
+          "from": "ev-rock-ks-hat",
+          "to": "logic-rock-ks-hat",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-rock-ks-hat",
+          "to": "logic-rock-ks-hat-mul"
+        },
+        {
+          "from": "logic-rock-ks-hat-mul",
+          "to": "act-rock-ks-hat"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-rock-ks-kick": {
+            "x": 510.66666666666663,
+            "y": 3.554367290685718
+          },
+          "ev-rock-ks-snare": {
+            "x": 260.9211126882583,
+            "y": -1.3333333333332575
+          },
+          "ev-rock-ks-hat": {
+            "x": 18.13663737103343,
+            "y": 0
+          },
+          "act-rock-ks-kick": {
+            "x": 524.055063749353,
+            "y": 368.09592762763316
+          },
+          "act-rock-ks-snare": {
+            "x": 248.99370151758194,
+            "y": 370.25711788237095
+          },
+          "act-rock-ks-hat": {
+            "x": 13.552557695657015,
+            "y": 372.0877006240189
+          },
+          "logic-rock-ks-kick": {
+            "x": 527.6603681842486,
+            "y": 154.22824240277225
+          },
+          "logic-rock-ks-kick-mul": {
+            "x": 528.4942671793202,
+            "y": 264.54940275276715
+          },
+          "logic-rock-ks-snare": {
+            "x": 260.68754650838673,
+            "y": 150.82379404455423
+          },
+          "logic-rock-ks-snare-mul": {
+            "x": 256.0913738645613,
+            "y": 267.533246666193
+          },
+          "logic-rock-ks-hat": {
+            "x": 0,
+            "y": 146.88767321780324
+          },
+          "logic-rock-ks-hat-mul": {
+            "x": 17.70351330935955,
+            "y": 276.81813925877213
+          }
+        },
+        "viewport": {
+          "x": 241.15458274190314,
+          "y": 139.1640271396376,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-rock-arena-strobe",
+      "name": "Arena Flash",
+      "description": "White flash on the front on each beat; amber flash on the back 80 ms later.",
+      "cueTypeId": "audio-rock-arena-flash",
+      "effects": [
+        {
+          "effectId": "effect-audio-flash",
+          "effectFileId": "audio-core-effects",
+          "name": "Audio Flash"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-rock-as-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.3
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "logic-rock-as-delay",
+            "type": "logic",
+            "logicType": "delay",
+            "delayTime": {
+              "source": "literal",
+              "value": 80
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "er-rock-as-white",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-flash",
+            "parameterValues": {
+              "group": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "fadeInMs": {
+                "source": "literal",
+                "value": 10
+              },
+              "holdMs": {
+                "source": "literal",
+                "value": 20
+              },
+              "fadeOutMs": {
+                "source": "literal",
+                "value": 100
+              }
+            }
+          },
+          {
+            "id": "er-rock-as-amber",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-flash",
+            "parameterValues": {
+              "group": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "amber"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "fadeInMs": {
+                "source": "literal",
+                "value": 10
+              },
+              "holdMs": {
+                "source": "literal",
+                "value": 20
+              },
+              "fadeOutMs": {
+                "source": "literal",
+                "value": 120
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-rock-as-beat",
+          "to": "er-rock-as-white"
+        },
+        {
+          "from": "ev-rock-as-beat",
+          "to": "logic-rock-as-delay"
+        },
+        {
+          "from": "logic-rock-as-delay",
+          "to": "er-rock-as-amber"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-rock-as-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "logic-rock-as-delay": {
+            "x": -62.666666666666686,
+            "y": 91.25862477968133
+          },
+          "er-rock-as-white": {
+            "x": 154.66666666666674,
+            "y": 115.99999999999989
+          },
+          "er-rock-as-amber": {
+            "x": -76.66859666941065,
+            "y": 222.51724955936265
+          }
+        },
+        "viewport": {
+          "x": 432.78924055696484,
+          "y": 43.49221274383544,
+          "zoom": 1.0844492209093106
+        }
+      }
+    },
+    {
+      "id": "cue-rock-metal-wall",
+      "name": "Metal Wall",
+      "description": "Sub-bass red, mid-range vermilion, and high-frequency white in additive layers across all lights.",
+      "cueTypeId": "audio-rock-metal-wall",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-rock-mw-sub",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 80
+            },
+            "threshold": 0.1,
+            "hysteresis": 0.04,
+            "holdMs": 180,
+            "color": "#ff0000",
+            "nodeLabel": "Sub",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Sub"
+          },
+          {
+            "id": "ev-rock-mw-mid",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 200,
+              "maxHz": 4000
+            },
+            "threshold": 0.08,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "color": "#ff4400",
+            "nodeLabel": "Mids",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Mids"
+          },
+          {
+            "id": "ev-rock-mw-high",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 4000,
+              "maxHz": 16000
+            },
+            "threshold": 0.06,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "color": "#ffffff",
+            "nodeLabel": "Highs",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Highs"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-rock-mw-sub",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "act-rock-mw-mid",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "vermilion"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-rock-mw-high",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": { "source": "literal", "value": "linear" },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 2
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-rock-mw-sub",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-rock-mw-mid",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-rock-mw-high",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-rock-mw-sub",
+          "to": "logic-rock-mw-sub",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-rock-mw-sub",
+          "to": "act-rock-mw-sub"
+        },
+        {
+          "from": "ev-rock-mw-mid",
+          "to": "logic-rock-mw-mid",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-rock-mw-mid",
+          "to": "act-rock-mw-mid"
+        },
+        {
+          "from": "ev-rock-mw-high",
+          "to": "logic-rock-mw-high",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-rock-mw-high",
+          "to": "act-rock-mw-high"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-rock-mw-sub": {
+            "x": 546.2378175134461,
+            "y": 12
+          },
+          "ev-rock-mw-mid": {
+            "x": 280,
+            "y": 6.332761995494366
+          },
+          "ev-rock-mw-high": {
+            "x": 0,
+            "y": 0
+          },
+          "act-rock-mw-sub": {
+            "x": 528.8781565055251,
+            "y": 262.22496607402957
+          },
+          "act-rock-mw-mid": {
+            "x": 247.45464190033567,
+            "y": 260.9022494492432
+          },
+          "act-rock-mw-high": {
+            "x": -26.080885764211416,
+            "y": 266.33276199549437
+          },
+          "logic-rock-mw-sub": {
+            "x": 533.5082510982952,
+            "y": 130.0827658325435
+          },
+          "logic-rock-mw-mid": {
+            "x": 268.1749177649617,
+            "y": 134.301812985291
+          },
+          "logic-rock-mw-high": {
+            "x": -7.599822648490488,
+            "y": 142.5366707804303
+          }
+        },
+        "viewport": {
+          "x": 213.67069131042808,
+          "y": 104.66165645653382,
+          "zoom": 0.75
+        }
+      }
+    }
+  ],
+  "bundled": true
+}

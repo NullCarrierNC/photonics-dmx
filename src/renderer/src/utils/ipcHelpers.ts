@@ -1,111 +1,87 @@
 /**
- * Utility functions for IPC communication
+ * Utility functions for IPC event subscriptions.
+ * Uses one native listener per channel and fans out to in-process subscribers,
+ * so multiple components can listen without increasing the native listener count.
  */
 
-// Keep track of active listeners to avoid duplicates and memory leaks
-const activeListeners = new Map<string, Map<(...args: any[]) => void, (...args: any[]) => void>>();
+import type { IpcEventChannel, IpcEventMap } from '../../../shared/ipcTypes'
+
+export type IpcHandler<TPayload = unknown> = (payload: TPayload) => void
+
+interface ChannelState {
+  subscribers: Set<IpcHandler>
+  cleanup: () => void
+}
+
+const registry = new Map<string, ChannelState>()
 
 /**
- * Add an IPC event listener with cleanup tracking
- * @param channel The IPC channel to listen on
- * @param listener The listener function
+ * Add an IPC event listener with fan-out.
+ * At most one native listener exists per channel; events are fanned out to all subscribers.
+ *
+ * @param channel The RENDERER_RECEIVE channel to listen on
+ * @param listener The listener function (payload)
  */
-export function addIpcListener(channel: string, listener: (...args: any[]) => void): void {
-  // Initialize the map of listeners for this channel if it doesn't exist
-  if (!activeListeners.has(channel)) {
-    activeListeners.set(channel, new Map());
+export function addIpcListener<T extends IpcEventChannel>(
+  channel: T,
+  listener: IpcHandler<IpcEventMap[T]>,
+): void {
+  if (!registry.has(channel)) {
+    const subscribers = new Set<IpcHandler>()
+    const cleanup = window.api.receive(channel, (payload: IpcEventMap[T]) => {
+      subscribers.forEach((fn) => {
+        try {
+          fn(payload)
+        } catch (err) {
+          console.error(`[ipcHelpers] Subscriber error on channel "${channel}":`, err)
+        }
+      })
+    })
+    registry.set(channel, { subscribers, cleanup })
   }
-  
-  const listeners = activeListeners.get(channel)!;
-  
-  // Check if this exact listener function is already registered
-  if (listeners.has(listener)) {
-    console.warn(`Listener for channel "${channel}" already registered. Skipping to prevent duplicates.`);
-    return;
+
+  const state = registry.get(channel)!
+  if (state.subscribers.has(listener as IpcHandler)) {
+    console.warn(
+      `Listener for channel "${channel}" already registered. Skipping to prevent duplicates.`,
+    )
+    return
   }
-  
-  // Create a wrapped listener that we can keep track of
-  const wrappedListener = (...args: any[]) => {
-    listener(...args);
-  };
-  
-  // Map the original listener to the wrapped one
-  listeners.set(listener, wrappedListener);
-  
-  // Add the wrapped listener to the IPC renderer
-  window.electron.ipcRenderer.on(channel, wrappedListener);
-  
-  // Log the current listener count
-  console.debug(`Added listener to channel "${channel}". Total listeners: ${listeners.size}`);
-  
-  // Warn if too many listeners are added to the same channel
-  if (listeners.size > 5) {
-    console.warn(`Many listeners (${listeners.size}) for channel "${channel}". Possible memory leak?`);
-  }
+  state.subscribers.add(listener as IpcHandler)
 }
 
 /**
- * Remove an IPC event listener and update tracking
- * @param channel The IPC channel to remove the listener from
+ * Remove an IPC event listener.
+ * The native listener is kept alive; only the subscriber is removed from the fan-out set.
+ *
+ * @param channel The RENDERER_RECEIVE channel
  * @param listener The listener function to remove
  */
-export function removeIpcListener(channel: string, listener: (...args: any[]) => void): void {
-  if (!activeListeners.has(channel)) {
-    return;
+export function removeIpcListener<T extends IpcEventChannel>(
+  channel: T,
+  listener: IpcHandler<IpcEventMap[T]>,
+): void {
+  const state = registry.get(channel)
+  if (!state) {
+    return
   }
-  
-  const listeners = activeListeners.get(channel)!;
-  
-  // Get the wrapped listener that was registered
-  const wrappedListener = listeners.get(listener);
-  if (!wrappedListener) {
-    return;
-  }
-  
-  
-  // Step 1: Temporarily store all other listeners for this channel
-  const otherListeners = new Array<[(...args: any[]) => void, (...args: any[]) => void]>();
-  listeners.forEach((wrapped, original) => {
-    if (original !== listener) {
-      otherListeners.push([original, wrapped]);
-    }
-  });
-  
-  // Step 2: Remove all listeners from this channel
-  window.electron.ipcRenderer.removeAllListeners(channel);
-  
-  // Step 3: Re-add all the other listeners except the one we want to remove
-  otherListeners.forEach(([_, wrapped]) => {
-    window.electron.ipcRenderer.on(channel, wrapped);
-  });
-  
-  // Update our tracking
-  listeners.delete(listener);
-  
-  // Log the operation
-  console.debug(`Removed listener from channel "${channel}". Remaining listeners: ${listeners.size}`);
-  
-  // Clean up the channel entry if no listeners remain
-  if (listeners.size === 0) {
-    activeListeners.delete(channel);
-    console.debug(`No more listeners for channel "${channel}". Removed tracking.`);
-  }
+  state.subscribers.delete(listener as IpcHandler)
 }
 
 /**
- * Register an IPC event handler that will be automatically cleaned up on component unmount
- * Designed to be used in a React useEffect hook
- * 
- * @param channel The IPC channel to listen on
- * @param listener The listener function
+ * Register an IPC event handler that is automatically cleaned up on component unmount.
+ * Returns a cleanup function to use as the return value of a React useEffect hook.
+ *
+ * @param channel The RENDERER_RECEIVE channel to listen on
+ * @param listener The listener function (payload)
  * @returns A cleanup function to be returned from useEffect
  */
-export function useIpcListener(channel: string, listener: (...args: any[]) => void): () => void {
-  // Register the listener
-  addIpcListener(channel, listener);
-  
-  // Return a cleanup function
+export function registerIpcListener<T extends IpcEventChannel>(
+  channel: T,
+  listener: IpcHandler<IpcEventMap[T]>,
+): () => void {
+  addIpcListener(channel, listener)
   return () => {
-    removeIpcListener(channel, listener);
-  };
-} 
+    removeIpcListener(channel, listener)
+  }
+}

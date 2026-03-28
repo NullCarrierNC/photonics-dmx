@@ -1,10 +1,10 @@
-import { jest, afterEach } from '@jest/globals';
+import { jest, afterEach } from '@jest/globals'
 
 // Mock timers
-jest.useFakeTimers();
+jest.useFakeTimers()
 
 // Cleanup after each test
 afterEach(() => {
-  jest.clearAllMocks();
-  jest.clearAllTimers();
-}); 
+  jest.clearAllMocks()
+  jest.clearAllTimers()
+})

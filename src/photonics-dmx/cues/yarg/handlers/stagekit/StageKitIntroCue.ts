@@ -1,26 +1,30 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { Effect, EffectTransition } from '../../../../types';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { Effect, EffectTransition } from '../../../../types'
 
 /**
  * StageKit Intro Cue - All green lights on
  * Simple green lighting for intro sequences
  */
-export class StageKitIntroCue implements ICue {
-  id = 'stagekit-intro';
-  cueId = CueType.Intro;
-  description = 'All green lights';
-  style = CueStyle.Primary;
-  
-  private isFirstExecution: boolean = true;
+export class StageKitIntroCue implements INetCue {
+  id = 'stagekit-intro'
+  cueId = CueType.Intro
+  description = 'All green lights'
+  style = CueStyle.Primary
 
-  async execute(_cueData: CueData, controller: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const allLights = lightManager.getLights(['front', 'back'], ['all']);
-    const greenColor = getColor('green', 'medium');
-    
+  private isFirstExecution: boolean = true
+
+  async execute(
+    _cueData: CueData,
+    controller: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const allLights = lightManager.getLights(['front', 'back'], ['all'])
+    const greenColor = getColor('green', 'medium')
+
     const transitions: EffectTransition[] = [
       {
         lights: allLights,
@@ -32,27 +36,27 @@ export class StageKitIntroCue implements ICue {
         transform: {
           color: greenColor,
           easing: 'linear',
-          duration: 0 // Instant
-        }
-      }
-    ];
-    
+          duration: 0, // Instant
+        },
+      },
+    ]
+
     const introEffect: Effect = {
       id: 'stagekit-intro',
       description: 'All green lights on',
-      transitions: transitions
-    };
-    
+      transitions: transitions,
+    }
+
     if (this.isFirstExecution) {
-      controller.setEffect('stagekit-intro', introEffect);
-      this.isFirstExecution = false;
+      controller.setEffect('stagekit-intro', introEffect)
+      this.isFirstExecution = false
     } else {
-      controller.addEffect('stagekit-intro', introEffect);
+      controller.addEffect('stagekit-intro', introEffect)
     }
   }
 
   onStop(): void {
-    this.isFirstExecution = true;
+    this.isFirstExecution = true
   }
 
   onPause(): void {
@@ -62,4 +66,4 @@ export class StageKitIntroCue implements ICue {
   onDestroy(): void {
     // Cleanup handled by effect system
   }
-} 
+}

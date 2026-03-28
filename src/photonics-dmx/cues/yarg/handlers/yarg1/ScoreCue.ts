@@ -1,23 +1,27 @@
-import { CueData, CueType } from '../../../cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
-import { getEffectFlashColor } from '../../../../effects/effectFlashColor';
-import { EasingType } from '../../../../easing';
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { getEffectSingleColor } from '../../../../effects/effectSingleColor'
+import { getEffectFlashColor } from '../../../../effects/effectFlashColor'
+import { EasingType } from '../../../../easing'
 
-export class ScoreCue implements ICue {
-  id = 'default-score';
-  cueId = CueType.Score;
-  description = 'Solid medium-blue colour on front with yellow flash';
-  style = CueStyle.Primary;
-  private isFirstExecution = true;
+export class ScoreCue implements INetCue {
+  id = 'default-score'
+  cueId = CueType.Score
+  description = 'Solid medium-blue colour on front with yellow flash'
+  style = CueStyle.Primary
+  private isFirstExecution = true
 
-  async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const all = lightManager.getLights(['front'], 'all');
-    const blue = getColor('blue', 'medium');
-    const yellow = getColor('yellow', 'medium');
+  async execute(
+    _parameters: CueData,
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const all = lightManager.getLights(['front'], 'all')
+    const blue = getColor('blue', 'medium')
+    const yellow = getColor('yellow', 'medium')
 
     // Set base blue color
     const baseEffect = getEffectSingleColor({
@@ -25,7 +29,7 @@ export class ScoreCue implements ICue {
       color: blue,
       duration: 10,
       layer: 0,
-    });
+    })
 
     // Add periodic yellow flash
     const flashEffect = getEffectFlashColor({
@@ -40,20 +44,20 @@ export class ScoreCue implements ICue {
       lights: all,
       layer: 1,
       easing: EasingType.SIN_IN_OUT,
-    });
+    })
 
     if (this.isFirstExecution) {
-      sequencer.setEffect('score_base', baseEffect, true);
-      sequencer.addEffect('score_flash', flashEffect, true);
-      this.isFirstExecution = false;
+      sequencer.setEffect('score_base', baseEffect, true)
+      sequencer.addEffect('score_flash', flashEffect, true)
+      this.isFirstExecution = false
     } else {
-      sequencer.addEffect('score_base', baseEffect, true);
-      sequencer.addEffect('score_flash', flashEffect, true);
+      sequencer.addEffect('score_base', baseEffect, true)
+      sequencer.addEffect('score_flash', flashEffect, true)
     }
   }
 
   onStop(): void {
     // Reset the first execution flag so next time this cue runs it will use setEffect
-    this.isFirstExecution = true;
+    this.isFirstExecution = true
   }
-} 
+}

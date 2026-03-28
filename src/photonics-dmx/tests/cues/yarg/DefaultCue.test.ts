@@ -1,17 +1,17 @@
-import { DefaultCue } from '../../../cues/yarg/handlers/yarg1/DefaultCue';
-import { CueData } from '../../../cues/cueTypes';
-import { ILightingController } from '../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../controllers/DmxLightManager';
-import { beforeEach, describe, jest, it, expect } from '@jest/globals';
+import { DefaultCue } from '../../../cues/yarg/handlers/yarg1/DefaultCue'
+import { CueData } from '../../../cues/types/cueTypes'
+import { ILightingController } from '../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../controllers/DmxLightManager'
+import { beforeEach, describe, jest, it, expect } from '@jest/globals'
 
 describe('DefaultCue', () => {
-  let cue: DefaultCue;
-  let mockController: jest.Mocked<ILightingController>;
-  let mockLightManager: jest.Mocked<DmxLightManager>;
+  let cue: DefaultCue
+  let mockController: jest.Mocked<ILightingController>
+  let mockLightManager: jest.Mocked<DmxLightManager>
 
   beforeEach(() => {
-    cue = new DefaultCue();
-    
+    cue = new DefaultCue()
+
     // Create mock controller
     mockController = {
       addEffect: jest.fn(),
@@ -29,7 +29,7 @@ describe('DefaultCue', () => {
       enableDebug: jest.fn(),
       debugLightLayers: jest.fn(),
       shutdown: jest.fn(),
-    } as any;
+    } as any
 
     // Create mock light manager
     mockLightManager = {
@@ -42,19 +42,19 @@ describe('DefaultCue', () => {
       getDmxLight: jest.fn(),
       setConfiguration: jest.fn(),
       shutdown: jest.fn(),
-    } as any;
-  });
+    } as any
+  })
 
   describe('execute', () => {
     it('should set default lighting state', async () => {
       const data: CueData = {
         datagramVersion: 1,
-        platform: "RB3E",
-        currentScene: "Gameplay",
-        pauseState: "Unpaused",
-        venueSize: "Large",
+        platform: 'RB3E',
+        currentScene: 'Gameplay',
+        pauseState: 'Unpaused',
+        venueSize: 'Large',
         beatsPerMinute: 120,
-        songSection: "Verse",
+        songSection: 'Verse',
         guitarNotes: [],
         bassNotes: [],
         drumNotes: [],
@@ -63,36 +63,36 @@ describe('DefaultCue', () => {
         harmony0Note: 0,
         harmony1Note: 0,
         harmony2Note: 0,
-        lightingCue: "Default",
-        postProcessing: "Default",
+        lightingCue: 'Default',
+        postProcessing: 'Default',
         fogState: false,
-        strobeState: "Strobe_Off",
+        strobeState: 'Strobe_Off',
         performer: 0,
         trackMode: 'tracked',
-        beat: "Strong",
-        keyframe: "Unknown",
+        beat: 'Strong',
+        keyframe: 'Unknown',
         bonusEffect: false,
         cueHistory: [],
-      executionCount: 1,
-      cueStartTime: Date.now(),
-      timeSinceLastCue: 0,
-      };
+        executionCount: 1,
+        cueStartTime: Date.now(),
+        timeSinceLastCue: 0,
+      }
 
-      await cue.execute(data, mockController, mockLightManager);
+      await cue.execute(data, mockController, mockLightManager)
 
       // Verify that setEffect was called with the default effect
-      expect(mockController.setEffect).toHaveBeenCalledWith('default-base', expect.any(Object));
-    });
+      expect(mockController.setEffect).toHaveBeenCalledWith('default-base', expect.any(Object))
+    })
 
     it('should handle missing data', async () => {
       const data: CueData = {
         datagramVersion: 1,
-        platform: "RB3E",
-        currentScene: "Gameplay",
-        pauseState: "Unpaused",
-        venueSize: "Large",
+        platform: 'RB3E',
+        currentScene: 'Gameplay',
+        pauseState: 'Unpaused',
+        venueSize: 'Large',
         beatsPerMinute: 120,
-        songSection: "Verse",
+        songSection: 'Verse',
         guitarNotes: [],
         bassNotes: [],
         drumNotes: [],
@@ -101,25 +101,25 @@ describe('DefaultCue', () => {
         harmony0Note: 0,
         harmony1Note: 0,
         harmony2Note: 0,
-        lightingCue: "Default",
-        postProcessing: "Default",
+        lightingCue: 'Default',
+        postProcessing: 'Default',
         fogState: false,
-        strobeState: "Strobe_Off",
+        strobeState: 'Strobe_Off',
         performer: 0,
         trackMode: 'tracked',
-        beat: "Strong",
-        keyframe: "Unknown",
+        beat: 'Strong',
+        keyframe: 'Unknown',
         bonusEffect: false,
         cueHistory: [],
-      executionCount: 1,
-      cueStartTime: Date.now(),
-      timeSinceLastCue: 0,
-      };
+        executionCount: 1,
+        cueStartTime: Date.now(),
+        timeSinceLastCue: 0,
+      }
 
-      await cue.execute(data, mockController, mockLightManager);
+      await cue.execute(data, mockController, mockLightManager)
 
       // Verify that setEffect was called with the default effect
-      expect(mockController.setEffect).toHaveBeenCalledWith('default-base', expect.any(Object));
-    });
-  });
-}); 
+      expect(mockController.setEffect).toHaveBeenCalledWith('default-base', expect.any(Object))
+    })
+  })
+})

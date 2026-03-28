@@ -1,14 +1,19 @@
-import * as dgram from 'dgram';
-import { EventEmitter } from 'events';
-import { Rb3ePacketType, Rb3GameState, Rb3PlatformID, Rb3TrackType, Rb3Difficulty } from './rb3eTypes';
-import { CueData, StrobeState } from '../../cues/cueTypes';
-
+import * as dgram from 'dgram'
+import { EventEmitter } from 'events'
+import {
+  Rb3ePacketType,
+  Rb3GameState,
+  Rb3PlatformID,
+  Rb3TrackType,
+  Rb3Difficulty,
+} from './rb3eTypes'
+import { CueData, StrobeState } from '../../cues/types/cueTypes'
 
 // Use the same port that RB3Enhanced sends to.
-const PORT = 21070;
+const PORT = 21070
 
 // "RB3E" in ASCII -> 0x52, 0x42, 0x33, 0x45
-const PROTOCOL_MAGIC = Buffer.from([0x52, 0x42, 0x33, 0x45]);
+const PROTOCOL_MAGIC = Buffer.from([0x52, 0x42, 0x33, 0x45])
 
 // Platform mapping from RB3Enhanced
 const PLATFORM_MAP: Record<number, string> = {
@@ -18,8 +23,8 @@ const PLATFORM_MAP: Record<number, string> = {
   [Rb3PlatformID.RB3E_PLATFORM_DOLPHIN]: 'Dolphin',
   [Rb3PlatformID.RB3E_PLATFORM_PS3]: 'PS3',
   [Rb3PlatformID.RB3E_PLATFORM_RPCS3]: 'RPCS3',
-  [Rb3PlatformID.RB3E_PLATFORM_UNKNOWN]: 'Unknown'
-};
+  [Rb3PlatformID.RB3E_PLATFORM_UNKNOWN]: 'Unknown',
+}
 
 // Track type mapping from RB3Enhanced
 const TRACK_TYPE_MAP: Record<number, Rb3TrackType> = {
@@ -29,8 +34,8 @@ const TRACK_TYPE_MAP: Record<number, Rb3TrackType> = {
   3: 'Vocals',
   4: 'Keys',
   5: 'Harmony',
-  255: 'Unknown'
-};
+  255: 'Unknown',
+}
 
 // Difficulty mapping from RB3Enhanced
 const DIFFICULTY_MAP: Record<number, Rb3Difficulty> = {
@@ -38,13 +43,12 @@ const DIFFICULTY_MAP: Record<number, Rb3Difficulty> = {
   1: 'Medium',
   2: 'Hard',
   3: 'Expert',
-  255: 'Unknown'
-};
-
+  255: 'Unknown',
+}
 
 /**
  * RB3Enhanced Network Listener
- * 
+ *
  * This class listens for UDP packets from RB3Enhanced and parses all available data types:
  * - Platform detection (Xbox, Wii, PS3, emulators)
  * - Game state (menus vs in-game)
@@ -55,159 +59,167 @@ const DIFFICULTY_MAP: Record<number, Rb3Difficulty> = {
  * - Venue and screen information
  * - Mod data (DX data for custom information)
  * - Build tag information
- * 
+ *
  * The listener emits both general 'rb3eData' events with complete data and specific events
  * for individual data types.
- * 
+ *
  * @example
  * ```typescript
  * const listener = new Rb3eNetworkListener(cueHandler);
- * 
+ *
  * // Listen for all RB3E data
  * listener.on('rb3eData', (data) => {
  *   console.log('Received RB3E data:', data);
  * });
- * 
+ *
  * // Listen for specific song information
  * listener.on('rb3eSongName', (songName) => {
  *   console.log('Song changed to:', songName);
  * });
- * 
+ *
  * // Listen for platform changes
  * listener.on('rb3ePlatform', (platform) => {
  *   console.log('Platform detected:', platform);
  * });
- * 
+ *
  * listener.start();
  * ```
  */
 export class Rb3eNetworkListener extends EventEmitter {
-  private server: dgram.Socket | null = null;
-  private listening = false;
-  private lastData: { header: any; payload: Buffer; cueData: CueData } | null = null;
+  private server: dgram.Socket | null = null
+  private listening = false
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- packet header shape from parser
+  private lastData: { header: any; payload: Buffer; cueData: CueData } | null = null
   // Track the current LED brightness setting
-  private _currentBrightness: 'low' | 'medium' | 'high' = 'medium';
+  private _currentBrightness: 'low' | 'medium' | 'high' = 'medium'
   // Track persistent strobe state across all packet types
-  private _currentStrobeState: StrobeState = 'Strobe_Off';
+  private _currentStrobeState: StrobeState = 'Strobe_Off'
   // Packet counter for debugging
-  private packetCount = 0;
+  private packetCount = 0
 
   constructor() {
-    super();
-    console.log('Rb3eNetworkListener initialized as event emitter.');
+    super()
+    console.log('Rb3eNetworkListener initialized as event emitter.')
   }
 
   public start() {
     if (this.listening) {
-      console.warn('RB3ENetworkListener is already running.');
-      return;
+      console.warn('RB3ENetworkListener is already running.')
+      return
     }
-    console.log(`RB3ENetworkListener: Starting UDP server on port ${PORT}...`);
-    this.server = dgram.createSocket('udp4');
-    this.setupServerEvents();
+    console.log(`RB3ENetworkListener: Starting UDP server on port ${PORT}...`)
+    this.server = dgram.createSocket('udp4')
+    this.setupServerEvents()
     this.server.bind(PORT, () => {
-      this.listening = true;
-      console.log(`RB3ENetworkListener started and listening on port ${PORT}`);
-    });
-    
+      this.listening = true
+      console.log(`RB3ENetworkListener started and listening on port ${PORT}`)
+    })
+
     // Add error handling for bind failures
     this.server.on('error', (err) => {
-      console.error(`RB3ENetworkListener: Bind error:`, err);
-    });
+      console.error(`RB3ENetworkListener: Bind error:`, err)
+    })
   }
 
   public stop() {
     if (!this.listening) {
-      console.warn('RB3ENetworkListener is not running.');
-      return;
+      console.warn('RB3ENetworkListener is not running.')
+      return
     }
     if (this.server) {
       this.server.close(() => {
-        console.log('RB3ENetworkListener server closed.');
-        this.listening = false;
-        this.server = null;
-      });
+        console.log('RB3ENetworkListener server closed.')
+        this.listening = false
+        this.server = null
+      })
     }
   }
 
   public shutdown() {
-    this.stop();
+    this.stop()
   }
 
-
   private setupServerEvents() {
-    if (!this.server) return;
+    if (!this.server) return
 
     this.server.on('error', (err) => {
-      console.error(`Server error:\n${err.stack}`);
-      this.server?.close();
-      this.listening = false;
-    });
+      console.error(`Server error:\n${err.stack}`)
+      this.server?.close()
+      this.listening = false
+    })
 
     this.server.on('listening', () => {
-      const address = this.server?.address();
+      const address = this.server?.address()
       if (address) {
-        console.log(`Listening for RB3E events on ${address.address}:${address.port}`);
+        console.log(`Listening for RB3E events on ${address.address}:${address.port}`)
       }
-    });
+    })
 
     this.server.on('message', (msg) => {
-    ///  console.log(`RB3ENetworkListener: Received UDP message of ${msg.length} bytes`);
+      ///  console.log(`RB3ENetworkListener: Received UDP message of ${msg.length} bytes`);
       try {
-        this.deserializePacket(msg);
+        this.deserializePacket(msg)
       } catch (error) {
-        console.error('Failed to parse message:', error);
+        console.error('Failed to parse message:', error)
       }
-    });
+    })
   }
 
   private deserializePacket(buffer: Buffer) {
-    let offset = 0;
+    let offset = 0
 
     try {
       // Minimum 8 bytes for RB3E header (magic + 4 more).
       if (buffer.length < 8) {
-        console.warn(`Received packet is too short: ${buffer.length} bytes`);
-        return;
+        console.warn(`Received packet is too short: ${buffer.length} bytes`)
+        return
       }
 
       // Check "RB3E" magic
-      const magic = buffer.subarray(0, 4);
-      if (!(magic[0] === PROTOCOL_MAGIC[0] && magic[1] === PROTOCOL_MAGIC[1] &&
-        magic[2] === PROTOCOL_MAGIC[2] && magic[3] === PROTOCOL_MAGIC[3])) {
-        console.warn(`Invalid protocol magic: ${magic.toString('hex')}`);
-        return;
+      const magic = buffer.subarray(0, 4)
+      if (
+        !(
+          magic[0] === PROTOCOL_MAGIC[0] &&
+          magic[1] === PROTOCOL_MAGIC[1] &&
+          magic[2] === PROTOCOL_MAGIC[2] &&
+          magic[3] === PROTOCOL_MAGIC[3]
+        )
+      ) {
+        console.warn(`Invalid protocol magic: ${magic.toString('hex')}`)
+        return
       }
-      offset += 4;
+      offset += 4
 
       // Read the main header fields.
-      const protocolVersion = buffer.readUInt8(offset++);
-      const packetType = buffer.readUInt8(offset++);
-      const payloadSize = buffer.readUInt8(offset++);
-      const platform = buffer.readUInt8(offset++);
+      const protocolVersion = buffer.readUInt8(offset++)
+      const packetType = buffer.readUInt8(offset++)
+      const payloadSize = buffer.readUInt8(offset++)
+      const platform = buffer.readUInt8(offset++)
 
       // Validate packet type
       if (packetType > 10) {
-        console.warn(`Invalid packet type: ${packetType}`);
-        return;
+        console.warn(`Invalid packet type: ${packetType}`)
+        return
       }
-      
-            this.packetCount++;
-      
+
+      this.packetCount++
+
       // Validate payload size
       if (payloadSize > 255) {
-        console.warn(`Invalid payload size: ${payloadSize}`);
-        return;
+        console.warn(`Invalid payload size: ${payloadSize}`)
+        return
       }
 
       if (buffer.length < offset + payloadSize) {
-        console.warn(`Packet payload is too short: expected ${payloadSize}, got ${buffer.length - offset}`);
-        return;
+        console.warn(
+          `Packet payload is too short: expected ${payloadSize}, got ${buffer.length - offset}`,
+        )
+        return
       }
 
       // Extract payload
-      const payload = buffer.subarray(offset, offset + payloadSize);
-      offset += payloadSize;
+      const payload = buffer.subarray(offset, offset + payloadSize)
+      offset += payloadSize
 
       const header = {
         magic: 'RB3E',
@@ -215,17 +227,17 @@ export class Rb3eNetworkListener extends EventEmitter {
         type: packetType,
         payloadSize,
         platform,
-        timestamp: Date.now()
-      };
+        timestamp: Date.now(),
+      }
 
       const cueData: CueData = {
         datagramVersion: 1,
-        platform: "RB3E",
-        currentScene: "Unknown",
-        pauseState: "Unpaused",
-        venueSize: "NoVenue",
+        platform: 'RB3E',
+        currentScene: 'Unknown',
+        pauseState: 'Unpaused',
+        venueSize: 'NoVenue',
         beatsPerMinute: 0,
-        songSection: "Unknown",
+        songSection: 'Unknown',
         guitarNotes: [],
         bassNotes: [],
         drumNotes: [],
@@ -234,124 +246,123 @@ export class Rb3eNetworkListener extends EventEmitter {
         harmony0Note: 0,
         harmony1Note: 0,
         harmony2Note: 0,
-        lightingCue: "NoCue",
-        postProcessing: "Default",
+        lightingCue: 'NoCue',
+        postProcessing: 'Default',
         fogState: false,
         strobeState: this._currentStrobeState, // Use persistent strobe state
         performer: 0,
         trackMode: 'tracked',
-        beat: "Unknown",
-        keyframe: "Unknown",
+        beat: 'Unknown',
+        keyframe: 'Unknown',
         bonusEffect: false,
         ledColor: null,
-        rb3Platform: "Unknown",
-        rb3BuildTag: "",
-        rb3SongName: "",
-        rb3SongArtist: "",
-        rb3SongShortName: "",
-        rb3VenueName: "",
-        rb3ScreenName: "",
+        rb3Platform: 'Unknown',
+        rb3BuildTag: '',
+        rb3SongName: '',
+        rb3SongArtist: '',
+        rb3SongShortName: '',
+        rb3VenueName: '',
+        rb3ScreenName: '',
         rb3BandInfo: { members: [] },
-        rb3ModData: { identifyValue: "", string: "" },
+        rb3ModData: { identifyValue: '', string: '' },
         totalScore: 0,
         memberScores: [],
         stars: 0,
         sustainDurationMs: 0,
         measureOrBeat: 0,
-      
-      };
+      }
 
       // Store platform information from the packet header
-      cueData.rb3Platform = PLATFORM_MAP[platform] || 'Unknown';
+      cueData.rb3Platform = PLATFORM_MAP[platform] || 'Unknown'
 
       switch (packetType) {
         case Rb3ePacketType.EVENT_ALIVE:
-          this.handleAlive(payload, cueData);
-          break;
+          this.handleAlive(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_STATE:
-          this.handleGameState(payload, cueData);
-          break;
+          this.handleGameState(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_SONG_NAME:
-          this.handleSongName(payload, cueData);
-          break;
+          this.handleSongName(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_SONG_ARTIST:
-          this.handleSongArtist(payload, cueData);
-          break;
+          this.handleSongArtist(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_SONG_SHORTNAME:
-          this.handleSongShortName(payload, cueData);
-          break;
+          this.handleSongShortName(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_SCORE:
-          this.handleScore(payload, cueData);
-          break;
+          this.handleScore(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_STAGEKIT:
-          this.handleStageKit(payload, cueData);
-          break;
+          this.handleStageKit(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_BAND_INFO:
-          this.handleBandInfo(payload, cueData);
-          break;
+          this.handleBandInfo(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_VENUE_NAME:
-          this.handleVenueName(payload, cueData);
-          break;
+          this.handleVenueName(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_SCREEN_NAME:
-          this.handleScreenName(payload, cueData);
-          break;
+          this.handleScreenName(payload, cueData)
+          break
 
         case Rb3ePacketType.EVENT_DX_DATA:
-          this.handleDxData(payload, cueData);
-          break;
+          this.handleDxData(payload, cueData)
+          break
 
         default:
-          console.warn(`Unknown RB3E packet type: ${packetType}`);
-          return;
+          console.warn(`Unknown RB3E packet type: ${packetType}`)
+          return
       }
 
       // De‐duplicate repeated data
       if (this.lastData && this.isDataEqual(this.lastData, { header, payload, cueData })) {
-    //    console.log(`RB3E: Skipping duplicate data for packet type ${packetType}`);
-        return;
+        //    console.log(`RB3E: Skipping duplicate data for packet type ${packetType}`);
+        return
       }
-      this.lastData = { header, payload, cueData };
+      this.lastData = { header, payload, cueData }
 
       // Emit the enhanced cue data for external consumers
-      this.emit('rb3eData', cueData);
+      this.emit('rb3eData', cueData)
 
       // Emit specific events for different data types
-      if (cueData.rb3SongName) this.emit('rb3eSongName', cueData.rb3SongName);
-      if (cueData.rb3SongArtist) this.emit('rb3eSongArtist', cueData.rb3SongArtist);
-      if (cueData.rb3SongShortName) this.emit('rb3eSongShortName', cueData.rb3SongShortName);
-      if (cueData.rb3VenueName) this.emit('rb3eVenueName', cueData.rb3VenueName);
-      if (cueData.rb3ScreenName) this.emit('rb3eScreenName', cueData.rb3ScreenName);
-      if (cueData.rb3BandInfo) this.emit('rb3eBandInfo', cueData.rb3BandInfo);
-      if (cueData.rb3ModData) this.emit('rb3eModData', cueData.rb3ModData);
-      if (cueData.rb3Platform) this.emit('rb3ePlatform', cueData.rb3Platform);
-      if (cueData.rb3BuildTag) this.emit('rb3eBuildTag', cueData.rb3BuildTag);
+      if (cueData.rb3SongName) this.emit('rb3eSongName', cueData.rb3SongName)
+      if (cueData.rb3SongArtist) this.emit('rb3eSongArtist', cueData.rb3SongArtist)
+      if (cueData.rb3SongShortName) this.emit('rb3eSongShortName', cueData.rb3SongShortName)
+      if (cueData.rb3VenueName) this.emit('rb3eVenueName', cueData.rb3VenueName)
+      if (cueData.rb3ScreenName) this.emit('rb3eScreenName', cueData.rb3ScreenName)
+      if (cueData.rb3BandInfo) this.emit('rb3eBandInfo', cueData.rb3BandInfo)
+      if (cueData.rb3ModData) this.emit('rb3eModData', cueData.rb3ModData)
+      if (cueData.rb3Platform) this.emit('rb3ePlatform', cueData.rb3Platform)
+      if (cueData.rb3BuildTag) this.emit('rb3eBuildTag', cueData.rb3BuildTag)
 
       // Log summary of the data received
-    //  this.logDataSummary(cueData, packetType);
-
+      //  this.logDataSummary(cueData, packetType);
     } catch (error) {
-      console.error('Error processing RB3E packet:', error);
-      console.error('Packet buffer:', buffer.toString('hex'));
+      console.error('Error processing RB3E packet:', error)
+      console.error('Packet buffer:', buffer.toString('hex'))
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic packet comparison
   private isDataEqual(data1: any, data2: any): boolean {
-    if (data1.header.type !== data2.header.type) return false;
-    if (data1.payload.length !== data2.payload.length) return false;
-    return data1.payload.equals(data2.payload);
+    if (data1.header.type !== data2.header.type) return false
+    if (data1.payload.length !== data2.payload.length) return false
+    return data1.payload.equals(data2.payload)
   }
 
   public destroy() {
-    this.stop();
+    this.stop()
   }
 
   /**
@@ -359,7 +370,7 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns The current CueData with all available RB3E information
    */
   public getCurrentData(): CueData | null {
-    return this.lastData ? this.lastData.cueData : null;
+    return this.lastData ? this.lastData.cueData : null
   }
 
   /**
@@ -367,9 +378,9 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns True if we have platform and basic game state information
    */
   public hasBasicInfo(): boolean {
-    if (!this.lastData) return false;
-    const data = this.lastData.cueData;
-    return !!(data.rb3Platform && data.rb3Platform !== 'Unknown');
+    if (!this.lastData) return false
+    const data = this.lastData.cueData
+    return !!(data.rb3Platform && data.rb3Platform !== 'Unknown')
   }
 
   /**
@@ -377,9 +388,9 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns True if we have song name, artist, and basic metadata
    */
   public hasSongInfo(): boolean {
-    if (!this.lastData) return false;
-    const data = this.lastData.cueData;
-    return !!(data.rb3SongName && data.rb3SongArtist && data.rb3SongShortName);
+    if (!this.lastData) return false
+    const data = this.lastData.cueData
+    return !!(data.rb3SongName && data.rb3SongArtist && data.rb3SongShortName)
   }
 
   /**
@@ -387,9 +398,9 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns True if we have band member details
    */
   public hasBandInfo(): boolean {
-    if (!this.lastData) return false;
-    const data = this.lastData.cueData;
-    return !!(data.rb3BandInfo && data.rb3BandInfo.members.length > 0);
+    if (!this.lastData) return false
+    const data = this.lastData.cueData
+    return !!(data.rb3BandInfo && data.rb3BandInfo.members.length > 0)
   }
 
   /**
@@ -397,8 +408,8 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns The current platform or 'Unknown'
    */
   public getCurrentPlatform(): string {
-    if (!this.lastData) return 'Unknown';
-    return this.lastData.cueData.rb3Platform || 'Unknown';
+    if (!this.lastData) return 'Unknown'
+    return this.lastData.cueData.rb3Platform || 'Unknown'
   }
 
   /**
@@ -406,8 +417,8 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns The current build tag or empty string
    */
   public getCurrentBuildTag(): string {
-    if (!this.lastData) return '';
-    return this.lastData.cueData.rb3BuildTag || '';
+    if (!this.lastData) return ''
+    return this.lastData.cueData.rb3BuildTag || ''
   }
 
   /**
@@ -415,7 +426,7 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns The current strobe state that persists across all packet types
    */
   public getCurrentStrobeState(): StrobeState {
-    return this._currentStrobeState;
+    return this._currentStrobeState
   }
 
   /**
@@ -423,31 +434,35 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns Object with song name, artist, and short name
    */
   public getCurrentSongInfo(): { name: string; artist: string; shortName: string } | null {
-    if (!this.lastData) return null;
-    const data = this.lastData.cueData;
-    if (!data.rb3SongName || !data.rb3SongArtist || !data.rb3SongShortName) return null;
+    if (!this.lastData) return null
+    const data = this.lastData.cueData
+    if (!data.rb3SongName || !data.rb3SongArtist || !data.rb3SongShortName) return null
 
     return {
       name: data.rb3SongName,
       artist: data.rb3SongArtist,
-      shortName: data.rb3SongShortName
-    };
+      shortName: data.rb3SongShortName,
+    }
   }
 
   /**
    * Get the current score information
    * @returns Object with total score, member scores, and stars
    */
-  public getCurrentScoreInfo(): { totalScore: number; memberScores: number[]; stars: number } | null {
-    if (!this.lastData) return null;
-    const data = this.lastData.cueData;
-    if (data.totalScore === undefined || !data.memberScores || data.stars === undefined) return null;
+  public getCurrentScoreInfo(): {
+    totalScore: number
+    memberScores: number[]
+    stars: number
+  } | null {
+    if (!this.lastData) return null
+    const data = this.lastData.cueData
+    if (data.totalScore === undefined || !data.memberScores || data.stars === undefined) return null
 
     return {
       totalScore: data.totalScore,
       memberScores: data.memberScores,
-      stars: data.stars
-    };
+      stars: data.stars,
+    }
   }
 
   /**
@@ -455,14 +470,14 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns Object with venue name and screen name
    */
   public getCurrentVenueInfo(): { venueName: string; screenName: string } | null {
-    if (!this.lastData) return null;
-    const data = this.lastData.cueData;
-    if (!data.rb3VenueName || !data.rb3ScreenName) return null;
+    if (!this.lastData) return null
+    const data = this.lastData.cueData
+    if (!data.rb3VenueName || !data.rb3ScreenName) return null
 
     return {
       venueName: data.rb3VenueName,
-      screenName: data.rb3ScreenName
-    };
+      screenName: data.rb3ScreenName,
+    }
   }
 
   /**
@@ -470,7 +485,7 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns True if we have received at least one packet
    */
   public hasReceivedData(): boolean {
-    return this.lastData !== null;
+    return this.lastData !== null
   }
 
   /**
@@ -478,24 +493,23 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @returns Timestamp in milliseconds or null if no data received
    */
   public getLastDataTimestamp(): number | null {
-    return this.lastData ? this.lastData.header.timestamp : null;
+    return this.lastData ? this.lastData.header.timestamp : null
   }
 
   // Helper Methods for non‐lighting RB3E events
   private handleAlive(payload: Buffer, cueData: CueData) {
-    const txt = this.readNullTerminatedString(payload);
-    cueData.rb3BuildTag = txt;
-    console.log(`RB3E_EVENT_ALIVE => ${txt}`);
+    const txt = this.readNullTerminatedString(payload)
+    cueData.rb3BuildTag = txt
+    console.log(`RB3E_EVENT_ALIVE => ${txt}`)
   }
-
 
   private handleGameState(payload: Buffer, _cueData: CueData) {
     // Single byte: 0 = menus, 1 = in‐game
-    if (payload.length < 1) return;
-    const stateByte = payload.readUInt8(0);
-    const gameState: Rb3GameState = stateByte === 0 ? 'Menus' : 'InGame';
+    if (payload.length < 1) return
+    const stateByte = payload.readUInt8(0)
+    const gameState: Rb3GameState = stateByte === 0 ? 'Menus' : 'InGame'
 
-    console.log(`RB3E_EVENT_STATE => ${gameState}`);
+    console.log(`RB3E_EVENT_STATE => ${gameState}`)
 
     //TODO: Tie in game state to the rest of the system
     this.emit('rb3e:gameState', {
@@ -503,97 +517,98 @@ export class Rb3eNetworkListener extends EventEmitter {
       platform: this.lastData?.cueData?.rb3Platform || 'Unknown',
       timestamp: Date.now(),
       // Include real data from current cue data
-      cueData: this.lastData?.cueData || null
-    });
-
+      cueData: this.lastData?.cueData || null,
+    })
   }
 
   private handleSongName(payload: Buffer, cueData: CueData) {
-    const name = this.readNullTerminatedString(payload);
-    cueData.rb3SongName = name;
+    const name = this.readNullTerminatedString(payload)
+    cueData.rb3SongName = name
 
     // Emit song name event for event processors to handle
     this.emit('rb3e:songName', {
       songName: name,
-      timestamp: Date.now()
-    });
+      timestamp: Date.now(),
+    })
 
-    console.log(`RB3E_EVENT_SONG_NAME => ${name}`);
+    console.log(`RB3E_EVENT_SONG_NAME => ${name}`)
   }
 
   private handleSongArtist(payload: Buffer, cueData: CueData) {
-    const artist = this.readNullTerminatedString(payload);
-    cueData.rb3SongArtist = artist;
+    const artist = this.readNullTerminatedString(payload)
+    cueData.rb3SongArtist = artist
 
     // Emit song artist event for event processors to handle
     this.emit('rb3e:songArtist', {
       songArtist: artist,
-      timestamp: Date.now()
-    });
+      timestamp: Date.now(),
+    })
 
-    console.log(`RB3E_EVENT_SONG_ARTIST => ${artist}`);
+    console.log(`RB3E_EVENT_SONG_ARTIST => ${artist}`)
   }
 
   private handleSongShortName(payload: Buffer, cueData: CueData) {
-    const shortName = this.readNullTerminatedString(payload);
-    cueData.rb3SongShortName = shortName;
+    const shortName = this.readNullTerminatedString(payload)
+    cueData.rb3SongShortName = shortName
 
     // Emit song short name event for event processors to handle
     this.emit('rb3e:songShortName', {
       songShortName: shortName,
-      timestamp: Date.now()
-    });
+      timestamp: Date.now(),
+    })
 
-    console.log(`RB3E_EVENT_SONG_SHORTNAME => ${shortName}`);
+    console.log(`RB3E_EVENT_SONG_SHORTNAME => ${shortName}`)
   }
 
   private handleScore(payload: Buffer, _cueData: CueData) {
     // struct is 4 + 4*4 + 1 = 21 bytes total
     if (payload.length < 21) {
-      console.warn(`Score payload too short, expected >=21, got ${payload.length}`);
-      return;
+      console.warn(`Score payload too short, expected >=21, got ${payload.length}`)
+      return
     }
-    const totalScore = payload.readInt32LE(0);
+    const totalScore = payload.readInt32LE(0)
     const memberScores = [
       payload.readInt32LE(4),
       payload.readInt32LE(8),
       payload.readInt32LE(12),
       payload.readInt32LE(16),
-    ];
-    const stars = payload.readUInt8(20);
+    ]
+    const stars = payload.readUInt8(20)
 
-    _cueData.totalScore = totalScore;
-    _cueData.memberScores = memberScores;
-    _cueData.stars = stars;
+    _cueData.totalScore = totalScore
+    _cueData.memberScores = memberScores
+    _cueData.stars = stars
 
     // Emit score event for event processors to handle
     this.emit('rb3e:score', {
       totalScore,
       memberScores,
       stars,
-      timestamp: Date.now()
-    });
+      timestamp: Date.now(),
+    })
 
-    console.log(`RB3E_EVENT_SCORE => totalScore=${totalScore}, stars=${stars}, memberScores=${memberScores}`);
+    console.log(
+      `RB3E_EVENT_SCORE => totalScore=${totalScore}, stars=${stars}, memberScores=${memberScores}`,
+    )
   }
 
   private handleStageKit(payload: Buffer, cueData: CueData) {
     // StageKit struct has 2 bytes: LeftChannel, RightChannel
     if (payload.length < 2) {
-      console.warn(`STAGEKIT payload too short: expected 2 bytes, got ${payload.length}`);
-      return;
+      console.warn(`STAGEKIT payload too short: expected 2 bytes, got ${payload.length}`)
+      return
     }
-    const leftChannel = payload.readUInt8(0);
-    const rightChannel = payload.readUInt8(1);
+    const leftChannel = payload.readUInt8(0)
+    const rightChannel = payload.readUInt8(1)
 
     // Parse RB3E bytes into clean StageKit data
-    const stageKitData = this.parseStageKitData(leftChannel, rightChannel);
+    const stageKitData = this.parseStageKitData(leftChannel, rightChannel)
 
     // Update the cueData with the current persistent strobe state
     // (parseStageKitData already updated _currentStrobeState if this was a strobe command)
-    cueData.strobeState = this._currentStrobeState;
+    cueData.strobeState = this._currentStrobeState
 
-    this.emit('stagekit:data', stageKitData);
+    this.emit('stagekit:data', stageKitData)
   }
 
   /**
@@ -602,86 +617,89 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @param rightChannel The right channel value (color bank or effect control)
    * @returns Clean StageKit data structure
    */
-  private parseStageKitData(leftChannel: number, rightChannel: number): {
-    positions: number[];
-    color: string;
-    brightness: 'low' | 'medium' | 'high';
-    strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off';
-    timestamp: number;
+  private parseStageKitData(
+    leftChannel: number,
+    rightChannel: number,
+  ): {
+    positions: number[]
+    color: string
+    brightness: 'low' | 'medium' | 'high'
+    strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off'
+    timestamp: number
   } {
     // Parse left channel as LED position bitmask
-    const positions: number[] = [];
+    const positions: number[] = []
     for (let i = 0; i < 8; i++) {
-      const bit = 1 << i;
+      const bit = 1 << i
       if (leftChannel & bit) {
-        positions.push(i);
+        positions.push(i)
       }
     }
 
     // Parse right channel for colors and effects
-    let color: string;
-    let strobeEffect: 'slow' | 'medium' | 'fast' | 'fastest' | 'off' | undefined;
-    
+    let color: string
+    let strobeEffect: 'slow' | 'medium' | 'fast' | 'fastest' | 'off' | undefined
+
     // Check for strobe effects first and update persistent state
     switch (rightChannel) {
       case 3: // StrobeSlow
-        strobeEffect = 'slow';
+        strobeEffect = 'slow'
         if (this._currentStrobeState !== 'Strobe_Slow') {
-    //      console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Slow`);
-          this._currentStrobeState = 'Strobe_Slow';
+          //      console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Slow`);
+          this._currentStrobeState = 'Strobe_Slow'
         }
-        color = 'off';
-        break;
+        color = 'off'
+        break
       case 4: // StrobeMedium
-        strobeEffect = 'medium';
+        strobeEffect = 'medium'
         if (this._currentStrobeState !== 'Strobe_Medium') {
-   //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Medium`);
-          this._currentStrobeState = 'Strobe_Medium';
+          //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Medium`);
+          this._currentStrobeState = 'Strobe_Medium'
         }
-        color = 'off';
-        break;
+        color = 'off'
+        break
       case 5: // StrobeFast
-        strobeEffect = 'fast';
+        strobeEffect = 'fast'
         if (this._currentStrobeState !== 'Strobe_Fast') {
-   //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fast`);
-          this._currentStrobeState = 'Strobe_Fast';
+          //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fast`);
+          this._currentStrobeState = 'Strobe_Fast'
         }
-        color = 'off';
-        break;
+        color = 'off'
+        break
       case 6: // StrobeFastest
-        strobeEffect = 'fastest';
+        strobeEffect = 'fastest'
         if (this._currentStrobeState !== 'Strobe_Fastest') {
-   //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fastest`);
-          this._currentStrobeState = 'Strobe_Fastest';
+          //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fastest`);
+          this._currentStrobeState = 'Strobe_Fastest'
         }
-        color = 'off';
-        break;
+        color = 'off'
+        break
       case 7: // StrobeOff
-        strobeEffect = 'off';
+        strobeEffect = 'off'
         if (this._currentStrobeState !== 'Strobe_Off') {
-    //      console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Off`);
-          this._currentStrobeState = 'Strobe_Off';
+          //      console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Off`);
+          this._currentStrobeState = 'Strobe_Off'
         }
-        color = 'off';
-        break;
+        color = 'off'
+        break
       case 32: // Blue LEDs (0x20)
-        color = 'blue';
-        break;
+        color = 'blue'
+        break
       case 64: // Green LEDs (0x40)
-        color = 'green';
-        break;
+        color = 'green'
+        break
       case 96: // Yellow LEDs (0x60)
-        color = 'yellow';
-        break;
+        color = 'yellow'
+        break
       case 128: // Red LEDs (0x80)
-        color = 'red';
-        break;
+        color = 'red'
+        break
       case 0: // No color
-        color = 'off';
-        break;
+        color = 'off'
+        break
       default:
-        color = 'off';
-        break;
+        color = 'off'
+        break
     }
 
     return {
@@ -689,108 +707,104 @@ export class Rb3eNetworkListener extends EventEmitter {
       color,
       brightness: this._currentBrightness,
       strobeEffect,
-      timestamp: Date.now()
-    };
+      timestamp: Date.now(),
+    }
   }
-
-
-
-
 
   private handleBandInfo(payload: Buffer, cueData: CueData) {
     // 3 arrays of 4 bytes each: existence, difficulty, trackType
     if (payload.length < 12) {
-      console.warn(`Band info payload too short: expected >=12, got ${payload.length}`);
-      return;
+      console.warn(`Band info payload too short: expected >=12, got ${payload.length}`)
+      return
     }
 
     const members: Array<{
-      exists: boolean;
-      difficulty: Rb3Difficulty;
-      trackType: Rb3TrackType;
-    }> = [];
+      exists: boolean
+      difficulty: Rb3Difficulty
+      trackType: Rb3TrackType
+    }> = []
 
     for (let i = 0; i < 4; i++) {
-      const exists = payload.readUInt8(i) !== 0;
-      const difficulty = payload.readUInt8(4 + i);
-      const trackType = payload.readUInt8(8 + i);
+      const exists = payload.readUInt8(i) !== 0
+      const difficulty = payload.readUInt8(4 + i)
+      const trackType = payload.readUInt8(8 + i)
 
       members.push({
         exists,
         difficulty: DIFFICULTY_MAP[difficulty] || 'Unknown',
-        trackType: TRACK_TYPE_MAP[trackType] || 'Unknown'
-      });
+        trackType: TRACK_TYPE_MAP[trackType] || 'Unknown',
+      })
     }
 
-    cueData.rb3BandInfo = { members };
+    cueData.rb3BandInfo = { members }
 
     // Emit band info event for event processors to handle
     this.emit('rb3e:bandInfo', {
       members,
-      timestamp: Date.now()
-    });
+      timestamp: Date.now(),
+    })
 
-    console.log(`RB3E_EVENT_BAND_INFO => members: ${JSON.stringify(members)}`);
+    console.log(`RB3E_EVENT_BAND_INFO => members: ${JSON.stringify(members)}`)
   }
 
   private handleVenueName(payload: Buffer, cueData: CueData) {
-    const venue = this.readNullTerminatedString(payload);
-    cueData.rb3VenueName = venue;
+    const venue = this.readNullTerminatedString(payload)
+    cueData.rb3VenueName = venue
 
     // Emit venue name event for event processors to handle
     this.emit('rb3e:venueName', {
       venueName: venue,
-      timestamp: Date.now()
-    });
+      timestamp: Date.now(),
+    })
 
-    console.log(`RB3E_EVENT_VENUE_NAME => ${venue}`);
+    console.log(`RB3E_EVENT_VENUE_NAME => ${venue}`)
   }
 
   private handleScreenName(payload: Buffer, cueData: CueData) {
-    const screen = this.readNullTerminatedString(payload);
-    cueData.rb3ScreenName = screen;
+    const screen = this.readNullTerminatedString(payload)
+    cueData.rb3ScreenName = screen
 
     // Emit screen name event for event processors to handle
     this.emit('rb3e:screenName', {
       screenName: screen,
-      timestamp: Date.now()
-    });
+      timestamp: Date.now(),
+    })
 
-    console.log(`RB3E_EVENT_SCREEN_NAME => ${screen}`);
+    console.log(`RB3E_EVENT_SCREEN_NAME => ${screen}`)
   }
 
   private handleDxData(payload: Buffer, cueData: CueData) {
     // Typically 10 bytes identifyValue + up to 240 for string
     if (payload.length < 10) {
-      console.warn(`DX data payload too short: expected >=10, got ${payload.length}`);
-      return;
+      console.warn(`DX data payload too short: expected >=10, got ${payload.length}`)
+      return
     }
 
-    const identifyValue = this.readNullTerminatedString(payload.subarray(0, 10));
-    const string = this.readNullTerminatedString(payload.subarray(10));
+    const identifyValue = this.readNullTerminatedString(payload.subarray(0, 10))
+    const string = this.readNullTerminatedString(payload.subarray(10))
 
     cueData.rb3ModData = {
       identifyValue,
-      string
-    };
+      string,
+    }
 
     // Emit DX data event for event processors to handle
     this.emit('rb3e:dxData', {
       identifyValue,
       string,
-      timestamp: Date.now()
-    });
+      timestamp: Date.now(),
+    })
 
-    console.log(`RB3E_EVENT_DX_DATA => identifyValue: ${identifyValue}, string: ${string}`);
+    console.log(`RB3E_EVENT_DX_DATA => identifyValue: ${identifyValue}, string: ${string}`)
   }
 
   private readNullTerminatedString(buf: Buffer): string {
-    const nullIndex = buf.indexOf(0x00);
+    const nullIndex = buf.indexOf(0x00)
     if (nullIndex !== -1) {
-      return buf.subarray(0, nullIndex).toString('utf8');
+      return buf.subarray(0, nullIndex).toString('utf8')
     }
     // If no null terminator found, return entire buffer as a string
-    return buf.toString('utf8');
+    return buf.toString('utf8')
   }
 
   /* 
@@ -816,4 +830,3 @@ export class Rb3eNetworkListener extends EventEmitter {
   }
     */
 }
-

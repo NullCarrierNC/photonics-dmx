@@ -5,6 +5,7 @@
     "types": ["jest", "node"],
     "esModuleInterop": true,
     "baseUrl": "./",
+    "strictNullChecks": true,
     "paths": {
       "@lighting/*": ["src/photonics-dmx/*"]
     }

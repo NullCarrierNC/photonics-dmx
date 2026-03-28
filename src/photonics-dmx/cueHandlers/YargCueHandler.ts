@@ -1,292 +1,331 @@
-import { CueData, CueType } from '../cues/cueTypes';
-import { ILightingController } from '../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../controllers/DmxLightManager';
-import { BaseCueHandler } from './BaseCueHandler';
-import { ICue } from '../cues/interfaces/ICue';
+import { CueData, CueType } from '../cues/types/cueTypes'
+import { ILightingController } from '../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../controllers/DmxLightManager'
+import { BaseCueHandler } from './BaseCueHandler'
+import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
 
 /**
  * YargCueHandler handles the cues called by the YARG network listener.
- * 
- * The handler uses a registry system to manage multiple sets of cue implementations.
- * When a cue is triggered:
- * 1. If no group is active, a random group is selected
- * 2. The cue is executed using the active group's implementation
- * 3. If the active group doesn't implement the cue, falls back to the default group
- * 
+ *
+ * Cue selection is delegated to YargCueRegistry.getCueImplementation(cueType, trackMode), which uses
+ * active/enabled groups, consistency tracking, stage-kit preference when applicable,
+ * and default-group fallback when no active group implements the cue.
+ *
  * Reminder: setEffect clears all running effects, regardless of layer.
  * Layer 0 will maintain its state though.
  * addEffect will not clear other effects unless it's on the same layer.
  */
-class YargCueHandler extends BaseCueHandler {
-  private currentExecutingCue: ICue | null = null;
-  private currentExecutingCueType: CueType | null = null;
+const STROBE_TYPES: CueType[] = [
+  CueType.Strobe_Fastest,
+  CueType.Strobe_Fast,
+  CueType.Strobe_Medium,
+  CueType.Strobe_Slow,
+  CueType.Strobe_Off,
+]
 
-  constructor(
-    lightManager: DmxLightManager,
-    photonicsSequencer: ILightingController,
-    debouncePeriod: number
-  ) {
-    super(lightManager, photonicsSequencer, debouncePeriod);
+class YargCueHandler extends BaseCueHandler {
+  private currentPrimaryCue: INetCue | null = null
+  private currentSecondaryCue: INetCue | null = null
+  private currentStrobeCue: INetCue | null = null
+
+  constructor(lightManager: DmxLightManager, photonicsSequencer: ILightingController) {
+    super(lightManager, photonicsSequencer)
+  }
+
+  public reset(): void {
+    super.reset()
   }
 
   /**
    * Handle a beat event from YARG
    */
   public handleBeat(): void {
-    this._sequencer.onBeat();
+    this._sequencer.onBeat()
   }
 
   /**
    * Handle a measure event from YARG
    */
   public handleMeasure(): void {
-    this._sequencer.onBeat();
-    this._sequencer.onMeasure();
+    this._sequencer.onBeat()
+    this._sequencer.onMeasure()
   }
 
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
-    if (!this.checkDebounce()) return;
-
     // Update CueData with history and context information
-    const historicCueData = this.addHistoryToCueData(cueType, parameters);
+    const historicCueData = this.addHistoryToCueData(cueType, parameters)
 
     // Special cases that need to be handled differently
     switch (cueType) {
       case CueType.Blackout_Fast:
-        this.stopCurrentCue();
-        this._sequencer.blackout(0);
-        this.emit('cueHandled', historicCueData);
-        return;
+        this.stopCurrentCue()
+        this._sequencer.blackout(0)
+        this.emit('cueHandled', historicCueData)
+        return
       case CueType.Blackout_Slow:
-        this.stopCurrentCue();
-        this._sequencer.blackout(500);
-        this.emit('cueHandled', historicCueData);
-        return;
+        this.stopCurrentCue()
+        this._sequencer.blackout(500)
+        this.emit('cueHandled', historicCueData)
+        return
       case CueType.Blackout_Spotlight:
-        this.stopCurrentCue();
-        this._sequencer.blackout(0);
-        this.emit('cueHandled', historicCueData);
-        return;
+        this.stopCurrentCue()
+        this._sequencer.blackout(0)
+        this.emit('cueHandled', historicCueData)
+        return
       case CueType.Strobe_Off:
-        this.emit('cueHandled', historicCueData);
-        return; // Do nothing
+        if (this.currentStrobeCue) {
+          this.currentStrobeCue.onStop?.()
+          this.currentStrobeCue = null
+        }
+        this.emit('cueHandled', historicCueData)
+        return
       case CueType.Keyframe_First:
       case CueType.Keyframe_Next:
       case CueType.Keyframe_Previous:
-        this.handleKeyframe();
-        this.emit('cueHandled', historicCueData);
-        return;
+        this.handleKeyframe()
+        this.emit('cueHandled', historicCueData)
+        return
       case CueType.NoCue:
-        this.stopCurrentCue();
-        this._sequencer.blackout(0);
-        this.emit('cueHandled', historicCueData);
-        return;
+        this.stopCurrentCue()
+        this._sequencer.blackout(0)
+        this.emit('cueHandled', historicCueData)
+        return
       case CueType.Menu:
-        this.stopCurrentCue();
-        //this.registry.setActiveGroups([]);
-        break;
+      //      this.stopCurrentCue();
+      //     break;
     }
 
     // Get implementation from registry
     // Use trackMode, defaulting to 'tracked' if not specified
-    const trackMode = parameters.trackMode || 'tracked';
-    const cue = this.registry.getCueImplementation(cueType, trackMode);
-  
+    const trackMode = parameters.trackMode || 'tracked'
+    const cue =
+      trackMode === 'simulated' && parameters.simulationCueGroup
+        ? this.registry.getCueImplementationFromGroup(
+            cueType,
+            parameters.simulationCueGroup,
+            trackMode,
+          )
+        : this.registry.getCueImplementation(cueType, trackMode)
+
     if (cue) {
-      // Always check for cue transitions first
-      if (this.currentExecutingCueType !== cueType) {
-       // console.log(`[Lifecycle] Cue change detected: ${this.currentExecutingCueType} -> ${cueType}`);
+      const incomingIsStrobe = STROBE_TYPES.includes(cueType)
+      const incomingIsSecondary = cue.style === CueStyle.Secondary
 
-        // Strobes run on layer 255 above regular cues - don't clear effects when transitioning TO a strobe
-        const strobeTypes = ['Strobe_Fastest', 'Strobe_Fast', 'Strobe_Medium', 'Strobe_Slow', 'Strobe_Off'];
-        const incomingIsStrobe = strobeTypes.includes(cueType);
-        
-        // Only stop the current cue if we're NOT transitioning to a strobe
-        if (!incomingIsStrobe) {
-          this.stopCurrentCue();
-        } 
-
-        // ALWAYS update the tracking, regardless of whether we stopped the cue
-       // console.log(`[Lifecycle] Starting new cue: ${cue.cueId} (${cueType})`);
-        this.currentExecutingCue = cue;
-        this.currentExecutingCueType = cueType;
+      if (incomingIsStrobe) {
+        // Strobes run on top of primary and secondary overlays; track separately so Strobe_Off only clears strobes.
+        if (this.currentStrobeCue && this.currentStrobeCue !== cue) {
+          this.currentStrobeCue.onStop?.()
+          this.currentStrobeCue = null
+        }
+        this.currentStrobeCue = cue
+      } else if (incomingIsSecondary) {
+        // Non-strobe overlays run concurrently with primary and strobes, but replace the existing secondary overlay.
+        if (this.currentSecondaryCue && this.currentSecondaryCue !== cue) {
+          this.currentSecondaryCue.onStop?.()
+          this.currentSecondaryCue = null
+        }
+        this.currentSecondaryCue = cue
+      } else {
+        // Primary: stop previous primary when switching to a different cue instance (e.g. different group); leave secondary untouched.
+        if (this.currentPrimaryCue && this.currentPrimaryCue !== cue) {
+          this.currentPrimaryCue.onStop?.()
+          this.currentPrimaryCue = null
+        }
+        this.currentPrimaryCue = cue
       }
-      
-      await cue.execute(historicCueData, this._sequencer, this._lightManager);
-      this.emit('cueHandled', historicCueData);
+
+      await cue.execute(historicCueData, this._sequencer, this._lightManager)
+      this.emit('cueHandled', historicCueData)
     } else {
-      console.error(`No implementation found for cue: ${cueType}`);
-      this.emit('cueHandled', historicCueData);
+      console.error(`No implementation found for cue: ${cueType}`)
+      this.emit('cueHandled', historicCueData)
     }
   }
 
   /**
-   * Stop the currently executing cue and call its onStop lifecycle method
+   * Stop all tracked cues (primary, secondary, strobe) and call their onStop lifecycle methods.
+   * Used for blackout, NoCue, and by stopActiveCue(); primary-to-primary transitions stop only the previous primary inline, not via this method.
    */
   private stopCurrentCue(): void {
-    if (this.currentExecutingCue) {
-    //  console.log(`[Lifecycle] Calling onStop for cue: ${this.currentExecutingCue.cueId}`);
-      this.currentExecutingCue.onStop?.();
-      this.currentExecutingCue = null;
-      this.currentExecutingCueType = null;
+    if (this.currentPrimaryCue) {
+      this.currentPrimaryCue.onStop?.()
+      this.currentPrimaryCue = null
     }
+    if (this.currentSecondaryCue) {
+      this.currentSecondaryCue.onStop?.()
+      this.currentSecondaryCue = null
+    }
+    if (this.currentStrobeCue) {
+      this.currentStrobeCue.onStop?.()
+      this.currentStrobeCue = null
+    }
+  }
+
+  /**
+   * Stop the active cue (if any) and run its onStop lifecycle.
+   * Used by Cue Simulation / test harnesses so restarting the same cue works reliably.
+   */
+  public stopActiveCue(): void {
+    this.stopCurrentCue()
   }
 
   /**
    * Handle keyframe navigation
    */
   public handleKeyframe(): void {
-    this._sequencer.onKeyframe();
+    this._sequencer.onKeyframe()
   }
 
   protected async handleCueBigRockEnding(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.BigRockEnding, parameters);
+    await this.handleCue(CueType.BigRockEnding, parameters)
   }
 
   protected async handleCueBlackout_Fast(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Blackout_Fast, _parameters);
+    await this.handleCue(CueType.Blackout_Fast, _parameters)
   }
 
   protected async handleCueBlackout_Slow(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Blackout_Slow, _parameters);
+    await this.handleCue(CueType.Blackout_Slow, _parameters)
   }
 
   protected async handleCueBlackout_Spotlight(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Blackout_Spotlight, _parameters);
+    await this.handleCue(CueType.Blackout_Spotlight, _parameters)
   }
 
   protected async handleCueChorus(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Chorus, parameters);
+    await this.handleCue(CueType.Chorus, parameters)
   }
 
   protected async handleCueCool_Automatic(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Cool_Automatic, parameters);
+    await this.handleCue(CueType.Cool_Automatic, parameters)
   }
 
   protected async handleCueCool_Manual(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Cool_Manual, parameters);
+    await this.handleCue(CueType.Cool_Manual, parameters)
   }
 
   protected async handleCueDefault(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Default, parameters);
+    await this.handleCue(CueType.Default, parameters)
   }
 
   protected async handleCueDischord(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Dischord, parameters);
+    await this.handleCue(CueType.Dischord, parameters)
   }
 
   protected async handleCueFlare_Fast(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Flare_Fast, parameters);
+    await this.handleCue(CueType.Flare_Fast, parameters)
   }
 
   protected async handleCueFlare_Slow(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Flare_Slow, parameters);
+    await this.handleCue(CueType.Flare_Slow, parameters)
   }
 
   protected async handleCueFrenzy(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Frenzy, parameters);
+    await this.handleCue(CueType.Frenzy, parameters)
   }
 
   protected async handleCueHarmony(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Harmony, parameters);
+    await this.handleCue(CueType.Harmony, parameters)
   }
 
   protected async handleCueIntro(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Intro, parameters);
+    await this.handleCue(CueType.Intro, parameters)
   }
 
   protected async handleCueKeyframe_First(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Keyframe_First, _parameters);
+    await this.handleCue(CueType.Keyframe_First, _parameters)
   }
 
   protected async handleCueKeyframe_Next(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Keyframe_Next, _parameters);
+    await this.handleCue(CueType.Keyframe_Next, _parameters)
   }
 
   protected async handleCueKeyframe_Previous(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Keyframe_Previous, _parameters);
+    await this.handleCue(CueType.Keyframe_Previous, _parameters)
   }
 
   protected async handleCueMenu(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Menu, parameters);
+    await this.handleCue(CueType.Menu, parameters)
   }
 
   protected async handleCueNoCue(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.NoCue, _parameters);
+    await this.handleCue(CueType.NoCue, _parameters)
   }
 
   protected async handleCueScore(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Score, parameters);
+    await this.handleCue(CueType.Score, parameters)
   }
 
   protected async handleCueSearchlights(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Searchlights, parameters);
+    await this.handleCue(CueType.Searchlights, parameters)
   }
 
   protected async handleCueSilhouettes(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Silhouettes, parameters);
+    await this.handleCue(CueType.Silhouettes, parameters)
   }
 
   protected async handleCueSilhouettes_Spotlight(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Silhouettes_Spotlight, parameters);
+    await this.handleCue(CueType.Silhouettes_Spotlight, parameters)
   }
 
   protected async handleCueStomp(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Stomp, parameters);
+    await this.handleCue(CueType.Stomp, parameters)
   }
 
   protected async handleCueStrobe_Fast(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Fast, parameters);
+    await this.handleCue(CueType.Strobe_Fast, parameters)
   }
 
   protected async handleCueStrobe_Fastest(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Fastest, parameters);
+    await this.handleCue(CueType.Strobe_Fastest, parameters)
   }
 
   protected async handleCueStrobe_Medium(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Medium, parameters);
+    await this.handleCue(CueType.Strobe_Medium, parameters)
   }
 
   protected async handleCueStrobe_Off(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Off, parameters);
+    await this.handleCue(CueType.Strobe_Off, parameters)
   }
 
   protected async handleCueStrobe_Slow(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Slow, parameters);
+    await this.handleCue(CueType.Strobe_Slow, parameters)
   }
 
   protected async handleCueSweep(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Sweep, parameters);
+    await this.handleCue(CueType.Sweep, parameters)
   }
 
   protected async handleCueVerse(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Verse, parameters);
+    await this.handleCue(CueType.Verse, parameters)
   }
 
   protected async handleCueWarm_Automatic(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Warm_Automatic, parameters);
+    await this.handleCue(CueType.Warm_Automatic, parameters)
   }
 
   protected async handleCueWarm_Manual(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Warm_Manual, parameters);
+    await this.handleCue(CueType.Warm_Manual, parameters)
   }
 
   /**
-   * Clean up resources and call destroy lifecycle on any executing cue
+   * Clean up resources and call destroy lifecycle on any executing cue.
    */
   public shutdown(): void {
-   // console.log('[Lifecycle] YargCueHandler shutdown called');
-    // Call onDestroy on currently executing cue
-    if (this.currentExecutingCue) {
-   //   console.log(`[Lifecycle] Calling onDestroy for cue: ${this.currentExecutingCue.cueId}`);
-      this.currentExecutingCue.onDestroy?.();
-      this.currentExecutingCue = null;
-      this.currentExecutingCueType = null;
+    if (this.currentPrimaryCue) {
+      this.currentPrimaryCue.onDestroy?.()
+      this.currentPrimaryCue = null
     }
-    
-    // Call parent shutdown
-    super.shutdown();
+    if (this.currentSecondaryCue) {
+      this.currentSecondaryCue.onDestroy?.()
+      this.currentSecondaryCue = null
+    }
+    if (this.currentStrobeCue) {
+      this.currentStrobeCue.onDestroy?.()
+      this.currentStrobeCue = null
+    }
+    super.shutdown()
   }
 }
 
-export { YargCueHandler, CueType };
+export { YargCueHandler, CueType }

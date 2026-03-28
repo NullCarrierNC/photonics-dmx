@@ -1,40 +1,20 @@
 # Photonics - DMX Sequencer for YARG & Rock Band 3 (Enhanced)
 
-Photonics is a purpose built DMX light sequencer for use with YARG and Rock Band 3 Enhanced. 
+[![Photonics DMX demo](https://img.youtube.com/vi/RNMgnqftDfw/maxresdefault.jpg)](https://www.youtube.com/watch?v=RNMgnqftDfw)
+
+Photonics is a purpose built DMX light sequencer for use with YARG and Rock Band 3 Enhanced.
 It uses in-game lighting data to drive DMX lights in time to the music.
 
-It utilizes a library of built in lighting cues to create as close to a plug-and-play DMX experience as possible. 
-If you're interested in using DMX lights, but don't want to create all the lighting cues yourself in applications 
+It utilizes a library of built-in lighting cues to create as close to a plug-and-play DMX experience as possible.
+If you're interested in using DMX lights, but don't want to create all the lighting cues yourself in applications
 like LightJams or QLC+, it might be the solution for you.
 
-It sits somewhere between the original Rock Band Stage Kit and full blown DMX controllers like Lightjams and QLC+. 
+It sits somewhere between the original Rock Band Stage Kit and full blown DMX controllers like Lightjams and QLC+.
 Unlike YALCY Photonics *only* supports DMX lights and has support for Rock Band 3 (Enhanced).
 
+**DMX outputs:** sACN, ArtNet, Enttec Pro USB, OpenDMX, plus a live DMX preview in the app.
+
 For more information or the Quickstart guide please visit the project site: [Photonics.rocks](https://photonics.rocks)
-
-
-## Updating from Alpha 1
-
-Alpha 2 brings a lot of new functionality to Photonics, but it also brought a breaking change:
-
-### Light Layout order: 
-
-Previously the lights were ordered _ascending_ on the front and back lights. E.g.:
-
-Font: 1, 2, 3, 4
-
-Back: 5, 6, 7, 8
-
-
-The back order has changed to _descending_. E.g.: 
-
-Font: 1, 2, 3, 4
-
-Back: **8, 7, 6, 5**
-
-
-This better reflects the linear progression of sweep style effects that loop around the front and back lights.
-You will have to update your _Light Layout_ configuration to correctly order your physical DMX lights.
 
 If you have problems feel free to reach out in our [Discord Server](https://discord.gg/2Vyqc2hYcK).
 
@@ -84,6 +64,17 @@ will become Cyan on DMX Light 1.
 ** If you are running RB3E you will need either 4 or 8 DMX lights ** - other combinations are unsupported.
 
 
+## Music Visualization
+
+Photonics now includes audio-reactive cues, acting as a visualizer for music coming from any audio source! This 
+feature is aimed towards visualizing for rhythm games not directly supported, but can also be used as a general 
+visualizer.
+
+
+## Cue Editor
+
+Create your own cues for YARG or Music Visualization. Photonics includes a powerful node-based cue editor.
+
 
 ## Downloading and Playing
 
@@ -94,8 +85,9 @@ Please take a look at the [Quickstart Guide](https://photonics.rocks/quickstart-
 
 ## Status
 
-Photonics is still in its Alpha stages. The current release is Alpha 2 and has come a long way from Alpha 1. 
-That said, there's more to come and the possibility of breaking changes ahead...
+Photonics is still in its Alpha stages. The current release includes the node-based cue editor and will eventually
+replace code-based cues with JSON-defined cues. That said, there's more to come and the possibility of breaking
+changes ahead.
 
 See the [Project Status](https://photonics.rocks/project-status/) for more details.
 
@@ -117,6 +109,10 @@ Some libraries/assets that are packaged with the source code have licenses that 
 | [@electron-toolkit/preload](https://github.com/alex8088/electron-toolkit)   | MIT license | Electron preload utilities |
 | [@electron-toolkit/utils](https://github.com/alex8088/electron-toolkit)   | MIT license | Electron utilities |
 | [jotai](https://github.com/pmndrs/jotai)   | MIT license | State Management |
+| [reactflow](https://github.com/xyflow/xyflow)   | MIT license | Node-based cue editor UI |
+| [ajv](https://github.com/ajv-validator/ajv)   | MIT license | JSON schema validation for node cues |
+| [ajv-formats](https://github.com/ajv-validator/ajv-formats)   | MIT license | AJV format extensions |
+| [chokidar](https://github.com/paulmillr/chokidar)   | MIT license | File watching for cue hot-reload |
 | [react-icons](https://github.com/react-icons/react-icons)   | MIT license | UI Icons |
 | [date-fns](https://github.com/date-fns/date-fns)   | MIT license | Date Formatting and Manipulation |
 | [uuid](https://github.com/uuidjs/uuid)   | MIT license | UUID Generation |
@@ -153,6 +149,13 @@ $ npm run build:mac
 
 # For Linux - completely untested to-date!
 $ npm run build:linux
+```
+
+### Lint and Type Check
+
+```bash
+$ npm run lint
+$ npm run typecheck
 ```
 
 ### Running Tests

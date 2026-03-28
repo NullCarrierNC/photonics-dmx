@@ -1,9 +1,9 @@
-import React from 'react';
-import { DmxFixture } from '../../../photonics-dmx/types';
+import React from 'react'
+import { DmxFixture } from '../../../photonics-dmx/types'
 
 interface DmxChannelsProps {
-  light: DmxFixture;
-  onChannelChange: (channelName: string, value: number | boolean) => void;
+  light: DmxFixture
+  onChannelChange: (channelName: string, value: number | boolean) => void
 }
 
 const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => {
@@ -16,36 +16,32 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
   const renderChannels = (
     channels: Record<string, number | boolean>,
     title?: string,
-    allowZero: boolean = false
+    allowZero: boolean = false,
   ) => {
     // Define the desired order of channel names
-    const channelOrder = [
-      'masterDimmer',
-      'red',
-      'green',
-      'blue',
-      'white',
-      'pan',
-      'tilt',
-    ];
+    const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'pan', 'tilt']
 
     const sortedChannels = Object.entries(channels).sort((a, b) => {
-      const indexA = channelOrder.indexOf(a[0]);
-      const indexB = channelOrder.indexOf(b[0]);
+      const indexA = channelOrder.indexOf(a[0])
+      const indexB = channelOrder.indexOf(b[0])
 
       // If the channel is not in the predefined order, place it at the end
       return (
         (indexA === -1 ? channelOrder.length : indexA) -
         (indexB === -1 ? channelOrder.length : indexB)
-      );
-    });
+      )
+    })
 
     return (
       <div>
-        {title && <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">{title}</h3>}
+        {title && (
+          <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">{title}</h3>
+        )}
         {sortedChannels.map(([channelName, value]) => (
           <div key={channelName} className="flex items-center space-x-4 mb-2">
-            <label htmlFor={channelName} className="text-sm capitalize w-1/3 text-gray-700 dark:text-gray-300">
+            <label
+              htmlFor={channelName}
+              className="text-sm capitalize w-1/3 text-gray-700 dark:text-gray-300">
               {channelName}:
             </label>
             {typeof value === 'number' ? (
@@ -56,25 +52,20 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
                 max={255}
                 value={value}
                 onChange={(e) => {
-                  let newValue = Number(e.target.value);
+                  let newValue = Number(e.target.value)
 
                   // Handle invalid inputs (e.g., empty string)
                   if (isNaN(newValue)) {
-                    newValue = allowZero ? 0 : 1;
+                    newValue = allowZero ? 0 : 1
                   }
 
                   // Clamp the value within the allowed range
-                  newValue = Math.min(
-                    255,
-                    Math.max(allowZero ? 0 : 1, newValue)
-                  );
+                  newValue = Math.min(255, Math.max(allowZero ? 0 : 1, newValue))
 
-                  onChannelChange(channelName, newValue);
+                  onChannelChange(channelName, newValue)
                 }}
                 className={`p-2 border ${
-                  allowZero
-                    ? 'border-gray-300'
-                    : 'border-gray-300'
+                  allowZero ? 'border-gray-300' : 'border-gray-300'
                 } rounded w-[100px] text-black ${
                   value === 0 && !allowZero ? 'text-red-500 font-bold' : ''
                 }`}
@@ -85,8 +76,8 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
                 type="checkbox"
                 checked={value}
                 onChange={(e) => {
-                  const newValue = e.target.checked;
-                  onChannelChange(channelName, newValue);
+                  const newValue = e.target.checked
+                  onChannelChange(channelName, newValue)
                 }}
                 className="h-4 w-4 text-blue-600 border-gray-300 rounded"
               />
@@ -94,8 +85,8 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
           </div>
         ))}
       </div>
-    );
-  };
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -103,7 +94,7 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
       {renderChannels(
         light.channels as unknown as Record<string, number | boolean>,
         'Channels',
-        false
+        false,
       )}
 
       {/* Config Channels - Allow zero if they exist */}
@@ -111,10 +102,10 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
         renderChannels(
           light.config as unknown as Record<string, number | boolean>,
           'Config Channels',
-          true
+          true,
         )}
     </div>
-  );
-};
+  )
+}
 
-export default DmxChannels;
+export default DmxChannels

@@ -1,11 +1,10 @@
-import { CueRegistry } from '../CueRegistry';
-import { CueType } from '../cueTypes';
-import { ICueGroup } from '../interfaces/ICueGroup';
-import { CoolAutomaticCue } from './handlers/coolWarmAlt1/CoolAutomaticCue';
-import { CoolManualCue } from './handlers/coolWarmAlt1/CoolManualCue';
-import { WarmAutomaticCue } from './handlers/coolWarmAlt1/WarmAutomaticCue';
-import { WarmManualCue } from './handlers/coolWarmAlt1/WarmManualCue';
-
+import { YargCueRegistry } from '../registries/YargCueRegistry'
+import { CueType } from '../types/cueTypes'
+import { ICueGroup } from '../interfaces/INetCueGroup'
+import { CoolAutomaticCue } from './handlers/coolWarmAlt1/CoolAutomaticCue'
+import { CoolManualCue } from './handlers/coolWarmAlt1/CoolManualCue'
+import { WarmAutomaticCue } from './handlers/coolWarmAlt1/WarmAutomaticCue'
+import { WarmManualCue } from './handlers/coolWarmAlt1/WarmManualCue'
 
 /**
  * Create and register the cool/warm alternative 1 cue group.
@@ -20,10 +19,10 @@ const group: ICueGroup = {
     [CueType.Warm_Automatic, new WarmAutomaticCue()],
     [CueType.Warm_Manual, new WarmManualCue()],
   ]),
-};
+}
 
 // Get the registry instance and register the default group
-const registry = CueRegistry.getInstance();
-registry.registerGroup(group);
+const registry = YargCueRegistry.getInstance()
+registry.registerGroup(group)
 
-registry.activateGroup(group.id);
+registry.activateGroup(group.id)

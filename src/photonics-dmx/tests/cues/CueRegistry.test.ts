@@ -1,22 +1,30 @@
-import { CueRegistry } from '../../cues/CueRegistry';
-import { ICue, CueStyle } from '../../cues/interfaces/ICue';
-import { ICueGroup } from '../../cues/interfaces/ICueGroup';
-import { CueData, CueType } from '../../cues/cueTypes';
-import { ILightingController } from '../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../controllers/DmxLightManager';
-import { beforeEach, describe, it, expect } from '@jest/globals';
+import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
+import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
+import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
+import { CueData, CueType } from '../../cues/types/cueTypes'
+import { ILightingController } from '../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../controllers/DmxLightManager'
+import { beforeEach, describe, it, expect } from '@jest/globals'
 
 // Mock implementations
-class MockCueImplementation implements ICue {
-  private _id: string;
+class MockCueImplementation implements INetCue {
+  private _id: string
   constructor(private _name: string) {
-    this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`;
+    this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`
   }
-  get cueId(): string { return this._name; }
-  get id(): string { return this._id; }
-  description = 'Mock cue for testing';
-  style = CueStyle.Primary;
-  async execute(_data: CueData, _controller: ILightingController, _lightManager: DmxLightManager): Promise<void> {
+  get cueId(): string {
+    return this._name
+  }
+  get id(): string {
+    return this._id
+  }
+  description = 'Mock cue for testing'
+  style = CueStyle.Primary
+  async execute(
+    _data: CueData,
+    _controller: ILightingController,
+    _lightManager: DmxLightManager,
+  ): Promise<void> {
     // Mock implementation
   }
 
@@ -33,14 +41,14 @@ class MockCueImplementation implements ICue {
   }
 }
 
-describe('CueRegistry', () => {
-  let registry: CueRegistry;
-  let defaultGroup: ICueGroup;
-  let customGroup: ICueGroup;
+describe('YargCueRegistry', () => {
+  let registry: YargCueRegistry
+  let defaultGroup: ICueGroup
+  let customGroup: ICueGroup
 
   beforeEach(() => {
-    registry = CueRegistry.getInstance();
-    registry.reset(); // Clear any existing groups
+    registry = YargCueRegistry.getInstance()
+    registry.reset() // Clear any existing groups
 
     // Create default group
     defaultGroup = {
@@ -50,7 +58,7 @@ describe('CueRegistry', () => {
         [CueType.Default, new MockCueImplementation('default')],
         [CueType.Chorus, new MockCueImplementation('default-chorus')],
       ]),
-    };
+    }
 
     // Create custom group
     customGroup = {
@@ -60,248 +68,302 @@ describe('CueRegistry', () => {
         [CueType.Chorus, new MockCueImplementation('custom-chorus')],
         [CueType.Verse, new MockCueImplementation('custom-verse')],
       ]),
-    };
-    
+    }
+
     // Explicitly register and set the default group
-    registry.registerGroup(defaultGroup);
-    registry.setDefaultGroup(defaultGroup.id);
-  });
+    registry.registerGroup(defaultGroup)
+    registry.setDefaultGroup(defaultGroup.id)
+  })
 
   describe('registerGroup', () => {
     it('should register a group', () => {
-      expect(registry.getAllGroups()).toContain('default');
-    });
+      expect(registry.getAllGroups()).toContain('default')
+    })
 
     it('should set default group when registering group named "default"', () => {
-      const implementation = registry.getCueImplementation(CueType.Default, 'tracked');
-      expect(implementation).toBeDefined();
-      expect((implementation as MockCueImplementation).cueId).toBe('default');
-    });
-  });
+      const implementation = registry.getCueImplementation(CueType.Default, 'tracked')
+      expect(implementation).toBeDefined()
+      expect((implementation as MockCueImplementation).cueId).toBe('default')
+    })
+  })
 
   describe('getCueImplementation', () => {
     beforeEach(() => {
-      registry.registerGroup(customGroup);
-    });
+      registry.registerGroup(customGroup)
+    })
 
     it('should return implementation from active group if available', () => {
-      registry.setActiveGroups(['custom']);
-      const implementation = registry.getCueImplementation(CueType.Chorus);
-      expect(implementation).toBeDefined();
-      expect(implementation).toBeInstanceOf(MockCueImplementation);
-    });
+      registry.setActiveGroups(['custom'])
+      const implementation = registry.getCueImplementation(CueType.Chorus)
+      expect(implementation).toBeDefined()
+      expect(implementation).toBeInstanceOf(MockCueImplementation)
+    })
 
     it('should fall back to default group if cue not in active group', () => {
-      registry.setActiveGroups(['custom']);
-      const implementation = registry.getCueImplementation(CueType.Default);
-      expect(implementation).toBeDefined();
-      expect(implementation).toBeInstanceOf(MockCueImplementation);
-      expect((implementation as MockCueImplementation).cueId).toBe('default');
-    });
+      registry.setActiveGroups(['custom'])
+      const implementation = registry.getCueImplementation(CueType.Default)
+      expect(implementation).toBeDefined()
+      expect(implementation).toBeInstanceOf(MockCueImplementation)
+      expect((implementation as MockCueImplementation).cueId).toBe('default')
+    })
 
     it('should return null if no implementation found', () => {
-      registry.setActiveGroups(['custom']);
-      const implementation = registry.getCueImplementation(CueType.BigRockEnding);
-      expect(implementation).toBeNull();
-    });
-  });
+      registry.setActiveGroups(['custom'])
+      const implementation = registry.getCueImplementation(CueType.BigRockEnding)
+      expect(implementation).toBeNull()
+    })
+  })
+
+  describe('getCueImplementationFromGroup', () => {
+    beforeEach(() => {
+      registry.registerGroup(customGroup)
+    })
+
+    it('should return implementation from the requested group (deterministic)', () => {
+      const impl = registry.getCueImplementationFromGroup(CueType.Chorus, 'custom')
+      expect(impl).toBeDefined()
+      expect((impl as MockCueImplementation).cueId).toBe('custom-chorus')
+    })
+
+    it('should return same implementation on repeated calls with same group', () => {
+      const a = registry.getCueImplementationFromGroup(CueType.Chorus, 'custom')
+      const b = registry.getCueImplementationFromGroup(CueType.Chorus, 'custom')
+      expect(a).toBe(b)
+      expect((a as MockCueImplementation).cueId).toBe('custom-chorus')
+    })
+
+    it('should return default group cue when requested group does not have the cue', () => {
+      const impl = registry.getCueImplementationFromGroup(CueType.Default, 'custom')
+      expect(impl).toBeDefined()
+      expect((impl as MockCueImplementation).cueId).toBe('default')
+    })
+
+    it('should return null when neither requested group nor default has the cue', () => {
+      const impl = registry.getCueImplementationFromGroup(CueType.BigRockEnding, 'custom')
+      expect(impl).toBeNull()
+    })
+
+    it('should not use active groups (explicit group only)', () => {
+      registry.setActiveGroups(['default'])
+      const impl = registry.getCueImplementationFromGroup(CueType.Chorus, 'custom')
+      expect(impl).toBeDefined()
+      expect((impl as MockCueImplementation).cueId).toBe('custom-chorus')
+    })
+  })
 
   describe('setActiveGroups', () => {
     beforeEach(() => {
-      registry.registerGroup(customGroup);
-    });
+      registry.registerGroup(customGroup)
+    })
 
     it('should set active groups', () => {
-      registry.setActiveGroups(['custom']);
-      expect(registry.getActiveGroups()).toEqual(['custom']);
-    });
+      registry.setActiveGroups(['custom'])
+      expect(registry.getActiveGroups()).toEqual(['custom'])
+    })
 
     it('should clear active groups when empty array provided', () => {
-      registry.setActiveGroups(['custom']);
-      registry.setActiveGroups([]);
-      expect(registry.getActiveGroups()).toHaveLength(0);
-    });
+      registry.setActiveGroups(['custom'])
+      registry.setActiveGroups([])
+      expect(registry.getActiveGroups()).toHaveLength(0)
+    })
 
     it('should ignore non-existent group names', () => {
-      registry.setActiveGroups(['custom', 'non-existent']);
-      expect(registry.getActiveGroups()).toEqual(['custom']);
-    });
-  });
+      registry.setActiveGroups(['custom', 'non-existent'])
+      expect(registry.getActiveGroups()).toEqual(['custom'])
+    })
+  })
 
   describe('reset', () => {
     it('should clear all groups and active groups', () => {
-      registry.registerGroup(customGroup);
-      registry.setActiveGroups(['custom']);
-      registry.reset();
-      expect(registry.getAllGroups()).toHaveLength(2); // default and custom groups remain registered
-      expect(registry.getActiveGroups()).toHaveLength(0); // but active groups are cleared
-    });
-  });
+      registry.registerGroup(customGroup)
+      registry.setActiveGroups(['custom'])
+      registry.reset()
+      expect(registry.getAllGroups()).toHaveLength(2) // default and custom groups remain registered
+      expect(registry.getActiveGroups()).toHaveLength(0) // but active groups are cleared
+    })
+  })
 
   describe('Consistency Throttling', () => {
     it('should use consistent group selection within the consistency window', () => {
-      const registry = CueRegistry.getInstance();
-      registry.reset();
-      
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
       // Set up test groups
       const group1: ICueGroup = {
         id: 'group1',
         name: 'group1',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')],
-        ]),
-      };
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')]]),
+      }
       const group2: ICueGroup = {
         id: 'group2',
         name: 'group2',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')],
-        ]),
-      };
-      registry.registerGroup(group1);
-      registry.registerGroup(group2);
-      registry.setEnabledGroups(['group1', 'group2']);
-      registry.setActiveGroups(['group1', 'group2']);
-      
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')]]),
+      }
+      registry.registerGroup(group1)
+      registry.registerGroup(group2)
+      registry.setEnabledGroups(['group1', 'group2'])
+      registry.setActiveGroups(['group1', 'group2'])
+
       // Set consistency window to 2 seconds
-      registry.setCueConsistencyWindow(2000);
-      
+      registry.setCueConsistencyWindow(2000)
+
       // First call should randomly select a group
-      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic);
-      expect(firstCue).toBeTruthy();
-      const firstGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2';
-      
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+      const firstGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+
       // Second call within window should use same group
-      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic);
-      expect(secondCue).toBeTruthy();
-      const secondGroupId = secondCue!.id.includes('group1') ? 'group1' : 'group2';
-      
-      expect(secondGroupId).toBe(firstGroupId);
-    });
+      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(secondCue).toBeTruthy()
+      const secondGroupId = secondCue!.id.includes('group1') ? 'group1' : 'group2'
+
+      expect(secondGroupId).toBe(firstGroupId)
+    })
 
     it('should allow new randomization after consistency window expires', () => {
-      const registry = CueRegistry.getInstance();
-      registry.reset();
-      
-      // Set up test groups
-      const group1: ICueGroup = {
-        id: 'group1',
-        name: 'group1',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')],
-        ]),
-      };
-      const group2: ICueGroup = {
-        id: 'group2',
-        name: 'group2',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')],
-        ]),
-      };
-      registry.registerGroup(group1);
-      registry.registerGroup(group2);
-      registry.setEnabledGroups(['group1', 'group2']);
-      registry.setActiveGroups(['group1', 'group2']);
-      
-      // Set consistency window to 0ms for testing (immediate expiration)
-      registry.setCueConsistencyWindow(0);
-      
-      // First call
-      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic);
-      expect(firstCue).toBeTruthy();
-      
-      // Second call should allow new randomization since window is 0ms
-      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic);
-      expect(secondCue).toBeTruthy();
-      
-      // Both calls should work without hanging
-      expect(firstCue).toBeDefined();
-      expect(secondCue).toBeDefined();
-    });
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
 
-    it('should clear consistency tracking when active groups change', () => {
-      const registry = CueRegistry.getInstance();
-      registry.reset();
-      
       // Set up test groups
       const group1: ICueGroup = {
         id: 'group1',
         name: 'group1',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')],
-        ]),
-      };
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')]]),
+      }
       const group2: ICueGroup = {
         id: 'group2',
         name: 'group2',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')],
-        ]),
-      };
-      registry.registerGroup(group1);
-      registry.registerGroup(group2);
-      registry.setEnabledGroups(['group1', 'group2']);
-      registry.setActiveGroups(['group1']);
-      
-      // Set consistency window
-      registry.setCueConsistencyWindow(2000);
-      
-      // Call a cue to establish tracking
-      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic);
-      expect(firstCue).toBeTruthy();
-      
-      // Change active groups
-      registry.setActiveGroups(['group2']);
-      
-      // Check that consistency tracking was cleared
-      const status = registry.getConsistencyStatus();
-      expect(status.trackedCues).toHaveLength(0);
-    });
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')]]),
+      }
+      registry.registerGroup(group1)
+      registry.registerGroup(group2)
+      registry.setEnabledGroups(['group1', 'group2'])
+      registry.setActiveGroups(['group1', 'group2'])
+
+      // Set consistency window to 0ms for testing (immediate expiration)
+      registry.setCueConsistencyWindow(0)
+
+      // First call
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+
+      // Second call should allow new randomization since window is 0ms
+      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(secondCue).toBeTruthy()
+
+      // Both calls should work without hanging
+      expect(firstCue).toBeDefined()
+      expect(secondCue).toBeDefined()
+    })
+
+    it('should preserve consistency when setActiveGroups is called twice with the same list', () => {
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
+      const group1: ICueGroup = {
+        id: 'group1',
+        name: 'group1',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')]]),
+      }
+      const group2: ICueGroup = {
+        id: 'group2',
+        name: 'group2',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')]]),
+      }
+      registry.registerGroup(group1)
+      registry.registerGroup(group2)
+      registry.setEnabledGroups(['group1', 'group2'])
+      registry.setActiveGroups(['group1', 'group2'])
+      registry.setCueConsistencyWindow(2000)
+
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+      const firstGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+
+      // Re-apply same active list (e.g. UI refresh) – should not clear consistency
+      registry.setActiveGroups(['group1', 'group2'])
+
+      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(secondCue).toBeTruthy()
+      const secondGroupId = secondCue!.id.includes('group1') ? 'group1' : 'group2'
+      expect(secondGroupId).toBe(firstGroupId)
+    })
+
+    it('should clear consistency when setActiveGroups is called with a different list', () => {
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
+      const group1: ICueGroup = {
+        id: 'group1',
+        name: 'group1',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')]]),
+      }
+      const group2: ICueGroup = {
+        id: 'group2',
+        name: 'group2',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')]]),
+      }
+      registry.registerGroup(group1)
+      registry.registerGroup(group2)
+      registry.setEnabledGroups(['group1', 'group2'])
+      registry.setActiveGroups(['group1', 'group2'])
+      registry.setCueConsistencyWindow(2000)
+
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+
+      // Change active groups (e.g. DMX preview toggle)
+      registry.setActiveGroups(['group2'])
+
+      const status = registry.getConsistencyStatus()
+      expect(status.trackedCues).toHaveLength(0)
+
+      // Next getCueImplementation must use the new active set (only group2)
+      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(secondCue).toBeTruthy()
+      expect(secondCue!.id).toContain('group2')
+    })
 
     it('should provide consistency status information', () => {
-      const registry = CueRegistry.getInstance();
-      registry.reset();
-      
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
       // Set up test groups
       const group1: ICueGroup = {
         id: 'group1',
         name: 'group1',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')],
-        ]),
-      };
-      registry.registerGroup(group1);
-      registry.setEnabledGroups(['group1']);
-      registry.setActiveGroups(['group1']);
-      
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')]]),
+      }
+      registry.registerGroup(group1)
+      registry.setEnabledGroups(['group1'])
+      registry.setActiveGroups(['group1'])
+
       // Set consistency window
-      registry.setCueConsistencyWindow(2000);
-      
+      registry.setCueConsistencyWindow(2000)
+
       // Call a cue
-      const cue = registry.getCueImplementation(CueType.Cool_Automatic);
-      expect(cue).toBeTruthy();
-      
+      const cue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(cue).toBeTruthy()
+
       // Get status
-      const status = registry.getConsistencyStatus();
-      expect(status.windowMs).toBe(2000);
-      expect(status.trackedCues).toHaveLength(1);
-      expect(status.trackedCues[0].cueType).toBe(CueType.Cool_Automatic);
-      expect(status.trackedCues[0].isWithinWindow).toBe(true);
-    });
+      const status = registry.getConsistencyStatus()
+      expect(status.windowMs).toBe(2000)
+      expect(status.trackedCues).toHaveLength(1)
+      expect(status.trackedCues[0].cueType).toBe(CueType.Cool_Automatic)
+      expect(status.trackedCues[0].isWithinWindow).toBe(true)
+    })
 
     it('should properly handle fallback logic with consistency system', () => {
-      const registry = CueRegistry.getInstance();
-      registry.reset();
-      
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
       // Set up test groups with fallback scenario
       const defaultGroup: ICueGroup = {
         id: 'default',
         name: 'default',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('default-cool-auto')],
-        ]),
-      };
-      
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('default-cool-auto')]]),
+      }
+
       const customGroup: ICueGroup = {
         id: 'custom',
         name: 'custom',
@@ -309,48 +371,46 @@ describe('CueRegistry', () => {
           [CueType.Chorus, new MockCueImplementation('custom-chorus')],
           // Note: custom group does NOT have Cool_Automatic
         ]),
-      };
-      
-      registry.registerGroup(defaultGroup);
-      registry.registerGroup(customGroup);
-      registry.setDefaultGroup('default');
-      registry.setEnabledGroups(['custom']); // Only custom is enabled
-      registry.setActiveGroups(['custom']); // Only custom is active
-      
+      }
+
+      registry.registerGroup(defaultGroup)
+      registry.registerGroup(customGroup)
+      registry.setDefaultGroup('default')
+      registry.setEnabledGroups(['custom']) // Only custom is enabled
+      registry.setActiveGroups(['custom']) // Only custom is active
+
       // Set consistency window
-      registry.setCueConsistencyWindow(2000);
-      
+      registry.setCueConsistencyWindow(2000)
+
       // First call to Cool_Automatic should use default group as fallback
-      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic);
-      expect(firstCue).toBeTruthy();
-      expect(firstCue!.id).toContain('default-cool-auto');
-      
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+      expect(firstCue!.id).toContain('default-cool-auto')
+
       // Second call within window should use same fallback group
-      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic);
-      expect(secondCue).toBeTruthy();
-      expect(secondCue!.id).toContain('default-cool-auto');
-      
+      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(secondCue).toBeTruthy()
+      expect(secondCue!.id).toContain('default-cool-auto')
+
       // Verify consistency tracking shows fallback
-      const status = registry.getConsistencyStatus();
-      expect(status.trackedCues).toHaveLength(1);
-      expect(status.trackedCues[0].cueType).toBe(CueType.Cool_Automatic);
-      expect(status.trackedCues[0].lastGroupId).toBe('default');
-      expect(status.trackedCues[0].isWithinWindow).toBe(true);
-    });
+      const status = registry.getConsistencyStatus()
+      expect(status.trackedCues).toHaveLength(1)
+      expect(status.trackedCues[0].cueType).toBe(CueType.Cool_Automatic)
+      expect(status.trackedCues[0].lastGroupId).toBe('default')
+      expect(status.trackedCues[0].isWithinWindow).toBe(true)
+    })
 
     it('should use default group as fallback even when default is active', () => {
-      const registry = CueRegistry.getInstance();
-      registry.reset();
-      
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
       // Set up test groups where default is active but other active groups don't have the cue
       const defaultGroup: ICueGroup = {
         id: 'default',
         name: 'default',
-        cues: new Map([
-          [CueType.Strobe_Fast, new MockCueImplementation('default-strobe-fast')],
-        ]),
-      };
-      
+        cues: new Map([[CueType.Strobe_Fast, new MockCueImplementation('default-strobe-fast')]]),
+      }
+
       const customGroup: ICueGroup = {
         id: 'custom',
         name: 'custom',
@@ -358,64 +418,230 @@ describe('CueRegistry', () => {
           [CueType.Chorus, new MockCueImplementation('custom-chorus')],
           // Note: custom group does NOT have Strobe_Fast
         ]),
-      };
-      
-      registry.registerGroup(defaultGroup);
-      registry.registerGroup(customGroup);
-      registry.setDefaultGroup('default');
-      registry.setEnabledGroups(['custom', 'default']); // Both enabled
-      registry.setActiveGroups(['custom', 'default']); // Both active
-      
+      }
+
+      registry.registerGroup(defaultGroup)
+      registry.registerGroup(customGroup)
+      registry.setDefaultGroup('default')
+      registry.setEnabledGroups(['custom', 'default']) // Both enabled
+      registry.setActiveGroups(['custom', 'default']) // Both active
+
       // Call Strobe_Fast - should use default group as fallback since custom doesn't have it
-      const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast, 'tracked');
-      expect(strobeCue).toBeTruthy();
-      expect(strobeCue!.id).toContain('default-strobe-fast');
-      
+      const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast, 'tracked')
+      expect(strobeCue).toBeTruthy()
+      expect(strobeCue!.id).toContain('default-strobe-fast')
+
       // Verify this was treated as a fallback
-      const status = registry.getConsistencyStatus();
-      expect(status.trackedCues).toHaveLength(1);
-      expect(status.trackedCues[0].cueType).toBe(CueType.Strobe_Fast);
-      expect(status.trackedCues[0].lastGroupId).toBe('default');
-    });
+      const status = registry.getConsistencyStatus()
+      expect(status.trackedCues).toHaveLength(1)
+      expect(status.trackedCues[0].cueType).toBe(CueType.Strobe_Fast)
+      expect(status.trackedCues[0].lastGroupId).toBe('default')
+    })
 
     it('should prefer stage kit group when autoGen is false and stageKitPriority is prefer-for-tracked', () => {
-      const registry = CueRegistry.getInstance();
-      registry.reset();
-      
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
       // Set up test groups including a stage kit group
       const stageKitGroup: ICueGroup = {
         id: 'stagekit',
         name: 'stagekit',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('stagekit-cool-auto')],
-        ]),
-      };
-      
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('stagekit-cool-auto')]]),
+      }
+
       const customGroup: ICueGroup = {
         id: 'custom',
         name: 'custom',
-        cues: new Map([
-          [CueType.Cool_Automatic, new MockCueImplementation('custom-cool-auto')],
-        ]),
-      };
-      
-      registry.registerGroup(stageKitGroup);
-      registry.registerGroup(customGroup);
-      registry.setStageKitGroup('stagekit');
-      registry.setStageKitPriority('prefer-for-tracked');
-      registry.setEnabledGroups(['stagekit', 'custom']);
-      registry.setActiveGroups(['stagekit', 'custom']);
-      
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('custom-cool-auto')]]),
+      }
+
+      registry.registerGroup(stageKitGroup)
+      registry.registerGroup(customGroup)
+      registry.setStageKitGroup('stagekit')
+      registry.setStageKitPriority('prefer-for-tracked')
+      registry.setEnabledGroups(['stagekit', 'custom'])
+      registry.setActiveGroups(['stagekit', 'custom'])
+
       // When trackMode is 'autogen' (auto-generated lighting), should use random selection (existing behavior)
-      const cueWithAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, 'autogen');
-      expect(cueWithAutoGen).toBeTruthy();
+      const cueWithAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, 'autogen')
+      expect(cueWithAutoGen).toBeTruthy()
       // Could be either group since it's random
-      expect(['stagekit-cool-auto', 'custom-cool-auto']).toContain(cueWithAutoGen!.cueId);
-      
+      expect(['stagekit-cool-auto', 'custom-cool-auto']).toContain(cueWithAutoGen!.cueId)
+
       // When trackMode is 'tracked' (tracked lighting data), should prefer stage kit group
-      const cueWithoutAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, 'tracked');
-      expect(cueWithoutAutoGen).toBeTruthy();
-      expect(cueWithoutAutoGen!.cueId).toBe('stagekit-cool-auto');
-    });
-  });
-}); 
+      const cueWithoutAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, 'tracked')
+      expect(cueWithoutAutoGen).toBeTruthy()
+      expect(cueWithoutAutoGen!.cueId).toBe('stagekit-cool-auto')
+    })
+  })
+
+  describe('cue group selection mode (once per song)', () => {
+    it('with oncePerSong mode, one group is selected for all cues in the song until onSongEnd', () => {
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
+      const group1: ICueGroup = {
+        id: 'group1',
+        name: 'group1',
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')],
+          [CueType.Verse, new MockCueImplementation('group1-verse')],
+        ]),
+      }
+      const group2: ICueGroup = {
+        id: 'group2',
+        name: 'group2',
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')],
+          [CueType.Verse, new MockCueImplementation('group2-verse')],
+        ]),
+      }
+      registry.registerGroup(group1)
+      registry.registerGroup(group2)
+      registry.setEnabledGroups(['group1', 'group2'])
+      registry.setActiveGroups(['group1', 'group2'])
+      registry.setCueGroupSelectionMode('oncePerSong')
+      registry.setCueConsistencyWindow(0)
+
+      registry.onSongStart()
+
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+      const lockedGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+
+      for (let i = 0; i < 3; i++) {
+        const cue = registry.getCueImplementation(CueType.Cool_Automatic)
+        expect(cue).toBeTruthy()
+        expect(cue!.id.includes(lockedGroupId)).toBe(true)
+      }
+
+      const verseCue = registry.getCueImplementation(CueType.Verse)
+      expect(verseCue).toBeTruthy()
+      expect(verseCue!.id.includes(lockedGroupId)).toBe(true)
+
+      registry.onSongEnd()
+
+      const afterEndCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(afterEndCue).toBeTruthy()
+    })
+
+    it('with oncePerSong mode, uses default group as fallback when locked group does not have the cue', () => {
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
+      const defaultGroup: ICueGroup = {
+        id: 'default',
+        name: 'default',
+        cues: new Map([
+          [CueType.Cool_Automatic, new MockCueImplementation('default-cool-auto')],
+          [CueType.Strobe_Fast, new MockCueImplementation('default-strobe-fast')],
+        ]),
+      }
+      const customGroup: ICueGroup = {
+        id: 'custom',
+        name: 'custom',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('custom-cool-auto')]]),
+      }
+      registry.registerGroup(defaultGroup)
+      registry.registerGroup(customGroup)
+      registry.setDefaultGroup('default')
+      registry.setEnabledGroups(['custom'])
+      registry.setActiveGroups(['custom'])
+      registry.setCueGroupSelectionMode('oncePerSong')
+      registry.setCueConsistencyWindow(0)
+
+      registry.onSongStart()
+
+      const coolCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(coolCue).toBeTruthy()
+      expect(coolCue!.id).toContain('custom-cool-auto')
+
+      const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast)
+      expect(strobeCue).toBeTruthy()
+      expect(strobeCue!.id).toContain('default-strobe-fast')
+    })
+
+    it('with withinSong mode, onSongStart and onSongEnd do not change time-window behaviour', () => {
+      const registry = YargCueRegistry.getInstance()
+      registry.reset()
+
+      const group1: ICueGroup = {
+        id: 'group1',
+        name: 'group1',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group1-cool-auto')]]),
+      }
+      const group2: ICueGroup = {
+        id: 'group2',
+        name: 'group2',
+        cues: new Map([[CueType.Cool_Automatic, new MockCueImplementation('group2-cool-auto')]]),
+      }
+      registry.registerGroup(group1)
+      registry.registerGroup(group2)
+      registry.setEnabledGroups(['group1', 'group2'])
+      registry.setActiveGroups(['group1', 'group2'])
+      registry.setCueGroupSelectionMode('withinSong')
+      registry.setCueConsistencyWindow(2000)
+
+      registry.onSongStart()
+      const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(firstCue).toBeTruthy()
+      const firstGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+
+      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(secondCue).toBeTruthy()
+      const secondGroupId = secondCue!.id.includes('group1') ? 'group1' : 'group2'
+      expect(secondGroupId).toBe(firstGroupId)
+
+      registry.onSongEnd()
+      registry.setCueConsistencyWindow(0)
+      const thirdCue = registry.getCueImplementation(CueType.Cool_Automatic)
+      expect(thirdCue).toBeTruthy()
+    })
+  })
+
+  describe('setEnabledGroups (enabled vs active separation)', () => {
+    it('does not overwrite active groups when setting enabled groups', () => {
+      registry.reset()
+      const groupA: ICueGroup = {
+        id: 'groupA',
+        name: 'Group A',
+        cues: new Map([[CueType.Default, new MockCueImplementation('a-default')]]),
+      }
+      const groupB: ICueGroup = {
+        id: 'groupB',
+        name: 'Group B',
+        cues: new Map([[CueType.Default, new MockCueImplementation('b-default')]]),
+      }
+      registry.registerGroup(groupA)
+      registry.registerGroup(groupB)
+      registry.setActiveGroups(['groupA'])
+      expect(registry.getActiveGroups()).toEqual(['groupA'])
+
+      registry.setEnabledGroups(['groupA', 'groupB'])
+      expect(registry.getEnabledGroups()).toEqual(expect.arrayContaining(['groupA', 'groupB']))
+      expect(registry.getActiveGroups()).toEqual(['groupA'])
+    })
+
+    it('removes from active any group that is no longer enabled', () => {
+      registry.reset()
+      const groupA: ICueGroup = {
+        id: 'groupA',
+        name: 'Group A',
+        cues: new Map([[CueType.Default, new MockCueImplementation('a-default')]]),
+      }
+      const groupB: ICueGroup = {
+        id: 'groupB',
+        name: 'Group B',
+        cues: new Map([[CueType.Default, new MockCueImplementation('b-default')]]),
+      }
+      registry.registerGroup(groupA)
+      registry.registerGroup(groupB)
+      registry.setEnabledGroups(['groupA', 'groupB'])
+      registry.setActiveGroups(['groupA', 'groupB'])
+      expect(registry.getActiveGroups()).toHaveLength(2)
+
+      registry.setEnabledGroups(['groupA'])
+      expect(registry.getActiveGroups()).toEqual(['groupA'])
+    })
+  })
+})

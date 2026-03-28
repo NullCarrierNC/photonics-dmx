@@ -1,128 +1,140 @@
-import { useEffect, useState, useRef } from 'react';
-import { CueData } from 'src/photonics-dmx/cues/cueTypes';
-import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles';
-import { useIpcListener } from '@renderer/utils/ipcHelpers';
-
+import { useEffect, useState, useRef } from 'react'
+import { CueData } from 'src/photonics-dmx/cues/types/cueTypes'
+import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
+import { registerIpcListener } from '@renderer/utils/ipcHelpers'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { setListenCueData, getYargEnabled, getRb3Enabled } from '../ipcApi'
 
 const NetworkDebug = () => {
   // Local state for latest cue data from IPC events.
-  const [handledCue, setHandledCue] = useState<CueData | null>(null);
-  const [previousHandledCue, setPreviousHandledCue] = useState<string | null>(null);
-  const [previousLedColor, setPreviousLedColor] = useState<string | null>(null);
-  const [thirdHandledCue, setThirdHandledCue] = useState<string | null>(null);
-  const [thirdLedColor, setThirdLedColor] = useState<string | null>(null);
-  
-  // Use refs to track current values inside the event handlers
-  const currentHandledCueRef = useRef<string | null>(null);
-  const previousHandledCueRef = useRef<string | null>(null);
-  const currentLedColorRef = useRef<string | null>(null);
-  const previousLedColorRef = useRef<string | null>(null);
-  
-  // Counter for the events.
-  const [handledCount, setHandledCount] = useState(0);
-  
-  // Track enabled listeners for re-registration
-  const [yargEnabled, setYargEnabled] = useState(false);
-  const [rb3Enabled, setRb3Enabled] = useState(false);
+  const [handledCue, setHandledCue] = useState<CueData | null>(null)
+  const [previousHandledCue, setPreviousHandledCue] = useState<string | null>(null)
+  const [previousLedColor, setPreviousLedColor] = useState<string | null>(null)
+  const [thirdHandledCue, setThirdHandledCue] = useState<string | null>(null)
+  const [thirdLedColor, setThirdLedColor] = useState<string | null>(null)
 
+  // Use refs to track current values inside the event handlers
+  const currentHandledCueRef = useRef<string | null>(null)
+  const previousHandledCueRef = useRef<string | null>(null)
+  const currentLedColorRef = useRef<string | null>(null)
+  const previousLedColorRef = useRef<string | null>(null)
+
+  // Counter for the events.
+  const [handledCount, setHandledCount] = useState(0)
+
+  // Track enabled listeners for re-registration
+  const [yargEnabled, setYargEnabled] = useState(false)
+  const [rb3Enabled, setRb3Enabled] = useState(false)
 
   useEffect(() => {
     // Reset counter on mount.
-    setHandledCount(0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset counter on mount
+    setHandledCount(0)
 
     // Tell the main process to start sending cue data
-    window.electron.ipcRenderer.send('set-listen-cue-data', true);
+    setListenCueData(true)
 
     // Handler for the cue-handled event.
-    const handleCueHandled = (_event: any, cueData: CueData) => {
+    const handleCueHandled = (cueData: CueData) => {
       // Get the LED color from the cue data
-      const currentLedColorValue = cueData.ledColor || '';
-      
-    
+      const currentLedColorValue = cueData.ledColor || ''
+
       // Only update cue history if this is a different cue
       if (currentHandledCueRef.current && currentHandledCueRef.current !== cueData.lightingCue) {
         // Move current to previous, and previous to third
-        setThirdHandledCue(previousHandledCueRef.current);
-        setThirdLedColor(previousLedColorRef.current);
-        setPreviousHandledCue(currentHandledCueRef.current);
-        setPreviousLedColor(currentLedColorRef.current);
-        
-        previousHandledCueRef.current = currentHandledCueRef.current;
-        previousLedColorRef.current = currentLedColorRef.current;
-      }
-      
-      // Update our refs to track the current cue and LED color
-      currentHandledCueRef.current = cueData.lightingCue;
-      currentLedColorRef.current = currentLedColorValue;
-      
-      setHandledCue(cueData);
-      setHandledCount((prev) => prev + 1);
-    };
+        setThirdHandledCue(previousHandledCueRef.current)
+        setThirdLedColor(previousLedColorRef.current)
+        setPreviousHandledCue(currentHandledCueRef.current)
+        setPreviousLedColor(currentLedColorRef.current)
 
-    // Use our custom IPC listener utility to register handlers
-    const cleanupHandled = useIpcListener('cue-handled', handleCueHandled);
+        previousHandledCueRef.current = currentHandledCueRef.current
+        previousLedColorRef.current = currentLedColorRef.current
+      }
+
+      // Update our refs to track the current cue and LED color
+      currentHandledCueRef.current = cueData.lightingCue
+      currentLedColorRef.current = currentLedColorValue
+
+      setHandledCue(cueData)
+      setHandledCount((prev) => prev + 1)
+    }
+
+    const cleanupHandled = registerIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueHandled)
 
     return () => {
-      console.log('NetworkDebug unmounting, cleaning up listeners');
+      console.log('NetworkDebug unmounting, cleaning up listeners')
       // First disable the data listening on the main process
-      window.electron.ipcRenderer.send('set-listen-cue-data', false);
-      
-      // Clean up our event listeners 
-      cleanupHandled();
-    };
-  }, []);
+      setListenCueData(false)
+
+      // Clean up our event listeners
+      cleanupHandled()
+    }
+  }, [])
 
   // Monitor enabled listeners and re-register when they change
   useEffect(() => {
     const checkEnabledState = async () => {
       try {
-        const yargState = await window.electron.ipcRenderer.invoke('get-yarg-enabled');
-        const rb3State = await window.electron.ipcRenderer.invoke('get-rb3-enabled');
-        
-        const yargWasEnabled = yargEnabled;
-        const rb3WasEnabled = rb3Enabled;
-        
-        setYargEnabled(yargState);
-        setRb3Enabled(rb3State);
-        
+        const yargState = await getYargEnabled()
+        const rb3State = await getRb3Enabled()
+
+        const yargWasEnabled = yargEnabled
+        const rb3WasEnabled = rb3Enabled
+
+        setYargEnabled(yargState)
+        setRb3Enabled(rb3State)
+
         // If listeners were enabled while we were already mounted, re-register
         if ((yargState && !yargWasEnabled) || (rb3State && !rb3WasEnabled)) {
-          console.log('Listener state changed, re-registering cue data listeners');
-          window.electron.ipcRenderer.send('set-listen-cue-data', true);
+          console.log('Listener state changed, re-registering cue data listeners')
+          setListenCueData(true)
         }
       } catch (error) {
-        console.error('Error checking listener state:', error);
+        console.error('Error checking listener state:', error)
       }
-    };
+    }
 
     // Check initial state
-    checkEnabledState();
-    
-    // Set up interval to check for changes
-    const interval = setInterval(checkEnabledState, 1000);
-    
-    return () => clearInterval(interval);
-  }, [yargEnabled, rb3Enabled]); 
+    checkEnabledState()
 
+    // Set up interval to check for changes
+    const interval = setInterval(checkEnabledState, 1000)
+
+    return () => clearInterval(interval)
+  }, [yargEnabled, rb3Enabled])
 
   const renderCueData = (data: CueData) => {
     return (
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontFamily: 'Courier New, monospace', fontSize: '0.8rem' }}>
+      <ul
+        style={{
+          listStyle: 'none',
+          padding: 0,
+          margin: 0,
+          fontFamily: 'Courier New, monospace',
+          fontSize: '0.8rem',
+        }}>
         {Object.entries(data).map(([key, value]) => {
           // Handle different value types for better display
-          let displayValue: string;
+          let displayValue: string
           if (Array.isArray(value)) {
-            displayValue = value.join(', ');
+            displayValue = value.join(', ')
           } else if (typeof value === 'boolean') {
             // Format boolean values with better styling
-            displayValue = value ? 'true' : 'false';
+            displayValue = value ? 'true' : 'false'
           } else {
-            displayValue = String(value);
+            displayValue = String(value)
           }
 
           // Bold and style important fields
-          if (key === 'lightingCue' || key === 'strobeState' || key === 'beat' || key === 'songSection' 
-            || key === 'beatsPerMinute' || key === 'pauseState' || key === 'venueSize') {
+          if (
+            key === 'lightingCue' ||
+            key === 'strobeState' ||
+            key === 'beat' ||
+            key === 'songSection' ||
+            key === 'beatsPerMinute' ||
+            key === 'pauseState' ||
+            key === 'venueSize'
+          ) {
             return (
               <li key={key}>
                 <strong>{key}:</strong>{' '}
@@ -130,39 +142,39 @@ const NetworkDebug = () => {
                   <strong>{displayValue}</strong>
                 </span>
               </li>
-            );
+            )
           }
-          
+
           // Special styling for boolean fields
           if (key === 'trackMode') {
             return (
               <li key={key}>
                 <strong>{key}:</strong>{' '}
-                <span style={{ 
-                  fontFamily: 'Courier New, monospace',
-                  color: value ? '#10b981' : '#ef4444', // Green for true, red for false
-                  fontWeight: 'bold'
-                }}>
+                <span
+                  style={{
+                    fontFamily: 'Courier New, monospace',
+                    color: value ? '#10b981' : '#ef4444', // Green for true, red for false
+                    fontWeight: 'bold',
+                  }}>
                   {displayValue}
                 </span>
               </li>
-            );
+            )
           }
-          
+
           return (
             <li key={key}>
               {key}: {displayValue}
             </li>
-          );
+          )
         })}
       </ul>
-    );
-  };
+    )
+  }
 
-  const handledCueName = handledCue ? handledCue.lightingCue : '';
-  const strobeState = handledCue ? handledCue.strobeState : '';
-  const ledColor = handledCue?.ledColor || '';
-
+  const handledCueName = handledCue ? handledCue.lightingCue : ''
+  const strobeState = handledCue ? handledCue.strobeState : ''
+  const ledColor = handledCue?.ledColor || ''
 
   return (
     <div className="p-6">
@@ -172,42 +184,47 @@ const NetworkDebug = () => {
 
       <hr className="mt-8 mb-8 border-gray-200 dark:border-gray-600" />
 
-      <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">Network Lighting Cue Data</h2>
-        <p className="mb-8 text-sm text-gray-600 dark:text-gray-400">
-          This window will display the raw light data sent over the network by YARG/RB3E. 
-          Enable either YARG or RB3E above and start a song in the game. You should see the network data appear below. 
-          If nothing happens, verify your network connections, and ensure that all elements are on the same network / subnet.
-          Payloads are different between YARG and RB3E, some fields only apply to one or the other.
-        </p>
+      <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">
+        Network Lighting Cue Data
+      </h2>
+      <p className="mb-8 text-sm text-gray-600 dark:text-gray-400">
+        This window will display the raw light data sent over the network by YARG/RB3E. Enable
+        either YARG or RB3E above and start a song in the game. You should see the network data
+        appear below. If nothing happens, verify your network connections, and ensure that all
+        elements are on the same network / subnet. Payloads are different between YARG and RB3E,
+        some fields only apply to one or the other.
+      </p>
       <div
         style={{
           display: 'flex',
           flexWrap: 'wrap',
           gap: '1rem',
-        }}
-      >
+        }}>
         {/* Handled Cue Panel */}
         <div style={{ flex: '1 1 300px' }}>
           <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200">
-            Handled Cue ({handledCount}): {handledCueName} {strobeState && `[${strobeState}]`} {ledColor && `[LED: ${ledColor}]`}
+            Handled Cue ({handledCount}): {handledCueName} {strobeState && `[${strobeState}]`}{' '}
+            {ledColor && `[LED: ${ledColor}]`}
           </h3>
-          
+
           {/* Cue History */}
           <div className="text-sm mb-2">
             {previousHandledCue && previousHandledCue !== handledCueName && (
-              <p className='text-gray-500 dark:text-gray-400'>
-                Previous cue: {previousHandledCue} 
+              <p className="text-gray-500 dark:text-gray-400">
+                Previous cue: {previousHandledCue}
                 {previousLedColor ? ` [LED: ${previousLedColor}]` : ''}
               </p>
             )}
-            {thirdHandledCue && thirdHandledCue !== previousHandledCue && thirdHandledCue !== handledCueName && (
-              <p className='text-sm text-gray-500 dark:text-gray-400'>
-                Third cue: {thirdHandledCue} 
-                {thirdLedColor ? ` [LED: ${thirdLedColor}]` : ''}
-              </p>
-            )}
+            {thirdHandledCue &&
+              thirdHandledCue !== previousHandledCue &&
+              thirdHandledCue !== handledCueName && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Third cue: {thirdHandledCue}
+                  {thirdLedColor ? ` [LED: ${thirdLedColor}]` : ''}
+                </p>
+              )}
           </div>
-          
+
           {handledCue ? (
             renderCueData(handledCue)
           ) : (
@@ -230,7 +247,7 @@ const NetworkDebug = () => {
         */}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default NetworkDebug;
+export default NetworkDebug

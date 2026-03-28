@@ -1,35 +1,31 @@
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { CueData, CueType } from '../../../cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import {  RGBIO,  } from '../../../../types';
-import { getEffectSingleColor, getSweepEffect } from '../../../../effects';
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { RGBIO } from '../../../../types'
+import { getSweepEffect } from '../../../../effects'
 
 /**
  * StageKit Menu Cue - Blue lights rotating in sequence
  * 2-second cycle, blue lights rotating around ring layout
  */
-export class StageKitMenuCue implements ICue {
-  id = 'stagekit-menu';
-  cueId = CueType.Menu;
-  description = 'StageKit menu pattern - solid blue lights, no motion in this implementation.';
-  style = CueStyle.Primary;
-  private isFirstExecution: boolean = true;
-  
-  async execute(_cueData: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const allLights = lightManager.getLights(['front', 'back'], ['all']);
-    
-   
-    const blue: RGBIO = getColor('blue', 'low');
-    const brightBlue: RGBIO = getColor('blue', 'high');
+export class StageKitMenuCue implements INetCue {
+  id = 'stagekit-menu'
+  cueId = CueType.Menu
+  description = 'StageKit menu pattern - solid blue lights, no motion in this implementation.'
+  style = CueStyle.Primary
+  private isFirstExecution: boolean = true
 
-    const singleColor = getEffectSingleColor({
-      color: blue,
-      duration: 100,
-      lights: allLights,
-      layer: 0,
-    });
+  async execute(
+    _cueData: CueData,
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const allLights = lightManager.getLights(['front', 'back'], ['all'])
+
+    const blue: RGBIO = getColor('blue', 'low')
+    const brightBlue: RGBIO = getColor('blue', 'high')
 
     const sweep = getSweepEffect({
       lights: allLights,
@@ -40,22 +36,19 @@ export class StageKitMenuCue implements ICue {
       fadeOutDuration: 0,
       lightOverlap: 0,
       betweenSweepDelay: 0,
-      layer: 1,
-    });
+      layer: 0,
+    })
     // Use unblocked to avoid breaking the sweep timing and keep the sweep atomic.
     if (this.isFirstExecution) {
-      sequencer.setEffectUnblockedName('menu', singleColor, true);
-      sequencer.addEffectUnblockedName('menu-sweep', sweep, true);
-      this.isFirstExecution = false;
+      sequencer.setEffectUnblockedName('menu', sweep, true)
+      this.isFirstExecution = false
     } else {
-      sequencer.addEffectUnblockedName('menu', singleColor, true);
-      sequencer.addEffectUnblockedName('menu-sweep', sweep, true);
+      sequencer.addEffectUnblockedName('menu', sweep, true)
     }
-    
   }
 
   onStop(): void {
-    this.isFirstExecution = true;
+    this.isFirstExecution = true
   }
 
   onPause(): void {
@@ -65,4 +58,4 @@ export class StageKitMenuCue implements ICue {
   onDestroy(): void {
     // Cleanup handled by effect system
   }
-} 
+}

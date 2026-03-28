@@ -1,9 +1,9 @@
-import React from 'react';
-import { LightingConfiguration, DmxFixture } from '../../../photonics-dmx/types';
+import React from 'react'
+import { LightingConfiguration, DmxFixture } from '../../../photonics-dmx/types'
 
 interface LightsDmxChannelsPreviewProps {
-  lightingConfig: LightingConfiguration; // Lighting configuration containing the lights
-  dmxValues: Record<number, number>; // Record of DMX channel values. I.e. channe:value.
+  lightingConfig: LightingConfiguration // Lighting configuration containing the lights
+  dmxValues: Record<number, number> // Record of DMX channel values. I.e. channe:value.
 }
 
 /**
@@ -21,22 +21,21 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
    * Helper function to render a single light's channels and values.
    */
   const renderLightChannels = (light: DmxFixture) => {
-    const channelEntries = Object.entries(light.channels);
+    const channelEntries = Object.entries(light.channels)
 
     // Find the 'md' channel entry, if it exists
-    const mdEntry = channelEntries.find(([channelName]) => channelName === 'md');
+    const mdEntry = channelEntries.find(([channelName]) => channelName === 'md')
 
     // Filter out the 'md' channel from the other channels
-    const otherEntries = channelEntries.filter(([channelName]) => channelName !== 'md');
+    const otherEntries = channelEntries.filter(([channelName]) => channelName !== 'md')
 
     // Combine the other channels with the 'md' channel at the end (if it exists)
-    const sortedEntries = mdEntry ? [...otherEntries, mdEntry] : otherEntries;
+    const sortedEntries = mdEntry ? [...otherEntries, mdEntry] : otherEntries
 
     return (
       <div
         key={light.id || `light-${light.position}`}
-        className="p-4 border rounded-lg shadow mb-4"
-      >
+        className="p-4 border rounded-lg shadow mb-4">
         <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">
           {light.name} (#{light.position})
         </h3>
@@ -52,8 +51,8 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
           ))}
         </ul>
       </div>
-    );
-  };
+    )
+  }
 
   /**
    * Helper function to render a group of lights.
@@ -65,7 +64,7 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
         {lights.map((light) => renderLightChannels(light))}
       </div>
     </div>
-  );
+  )
 
   return (
     <div className="pt-6 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200 rounded-lg">
@@ -86,7 +85,7 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
       {/*lightingConfig.effectLights.length > 0 &&
         renderLightsGroup(lightingConfig.effectLights, 'Effect Lights') */}
     </div>
-  );
-};
+  )
+}
 
-export default LightsDmxChannelsPreview;
+export default LightsDmxChannelsPreview

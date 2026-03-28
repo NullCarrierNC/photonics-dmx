@@ -1,28 +1,31 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { getEnabledCueGroups, getCueGroups } from '../ipcApi'
 
-type CueRegistryType = 'YARG' | 'RB3E';
+type CueRegistryType = 'YARG' | 'RB3E'
 
 type CueGroup = {
-  id: string;
-  name: string;
-  description: string;
-  cueTypes: string[];
-};
+  id: string
+  name: string
+  description: string
+  cueTypes: string[]
+}
 
 interface CueRegistrySelectorProps {
-  onRegistryChange: (registryType: CueRegistryType) => void;
-  onGroupChange: (groupIds: string[]) => void;
-  selectedVenueSize: 'NoVenue' | 'Small' | 'Large';
-  onVenueSizeChange: (venueSize: 'NoVenue' | 'Small' | 'Large') => void;
-  selectedBpm: number;
-  onBpmChange: (bpm: number) => void;
-  selectedGroupId: string;
-  
+  onRegistryChange: (registryType: CueRegistryType) => void
+  onGroupChange: (groupIds: string[]) => void
+  selectedVenueSize: 'NoVenue' | 'Small' | 'Large'
+  onVenueSizeChange: (venueSize: 'NoVenue' | 'Small' | 'Large') => void
+  selectedBpm: number
+  onBpmChange: (bpm: number) => void
+  selectedGroupId: string
+
   /**
    * When true, the component will initialize with the currently active group selected.
    * Regardless of this setting, all available groups will be shown in the dropdown.
    */
-  useActiveGroupsOnly?: boolean;
+  useActiveGroupsOnly?: boolean
 }
 
 const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
@@ -31,82 +34,81 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   onVenueSizeChange,
   selectedBpm,
   onBpmChange,
-  selectedGroupId
+  selectedGroupId,
 }) => {
-  const [registryType] = useState<CueRegistryType>('YARG');
-  const [groups, setGroups] = useState<CueGroup[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<string>('');
-  const isMounted = useRef(false);
-  const isInitialMount = useRef(true);
+  const [registryType] = useState<CueRegistryType>('YARG')
+  const [groups, setGroups] = useState<CueGroup[]>([])
+  const [selectedGroup, setSelectedGroup] = useState<string>('')
+  const isInitialMount = useRef(true)
 
   // Wrap callback to avoid infinite loops
-  const handleGroupChangeCallback = useCallback((groupId: string) => {
-    // Pass the group ID directly
-    onGroupChange([groupId]);
-  }, [onGroupChange]);
+  const handleGroupChangeCallback = useCallback(
+    (groupId: string) => {
+      // Pass the group ID directly
+      onGroupChange([groupId])
+    },
+    [onGroupChange],
+  )
+
+  const fetchGroups = useCallback(async () => {
+    try {
+      console.log('Fetching enabled cue groups...')
+
+      const enabledGroupIds = await getEnabledCueGroups()
+      const allGroups = await getCueGroups()
+
+      const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id))
+
+      console.log(`Enabled groups:`, enabledGroups)
+      setGroups(enabledGroups)
+
+      if (selectedGroup === '') {
+        if (enabledGroups.length > 0 && isInitialMount.current) {
+          const firstGroup = enabledGroups[0]
+          setSelectedGroup(firstGroup.id)
+          handleGroupChangeCallback(firstGroup.id)
+          isInitialMount.current = false
+        }
+      } else if (isInitialMount.current && enabledGroups.length > 0) {
+        handleGroupChangeCallback(selectedGroup)
+        isInitialMount.current = false
+      }
+    } catch (error) {
+      console.error('Error fetching cue groups:', error)
+    }
+  }, [handleGroupChangeCallback, selectedGroup])
 
   useEffect(() => {
-    // Fetch available cue groups when component mounts or registry type changes
-    const fetchGroups = async () => {
-      try {
-        console.log('Fetching enabled cue groups...');
-        
-        // This will either get the user's preference or default to all groups
-        const enabledGroupIds = await window.electron.ipcRenderer.invoke('get-enabled-cue-groups');
-        
-        // We still need the full group objects for their descriptions
-        const allGroups = await window.electron.ipcRenderer.invoke('get-cue-groups');
-        
-        const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchGroups sets state in async callback
+    fetchGroups()
+  }, [fetchGroups, registryType])
 
-        console.log(`Enabled groups:`, enabledGroups);
-        setGroups(enabledGroups);
-        
-        // Handle group selection logic
-        if (selectedGroup === '') {
-          // If no group is selected and we have groups, auto-select the first one
-          if (enabledGroups.length > 0 && isInitialMount.current) {
-            const firstGroup = enabledGroups[0];
-            setSelectedGroup(firstGroup.id);
-            handleGroupChangeCallback(firstGroup.id);
-            isInitialMount.current = false;
-          }
-        } else if (isInitialMount.current && enabledGroups.length > 0) {
-          // On initial mount with a specific group selected, fire the callback
-          handleGroupChangeCallback(selectedGroup);
-          isInitialMount.current = false;
-        }
-
-      } catch (error) {
-        console.error('Error fetching cue groups:', error);
-      }
-    };
-
-    if (!isMounted.current) {
-      fetchGroups();
-      isMounted.current = true;
-    } else if (registryType) {
-      // Only re-fetch if registry type changed (not on initial mount)
-      fetchGroups();
+  useEffect(() => {
+    const handleNodeCuesChanged = () => {
+      fetchGroups()
     }
-  }, [registryType, handleGroupChangeCallback]);
+    addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged)
+    }
+  }, [fetchGroups])
 
   // Separate effect to handle fallback when selected group becomes invalid
   useEffect(() => {
-    if (groups.length > 0 && selectedGroup && !groups.some(g => g.id === selectedGroup)) {
+    if (groups.length > 0 && selectedGroup && !groups.some((g) => g.id === selectedGroup)) {
       // If the currently selected group is no longer available, fallback to first group
-      const firstGroup = groups[0];
-      setSelectedGroup(firstGroup.id);
-      handleGroupChangeCallback(firstGroup.id);
+      const firstGroup = groups[0]
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- fallback when selected group removed
+      setSelectedGroup(firstGroup.id)
+      handleGroupChangeCallback(firstGroup.id)
     }
-  }, [groups, selectedGroup, handleGroupChangeCallback]);
-
+  }, [groups, selectedGroup, handleGroupChangeCallback])
 
   const handleGroupChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const groupId = event.target.value;
-    setSelectedGroup(groupId);
-    handleGroupChangeCallback(groupId);
-  };
+    const groupId = event.target.value
+    setSelectedGroup(groupId)
+    handleGroupChangeCallback(groupId)
+  }
 
   return (
     <div className="flex items-center gap-4">
@@ -119,14 +121,13 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
           onChange={(e) => onVenueSizeChange(e.target.value as 'NoVenue' | 'Small' | 'Large')}
           className="p-2 pr-8 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
           style={{ width: '150px' }}
-          disabled={!selectedGroupId}
-        >
+          disabled={!selectedGroupId}>
           <option value="NoVenue">No Venue</option>
           <option value="Small">Small</option>
           <option value="Large">Large</option>
         </select>
       </div>
-      
+
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           BPM
@@ -151,8 +152,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
           value={selectedGroup}
           onChange={handleGroupChange}
           className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
-          style={{ width: '200px' }}
-        >
+          style={{ width: '200px' }}>
           {groups.map((group) => (
             <option key={group.id} value={group.id}>
               {group.name}
@@ -161,7 +161,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
         </select>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default CueRegistrySelector; 
+export default CueRegistrySelector

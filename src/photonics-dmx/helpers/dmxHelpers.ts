@@ -1,83 +1,147 @@
-import { BlendMode, Brightness, Color, FixtureTypes, RgbDmxChannels, RGBIO, RgbMovingHeadDmxChannels, RgbStrobeDmxChannels, RgbwDmxChannels, RgbwMovingHeadDmxChannels, RgbwStrobeDmxCannels, StrobeDmxChannels } from "../types";
+import {
+  BlendMode,
+  Brightness,
+  Color,
+  FixtureTypes,
+  RgbDmxChannels,
+  RGBIO,
+  RgbMovingHeadDmxChannels,
+  RgbStrobeDmxChannels,
+  RgbwDmxChannels,
+  RgbwMovingHeadDmxChannels,
+  RgbwStrobeDmxCannels,
+  StrobeDmxChannels,
+} from '../types'
 
 // Global brightness configuration - will be set by the application
-let globalBrightnessConfig: { low: number; medium: number; high: number; max: number } | null = null;
+let globalBrightnessConfig: { low: number; medium: number; high: number; max: number } | null = null
 
 /**
  * Sets the global brightness configuration
  * @param config - The brightness configuration to use globally
  */
-export const setGlobalBrightnessConfig = (config: { low: number; medium: number; high: number; max: number }): void => {
-  globalBrightnessConfig = config;
-};
+export const setGlobalBrightnessConfig = (config: {
+  low: number
+  medium: number
+  high: number
+  max: number
+}): void => {
+  globalBrightnessConfig = config
+}
 
 /**
  * Gets the current global brightness configuration
  * @returns The current brightness configuration or null if not set
  */
-export const getGlobalBrightnessConfig = (): { low: number; medium: number; high: number; max: number } | null => {
-  return globalBrightnessConfig;
-};
-
+export const getGlobalBrightnessConfig = (): {
+  low: number
+  medium: number
+  high: number
+  max: number
+} | null => {
+  return globalBrightnessConfig
+}
 
 /**
  * Generates an RGBIP object based on the specified color and brightness.
- * 
+ *
  * @param color - The base color from the color wheel, 'white', 'black', or 'transparent'.
- * @param brightness - The brightness level ('low', 'medium', 'high', 'max'). Ignored for black/transparent.
+ * @param brightness - The brightness level ('low', 'medium', 'high', 'max', 'linear'). Ignored for black/transparent.
  * @param blendMode - The blend mode for color mixing
  * @returns An RGBIP object with the specified color and brightness.
  */
+// Color map - single source of truth for valid colors and their RGB values
+const colorMap: { [key in Color]: { r: number; g: number; b: number } } = {
+  red: { r: 255, g: 0, b: 0 },
+  blue: { r: 0, g: 0, b: 255 },
+  yellow: { r: 255, g: 255, b: 0 },
+  green: { r: 0, g: 255, b: 0 },
+  cyan: { r: 0, g: 255, b: 255 },
+  orange: { r: 255, g: 127, b: 0 },
+  purple: { r: 128, g: 0, b: 128 },
+  chartreuse: { r: 127, g: 255, b: 0 },
+  teal: { r: 0, g: 128, b: 128 },
+  violet: { r: 138, g: 43, b: 226 },
+  magenta: { r: 255, g: 0, b: 255 },
+  vermilion: { r: 227, g: 66, b: 52 },
+  amber: { r: 255, g: 191, b: 0 },
+  white: { r: 255, g: 255, b: 255 },
+  black: { r: 0, g: 0, b: 0 },
+  transparent: { r: 0, g: 0, b: 0 },
+}
+
+/**
+ * Validates a string and converts it to a Color type.
+ * Uses the colorMap as the single source of truth for valid colors.
+ *
+ * @param colorString - The color string to validate
+ * @returns A valid Color type, or 'white' as fallback if invalid
+ */
+export const validateColorString = (colorString: string): Color => {
+  const normalizedColor = colorString.toLowerCase() as Color
+  // Check if the normalized string exists as a key in colorMap
+  return normalizedColor in colorMap ? normalizedColor : 'white'
+}
+
+/**
+ * CSS `background-color` for cue-editor node previews. Palette names like `amber` and `vermilion`
+ * are not valid CSS named colours; map from the same colorMap used for DMX output.
+ */
+export const getPaletteColorCssRgb = (color: Color): string => {
+  const c = colorMap[color]
+  return `rgb(${c.r}, ${c.g}, ${c.b})`
+}
+
 export const getColor = (
   color: Color,
   brightness: Brightness,
-  blendMode: BlendMode = 'replace'
+  blendMode: BlendMode = 'replace',
 ): RGBIO => {
-  const colorMap: { [key in typeof color]: { r: number; g: number; b: number } } = {
-    red:        { r: 255, g: 0,   b: 0 },
-    blue:       { r: 0,   g: 0,   b: 255 },
-    yellow:     { r: 255, g: 255, b: 0 },
-    green:      { r: 0,   g: 255, b: 0 },
-    cyan:       { r: 0,   g: 255, b: 255 },
-    orange:     { r: 255, g: 127, b: 0 },
-    purple:     { r: 128, g: 0,   b: 128 },
-    chartreuse: { r: 127, g: 255, b: 0 },
-    teal:       { r: 0,   g: 128, b: 128 },
-    violet:     { r: 138, g: 43,  b: 226 },
-    magenta:    { r: 255, g: 0,   b: 255 },
-    vermilion:  { r: 227, g: 66,  b: 52 },
-    amber:      { r: 255, g: 191, b: 0 },
-    white:      { r: 255, g: 255, b: 255 },
-    black:      { r: 0,   g: 0,   b: 0 },
-    transparent: { r: 0,  g: 0,    b: 0 } 
-  };
-
-  // Use global brightness config or fall back to defaults
-  const defaultBrightnessMap: { [key in typeof brightness]: number } = {
-    low:    40,
+  const defaultBrightnessMap: Record<Exclude<Brightness, 'linear'>, number> = {
+    low: 40,
     medium: 100,
-    high:   180,
-    max:    255,
-  };
-  
-  const brightnessMap = globalBrightnessConfig || defaultBrightnessMap;
+    high: 180,
+    max: 255,
+  }
+
+  const brightnessMap = globalBrightnessConfig || defaultBrightnessMap
 
   if (color === 'black') {
     return {
-      red: 0, green: 0, blue: 0, intensity: 0,
-      opacity: 1.0, blendMode: blendMode,
-    };
-  }
-  
-  if (color === 'transparent') {
-    return {
-      red: 0, green: 0, blue: 0, intensity: 0,
-      opacity: 0.0, blendMode: blendMode,
-    };
+      red: 0,
+      green: 0,
+      blue: 0,
+      intensity: 0,
+      opacity: 1.0,
+      blendMode: blendMode,
+    }
   }
 
-  const selectedColor = colorMap[color];
-  const selectedIntensity = brightnessMap[brightness];
+  if (color === 'transparent') {
+    return {
+      red: 0,
+      green: 0,
+      blue: 0,
+      intensity: 0,
+      opacity: 0.0,
+      blendMode: blendMode,
+    }
+  }
+
+  const selectedColor = colorMap[color]
+
+  if (brightness === 'linear') {
+    return {
+      red: selectedColor.r,
+      green: selectedColor.g,
+      blue: selectedColor.b,
+      intensity: 255,
+      opacity: 1.0,
+      blendMode,
+    }
+  }
+
+  const selectedIntensity = brightnessMap[brightness]
 
   // Construct the RGBIP object
   return {
@@ -85,23 +149,30 @@ export const getColor = (
     green: selectedColor.g,
     blue: selectedColor.b,
     intensity: selectedIntensity,
-    
+
     opacity: 1.0,
     blendMode: blendMode,
-  };
-};
+  }
+}
 
 /**
  * Casts a channel configuration to the appropriate fixture type
- * 
+ *
  * @param fixtureType - The type of fixture to cast to
  * @param channels - Channel configuration object
  * @returns A strongly-typed channel object for the specified fixture type
  */
 export const castToChannelType = (
   fixtureType: FixtureTypes,
-  channels: { [key: string]: number }
-): RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels | RgbwStrobeDmxCannels | StrobeDmxChannels | RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels => {
+  channels: { [key: string]: number },
+):
+  | RgbDmxChannels
+  | RgbStrobeDmxChannels
+  | RgbwDmxChannels
+  | RgbwStrobeDmxCannels
+  | StrobeDmxChannels
+  | RgbMovingHeadDmxChannels
+  | RgbwMovingHeadDmxChannels => {
   switch (fixtureType) {
     case FixtureTypes.RGB:
       return {
@@ -109,7 +180,7 @@ export const castToChannelType = (
         green: channels.green || 0,
         blue: channels.blue || 0,
         masterDimmer: channels.masterDimmer || 0,
-      } as RgbDmxChannels;
+      } as RgbDmxChannels
     case FixtureTypes.RGBS:
       return {
         red: channels.red || 0,
@@ -117,7 +188,7 @@ export const castToChannelType = (
         blue: channels.blue || 0,
         masterDimmer: channels.masterDimmer || 0,
         strobeSpeed: channels.strobeSpeed || 0,
-      } as RgbStrobeDmxChannels;
+      } as RgbStrobeDmxChannels
     case FixtureTypes.RGBW:
       return {
         red: channels.red || 0,
@@ -125,7 +196,7 @@ export const castToChannelType = (
         blue: channels.blue || 0,
         white: channels.white || 0,
         masterDimmer: channels.masterDimmer || 0,
-      } as RgbwDmxChannels;
+      } as RgbwDmxChannels
     case FixtureTypes.RGBWS:
       return {
         red: channels.red || 0,
@@ -134,12 +205,12 @@ export const castToChannelType = (
         white: channels.white || 0,
         masterDimmer: channels.masterDimmer || 0,
         strobeSpeed: channels.strobeSpeed || 0,
-      } as RgbwStrobeDmxCannels;
+      } as RgbwStrobeDmxCannels
     case FixtureTypes.STROBE:
       return {
         masterDimmer: channels.masterDimmer || 0,
         strobeSpeed: channels.strobeSpeed || 0,
-      } as StrobeDmxChannels;
+      } as StrobeDmxChannels
     case FixtureTypes.RGBMH:
       return {
         red: channels.red || 0,
@@ -148,7 +219,7 @@ export const castToChannelType = (
         masterDimmer: channels.masterDimmer || 0,
         pan: channels.pan || 0,
         tilt: channels.tilt || 0,
-      } as RgbMovingHeadDmxChannels;
+      } as RgbMovingHeadDmxChannels
     case FixtureTypes.RGBWMH:
       return {
         red: channels.red || 0,
@@ -158,8 +229,8 @@ export const castToChannelType = (
         masterDimmer: channels.masterDimmer || 0,
         pan: channels.pan || 0,
         tilt: channels.tilt || 0,
-      } as RgbwMovingHeadDmxChannels;
+      } as RgbwMovingHeadDmxChannels
     default:
-      throw new Error(`Unknown fixture type: ${fixtureType}`);
+      throw new Error(`Unknown fixture type: ${fixtureType}`)
   }
-};
+}

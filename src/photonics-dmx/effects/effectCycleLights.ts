@@ -1,22 +1,22 @@
-import { Effect, EffectTransition, TrackedLight, RGBIO, WaitCondition } from "../types";
-import { IEffect } from "./interfaces/IEffect";
+import { Effect, EffectTransition, TrackedLight, RGBIO, WaitCondition } from '../types'
+import { IEffect } from './interfaces/IEffect'
 
 /**
  * Interface for cycling lights effect parameters
  */
 export interface CycleLightsEffectParams extends IEffect {
   /** Array of lights to cycle through */
-  lights: TrackedLight[];
+  lights: TrackedLight[]
   /** Base color for lights not currently active */
-  baseColor: RGBIO;
+  baseColor: RGBIO
   /** Color for the active light */
-  activeColor: RGBIO;
+  activeColor: RGBIO
   /** Duration in ms for color transitions */
-  transitionDuration?: number;
+  transitionDuration?: number
   /** The layer to apply the effect on */
-  layer?: number;
+  layer?: number
   /** The condition that triggers each step in the cycle */
-  waitFor?: WaitCondition;
+  waitFor?: WaitCondition
 }
 
 /**
@@ -32,15 +32,15 @@ export const getEffectCycleLights = ({
   layer = 0,
   waitFor = 'beat',
 }: CycleLightsEffectParams): Effect => {
-  const sequenceTransitions: EffectTransition[] = [];
-  const numLights = lights.length;
+  const sequenceTransitions: EffectTransition[] = []
+  const numLights = lights.length
 
   if (numLights === 0) {
     return {
-      id: "CycleLightsEffect",
-      description: "No lights provided for cycling",
+      id: 'CycleLightsEffect',
+      description: 'No lights provided for cycling',
       transitions: [],
-    };
+    }
   }
 
   // First light transitions to active color
@@ -48,47 +48,47 @@ export const getEffectCycleLights = ({
     lights: [lights[0]],
     layer: layer,
     waitForCondition: waitFor, // Wait for the specified trigger
-    waitForTime: 0, 
+    waitForTime: 0,
     waitUntilCondition: 'none',
     waitUntilTime: 0,
-    transform: { 
+    transform: {
       color: activeColor,
       easing: 'linear',
-      duration: transitionDuration, 
+      duration: transitionDuration,
     },
-  });
+  })
 
   // Remaining lights: Previous light reverts, current light activates
   for (let i = 1; i < numLights; i++) {
     // Add transition to change light `i-1` back to base color
     sequenceTransitions.push({
-      lights: [lights[i-1]], // Target the previous light
+      lights: [lights[i - 1]], // Target the previous light
       layer: layer,
-      waitForCondition: waitFor, 
-      waitForTime: 0, 
+      waitForCondition: waitFor,
+      waitForTime: 0,
       waitUntilCondition: 'none',
       waitUntilTime: 0,
-      transform: { 
-        color: baseColor, 
+      transform: {
+        color: baseColor,
         easing: 'linear',
-        duration: transitionDuration, 
+        duration: transitionDuration,
       },
-    });
-    
+    })
+
     // Add transition to change light `i` to active color
     sequenceTransitions.push({
       lights: [lights[i]], // Target the current light
       layer: layer,
-      waitForCondition: 'none', 
-      waitForTime: 0, 
+      waitForCondition: 'none',
+      waitForTime: 0,
       waitUntilCondition: 'none',
       waitUntilTime: 0,
-      transform: { 
+      transform: {
         color: activeColor, // Change to active
         easing: 'linear',
-        duration: transitionDuration, 
+        duration: transitionDuration,
       },
-    });
+    })
   }
 
   // Final step: Last light transitions back to base color
@@ -96,19 +96,19 @@ export const getEffectCycleLights = ({
     lights: [lights[numLights - 1]], // Target the last light
     layer: layer,
     waitForCondition: waitFor, // Wait for the specified trigger
-    waitForTime: 0, 
+    waitForTime: 0,
     waitUntilCondition: 'none',
     waitUntilTime: 0,
-    transform: { 
+    transform: {
       color: baseColor, // Revert to base
       easing: 'linear',
-      duration: transitionDuration, 
+      duration: transitionDuration,
     },
-  });
+  })
 
   return {
-    id: "CycleLightsEffect",
+    id: 'CycleLightsEffect',
     description: `Each light transitions to active colour on ${waitFor}, cycling through all positions`,
     transitions: sequenceTransitions,
-  };
-}; 
+  }
+}

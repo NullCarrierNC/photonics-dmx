@@ -1,66 +1,124 @@
-import { ConfigFile } from './ConfigFile';
-import { DmxFixture, LightingConfiguration, ConfigStrobeType, LightTypes } from '../../photonics-dmx/types';
+import { v4 as uuidv4 } from 'uuid'
+import { ConfigFile } from './ConfigFile'
+import {
+  DmxFixture,
+  LightingConfiguration,
+  ConfigStrobeType,
+  LightTypes,
+  DmxRig,
+  DmxRigsConfig,
+} from '../../photonics-dmx/types'
+
+import {
+  type AudioConfig,
+  type AudioGameModeConfig,
+  DEFAULT_AUDIO_GAME_MODE,
+} from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
+import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
 
 /**
  * Application preferences interface
  */
 export interface AppPreferences {
-  effectDebounce: number;
-  complex: boolean;
+  effectDebounce: number
+  complex: boolean
   enttecProConfig?: {
-    port: string;
-  };
+    port: string
+  }
   openDmxConfig?: {
-    port: string;
-    dmxSpeed: number;
-  };
+    port: string
+    dmxSpeed: number
+  }
   artNetConfig?: {
-    host: string;
-    universe: number;
-    net: number;
-    subnet: number;
-    subuni: number;
-    port: number;
-  };
+    host: string
+    universe: number
+    net: number
+    subnet: number
+    subuni: number
+    port: number
+  }
   sacnConfig?: {
-    universe: number;
-    networkInterface?: string;
-    unicastDestination?: string;
-    useUnicast: boolean;
-  };
+    universe: number
+    networkInterface?: string
+    unicastDestination?: string
+    useUnicast: boolean
+  }
   brightness?: {
-    low: number;
-    medium: number;
-    high: number;
-    max: number;
-  };
-  enabledCueGroups: string[];
-  cueConsistencyWindow: number;
-  clockRate: number;
-  
+    low: number
+    medium: number
+    high: number
+    max: number
+  }
+  enabledCueGroups: string[]
+  /** IDs of Yarg cue groups we have seen before; used to auto-enable only genuinely new groups */
+  knownYargCueGroups?: string[]
+  enabledAudioCueGroups?: string[]
+  /** IDs of audio cue groups we have seen before; used to auto-enable only genuinely new groups */
+  knownAudioCueGroups?: string[]
+  /** Per-group list of disabled cue IDs (YARG cue type strings) */
+  disabledYargCues?: Record<string, string[]>
+  /** Per-group list of disabled audio cue type IDs */
+  disabledAudioCues?: Record<string, string[]>
+  cueConsistencyWindow: number
+  /** Cue group selection: 'withinSong' = can change during song; 'oncePerSong' = fixed at song start */
+  cueGroupSelectionMode: 'oncePerSong' | 'withinSong'
+  clockRate: number
+
   // Frontend-specific preferences
   dmxOutputConfig?: {
-    sacnEnabled: boolean;
-    artNetEnabled: boolean;
-    enttecProEnabled: boolean;
-    openDmxEnabled: boolean;
-  };
+    sacnEnabled: boolean
+    artNetEnabled: boolean
+    enttecProEnabled: boolean
+    openDmxEnabled: boolean
+  }
   stageKitPrefs?: {
-    yargPriority: 'prefer-for-tracked' | 'random' | 'never';
-  };
+    yargPriority: 'prefer-for-tracked' | 'random' | 'never'
+  }
   dmxSettingsPrefs?: {
-    artNetExpanded: boolean;
-    enttecProExpanded: boolean;
-    sacnExpanded: boolean;
-    openDmxExpanded: boolean;
-  };
+    artNetExpanded: boolean
+    enttecProExpanded: boolean
+    sacnExpanded: boolean
+    openDmxExpanded: boolean
+  }
+  allowMultipleActiveRigs?: boolean
+  audioConfig?: AudioConfig
+  activeAudioCueType?: AudioCueType
+  audioGameMode?: AudioGameModeConfig
+  simulationSettings?: {
+    registryType: 'YARG' | 'RB3E'
+    groupId: string
+    effectId: string | null
+    venueSize: 'NoVenue' | 'Small' | 'Large'
+    bpm: number
+    instrument: 'guitar' | 'bass' | 'keys' | 'drums'
+  }
+  leftMenuCollapsed?: boolean
+  windowState?: {
+    width: number
+    height: number
+    x?: number
+    y?: number
+  }
+  cueEditorWindowState?: {
+    width: number
+    height: number
+    x?: number
+    y?: number
+  }
+  audioPreviewWindowState?: {
+    width: number
+    height: number
+    x?: number
+    y?: number
+  }
 }
 
 /**
  * User's lights configuration interface
  */
 export interface UserLightsConfig {
-  lights: DmxFixture[];
+  lights: DmxFixture[]
 }
 
 /**
@@ -70,98 +128,121 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
   enabledCueGroups: ['stagekit'],
+  enabledAudioCueGroups: [],
   cueConsistencyWindow: 60000,
-  clockRate: 5, // 5ms interval for smooth animations
+  cueGroupSelectionMode: 'withinSong',
+  clockRate: 10, // 10ms (100 Hz) for smooth animations and strobe cues
+  activeAudioCueType: '' as AudioCueType,
+  audioGameMode: DEFAULT_AUDIO_GAME_MODE,
 
   // Brightness configuration defaults
   brightness: {
     low: 40,
     medium: 100,
     high: 180,
-    max: 255
+    max: 255,
   },
-  
+
   // Frontend-specific preferences defaults
   dmxOutputConfig: {
     sacnEnabled: true,
     artNetEnabled: false,
     enttecProEnabled: false,
-    openDmxEnabled: false
+    openDmxEnabled: false,
   },
   enttecProConfig: {
-    port: ''
+    port: '',
   },
   openDmxConfig: {
     port: '',
-    dmxSpeed: 20
+    dmxSpeed: 40,
   },
   sacnConfig: {
     universe: 1,
     useUnicast: false,
-    unicastDestination: ''
+    unicastDestination: '',
   },
   stageKitPrefs: {
-    yargPriority: 'prefer-for-tracked'
+    yargPriority: 'prefer-for-tracked',
   },
   dmxSettingsPrefs: {
     artNetExpanded: false,
     enttecProExpanded: false,
     sacnExpanded: false,
-    openDmxExpanded: false
-  }
-};
+    openDmxExpanded: false,
+  },
+  allowMultipleActiveRigs: false,
+  audioConfig: DEFAULT_AUDIO_CONFIG,
+  cueEditorWindowState: {
+    width: 1200,
+    height: 900,
+  },
+  audioPreviewWindowState: {
+    width: 560,
+    height: 480,
+  },
+}
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {
   lights: [],
-};
+}
 
 const DEFAULT_LIGHTING_LAYOUT: LightingConfiguration = {
   numLights: 0,
   lightLayout: {
-    id: "default-layout",
-    label: "Default Layout"
+    id: 'default-layout',
+    label: 'Default Layout',
   },
   strobeType: ConfigStrobeType.None,
   frontLights: [],
   backLights: [],
-  strobeLights: []
-};
+  strobeLights: [],
+}
+
+const DEFAULT_DMX_RIGS: DmxRigsConfig = {
+  rigs: [],
+}
 
 /**
  * Simplified configuration manager using file-based organization
  */
 export class ConfigurationManager {
-  private preferences: ConfigFile<AppPreferences>;
-  private userLights: ConfigFile<UserLightsConfig>;
-  private lightingLayout: ConfigFile<LightingConfiguration>;
+  private preferences: ConfigFile<AppPreferences>
+  private userLights: ConfigFile<UserLightsConfig>
+  private lightingLayout: ConfigFile<LightingConfiguration>
+  private dmxRigs: ConfigFile<DmxRigsConfig>
 
   constructor() {
     // Initialize config files with version numbers
-    this.preferences = new ConfigFile('prefs.json', DEFAULT_PREFERENCES, 3);
-    this.userLights = new ConfigFile('lights.json', DEFAULT_USER_LIGHTS, 1);
-    this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1);
-    
+    this.preferences = new ConfigFile('prefs.json', DEFAULT_PREFERENCES, 3)
+    this.userLights = new ConfigFile('lights.json', DEFAULT_USER_LIGHTS, 1)
+    this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1)
+    this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1)
+
     // Handle legacy lights format migration
-    this.migrateLegacyLightsFormat();
-    this.migrateLegacyPreferences();
+    this.migrateLegacyLightsFormat()
+    this.migrateLegacyPreferences()
+    this.migrateToDmxRigs()
   }
 
   /**
    * Migrates legacy lights format (array) to new format ({lights: [...]})
    */
   private migrateLegacyLightsFormat(): void {
-    const currentData = this.userLights.get();
+    const currentData = this.userLights.get()
 
     // If already in new format, do nothing
     if (currentData && Array.isArray(currentData.lights)) {
-      return;
+      return
     }
 
     // If legacy format (just an array), migrate
     if (Array.isArray(currentData)) {
-      const migratedData: UserLightsConfig = { lights: currentData };
-      this.userLights.update(migratedData);
-      console.log(`[Photonics Config] Migrated legacy lights format to new format`);
+      const migratedData: UserLightsConfig = { lights: currentData }
+      this.userLights
+        .update(migratedData)
+        .catch((err) => console.error('[Photonics Config] Failed to persist migrated lights:', err))
+      console.log(`[Photonics Config] Migrated legacy lights format to new format`)
     }
   }
 
@@ -172,32 +253,87 @@ export class ConfigurationManager {
    * dedicated top-level config objects (enttecProConfig/openDmxConfig).
    */
   private migrateLegacyPreferences(): void {
-    const currentPrefs = { ...this.preferences.get() } as any;
-    let updated = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- prefs shape for partial merge
+    const currentPrefs = { ...this.preferences.get() } as any
+    let updated = false
 
-    const defaultEnttecConfig = { port: '' };
+    const defaultEnttecConfig = { port: '' }
 
     // v2 -> v3: migrate legacy enttecProPort into enttecProConfig
     if (!currentPrefs.enttecProConfig) {
-      const legacyPort = typeof currentPrefs.enttecProPort === 'string' ? currentPrefs.enttecProPort : '';
-      currentPrefs.enttecProConfig = { ...defaultEnttecConfig, port: legacyPort };
-      updated = true;
+      const legacyPort =
+        typeof currentPrefs.enttecProPort === 'string' ? currentPrefs.enttecProPort : ''
+      currentPrefs.enttecProConfig = { ...defaultEnttecConfig, port: legacyPort }
+      updated = true
     } else if (typeof currentPrefs.enttecProConfig.port !== 'string') {
-        currentPrefs.enttecProConfig = {
-          ...defaultEnttecConfig,
-          ...currentPrefs.enttecProConfig,
-          port: typeof currentPrefs.enttecProConfig.port === 'string' ? currentPrefs.enttecProConfig.port : ''
-        };
-      updated = true;
+      currentPrefs.enttecProConfig = {
+        ...defaultEnttecConfig,
+        ...currentPrefs.enttecProConfig,
+        port:
+          typeof currentPrefs.enttecProConfig.port === 'string'
+            ? currentPrefs.enttecProConfig.port
+            : '',
+      }
+      updated = true
     }
 
     if (currentPrefs.enttecProPort !== undefined) {
-      delete currentPrefs.enttecProPort;
-      updated = true;
+      delete currentPrefs.enttecProPort
+      updated = true
     }
 
     if (updated) {
-      this.preferences.update(currentPrefs);
+      this.preferences
+        .update(currentPrefs)
+        .catch((err) =>
+          console.error('[Photonics Config] Failed to persist migrated preferences:', err),
+        )
+    }
+  }
+
+  /**
+   * Migrates existing lighting layout to a default DMX rig
+   */
+  private migrateToDmxRigs(): void {
+    const currentRigs = this.dmxRigs.get()
+    const rigs = Array.isArray(currentRigs?.rigs) ? currentRigs.rigs : []
+
+    // If rigs already exist, no migration needed
+    if (rigs.length > 0) {
+      return
+    }
+
+    // Check if we have an existing layout to migrate
+    const existingLayout = this.lightingLayout.get() ?? ({} as LightingConfiguration)
+    const safeLayout: LightingConfiguration = {
+      numLights: existingLayout.numLights ?? 0,
+      lightLayout: existingLayout.lightLayout ?? { id: 'default-layout', label: 'Default Layout' },
+      strobeType: existingLayout.strobeType ?? ConfigStrobeType.None,
+      frontLights: Array.isArray(existingLayout.frontLights) ? existingLayout.frontLights : [],
+      backLights: Array.isArray(existingLayout.backLights) ? existingLayout.backLights : [],
+      strobeLights: Array.isArray(existingLayout.strobeLights) ? existingLayout.strobeLights : [],
+    }
+
+    // Only migrate if layout has actual lights configured
+    if (
+      safeLayout.numLights > 0 ||
+      safeLayout.frontLights.length > 0 ||
+      safeLayout.backLights.length > 0 ||
+      safeLayout.strobeLights.length > 0
+    ) {
+      const defaultRig: DmxRig = {
+        id: uuidv4(),
+        name: 'Default Rig',
+        active: true,
+        config: safeLayout,
+      }
+
+      this.dmxRigs
+        .update({ rigs: [defaultRig] })
+        .catch((err) =>
+          console.error('[Photonics Config] Failed to persist migrated DMX rigs:', err),
+        )
+      console.log('[Photonics Config] Migrated existing layout to default DMX rig')
     }
   }
 
@@ -207,38 +343,41 @@ export class ConfigurationManager {
    * Gets a specific preference value
    */
   getPreference<K extends keyof AppPreferences>(key: K): AppPreferences[K] {
-    return this.preferences.get()[key];
+    return this.preferences.get()[key]
   }
 
   /**
    * Sets a specific preference value
    */
-  setPreference<K extends keyof AppPreferences>(key: K, value: AppPreferences[K]): void {
-    const current = this.preferences.get();
-    this.preferences.update({ ...current, [key]: value });
+  async setPreference<K extends keyof AppPreferences>(
+    key: K,
+    value: AppPreferences[K],
+  ): Promise<void> {
+    const current = this.preferences.get()
+    await this.preferences.update({ ...current, [key]: value })
   }
 
   /**
    * Gets all preferences
    */
   getAllPreferences(): AppPreferences {
-    return this.preferences.get();
+    return this.preferences.get()
   }
 
   /**
    * Updates multiple preferences at once
    */
-  updatePreferences(updates: Partial<AppPreferences>): void {
-    const currentPrefs = this.preferences.get();
-    const newPrefs = { ...currentPrefs, ...updates };
-    this.preferences.update(newPrefs);
+  async updatePreferences(updates: Partial<AppPreferences>): Promise<void> {
+    const currentPrefs = this.preferences.get()
+    const newPrefs = { ...currentPrefs, ...updates }
+    await this.preferences.update(newPrefs)
   }
 
   /**
    * Resets preferences to default values
    */
-  resetPreferencesToDefaults(): void {
-    this.preferences.update(DEFAULT_PREFERENCES);
+  async resetPreferencesToDefaults(): Promise<void> {
+    await this.preferences.update(DEFAULT_PREFERENCES)
   }
 
   // Cue Group Preferences
@@ -248,44 +387,136 @@ export class ConfigurationManager {
    * Returns undefined if it has never been set.
    */
   getEnabledCueGroups(): string[] | undefined {
-    return this.preferences.get().enabledCueGroups;
+    return this.preferences.get().enabledCueGroups
   }
 
   /**
    * Sets the enabled cue groups by their IDs
    */
-  setEnabledCueGroups(groupIds: string[]): void {
-    this.setPreference('enabledCueGroups', groupIds);
+  async setEnabledCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('enabledCueGroups', groupIds)
+  }
+
+  /**
+   * Gets the known Yarg cue group IDs (discovered in past runs); used to distinguish new groups from user-disabled ones.
+   */
+  getKnownYargCueGroups(): string[] | undefined {
+    return this.preferences.get().knownYargCueGroups
+  }
+
+  /**
+   * Sets the known Yarg cue group IDs (e.g. after loading all groups).
+   */
+  async setKnownYargCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('knownYargCueGroups', groupIds)
+  }
+
+  /**
+   * Gets the known audio cue group IDs (discovered in past runs); used to distinguish new groups from user-disabled ones.
+   */
+  getKnownAudioCueGroups(): string[] | undefined {
+    return this.preferences.get().knownAudioCueGroups
+  }
+
+  /**
+   * Sets the known audio cue group IDs (e.g. after loading all groups).
+   */
+  async setKnownAudioCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('knownAudioCueGroups', groupIds)
+  }
+
+  /**
+   * Gets the enabled audio cue groups preference
+   */
+  getEnabledAudioCueGroups(): string[] | undefined {
+    return this.preferences.get().enabledAudioCueGroups
+  }
+
+  /**
+   * Sets the enabled audio cue groups by their IDs
+   */
+  async setEnabledAudioCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('enabledAudioCueGroups', groupIds)
+  }
+
+  /**
+   * Per-group disabled YARG cue type IDs (empty or missing group = no cues disabled in that group).
+   */
+  getDisabledYargCues(): Record<string, string[]> | undefined {
+    return this.preferences.get().disabledYargCues
+  }
+
+  async setDisabledYargCues(disabled: Record<string, string[]>): Promise<void> {
+    await this.setPreference('disabledYargCues', disabled)
+  }
+
+  /**
+   * Per-group disabled audio cue type IDs.
+   */
+  getDisabledAudioCues(): Record<string, string[]> | undefined {
+    return this.preferences.get().disabledAudioCues
+  }
+
+  async setDisabledAudioCues(disabled: Record<string, string[]>): Promise<void> {
+    await this.setPreference('disabledAudioCues', disabled)
+  }
+
+  /**
+   * Gets the preferred audio cue type
+   */
+  getActiveAudioCueType(): AudioCueType | undefined {
+    return this.preferences.get().activeAudioCueType
+  }
+
+  /**
+   * Persists the preferred audio cue type
+   */
+  async setActiveAudioCueType(cueType: AudioCueType): Promise<void> {
+    await this.setPreference('activeAudioCueType', cueType)
   }
 
   /**
    * Gets the cue consistency window preference
    */
   getCueConsistencyWindow(): number {
-    return this.preferences.get().cueConsistencyWindow;
+    return this.preferences.get().cueConsistencyWindow
   }
 
   /**
    * Sets the cue consistency window preference
    */
-  setCueConsistencyWindow(windowMs: number): void {
-    this.setPreference('cueConsistencyWindow', windowMs);
+  async setCueConsistencyWindow(windowMs: number): Promise<void> {
+    await this.setPreference('cueConsistencyWindow', windowMs)
+  }
+
+  /**
+   * Gets the cue group selection mode preference
+   */
+  getCueGroupSelectionMode(): 'oncePerSong' | 'withinSong' {
+    return this.preferences.get().cueGroupSelectionMode ?? 'withinSong'
+  }
+
+  /**
+   * Sets the cue group selection mode preference
+   */
+  async setCueGroupSelectionMode(mode: 'oncePerSong' | 'withinSong'): Promise<void> {
+    await this.setPreference('cueGroupSelectionMode', mode)
   }
 
   /**
    * Gets the clock rate preference (in milliseconds)
    */
   getClockRate(): number {
-    return this.preferences.get().clockRate;
+    return this.preferences.get().clockRate
   }
 
   /**
    * Sets the clock rate preference (in milliseconds)
    * @param rate The clock rate in milliseconds (1-100ms)
    */
-  setClockRate(rate: number): void {
-    const clampedRate = Math.max(1, Math.min(100, rate));
-    this.setPreference('clockRate', clampedRate);
+  async setClockRate(rate: number): Promise<void> {
+    const clampedRate = Math.max(1, Math.min(100, rate))
+    await this.setPreference('clockRate', clampedRate)
   }
 
   // User Lights Methods
@@ -294,21 +525,21 @@ export class ConfigurationManager {
    * Gets the user's saved lights
    */
   getUserLights(): DmxFixture[] {
-    return this.userLights.get().lights;
+    return this.userLights.get().lights
   }
 
   /**
    * Updates the user's lights
    */
-  updateUserLights(lights: DmxFixture[]): void {
-    this.userLights.update({ lights });
+  async updateUserLights(lights: DmxFixture[]): Promise<void> {
+    await this.userLights.update({ lights })
   }
 
   /**
    * Resets user's lights to default values (empty)
    */
-  resetUserLightsToDefaults(): void {
-    this.userLights.update(DEFAULT_USER_LIGHTS);
+  async resetUserLightsToDefaults(): Promise<void> {
+    await this.userLights.update(DEFAULT_USER_LIGHTS)
   }
 
   // Light Library Methods (Default Templates)
@@ -317,7 +548,7 @@ export class ConfigurationManager {
    * Gets the default light types (templates)
    */
   getLightLibrary(): DmxFixture[] {
-    return LightTypes;
+    return LightTypes
   }
 
   // Layout Methods
@@ -326,35 +557,139 @@ export class ConfigurationManager {
    * Gets the lighting layout configuration
    */
   getLightingLayout(): LightingConfiguration {
-    return this.lightingLayout.get();
+    return this.lightingLayout.get()
   }
 
   /**
    * Updates the lighting layout configuration
    */
-  updateLightingLayout(layout: LightingConfiguration): void {
-    this.lightingLayout.update(layout);
+  async updateLightingLayout(layout: LightingConfiguration): Promise<void> {
+    await this.lightingLayout.update(layout)
   }
 
   /**
    * Gets a specific property from the lighting layout
    */
   getLayoutProperty<K extends keyof LightingConfiguration>(key: K): LightingConfiguration[K] {
-    return this.lightingLayout.get()[key];
+    return this.lightingLayout.get()[key]
   }
 
   /**
    * Updates a specific property in the lighting layout
    */
-  updateLayoutProperty<K extends keyof LightingConfiguration>(key: K, value: LightingConfiguration[K]): void {
-    const current = this.lightingLayout.get();
-    this.lightingLayout.update({ ...current, [key]: value });
+  async updateLayoutProperty<K extends keyof LightingConfiguration>(
+    key: K,
+    value: LightingConfiguration[K],
+  ): Promise<void> {
+    const current = this.lightingLayout.get()
+    await this.lightingLayout.update({ ...current, [key]: value })
   }
 
   /**
    * Resets the lighting layout to default values
    */
-  resetLayoutToDefaults(): void {
-    this.lightingLayout.update(DEFAULT_LIGHTING_LAYOUT);
+  async resetLayoutToDefaults(): Promise<void> {
+    await this.lightingLayout.update(DEFAULT_LIGHTING_LAYOUT)
   }
-} 
+
+  // Audio Configuration Methods
+
+  /**
+   * Gets audio configuration
+   */
+  getAudioConfig(): AudioConfig {
+    const savedConfig = this.getPreference('audioConfig')
+
+    const config = savedConfig ? { ...DEFAULT_AUDIO_CONFIG, ...savedConfig } : DEFAULT_AUDIO_CONFIG
+
+    return { ...config, enabled: false }
+  }
+
+  /**
+   * Sets audio configuration
+   */
+  async setAudioConfig(config: AppPreferences['audioConfig']): Promise<void> {
+    await this.setPreference('audioConfig', config)
+  }
+
+  /**
+   * Updates audio configuration (partial update)
+   * Note: The 'enabled' field is never persisted (runtime-only state)
+   */
+  async updateAudioConfig(updates: Partial<AppPreferences['audioConfig']>): Promise<void> {
+    const current = this.getPreference('audioConfig') || {}
+    const updated = { ...current, ...updates }
+
+    const { enabled: _enabled, ...configToSave } = updated
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stripped audio config shape
+    await this.setPreference('audioConfig', configToSave as any)
+  }
+
+  /**
+   * Game Mode settings for audio-reactive automatic cue cycling
+   */
+  getAudioGameModeConfig(): AudioGameModeConfig {
+    const saved = this.preferences.get().audioGameMode
+    return saved ? { ...DEFAULT_AUDIO_GAME_MODE, ...saved } : DEFAULT_AUDIO_GAME_MODE
+  }
+
+  async setAudioGameModeConfig(config: AudioGameModeConfig): Promise<void> {
+    await this.setPreference('audioGameMode', config)
+  }
+
+  async updateAudioGameModeConfig(updates: Partial<AudioGameModeConfig>): Promise<void> {
+    const merged = { ...this.getAudioGameModeConfig(), ...updates }
+    await this.setPreference('audioGameMode', merged)
+  }
+
+  // DMX Rigs Methods
+
+  /**
+   * Gets all DMX rigs
+   */
+  getDmxRigs(): DmxRig[] {
+    return this.dmxRigs.get().rigs
+  }
+
+  /**
+   * Gets a specific DMX rig by ID
+   */
+  getDmxRig(id: string): DmxRig | null {
+    const rigs = this.getDmxRigs()
+    return rigs.find((rig) => rig.id === id) || null
+  }
+
+  /**
+   * Saves or updates a DMX rig
+   */
+  async saveDmxRig(rig: DmxRig): Promise<void> {
+    const current = this.dmxRigs.get()
+    const rigs = [...current.rigs]
+    const existingIndex = rigs.findIndex((r) => r.id === rig.id)
+
+    if (existingIndex >= 0) {
+      rigs[existingIndex] = rig
+    } else {
+      rigs.push(rig)
+    }
+
+    await this.dmxRigs.update({ rigs })
+  }
+
+  /**
+   * Deletes a DMX rig by ID
+   */
+  async deleteDmxRig(id: string): Promise<void> {
+    const current = this.dmxRigs.get()
+    const rigs = current.rigs.filter((rig) => rig.id !== id)
+    await this.dmxRigs.update({ rigs })
+  }
+
+  /**
+   * Gets only active DMX rigs (where active === true)
+   */
+  getActiveRigs(): DmxRig[] {
+    return this.getDmxRigs().filter((rig) => rig.active === true)
+  }
+}

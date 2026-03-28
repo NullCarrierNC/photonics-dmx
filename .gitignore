@@ -104,3 +104,5 @@ dev-scripts/webpack-dev-server-error.log
 # License-specific files
 license.data
 public.key 
+
+docs/

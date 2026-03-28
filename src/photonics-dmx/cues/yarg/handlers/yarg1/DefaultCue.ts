@@ -1,32 +1,37 @@
-import { CueData, CueType } from '../../../cueTypes';
-import { ILightingController } from '../../../../controllers/sequencer/interfaces';
-import { DmxLightManager } from '../../../../controllers/DmxLightManager';
-import { ICue, CueStyle } from '../../../interfaces/ICue';
-import { getColor } from '../../../../helpers/dmxHelpers';
-import { getEffectSingleColor } from '../../../../effects/effectSingleColor';
-import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors';
+import { CueData, CueType } from '../../../types/cueTypes'
+import { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { DmxLightManager } from '../../../../controllers/DmxLightManager'
+import { INetCue, CueStyle } from '../../../interfaces/INetCue'
+import { getColor } from '../../../../helpers/dmxHelpers'
+import { getEffectSingleColor } from '../../../../effects/effectSingleColor'
+import { getEffectCrossFadeColors } from '../../../../effects/effectCrossFadeColors'
 
-export class DefaultCue implements ICue {
-  id = 'default-default';
-  cueId = CueType.Default;
-  description = 'Alternates red and blue between front and back lights, triggered by keyframe events';
-  style = CueStyle.Primary;
+export class DefaultCue implements INetCue {
+  id = 'default-default'
+  cueId = CueType.Default
+  description =
+    'Alternates red and blue between front and back lights, triggered by keyframe events'
+  style = CueStyle.Primary
 
-  private isFirstExecution: boolean = true;
+  private isFirstExecution: boolean = true
 
-  async execute(_parameters: CueData, sequencer: ILightingController, lightManager: DmxLightManager): Promise<void> {
-    const front = lightManager.getLights(['front'], 'all');
-    const back = lightManager.getLights(['back'], 'all');
-    const all = lightManager.getLights(['front', 'back'], 'all');
+  async execute(
+    _parameters: CueData,
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): Promise<void> {
+    const front = lightManager.getLights(['front'], 'all')
+    const back = lightManager.getLights(['back'], 'all')
+    const all = lightManager.getLights(['front', 'back'], 'all')
 
-    const red = getColor('red', 'medium');
-    const blue = getColor('blue', 'medium');
+    const red = getColor('red', 'medium')
+    const blue = getColor('blue', 'medium')
 
     const baseLayer = getEffectSingleColor({
       lights: all,
       color: red,
       duration: 100,
-    });
+    })
 
     const crossFadeFront = getEffectCrossFadeColors({
       startColor: red,
@@ -37,7 +42,7 @@ export class DefaultCue implements ICue {
       duration: 200,
       lights: front,
       layer: 1,
-    });
+    })
     const crossFadeBack = getEffectCrossFadeColors({
       startColor: blue,
       crossFadeTrigger: 'keyframe',
@@ -47,21 +52,21 @@ export class DefaultCue implements ICue {
       duration: 200,
       lights: back,
       layer: 2,
-    });
+    })
 
     if (this.isFirstExecution) {
-      sequencer.setEffect('default-base', baseLayer);
-      this.isFirstExecution = false;
+      sequencer.setEffect('default-base', baseLayer)
+      this.isFirstExecution = false
     } else {
-      sequencer.addEffect('default-base', baseLayer);
+      sequencer.addEffect('default-base', baseLayer)
     }
-    
-    sequencer.addEffect('default-front', crossFadeFront);
-    sequencer.addEffect('default-back', crossFadeBack);
+
+    sequencer.addEffect('default-front', crossFadeFront)
+    sequencer.addEffect('default-back', crossFadeBack)
   }
 
   onStop(): void {
-    this.isFirstExecution = true;
+    this.isFirstExecution = true
   }
 
   onPause(): void {
@@ -71,4 +76,4 @@ export class DefaultCue implements ICue {
   onDestroy(): void {
     // Cleanup handled by effect system
   }
-} 
+}
