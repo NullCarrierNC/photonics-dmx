@@ -349,11 +349,10 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
         <div className="flex items-center justify-between">
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Global Sensitivity
+              Global Gain
             </label>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Adjust the global sensitivity: acts as a global gain for audio input. This is applied
-              to all frequency bands.
+              Adjust the global sensitivity. This is applied to all frequency bands.
             </p>
           </div>
         </div>
