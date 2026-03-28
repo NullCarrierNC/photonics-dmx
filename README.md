@@ -16,30 +16,6 @@ Unlike YALCY Photonics *only* supports DMX lights and has support for Rock Band 
 
 For more information or the Quickstart guide please visit the project site: [Photonics.rocks](https://photonics.rocks)
 
-
-## Updating from Alpha 1
-
-Alpha 2 brings a lot of new functionality to Photonics, but it also brought a breaking change:
-
-### Light Layout order: 
-
-Previously the lights were ordered _ascending_ on the front and back lights. E.g.:
-
-Font: 1, 2, 3, 4
-
-Back: 5, 6, 7, 8
-
-
-The back order has changed to _descending_. E.g.: 
-
-Font: 1, 2, 3, 4
-
-Back: **8, 7, 6, 5**
-
-
-This better reflects the linear progression of sweep style effects that loop around the front and back lights.
-You will have to update your _Light Layout_ configuration to correctly order your physical DMX lights.
-
 If you have problems feel free to reach out in our [Discord Server](https://discord.gg/2Vyqc2hYcK).
 
 
@@ -75,6 +51,17 @@ will become Cyan on DMX Light 1.
 
 ** If you are running RB3E you will need either 4 or 8 DMX lights ** - other combinations are unsupported.
 
+
+## Music Visualization
+
+Photonics now includes audio-reactive cues, acting as a visualizer for music coming from any audio source! This 
+feature is aimed towards visualizing for rhythm games not directly supported, but can also be used as a general 
+visualizer.
+
+
+## Cue Editor
+
+Create your own cues for YARG or Music Visualization. Photonics includes a powerful node-based cue editor.
 
 
 ## Downloading and Playing
