@@ -267,20 +267,33 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Get enabled audio cue groups
   ipcMain.handle(CONFIG.GET_ENABLED_AUDIO_CUE_GROUPS, async () => {
     const registry = AudioCueRegistry.getInstance()
-    const enabled = controllerManager.getConfig().getEnabledAudioCueGroups()
+    const config = controllerManager.getConfig()
+    const prefs = config.getAllPreferences()
+    let enabled = prefs.enabledAudioCueGroups
+    const allGroups = registry.getRegisteredGroups()
+    const knownAudioCueGroups = prefs.knownAudioCueGroups ?? []
 
-    if (enabled && enabled.length > 0) {
+    if (!enabled || enabled.length === 0) {
+      enabled = allGroups
+      if (allGroups.length > 0) {
+        await config.setEnabledAudioCueGroups(enabled)
+      }
+      await config.setKnownAudioCueGroups(allGroups)
       registry.setEnabledGroups(enabled)
-      const disabledAudio = controllerManager.getConfig().getDisabledAudioCues() ?? {}
-      registry.setDisabledCues(disabledAudio)
-      return enabled
+    } else {
+      // Auto-enable only genuinely new groups (not yet in known list); user-disabled groups stay disabled
+      const newGroups = allGroups.filter((id) => !knownAudioCueGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabled = [...enabled, ...newGroups]
+        await config.setEnabledAudioCueGroups(enabled)
+      }
+      await config.setKnownAudioCueGroups(allGroups)
+      registry.setEnabledGroups(enabled)
     }
 
-    const defaults = registry.getEnabledGroups()
-    await controllerManager.getConfig().setEnabledAudioCueGroups(defaults)
-    const disabledAudio = controllerManager.getConfig().getDisabledAudioCues() ?? {}
+    const disabledAudio = config.getDisabledAudioCues() ?? {}
     registry.setDisabledCues(disabledAudio)
-    return defaults
+    return enabled
   })
 
   // Set enabled audio cue groups

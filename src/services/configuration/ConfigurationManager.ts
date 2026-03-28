@@ -54,6 +54,8 @@ export interface AppPreferences {
   /** IDs of Yarg cue groups we have seen before; used to auto-enable only genuinely new groups */
   knownYargCueGroups?: string[]
   enabledAudioCueGroups?: string[]
+  /** IDs of audio cue groups we have seen before; used to auto-enable only genuinely new groups */
+  knownAudioCueGroups?: string[]
   /** Per-group list of disabled cue IDs (YARG cue type strings) */
   disabledYargCues?: Record<string, string[]>
   /** Per-group list of disabled audio cue type IDs */
@@ -407,6 +409,20 @@ export class ConfigurationManager {
    */
   async setKnownYargCueGroups(groupIds: string[]): Promise<void> {
     await this.setPreference('knownYargCueGroups', groupIds)
+  }
+
+  /**
+   * Gets the known audio cue group IDs (discovered in past runs); used to distinguish new groups from user-disabled ones.
+   */
+  getKnownAudioCueGroups(): string[] | undefined {
+    return this.preferences.get().knownAudioCueGroups
+  }
+
+  /**
+   * Sets the known audio cue group IDs (e.g. after loading all groups).
+   */
+  async setKnownAudioCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('knownAudioCueGroups', groupIds)
   }
 
   /**

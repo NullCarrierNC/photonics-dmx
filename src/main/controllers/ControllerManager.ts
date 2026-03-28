@@ -156,7 +156,8 @@ export class ControllerManager {
     await copyDefaultData(process.resourcesPath, baseDir)
     await this.initializeEffectLoader() // Initialize effects BEFORE node cues
     await this.initializeNodeCueLoader()
-    this.applyYargEnabledGroupsFromConfig()
+    await this.applyYargEnabledGroupsFromConfig()
+    await this.applyAudioEnabledGroupsFromConfig()
     await this.initializeListeners()
 
     this.isInitialized = true
@@ -301,21 +302,65 @@ export class ControllerManager {
    * Node cue groups are registered in initializeNodeCueLoader(), and each registerGroup()
    * adds the group to enabled by default, which would overwrite a saved "disabled" preference.
    * Calling this after the node cue loader ensures the persisted preference wins.
+   * Auto-enables groups that were never seen before (vs knownYargCueGroups); user-disabled
+   * groups stay disabled because they remain in the known set.
    */
-  private applyYargEnabledGroupsFromConfig(): void {
+  private async applyYargEnabledGroupsFromConfig(): Promise<void> {
     const registry = YargCueRegistry.getInstance()
     const registeredIds = registry.getAllGroups()
-    const enabledGroupIds = this.config.getEnabledCueGroups()
+    let enabledGroupIds = this.config.getEnabledCueGroups()
+    const knownGroups = this.config.getKnownYargCueGroups() ?? []
 
-    if (enabledGroupIds !== undefined) {
-      const restricted = enabledGroupIds.filter((id) => registeredIds.includes(id))
-      registry.setEnabledGroups(restricted)
-      console.log('CueRegistry enabled groups re-applied from config:', restricted)
+    if (enabledGroupIds === undefined) {
+      enabledGroupIds = registeredIds
+      await this.config.setEnabledCueGroups(enabledGroupIds)
+    } else {
+      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabledGroupIds = [...enabledGroupIds, ...newGroups]
+        await this.config.setEnabledCueGroups(enabledGroupIds)
+      }
     }
+
+    await this.config.setKnownYargCueGroups(registeredIds)
+    const restricted = enabledGroupIds.filter((id) => registeredIds.includes(id))
+    registry.setEnabledGroups(restricted)
+    console.log('CueRegistry enabled groups re-applied from config:', restricted)
+
     const disabledYarg = this.config.getDisabledYargCues() ?? {}
     registry.setDisabledCues(disabledYarg)
-    // If no saved preference, leave registry as-is (all groups enabled from registerGroup);
-    // GET_ENABLED_CUE_GROUPS will default to all and persist when the UI first reads.
+  }
+
+  /**
+   * Re-apply audio enabled groups from configuration after all groups are registered.
+   * Auto-enables groups that were never seen before (vs knownAudioCueGroups); user-disabled
+   * groups stay disabled because they remain in the known set.
+   */
+  private async applyAudioEnabledGroupsFromConfig(): Promise<void> {
+    const registry = AudioCueRegistry.getInstance()
+    const registeredIds = registry.getRegisteredGroups()
+    let enabledGroupIds = this.config.getEnabledAudioCueGroups()
+    const knownGroups = this.config.getKnownAudioCueGroups() ?? []
+
+    if (!enabledGroupIds || enabledGroupIds.length === 0) {
+      enabledGroupIds = registeredIds
+      if (registeredIds.length > 0) {
+        await this.config.setEnabledAudioCueGroups(enabledGroupIds)
+      }
+    } else {
+      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabledGroupIds = [...enabledGroupIds, ...newGroups]
+        await this.config.setEnabledAudioCueGroups(enabledGroupIds)
+      }
+    }
+
+    await this.config.setKnownAudioCueGroups(registeredIds)
+    registry.setEnabledGroups(enabledGroupIds)
+    const disabledAudio = this.config.getDisabledAudioCues() ?? {}
+    registry.setDisabledCues(disabledAudio)
+    console.log('AudioCueRegistry enabled groups re-applied from config:', enabledGroupIds)
+    this.refreshAudioCueSelection()
   }
 
   private async initializeNodeCueLoader(): Promise<void> {
