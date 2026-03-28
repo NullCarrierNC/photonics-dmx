@@ -166,6 +166,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
 
   const rangeClassName =
     'flex-1 min-w-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider'
+  const compactStrobeRangeClassName = `${rangeClassName} disabled:cursor-not-allowed`
   const numberClassName =
     'w-16 shrink-0 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center'
 
@@ -263,80 +264,85 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             }}
             aria-label="Strobe"
           />
-          <label
-            htmlFor="audio-compact-strobe-threshold"
-            className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
-            Threshold
-          </label>
-          <input
-            id="audio-compact-strobe-threshold"
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={strobeTriggerThreshold}
-            onChange={(e) => setStrobeTriggerThreshold(Number(e.target.value))}
-            onMouseUp={() => void persistStrobe({ strobeTriggerThreshold })}
-            onTouchEnd={() => void persistStrobe({ strobeTriggerThreshold })}
-            disabled={strobeControlsDisabled}
-            className={rangeClassName}
-            style={strobeTriggerRangeStyle}
-          />
-
-          <input
-            type="number"
-            min={0}
-            max={1}
-            step={0.01}
-            value={strobeTriggerThreshold}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value)
-              if (Number.isFinite(value)) {
-                setStrobeTriggerThreshold(Math.max(0, Math.min(1, value)))
-              }
-            }}
-            onBlur={() => void persistStrobe({ strobeTriggerThreshold })}
-            disabled={strobeControlsDisabled}
-            className={numberClassName}
-            aria-label="Strobe threshold numeric"
-          />
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
-            Strobe prob.
-          </span>
-          <input
-            id="audio-compact-strobe-probability"
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={strobeProbability}
-            onChange={(e) => setStrobeProbability(Number(e.target.value))}
-            onMouseUp={() => void persistStrobe({ strobeProbability })}
-            onTouchEnd={() => void persistStrobe({ strobeProbability })}
-            disabled={strobeControlsDisabled}
-            className={rangeClassName}
-            style={strobeProbabilityRangeStyle}
-          />
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={1}
-            value={strobeProbability}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value)
-              if (Number.isFinite(value)) {
-                setStrobeProbability(Math.max(0, Math.min(100, Math.round(value))))
-              }
-            }}
-            onBlur={() => void persistStrobe({ strobeProbability })}
-            disabled={strobeControlsDisabled}
-            className={numberClassName}
-            aria-label="Strobe probability percent"
-          />
+        <div className={strobeControlsDisabled ? 'space-y-3 opacity-60' : 'space-y-3'}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
+            <label
+              htmlFor="audio-compact-strobe-threshold"
+              className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
+              Threshold
+            </label>
+            <input
+              id="audio-compact-strobe-threshold"
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={strobeTriggerThreshold}
+              onChange={(e) => setStrobeTriggerThreshold(Number(e.target.value))}
+              onMouseUp={() => void persistStrobe({ strobeTriggerThreshold })}
+              onTouchEnd={() => void persistStrobe({ strobeTriggerThreshold })}
+              disabled={strobeControlsDisabled}
+              className={compactStrobeRangeClassName}
+              style={strobeTriggerRangeStyle}
+            />
+
+            <input
+              type="number"
+              min={0}
+              max={1}
+              step={0.01}
+              value={strobeTriggerThreshold}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value)
+                if (Number.isFinite(value)) {
+                  setStrobeTriggerThreshold(Math.max(0, Math.min(1, value)))
+                }
+              }}
+              onBlur={() => void persistStrobe({ strobeTriggerThreshold })}
+              disabled={strobeControlsDisabled}
+              className={numberClassName}
+              aria-label="Strobe threshold numeric"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
+              Strobe prob.
+            </span>
+            <input
+              id="audio-compact-strobe-probability"
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={strobeProbability}
+              onChange={(e) => setStrobeProbability(Number(e.target.value))}
+              onMouseUp={() => void persistStrobe({ strobeProbability })}
+              onTouchEnd={() => void persistStrobe({ strobeProbability })}
+              disabled={strobeControlsDisabled}
+              className={compactStrobeRangeClassName}
+              style={strobeProbabilityRangeStyle}
+            />
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={strobeProbability}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value)
+                if (Number.isFinite(value)) {
+                  setStrobeProbability(Math.max(0, Math.min(100, Math.round(value))))
+                }
+              }}
+              onBlur={() => void persistStrobe({ strobeProbability })}
+              disabled={strobeControlsDisabled}
+              className={numberClassName}
+              aria-label="Strobe probability percent"
+            />
+          </div>
         </div>
       </div>
     )
