@@ -49,6 +49,7 @@
             "threshold": 0.1,
             "hysteresis": 0.04,
             "holdMs": 150,
+            "smoothing": 0.82,
             "color": "#ff0000",
             "nodeLabel": "Bass",
             "outputs": ["enter", "during", "exit"],
@@ -65,6 +66,7 @@
             "threshold": 0.09,
             "hysteresis": 0.05,
             "holdMs": 150,
+            "smoothing": 0.75,
             "color": "#00ff00",
             "nodeLabel": "Mid",
             "outputs": ["enter", "during", "exit"],
@@ -81,6 +83,7 @@
             "threshold": 0.07,
             "hysteresis": 0.05,
             "holdMs": 150,
+            "smoothing": 0.68,
             "color": "#0000ff",
             "nodeLabel": "Treble",
             "outputs": ["enter", "during", "exit"],
@@ -599,6 +602,7 @@
             "threshold": 0.08,
             "hysteresis": 0.03,
             "holdMs": 200,
+            "smoothing": 0.84,
             "color": "#aa2200",
             "nodeLabel": "Bass",
             "outputs": ["enter", "during", "exit"],
@@ -1951,6 +1955,7 @@
             "threshold": 0.1,
             "hysteresis": 0.04,
             "holdMs": 200,
+            "smoothing": 0.85,
             "color": "#ff0000",
             "nodeLabel": "Sub",
             "outputs": ["enter", "during", "exit"],
@@ -1968,6 +1973,7 @@
             "threshold": 0.18,
             "hysteresis": 0.04,
             "holdMs": 180,
+            "smoothing": 0.85,
             "color": "#ff7f00",
             "nodeLabel": "Kick",
             "outputs": ["enter", "during", "exit"],
@@ -1984,6 +1990,7 @@
             "threshold": 0.14,
             "hysteresis": 0.04,
             "holdMs": 160,
+            "smoothing": 0.82,
             "color": "#ffff00",
             "nodeLabel": "Bass",
             "outputs": ["enter", "during", "exit"],
@@ -2000,6 +2007,7 @@
             "threshold": 0.1,
             "hysteresis": 0.05,
             "holdMs": 150,
+            "smoothing": 0.78,
             "color": "#00ff00",
             "nodeLabel": "Low Mid",
             "outputs": ["enter", "during", "exit"],
@@ -2016,6 +2024,7 @@
             "threshold": 0.08,
             "hysteresis": 0.05,
             "holdMs": 150,
+            "smoothing": 0.75,
             "color": "#00ffff",
             "nodeLabel": "Mid",
             "outputs": ["enter", "during", "exit"],
@@ -2032,6 +2041,7 @@
             "threshold": 0.06,
             "hysteresis": 0.05,
             "holdMs": 150,
+            "smoothing": 0.7,
             "color": "#0000ff",
             "nodeLabel": "Presence",
             "outputs": ["enter", "during", "exit"],
@@ -2048,6 +2058,7 @@
             "threshold": 0.05,
             "hysteresis": 0.05,
             "holdMs": 150,
+            "smoothing": 0.65,
             "color": "#800080",
             "nodeLabel": "High",
             "outputs": ["enter", "during", "exit"],
@@ -2064,6 +2075,7 @@
             "threshold": 0,
             "hysteresis": 0.01,
             "holdMs": 500,
+            "smoothing": 0.65,
             "color": "#ff00ff",
             "nodeLabel": "Air",
             "outputs": ["enter", "during", "exit"],
@@ -3284,6 +3296,371 @@
           "x": 430.91970720681246,
           "y": 186.95143454093898,
           "zoom": 0.6792431422744739
+        }
+      }
+    },
+    {
+      "id": "cue-70s-layered-spectrum",
+      "name": "Layered Spectrum",
+      "description": "Kick and bass drive red on layer 0, low mid and mid drive green on layer 1, upper mid and high drive blue on layer 2. Additive blending; amplitude sets brightness; dark bands are transparent to layers below.",
+      "cueTypeId": "audio-70s-layered-spectrum",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-70s-ls-low",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 250
+            },
+            "threshold": 0.1,
+            "hysteresis": 0.04,
+            "holdMs": 180,
+            "smoothing": 0.82,
+            "color": "#ff0000",
+            "nodeLabel": "Kick & Bass",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Kick & Bass"
+          },
+          {
+            "id": "ev-70s-ls-mid",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 250,
+              "maxHz": 2500
+            },
+            "threshold": 0.09,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.75,
+            "color": "#00ff00",
+            "nodeLabel": "Low Mid & Mid",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Low Mid & Mid"
+          },
+          {
+            "id": "ev-70s-ls-high",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 2500,
+              "maxHz": 20000
+            },
+            "threshold": 0.06,
+            "hysteresis": 0.05,
+            "holdMs": 150,
+            "smoothing": 0.68,
+            "color": "#0000ff",
+            "nodeLabel": "Upper Mid & High",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Upper Mid & High"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-70s-ls-low-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "act-70s-ls-mid-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-70s-ls-high-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 2
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-70s-ls-low-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-ls-mid-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-70s-ls-high-level",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-70s-ls-low",
+          "to": "logic-70s-ls-low-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-ls-low-level",
+          "to": "act-70s-ls-low-on"
+        },
+        {
+          "from": "ev-70s-ls-mid",
+          "to": "logic-70s-ls-mid-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-ls-mid-level",
+          "to": "act-70s-ls-mid-on"
+        },
+        {
+          "from": "ev-70s-ls-high",
+          "to": "logic-70s-ls-high-level",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-70s-ls-high-level",
+          "to": "act-70s-ls-high-on"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-70s-ls-low": {
+            "x": 400,
+            "y": 0
+          },
+          "ev-70s-ls-mid": {
+            "x": 200,
+            "y": 0
+          },
+          "ev-70s-ls-high": {
+            "x": 0,
+            "y": 0
+          },
+          "logic-70s-ls-low-level": {
+            "x": 400,
+            "y": 120
+          },
+          "logic-70s-ls-mid-level": {
+            "x": 200,
+            "y": 120
+          },
+          "logic-70s-ls-high-level": {
+            "x": 0,
+            "y": 120
+          },
+          "act-70s-ls-low-on": {
+            "x": 400,
+            "y": 260
+          },
+          "act-70s-ls-mid-on": {
+            "x": 200,
+            "y": 260
+          },
+          "act-70s-ls-high-on": {
+            "x": 0,
+            "y": 260
+          }
+        },
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.75
         }
       }
     }
