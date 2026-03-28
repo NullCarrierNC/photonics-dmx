@@ -2801,6 +2801,13 @@
           "isParameter": true
         },
         {
+          "name": "layerB",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
           "name": "numLights",
           "type": "number",
           "scope": "cue",
@@ -3185,7 +3192,7 @@
             },
             "layer": {
               "source": "variable",
-              "name": "layerValue"
+              "name": "layerB"
             }
           },
           {
@@ -3253,7 +3260,7 @@
             },
             "layer": {
               "source": "variable",
-              "name": "layerValue"
+              "name": "layerB"
             }
           },
           {
@@ -3321,7 +3328,7 @@
             },
             "layer": {
               "source": "variable",
-              "name": "layerValue"
+              "name": "layerB"
             }
           }
         ],
@@ -3347,6 +3354,21 @@
               "value": 2
             },
             "assignTo": "halfOffset"
+          },
+          {
+            "id": "diag-layer-b",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "layerValue"
+            },
+            "right": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "assignTo": "layerB"
           },
           {
             "id": "diag-start-a",
@@ -3596,6 +3618,10 @@
         },
         {
           "from": "diag-half",
+          "to": "diag-layer-b"
+        },
+        {
+          "from": "diag-layer-b",
           "to": "diag-start-a"
         },
         {
@@ -3710,6 +3736,10 @@
           "diag-half": {
             "x": 0,
             "y": 240
+          },
+          "diag-layer-b": {
+            "x": 0,
+            "y": 300
           },
           "diag-start-a": {
             "x": 0,

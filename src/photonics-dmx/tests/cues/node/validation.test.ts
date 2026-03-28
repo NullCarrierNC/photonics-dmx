@@ -983,6 +983,7 @@ describe('Node cue validation', () => {
       'cue-sk-audio-harmony',
       'cue-sk-audio-searchlights',
       'cue-sk-audio-score',
+      'cue-sk-audio-sweep',
     ]
     for (const cueId of cueIds) {
       const cue = data.cues.find((c) => c.id === cueId)
@@ -991,7 +992,9 @@ describe('Node cue validation', () => {
       for (const r of raisers) {
         if (
           r.effectId === 'effect-audio-rotation-cw' ||
-          r.effectId === 'effect-audio-rotation-ccw'
+          r.effectId === 'effect-audio-rotation-ccw' ||
+          r.effectId === 'effect-audio-diagonal-sweep' ||
+          r.effectId === 'effect-audio-sweep-color'
         ) {
           expect(r.isPersistent).toBe(true)
         }

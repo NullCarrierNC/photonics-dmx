@@ -3198,6 +3198,7 @@
           {
             "id": "sk_audio_sweep-diag",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-diagonal-sweep",
             "parameterValues": {
               "allLights": {
@@ -3221,6 +3222,7 @@
           {
             "id": "sk_audio_sweep-ya",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-sweep-color",
             "parameterValues": {
               "lights": {
@@ -3276,6 +3278,7 @@
           {
             "id": "sk_audio_sweep-yb",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-sweep-color",
             "parameterValues": {
               "lights": {
@@ -3331,6 +3334,7 @@
           {
             "id": "sk_audio_sweep-blue",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-sweep-color",
             "parameterValues": {
               "lights": {
@@ -3386,6 +3390,7 @@
           {
             "id": "sk_audio_sweep-green",
             "type": "effect-raiser",
+            "isPersistent": true,
             "effectId": "effect-audio-sweep-color",
             "parameterValues": {
               "lights": {
