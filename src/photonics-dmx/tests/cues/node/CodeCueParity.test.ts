@@ -93,7 +93,7 @@ function sustainPatternCueDefinition(): YargNodeCueDefinition {
       duration: { source: 'literal', value: 0 },
       waitUntilCondition: { source: 'literal', value: 'none' },
       waitUntilTime: { source: 'literal', value: 0 },
-      easing: 'linear',
+      easing: { source: 'literal', value: 'linear' },
     },
   }
   return {
@@ -136,7 +136,7 @@ function cueCalledOnlyDefinition(): YargNodeCueDefinition {
       duration: { source: 'literal', value: 200 },
       waitUntilCondition: { source: 'literal', value: 'none' },
       waitUntilTime: { source: 'literal', value: 0 },
-      easing: 'linear',
+      easing: { source: 'literal', value: 'linear' },
     },
   }
   return {

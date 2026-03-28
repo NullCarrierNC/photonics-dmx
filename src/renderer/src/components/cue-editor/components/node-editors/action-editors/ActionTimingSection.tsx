@@ -129,19 +129,14 @@ const ActionTimingSection: React.FC<ActionTimingSectionProps> = ({
       )}
     </div>
 
-    <label className="flex flex-col font-medium">
-      Easing
-      <select
-        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-        value={currentTiming.easing ?? 'linear'}
-        onChange={(event) => updateTiming({ easing: event.target.value })}>
-        {EASING_OPTIONS.map((ease) => (
-          <option key={ease} value={ease}>
-            {ease}
-          </option>
-        ))}
-      </select>
-    </label>
+    <ValueSourceEditor
+      label="Easing"
+      value={currentTiming.easing}
+      onChange={(next) => updateTiming({ easing: next })}
+      expected="string"
+      validLiterals={[...EASING_OPTIONS]}
+      availableVariables={availableVariables}
+    />
   </div>
 )
 

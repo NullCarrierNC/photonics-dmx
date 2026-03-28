@@ -526,6 +526,7 @@ const CueEditor: React.FC = () => {
               'timing.waitUntilConditionCount',
             )
             checkValueSource(action.timing.level, nodeType, nodeId, nodeLabel, 'timing.level')
+            checkValueSource(action.timing.easing, nodeType, nodeId, nodeLabel, 'timing.easing')
           }
         }
 

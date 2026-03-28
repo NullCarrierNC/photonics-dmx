@@ -256,7 +256,13 @@ export class ActionEffectFactory {
         timing.waitUntilConditionCount?.source === 'literal'
           ? Number(timing.waitUntilConditionCount.value)
           : undefined,
-      easing: timing.easing,
+      easing: (() => {
+        const e = timing.easing as string | { source?: string; value?: unknown } | undefined
+        if (e === undefined) return undefined
+        if (typeof e === 'string') return e
+        if (e && typeof e === 'object' && e.source === 'literal') return String(e.value)
+        return undefined
+      })(),
       level: timing.level?.source === 'literal' ? Number(timing.level.value) : 1,
     }
   }

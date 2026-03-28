@@ -126,7 +126,7 @@ const timingSchema: JSONSchemaType<ActionTimingConfig> = {
     waitUntilCondition: valueSourceSchema,
     waitUntilTime: valueSourceSchema,
     waitUntilConditionCount: { ...valueSourceSchema, nullable: true },
-    easing: { type: 'string', nullable: true },
+    easing: { ...valueSourceSchema, nullable: true },
     level: { ...valueSourceSchema, nullable: true },
   },
 } as any
@@ -1178,10 +1178,76 @@ const checkConditionalValidValues = (
   }
 }
 
+/**
+ * Converts legacy `timing.easing` string to ValueSource for backward compatibility.
+ */
+function migrateEasingInActions(actions: unknown[]): unknown[] {
+  return actions.map((action) => {
+    if (!action || typeof action !== 'object') return action
+    const a = action as { timing?: Record<string, unknown> }
+    const timing = a.timing
+    if (!timing || typeof timing !== 'object') return action
+    const easing = timing.easing
+    if (typeof easing === 'string') {
+      return {
+        ...a,
+        timing: {
+          ...timing,
+          easing: { source: 'literal', value: easing },
+        },
+      }
+    }
+    return action
+  })
+}
+
+function migrateEasingInNodeCueFile(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || !Array.isArray((value as { cues?: unknown }).cues)) {
+    return value
+  }
+  const file = value as { cues: Array<{ nodes?: { actions?: unknown[] } }> }
+  const migratedCues = file.cues.map((cue) => {
+    const actions = cue.nodes?.actions
+    if (!Array.isArray(actions)) return cue
+    return {
+      ...cue,
+      nodes: {
+        ...cue.nodes,
+        actions: migrateEasingInActions(actions),
+      },
+    }
+  })
+  return { ...file, cues: migratedCues }
+}
+
+function migrateEasingInEffectFile(value: unknown): unknown {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !Array.isArray((value as { effects?: unknown }).effects)
+  ) {
+    return value
+  }
+  const file = value as { effects: Array<{ nodes?: { actions?: unknown[] } }> }
+  const migratedEffects = file.effects.map((effect) => {
+    const actions = effect.nodes?.actions
+    if (!Array.isArray(actions)) return effect
+    return {
+      ...effect,
+      nodes: {
+        ...effect.nodes,
+        actions: migrateEasingInActions(actions),
+      },
+    }
+  })
+  return { ...file, effects: migratedEffects }
+}
+
 export const validateYargNodeCueFile = (
   value: unknown,
 ): NodeCueValidationResult<YargNodeCueFile> => {
-  if (!validateYargSchema(value)) {
+  const migrated = migrateEasingInNodeCueFile(value)
+  if (!validateYargSchema(migrated)) {
     return {
       valid: false,
       errors: formatErrors(validateYargSchema.errors as DefinedError[]),
@@ -1190,9 +1256,10 @@ export const validateYargNodeCueFile = (
   }
 
   const semanticErrors: string[] = []
+  const fileData = migrated as YargNodeCueFile
 
   // Check for duplicate group-level variable names
-  const groupVariables = value.group.variables ?? []
+  const groupVariables = fileData.group.variables ?? []
   const groupVarNames = new Set<string>()
   for (const varDef of groupVariables) {
     if (groupVarNames.has(varDef.name)) {
@@ -1201,7 +1268,7 @@ export const validateYargNodeCueFile = (
     groupVarNames.add(varDef.name)
   }
 
-  for (const cue of value.cues) {
+  for (const cue of fileData.cues) {
     // Check for duplicate cue-level variable names
     const cueVariables = cue.variables ?? []
     const cueVarNames = new Set<string>()
@@ -1235,7 +1302,7 @@ export const validateYargNodeCueFile = (
 
   return {
     valid: true,
-    data: value,
+    data: fileData,
     errors: [],
     mode: 'yarg',
   }
@@ -1273,7 +1340,7 @@ function migrateAudioNodeCueFile(value: unknown): unknown {
 export const validateAudioNodeCueFile = (
   value: unknown,
 ): NodeCueValidationResult<AudioNodeCueFile> => {
-  const migrated = migrateAudioNodeCueFile(value)
+  const migrated = migrateEasingInNodeCueFile(migrateAudioNodeCueFile(value))
   if (!validateAudioSchema(migrated)) {
     return {
       valid: false,
@@ -1425,7 +1492,8 @@ export const validateYargEffectFile = (value: unknown): EffectValidationResult<Y
     }
   }
 
-  if (!validateYargEffectSchema(value)) {
+  const migrated = migrateEasingInEffectFile(value)
+  if (!validateYargEffectSchema(migrated)) {
     return {
       valid: false,
       errors: formatErrors(validateYargEffectSchema.errors as DefinedError[]),
@@ -1433,7 +1501,7 @@ export const validateYargEffectFile = (value: unknown): EffectValidationResult<Y
     }
   }
 
-  const file = value as YargEffectFile
+  const file = migrated as YargEffectFile
   const semanticErrors: string[] = []
 
   const effectIds = new Set<string>()
@@ -1475,7 +1543,8 @@ export const validateAudioEffectFile = (
     }
   }
 
-  const file = value as any
+  const migrated = migrateEasingInEffectFile(value)
+  const file = migrated as any
 
   // Check required fields
   if (file.version !== 1) {

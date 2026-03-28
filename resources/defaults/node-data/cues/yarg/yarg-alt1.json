@@ -76,7 +76,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -182,7 +182,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -393,7 +393,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -609,7 +609,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -882,7 +882,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -946,7 +946,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1010,7 +1010,7 @@
                 "source": "literal",
                 "value": 160
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1074,7 +1074,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1409,7 +1409,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1473,7 +1473,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1537,7 +1537,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1601,7 +1601,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1665,7 +1665,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1729,7 +1729,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1793,7 +1793,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1857,7 +1857,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2585,7 +2585,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2962,7 +2962,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3641,7 +3641,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3705,7 +3705,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -6155,7 +6155,7 @@
                 "source": "literal",
                 "value": 120
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -6219,7 +6219,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -6658,7 +6658,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "sin-out",
+              "easing": { "source": "literal", "value": "sin-out" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -6722,7 +6722,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "sin-out",
+              "easing": { "source": "literal", "value": "sin-out" },
               "level": {
                 "source": "literal",
                 "value": 1

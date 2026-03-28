@@ -107,7 +107,7 @@ function cueDefinitionWithEventType(
       duration: { source: 'literal', value: 200 },
       waitUntilCondition: { source: 'literal', value: 'none' },
       waitUntilTime: { source: 'literal', value: 0 },
-      easing: 'linear',
+      easing: { source: 'literal', value: 'linear' },
     },
   }
   return {

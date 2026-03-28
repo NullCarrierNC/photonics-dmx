@@ -137,7 +137,7 @@ describe('NodeExecutionEngine', () => {
           duration: { source: 'literal', value: 200 },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
-          easing: 'linear',
+          easing: { source: 'literal', value: 'linear' },
         },
       }
 
@@ -1045,7 +1045,7 @@ describe('NodeExecutionEngine', () => {
           duration: { source: 'literal', value: 100 },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
-          easing: 'linear',
+          easing: { source: 'literal', value: 'linear' },
           level: { source: 'literal', value: 1 },
         },
         layer: { source: 'literal', value: 0 },
@@ -1191,7 +1191,7 @@ describe('NodeExecutionEngine', () => {
                 duration: { source: 'literal', value: 0 },
                 waitUntilCondition: { source: 'variable', name: 'waitUntilCondition' },
                 waitUntilTime: { source: 'variable', name: 'waitUntilTime' },
-                easing: 'linear',
+                easing: { source: 'literal', value: 'linear' },
                 level: { source: 'literal', value: 1 },
               },
               layer: { source: 'literal', value: 1 },
@@ -1908,7 +1908,7 @@ describe('NodeExecutionEngine', () => {
           duration: { source: 'literal', value: 200 },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
-          easing: 'sinInOut',
+          easing: { source: 'literal', value: 'sinInOut' },
           level: { source: 'literal', value: 1 },
         },
       }
@@ -2002,7 +2002,7 @@ describe('NodeExecutionEngine', () => {
           duration: { source: 'literal', value: 200 },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
-          easing: 'sinInOut',
+          easing: { source: 'literal', value: 'sinInOut' },
           level: { source: 'literal', value: 1 },
         },
       }
@@ -2085,7 +2085,7 @@ describe('NodeExecutionEngine', () => {
           duration: { source: 'literal', value: 200 },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
-          easing: 'sinInOut',
+          easing: { source: 'literal', value: 'sinInOut' },
           level: { source: 'literal', value: 1 },
         },
       }
@@ -2184,7 +2184,7 @@ describe('NodeExecutionEngine', () => {
           duration: { source: 'variable', name: 'calculatedDuration' },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
-          easing: 'sinInOut',
+          easing: { source: 'literal', value: 'sinInOut' },
           level: { source: 'literal', value: 1 },
         },
       }
@@ -2287,7 +2287,7 @@ describe('NodeExecutionEngine', () => {
           duration: { source: 'literal', value: 200 },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
-          easing: 'sinInOut',
+          easing: { source: 'literal', value: 'sinInOut' },
           level: { source: 'literal', value: 1 },
         },
       }
@@ -2810,7 +2810,7 @@ describe('NodeExecutionEngine', () => {
           duration: { source: 'literal', value: 200 },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
-          easing: 'linear',
+          easing: { source: 'literal', value: 'linear' },
         },
       }
       const definition1: YargNodeCueDefinition = {
