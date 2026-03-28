@@ -127,6 +127,8 @@ const ActiveRigsSettings: React.FC = () => {
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         Manage your DMX rigs. Only active rigs will output DMX data.
+        <br />
+        <strong>CAUTION: multiple rig support is experimental and may not work as intended.</strong>
       </p>
 
       <div className="mb-4">
