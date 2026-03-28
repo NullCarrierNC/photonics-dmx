@@ -2894,7 +2894,7 @@
     {
       "id": "cue-sk-audio-menu",
       "name": "Menu",
-      "description": "Low blue base then blue sweep across all lights (2000ms).",
+      "description": "Low blue base then blue rotation across all lights (beat-stepped).",
       "cueTypeId": "audio-sk-menu",
       "variables": [
         {
@@ -2906,9 +2906,9 @@
       ],
       "effects": [
         {
-          "effectId": "effect-audio-sweep-color",
+          "effectId": "effect-audio-rotation-cw",
           "effectFileId": "audio-stagekit-effects",
-          "name": "Sweep Colour"
+          "name": "Rotation CW"
         }
       ],
       "nodes": {
@@ -3011,7 +3011,7 @@
           {
             "id": "sk_audio_menu-sweep",
             "type": "effect-raiser",
-            "effectId": "effect-audio-sweep-color",
+            "effectId": "effect-audio-rotation-cw",
             "isPersistent": true,
             "parameterValues": {
               "lights": {
@@ -3034,33 +3034,29 @@
                 "source": "literal",
                 "value": "replace"
               },
-              "sweepTime": {
+              "waitUntilCondition": {
                 "source": "literal",
-                "value": 2000
+                "value": "beat"
               },
-              "fadeInDuration": {
+              "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
               },
-              "fadeOutDuration": {
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
                 "source": "literal",
                 "value": 0
               },
-              "lightOverlap": {
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              },
+              "startOffset": {
                 "source": "literal",
                 "value": 0
-              },
-              "betweenDelay": {
-                "source": "literal",
-                "value": 0
-              },
-              "lowBrightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "lowColor": {
-                "source": "literal",
-                "value": "blue"
               }
             }
           }
