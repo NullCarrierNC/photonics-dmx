@@ -959,6 +959,36 @@ describe('Node cue validation', () => {
     }
   })
 
+  it('validates bundled audio-disco.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/audio/audio-disco.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateAudioNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+      }
+    }
+  })
+
+  it('validates bundled audio-rock.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/audio/audio-rock.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateAudioNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+      }
+    }
+  })
+
   it('audio stagekit rotation effect raisers are persistent (seamless loop at wrap)', () => {
     const filePath = path.join(
       __dirname,

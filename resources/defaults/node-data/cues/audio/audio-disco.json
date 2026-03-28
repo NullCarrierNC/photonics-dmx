@@ -1,0 +1,1159 @@
+{
+  "version": 1,
+  "mode": "audio",
+  "group": {
+    "id": "audio-disco",
+    "name": "Disco",
+    "description": "Audio-reactive disco lighting: mirror-ball flashes, saturated washes, quarter chases, and funky bass with HFC accents"
+  },
+  "cues": [
+    {
+      "id": "cue-disco-hustle-wash",
+      "name": "Hustle Wash",
+      "description": "Amber wash on bass and kick (front); magenta wash on mid and treble (back). Additive blending with amplitude-driven opacity.",
+      "cueTypeId": "audio-disco-hustle-wash",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-disco-hw-bass",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 200
+            },
+            "threshold": 0.09,
+            "hysteresis": 0.04,
+            "holdMs": 160,
+            "color": "#ffaa00",
+            "nodeLabel": "Bass / kick",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Bass / kick"
+          },
+          {
+            "id": "ev-disco-hw-mid",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 1000,
+              "maxHz": 8000
+            },
+            "threshold": 0.07,
+            "hysteresis": 0.05,
+            "holdMs": 140,
+            "color": "#ff00ff",
+            "nodeLabel": "Mid / treble",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Mid / treble"
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-disco-hw-amber",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "amber"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "act-disco-hw-magenta",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "magenta"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-disco-hw-bass",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-disco-hw-mid",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-disco-hw-bass",
+          "to": "logic-disco-hw-bass",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-disco-hw-bass",
+          "to": "act-disco-hw-amber"
+        },
+        {
+          "from": "ev-disco-hw-mid",
+          "to": "logic-disco-hw-mid",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-disco-hw-mid",
+          "to": "act-disco-hw-magenta"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-disco-hw-bass": {
+            "x": 0,
+            "y": 0
+          },
+          "ev-disco-hw-mid": {
+            "x": 251.732945041731,
+            "y": 0
+          },
+          "act-disco-hw-amber": {
+            "x": 16.46444725804031,
+            "y": 274.475266315043
+          },
+          "act-disco-hw-magenta": {
+            "x": 254.0943859424442,
+            "y": 269.3389717079699
+          },
+          "logic-disco-hw-bass": {
+            "x": 16.6959933321923,
+            "y": 150.13039815798402
+          },
+          "logic-disco-hw-mid": {
+            "x": 271.465890083462,
+            "y": 162.9069550782442
+          }
+        },
+        "viewport": {
+          "x": 498.20029121870175,
+          "y": 97.07177513185889,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-disco-color-chase",
+      "name": "Colour Chase",
+      "description": "Each beat advances a lit quarter on the front with a random saturated disco colour (magenta, cyan, amber, or green).",
+      "cueTypeId": "audio-disco-color-chase",
+      "variables": [
+        {
+          "name": "chasePos",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 3,
+          "description": "Beat counter (starts at 3 so first beat lands on quarter 1)"
+        },
+        {
+          "name": "chaseColor",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "magenta",
+          "description": "Random disco colour for the active quarter this beat"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-disco-cc-beat",
+            "type": "event",
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "label": "Beat",
+            "threshold": 0.4
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-disco-cc-blackout",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 80
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "act-disco-cc-q1",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "chaseColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "easing": "easeIn",
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-disco-cc-q2",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-2"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "chaseColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "easing": "easeIn",
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-disco-cc-q3",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-3"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "chaseColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 500
+              },
+              "easing": "easeIn",
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "act-disco-cc-q4",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "quarter-4"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "chaseColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 100
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 100
+              },
+              "easing": "easeIn",
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-disco-cc-add",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "chasePos"
+          },
+          {
+            "id": "logic-disco-cc-mod",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "chasePos"
+          },
+          {
+            "id": "logic-disco-cc-rand",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-choice",
+            "choices": ["magenta", "cyan", "amber", "green"],
+            "assignTo": "chaseColor"
+          },
+          {
+            "id": "logic-disco-cc-eq0",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "logic-disco-cc-eq1",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            }
+          },
+          {
+            "id": "logic-disco-cc-eq2",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "chasePos"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-disco-cc-beat",
+          "to": "act-disco-cc-blackout"
+        },
+        {
+          "from": "act-disco-cc-blackout",
+          "to": "logic-disco-cc-add"
+        },
+        {
+          "from": "logic-disco-cc-add",
+          "to": "logic-disco-cc-mod"
+        },
+        {
+          "from": "logic-disco-cc-mod",
+          "to": "logic-disco-cc-rand"
+        },
+        {
+          "from": "logic-disco-cc-rand",
+          "to": "logic-disco-cc-eq0"
+        },
+        {
+          "from": "logic-disco-cc-eq0",
+          "to": "act-disco-cc-q1",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-disco-cc-eq0",
+          "to": "logic-disco-cc-eq1",
+          "fromPort": "false"
+        },
+        {
+          "from": "logic-disco-cc-eq1",
+          "to": "act-disco-cc-q2",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-disco-cc-eq1",
+          "to": "logic-disco-cc-eq2",
+          "fromPort": "false"
+        },
+        {
+          "from": "logic-disco-cc-eq2",
+          "to": "act-disco-cc-q3",
+          "fromPort": "true"
+        },
+        {
+          "from": "logic-disco-cc-eq2",
+          "to": "act-disco-cc-q4",
+          "fromPort": "false"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-disco-cc-beat": {
+            "x": 1.211577856913209,
+            "y": 0
+          },
+          "act-disco-cc-blackout": {
+            "x": 20.734284097328782,
+            "y": 102.63180541619658
+          },
+          "act-disco-cc-q1": {
+            "x": -268.59348598867655,
+            "y": 691.9999999999999
+          },
+          "act-disco-cc-q2": {
+            "x": -204.59348598867655,
+            "y": 923.4515491463244
+          },
+          "act-disco-cc-q3": {
+            "x": -4,
+            "y": 1098.9030982926488
+          },
+          "act-disco-cc-q4": {
+            "x": 254.81302802264702,
+            "y": 981.4515491463244
+          },
+          "logic-disco-cc-add": {
+            "x": 4.732226304709911,
+            "y": 242.74238503724337
+          },
+          "logic-disco-cc-mod": {
+            "x": 0,
+            "y": 359.1935880072415
+          },
+          "logic-disco-cc-rand": {
+            "x": 15.43048950098455,
+            "y": 468.4474540911615
+          },
+          "logic-disco-cc-eq0": {
+            "x": 3.406514011323452,
+            "y": 567.4515491463244
+          },
+          "logic-disco-cc-eq1": {
+            "x": 40.81302802264702,
+            "y": 733.9999999999999
+          },
+          "logic-disco-cc-eq2": {
+            "x": 124,
+            "y": 879.4515491463244
+          }
+        },
+        "viewport": {
+          "x": 291.0502405686305,
+          "y": 31.61274981936316,
+          "zoom": 0.6045778379166812
+        }
+      }
+    },
+    {
+      "id": "cue-disco-funky-bass",
+      "name": "Funky Bassline",
+      "description": "Sub-bass on front half-1 (purple), bass guitar on front half-2 (orange). HFC accents trigger a white flash on the back.",
+      "cueTypeId": "audio-disco-funky-bass",
+      "variables": [
+        {
+          "name": "bandLevel",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Current audio-trigger band amplitude (0–1) for opacity"
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-audio-flash",
+          "effectFileId": "audio-core-effects",
+          "name": "Audio Flash"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ev-disco-fb-sub",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 20,
+              "maxHz": 80
+            },
+            "threshold": 0.1,
+            "hysteresis": 0.04,
+            "holdMs": 180,
+            "color": "#8800ff",
+            "nodeLabel": "Sub",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Sub"
+          },
+          {
+            "id": "ev-disco-fb-bass",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 80,
+              "maxHz": 350
+            },
+            "threshold": 0.09,
+            "hysteresis": 0.04,
+            "holdMs": 160,
+            "color": "#ff8800",
+            "nodeLabel": "Bass guitar",
+            "outputs": ["enter", "during", "exit"],
+            "label": "Bass guitar"
+          },
+          {
+            "id": "ev-disco-fb-hfc",
+            "type": "event",
+            "eventType": "audio-hfc",
+            "triggerMode": "edge",
+            "label": "HFC accent",
+            "threshold": 0.05,
+            "cooldownMs": 120
+          }
+        ],
+        "actions": [
+          {
+            "id": "act-disco-fb-sub",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "half-1"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "purple"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "act-disco-fb-bass",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "half-2"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "orange"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "bandLevel"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 16
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": "linear",
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-disco-fb-sub",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          },
+          {
+            "id": "logic-disco-fb-bass",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "trigger-band-amplitude",
+            "assignTo": "bandLevel"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "er-disco-fb-hfc",
+            "type": "effect-raiser",
+            "effectId": "effect-audio-flash",
+            "parameterValues": {
+              "group": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 2
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "fadeInMs": {
+                "source": "literal",
+                "value": 40
+              },
+              "holdMs": {
+                "source": "literal",
+                "value": 60
+              },
+              "fadeOutMs": {
+                "source": "literal",
+                "value": 200
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ev-disco-fb-sub",
+          "to": "logic-disco-fb-sub",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-disco-fb-sub",
+          "to": "act-disco-fb-sub"
+        },
+        {
+          "from": "ev-disco-fb-bass",
+          "to": "logic-disco-fb-bass",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-disco-fb-bass",
+          "to": "act-disco-fb-bass"
+        },
+        {
+          "from": "ev-disco-fb-hfc",
+          "to": "er-disco-fb-hfc"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ev-disco-fb-sub": {
+            "x": 0,
+            "y": 0
+          },
+          "ev-disco-fb-bass": {
+            "x": 245.80905403383076,
+            "y": 9.333333333333258
+          },
+          "ev-disco-fb-hfc": {
+            "x": 14.183450505137444,
+            "y": 439.62650640308857
+          },
+          "act-disco-fb-sub": {
+            "x": -36.60762987906736,
+            "y": 276.9598397364218
+          },
+          "act-disco-fb-bass": {
+            "x": 240.7533360235393,
+            "y": 274.6622635498643
+          },
+          "logic-disco-fb-sub": {
+            "x": 0.6039902586489916,
+            "y": 159.73322407901287
+          },
+          "logic-disco-fb-bass": {
+            "x": 232.603990258649,
+            "y": 151.5304934978485
+          },
+          "er-disco-fb-hfc": {
+            "x": 2.6666666666666856,
+            "y": 510.7815129185717
+          }
+        },
+        "viewport": {
+          "x": 369.32160473731346,
+          "y": 96.95693265553564,
+          "zoom": 0.75
+        }
+      }
+    }
+  ],
+  "bundled": true
+}
