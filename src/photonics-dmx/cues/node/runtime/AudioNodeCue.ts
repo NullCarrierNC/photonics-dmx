@@ -92,8 +92,9 @@ export class AudioNodeCue implements IAudioCue {
   /** True after `cue-started` events have run for this activation; reset in onStop/onDestroy. */
   private cueStartedFired = false
   /**
-   * When `use` is true, the next graph effect submission uses setEffect (clears sequencer). Primary cues
-   * set this before running cue-started; secondary cues never set it.
+   * When `use` is true, the next graph effect submission uses setEffect (clears sequencer).
+   * Primary cues arm this on first activation; the first submission (engine or level path) clears
+   * atomically with `addEffect`, avoiding a black gap before beat/FFT-driven events.
    */
   private readonly firstSubmissionUsesSetEffectRef = { use: false }
 
@@ -167,10 +168,7 @@ export class AudioNodeCue implements IAudioCue {
     }
 
     if (!this.cueStartedFired) {
-      const hasCueStarted = [...this.compiledCue.eventMap.values()].some(
-        (e) => e.eventType === 'cue-started',
-      )
-      if (hasCueStarted && this.style === 'primary') {
+      if (this.style === 'primary') {
         this.firstSubmissionUsesSetEffectRef.use = true
       }
       for (const event of this.compiledCue.eventMap.values()) {
@@ -255,7 +253,12 @@ export class AudioNodeCue implements IAudioCue {
           if (effect) {
             // Extract layer from ValueSource or use default
             const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
-            sequencer.removeEffect(effectKey, layer)
+            if (this.firstSubmissionUsesSetEffectRef.use) {
+              this.firstSubmissionUsesSetEffectRef.use = false
+              sequencer.removeAllEffects()
+            } else {
+              sequencer.removeEffect(effectKey, layer)
+            }
             sequencer.addEffect(effectKey, effect)
             this.activeLevelEffects.set(effectKey, layer)
           }
