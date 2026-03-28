@@ -501,6 +501,22 @@ export interface IpcInvokeMap {
     request: string[]
     response: IpcSuccessResult | IpcErrorResult
   }
+  [CONFIG.GET_DISABLED_YARG_CUES]: {
+    request: void
+    response: Record<string, string[]>
+  }
+  [CONFIG.SET_DISABLED_YARG_CUES]: {
+    request: Record<string, string[]>
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_DISABLED_AUDIO_CUES]: {
+    request: void
+    response: Record<string, string[]>
+  }
+  [CONFIG.SET_DISABLED_AUDIO_CUES]: {
+    request: Record<string, string[]>
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [CONFIG.GET_AUDIO_REACTIVE_CUES]: {
     request: void
     response:
@@ -598,6 +614,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED]: { enabled: boolean }
   [RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE]: AudioConfig | undefined
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE]: AudioGameModeConfig
+  [RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
   [RENDERER_RECEIVE.AUDIO_STROBE_STATE]: {
     active: boolean

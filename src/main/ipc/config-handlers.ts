@@ -16,6 +16,7 @@ import {
   validatePreferencesPayload,
   validateAudioConfigPayload,
   validateAudioGameModePayload,
+  validateDisabledCuesMap,
 } from './inputValidation'
 
 /**
@@ -232,6 +233,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       registry.setStageKitPriority(configPriority)
     }
 
+    const disabledYarg = config.getDisabledYargCues() ?? {}
+    registry.setDisabledCues(disabledYarg)
+
     return enabled!
   })
 
@@ -248,6 +252,8 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       const registry = YargCueRegistry.getInstance()
 
       registry.setEnabledGroups(groupIds)
+      const disabledYarg = controllerManager.getConfig().getDisabledYargCues() ?? {}
+      registry.setDisabledCues(disabledYarg)
 
       console.log('Updated CueRegistry enabled groups:', groupIds)
 
@@ -265,11 +271,15 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
     if (enabled && enabled.length > 0) {
       registry.setEnabledGroups(enabled)
+      const disabledAudio = controllerManager.getConfig().getDisabledAudioCues() ?? {}
+      registry.setDisabledCues(disabledAudio)
       return enabled
     }
 
     const defaults = registry.getEnabledGroups()
     await controllerManager.getConfig().setEnabledAudioCueGroups(defaults)
+    const disabledAudio = controllerManager.getConfig().getDisabledAudioCues() ?? {}
+    registry.setDisabledCues(disabledAudio)
     return defaults
   })
 
@@ -283,11 +293,58 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       await controllerManager.getConfig().setEnabledAudioCueGroups(groupIds)
       const registry = AudioCueRegistry.getInstance()
       registry.setEnabledGroups(groupIds)
+      const disabledAudio = controllerManager.getConfig().getDisabledAudioCues() ?? {}
+      registry.setDisabledCues(disabledAudio)
       controllerManager.refreshAudioCueSelection()
+      sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
       console.log('Updated AudioCueRegistry enabled groups:', groupIds)
       return { success: true }
     } catch (error) {
       console.error('Error setting enabled audio cue groups:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_DISABLED_YARG_CUES, async () => {
+    const disabled = controllerManager.getConfig().getDisabledYargCues() ?? {}
+    YargCueRegistry.getInstance().setDisabledCues(disabled)
+    return disabled
+  })
+
+  ipcMain.handle(CONFIG.SET_DISABLED_YARG_CUES, async (_, payload: unknown) => {
+    try {
+      const validation = validateDisabledCuesMap(payload, 'disabledYargCues')
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      await controllerManager.getConfig().setDisabledYargCues(validation.value)
+      YargCueRegistry.getInstance().setDisabledCues(validation.value)
+      return { success: true }
+    } catch (error) {
+      console.error('Error setting disabled YARG cues:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_DISABLED_AUDIO_CUES, async () => {
+    const disabled = controllerManager.getConfig().getDisabledAudioCues() ?? {}
+    AudioCueRegistry.getInstance().setDisabledCues(disabled)
+    return disabled
+  })
+
+  ipcMain.handle(CONFIG.SET_DISABLED_AUDIO_CUES, async (_, payload: unknown) => {
+    try {
+      const validation = validateDisabledCuesMap(payload, 'disabledAudioCues')
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      await controllerManager.getConfig().setDisabledAudioCues(validation.value)
+      AudioCueRegistry.getInstance().setDisabledCues(validation.value)
+      controllerManager.refreshAudioCueSelection()
+      sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
+      return { success: true }
+    } catch (error) {
+      console.error('Error setting disabled audio cues:', error)
       return ipcError(error)
     }
   })

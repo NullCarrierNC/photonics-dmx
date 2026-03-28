@@ -118,6 +118,10 @@ export const CONFIG = {
   SET_AUDIO_ENABLED: 'set-audio-enabled',
   GET_ENABLED_AUDIO_CUE_GROUPS: 'get-enabled-audio-cue-groups',
   SET_ENABLED_AUDIO_CUE_GROUPS: 'set-enabled-audio-cue-groups',
+  GET_DISABLED_YARG_CUES: 'get-disabled-yarg-cues',
+  SET_DISABLED_YARG_CUES: 'set-disabled-yarg-cues',
+  GET_DISABLED_AUDIO_CUES: 'get-disabled-audio-cues',
+  SET_DISABLED_AUDIO_CUES: 'set-disabled-audio-cues',
   GET_AUDIO_REACTIVE_CUES: 'get-audio-reactive-cues',
   SET_ACTIVE_AUDIO_CUE: 'set-active-audio-cue',
   GET_AUDIO_GAME_MODE: 'get-audio-game-mode',
@@ -152,6 +156,8 @@ export const RENDERER_RECEIVE = {
   AUDIO_ENABLED_CHANGED: 'audio:enabled-changed',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
   AUDIO_GAME_MODE_UPDATE: 'audio:game-mode-update',
+  /** Enabled audio cue groups or per-cue disables changed (Preferences → all windows). */
+  AUDIO_CUE_GROUPS_CHANGED: 'audio:cue-groups-changed',
   /** Game Mode primary cue changed (main process → renderer). */
   AUDIO_GAME_MODE_CUE_CHANGE: 'audio:game-mode-cue-change',
   /** Strobe cue firing state (main process → renderer, on transitions). */

@@ -118,12 +118,14 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, handleAudioEvent)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, handleAudioEvent)
 
     return () => {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, handleAudioEvent)
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, handleAudioEvent)
     }
   }, [loadCueState])
 

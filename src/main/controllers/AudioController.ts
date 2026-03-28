@@ -255,6 +255,9 @@ export class AudioController {
       const group = registry.getGroup(groupId)
       if (!group) continue
       group.cues.forEach((cue) => {
+        if (registry.isCueDisabled(groupId, cue.cueType)) {
+          return
+        }
         cueMap.set(cue.cueType, {
           id: cue.cueType,
           label: cue.name,

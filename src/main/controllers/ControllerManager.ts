@@ -268,6 +268,9 @@ export class ControllerManager {
     const selectionMode = this.config.getCueGroupSelectionMode()
     registry.setCueGroupSelectionMode(selectionMode)
     console.log('CueRegistry initialized with cue group selection mode:', selectionMode)
+
+    const disabledYarg = this.config.getDisabledYargCues() ?? {}
+    registry.setDisabledCues(disabledYarg)
   }
 
   /**
@@ -288,6 +291,9 @@ export class ControllerManager {
       }
       console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
     }
+
+    const disabledAudio = this.config.getDisabledAudioCues() ?? {}
+    registry.setDisabledCues(disabledAudio)
   }
 
   /**
@@ -306,6 +312,8 @@ export class ControllerManager {
       registry.setEnabledGroups(restricted)
       console.log('CueRegistry enabled groups re-applied from config:', restricted)
     }
+    const disabledYarg = this.config.getDisabledYargCues() ?? {}
+    registry.setDisabledCues(disabledYarg)
     // If no saved preference, leave registry as-is (all groups enabled from registerGroup);
     // GET_ENABLED_CUE_GROUPS will default to all and persist when the UI first reads.
   }

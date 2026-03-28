@@ -38,6 +38,9 @@ export class YargCueRegistry {
   /** Set of groups that are currently active during gameplay */
   private activeGroups: Set<string> = new Set()
 
+  /** Per-group disabled cue types (user preferences) */
+  private disabledCues: Map<string, Set<string>> = new Map()
+
   /** Name of the default group that provides fallback implementations */
   private defaultGroup: string | null = null
 
@@ -125,6 +128,7 @@ export class YargCueRegistry {
   public reset(): void {
     this.enabledGroups.clear()
     this.activeGroups.clear()
+    this.disabledCues.clear()
     this.defaultGroup = null
     this.stageKitGroup = null
     this.stageKitPriority = 'prefer-for-tracked'
@@ -237,10 +241,11 @@ export class YargCueRegistry {
     if (
       trackMode === 'tracked' &&
       this.stageKitPriority === 'prefer-for-tracked' &&
-      this.stageKitGroup
+      this.stageKitGroup &&
+      this.activeGroups.has(this.stageKitGroup)
     ) {
       const stageKitGroup = this.groups.get(this.stageKitGroup)
-      if (stageKitGroup?.cues.has(cueType)) {
+      if (stageKitGroup?.cues.has(cueType) && !this.isCueDisabled(this.stageKitGroup, cueType)) {
         // Stage kit group has this cue and should be preferred
         const cue = stageKitGroup.cues.get(cueType)!
         if (cue.style === CueStyle.Primary) {
@@ -267,7 +272,7 @@ export class YargCueRegistry {
       // Use the consistent selection
       const group = this.groups.get(consistentSelection.groupId)
       const cue = group?.cues.get(cueType)
-      if (group && cue) {
+      if (group && cue && !this.isCueDisabled(consistentSelection.groupId, cueType)) {
         if (cue.style === CueStyle.Primary) {
           return this.handlePrimaryCue(cueType, consistentSelection, trackMode === 'autogen')
         } else {
@@ -310,7 +315,7 @@ export class YargCueRegistry {
     trackMode: 'tracked' | 'autogen' | 'simulated' = 'simulated',
   ): INetCue | null {
     const group = this.groups.get(groupId)
-    if (group?.cues.has(cueType)) {
+    if (group?.cues.has(cueType) && !this.isCueDisabled(groupId, cueType)) {
       const cue = group.cues.get(cueType)!
       const selection = { groupId, isFallback: false }
       if (cue.style === CueStyle.Primary) {
@@ -318,7 +323,11 @@ export class YargCueRegistry {
       }
       return this.handleSecondaryCue(cueType, selection, trackMode === 'autogen')
     }
-    if (this.defaultGroup && this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
+    if (
+      this.defaultGroup &&
+      this.groups.get(this.defaultGroup)?.cues.has(cueType) &&
+      !this.isCueDisabled(this.defaultGroup, cueType)
+    ) {
       const selection = { groupId: this.defaultGroup, isFallback: true }
       const cue = this.groups.get(this.defaultGroup)!.cues.get(cueType)!
       if (cue.style === CueStyle.Primary) {
@@ -395,9 +404,14 @@ export class YargCueRegistry {
   ): { groupId: string; isFallback: boolean } | null {
     // If stage kit priority should be used, don't use consistency tracking
     // When autoGen=false (tracked lighting data), prefer stage kit group if priority is set
-    if (!autoGen && this.stageKitPriority === 'prefer-for-tracked' && this.stageKitGroup) {
+    if (
+      !autoGen &&
+      this.stageKitPriority === 'prefer-for-tracked' &&
+      this.stageKitGroup &&
+      this.activeGroups.has(this.stageKitGroup)
+    ) {
       const stageKitGroup = this.groups.get(this.stageKitGroup)
-      if (stageKitGroup?.cues.has(cueType)) {
+      if (stageKitGroup?.cues.has(cueType) && !this.isCueDisabled(this.stageKitGroup, cueType)) {
         return null
       }
     }
@@ -413,11 +427,18 @@ export class YargCueRegistry {
         this.lockedGroupIdForSong = null
         return null
       }
-      if (lockedGroup.cues.has(cueType)) {
+      if (
+        lockedGroup.cues.has(cueType) &&
+        !this.isCueDisabled(this.lockedGroupIdForSong, cueType)
+      ) {
         this.lastCueExecutionTime.set(cueType, now)
         return { groupId: this.lockedGroupIdForSong, isFallback: false }
       }
-      if (this.defaultGroup && this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
+      if (
+        this.defaultGroup &&
+        this.groups.get(this.defaultGroup)?.cues.has(cueType) &&
+        !this.isCueDisabled(this.defaultGroup, cueType)
+      ) {
         this.lastCueExecutionTime.set(cueType, now)
         return { groupId: this.defaultGroup, isFallback: true }
       }
@@ -428,14 +449,14 @@ export class YargCueRegistry {
     if (lastExecutionTime && lastSelection && now - lastExecutionTime < this.cueConsistencyWindow) {
       // Validate that the group still exists and has the cue implementation
       const group = this.groups.get(lastSelection.groupId)
-      if (group && group.cues.has(cueType)) {
+      if (group && group.cues.has(cueType) && !this.isCueDisabled(lastSelection.groupId, cueType)) {
         // Check if this is a fallback group - if so, ensure it's still valid as fallback
         if (lastSelection.isFallback) {
           // For fallback groups, we need to ensure no active groups have this cue
           // If an active group now has it, we should use that instead
           const activeGroupHasCue = Array.from(this.activeGroups).some((groupId) => {
             const activeGroup = this.groups.get(groupId)
-            return activeGroup?.cues.has(cueType)
+            return activeGroup?.cues.has(cueType) === true && !this.isCueDisabled(groupId, cueType)
           })
 
           if (activeGroupHasCue) {
@@ -449,7 +470,10 @@ export class YargCueRegistry {
           }
         } else {
           // Non-fallback: require the cached group to still be active (e.g. not toggled off in DMX preview)
-          if (!this.activeGroups.has(lastSelection.groupId)) {
+          if (
+            !this.activeGroups.has(lastSelection.groupId) ||
+            this.isCueDisabled(lastSelection.groupId, cueType)
+          ) {
             this.clearCueConsistencyTracking(cueType)
             return null
           }
@@ -502,7 +526,7 @@ export class YargCueRegistry {
       const group = this.groups.get(preSelection.groupId)
       const cue = group?.cues.get(cueType)
 
-      if (group && cue) {
+      if (group && cue && !this.isCueDisabled(preSelection.groupId, cueType)) {
         // Use the pre-selection and increment counter
         this.primaryCueCounter++
         this.emitCueStateUpdate(
@@ -528,7 +552,7 @@ export class YargCueRegistry {
       const group = this.groups.get(consistentSelection.groupId)
       const cue = group?.cues.get(cueType)
 
-      if (group && cue) {
+      if (group && cue && !this.isCueDisabled(consistentSelection.groupId, cueType)) {
         // Use the consistent selection and increment counter
         this.primaryCueCounter++
         this.emitCueStateUpdate(
@@ -581,7 +605,8 @@ export class YargCueRegistry {
       this.primaryCueCounter++
       if (
         this.lastPrimaryCueGroup &&
-        this.groups.get(this.lastPrimaryCueGroup)?.cues.has(cueType)
+        this.groups.get(this.lastPrimaryCueGroup)?.cues.has(cueType) &&
+        !this.isCueDisabled(this.lastPrimaryCueGroup, cueType)
       ) {
         this.emitCueStateUpdate(
           cueType,
@@ -615,7 +640,7 @@ export class YargCueRegistry {
       const group = this.groups.get(preSelection.groupId)
       const cue = group?.cues.get(cueType)
 
-      if (group && cue) {
+      if (group && cue && !this.isCueDisabled(preSelection.groupId, cueType)) {
         // Use the pre-selection and increment counter
         this.secondaryCueCounter++
         this.emitCueStateUpdate(
@@ -641,7 +666,7 @@ export class YargCueRegistry {
       const group = this.groups.get(consistentSelection.groupId)
       const cue = group?.cues.get(cueType)
 
-      if (group && cue) {
+      if (group && cue && !this.isCueDisabled(consistentSelection.groupId, cueType)) {
         // Use the consistent selection and increment counter
         this.secondaryCueCounter++
         this.emitCueStateUpdate(
@@ -694,7 +719,8 @@ export class YargCueRegistry {
       this.secondaryCueCounter++
       if (
         this.lastSecondaryCueGroup &&
-        this.groups.get(this.lastSecondaryCueGroup)?.cues.has(cueType)
+        this.groups.get(this.lastSecondaryCueGroup)?.cues.has(cueType) &&
+        !this.isCueDisabled(this.lastSecondaryCueGroup, cueType)
       ) {
         this.emitCueStateUpdate(
           cueType,
@@ -728,7 +754,7 @@ export class YargCueRegistry {
 
     for (const groupId of this.activeGroups) {
       const group = this.groups.get(groupId)
-      if (group?.cues.has(cueType)) {
+      if (group?.cues.has(cueType) && !this.isCueDisabled(groupId, cueType)) {
         availableGroups.push(groupId)
       }
     }
@@ -744,7 +770,11 @@ export class YargCueRegistry {
     }
 
     // Step 4: No active groups have it, try default as fallback (regardless of whether it's active)
-    if (this.defaultGroup && this.groups.get(this.defaultGroup)?.cues.has(cueType)) {
+    if (
+      this.defaultGroup &&
+      this.groups.get(this.defaultGroup)?.cues.has(cueType) &&
+      !this.isCueDisabled(this.defaultGroup, cueType)
+    ) {
       return {
         groupId: this.defaultGroup,
         isFallback: true,
@@ -752,6 +782,23 @@ export class YargCueRegistry {
     }
 
     return null
+  }
+
+  /**
+   * Replace per-group disabled cue sets from preferences.
+   */
+  public setDisabledCues(disabled: Record<string, string[]>): void {
+    this.disabledCues.clear()
+    for (const [groupId, ids] of Object.entries(disabled)) {
+      this.disabledCues.set(groupId, new Set(ids))
+    }
+  }
+
+  /**
+   * Whether this cue type is disabled for the given group in preferences.
+   */
+  public isCueDisabled(groupId: string, cueType: CueType): boolean {
+    return this.disabledCues.get(groupId)?.has(cueType) ?? false
   }
 
   /**
