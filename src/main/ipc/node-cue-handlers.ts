@@ -2,11 +2,14 @@ import { IpcMain, dialog } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../controllers/ControllerManager'
+import { sendToAllWindows } from '../utils/windowUtils'
 import { NodeCueMode, NodeCueFile } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
 import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeExecutionEngine'
+import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
+import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { ipcError } from './ipcResult'
-import { NODE_CUES } from '../../shared/ipcChannels'
+import { NODE_CUES, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 
 const ensureLoader = (controllerManager: ControllerManager) => {
   const loader = controllerManager.getNodeCueLoader()
@@ -25,6 +28,34 @@ interface SavePayload {
 interface ValidatePayload {
   path?: string
   content?: NodeCueFile
+}
+
+async function persistGroupEnableAfterNodeCueSave(
+  controllerManager: ControllerManager,
+  mode: NodeCueMode,
+  groupId: string,
+): Promise<void> {
+  const config = controllerManager.getConfig()
+
+  if (mode === 'yarg') {
+    const enabled = config.getEnabledCueGroups() ?? []
+    if (!enabled.includes(groupId)) {
+      const next = [...enabled, groupId]
+      await config.setEnabledCueGroups(next)
+      YargCueRegistry.getInstance().setEnabledGroups(next)
+      await config.setKnownYargCueGroups(YargCueRegistry.getInstance().getAllGroups())
+    }
+  } else {
+    const enabled = config.getEnabledAudioCueGroups() ?? []
+    if (!enabled.includes(groupId)) {
+      const next = [...enabled, groupId]
+      await config.setEnabledAudioCueGroups(next)
+      AudioCueRegistry.getInstance().setEnabledGroups(next)
+      await config.setKnownAudioCueGroups(AudioCueRegistry.getInstance().getRegisteredGroups())
+      controllerManager.refreshAudioCueSelection()
+      sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
+    }
+  }
 }
 
 export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
@@ -50,7 +81,13 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
 
   ipcMain.handle(NODE_CUES.SAVE, async (_event, payload: SavePayload) => {
     const loader = ensureLoader(controllerManager)
-    return loader.saveFile(payload.mode, payload.filename, payload.content)
+    const result = await loader.saveFile(payload.mode, payload.filename, payload.content)
+    await persistGroupEnableAfterNodeCueSave(
+      controllerManager,
+      payload.mode,
+      payload.content.group.id,
+    )
+    return result
   })
 
   ipcMain.handle(NODE_CUES.DELETE, async (_event, filePath: string) => {
@@ -112,6 +149,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     const mode = preferredMode ?? validation.mode
     const filename = path.basename(sourcePath)
     const saveResult = await loader.saveFile(mode, filename, validation.data)
+    await persistGroupEnableAfterNodeCueSave(controllerManager, mode, validation.data.group.id)
     return { success: true, path: saveResult.path }
   })
 
