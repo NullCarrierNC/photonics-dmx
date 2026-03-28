@@ -8,12 +8,14 @@ import { DmxLightManager } from '../controllers/DmxLightManager'
 
 /**
  * Handler for audio-reactive lighting cues.
- * Primary slot: base look; optional secondary slot: overlays (e.g. strobes) layered via effect parameters such as layer.
+ * Primary slot: base look; optional secondary slot: overlays; optional strobe slot: energy-triggered strobes.
+ * All three can run concurrently; layers combine in the sequencer.
  */
 export class AudioCueHandler extends EventEmitter {
   private registry: AudioCueRegistry
   private currentPrimaryCue: IAudioCue | null = null
   private currentSecondaryCue: IAudioCue | null = null
+  private currentStrobeCue: IAudioCue | null = null
   private executionCount = 0
 
   constructor(
@@ -25,19 +27,22 @@ export class AudioCueHandler extends EventEmitter {
   }
 
   /**
-   * Handle audio data by executing active primary and optional secondary overlay cues.
+   * Handle audio data by executing active primary, optional secondary overlay, and optional strobe cues.
    * @param primaryCueType Main cue (wash / rotation); empty string clears primary slot
    * @param secondaryCueType Optional overlay; null clears secondary slot
+   * @param strobeCueType Optional strobe overlay; null clears strobe slot
    */
   public async handleAudioData(
     audioData: AudioLightingData,
     config: AudioConfig,
     primaryCueType: AudioCueType,
     secondaryCueType: AudioCueType | null,
+    strobeCueType: AudioCueType | null,
     enabledBandCount: number,
   ): Promise<void> {
     this.assignPrimarySlot(primaryCueType)
     this.assignSecondarySlot(secondaryCueType)
+    this.assignStrobeSlot(strobeCueType)
 
     this.executionCount++
 
@@ -57,6 +62,7 @@ export class AudioCueHandler extends EventEmitter {
     }
     await run(this.currentPrimaryCue)
     await run(this.currentSecondaryCue)
+    await run(this.currentStrobeCue)
   }
 
   private assignPrimarySlot(cueType: AudioCueType): void {
@@ -87,9 +93,14 @@ export class AudioCueHandler extends EventEmitter {
   /**
    * Apply slot assignments immediately (e.g. after config changes) without waiting for the next audio frame.
    */
-  public syncSlots(primaryCueType: AudioCueType, secondaryCueType: AudioCueType | null): void {
+  public syncSlots(
+    primaryCueType: AudioCueType,
+    secondaryCueType: AudioCueType | null,
+    strobeCueType: AudioCueType | null = null,
+  ): void {
     this.assignPrimarySlot(primaryCueType)
     this.assignSecondarySlot(secondaryCueType)
+    this.assignStrobeSlot(strobeCueType)
   }
 
   private assignSecondarySlot(cueType: AudioCueType | null): void {
@@ -113,6 +124,27 @@ export class AudioCueHandler extends EventEmitter {
     }
   }
 
+  private assignStrobeSlot(cueType: AudioCueType | null): void {
+    if (cueType == null || cueType === '') {
+      if (this.currentStrobeCue) {
+        this.currentStrobeCue.onStop?.()
+        this.currentStrobeCue = null
+      }
+      return
+    }
+
+    const cue = this.registry.getCueImplementation(cueType)
+    if (!cue) {
+      console.warn(`Audio cue not found: ${cueType}`)
+      return
+    }
+
+    if (this.currentStrobeCue !== cue) {
+      this.currentStrobeCue?.onStop?.()
+      this.currentStrobeCue = cue
+    }
+  }
+
   /**
    * Stop all active cues
    */
@@ -125,6 +157,8 @@ export class AudioCueHandler extends EventEmitter {
     this.currentPrimaryCue = null
     this.currentSecondaryCue?.onStop?.()
     this.currentSecondaryCue = null
+    this.currentStrobeCue?.onStop?.()
+    this.currentStrobeCue = null
     this.executionCount = 0
   }
 
@@ -136,6 +170,8 @@ export class AudioCueHandler extends EventEmitter {
     this.currentPrimaryCue = null
     this.currentSecondaryCue?.onDestroy?.()
     this.currentSecondaryCue = null
+    this.currentStrobeCue?.onDestroy?.()
+    this.currentStrobeCue = null
     this.executionCount = 0
   }
 }

@@ -59,10 +59,10 @@ export class AudioController {
         preferredCueType,
       )
       this.audioProcessor.setOnStrobeStateChange((active) => {
-        const secondaryCueType = this.audioProcessor?.getEffectiveSecondaryCueType() ?? null
+        const strobeCueType = this.audioProcessor?.getEffectiveStrobeCueType() ?? null
         this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_STROBE_STATE, {
           active,
-          secondaryCueType,
+          strobeCueType,
         })
       })
       this.audioProcessor.setOnGameModeCueChange((activeCueType) => {
@@ -175,6 +175,13 @@ export class AudioController {
   public getActiveSecondaryCueType(): AudioCueType | null {
     if (this.audioProcessor) {
       return this.audioProcessor.getEffectiveSecondaryCueType()
+    }
+    return null
+  }
+
+  public getActiveStrobeCueType(): AudioCueType | null {
+    if (this.audioProcessor) {
+      return this.audioProcessor.getEffectiveStrobeCueType()
     }
     return null
   }

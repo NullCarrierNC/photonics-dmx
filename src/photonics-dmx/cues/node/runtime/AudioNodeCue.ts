@@ -253,9 +253,10 @@ export class AudioNodeCue implements IAudioCue {
           })
 
           if (effect) {
-            tasks.push(sequencer.setEffect(effectKey, effect))
             // Extract layer from ValueSource or use default
             const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
+            sequencer.removeEffect(effectKey, layer)
+            sequencer.addEffect(effectKey, effect)
             this.activeLevelEffects.set(effectKey, layer)
           }
         } else if (this.activeLevelEffects.has(effectKey)) {

@@ -601,7 +601,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
   [RENDERER_RECEIVE.AUDIO_STROBE_STATE]: {
     active: boolean
-    secondaryCueType: string | null
+    strobeCueType: string | null
   }
   [RENDERER_RECEIVE.AUDIO_DATA_MIRROR]: AudioLightingData
   [RENDERER_RECEIVE.CUE_STATE_UPDATE]: CueStateUpdatePayload

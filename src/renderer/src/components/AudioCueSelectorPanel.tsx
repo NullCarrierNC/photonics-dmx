@@ -46,6 +46,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
   const [error, setError] = useState<string | null>(null)
   const [gameModeEnabled, setGameModeEnabled] = useState(false)
   const [strobeFiringDisplay, setStrobeFiringDisplay] = useState(false)
+  const [strobeCueType, setStrobeCueType] = useState<string | null>(null)
   const strobeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadCueState = useCallback(async (silent = false) => {
@@ -67,6 +68,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setAvailableCues([])
         setActiveCue(null)
         setSecondaryCueType(null)
+        setStrobeCueType(null)
         setSelectedCueId('')
         setSelectedGroupId('')
         setError(null)
@@ -143,8 +145,8 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       }
     }
 
-    const handleStrobeState = (payload: { active: boolean; secondaryCueType: string | null }) => {
-      setSecondaryCueType(payload.secondaryCueType)
+    const handleStrobeState = (payload: { active: boolean; strobeCueType: string | null }) => {
+      setStrobeCueType(payload.strobeCueType)
       if (payload.active) {
         clearHideTimer()
         setStrobeFiringDisplay(true)
@@ -347,7 +349,12 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
                           ? 'text-gray-900 dark:text-white'
                           : 'text-gray-500 dark:text-gray-400'
                       }`}>
-                      {strobeFiringDisplay ? 'Active' : 'Inactive'}
+                      {strobeFiringDisplay
+                        ? strobeCueType
+                          ? availableCues.find((c) => c.id === strobeCueType)?.label ??
+                            strobeCueType
+                          : 'Active'
+                        : 'Inactive'}
                     </p>
                   </div>
                 </div>
