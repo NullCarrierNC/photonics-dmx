@@ -54,6 +54,10 @@ export interface AppPreferences {
   /** IDs of Yarg cue groups we have seen before; used to auto-enable only genuinely new groups */
   knownYargCueGroups?: string[]
   enabledAudioCueGroups?: string[]
+  /** Per-group list of disabled cue IDs (YARG cue type strings) */
+  disabledYargCues?: Record<string, string[]>
+  /** Per-group list of disabled audio cue type IDs */
+  disabledAudioCues?: Record<string, string[]>
   cueConsistencyWindow: number
   /** Cue group selection: 'withinSong' = can change during song; 'oncePerSong' = fixed at song start */
   cueGroupSelectionMode: 'oncePerSong' | 'withinSong'
@@ -417,6 +421,28 @@ export class ConfigurationManager {
    */
   async setEnabledAudioCueGroups(groupIds: string[]): Promise<void> {
     await this.setPreference('enabledAudioCueGroups', groupIds)
+  }
+
+  /**
+   * Per-group disabled YARG cue type IDs (empty or missing group = no cues disabled in that group).
+   */
+  getDisabledYargCues(): Record<string, string[]> | undefined {
+    return this.preferences.get().disabledYargCues
+  }
+
+  async setDisabledYargCues(disabled: Record<string, string[]>): Promise<void> {
+    await this.setPreference('disabledYargCues', disabled)
+  }
+
+  /**
+   * Per-group disabled audio cue type IDs.
+   */
+  getDisabledAudioCues(): Record<string, string[]> | undefined {
+    return this.preferences.get().disabledAudioCues
+  }
+
+  async setDisabledAudioCues(disabled: Record<string, string[]>): Promise<void> {
+    await this.setPreference('disabledAudioCues', disabled)
   }
 
   /**

@@ -27,6 +27,9 @@ export class AudioCueRegistry {
   /** Groups that are currently enabled */
   private enabledGroups: Set<string> = new Set()
 
+  /** Per-group disabled audio cue type IDs (user preferences) */
+  private disabledCues: Map<string, Set<string>> = new Map()
+
   /** Cache of cue metadata for renderer requests */
   private cueDetailsCache: Map<string, Array<{ id: string; description: string }>> = new Map()
 
@@ -102,6 +105,9 @@ export class AudioCueRegistry {
    */
   public getCueImplementation(cueType: AudioCueType): IAudioCue | null {
     for (const groupId of this.enabledGroups) {
+      if (this.isCueDisabled(groupId, cueType)) {
+        continue
+      }
       const group = this.groups.get(groupId)
       const cue = group?.cues.get(cueType)
       if (cue) {
@@ -109,8 +115,12 @@ export class AudioCueRegistry {
       }
     }
 
-    const fallback = this.defaultGroup ? this.groups.get(this.defaultGroup) : null
-    return fallback?.cues.get(cueType) ?? null
+    const fallbackId = this.defaultGroup
+    const fallback = fallbackId ? this.groups.get(fallbackId) : null
+    if (fallback && fallbackId && !this.isCueDisabled(fallbackId, cueType)) {
+      return fallback.cues.get(cueType) ?? null
+    }
+    return null
   }
 
   /**
@@ -123,13 +133,22 @@ export class AudioCueRegistry {
     for (const groupId of groupIds) {
       const group = this.groups.get(groupId)
       if (!group) continue
-      group.cues.forEach((_cue, cueType) => cueTypes.add(cueType))
+      group.cues.forEach((_cue, cueType) => {
+        if (!this.isCueDisabled(groupId, cueType)) {
+          cueTypes.add(cueType)
+        }
+      })
     }
 
     // Fallback to default group if none collected
     if (cueTypes.size === 0 && this.defaultGroup) {
-      const fallback = this.groups.get(this.defaultGroup)
-      fallback?.cues.forEach((_cue, cueType) => cueTypes.add(cueType))
+      const defId = this.defaultGroup
+      const fallback = this.groups.get(defId)
+      fallback?.cues.forEach((_cue, cueType) => {
+        if (!this.isCueDisabled(defId, cueType)) {
+          cueTypes.add(cueType)
+        }
+      })
     }
 
     return Array.from(cueTypes)
@@ -141,6 +160,9 @@ export class AudioCueRegistry {
   public getCueImplementationFromGroup(cueType: AudioCueType, groupId: string): IAudioCue | null {
     const group = this.groups.get(groupId)
     if (!group) return null
+    if (this.isCueDisabled(groupId, cueType)) {
+      return null
+    }
 
     return group.cues.get(cueType) || null
   }
@@ -228,6 +250,24 @@ export class AudioCueRegistry {
   }
 
   /**
+   * Replace per-group disabled cue sets from preferences.
+   */
+  public setDisabledCues(disabled: Record<string, string[]>): void {
+    this.disabledCues.clear()
+    for (const [groupId, ids] of Object.entries(disabled)) {
+      this.disabledCues.set(groupId, new Set(ids))
+    }
+    this.cueDetailsCache.clear()
+  }
+
+  /**
+   * Whether this cue type is disabled for the given group in preferences.
+   */
+  public isCueDisabled(groupId: string, cueType: AudioCueType): boolean {
+    return this.disabledCues.get(groupId)?.has(cueType) ?? false
+  }
+
+  /**
    * Get cue metadata for a group (id + description).
    */
   public getCueDetails(groupId: string): Array<{ id: string; description: string }> {
@@ -263,6 +303,7 @@ export class AudioCueRegistry {
     this.groups.clear()
     this.defaultGroup = null
     this.enabledGroups.clear()
+    this.disabledCues.clear()
     this.cueDetailsCache.clear()
     console.log('AudioCueRegistry reset to initial state')
   }

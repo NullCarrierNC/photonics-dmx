@@ -147,6 +147,17 @@ export const getEnabledAudioCueGroups = () =>
 export const setEnabledAudioCueGroups = (groupIds: string[]) =>
   window.api.invoke(CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS, groupIds)
 
+export const getDisabledYargCues = () => window.api.invoke(CONFIG.GET_DISABLED_YARG_CUES, undefined)
+
+export const setDisabledYargCues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_YARG_CUES, disabled)
+
+export const getDisabledAudioCues = () =>
+  window.api.invoke(CONFIG.GET_DISABLED_AUDIO_CUES, undefined)
+
+export const setDisabledAudioCues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_AUDIO_CUES, disabled)
+
 export const getAudioReactiveCues = () =>
   window.api.invoke(CONFIG.GET_AUDIO_REACTIVE_CUES, undefined)
 

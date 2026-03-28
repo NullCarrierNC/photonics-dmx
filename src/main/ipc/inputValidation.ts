@@ -70,6 +70,36 @@ export function validateOptionalStringArray(
   return { ok: true, value }
 }
 
+/**
+ * Validates per-group disabled cue id maps (Preferences → registry).
+ */
+export function validateDisabledCuesMap(
+  value: unknown,
+  fieldName: string,
+): ValidationResult<Record<string, string[]>> {
+  if (!isPlainObject(value)) {
+    return { ok: false, error: `${fieldName} must be an object` }
+  }
+  const out: Record<string, string[]> = {}
+  for (const [groupId, arr] of Object.entries(value)) {
+    if (!isNonEmptyString(groupId)) {
+      return { ok: false, error: `${fieldName} keys must be non-empty strings` }
+    }
+    if (!Array.isArray(arr)) {
+      return { ok: false, error: `${fieldName}.${groupId} must be an array` }
+    }
+    const ids: string[] = []
+    for (const entry of arr) {
+      if (!isNonEmptyString(entry)) {
+        return { ok: false, error: `${fieldName}.${groupId} must contain only non-empty strings` }
+      }
+      ids.push(entry.trim())
+    }
+    out[groupId] = ids
+  }
+  return { ok: true, value: out }
+}
+
 export function validateHost(value: unknown): ValidationResult<string> {
   if (!isNonEmptyString(value)) {
     return { ok: false, error: 'Host must be a non-empty string' }
