@@ -444,7 +444,7 @@ export interface ActionTimingConfig {
   waitUntilCondition: ValueSource
   waitUntilTime: ValueSource
   waitUntilConditionCount?: ValueSource
-  easing?: string
+  easing?: ValueSource
   level?: ValueSource
 }
 
@@ -458,7 +458,7 @@ export const createDefaultActionTiming = (): ActionTimingConfig => ({
   duration: { source: 'literal', value: 200 },
   waitUntilCondition: { source: 'literal', value: 'none' },
   waitUntilTime: { source: 'literal', value: 0 },
-  easing: 'linear',
+  easing: { source: 'literal', value: 'linear' },
   level: { source: 'literal', value: 1 },
 })
 

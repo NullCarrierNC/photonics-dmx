@@ -43,6 +43,7 @@ export function resolveActionTiming(
     waitUntilConditionCount: timing.waitUntilConditionCount
       ? Number(resolveValue('number', timing.waitUntilConditionCount, context))
       : undefined,
+    easing: timing.easing ? String(resolveValue('string', timing.easing, context)) : undefined,
     level: timing.level ? Number(resolveValue('number', timing.level, context)) : 1,
   }
 }

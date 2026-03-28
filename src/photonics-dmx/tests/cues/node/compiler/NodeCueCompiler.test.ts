@@ -17,7 +17,7 @@ function minimalAction(id: string, overrides?: Partial<ActionNode['timing']>): A
     duration: { source: 'literal' as const, value: 200 },
     waitUntilCondition: { source: 'literal' as const, value: 'none' },
     waitUntilTime: { source: 'literal' as const, value: 0 },
-    easing: 'sinInOut' as const,
+    easing: { source: 'literal' as const, value: 'sinInOut' },
     level: { source: 'literal' as const, value: 1 },
     ...overrides,
   }

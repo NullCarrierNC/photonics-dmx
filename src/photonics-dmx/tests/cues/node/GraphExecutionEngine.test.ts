@@ -51,7 +51,7 @@ function minimalCueDefinition(): YargNodeCueDefinition {
       duration: { source: 'literal', value: 200 },
       waitUntilCondition: { source: 'literal', value: 'none' },
       waitUntilTime: { source: 'literal', value: 0 },
-      easing: 'linear',
+      easing: { source: 'literal', value: 'linear' },
     },
   }
   return {
@@ -88,7 +88,7 @@ function sustainPatternCueDefinition(): YargNodeCueDefinition {
       duration: { source: 'literal', value: 0 },
       waitUntilCondition: { source: 'literal', value: 'none' },
       waitUntilTime: { source: 'literal', value: 0 },
-      easing: 'linear',
+      easing: { source: 'literal', value: 'linear' },
     },
   }
   return {
@@ -316,7 +316,7 @@ describe('GraphExecutionEngine', () => {
           duration: { source: 'literal', value: 0 },
           waitUntilCondition: { source: 'literal', value: 'delay' as const },
           waitUntilTime: { source: 'literal', value: 10 },
-          easing: 'linear',
+          easing: { source: 'literal', value: 'linear' },
         },
       }
       const action2: ActionNode = {
@@ -339,7 +339,7 @@ describe('GraphExecutionEngine', () => {
           duration: { source: 'literal', value: 0 },
           waitUntilCondition: { source: 'literal', value: 'none' },
           waitUntilTime: { source: 'literal', value: 0 },
-          easing: 'linear',
+          easing: { source: 'literal', value: 'linear' },
         },
       }
       const def: YargNodeCueDefinition = {

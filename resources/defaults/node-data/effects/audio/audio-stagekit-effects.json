@@ -338,7 +338,7 @@
                 "source": "variable",
                 "name": "holdTime"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -402,7 +402,7 @@
                 "source": "variable",
                 "name": "extraWait"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -466,7 +466,7 @@
                 "source": "variable",
                 "name": "betweenDelay"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1350,7 +1350,7 @@
                 "source": "variable",
                 "name": "p1Count"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1418,7 +1418,7 @@
                 "source": "variable",
                 "name": "phase2Count"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1486,7 +1486,7 @@
                 "source": "variable",
                 "name": "p3Count"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2195,7 +2195,7 @@
                 "source": "variable",
                 "name": "p1Count"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2263,7 +2263,7 @@
                 "source": "variable",
                 "name": "phase2Count"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2331,7 +2331,7 @@
                 "source": "variable",
                 "name": "p3Count"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2980,7 +2980,7 @@
                 "source": "variable",
                 "name": "aStepsUntil"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3048,7 +3048,7 @@
                 "source": "literal",
                 "value": 1
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3116,7 +3116,7 @@
                 "source": "variable",
                 "name": "aStepsAfter"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3184,7 +3184,7 @@
                 "source": "variable",
                 "name": "bStepsUntil"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3252,7 +3252,7 @@
                 "source": "literal",
                 "value": 1
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3320,7 +3320,7 @@
                 "source": "variable",
                 "name": "bStepsAfter"
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1

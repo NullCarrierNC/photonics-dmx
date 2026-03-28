@@ -110,7 +110,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -174,7 +174,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -390,7 +390,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -454,7 +454,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -518,7 +518,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -988,7 +988,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1052,7 +1052,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1116,7 +1116,7 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": "linear",
+              "easing": { "source": "literal", "value": "linear" },
               "level": {
                 "source": "literal",
                 "value": 1

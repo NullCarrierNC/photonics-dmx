@@ -1023,7 +1023,7 @@ describe('Runtime Event System', () => {
                 duration: { source: 'literal', value: 100 },
                 waitUntilCondition: { source: 'literal', value: 'beat' },
                 waitUntilTime: { source: 'literal', value: 0 },
-                easing: 'linear',
+                easing: { source: 'literal', value: 'linear' },
                 level: { source: 'literal', value: 1 },
               },
               layer: { source: 'literal', value: 0 },
