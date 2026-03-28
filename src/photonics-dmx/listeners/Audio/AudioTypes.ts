@@ -141,6 +141,8 @@ export interface AudioConfig {
   strobeEnabled: boolean
   /** Normalised total energy (0–1) required to activate the strobe secondary cue */
   strobeTriggerThreshold: number
+  /** Probability (0–100 %) that the strobe fires when the threshold is exceeded (default: 100) */
+  strobeProbability: number
 }
 
 /**

@@ -386,6 +386,7 @@ const AUDIO_CONFIG_KEYS = new Set([
   'linearResponse',
   'strobeEnabled',
   'strobeTriggerThreshold',
+  'strobeProbability',
 ])
 
 /**
@@ -481,6 +482,12 @@ export function validateAudioConfigPayload(
         cleaned[key] = v
       } else if (key === 'strobeTriggerThreshold') {
         const t = validateNumberInRange(data[key], 0, 1, 'strobeTriggerThreshold')
+        if (!t.ok) {
+          return t
+        }
+        cleaned[key] = t.value
+      } else if (key === 'strobeProbability') {
+        const t = validateNumberInRange(data[key], 0, 100, 'strobeProbability')
         if (!t.ok) {
           return t
         }

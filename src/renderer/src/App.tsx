@@ -288,6 +288,7 @@ export const App = (): JSX.Element => {
           linearResponse: config.linearResponse,
           strobeEnabled: config.strobeEnabled,
           strobeTriggerThreshold: config.strobeTriggerThreshold,
+          strobeProbability: config.strobeProbability,
           // Preserve fields that exist in frontend but not in backend config
           sampleRate: prev.audioConfig?.sampleRate,
           updateIntervalMs: prev.audioConfig?.updateIntervalMs,

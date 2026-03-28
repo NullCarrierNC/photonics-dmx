@@ -31,6 +31,7 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   linearResponse: true,
   strobeEnabled: false,
   strobeTriggerThreshold: 0.8,
+  strobeProbability: 100,
 }
 
 export default DEFAULT_AUDIO_CONFIG

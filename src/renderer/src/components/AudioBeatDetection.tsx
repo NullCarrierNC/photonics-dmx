@@ -53,21 +53,13 @@ const AudioBeatDetection: React.FC = () => {
 
       {/* Threshold */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Detection Threshold
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Lower values detect more beats (0.1 = very sensitive, 1.0 = less sensitive)
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
-              {threshold.toFixed(2)}
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">/ 1.0</span>
-          </div>
+        <div>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Detection Threshold
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Lower values detect more beats (0.1 = very sensitive, 1.0 = less sensitive)
+          </p>
         </div>
 
         <div className="flex items-center space-x-4">
@@ -104,22 +96,11 @@ const AudioBeatDetection: React.FC = () => {
 
       {/* Decay Rate */}
       <div className="space-y-1 mt-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Decay Rate
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              How quickly the energy threshold adapts (0.80 = fast adaptation, 0.99 = slow
-              adaptation)
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
-              {decayRate.toFixed(2)}
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">/ 0.99</span>
-          </div>
+        <div>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Decay Rate</label>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            How quickly the energy threshold adapts (0.80 = fast adaptation, 0.99 = slow adaptation)
+          </p>
         </div>
 
         <div className="flex items-center space-x-4">
@@ -156,21 +137,13 @@ const AudioBeatDetection: React.FC = () => {
 
       {/* Min Interval */}
       <div className="space-y-1 mt-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Minimum Beat Interval
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Minimum time between detected beats (prevents rapid re-triggering)
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem] text-right">
-              {minInterval}
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">/ 500ms</span>
-          </div>
+        <div>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Minimum Beat Interval
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Minimum time between detected beats (prevents rapid re-triggering)
+          </p>
         </div>
 
         <div className="flex items-center space-x-4">

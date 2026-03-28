@@ -320,6 +320,10 @@ export class AudioCueProcessor {
     const above = energy > this.config.strobeTriggerThreshold
 
     if (above && !this.strobeActive) {
+      const prob = this.config.strobeProbability ?? 100
+      if (prob < 100 && Math.random() * 100 >= prob) {
+        return
+      }
       const available = this.registry.getAvailableCueTypes()
       const all = available.length > 0 ? available : this.registry.getAvailableCueTypes(true)
       const chosen = pickStrobeCueType(this.registry, all)
