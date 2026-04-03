@@ -6,9 +6,11 @@ import {
   validateNodeCueFile,
   validateAudioNodeCueFile,
   validateYargNodeCueFile,
+  validateMotionNodeCueFile,
 } from '../schema/validation'
 import {
   AudioNodeCueFile,
+  MotionNodeCueFile,
   NodeCueFile,
   NodeCueMode,
   YargNodeCueFile,
@@ -16,9 +18,11 @@ import {
 import { NodeCueCompilationError, NodeCueCompiler } from '../compiler/NodeCueCompiler'
 import { YargCueRegistry } from '../../registries/YargCueRegistry'
 import { AudioCueRegistry, AudioCueGroup } from '../../registries/AudioCueRegistry'
-import type { ICueGroup } from '../../interfaces/INetCueGroup'
+import { MotionCueRegistry } from '../../registries/MotionCueRegistry'
+import type { ICueGroup, IMotionCueGroup } from '../../interfaces/INetCueGroup'
 import { INetCue } from '../../interfaces/INetCue'
 import { YargNodeCue } from '../runtime/YargNodeCue'
+import { MotionNodeCue } from '../runtime/MotionNodeCue'
 import { CompiledEffectIndex } from '../runtime/CompiledEffectIndex'
 import { AudioNodeCue } from '../runtime/AudioNodeCue'
 import { CueType } from '../../types/cueTypes'
@@ -27,7 +31,7 @@ import { IAudioCue } from '../../interfaces/IAudioCue'
 import { EffectRegistry } from '../runtime/EffectRegistry'
 import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
-import type { EffectReference } from '../../types/nodeCueTypes'
+import type { EffectMode, EffectReference } from '../../types/nodeCueTypes'
 
 export interface NodeCueFileSummary {
   path: string
@@ -43,6 +47,7 @@ export interface NodeCueFileSummary {
 export interface NodeCueListSummary {
   yarg: NodeCueFileSummary[]
   audio: NodeCueFileSummary[]
+  motion: NodeCueFileSummary[]
 }
 
 export interface NodeCueLoadResult {
@@ -58,6 +63,7 @@ interface NodeCueLoaderOptions {
   baseDir: string
   yargRegistry: YargCueRegistry
   audioRegistry: AudioCueRegistry
+  motionRegistry: MotionCueRegistry
   effectLoader?: EffectLoader
   /** When provided, passed to YargNodeCue for debug/error emission. */
   getNodeRuntimeCallbacks?: () => NodeRuntimeCallbacks | undefined
@@ -76,8 +82,9 @@ export class NodeCueLoader extends EventEmitter {
   private readonly baseDir: string
   private readonly yargDir: string
   private readonly audioDir: string
+  private readonly motionDir: string
   private watcher: FSWatcher | null = null
-  private summaries: NodeCueListSummary = { yarg: [], audio: [] }
+  private summaries: NodeCueListSummary = { yarg: [], audio: [], motion: [] }
   private fileRegistrations: Map<string, FileRegistration> = new Map()
   private customAudioCueTypes: Set<AudioCueType> = new Set()
 
@@ -86,13 +93,18 @@ export class NodeCueLoader extends EventEmitter {
     this.baseDir = options.baseDir
     this.yargDir = path.join(this.baseDir, 'node-data', 'cues', 'yarg')
     this.audioDir = path.join(this.baseDir, 'node-data', 'cues', 'audio')
+    this.motionDir = path.join(this.baseDir, 'node-data', 'cues', 'motion')
   }
 
   public async loadAll(): Promise<NodeCueLoadResult> {
     await this.ensureDirectories()
     this.customAudioCueTypes.clear()
 
-    const results = await Promise.all([this.loadDirectory('yarg'), this.loadDirectory('audio')])
+    const results = await Promise.all([
+      this.loadDirectory('yarg'),
+      this.loadDirectory('audio'),
+      this.loadDirectory('motion'),
+    ])
 
     const summary = results.reduce<NodeCueLoadResult>(
       (acc, curr) => ({
@@ -115,6 +127,7 @@ export class NodeCueLoader extends EventEmitter {
     return {
       yarg: [...this.summaries.yarg],
       audio: [...this.summaries.audio],
+      motion: [...this.summaries.motion],
     }
   }
 
@@ -128,7 +141,11 @@ export class NodeCueLoader extends EventEmitter {
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed = JSON.parse(data)
     const validation =
-      mode === 'yarg' ? validateYargNodeCueFile(parsed) : validateAudioNodeCueFile(parsed)
+      mode === 'yarg'
+        ? validateYargNodeCueFile(parsed)
+        : mode === 'audio'
+          ? validateAudioNodeCueFile(parsed)
+          : validateMotionNodeCueFile(parsed)
 
     if (!validation.valid) {
       throw new Error(`Invalid node cue file: ${validation.errors.join(', ')}`)
@@ -151,7 +168,8 @@ export class NodeCueLoader extends EventEmitter {
       throw new Error(validation.errors.join(', '))
     }
 
-    const targetDir = mode === 'yarg' ? this.yargDir : this.audioDir
+    const targetDir =
+      mode === 'yarg' ? this.yargDir : mode === 'audio' ? this.audioDir : this.motionDir
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
@@ -179,7 +197,7 @@ export class NodeCueLoader extends EventEmitter {
   public async startWatching(): Promise<void> {
     await this.ensureDirectories()
 
-    this.watcher = chokidar.watch([this.yargDir, this.audioDir], {
+    this.watcher = chokidar.watch([this.yargDir, this.audioDir, this.motionDir], {
       ignoreInitial: true,
       persistent: true,
       awaitWriteFinish: {
@@ -201,6 +219,9 @@ export class NodeCueLoader extends EventEmitter {
   }
 
   public getAvailableCueTypes(mode: NodeCueMode): string[] {
+    if (mode === 'motion') {
+      return []
+    }
     if (mode === 'yarg') {
       return Object.values(CueType)
     }
@@ -213,10 +234,11 @@ export class NodeCueLoader extends EventEmitter {
   private async ensureDirectories(): Promise<void> {
     await fs.mkdir(this.yargDir, { recursive: true })
     await fs.mkdir(this.audioDir, { recursive: true })
+    await fs.mkdir(this.motionDir, { recursive: true })
   }
 
   private async loadDirectory(mode: NodeCueMode): Promise<NodeCueLoadResult> {
-    const dir = mode === 'yarg' ? this.yargDir : this.audioDir
+    const dir = mode === 'yarg' ? this.yargDir : mode === 'audio' ? this.audioDir : this.motionDir
     const files = await fs.readdir(dir).catch(() => [])
 
     let loaded = 0
@@ -260,7 +282,11 @@ export class NodeCueLoader extends EventEmitter {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed = JSON.parse(contents)
     const validation =
-      mode === 'yarg' ? validateYargNodeCueFile(parsed) : validateAudioNodeCueFile(parsed)
+      mode === 'yarg'
+        ? validateYargNodeCueFile(parsed)
+        : mode === 'audio'
+          ? validateAudioNodeCueFile(parsed)
+          : validateMotionNodeCueFile(parsed)
 
     if (!validation.valid) {
       throw new Error(validation.errors.join(', '))
@@ -310,13 +336,20 @@ export class NodeCueLoader extends EventEmitter {
       if (groupMeta.isStageKit) {
         this.options.yargRegistry.setStageKitGroup(group.id)
       }
-    } else {
+    } else if (mode === 'audio') {
       const group = await this.buildAudioGroup(file as AudioNodeCueFile)
       this.options.audioRegistry.registerGroup(group)
       if (wasAudioGroupEnabled) {
         this.options.audioRegistry.enableGroup(group.id)
       }
       file.cues.forEach((cue) => this.customAudioCueTypes.add(cue.cueTypeId))
+    } else {
+      const group = await this.buildMotionGroup(file as MotionNodeCueFile)
+      this.options.motionRegistry.registerGroup(group)
+      const groupMeta = (file as MotionNodeCueFile).group
+      if (groupMeta.isDefault) {
+        this.options.motionRegistry.setDefaultGroup(group.id)
+      }
     }
 
     this.fileRegistrations.set(filePath, { mode, groupId: file.group.id })
@@ -331,9 +364,12 @@ export class NodeCueLoader extends EventEmitter {
     if (registration.mode === 'yarg') {
       this.options.yargRegistry.unregisterGroup(registration.groupId)
       this.summaries.yarg = this.summaries.yarg.filter((summary) => summary.path !== filePath)
-    } else {
+    } else if (registration.mode === 'audio') {
       this.options.audioRegistry.unregisterGroup(registration.groupId)
       this.summaries.audio = this.summaries.audio.filter((summary) => summary.path !== filePath)
+    } else {
+      this.options.motionRegistry.unregisterGroup(registration.groupId)
+      this.summaries.motion = this.summaries.motion.filter((summary) => summary.path !== filePath)
     }
 
     this.fileRegistrations.delete(filePath)
@@ -410,8 +446,48 @@ export class NodeCueLoader extends EventEmitter {
     }
   }
 
+  private async buildMotionGroup(file: MotionNodeCueFile): Promise<IMotionCueGroup> {
+    const cueMap = new Map<string, INetCue>()
+
+    for (const cue of file.cues) {
+      if (cueMap.has(cue.id)) {
+        throw new NodeCueCompilationError(
+          `Duplicate motion cue id '${cue.id}' in motion group '${file.group.name}'.`,
+        )
+      }
+
+      try {
+        const compiled = NodeCueCompiler.compileMotionCue(cue)
+        compiled.groupVariables = file.group.variables ?? []
+
+        const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
+
+        const callbacks = this.options.getNodeRuntimeCallbacks?.()
+        cueMap.set(cue.id, new MotionNodeCue(file.group.id, compiled, effectRegistry, callbacks))
+      } catch (err) {
+        console.warn(`Skipping motion cue '${cue.id}':`, err)
+      }
+    }
+
+    if (cueMap.size === 0) {
+      throw new NodeCueCompilationError('Motion group must contain at least one cue definition.')
+    }
+
+    return {
+      id: file.group.id,
+      name: file.group.name,
+      description: file.group.description,
+      cues: cueMap,
+    }
+  }
+
   private updateSummary(summary: NodeCueFileSummary): void {
-    const summaries = summary.mode === 'yarg' ? this.summaries.yarg : this.summaries.audio
+    const summaries =
+      summary.mode === 'yarg'
+        ? this.summaries.yarg
+        : summary.mode === 'audio'
+          ? this.summaries.audio
+          : this.summaries.motion
     const existingIndex = summaries.findIndex((item) => item.path === summary.path)
     if (existingIndex >= 0) {
       summaries[existingIndex] = summary
@@ -445,6 +521,9 @@ export class NodeCueLoader extends EventEmitter {
     }
     if (this.isPathWithinDir(filePath, this.audioDir)) {
       return 'audio'
+    }
+    if (this.isPathWithinDir(filePath, this.motionDir)) {
+      return 'motion'
     }
     return null
   }
@@ -494,17 +573,23 @@ export class NodeCueLoader extends EventEmitter {
       return registry
     }
 
+    const effectLoaderMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
+    const effectIndexMode: NodeCueMode = mode === 'motion' ? 'yarg' : mode
+
     const effectIndex = this.options.getCompiledEffectIndex?.()
 
     for (const effectRef of effectReferences) {
       try {
-        const cached = effectIndex?.get(mode, effectRef.effectFileId, effectRef.effectId)
+        const cached = effectIndex?.get(effectIndexMode, effectRef.effectFileId, effectRef.effectId)
         if (cached) {
           registry.registerEffect(effectRef.effectId, cached)
           continue
         }
 
-        const effectFile = await this.options.effectLoader.loadEffectByReference(effectRef, mode)
+        const effectFile = await this.options.effectLoader.loadEffectByReference(
+          effectRef,
+          effectLoaderMode,
+        )
 
         if (!effectFile) {
           console.warn(
@@ -523,7 +608,12 @@ export class NodeCueLoader extends EventEmitter {
         }
 
         const compiledEffect = EffectCompiler.compile(effect)
-        effectIndex?.set(mode, effectRef.effectFileId, effectRef.effectId, compiledEffect)
+        effectIndex?.set(
+          effectIndexMode,
+          effectRef.effectFileId,
+          effectRef.effectId,
+          compiledEffect,
+        )
         registry.registerEffect(effectRef.effectId, compiledEffect)
       } catch (error) {
         console.error(`Failed to load/compile effect ${effectRef.effectId}:`, error)

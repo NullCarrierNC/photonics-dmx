@@ -11,6 +11,11 @@ import { sendToAllWindows } from '../utils/windowUtils'
 import { ipcError } from './ipcResult'
 import { createMockCueData } from './mockCueData'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { INetCue } from '../../photonics-dmx/cues/interfaces/INetCue'
+import { MotionCueRegistry } from '../../photonics-dmx/cues/registries/MotionCueRegistry'
+
+/** Motion cue started from Cue Simulation; stopped explicitly or replaced by another start. */
+let activeSimulatedMotionCue: INetCue | null = null
 
 /**
  * Set up simulation and test-effect IPC handlers (beat/keyframe/measure/instrument, test effects, system status, available cues).
@@ -138,7 +143,13 @@ export function setupSimulationHandlers(
           const cueHandler = controllerManager.getCueHandler()
           if (cueHandler && effectId) {
             const cueType = getCueTypeFromId(effectId)
-            if (cueType) await cueHandler.handleCue(cueType, mockCueData)
+            if (cueType) {
+              try {
+                await cueHandler.handleCue(cueType, mockCueData)
+              } catch (error) {
+                console.error('Error handling cue in simulate beat:', error)
+              }
+            }
           }
           sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
         }
@@ -174,7 +185,13 @@ export function setupSimulationHandlers(
           const cueHandler = controllerManager.getCueHandler()
           if (cueHandler && effectId) {
             const cueType = getCueTypeFromId(effectId)
-            if (cueType) await cueHandler.handleCue(cueType, mockCueData)
+            if (cueType) {
+              try {
+                await cueHandler.handleCue(cueType, mockCueData)
+              } catch (error) {
+                console.error('Error handling cue in simulate keyframe:', error)
+              }
+            }
           }
           sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
         }
@@ -210,7 +227,13 @@ export function setupSimulationHandlers(
           const cueHandler = controllerManager.getCueHandler()
           if (cueHandler && effectId) {
             const cueType = getCueTypeFromId(effectId)
-            if (cueType) await cueHandler.handleCue(cueType, mockCueData)
+            if (cueType) {
+              try {
+                await cueHandler.handleCue(cueType, mockCueData)
+              } catch (error) {
+                console.error('Error handling cue in simulate measure:', error)
+              }
+            }
           }
           sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
         }
@@ -315,6 +338,63 @@ export function setupSimulationHandlers(
       }
     },
   )
+
+  ipcMain.handle(
+    LIGHT.START_MOTION_CUE_SIMULATION,
+    async (_, data: { groupId: string; cueId: string }) => {
+      try {
+        const { groupId, cueId } = data ?? {}
+        if (!groupId || !cueId) {
+          return ipcError(new Error('groupId and cueId are required'))
+        }
+        if (!controllerManager.getIsInitialized()) {
+          await controllerManager.init()
+        }
+        const lightManager = controllerManager.getDmxLightManager()
+        const sequencer = controllerManager.getLightingController()
+        if (!lightManager || !sequencer) {
+          return ipcError(new Error('Lighting system not available'))
+        }
+        const group = MotionCueRegistry.getInstance().getGroup(groupId)
+        if (!group) {
+          return ipcError(new Error(`Motion group not found: ${groupId}`))
+        }
+        const cue = group.cues.get(cueId)
+        if (!cue) {
+          return ipcError(new Error(`Motion cue not found: ${groupId}/${cueId}`))
+        }
+        activeSimulatedMotionCue?.onStop?.()
+        activeSimulatedMotionCue = null
+        sequencer.cancelPanTiltClear()
+        const mockCueData = createMockCueData({
+          venueSize: 'Small',
+          bpm: 120,
+          simulationCueGroup: groupId,
+        })
+        const maybePromise = cue.execute(mockCueData, sequencer, lightManager)
+        if (maybePromise instanceof Promise) {
+          await maybePromise
+        }
+        activeSimulatedMotionCue = cue
+        return { success: true as const }
+      } catch (error) {
+        console.error('Error starting motion cue simulation:', error)
+        return ipcError(error)
+      }
+    },
+  )
+
+  ipcMain.handle(LIGHT.STOP_MOTION_CUE_SIMULATION, async () => {
+    try {
+      activeSimulatedMotionCue?.onStop?.()
+      activeSimulatedMotionCue = null
+      controllerManager.getLightingController()?.schedulePanTiltClear()
+      return { success: true as const }
+    } catch (error) {
+      console.error('Error stopping motion cue simulation:', error)
+      return ipcError(error)
+    }
+  })
 
   ipcMain.handle(LIGHT.GET_SYSTEM_STATUS, async () => {
     try {

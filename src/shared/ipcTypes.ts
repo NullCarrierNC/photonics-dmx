@@ -398,6 +398,30 @@ export interface IpcInvokeMap {
     request: void
     response: { success: true; status: unknown } | IpcErrorResult
   }
+  [LIGHT.GET_MOTION_CUE_GROUPS]: {
+    request: void
+    response: Array<{ id: string; name: string; description?: string; cueCount: number }>
+  }
+  [LIGHT.GET_AVAILABLE_MOTION_CUES]: {
+    request: string | undefined
+    response: Array<{ id: string; name: string; description: string }>
+  }
+  [LIGHT.GET_MOTION_GROUP_SELECTION_MODE]: {
+    request: void
+    response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
+  }
+  [LIGHT.SET_MOTION_GROUP_SELECTION_MODE]: {
+    request: 'oncePerSong' | 'perCueChange' | 'none'
+    response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
+  }
+  [LIGHT.START_MOTION_CUE_SIMULATION]: {
+    request: { groupId: string; cueId: string }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.STOP_MOTION_CUE_SIMULATION]: {
+    request: void
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [LIGHT.UPDATE_SACN_CONFIG]: {
     request: {
       universe?: number
@@ -517,6 +541,22 @@ export interface IpcInvokeMap {
     request: Record<string, string[]>
     response: IpcSuccessResult | IpcErrorResult
   }
+  [CONFIG.GET_ENABLED_MOTION_CUE_GROUPS]: {
+    request: void
+    response: string[]
+  }
+  [CONFIG.SET_ENABLED_MOTION_CUE_GROUPS]: {
+    request: string[]
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_DISABLED_MOTION_CUES]: {
+    request: void
+    response: Record<string, string[]>
+  }
+  [CONFIG.SET_DISABLED_MOTION_CUES]: {
+    request: Record<string, string[]>
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [CONFIG.GET_AUDIO_REACTIVE_CUES]: {
     request: void
     response:
@@ -615,6 +655,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE]: AudioConfig | undefined
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE]: AudioGameModeConfig
   [RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED]: undefined
+  [RENDERER_RECEIVE.MOTION_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
   [RENDERER_RECEIVE.AUDIO_STROBE_STATE]: {
     active: boolean

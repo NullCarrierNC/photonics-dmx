@@ -42,6 +42,12 @@ export interface ResolvedActionTiming {
   level?: number
 }
 
+/** Resolved pan/tilt for set-position actions (logical 0–255). */
+export interface ResolvedPositionSetting {
+  pan: number
+  tilt: number
+}
+
 interface BuildEffectParams {
   action: ActionNode
   lights: TrackedLight[]
@@ -52,6 +58,7 @@ interface BuildEffectParams {
   // Add resolved values for direct use
   resolvedTarget?: ResolvedActionTarget
   resolvedColor?: ResolvedColorSetting
+  resolvedPosition?: ResolvedPositionSetting
   resolvedTiming?: ResolvedActionTiming
   resolvedLayer?: number
 }
@@ -310,7 +317,6 @@ export class ActionEffectFactory {
 
     // Use provided resolved values or resolve from action
     const timing = params.resolvedTiming ?? this.resolveTiming(action.timing)
-    const primaryColor = params.resolvedColor ?? this.resolveColorSetting(action.color)
     const layer =
       params.resolvedLayer ?? (action.layer?.source === 'literal' ? Number(action.layer.value) : 0)
 
@@ -332,12 +338,43 @@ export class ActionEffectFactory {
     }
 
     const easing = resolveEasing(timing.easing)
-    const baseColor = resolveColor(primaryColor, intensityScale || 0.01)
 
     let effect: Effect | null = null
 
     switch (action.effectType) {
+      case 'set-position': {
+        const pos = params.resolvedPosition
+        if (!pos) {
+          return null
+        }
+        const positionRgbio: RGBIO = {
+          red: 0,
+          green: 0,
+          blue: 0,
+          intensity: 0,
+          opacity: 0.0,
+          blendMode: 'replace',
+          pan: pos.pan,
+          tilt: pos.tilt,
+        }
+        effect = createSingleColorEffect({
+          lights,
+          layer,
+          waitFor,
+          color: positionRgbio,
+          timing: timing,
+          easing,
+        })
+        break
+      }
       case 'set-color': {
+        const resolvedForColor =
+          params.resolvedColor ??
+          (action.color ? this.resolveColorSetting(action.color) : undefined)
+        if (!resolvedForColor) {
+          return null
+        }
+        const baseColor = resolveColor(resolvedForColor, intensityScale || 0.01)
         effect = createSingleColorEffect({
           lights,
           layer,
@@ -396,7 +433,12 @@ export class ActionEffectFactory {
       if (ids !== baseLightIds) return null
 
       const timing = step.resolvedTiming ?? this.resolveTiming(step.action.timing)
-      const primaryColor = step.resolvedColor ?? this.resolveColorSetting(step.action.color)
+      const primaryColor =
+        step.resolvedColor ??
+        (step.action.color ? this.resolveColorSetting(step.action.color) : undefined)
+      if (!primaryColor) {
+        return null
+      }
 
       const timingLevel = 1
       const intensityScale = clamp((step.intensityScale ?? 1) * timingLevel, 0, 1)

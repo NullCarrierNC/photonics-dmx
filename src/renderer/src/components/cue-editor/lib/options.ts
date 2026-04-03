@@ -62,13 +62,13 @@ const ACTION_WAIT_OPTIONS_AUDIO = [
 ] as const
 
 const getActionWaitOptions = (mode: NodeCueMode) =>
-  mode === 'yarg' ? ACTION_WAIT_OPTIONS_YARG : ACTION_WAIT_OPTIONS_AUDIO
+  mode === 'yarg' || mode === 'motion' ? ACTION_WAIT_OPTIONS_YARG : ACTION_WAIT_OPTIONS_AUDIO
 
 const getEventOptionsForMode = (mode: NodeCueMode) =>
-  mode === 'yarg' ? YARG_EVENT_OPTIONS_CATEGORIZED : AUDIO_EVENT_OPTIONS
+  mode === 'yarg' || mode === 'motion' ? YARG_EVENT_OPTIONS_CATEGORIZED : AUDIO_EVENT_OPTIONS
 
 const getDefaultEventOption = (mode: NodeCueMode) => {
-  if (mode === 'yarg') {
+  if (mode === 'yarg' || mode === 'motion') {
     const beat = YARG_EVENT_OPTIONS.find((option) => option.value === 'beat')
     return beat ?? YARG_EVENT_OPTIONS[0]
   }

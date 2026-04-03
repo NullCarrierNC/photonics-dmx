@@ -5,6 +5,7 @@ import type {
   NodeCueFile,
   NodeCueMode,
   YargNodeCueDefinition,
+  MotionNodeCueDefinition,
   EffectFile,
   YargEffectDefinition,
   AudioEffectDefinition,
@@ -35,6 +36,7 @@ type UseCueFilesParams = {
     cue:
       | YargNodeCueDefinition
       | AudioNodeCueDefinition
+      | MotionNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition
       | null,
@@ -54,7 +56,9 @@ const useCueFiles = ({
   const [effectFiles, setEffectFiles] = useState<EffectFileSummary[]>([])
   const [mode, setMode] = useState<NodeCueMode>(() => {
     const stored = getLastActiveMode()
-    if (stored) return stored.startsWith('yarg') ? 'yarg' : 'audio'
+    if (stored === 'motion-cue') return 'motion'
+    if (stored?.startsWith('yarg')) return 'yarg'
+    if (stored?.startsWith('audio')) return 'audio'
     return 'yarg'
   })
   const [editorMode, setEditorMode] = useState<EditorMode>(() => {
@@ -76,7 +80,7 @@ const useCueFiles = ({
   const refreshFiles = useCallback(async () => {
     try {
       const summary = await listNodeCueFiles()
-      setFiles([...summary.yarg, ...summary.audio])
+      setFiles([...summary.yarg, ...summary.audio, ...summary.motion])
     } catch (error) {
       console.error('Failed to list node cue files', error)
     }
@@ -162,6 +166,7 @@ const useCueFiles = ({
     () => ({
       yarg: files.filter((file) => file.mode === 'yarg'),
       audio: files.filter((file) => file.mode === 'audio'),
+      motion: files.filter((file) => file.mode === 'motion'),
     }),
     [files],
   )
@@ -178,14 +183,20 @@ const useCueFiles = ({
     (nextMode: string) => {
       const isEffect = nextMode === 'yarg-effect' || nextMode === 'audio-effect'
       const cueMode: NodeCueMode =
-        nextMode === 'yarg-effect' || nextMode === 'yarg' ? 'yarg' : 'audio'
+        nextMode === 'motion-cue' || nextMode === 'motion'
+          ? 'motion'
+          : nextMode === 'yarg-effect' || nextMode === 'yarg'
+            ? 'yarg'
+            : 'audio'
       const modeKey: EditorModeKey = isEffect
         ? cueMode === 'yarg'
           ? 'yarg-effect'
           : 'audio-effect'
         : cueMode === 'yarg'
           ? 'yarg-cue'
-          : 'audio-cue'
+          : cueMode === 'motion'
+            ? 'motion-cue'
+            : 'audio-cue'
 
       setMode(cueMode)
       setEditorMode(isEffect ? 'effect' : 'cue')
@@ -234,8 +245,12 @@ const useCueFiles = ({
   useEffect(() => {
     fileIO.refreshFiles()
     fileIO.refreshEffectFiles()
-    const handler = (payload: { yarg: NodeCueFileSummary[]; audio: NodeCueFileSummary[] }) => {
-      setFiles([...payload.yarg, ...payload.audio])
+    const handler = (payload: {
+      yarg: NodeCueFileSummary[]
+      audio: NodeCueFileSummary[]
+      motion: NodeCueFileSummary[]
+    }) => {
+      setFiles([...payload.yarg, ...payload.audio, ...payload.motion])
     }
     const effectHandler = (payload: { yarg: EffectFileSummary[]; audio: EffectFileSummary[] }) => {
       setEffectFiles([...payload.yarg, ...payload.audio])
@@ -250,6 +265,10 @@ const useCueFiles = ({
   }, [fileIO.refreshFiles, fileIO.refreshEffectFiles])
 
   useEffect(() => {
+    if (mode === 'motion') {
+      setAvailableCueTypes([])
+      return
+    }
     getNodeCueTypes(mode)
       .then((types: string[]) => setAvailableCueTypes(types.filter(isCueTypeSelectable)))
       .catch(() => setAvailableCueTypes([]))
@@ -265,7 +284,9 @@ const useCueFiles = ({
         : 'audio-effect'
       : cueMode === 'yarg'
         ? 'yarg-cue'
-        : 'audio-cue'
+        : cueMode === 'motion'
+          ? 'motion-cue'
+          : 'audio-cue'
     setLastItemIdForMode(modeKey, selectedCueId)
   }, [selectedCueId, editorDoc])
 

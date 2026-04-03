@@ -3,7 +3,7 @@
  */
 
 import type { BaseEventNode } from '../../types/nodeCueTypes'
-import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
+import type { CompiledMotionCue, CompiledYargCue } from '../compiler/NodeCueCompiler'
 import type { CompiledEffect } from '../compiler/EffectCompiler'
 import type { CueData } from '../../types/cueTypes'
 import { isInstrumentEventTriggered } from '../../types/cueTypes'
@@ -41,26 +41,30 @@ export interface GraphExecutionPolicy {
    * Cue: event nodes from eventMap (triggered by params + entryContext.hasCueStartedFired); effect: single effect listener.
    */
   getEntryNodes(
-    compiled: CompiledYargCue | CompiledEffect<BaseEventNode>,
+    compiled: CompiledYargCue | CompiledMotionCue | CompiledEffect<BaseEventNode>,
     parameters: ExecutionParameters,
     entryContext?: { hasCueStartedFired?: boolean },
   ): BaseEventNode[]
 }
 
 /**
- * Cue graph policy: entry events cue-started/cue-called, queuing on, strict revisit, can invoke effects.
+ * Shared cue-like graph policy (YARG visual cues and motion node cues share entry-node logic).
  */
-export function cueGraphPolicy(groupId: string, cueId: string): GraphExecutionPolicy {
+function cueLikeGraphPolicy(
+  groupId: string,
+  cueId: string,
+  useInitialClearPolicy: boolean,
+): GraphExecutionPolicy {
   const entryEventTypes: EntryEventConfig = ['cue-started', 'cue-called']
   return {
     entryEventTypes,
     queuing: true,
     revisitPolicy: 'strict',
-    useInitialClearPolicy: true,
+    useInitialClearPolicy,
     canInvokeEffects: true,
     getLogPrefix: () => `cue:${groupId}:${cueId}`,
     getEntryNodes(compiled, parameters, entryContext): BaseEventNode[] {
-      const cue = compiled as CompiledYargCue
+      const cue = compiled as CompiledYargCue | CompiledMotionCue
       const hasCueStartedFired = entryContext?.hasCueStartedFired ?? false
       const cueData = parameters as CueData
 
@@ -133,6 +137,22 @@ export function cueGraphPolicy(groupId: string, cueId: string): GraphExecutionPo
       return ordered
     },
   }
+}
+
+/**
+ * Cue graph policy: entry events cue-started/cue-called, queuing on, strict revisit, can invoke effects.
+ * First effect submission may use setEffect to clear prior effects (primary visual cue behaviour).
+ */
+export function cueGraphPolicy(groupId: string, cueId: string): GraphExecutionPolicy {
+  return cueLikeGraphPolicy(groupId, cueId, true)
+}
+
+/**
+ * Motion cue graph policy: same entry logic as visual cues but never uses initial setEffect clear,
+ * so motion runs alongside running visual effects.
+ */
+export function motionCueGraphPolicy(groupId: string, cueId: string): GraphExecutionPolicy {
+  return cueLikeGraphPolicy(groupId, cueId, false)
 }
 
 /**

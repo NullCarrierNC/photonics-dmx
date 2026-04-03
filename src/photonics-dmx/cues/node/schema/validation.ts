@@ -34,6 +34,8 @@ import {
   YargEventNode,
   YargNodeCueDefinition,
   YargNodeCueFile,
+  MotionNodeCueDefinition,
+  MotionNodeCueFile,
 } from '../../types/nodeCueTypes'
 import { YargEventType, YARG_EVENT_TYPES as YARG_EVENT_TYPES_SOURCE } from '../../../types'
 import { AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY } from '../../../constants/options'
@@ -113,6 +115,16 @@ const colorSchema: JSONSchemaType<{
     opacity: { ...valueSourceSchema, nullable: true },
   },
 } as any
+
+const positionSchema = {
+  type: 'object' as const,
+  required: ['pan', 'tilt'],
+  additionalProperties: false,
+  properties: {
+    pan: valueSourceSchema,
+    tilt: valueSourceSchema,
+  },
+}
 
 const timingSchema: JSONSchemaType<ActionTimingConfig> = {
   type: 'object',
@@ -598,14 +610,15 @@ const targetSchema: JSONSchemaType<NodeActionTarget> = {
 
 const actionSchema: JSONSchemaType<ActionNode> = {
   type: 'object',
-  required: ['id', 'type', 'effectType', 'target', 'color', 'timing'],
+  required: ['id', 'type', 'effectType', 'target', 'timing'],
   additionalProperties: true, // Allow editor/backup metadata (e.g. position) to be ignored
   properties: {
     id: stringIdSchema,
     type: { type: 'string', const: 'action' },
     effectType: { type: 'string', enum: NODE_EFFECT_TYPES },
     target: targetSchema,
-    color: colorSchema,
+    color: { ...colorSchema, nullable: true },
+    position: { ...positionSchema, nullable: true },
     timing: timingSchema,
     layer: { ...valueSourceSchema, nullable: true },
     label: { type: 'string', nullable: true },
@@ -621,6 +634,24 @@ const actionSchema: JSONSchemaType<ActionNode> = {
     },
     config: { ...actionConfigSchema, nullable: true },
   },
+  allOf: [
+    {
+      if: {
+        properties: { effectType: { const: 'set-color' } },
+      },
+      then: {
+        required: ['color'],
+      },
+    },
+    {
+      if: {
+        properties: { effectType: { const: 'set-position' } },
+      },
+      then: {
+        required: ['position'],
+      },
+    },
+  ],
 } as any
 
 const yargEventSchema: JSONSchemaType<YargEventNode> = {
@@ -1026,8 +1057,112 @@ const audioFileSchema: JSONSchemaType<AudioNodeCueFile> = {
   },
 }
 
+const motionCueSchema: JSONSchemaType<MotionNodeCueDefinition> = {
+  type: 'object',
+  required: ['id', 'name', 'nodes', 'connections'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    name: { type: 'string', minLength: 1 },
+    description: { type: 'string', nullable: true },
+    nodes: {
+      type: 'object',
+      required: ['events', 'actions'],
+      additionalProperties: false,
+      properties: {
+        events: {
+          type: 'array',
+          minItems: 1,
+          items: yargEventSchema,
+        },
+        actions: {
+          type: 'array',
+          items: actionSchema,
+        },
+        logic: {
+          type: 'array',
+          nullable: true,
+          items: logicNodeSchema,
+          default: [],
+        },
+        eventRaisers: {
+          type: 'array',
+          nullable: true,
+          items: eventRaiserNodeSchema,
+          default: [],
+        },
+        eventListeners: {
+          type: 'array',
+          nullable: true,
+          items: eventListenerNodeSchema,
+          default: [],
+        },
+        effectRaisers: {
+          type: 'array',
+          nullable: true,
+          items: { type: 'object' } as any,
+          default: [],
+        },
+        effectListeners: {
+          type: 'array',
+          nullable: true,
+          items: { type: 'object' } as any,
+          default: [],
+        },
+        notes: {
+          type: 'array',
+          nullable: true,
+          items: notesNodeSchema,
+          default: [],
+        },
+      },
+    },
+    connections: {
+      type: 'array',
+      items: connectionSchema,
+    },
+    layout: { ...layoutSchema, nullable: true },
+    variables: {
+      type: 'array',
+      nullable: true,
+      items: variableDefinitionSchema,
+      default: [],
+    },
+    events: {
+      type: 'array',
+      nullable: true,
+      items: eventDefinitionSchema,
+      default: [],
+    },
+    effects: {
+      type: 'array',
+      nullable: true,
+      items: effectReferenceSchema,
+      default: [],
+    },
+  },
+}
+
+const motionFileSchema: JSONSchemaType<MotionNodeCueFile> = {
+  type: 'object',
+  required: ['version', 'mode', 'group', 'cues'],
+  additionalProperties: false,
+  properties: {
+    version: { type: 'integer', const: 1 },
+    mode: { type: 'string', const: 'motion' },
+    group: groupSchema,
+    cues: {
+      type: 'array',
+      minItems: 1,
+      items: motionCueSchema,
+    },
+    bundled: { type: 'boolean', nullable: true },
+  },
+}
+
 const validateYargSchema = ajv.compile<YargNodeCueFile>(yargFileSchema)
 const validateAudioSchema = ajv.compile<AudioNodeCueFile>(audioFileSchema)
+const validateMotionSchema = ajv.compile<MotionNodeCueFile>(motionFileSchema)
 
 export interface NodeCueValidationSuccess<T extends NodeCueFile> {
   valid: true
@@ -1402,6 +1537,67 @@ export const validateAudioNodeCueFile = (
   }
 }
 
+export const validateMotionNodeCueFile = (
+  value: unknown,
+): NodeCueValidationResult<MotionNodeCueFile> => {
+  const migrated = migrateEasingInNodeCueFile(value)
+  if (!validateMotionSchema(migrated)) {
+    return {
+      valid: false,
+      errors: formatErrors(validateMotionSchema.errors as DefinedError[]),
+      structuredErrors: extractStructuredErrors(validateMotionSchema.errors as DefinedError[]),
+    }
+  }
+
+  const semanticErrors: string[] = []
+  const fileData = migrated as MotionNodeCueFile
+
+  const groupVariables = fileData.group.variables ?? []
+  const groupVarNames = new Set<string>()
+  for (const varDef of groupVariables) {
+    if (groupVarNames.has(varDef.name)) {
+      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`)
+    }
+    groupVarNames.add(varDef.name)
+  }
+
+  for (const cue of fileData.cues) {
+    const cueVariables = cue.variables ?? []
+    const cueVarNames = new Set<string>()
+    for (const varDef of cueVariables) {
+      if (cueVarNames.has(varDef.name)) {
+        semanticErrors.push(
+          `cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`,
+        )
+      }
+      cueVarNames.add(varDef.name)
+    }
+
+    const logicIds = new Set((cue.nodes.logic ?? []).map((node) => node.id))
+    const actionIds = new Set(cue.nodes.actions.map((a) => a.id))
+    const nonEventIds = new Set<string>([...logicIds, ...actionIds])
+    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
+    semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
+
+    const cueVarDefs = [...groupVariables, ...cueVariables]
+    checkConditionalValidValues(cue.name, cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
+  }
+
+  if (semanticErrors.length > 0) {
+    return {
+      valid: false,
+      errors: semanticErrors,
+    }
+  }
+
+  return {
+    valid: true,
+    data: fileData,
+    errors: [],
+    mode: 'motion',
+  }
+}
+
 export const validateNodeCueFile = (value: unknown): NodeCueValidationResult => {
   if (!value || typeof value !== 'object') {
     return {
@@ -1419,9 +1615,13 @@ export const validateNodeCueFile = (value: unknown): NodeCueValidationResult => 
     return validateYargNodeCueFile(value)
   }
 
+  if (mode === 'motion') {
+    return validateMotionNodeCueFile(value)
+  }
+
   return {
     valid: false,
-    errors: ['mode must be either "yarg" or "audio"'],
+    errors: ['mode must be "yarg", "audio", or "motion"'],
   }
 }
 

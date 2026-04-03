@@ -11,6 +11,7 @@ import type {
   AudioEffectDefinition,
   NodeCueMode,
   YargNodeCueDefinition,
+  MotionNodeCueDefinition,
   YargEffectDefinition,
   EffectDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -96,6 +97,7 @@ const useCueFlow = ({
       cue:
         | YargNodeCueDefinition
         | AudioNodeCueDefinition
+        | MotionNodeCueDefinition
         | YargEffectDefinition
         | AudioEffectDefinition
         | null,

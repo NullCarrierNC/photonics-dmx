@@ -2,7 +2,7 @@ import React from 'react'
 import { useAtom } from 'jotai'
 import { liveMonitorEnabledAtom } from '@renderer/atoms'
 
-export type CueTypeMode = 'yarg' | 'audio'
+export type CueTypeMode = 'yarg' | 'audio' | 'motion'
 
 type CueEditorToolbarProps = {
   cueMode: CueTypeMode
@@ -67,10 +67,18 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
           </button>
           <button
             type="button"
-            className={`${cueMode === 'audio' ? segmentActive : segmentInactive} ${segmentRight}`}
+            className={`${cueMode === 'audio' ? segmentActive : segmentInactive} ${isEffectMode ? segmentRight : 'border-l-0'}`}
             onClick={() => onCueModeChange('audio')}>
             Audio
           </button>
+          {!isEffectMode && (
+            <button
+              type="button"
+              className={`${cueMode === 'motion' ? segmentActive : segmentInactive} border-l-0 ${segmentRight}`}
+              onClick={() => onCueModeChange('motion')}>
+              Motion
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span

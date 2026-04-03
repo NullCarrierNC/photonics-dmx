@@ -4,6 +4,7 @@ import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { CueData, CueType } from '../../cues/types/cueTypes'
 import { beforeEach, describe, jest, it, expect } from '@jest/globals'
 import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
+import { MotionCueRegistry } from '../../cues/registries/MotionCueRegistry'
 import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
 // Mock implementation for the test
@@ -129,6 +130,7 @@ describe('YargCueHandler', () => {
     // Get and reset the YargCueRegistry
     registry = YargCueRegistry.getInstance()
     registry.reset()
+    MotionCueRegistry.getInstance().reset()
 
     mockStrobeCue = new MockStrobeCue(CueType.Strobe_Fast)
     // Define and register a minimal mock default group for this test suite
@@ -181,6 +183,8 @@ describe('YargCueHandler', () => {
       removeEffectByLayer: jest.fn(),
       getActiveEffectsForLight: jest.fn(),
       isLayerFreeForLight: jest.fn(),
+      schedulePanTiltClear: jest.fn(),
+      cancelPanTiltClear: jest.fn(),
       shutdown: jest.fn(),
     } as any
 

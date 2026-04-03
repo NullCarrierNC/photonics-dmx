@@ -6,6 +6,7 @@ import type {
   NodeCueMode,
   YargNodeCueDefinition,
   AudioNodeCueDefinition,
+  MotionNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
   NodeCueFile,
@@ -31,6 +32,7 @@ type Props = {
     cue:
       | YargNodeCueDefinition
       | AudioNodeCueDefinition
+      | MotionNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition
       | null,

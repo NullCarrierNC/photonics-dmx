@@ -296,6 +296,17 @@ export interface ILightingController {
   setState(lights: TrackedLight[], color: RGBIO, time: number): void
 
   /**
+   * Next frame: clear pan/tilt from layer state so fixtures use home in DmxPublisher.
+   * Used when motion cues stop without a replacement.
+   */
+  schedulePanTiltClear(): void
+
+  /**
+   * Cancel a pending deferred pan/tilt clear (e.g. a new motion cue starts same tick).
+   */
+  cancelPanTiltClear(): void
+
+  /**
    * Add an effect with a completion callback.
    * Callback is fired when the effect fully completes (including waitUntilTime).
    */

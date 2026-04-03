@@ -3,6 +3,7 @@ import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { BaseCueHandler } from './BaseCueHandler'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
+import { MotionCueRegistry } from '../cues/registries/MotionCueRegistry'
 
 /**
  * YargCueHandler handles the cues called by the YARG network listener.
@@ -10,6 +11,9 @@ import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
  * Cue selection is delegated to YargCueRegistry.getCueImplementation(cueType, trackMode), which uses
  * active/enabled groups, consistency tracking, stage-kit preference when applicable,
  * and default-group fallback when no active group implements the cue.
+ *
+ * Motion cues run in parallel via MotionCueRegistry.getRandomMotionCue() (enabled groups, optional
+ * once-per-song lock from configuration).
  *
  * Reminder: setEffect clears all running effects, regardless of layer.
  * Layer 0 will maintain its state though.
@@ -27,9 +31,20 @@ class YargCueHandler extends BaseCueHandler {
   private currentPrimaryCue: INetCue | null = null
   private currentSecondaryCue: INetCue | null = null
   private currentStrobeCue: INetCue | null = null
+  private currentMotionCue: INetCue | null = null
 
   constructor(lightManager: DmxLightManager, photonicsSequencer: ILightingController) {
     super(lightManager, photonicsSequencer)
+  }
+
+  public override notifySongStart(): void {
+    super.notifySongStart()
+    MotionCueRegistry.getInstance().onSongStart()
+  }
+
+  public override notifySongEnd(): void {
+    super.notifySongEnd()
+    MotionCueRegistry.getInstance().onSongEnd()
   }
 
   public reset(): void {
@@ -135,11 +150,34 @@ class YargCueHandler extends BaseCueHandler {
       }
 
       await cue.execute(historicCueData, this._sequencer, this._lightManager)
-      this.emit('cueHandled', historicCueData)
     } else {
       console.error(`No implementation found for cue: ${cueType}`)
-      this.emit('cueHandled', historicCueData)
     }
+
+    const motionCue = MotionCueRegistry.getInstance().getRandomMotionCue()
+    try {
+      if (motionCue) {
+        if (this.currentMotionCue && this.currentMotionCue !== motionCue) {
+          this.currentMotionCue.onStop?.()
+        }
+        this.currentMotionCue = motionCue
+        this._sequencer.cancelPanTiltClear()
+        await motionCue.execute(historicCueData, this._sequencer, this._lightManager)
+      } else if (this.currentMotionCue) {
+        this.currentMotionCue.onStop?.()
+        this.currentMotionCue = null
+        this._sequencer.schedulePanTiltClear()
+      }
+    } catch (error) {
+      console.error('Motion cue execution failed:', error)
+      if (motionCue && this.currentMotionCue === motionCue) {
+        this.currentMotionCue.onStop?.()
+        this.currentMotionCue = null
+        this._sequencer.schedulePanTiltClear()
+      }
+    }
+
+    this.emit('cueHandled', historicCueData)
   }
 
   /**
@@ -158,6 +196,11 @@ class YargCueHandler extends BaseCueHandler {
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
+    }
+    if (this.currentMotionCue) {
+      this.currentMotionCue.onStop?.()
+      this.currentMotionCue = null
+      this._sequencer.schedulePanTiltClear()
     }
   }
 
@@ -323,6 +366,10 @@ class YargCueHandler extends BaseCueHandler {
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onDestroy?.()
       this.currentStrobeCue = null
+    }
+    if (this.currentMotionCue) {
+      this.currentMotionCue.onDestroy?.()
+      this.currentMotionCue = null
     }
     super.shutdown()
   }

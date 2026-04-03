@@ -16,3 +16,13 @@ export interface ICueGroup {
   /** Map of cue types to their implementations in this group */
   cues: Map<CueType, INetCue>
 }
+
+/**
+ * Motion cue group: implementations keyed by motion cue definition id (not YARG CueType).
+ */
+export interface IMotionCueGroup {
+  id: string
+  name: string
+  description?: string
+  cues: Map<string, INetCue>
+}

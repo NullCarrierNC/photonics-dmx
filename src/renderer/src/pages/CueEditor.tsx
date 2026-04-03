@@ -49,6 +49,8 @@ import type {
   ValueSource,
   YargNodeCueDefinition,
   AudioNodeCueDefinition,
+  MotionNodeCueDefinition,
+  NodeCueMode,
 } from '../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
   getAudioCueDataPropertyMeta,
@@ -61,6 +63,7 @@ import { AudioCaptureManager } from '../services/AudioCaptureManager'
 type EditorCueOrEffect =
   | YargNodeCueDefinition
   | AudioNodeCueDefinition
+  | MotionNodeCueDefinition
   | YargEffectDefinition
   | AudioEffectDefinition
   | null
@@ -78,7 +81,7 @@ type AvailableVariable = {
 
 function deriveCueDataValidValues(
   logicNodes: LogicNode[] | undefined,
-  mode: 'yarg' | 'audio',
+  mode: NodeCueMode,
 ): Map<string, string[]> {
   const derivedValidValues = new Map<string, string[]>()
 
@@ -86,9 +89,9 @@ function deriveCueDataValidValues(
     if (node.logicType !== 'cue-data' || !node.assignTo || !node.dataProperty) continue
 
     const meta =
-      mode === 'yarg'
-        ? getYargCueDataPropertyMeta(node.dataProperty)
-        : getAudioCueDataPropertyMeta(node.dataProperty)
+      mode === 'audio'
+        ? getAudioCueDataPropertyMeta(node.dataProperty)
+        : getYargCueDataPropertyMeta(node.dataProperty)
 
     if (!meta?.validValues?.length) continue
     derivedValidValues.set(node.assignTo, [...meta.validValues])
@@ -100,7 +103,7 @@ function deriveCueDataValidValues(
 function enrichAvailableVariables(
   variables: AvailableVariable[],
   logicNodes: LogicNode[] | undefined,
-  mode: 'yarg' | 'audio',
+  mode: NodeCueMode,
 ): AvailableVariable[] {
   const derivedValidValues = deriveCueDataValidValues(logicNodes, mode)
   if (derivedValidValues.size === 0) return variables
@@ -254,16 +257,29 @@ const CueEditor: React.FC = () => {
   const isEffectMode = editorMode === 'effect'
 
   const handleCueModeChange = useCallback(
-    (mode: 'yarg' | 'audio') => {
-      handleModeChange(isEffectMode ? (mode === 'yarg' ? 'yarg-effect' : 'audio-effect') : mode)
+    (m: 'yarg' | 'audio' | 'motion') => {
+      if (isEffectMode) {
+        handleModeChange(m === 'audio' ? 'audio-effect' : 'yarg-effect')
+      } else if (m === 'motion') {
+        handleModeChange('motion-cue')
+      } else if (m === 'yarg') {
+        handleModeChange('yarg')
+      } else {
+        handleModeChange('audio')
+      }
     },
     [handleModeChange, isEffectMode],
   )
   const handleEffectToggle = useCallback(
     (isEffect: boolean) => {
-      handleModeChange(
-        isEffect ? (activeMode === 'yarg' ? 'yarg-effect' : 'audio-effect') : activeMode,
-      )
+      if (isEffect) {
+        const effectKey = activeMode === 'audio' ? 'audio-effect' : 'yarg-effect'
+        handleModeChange(effectKey)
+      } else {
+        const cueKey =
+          activeMode === 'motion' ? 'motion-cue' : activeMode === 'yarg' ? 'yarg' : 'audio'
+        handleModeChange(cueKey)
+      }
     },
     [handleModeChange, activeMode],
   )
@@ -345,7 +361,12 @@ const CueEditor: React.FC = () => {
   const errorNodeIds = useErrorNodes(currentGraphId)
 
   const usedCueTypes = useMemo((): Set<string> => {
-    if (!editorDoc || editorDoc.mode !== 'cue' || activeMode !== 'yarg') return new Set()
+    if (
+      !editorDoc ||
+      editorDoc.mode !== 'cue' ||
+      (activeMode !== 'yarg' && activeMode !== 'motion')
+    )
+      return new Set()
     const cueFile = editorDoc.file as NodeCueFile
     return new Set(
       cueFile.cues
@@ -809,7 +830,12 @@ const CueEditor: React.FC = () => {
     }
   }, [pendingNavigation, setIsDirty])
 
-  const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio
+  const fileList =
+    mode === 'yarg'
+      ? groupedFiles.yarg
+      : mode === 'motion'
+        ? groupedFiles.motion
+        : groupedFiles.audio
   const effectFiles = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
 
   const hasFile = !!editorDoc?.path

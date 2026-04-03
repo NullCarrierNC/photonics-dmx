@@ -60,6 +60,13 @@ export interface AppPreferences {
   disabledYargCues?: Record<string, string[]>
   /** Per-group list of disabled audio cue type IDs */
   disabledAudioCues?: Record<string, string[]>
+  enabledMotionCueGroups?: string[]
+  /** IDs of motion cue groups seen in past runs; used to auto-enable only genuinely new groups */
+  knownMotionCueGroups?: string[]
+  /** Per-group list of disabled motion cue definition ids */
+  disabledMotionCues?: Record<string, string[]>
+  /** Motion group selection: perCueChange = random each visual cue; oncePerSong = lock motion program for the song; none = no automatic motion */
+  motionGroupSelectionMode?: 'oncePerSong' | 'perCueChange' | 'none'
   cueConsistencyWindow: number
   /** Cue group selection: 'withinSong' = can change during song; 'oncePerSong' = fixed at song start */
   cueGroupSelectionMode: 'oncePerSong' | 'withinSong'
@@ -130,6 +137,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledCueGroups: ['stagekit'],
   enabledAudioCueGroups: [],
   cueConsistencyWindow: 60000,
+  motionGroupSelectionMode: 'perCueChange',
   cueGroupSelectionMode: 'withinSong',
   clockRate: 10, // 10ms (100 Hz) for smooth animations and strobe cues
   activeAudioCueType: '' as AudioCueType,
@@ -461,6 +469,30 @@ export class ConfigurationManager {
     await this.setPreference('disabledAudioCues', disabled)
   }
 
+  getEnabledMotionCueGroups(): string[] | undefined {
+    return this.preferences.get().enabledMotionCueGroups
+  }
+
+  async setEnabledMotionCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('enabledMotionCueGroups', groupIds)
+  }
+
+  getKnownMotionCueGroups(): string[] | undefined {
+    return this.preferences.get().knownMotionCueGroups
+  }
+
+  async setKnownMotionCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('knownMotionCueGroups', groupIds)
+  }
+
+  getDisabledMotionCues(): Record<string, string[]> | undefined {
+    return this.preferences.get().disabledMotionCues
+  }
+
+  async setDisabledMotionCues(disabled: Record<string, string[]>): Promise<void> {
+    await this.setPreference('disabledMotionCues', disabled)
+  }
+
   /**
    * Gets the preferred audio cue type
    */
@@ -501,6 +533,14 @@ export class ConfigurationManager {
    */
   async setCueGroupSelectionMode(mode: 'oncePerSong' | 'withinSong'): Promise<void> {
     await this.setPreference('cueGroupSelectionMode', mode)
+  }
+
+  getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    return this.preferences.get().motionGroupSelectionMode ?? 'perCueChange'
+  }
+
+  async setMotionGroupSelectionMode(mode: 'oncePerSong' | 'perCueChange' | 'none'): Promise<void> {
+    await this.setPreference('motionGroupSelectionMode', mode)
   }
 
   /**

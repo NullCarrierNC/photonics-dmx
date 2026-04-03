@@ -5,6 +5,7 @@ import type {
   NodeCueFile,
   NodeCueGroupMeta,
   YargNodeCueDefinition,
+  MotionNodeCueDefinition,
   YargEffectDefinition,
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -40,7 +41,12 @@ export function useCueMetadata({
   )
 
   const updateCueMetadata = useCallback(
-    (updates: Partial<YargNodeCueDefinition> | Partial<AudioNodeCueDefinition>) => {
+    (
+      updates:
+        | Partial<YargNodeCueDefinition>
+        | Partial<AudioNodeCueDefinition>
+        | Partial<MotionNodeCueDefinition>,
+    ) => {
       if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return
       const cueFile = editorDoc.file as NodeCueFile
       const updatedCues = cueFile.cues.map((cue) =>

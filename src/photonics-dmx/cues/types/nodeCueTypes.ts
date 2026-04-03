@@ -7,7 +7,7 @@ import {
   AUDIO_CUE_DATA_PROPERTIES,
 } from '../../constants/nodeConstants'
 
-export type NodeCueMode = 'yarg' | 'audio'
+export type NodeCueMode = 'yarg' | 'audio' | 'motion'
 
 // Effect mode - typed like cues
 export type EffectMode = 'yarg' | 'audio'
@@ -308,6 +308,11 @@ export interface AudioNodeCueDefinition extends BaseCueDefinition {
   nodes: NodeGraph<AudioEventNodeUnion, ActionNode>
 }
 
+/** Motion cue: YARG event model, position-only actions. Runs in parallel with lighting cues. */
+export interface MotionNodeCueDefinition extends BaseCueDefinition {
+  nodes: NodeGraph<YargEventNode, ActionNode>
+}
+
 export interface YargNodeCueFile {
   version: 1
   mode: 'yarg'
@@ -324,7 +329,15 @@ export interface AudioNodeCueFile {
   bundled?: boolean
 }
 
-export type NodeCueFile = YargNodeCueFile | AudioNodeCueFile
+export interface MotionNodeCueFile {
+  version: 1
+  mode: 'motion'
+  group: NodeCueGroupMeta
+  cues: MotionNodeCueDefinition[]
+  bundled?: boolean
+}
+
+export type NodeCueFile = YargNodeCueFile | AudioNodeCueFile | MotionNodeCueFile
 
 export interface BaseEventNode {
   id: string
@@ -420,7 +433,7 @@ export interface AudioTriggerNode extends BaseEventNode {
 
 export type AudioEventNodeUnion = AudioEventNode | AudioTriggerNode
 
-export const NODE_EFFECT_TYPES = ['set-color', 'blackout'] as const
+export const NODE_EFFECT_TYPES = ['set-color', 'set-position', 'blackout'] as const
 
 export type NodeEffectType = (typeof NODE_EFFECT_TYPES)[number]
 
@@ -434,6 +447,12 @@ export interface NodeColorSetting {
   brightness: ValueSource // Can reference a string variable with brightness level
   blendMode?: ValueSource // Can reference a string variable with blend mode
   opacity?: ValueSource // Can reference a number variable with opacity (0.0-1.0)
+}
+
+/** Pan/tilt in logical 0–255 range (matches RGBIO and DMX channel values). */
+export interface NodePositionSetting {
+  pan: ValueSource
+  tilt: ValueSource
 }
 
 export interface ActionTimingConfig {
@@ -467,7 +486,10 @@ export interface ActionNode {
   type: 'action'
   effectType: NodeEffectType
   target: NodeActionTarget
-  color: NodeColorSetting
+  /** Required for set-color / blackout; omitted for set-position in motion cue files. */
+  color?: NodeColorSetting
+  /** Required for set-position. */
+  position?: NodePositionSetting
   timing: ActionTimingConfig
   layer?: ValueSource
   label?: string

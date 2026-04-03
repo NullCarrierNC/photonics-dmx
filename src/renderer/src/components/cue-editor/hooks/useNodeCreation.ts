@@ -324,7 +324,7 @@ const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCre
               ? 'Audio Trigger'
               : defaultOption.label,
           payload:
-            nodeMode === 'yarg'
+            nodeMode === 'yarg' || nodeMode === 'motion'
               ? {
                   id: newEventId,
                   type: 'event',

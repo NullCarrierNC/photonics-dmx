@@ -17,6 +17,7 @@ import {
   NODE_EFFECT_TYPES,
   type LogicNode,
   type NodeEffectType,
+  type NodeCueMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type {
   AudioEventNode,
@@ -43,7 +44,7 @@ type Props = {
   onRemoveNode: (nodeId: string) => void
   setReactFlowInstance: (instance: ReactFlowInstance) => void
   isValidConnection: (connection: Connection) => boolean
-  activeMode: 'yarg' | 'audio'
+  activeMode: NodeCueMode
   editorMode: 'cue' | 'effect'
   addEventNode: (
     option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,

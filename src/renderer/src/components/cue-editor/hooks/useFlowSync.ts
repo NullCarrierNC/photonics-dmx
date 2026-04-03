@@ -9,6 +9,7 @@ import type { EditorNodeData } from '../lib/types'
 import { cueToFlow, effectToFlow } from '../lib/cueTransforms'
 import type {
   YargNodeCueDefinition,
+  MotionNodeCueDefinition,
   AudioNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
@@ -122,6 +123,7 @@ export function useFlowSync({
       cue:
         | YargNodeCueDefinition
         | AudioNodeCueDefinition
+        | MotionNodeCueDefinition
         | YargEffectDefinition
         | AudioEffectDefinition
         | null,
@@ -130,7 +132,10 @@ export function useFlowSync({
 
       const { nodes: flowNodes, edges: flowEdges } = isEffect
         ? effectToFlow(cue as YargEffectDefinition | AudioEffectDefinition)
-        : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null, effectDefinitions)
+        : cueToFlow(
+            cue as YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition | null,
+            effectDefinitions,
+          )
 
       setNodes(flowNodes)
       setEdges(flowEdges)

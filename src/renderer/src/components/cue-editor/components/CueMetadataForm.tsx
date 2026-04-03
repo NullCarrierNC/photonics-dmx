@@ -6,6 +6,7 @@ import type {
   NodeCueMode,
   NodeCueGroupMeta,
   YargNodeCueDefinition,
+  MotionNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
   EffectGroupMeta,
@@ -16,7 +17,7 @@ import type { EditorMode } from '../lib/types'
 type Props = {
   filename: string
   group: NodeCueGroupMeta | EffectGroupMeta | null
-  currentCue: YargNodeCueDefinition | AudioNodeCueDefinition | null
+  currentCue: YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition | null
   currentEffect?: YargEffectDefinition | AudioEffectDefinition | null
   availableCueTypes: string[]
   usedCueTypes?: Set<string>
@@ -24,7 +25,10 @@ type Props = {
   editorMode: EditorMode
   onGroupChange: (updates: Partial<NodeCueGroupMeta | EffectGroupMeta>) => void
   onCueMetadataChange: (
-    updates: Partial<YargNodeCueDefinition> | Partial<AudioNodeCueDefinition>,
+    updates:
+      | Partial<YargNodeCueDefinition>
+      | Partial<AudioNodeCueDefinition>
+      | Partial<MotionNodeCueDefinition>,
   ) => void
   onEffectMetadataChange?: (
     updates: Partial<YargEffectDefinition> & Partial<AudioEffectDefinition>,

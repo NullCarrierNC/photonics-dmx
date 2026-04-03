@@ -100,6 +100,8 @@ describe('AbstractCueHandler', () => {
       removeEffectByLayer: jest.fn(),
       getActiveEffectsForLight: jest.fn(),
       isLayerFreeForLight: jest.fn(),
+      schedulePanTiltClear: jest.fn(),
+      cancelPanTiltClear: jest.fn(),
       shutdown: jest.fn(),
     } as ILightingController
 

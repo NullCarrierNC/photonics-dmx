@@ -64,6 +64,39 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
         updateNode={updateNode}
       />
 
+      {node.effectType === 'set-position' && (
+        <>
+          <ValueSourceEditor
+            label="Pan"
+            value={node.position?.pan ?? { source: 'literal', value: 128 }}
+            onChange={(next) =>
+              updateNode({
+                position: {
+                  pan: next,
+                  tilt: node.position?.tilt ?? { source: 'literal', value: 128 },
+                },
+              })
+            }
+            expected="number"
+            availableVariables={availableVariables}
+          />
+          <ValueSourceEditor
+            label="Tilt"
+            value={node.position?.tilt ?? { source: 'literal', value: 128 }}
+            onChange={(next) =>
+              updateNode({
+                position: {
+                  pan: node.position?.pan ?? { source: 'literal', value: 128 },
+                  tilt: next,
+                },
+              })
+            }
+            expected="number"
+            availableVariables={availableVariables}
+          />
+        </>
+      )}
+
       {node.effectType !== 'blackout' && (
         <ValueSourceEditor
           label="Layer"

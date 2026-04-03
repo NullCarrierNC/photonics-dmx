@@ -39,6 +39,7 @@ import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { MotionCueRegistry } from '../../photonics-dmx/cues/registries/MotionCueRegistry'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import {
   NodeCueLoader,
@@ -152,12 +153,14 @@ export class ControllerManager {
     await this.initializeSequencer()
     await this.initializeCueRegistry()
     await this.initializeAudioCueRegistry()
+    await this.initializeMotionCueRegistry()
     const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
     await copyDefaultData(process.resourcesPath, baseDir)
     await this.initializeEffectLoader() // Initialize effects BEFORE node cues
     await this.initializeNodeCueLoader()
     await this.applyYargEnabledGroupsFromConfig()
     await this.applyAudioEnabledGroupsFromConfig()
+    await this.applyMotionEnabledGroupsFromConfig()
     await this.initializeListeners()
 
     this.isInitialized = true
@@ -298,6 +301,18 @@ export class ControllerManager {
   }
 
   /**
+   * Load motion cue registry preferences from configuration (groups register later via NodeCueLoader).
+   */
+  private async initializeMotionCueRegistry(): Promise<void> {
+    const registry = MotionCueRegistry.getInstance()
+    const motionMode = this.config.getMotionGroupSelectionMode()
+    registry.setMotionSelectionMode(motionMode)
+    console.log('MotionCueRegistry initialized with motion group selection mode:', motionMode)
+    const disabledMotion = this.config.getDisabledMotionCues() ?? {}
+    registry.setDisabledCues(disabledMotion)
+  }
+
+  /**
    * Re-apply Yarg enabled groups from configuration after all groups are registered.
    * Node cue groups are registered in initializeNodeCueLoader(), and each registerGroup()
    * adds the group to enabled by default, which would overwrite a saved "disabled" preference.
@@ -363,6 +378,35 @@ export class ControllerManager {
     this.refreshAudioCueSelection()
   }
 
+  /**
+   * Re-apply motion enabled groups from configuration after all groups are registered.
+   */
+  private async applyMotionEnabledGroupsFromConfig(): Promise<void> {
+    const registry = MotionCueRegistry.getInstance()
+    const registeredIds = registry.getAllGroups()
+    let enabledGroupIds = this.config.getEnabledMotionCueGroups()
+    const knownGroups = this.config.getKnownMotionCueGroups() ?? []
+
+    if (!enabledGroupIds || enabledGroupIds.length === 0) {
+      enabledGroupIds = registeredIds
+      if (registeredIds.length > 0) {
+        await this.config.setEnabledMotionCueGroups(enabledGroupIds)
+      }
+    } else {
+      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabledGroupIds = [...enabledGroupIds, ...newGroups]
+        await this.config.setEnabledMotionCueGroups(enabledGroupIds)
+      }
+    }
+
+    await this.config.setKnownMotionCueGroups(registeredIds)
+    registry.setEnabledGroups(enabledGroupIds)
+    const disabledMotion = this.config.getDisabledMotionCues() ?? {}
+    registry.setDisabledCues(disabledMotion)
+    console.log('MotionCueRegistry enabled groups re-applied from config:', enabledGroupIds)
+  }
+
   private async initializeNodeCueLoader(): Promise<void> {
     if (this.nodeCueLoader) {
       return
@@ -376,6 +420,7 @@ export class ControllerManager {
       baseDir,
       yargRegistry: YargCueRegistry.getInstance(),
       audioRegistry: AudioCueRegistry.getInstance(),
+      motionRegistry: MotionCueRegistry.getInstance(),
       effectLoader: this.effectLoader ?? undefined,
     })
 

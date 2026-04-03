@@ -8,6 +8,7 @@ import { sendToAllWindows } from '../utils/windowUtils'
 import { setupSenderHandlers } from './sender-handlers'
 import { setupSimulationHandlers } from './simulation-handlers'
 import { setupCueGroupHandlers } from './cue-group-handlers'
+import { setupMotionGroupHandlers } from './motion-group-handlers'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 
 /**
@@ -36,4 +37,5 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   setupSenderHandlers(ipcMain, controllerManager)
   setupSimulationHandlers(ipcMain, controllerManager)
   setupCueGroupHandlers(ipcMain, controllerManager)
+  setupMotionGroupHandlers(ipcMain, controllerManager)
 }

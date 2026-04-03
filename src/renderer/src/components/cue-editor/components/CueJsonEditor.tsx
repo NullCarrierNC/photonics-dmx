@@ -10,6 +10,7 @@ import type {
   AudioNodeCueDefinition,
   NodeCueFile,
   YargNodeCueDefinition,
+  MotionNodeCueDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { validateNodeCue } from '../../../ipcApi'
@@ -76,7 +77,7 @@ function resolveJsonPath(
 }
 
 type CueJsonEditorProps = {
-  cueDefinition: YargNodeCueDefinition | AudioNodeCueDefinition
+  cueDefinition: YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition
   editorDoc: EditorDocument
   selectedCueId: string
   onSave: (updatedCue: YargNodeCueDefinition | AudioNodeCueDefinition) => void

@@ -46,6 +46,23 @@ export const getCueGroupSelectionMode = () =>
 export const setCueGroupSelectionMode = (mode: 'oncePerSong' | 'withinSong') =>
   window.api.invoke(LIGHT.SET_CUE_GROUP_SELECTION_MODE, mode)
 
+export const getMotionGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_MOTION_GROUP_SELECTION_MODE, undefined)
+
+export const setMotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
+  window.api.invoke(LIGHT.SET_MOTION_GROUP_SELECTION_MODE, mode)
+
+export const getMotionCueGroups = () => window.api.invoke(LIGHT.GET_MOTION_CUE_GROUPS, undefined)
+
+export const getAvailableMotionCues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_MOTION_CUES, groupId)
+
+export const startMotionCueSimulation = (groupId: string, cueId: string) =>
+  window.api.invoke(LIGHT.START_MOTION_CUE_SIMULATION, { groupId, cueId })
+
+export const stopMotionCueSimulation = () =>
+  window.api.invoke(LIGHT.STOP_MOTION_CUE_SIMULATION, undefined)
+
 export const getConsistencyStatus = () => window.api.invoke(LIGHT.GET_CONSISTENCY_STATUS, undefined)
 
 // ---------------------------------------------------------------------------
@@ -157,6 +174,18 @@ export const getDisabledAudioCues = () =>
 
 export const setDisabledAudioCues = (disabled: Record<string, string[]>) =>
   window.api.invoke(CONFIG.SET_DISABLED_AUDIO_CUES, disabled)
+
+export const getEnabledMotionCueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_MOTION_CUE_GROUPS, undefined)
+
+export const setEnabledMotionCueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_MOTION_CUE_GROUPS, groupIds)
+
+export const getDisabledMotionCues = () =>
+  window.api.invoke(CONFIG.GET_DISABLED_MOTION_CUES, undefined)
+
+export const setDisabledMotionCues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_MOTION_CUES, disabled)
 
 export const getAudioReactiveCues = () =>
   window.api.invoke(CONFIG.GET_AUDIO_REACTIVE_CUES, undefined)

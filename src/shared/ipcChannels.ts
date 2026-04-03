@@ -89,6 +89,12 @@ export const LIGHT = {
   SET_CUE_GROUP_SELECTION_MODE: 'set-cue-group-selection-mode',
   GET_CUE_GROUP_SELECTION_MODE: 'get-cue-group-selection-mode',
   GET_CONSISTENCY_STATUS: 'get-consistency-status',
+  GET_MOTION_CUE_GROUPS: 'get-motion-cue-groups',
+  GET_AVAILABLE_MOTION_CUES: 'get-available-motion-cues',
+  GET_MOTION_GROUP_SELECTION_MODE: 'get-motion-group-selection-mode',
+  SET_MOTION_GROUP_SELECTION_MODE: 'set-motion-group-selection-mode',
+  START_MOTION_CUE_SIMULATION: 'start-motion-cue-simulation',
+  STOP_MOTION_CUE_SIMULATION: 'stop-motion-cue-simulation',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
 } as const
 
@@ -122,6 +128,10 @@ export const CONFIG = {
   SET_DISABLED_YARG_CUES: 'set-disabled-yarg-cues',
   GET_DISABLED_AUDIO_CUES: 'get-disabled-audio-cues',
   SET_DISABLED_AUDIO_CUES: 'set-disabled-audio-cues',
+  GET_ENABLED_MOTION_CUE_GROUPS: 'get-enabled-motion-cue-groups',
+  SET_ENABLED_MOTION_CUE_GROUPS: 'set-enabled-motion-cue-groups',
+  GET_DISABLED_MOTION_CUES: 'get-disabled-motion-cues',
+  SET_DISABLED_MOTION_CUES: 'set-disabled-motion-cues',
   GET_AUDIO_REACTIVE_CUES: 'get-audio-reactive-cues',
   SET_ACTIVE_AUDIO_CUE: 'set-active-audio-cue',
   GET_AUDIO_GAME_MODE: 'get-audio-game-mode',
@@ -158,6 +168,8 @@ export const RENDERER_RECEIVE = {
   AUDIO_GAME_MODE_UPDATE: 'audio:game-mode-update',
   /** Enabled audio cue groups or per-cue disables changed (Preferences → all windows). */
   AUDIO_CUE_GROUPS_CHANGED: 'audio:cue-groups-changed',
+  /** Enabled motion cue groups or per-cue disables changed (Preferences → all windows). */
+  MOTION_CUE_GROUPS_CHANGED: 'motion:cue-groups-changed',
   /** Game Mode primary cue changed (main process → renderer). */
   AUDIO_GAME_MODE_CUE_CHANGE: 'audio:game-mode-cue-change',
   /** Strobe cue firing state (main process → renderer, on transitions). */

@@ -7,12 +7,47 @@ import {
   FixtureTypes,
   RgbDmxChannels,
   RgbwDmxChannels,
+  RgbMovingHeadDmxChannels,
+  RgbwMovingHeadDmxChannels,
   ConfigStrobeType,
 } from '../../../photonics-dmx/types'
 
 interface LightsDmxPreviewProps {
   lightingConfig: LightingConfiguration
   dmxValues: Record<number, number>
+}
+
+/** Fixture-style pan: 0–255 maps linearly to 540° total rotation. */
+const PAN_RANGE_DEG = 540
+/** Fixture-style tilt: 0–255 maps linearly to 180° (forward horizontal → up → backward horizontal). */
+const TILT_RANGE_DEG = 180
+
+/**
+ * Top-down polar projection: centre = beam straight up, edge = horizontal.
+ * Returns CSS left/top percentages (0–100) for the motion indicator dot.
+ */
+function panTiltToXY(pan: number, tilt: number): { xPct: number; yPct: number } {
+  const panAngleDeg = (pan / 255) * PAN_RANGE_DEG
+  const panAngleRad = (panAngleDeg * Math.PI) / 180
+
+  const tiltAngleDeg = (tilt / 255) * TILT_RANGE_DEG
+  const zenithDeg = Math.abs(tiltAngleDeg - 90)
+  const radius = Math.min(1, zenithDeg / 90)
+
+  let x: number
+  let y: number
+  if (tiltAngleDeg < 90) {
+    x = -Math.sin(panAngleRad) * radius
+    y = -Math.cos(panAngleRad) * radius
+  } else {
+    x = Math.sin(panAngleRad) * radius
+    y = Math.cos(panAngleRad) * radius
+  }
+
+  return {
+    xPct: 50 + x * 50,
+    yPct: 50 + y * 50,
+  }
 }
 
 const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmxValues }) => {
@@ -68,19 +103,59 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
     return 'rgb(0, 0, 0)'
   }
 
+  const isMovingHead = (light: DmxFixture): boolean =>
+    light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH
+
   /**
-   * Helper function to render individual light circles.
+   * Helper function to render individual light circles (moving heads include pan/tilt dot overlay).
    */
-  const renderLightCircle = (light: DmxFixture, index: number) => (
-    <div
-      key={light.id || `light-${index}`}
-      className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold shadow-md mx-2"
-      style={{
-        backgroundColor: getLightColor(light),
-      }}>
-      {light.position}
-    </div>
-  )
+  const renderLightCircle = (light: DmxFixture, index: number) => {
+    const baseCircleClasses =
+      'w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold shadow-md mx-2'
+
+    if (!isMovingHead(light)) {
+      return (
+        <div key={light.id || `light-${index}`}>
+          <div
+            className={baseCircleClasses}
+            style={{
+              backgroundColor: getLightColor(light),
+            }}>
+            {light.position}
+          </div>
+        </div>
+      )
+    }
+
+    const channels = light.channels as RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels
+    const pan = dmxValues[channels.pan] ?? 0
+    const tilt = dmxValues[channels.tilt] ?? 0
+    const { xPct, yPct } = panTiltToXY(pan, tilt)
+
+    return (
+      <div key={light.id || `light-${index}`}>
+        <div
+          className={`${baseCircleClasses} relative overflow-hidden`}
+          style={{
+            backgroundColor: getLightColor(light),
+          }}>
+          <div
+            className="absolute rounded-full bg-red-500 z-10"
+            style={{
+              width: 6,
+              height: 6,
+              left: `${xPct}%`,
+              top: `${yPct}%`,
+              transform: 'translate(-50%, -50%)',
+              border: '3px solid black',
+              boxSizing: 'content-box',
+            }}
+          />
+          <span className="relative z-0">{light.position}</span>
+        </div>
+      </div>
+    )
+  }
 
   /**
    * Helper function to render a row of lights.

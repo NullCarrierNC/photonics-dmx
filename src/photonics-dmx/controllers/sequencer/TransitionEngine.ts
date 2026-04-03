@@ -22,6 +22,12 @@ export class TransitionEngine implements ITransitionEngine {
   private _pendingLayerRemovals: Array<{ layer: number; lightId: string }> = []
 
   /**
+   * When true, next updateTransitions clears pan/tilt from layer state so fixtures return to
+   * configured home via DmxPublisher. Deferred one frame like _pendingLayerRemovals.
+   */
+  private _pendingPanTiltClear = false
+
+  /**
    * @constructor
    * @param lightTransitionController The underlying transition controller
    * @param layerManager The layer manager instance
@@ -97,6 +103,14 @@ export class TransitionEngine implements ITransitionEngine {
     return this.lightTransitionController
   }
 
+  public schedulePanTiltClear(): void {
+    this._pendingPanTiltClear = true
+  }
+
+  public cancelPanTiltClear(): void {
+    this._pendingPanTiltClear = false
+  }
+
   /**
    * Updates all active transitions using a single timestamp for atomic calculations.
    * This method is called by the Clock system to advance transitions incrementally.
@@ -115,6 +129,11 @@ export class TransitionEngine implements ITransitionEngine {
       }
     }
     this._pendingLayerRemovals = []
+
+    if (this._pendingPanTiltClear) {
+      this.lightTransitionController.clearPanTilt()
+      this._pendingPanTiltClear = false
+    }
 
     const effectsToRemove: Array<{ layer: number; lightId: string }> = []
 

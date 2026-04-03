@@ -4,9 +4,12 @@ import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
   NodeCueFile,
+  NodeCueMode,
   YargNodeCueDefinition,
+  MotionNodeCueDefinition,
   YargEffectDefinition,
   EffectFile,
+  EffectMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { firstByName } from '../lib/cueUtils'
@@ -39,14 +42,15 @@ export type UseCueFileIOParams = {
   setFilename: React.Dispatch<React.SetStateAction<string>>
   selectedCueId: string | null
   setSelectedCueId: (id: string | null) => void
-  mode: 'yarg' | 'audio'
-  setMode: React.Dispatch<React.SetStateAction<'yarg' | 'audio'>>
+  mode: NodeCueMode
+  setMode: React.Dispatch<React.SetStateAction<NodeCueMode>>
   setValidationErrors: (errors: string[]) => void
   setIsDirty: (dirty: boolean) => void
   loadCueIntoFlow: (
     cue:
       | YargNodeCueDefinition
       | AudioNodeCueDefinition
+      | MotionNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition
       | null,
@@ -96,7 +100,11 @@ export function useCueFileIO({
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
         const cueFile = file as NodeCueFile
-        const cues = cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[]
+        const cues = cueFile.cues as (
+          | YargNodeCueDefinition
+          | AudioNodeCueDefinition
+          | MotionNodeCueDefinition
+        )[]
         const preferredCue =
           preferredItemId != null ? cues.find((c) => c.id === preferredItemId) : null
         const cueToLoad = preferredCue ?? firstByName(cues)
@@ -105,7 +113,8 @@ export function useCueFileIO({
         setIsDirty(false)
         loadCueIntoFlow(cueToLoad ?? null)
         rememberLastFilePath(fileSummary.path)
-        const modeKey: EditorModeKey = file.mode === 'yarg' ? 'yarg-cue' : 'audio-cue'
+        const modeKey: EditorModeKey =
+          file.mode === 'yarg' ? 'yarg-cue' : file.mode === 'motion' ? 'motion-cue' : 'audio-cue'
         setLastFilePathForMode(modeKey, fileSummary.path)
         setLastActiveMode(modeKey)
       } catch (error) {
@@ -262,7 +271,9 @@ export function useCueFileIO({
           : 'audio-effect'
         : fileMode === 'yarg'
           ? 'yarg-cue'
-          : 'audio-cue'
+          : fileMode === 'motion'
+            ? 'motion-cue'
+            : 'audio-cue'
     clearLastFilePathForMode(modeKey)
     setEditorDoc(null)
     setSelectedCueId(null)
@@ -292,7 +303,8 @@ export function useCueFileIO({
 
   const handleImport = useCallback(async () => {
     if (editorDoc?.mode === 'effect') {
-      await importEffectFile(mode)
+      const effectMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
+      await importEffectFile(effectMode)
       refreshEffectFiles()
     } else {
       await importNodeCueFile(mode)
@@ -341,7 +353,11 @@ export function useCueFileIO({
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
           const cueFile = file as NodeCueFile
           const firstCue = firstByName(
-            cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[],
+            cueFile.cues as (
+              | YargNodeCueDefinition
+              | AudioNodeCueDefinition
+              | MotionNodeCueDefinition
+            )[],
           )
           const cueId = cueFile.cues.find((c) => c.id === selectedCueId)?.id ?? firstCue?.id ?? null
           setSelectedCueId(cueId)

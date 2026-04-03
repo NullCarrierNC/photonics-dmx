@@ -16,6 +16,7 @@ import type {
   EffectEventListenerNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorNode } from '../lib/types'
+import type { NodeCueMode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 export type UseNodeSelectionParams = {
   nodes: EditorNode[]
@@ -24,7 +25,7 @@ export type UseNodeSelectionParams = {
   setEdges: React.Dispatch<React.SetStateAction<import('reactflow').Edge[]>>
   reactFlowInstance: ReactFlowInstance | null
   flowWrapperRef?: React.RefObject<HTMLDivElement>
-  activeMode: 'yarg' | 'audio'
+  activeMode: NodeCueMode
   setIsDirty: (dirty: boolean) => void
 }
 
@@ -177,7 +178,8 @@ export function useNodeSelection({
           const label = (() => {
             switch (node.data.kind) {
               case 'event': {
-                if (activeMode === 'yarg') return (nextPayload as YargEventNode).eventType
+                if (activeMode === 'yarg' || activeMode === 'motion')
+                  return (nextPayload as YargEventNode).eventType
                 const audioPayload = nextPayload as AudioEventNodeUnion
                 return audioPayload.eventType === 'audio-trigger'
                   ? (audioPayload as AudioTriggerNode).nodeLabel

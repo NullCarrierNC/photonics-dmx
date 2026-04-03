@@ -259,6 +259,14 @@ export class Sequencer implements ILightingController {
     this.effectManager.setState(lights, color, time)
   }
 
+  public schedulePanTiltClear(): void {
+    this.transitionEngine.schedulePanTiltClear()
+  }
+
+  public cancelPanTiltClear(): void {
+    this.transitionEngine.cancelPanTiltClear()
+  }
+
   /**
    * Trigger the beat event.
    */

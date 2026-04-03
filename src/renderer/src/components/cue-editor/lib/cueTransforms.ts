@@ -17,6 +17,7 @@ import type {
   LogicNode,
   YargEventNode,
   YargNodeCueDefinition,
+  MotionNodeCueDefinition,
   YargEffectDefinition,
   NotesNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -28,7 +29,7 @@ import type { EditorMode } from './edgeValidation'
 /** Edge data for editor edges (port info for logic/conditional nodes). */
 export type EditorEdgeData = { fromPort?: string | null; toPort?: string | null }
 
-type CueDefinition = YargNodeCueDefinition | AudioNodeCueDefinition
+type CueDefinition = YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition
 type EffectDefinition = YargEffectDefinition | AudioEffectDefinition
 
 const DEFAULT_POS = {
@@ -120,7 +121,7 @@ function buildEventNodes(
     data: {
       kind: 'event' as const,
       label:
-        mode === 'yarg'
+        mode === 'yarg' || mode === 'motion'
           ? getYargEventLabel((event as YargEventNode).eventType)
           : event.eventType === 'audio-trigger'
             ? (event as AudioTriggerNode).nodeLabel
@@ -331,7 +332,11 @@ function flowToNodesAndConnections(
   return { layoutPositions, nodes: payload, connections }
 }
 
-const cueModeOf = (cue: CueDefinition): NodeCueMode => ('cueType' in cue ? 'yarg' : 'audio')
+const cueModeOf = (cue: CueDefinition): NodeCueMode => {
+  if ('cueTypeId' in cue) return 'audio'
+  if ('style' in cue) return 'yarg'
+  return 'motion'
+}
 
 const cueToFlow = (
   cue: CueDefinition | null,

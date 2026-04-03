@@ -6,7 +6,7 @@
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
-import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
+import type { CompiledYargCue, CompiledMotionCue } from '../compiler/NodeCueCompiler'
 import type { CompiledEffect } from '../compiler/EffectCompiler'
 import type { BaseEventNode } from '../../types/nodeCueTypes'
 import type { VariableDefinition } from '../../types/nodeCueTypes'
@@ -65,7 +65,7 @@ export class GraphExecutionEngine {
   private readonly callbacks?: NodeRuntimeCallbacks
   private readonly variableDefinitions: VariableDefinition[]
   private effectRegistry?: EffectRegistry
-  private compiledCue?: CompiledYargCue
+  private compiledCue?: CompiledYargCue | CompiledMotionCue
   private compiledEffect?: CompiledEffect<BaseEventNode>
   private readonly cueId: string
   private nodeEngine: NodeExecutionEngine | null = null
@@ -76,18 +76,21 @@ export class GraphExecutionEngine {
   private isExecutingCueStarted = false
   private queuedParameters: ExecutionParameters[] = []
 
-  private get compiledCueOrEffect(): CompiledYargCue | CompiledEffect<BaseEventNode> {
+  private get compiledCueOrEffect():
+    | CompiledYargCue
+    | CompiledMotionCue
+    | CompiledEffect<BaseEventNode> {
     if (this.compiledCue) return this.compiledCue
     if (this.compiledEffect) return this.compiledEffect
     throw new Error('GraphExecutionEngine: neither compiledCue nor compiledEffect set')
   }
 
   /**
-   * Create engine for a cue graph (CompiledYargCue).
+   * Create engine for a cue graph (YARG or motion node cues).
    * Effect registry required for effect-raiser nodes.
    */
   static forCue(
-    compiledCue: CompiledYargCue,
+    compiledCue: CompiledYargCue | CompiledMotionCue,
     cueId: string,
     policy: GraphExecutionPolicy,
     session: IGraphExecutionSession,
@@ -252,7 +255,7 @@ export class GraphExecutionEngine {
     parameters: ExecutionParameters,
     entryContext?: { hasCueStartedFired?: boolean },
   ): void {
-    const compiled = this.compiledCueOrEffect as CompiledYargCue
+    const compiled = this.compiledCueOrEffect as CompiledYargCue | CompiledMotionCue
     const entryNodes = this.policy.getEntryNodes(compiled, parameters, entryContext)
     const cueStartedNodes = entryNodes.filter(
       (n) => (n as { eventType?: string }).eventType === 'cue-started',
@@ -276,6 +279,7 @@ export class GraphExecutionEngine {
     }
 
     if (
+      this.policy.useInitialClearPolicy &&
       this.session.setFirstSubmissionUsesSetEffect &&
       hasCueEvent &&
       !(this.session.getClearedForThisActivation?.() ?? false)

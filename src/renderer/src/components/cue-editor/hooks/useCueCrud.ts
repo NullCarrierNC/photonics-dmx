@@ -5,9 +5,11 @@ import type {
   NodeCueFile,
   NodeCueMode,
   YargNodeCueDefinition,
+  MotionNodeCueDefinition,
   YargEffectDefinition,
   YargNodeCueFile,
   AudioNodeCueFile,
+  MotionNodeCueFile,
   YargEffectFile,
   AudioEffectFile,
   EffectFile,
@@ -36,6 +38,7 @@ export type UseCueCrudParams = {
     cue:
       | YargNodeCueDefinition
       | AudioNodeCueDefinition
+      | MotionNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition
       | null,
@@ -173,11 +176,18 @@ export function useCueCrud({
     const updatedFile =
       mode === 'yarg'
         ? ({ ...baseDoc.file, cues: updatedCues as YargNodeCueDefinition[] } as YargNodeCueFile)
-        : ({ ...baseDoc.file, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
+        : mode === 'motion'
+          ? ({
+              ...baseDoc.file,
+              cues: updatedCues as MotionNodeCueDefinition[],
+            } as MotionNodeCueFile)
+          : ({ ...baseDoc.file, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
     const updatedDoc: EditorDocument = { ...baseDoc, file: updatedFile }
     setEditorDoc(updatedDoc)
     setSelectedCueId(newCue.id)
-    loadCueIntoFlow(newCue as YargNodeCueDefinition | AudioNodeCueDefinition)
+    loadCueIntoFlow(
+      newCue as YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition,
+    )
     setIsDirty(true)
   }, [editorDoc, mode, loadCueIntoFlow, setEditorDoc, setFilename, setSelectedCueId, setIsDirty])
 
@@ -224,7 +234,9 @@ export function useCueCrud({
       const updatedFile =
         cueFile.mode === 'yarg'
           ? ({ ...cueFile, cues: updatedCues as YargNodeCueDefinition[] } as YargNodeCueFile)
-          : ({ ...cueFile, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
+          : cueFile.mode === 'motion'
+            ? ({ ...cueFile, cues: updatedCues as MotionNodeCueDefinition[] } as MotionNodeCueFile)
+            : ({ ...cueFile, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
       const updatedDoc: EditorDocument = { ...editorDoc, file: updatedFile }
 
       setEditorDoc(updatedDoc)
@@ -238,7 +250,9 @@ export function useCueCrud({
 
       const nextCue =
         updatedCues.find((cue) => cue.id === nextCueId) ?? firstByName(updatedCues) ?? null
-      loadCueIntoFlow(nextCue as YargNodeCueDefinition | AudioNodeCueDefinition | null)
+      loadCueIntoFlow(
+        nextCue as YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition | null,
+      )
       setIsDirty(true)
     },
     [editorDoc, loadCueIntoFlow, selectedCueId, setEditorDoc, setSelectedCueId, setIsDirty],

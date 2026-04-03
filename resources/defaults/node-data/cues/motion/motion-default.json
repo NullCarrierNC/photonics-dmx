@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "mode": "motion",
+  "group": {
+    "id": "motion-default",
+    "name": "Default motion",
+    "description": "Example motion pan/tilt (parallel with lighting)",
+    "isDefault": true
+  },
+  "cues": [
+    {
+      "id": "motion-default-cue",
+      "name": "Default motion",
+      "description": "Moves pan/tilt on cue-started; layer above normal colour cues",
+      "nodes": {
+        "events": [
+          {
+            "id": "motion-default-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "motion-default-action-pos",
+            "type": "action",
+            "effectType": "set-position",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "position": {
+              "pan": { "source": "literal", "value": 128 },
+              "tilt": { "source": "literal", "value": 96 }
+            },
+            "timing": {
+              "waitForCondition": { "source": "literal", "value": "none" },
+              "waitForTime": { "source": "literal", "value": 0 },
+              "duration": { "source": "literal", "value": 800 },
+              "waitUntilCondition": { "source": "literal", "value": "none" },
+              "waitUntilTime": { "source": "literal", "value": 0 },
+              "easing": { "source": "literal", "value": "easeInOut" },
+              "level": { "source": "literal", "value": "normal" }
+            },
+            "layer": { "source": "literal", "value": 120 }
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "motion-default-event-start",
+          "to": "motion-default-action-pos"
+        }
+      ],
+      "layout": {
+        "nodePositions": {}
+      }
+    }
+  ],
+  "bundled": true
+}

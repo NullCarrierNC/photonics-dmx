@@ -246,6 +246,22 @@ export class LightTransitionController {
   }
 
   /**
+   * Strips pan/tilt from every layer state so merged output omits them and DmxPublisher
+   * can fall back to fixture panHome/tiltHome. Invoked on the frame after motion cues stop.
+   */
+  public clearPanTilt(): void {
+    for (const [lightId, layerMap] of this._currentLayerStates) {
+      for (const [layer, state] of layerMap) {
+        const next: RGBIO = { ...state }
+        delete next.pan
+        delete next.tilt
+        layerMap.set(layer, next)
+      }
+      this.calculateFinalColorForLight(lightId)
+    }
+  }
+
+  /**
    * Removes all transitions for the given lights entirely.
    */
   public removeLights(lightIds: string[]): void {

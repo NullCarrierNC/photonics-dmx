@@ -11,12 +11,13 @@
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
-import { CompiledYargCue, CompiledAudioCue } from '../compiler/NodeCueCompiler'
+import { CompiledYargCue, CompiledAudioCue, CompiledMotionCue } from '../compiler/NodeCueCompiler'
 import {
   ActionEffectFactory,
   ResolvedActionTarget,
   ResolvedColorSetting,
   ResolvedActionTiming,
+  ResolvedPositionSetting,
 } from '../compiler/ActionEffectFactory'
 import {
   ActionNode,
@@ -43,7 +44,12 @@ import {
   resolveLightTarget,
   getVariableStore,
 } from './valueResolver'
-import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
+import {
+  resolveActionTiming,
+  resolveActionColor,
+  resolveActionLayer,
+  resolveActionPosition,
+} from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -87,7 +93,7 @@ export class NodeExecutionEngine {
     return NodeExecutionEngine.globalDebugEnabled
   }
 
-  private compiledCue: CompiledYargCue | CompiledAudioCue
+  private compiledCue: CompiledYargCue | CompiledAudioCue | CompiledMotionCue
   private cueId: string
   private activeContexts: Map<string, ExecutionContext> = new Map()
   private sequencer: ILightingController
@@ -119,7 +125,7 @@ export class NodeExecutionEngine {
   ) => void
 
   constructor(
-    compiledCue: CompiledYargCue | CompiledAudioCue,
+    compiledCue: CompiledYargCue | CompiledAudioCue | CompiledMotionCue,
     cueId: string,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
@@ -466,10 +472,115 @@ export class NodeExecutionEngine {
         return
       }
 
+      if (actionNode.effectType === 'set-position') {
+        if (!actionNode.position) {
+          console.warn(`set-position action ${actionNode.id} is missing position`)
+          this.continueToNextNodes(actionNode.id, context)
+          return
+        }
+
+        const resolvedTarget: ResolvedActionTarget = {
+          groups: resolveLocationGroups(actionNode.target.groups, context),
+          filter: resolveLightTarget(actionNode.target.filter, context),
+        }
+        const resolvedPosition: ResolvedPositionSetting = resolveActionPosition(
+          actionNode.position,
+          context,
+        )
+        const resolvedTiming = resolveActionTiming(actionNode.timing, context)
+        const resolvedLayer = resolveActionLayer(actionNode.layer, context)
+
+        const resolvedAction = {
+          ...actionNode,
+          target: resolvedTarget,
+          timing: resolvedTiming,
+          layer: resolvedLayer,
+        } as ActionNode & {
+          target: ResolvedActionTarget
+          timing: ResolvedActionTiming
+          layer: number
+        }
+
+        const lights = ActionEffectFactory.resolveLights(
+          this.lightManager,
+          actionNode.target,
+          (varName: string) => {
+            const cueVar = context.cueLevelVarStore.get(varName)
+            const groupVar = context.groupLevelVarStore.get(varName)
+            return cueVar ?? groupVar
+          },
+        )
+
+        if (!lights || lights.length === 0) {
+          this.continueToNextNodes(actionNode.id, context)
+          return
+        }
+
+        const submitPositionAction = (): void => {
+          const effect = ActionEffectFactory.buildEffect({
+            action: resolvedAction,
+            lights,
+            waitCondition: undefined,
+            waitTime: 0,
+            resolvedTarget,
+            resolvedTiming,
+            resolvedLayer,
+            resolvedPosition,
+          })
+
+          if (!effect) {
+            this.continueToNextNodes(actionNode.id, context)
+            return
+          }
+
+          const iterIdx = context.getForEachIterationIndex()
+          const effectName =
+            iterIdx >= 0
+              ? `${this.cueId}:${actionNode.id}:${iterIdx}`
+              : `${this.cueId}:${actionNode.id}`
+
+          const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
+          const useSetEffect = this.getAndConsumeInitialClearPolicy()
+
+          if (shouldBlock) {
+            context.registerActiveAction(actionNode.id, actionNode)
+            const callback = (): void => {
+              this.submittedEffects.delete(effectName)
+              this.emitNodeExecution('deactivated', actionNode.id)
+              context.completeAction(actionNode.id)
+            }
+            this.submittedEffects.set(effectName, resolvedLayer)
+            if (useSetEffect) {
+              this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
+            } else {
+              this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
+            }
+          } else {
+            this.submittedEffects.set(effectName, resolvedLayer)
+            if (useSetEffect) {
+              this.sequencer.setEffectUnblockedName(effectName, effect)
+            } else {
+              this.sequencer.addEffect(effectName, effect)
+            }
+            this.emitNodeExecution('deactivated', actionNode.id)
+            this.continueToNextNodes(actionNode.id, context)
+          }
+        }
+
+        submitPositionAction()
+        return
+      }
+
       // Resolve target
       const resolvedTarget: ResolvedActionTarget = {
         groups: resolveLocationGroups(actionNode.target.groups, context),
         filter: resolveLightTarget(actionNode.target.filter, context),
+      }
+
+      if (!actionNode.color) {
+        console.warn(`Action ${actionNode.id} (${actionNode.effectType}) is missing color`)
+        this.continueToNextNodes(actionNode.id, context)
+        return
       }
 
       const resolvedColor = resolveActionColor(actionNode.color, context)
@@ -628,6 +739,12 @@ export class NodeExecutionEngine {
 
       const resolveChainStep = (a: ActionNode): ChainStep | null => {
         if (a.effectType === 'blackout') {
+          return null
+        }
+        if (a.effectType !== 'set-color') {
+          return null
+        }
+        if (!a.color) {
           return null
         }
 

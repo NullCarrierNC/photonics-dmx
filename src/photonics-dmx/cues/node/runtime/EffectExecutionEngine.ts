@@ -13,6 +13,7 @@ import {
   ActionEffectFactory,
   ResolvedColorSetting,
   ResolvedActionTiming,
+  ResolvedPositionSetting,
 } from '../compiler/ActionEffectFactory'
 import {
   ActionNode,
@@ -27,7 +28,12 @@ import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
 import { resolveValue, getVariableStore } from './valueResolver'
-import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
+import {
+  resolveActionTiming,
+  resolveActionColor,
+  resolveActionLayer,
+  resolveActionPosition,
+} from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -354,6 +360,82 @@ export class EffectExecutionEngine {
       return
     }
 
+    if (action.effectType === 'set-position') {
+      if (!action.position) {
+        console.warn(`set-position action ${action.id} is missing position`)
+        this.emitNodeExecution('deactivated', action.id)
+        this.continueToNextNodes(action.id, context)
+        return
+      }
+      const resolvedPosition: ResolvedPositionSetting = resolveActionPosition(
+        action.position,
+        context,
+      )
+      const resolvedTiming = resolveActionTiming(action.timing, context)
+      const resolvedLayer = resolveActionLayer(action.layer, context)
+      const iterIdx = context.getForEachIterationIndex()
+
+      const submitPositionAction = (): void => {
+        const effect = ActionEffectFactory.buildEffect({
+          action,
+          lights,
+          resolvedPosition,
+          resolvedTiming,
+          resolvedLayer,
+        })
+        if (!effect) {
+          console.warn(`Failed to create set-position effect for action ${action.id}`)
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+          return
+        }
+        const useSetEffect = this.getAndConsumeInitialClearPolicy()
+        const effectName =
+          iterIdx >= 0
+            ? `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}:${iterIdx}`
+            : `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}`
+        const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
+        if (shouldBlock) {
+          context.registerActiveAction(action.id, action)
+          this.pendingCallbackEffects.add(effectName)
+          const callback = (): void => {
+            this.pendingCallbackEffects.delete(effectName)
+            this.submittedEffects.delete(effectName)
+            this.emitNodeExecution('deactivated', action.id)
+            context.advancePhase()
+            context.completeAction(action.id)
+            this.continueToNextNodes(action.id, context)
+            this.maybeFireIdle()
+          }
+          this.submittedEffects.set(effectName, resolvedLayer)
+          if (useSetEffect) {
+            this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
+          } else {
+            this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
+          }
+        } else {
+          this.submittedEffects.set(effectName, resolvedLayer)
+          if (useSetEffect) {
+            this.sequencer.setEffectUnblockedName(effectName, effect)
+          } else {
+            this.sequencer.addEffect(effectName, effect)
+          }
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+        }
+      }
+
+      submitPositionAction()
+      return
+    }
+
+    if (!action.color) {
+      console.warn(`Action ${action.id} (${action.effectType}) is missing color`)
+      this.emitNodeExecution('deactivated', action.id)
+      this.continueToNextNodes(action.id, context)
+      return
+    }
+
     const resolvedColor = resolveActionColor(action.color, context)
     const resolvedTiming = resolveActionTiming(action.timing, context)
     const resolvedLayer = resolveActionLayer(action.layer, context)
@@ -447,6 +529,7 @@ export class EffectExecutionEngine {
     // Try to resolve each chain step (only set-color actions can be chained)
     const resolveChainStep = (a: ActionNode): ChainStep | null => {
       if (a.effectType !== 'set-color') return null
+      if (!a.color) return null
 
       const layerNum = resolveActionLayer(a.layer, context)
       const rc = resolveActionColor(a.color, context)
