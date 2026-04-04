@@ -8,6 +8,7 @@ import {
   RgbwDmxChannels,
   StrobeDmxChannels,
   FixtureConfig,
+  normalizeFixtureConfig,
 } from '../../../photonics-dmx/types'
 import { LightIcon } from './LightIcon'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
@@ -25,7 +26,15 @@ const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSp
 
 const getDisplayName = (channelName: string) => {
   if (channelName === 'masterDimmer') return 'Master Dimmer'
-  // For other keys, simply capitalize the first letter.
+  if (channelName === 'panRangeDeg') return 'Pan range (deg)'
+  if (channelName === 'tiltRangeDeg') return 'Tilt range (deg)'
+  if (channelName === 'panMin') return 'Pan min'
+  if (channelName === 'panMax') return 'Pan max'
+  if (channelName === 'tiltMin') return 'Tilt min'
+  if (channelName === 'tiltMax') return 'Tilt max'
+  if (channelName === 'panHome') return 'Pan home'
+  if (channelName === 'tiltHome') return 'Tilt home'
+  // For other keys, capitalize the first letter.
   return channelName.charAt(0).toUpperCase() + channelName.slice(1)
 }
 
@@ -88,7 +97,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       // Handle Config
       // Copy the config from the light (no master dimmer logic here)
       if (light.config) {
-        setLocalConfig(light.config)
+        setLocalConfig(normalizeFixtureConfig(light.config))
       } else {
         setLocalConfig(null)
       }
@@ -155,7 +164,15 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- config value can be number or string
       let updatedValue: any = value
       if (key !== 'invert') {
-        updatedValue = Number(value)
+        if (key === 'panRangeDeg') {
+          const num = Number(value)
+          updatedValue = Math.max(1, Math.min(720, Math.round(num)))
+        } else if (key === 'tiltRangeDeg') {
+          const num = Number(value)
+          updatedValue = Math.max(1, Math.min(360, Math.round(num)))
+        } else {
+          updatedValue = Number(value)
+        }
       }
       const updatedConfig = { ...localConfig, [key]: updatedValue }
       setLocalConfig(updatedConfig)
@@ -208,8 +225,9 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
     // For config, if the new fixture has a config template, use it.
     if (selectedFixture.config) {
-      setLocalConfig(selectedFixture.config)
-      updatedLight.config = { ...selectedFixture.config }
+      const normalized = normalizeFixtureConfig(selectedFixture.config)
+      setLocalConfig(normalized)
+      updatedLight.config = normalized
     } else {
       setLocalConfig(null)
       updatedLight.config = undefined
@@ -312,9 +330,13 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
             {Object.entries(localConfig).map(([key, value]) => {
               // Determine input type based on value type.
               const inputType = typeof value === 'boolean' ? 'checkbox' : 'number'
+              const isPanRangeDeg = key === 'panRangeDeg'
+              const isTiltRangeDeg = key === 'tiltRangeDeg'
               return (
                 <li key={key} className="flex justify-between items-center">
-                  <span className="capitalize">{getDisplayName(key)}</span>
+                  <span className={isPanRangeDeg || isTiltRangeDeg ? '' : 'capitalize'}>
+                    {getDisplayName(key)}
+                  </span>
                   {inputType === 'checkbox' ? (
                     <input
                       type="checkbox"
@@ -327,6 +349,8 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                   ) : (
                     <input
                       type="number"
+                      min={isPanRangeDeg ? 1 : isTiltRangeDeg ? 1 : undefined}
+                      max={isPanRangeDeg ? 720 : isTiltRangeDeg ? 360 : undefined}
                       value={value as number}
                       onChange={(e) =>
                         handleConfigChange(key as keyof FixtureConfig, e.target.value)

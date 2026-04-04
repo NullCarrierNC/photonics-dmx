@@ -10,6 +10,7 @@ import {
   RgbMovingHeadDmxChannels,
   RgbwMovingHeadDmxChannels,
   ConfigStrobeType,
+  normalizeFixtureConfig,
 } from '../../../photonics-dmx/types'
 
 interface LightsDmxPreviewProps {
@@ -17,20 +18,22 @@ interface LightsDmxPreviewProps {
   dmxValues: Record<number, number>
 }
 
-/** Fixture-style pan: 0–255 maps linearly to 540° total rotation. */
-const PAN_RANGE_DEG = 540
-/** Fixture-style tilt: 0–255 maps linearly to 180° (forward horizontal → up → backward horizontal). */
-const TILT_RANGE_DEG = 180
-
 /**
  * Top-down polar projection: centre = beam straight up, edge = horizontal.
  * Returns CSS left/top percentages (0–100) for the motion indicator dot.
+ * @param panRangeDeg Physical pan span mapped from DMX 0–255 (from fixture config).
+ * @param tiltRangeDeg Physical tilt span mapped from DMX 0–255 (from fixture config).
  */
-function panTiltToXY(pan: number, tilt: number): { xPct: number; yPct: number } {
-  const panAngleDeg = (pan / 255) * PAN_RANGE_DEG
+function panTiltToXY(
+  pan: number,
+  tilt: number,
+  panRangeDeg: number,
+  tiltRangeDeg: number,
+): { xPct: number; yPct: number } {
+  const panAngleDeg = (pan / 255) * panRangeDeg
   const panAngleRad = (panAngleDeg * Math.PI) / 180
 
-  const tiltAngleDeg = (tilt / 255) * TILT_RANGE_DEG
+  const tiltAngleDeg = (tilt / 255) * tiltRangeDeg
   const zenithDeg = Math.abs(tiltAngleDeg - 90)
   const radius = Math.min(1, zenithDeg / 90)
 
@@ -130,7 +133,8 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
     const channels = light.channels as RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels
     const pan = dmxValues[channels.pan] ?? 0
     const tilt = dmxValues[channels.tilt] ?? 0
-    const { xPct, yPct } = panTiltToXY(pan, tilt)
+    const { panRangeDeg, tiltRangeDeg } = normalizeFixtureConfig(light.config)
+    const { xPct, yPct } = panTiltToXY(pan, tilt, panRangeDeg, tiltRangeDeg)
 
     return (
       <div key={light.id || `light-${index}`}>

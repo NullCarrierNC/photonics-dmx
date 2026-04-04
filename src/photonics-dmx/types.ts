@@ -254,14 +254,62 @@ export interface MovingHeadDmxChannels {
   tilt: number
 }
 
+/** Default physical pan range (degrees) when not specified on a fixture. */
+export const DEFAULT_PAN_RANGE_DEG = 540
+/** Default physical tilt range (degrees) when not specified on a fixture. */
+export const DEFAULT_TILT_RANGE_DEG = 180
+
 export interface FixtureConfig {
   panHome: number
   panMin: number
   panMax: number
+  /** Physical pan travel in degrees (DMX 0–255 maps across this span). */
+  panRangeDeg: number
   tiltHome: number
   tiltMin: number
   tiltMax: number
+  /** Physical tilt travel in degrees (DMX 0–255 maps across this span). */
+  tiltRangeDeg: number
   invert: boolean
+}
+
+/** Full defaults for moving-head fixture config; use {@link normalizeFixtureConfig} for persisted data. */
+export const DEFAULT_MOVING_HEAD_FIXTURE_CONFIG: Readonly<FixtureConfig> = {
+  panHome: 0,
+  panMin: 0,
+  panMax: 255,
+  panRangeDeg: DEFAULT_PAN_RANGE_DEG,
+  tiltHome: 0,
+  tiltMin: 0,
+  tiltMax: 255,
+  tiltRangeDeg: DEFAULT_TILT_RANGE_DEG,
+  invert: false,
+}
+
+/**
+ * Merges partial or legacy saved config with defaults (e.g. missing degree-range fields).
+ */
+export function normalizeFixtureConfig(
+  config: Partial<FixtureConfig> | null | undefined,
+): FixtureConfig {
+  const c = config ?? {}
+  return {
+    panHome: c.panHome ?? DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.panHome,
+    panMin: c.panMin ?? DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.panMin,
+    panMax: c.panMax ?? DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.panMax,
+    panRangeDeg:
+      Number.isFinite(c.panRangeDeg) && (c.panRangeDeg as number) > 0
+        ? (c.panRangeDeg as number)
+        : DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.panRangeDeg,
+    tiltHome: c.tiltHome ?? DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.tiltHome,
+    tiltMin: c.tiltMin ?? DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.tiltMin,
+    tiltMax: c.tiltMax ?? DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.tiltMax,
+    tiltRangeDeg:
+      Number.isFinite(c.tiltRangeDeg) && (c.tiltRangeDeg as number) > 0
+        ? (c.tiltRangeDeg as number)
+        : DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.tiltRangeDeg,
+    invert: c.invert ?? DEFAULT_MOVING_HEAD_FIXTURE_CONFIG.invert,
+  }
 }
 
 export interface RgbMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbDmxChannels {}
@@ -357,13 +405,7 @@ export const LightTypes: DmxFixture[] = [
       tilt: 0,
     },
     config: {
-      panHome: 0,
-      panMin: 0,
-      panMax: 255,
-      tiltHome: 0,
-      tiltMin: 0,
-      tiltMax: 255,
-      invert: false,
+      ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
     },
     universe: 1,
   },
@@ -385,13 +427,7 @@ export const LightTypes: DmxFixture[] = [
       tilt: 0,
     },
     config: {
-      panHome: 0,
-      panMin: 0,
-      panMax: 255,
-      tiltHome: 0,
-      tiltMin: 0,
-      tiltMax: 255,
-      invert: false,
+      ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
     },
     universe: 1,
   },

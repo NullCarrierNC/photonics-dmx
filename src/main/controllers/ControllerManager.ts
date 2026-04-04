@@ -14,6 +14,7 @@ import {
   DmxFixture,
   FixtureTypes,
   FixtureConfig,
+  normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
@@ -1122,15 +1123,7 @@ export class ControllerManager {
     if (light.fixture !== FixtureTypes.RGBMH && light.fixture !== FixtureTypes.RGBWMH) {
       return { success: false, error: 'Light is not a moving head fixture' }
     }
-    const baseConfig: FixtureConfig = light.config ?? {
-      panHome: 0,
-      panMin: 0,
-      panMax: 255,
-      tiltHome: 0,
-      tiltMin: 0,
-      tiltMax: 255,
-      invert: false,
-    }
+    const baseConfig: FixtureConfig = normalizeFixtureConfig(light.config)
     const newConfig: FixtureConfig = {
       ...baseConfig,
       panHome: panClamped,
@@ -1149,15 +1142,7 @@ export class ControllerManager {
     if (fixture.fixture !== FixtureTypes.RGBMH && fixture.fixture !== FixtureTypes.RGBWMH) {
       return { success: false, error: 'Fixture template is not a moving head' }
     }
-    const fBase: FixtureConfig = fixture.config ?? {
-      panHome: 0,
-      panMin: 0,
-      panMax: 255,
-      tiltHome: 0,
-      tiltMin: 0,
-      tiltMax: 255,
-      invert: false,
-    }
+    const fBase: FixtureConfig = normalizeFixtureConfig(fixture.config)
     const newUserLights = [...userLights]
     newUserLights[fi] = {
       ...fixture,

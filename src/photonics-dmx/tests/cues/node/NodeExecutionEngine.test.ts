@@ -17,7 +17,7 @@ import { Beat, CueData, CueType } from '../../../cues/types/cueTypes'
 import { VariableValue } from '../../../cues/node/runtime/executionTypes'
 import type { CompiledEffect } from '../../../cues/node/runtime/EffectRegistry'
 import type { TrackedLight } from '../../../types'
-import type { FixtureConfig } from '../../../types'
+import { type FixtureConfig, DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../../types'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { sendToAllWindows } from '../../../../main/utils/windowUtils'
 
@@ -240,15 +240,7 @@ describe('NodeExecutionEngine', () => {
             {
               id: 'back1',
               position: 1,
-              config: {
-                panHome: 0,
-                panMin: 0,
-                panMax: 255,
-                tiltHome: 0,
-                tiltMin: 0,
-                tiltMax: 255,
-                invert: false,
-              },
+              config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG },
             },
           ]
         }
@@ -256,15 +248,7 @@ describe('NodeExecutionEngine', () => {
           {
             id: 'front1',
             position: 0,
-            config: {
-              panHome: 0,
-              panMin: 0,
-              panMax: 255,
-              tiltHome: 0,
-              tiltMin: 0,
-              tiltMax: 255,
-              invert: false,
-            },
+            config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG },
           },
         ]
       })
@@ -2416,11 +2400,11 @@ describe('NodeExecutionEngine', () => {
 
     it('should get all config-data array types', () => {
       const mockFrontLights: TrackedLight[] = [
-        { id: 'front1', position: 0, config: {} as FixtureConfig },
-        { id: 'front2', position: 1, config: {} as FixtureConfig },
+        { id: 'front1', position: 0, config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } },
+        { id: 'front2', position: 1, config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } },
       ]
       const mockBackLights: TrackedLight[] = [
-        { id: 'back1', position: 0, config: {} as FixtureConfig },
+        { id: 'back1', position: 0, config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } },
       ]
 
       mockLightManager.getLightsInGroup = jest.fn((groups: string | string[]) => {

@@ -1,6 +1,11 @@
 import { atom, getDefaultStore } from 'jotai'
 import { atomWithStorage, createJSONStorage } from 'jotai/utils'
-import { DmxFixture, LightingConfiguration, DmxRig } from '../../photonics-dmx/types'
+import {
+  DmxFixture,
+  LightingConfiguration,
+  DmxRig,
+  normalizeFixtureConfig,
+} from '../../photonics-dmx/types'
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { Pages } from './types'
@@ -45,9 +50,12 @@ export const myValidDmxLightsAtom = atom((get) => {
 
     // Include configChannels if they exist and ensure their values are valid
     if (DmxLight.config) {
-      const { panHome, panMin, panMax, tiltHome, tiltMin, tiltMax } = DmxLight.config
+      const cfg = normalizeFixtureConfig(DmxLight.config)
       const areConfigChannelsValid =
-        panHome >= panMin && panHome <= panMax && tiltHome >= tiltMin && tiltHome <= tiltMax
+        cfg.panHome >= cfg.panMin &&
+        cfg.panHome <= cfg.panMax &&
+        cfg.tiltHome >= cfg.tiltMin &&
+        cfg.tiltHome <= cfg.tiltMax
 
       return areChannelsValid && areConfigChannelsValid
     }

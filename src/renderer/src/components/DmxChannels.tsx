@@ -1,5 +1,5 @@
 import React from 'react'
-import { DmxFixture } from '../../../photonics-dmx/types'
+import { DmxFixture, normalizeFixtureConfig } from '../../../photonics-dmx/types'
 
 interface DmxChannelsProps {
   light: DmxFixture
@@ -100,7 +100,7 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
       {/* Config Channels - Allow zero if they exist */}
       {light.config &&
         renderChannels(
-          light.config as unknown as Record<string, number | boolean>,
+          normalizeFixtureConfig(light.config) as unknown as Record<string, number | boolean>,
           'Config Channels',
           true,
         )}

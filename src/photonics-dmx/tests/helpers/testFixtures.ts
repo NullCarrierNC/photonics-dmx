@@ -5,6 +5,7 @@ import {
   RGBIO,
   FixtureTypes,
   DmxLight,
+  DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
 } from '../../types'
 import { ConfigStrobeType } from '../../types'
 
@@ -48,13 +49,7 @@ export const createMockTrackedLight = (overrides?: Partial<TrackedLight>): Track
   id: 'test-light-1',
   position: 1,
   config: {
-    panHome: 0,
-    panMin: 0,
-    panMax: 255,
-    tiltHome: 0,
-    tiltMin: 0,
-    tiltMax: 255,
-    invert: false,
+    ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
   },
   ...overrides,
 })
