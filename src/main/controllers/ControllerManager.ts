@@ -6,7 +6,15 @@ import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager
 import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
-import { LightingConfiguration, ConfigStrobeType } from '../../photonics-dmx/types'
+import {
+  LightingConfiguration,
+  ConfigStrobeType,
+  DmxRig,
+  DmxLight,
+  DmxFixture,
+  FixtureTypes,
+  FixtureConfig,
+} from '../../photonics-dmx/types'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
@@ -82,6 +90,9 @@ export class ControllerManager {
   private readonly audioController: AudioController
 
   private isInitialized = false
+
+  /** Snapshot of listeners disabled while DMX Console is active */
+  private consoleRestore: { yarg: boolean; rb3: boolean; audio: boolean } | null = null
 
   constructor() {
     this.config = new ConfigurationManager()
@@ -922,5 +933,217 @@ export class ControllerManager {
    */
   public setAudioMirrorBroadcaster(fn: (data: AudioLightingData) => void): void {
     this.audioController.setBroadcastAudioMirror(fn)
+  }
+
+  /**
+   * DMX Console: pause cue/audio listeners and take over DMX output with a manual buffer.
+   */
+  public async enableConsoleMode(
+    rigId: string,
+  ): Promise<{ success: true } | { success: false; error: string }> {
+    await this.init()
+    const rig = this.config.getDmxRig(rigId)
+    if (!rig) {
+      return { success: false, error: 'Rig not found' }
+    }
+    if (this.consoleRestore !== null) {
+      this.dmxPublisher?.setManualBuffer({})
+      return { success: true }
+    }
+    this.consoleRestore = {
+      yarg: this.listenerCoordinator.getIsYargEnabled(),
+      rb3: this.listenerCoordinator.getIsRb3Enabled(),
+      audio: this.getIsAudioEnabled(),
+    }
+    if (this.consoleRestore.yarg) {
+      await this.disableYarg()
+    }
+    if (this.consoleRestore.rb3) {
+      await this.disableRb3()
+    }
+    if (this.consoleRestore.audio) {
+      await this.disableAudio()
+    }
+    this.dmxPublisher?.setManualBuffer({})
+    return { success: true }
+  }
+
+  /**
+   * Resume normal cue-driven output and restore listeners that were active before the console.
+   */
+  public async disableConsoleMode(): Promise<
+    { success: true } | { success: false; error: string }
+  > {
+    if (this.consoleRestore === null) {
+      return { success: true }
+    }
+    const r = this.consoleRestore
+    this.consoleRestore = null
+    this.dmxPublisher?.clearManualBuffer()
+    if (this.consoleRestore !== null) {
+      return { success: true }
+    }
+    if (r.yarg) {
+      this.enableYarg()
+    } else if (r.rb3) {
+      await this.enableRb3()
+    }
+    if (this.consoleRestore !== null) {
+      return { success: true }
+    }
+    if (r.audio) {
+      await this.enableAudio()
+    }
+    return { success: true }
+  }
+
+  public sendConsoleDmx(buffer: Record<number, number>): void {
+    this.dmxPublisher?.setManualBuffer(buffer)
+  }
+
+  public async updateConsoleChannel(payload: {
+    rigId: string
+    lightId: string
+    fixtureId: string
+    channelName: string
+    channelNumber: number
+  }): Promise<{ success: true } | { success: false; error: string }> {
+    const { rigId, lightId, fixtureId, channelName, channelNumber } = payload
+    if (!Number.isFinite(channelNumber) || channelNumber < 1 || channelNumber > 512) {
+      return { success: false, error: 'Channel number must be between 1 and 512' }
+    }
+    const rig = this.config.getDmxRig(rigId)
+    if (!rig) {
+      return { success: false, error: 'Rig not found' }
+    }
+    const light = this.findLightInRig(rig, lightId)
+    if (!light) {
+      return { success: false, error: 'Light not found in rig' }
+    }
+    const channels = light.channels as unknown as Record<string, number>
+    if (!Object.prototype.hasOwnProperty.call(channels, channelName)) {
+      return { success: false, error: `Unknown channel: ${channelName}` }
+    }
+    const updatedLight: DmxLight = {
+      ...light,
+      channels: { ...channels, [channelName]: channelNumber } as unknown as DmxLight['channels'],
+    }
+    const newConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
+    const updatedRig: DmxRig = { ...rig, config: newConfig }
+    await this.config.saveDmxRig(updatedRig)
+
+    const userLights = this.config.getUserLights()
+    const fi = userLights.findIndex((f) => f.id === fixtureId)
+    if (fi < 0) {
+      return { success: false, error: 'Fixture template not found in My Lights' }
+    }
+    const fixture = userLights[fi]
+    const fch = fixture.channels as unknown as Record<string, number>
+    if (!Object.prototype.hasOwnProperty.call(fch, channelName)) {
+      return { success: false, error: `Channel ${channelName} not on fixture template` }
+    }
+    const newUserLights = [...userLights]
+    newUserLights[fi] = {
+      ...fixture,
+      channels: { ...fch, [channelName]: channelNumber } as unknown as DmxFixture['channels'],
+    }
+    await this.config.updateUserLights(newUserLights)
+
+    this.refreshActiveRigs()
+    return { success: true }
+  }
+
+  public async setConsoleHome(payload: {
+    rigId: string
+    lightId: string
+    fixtureId: string
+    panHome: number
+    tiltHome: number
+  }): Promise<{ success: true } | { success: false; error: string }> {
+    const { rigId, lightId, fixtureId, panHome, tiltHome } = payload
+    if (!Number.isFinite(panHome) || !Number.isFinite(tiltHome)) {
+      return { success: false, error: 'panHome and tiltHome must be finite numbers' }
+    }
+    const panClamped = Math.max(0, Math.min(255, Math.round(panHome)))
+    const tiltClamped = Math.max(0, Math.min(255, Math.round(tiltHome)))
+    const rig = this.config.getDmxRig(rigId)
+    if (!rig) {
+      return { success: false, error: 'Rig not found' }
+    }
+    const light = this.findLightInRig(rig, lightId)
+    if (!light) {
+      return { success: false, error: 'Light not found in rig' }
+    }
+    if (light.fixture !== FixtureTypes.RGBMH && light.fixture !== FixtureTypes.RGBWMH) {
+      return { success: false, error: 'Light is not a moving head fixture' }
+    }
+    const baseConfig: FixtureConfig = light.config ?? {
+      panHome: 0,
+      panMin: 0,
+      panMax: 255,
+      tiltHome: 0,
+      tiltMin: 0,
+      tiltMax: 255,
+      invert: false,
+    }
+    const newConfig: FixtureConfig = {
+      ...baseConfig,
+      panHome: panClamped,
+      tiltHome: tiltClamped,
+    }
+    const updatedLight: DmxLight = { ...light, config: newConfig }
+    const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
+    await this.config.saveDmxRig({ ...rig, config: newRigConfig })
+
+    const userLights = this.config.getUserLights()
+    const fi = userLights.findIndex((f) => f.id === fixtureId)
+    if (fi < 0) {
+      return { success: false, error: 'Fixture template not found in My Lights' }
+    }
+    const fixture = userLights[fi]
+    if (fixture.fixture !== FixtureTypes.RGBMH && fixture.fixture !== FixtureTypes.RGBWMH) {
+      return { success: false, error: 'Fixture template is not a moving head' }
+    }
+    const fBase: FixtureConfig = fixture.config ?? {
+      panHome: 0,
+      panMin: 0,
+      panMax: 255,
+      tiltHome: 0,
+      tiltMin: 0,
+      tiltMax: 255,
+      invert: false,
+    }
+    const newUserLights = [...userLights]
+    newUserLights[fi] = {
+      ...fixture,
+      config: {
+        ...fBase,
+        panHome: panClamped,
+        tiltHome: tiltClamped,
+      },
+    }
+    await this.config.updateUserLights(newUserLights)
+
+    this.refreshActiveRigs()
+    return { success: true }
+  }
+
+  private findLightInRig(rig: DmxRig, lightId: string): DmxLight | null {
+    const all = [...rig.config.frontLights, ...rig.config.backLights, ...rig.config.strobeLights]
+    const found = all.find((l) => l.id === lightId)
+    return found ?? null
+  }
+
+  private replaceLightInRigConfig(
+    config: LightingConfiguration,
+    lightId: string,
+    replacement: DmxLight,
+  ): LightingConfiguration {
+    return {
+      ...config,
+      frontLights: config.frontLights.map((l) => (l.id === lightId ? replacement : l)),
+      backLights: config.backLights.map((l) => (l.id === lightId ? replacement : l)),
+      strobeLights: config.strobeLights.map((l) => (l.id === lightId ? replacement : l)),
+    }
   }
 }

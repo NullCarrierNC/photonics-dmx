@@ -239,6 +239,35 @@ export const enableSender = (config: SenderConfig) => window.api.send(LIGHT.SEND
 export const disableSender = (config: { sender: string }) =>
   window.api.send(LIGHT.SENDER_DISABLE, config)
 
+export const disableAllOutputSenders = () => window.api.invoke(LIGHT.SENDER_DISABLE_ALL, undefined)
+
+// ---------------------------------------------------------------------------
+// DMX Console (exclusive manual buffer)
+// ---------------------------------------------------------------------------
+
+export const enableConsole = (rigId: string) => window.api.invoke(LIGHT.CONSOLE_ENABLE, { rigId })
+
+export const disableConsole = () => window.api.invoke(LIGHT.CONSOLE_DISABLE, undefined)
+
+export const sendConsoleDmx = (buffer: Record<number, number>) =>
+  window.api.send(LIGHT.CONSOLE_SEND_DMX, buffer)
+
+export const updateConsoleChannel = (payload: {
+  rigId: string
+  lightId: string
+  fixtureId: string
+  channelName: string
+  channelNumber: number
+}) => window.api.invoke(LIGHT.CONSOLE_UPDATE_CHANNEL, payload)
+
+export const setConsoleHome = (payload: {
+  rigId: string
+  lightId: string
+  fixtureId: string
+  panHome: number
+  tiltHome: number
+}) => window.api.invoke(LIGHT.CONSOLE_SET_HOME, payload)
+
 // ---------------------------------------------------------------------------
 // Listener management
 // ---------------------------------------------------------------------------

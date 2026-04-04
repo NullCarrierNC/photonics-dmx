@@ -65,6 +65,7 @@ export const CUE = {
 export const LIGHT = {
   SENDER_ENABLE: 'sender-enable',
   SENDER_DISABLE: 'sender-disable',
+  SENDER_DISABLE_ALL: 'sender-disable-all',
   GET_SYSTEM_STATUS: 'get-system-status',
   GET_CUE_GROUPS: 'get-cue-groups',
   GET_ACTIVE_CUE_GROUPS: 'get-active-cue-groups',
@@ -90,6 +91,11 @@ export const LIGHT = {
   GET_CUE_GROUP_SELECTION_MODE: 'get-cue-group-selection-mode',
   GET_CONSISTENCY_STATUS: 'get-consistency-status',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
+  CONSOLE_ENABLE: 'console-enable',
+  CONSOLE_DISABLE: 'console-disable',
+  CONSOLE_SEND_DMX: 'console-send-dmx',
+  CONSOLE_UPDATE_CHANNEL: 'console-update-channel',
+  CONSOLE_SET_HOME: 'console-set-home',
 } as const
 
 // ---- Config ----

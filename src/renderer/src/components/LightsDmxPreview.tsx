@@ -24,7 +24,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
 
     if (fixture === FixtureTypes.STROBE) {
       // For strobe fixtures, use only masterDimmer for brightness
-      const dimmer = dmxValues[channels.masterDimmer] || 255
+      const dimmer = dmxValues[channels.masterDimmer] ?? 0
       const scale = dimmer / 255
 
       // Represent strobe with grayscale color
@@ -41,7 +41,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
       const red = dmxValues[rgbChannels.red] || 0
       const green = dmxValues[rgbChannels.green] || 0
       const blue = dmxValues[rgbChannels.blue] || 0
-      const dimmer = dmxValues[rgbChannels.masterDimmer] || 255
+      const dimmer = dmxValues[rgbChannels.masterDimmer] ?? 0
       const scale = dimmer / 255
 
       return `rgb(${Math.round(red * scale)}, ${Math.round(green * scale)}, ${Math.round(blue * scale)})`
@@ -58,7 +58,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
       const green = dmxValues[rgbwChannels.green] || 0
       const blue = dmxValues[rgbwChannels.blue] || 0
       const white = dmxValues[rgbwChannels.white] || 0
-      const dimmer = dmxValues[rgbwChannels.masterDimmer] || 255
+      const dimmer = dmxValues[rgbwChannels.masterDimmer] ?? 0
       const scale = dimmer / 255
 
       return `rgb(${Math.round((red + white) * scale)}, ${Math.round((green + white) * scale)}, ${Math.round((blue + white) * scale)})`
