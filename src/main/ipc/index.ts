@@ -8,6 +8,7 @@ import { setupNodeCueHandlers } from './node-cue-handlers'
 import { setupEffectHandlers } from './effect-handlers'
 import { setupShellHandlers } from './shell-handlers'
 import { setupWindowHandlers } from './window-handlers'
+import { setupConsoleHandlers } from './console-handlers'
 
 /**
  * Set up all IPC handlers
@@ -25,6 +26,7 @@ export function setupIpcHandlers(
 ): void {
   setupConfigHandlers(ipcMain, controllerManager)
   setupLightHandlers(ipcMain, controllerManager)
+  setupConsoleHandlers(ipcMain, controllerManager)
   setupCueHandlers(ipcMain, controllerManager)
   setupNodeCueHandlers(ipcMain, controllerManager)
   setupEffectHandlers(ipcMain, controllerManager)

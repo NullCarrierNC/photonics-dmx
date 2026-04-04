@@ -12,7 +12,7 @@ import {
   FiChevronRight,
   FiExternalLink,
 } from 'react-icons/fi'
-import { MdGraphicEq } from 'react-icons/md'
+import { MdGraphicEq, MdTune } from 'react-icons/md'
 import { useAtom, useSetAtom } from 'jotai'
 import { Pages } from './../types'
 import { currentPageAtom } from './../atoms'
@@ -82,6 +82,15 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           title={isCollapsed ? 'Light Layout' : undefined}>
           <FiLayout className="text-xl" />
           {!isCollapsed && <span className="text-[10pt]">Light Layout</span>}
+        </button>
+
+        {/* DMX Console */}
+        <button
+          onClick={() => handleMenuClick(Pages.DmxConsole)}
+          className={buttonClasses(Pages.DmxConsole)}
+          title={isCollapsed ? 'DMX Console' : undefined}>
+          <MdTune className="text-xl" />
+          {!isCollapsed && <span className="text-[10pt]">DMX Console</span>}
         </button>
 
         {/* Cue Preview Button */}

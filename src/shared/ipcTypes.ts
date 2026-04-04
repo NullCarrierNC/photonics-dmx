@@ -431,6 +431,38 @@ export interface IpcInvokeMap {
     }
     response: IpcSuccessResult | IpcErrorResult
   }
+  [LIGHT.SENDER_DISABLE_ALL]: {
+    request: void
+    response: { disabled: string[] }
+  }
+  [LIGHT.CONSOLE_ENABLE]: {
+    request: { rigId: string }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.CONSOLE_DISABLE]: {
+    request: void
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.CONSOLE_UPDATE_CHANNEL]: {
+    request: {
+      rigId: string
+      lightId: string
+      fixtureId: string
+      channelName: string
+      channelNumber: number
+    }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.CONSOLE_SET_HOME]: {
+    request: {
+      rigId: string
+      lightId: string
+      fixtureId: string
+      panHome: number
+      tiltHome: number
+    }
+    response: IpcSuccessResult | IpcErrorResult
+  }
 
   // ---- Config ----
   [CONFIG.GET_LIGHT_LIBRARY]: {
@@ -617,6 +649,7 @@ export interface IpcSendMap {
   [CUE.UPDATE_EFFECT_DEBOUNCE]: number
   [LIGHT.SENDER_ENABLE]: SenderConfig
   [LIGHT.SENDER_DISABLE]: { sender: string }
+  [LIGHT.CONSOLE_SEND_DMX]: Record<number, number>
   [CONFIG.SAVE_MY_LIGHTS]: DmxFixture[]
 }
 

@@ -1,4 +1,5 @@
-import { atom } from 'jotai'
+import { atom, getDefaultStore } from 'jotai'
+import { atomWithStorage, createJSONStorage } from 'jotai/utils'
 import { DmxFixture, LightingConfiguration, DmxRig } from '../../photonics-dmx/types'
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
@@ -70,11 +71,35 @@ export const dmxRigsAtom = atom<DmxRig[]>([])
  */
 export const activeRigIdAtom = atom<string | null>(null)
 
+const LAST_USED_RIG_STORAGE_KEY = 'photonics.dmx.lastUsedRigId'
+
+const rigIdLocalStorage = createJSONStorage<string | null>(() => localStorage)
+
 /**
- * Atom for the selected rig ID on DMX Preview / Cue Simulation pages.
- * Shared across pages so selection persists when navigating between them.
+ * Picks `current` if it appears in `orderedIds`, otherwise the first id, or null if the list is empty.
  */
-export const previewRigIdAtom = atom<string | null>(null)
+export function resolveLastUsedRigId(
+  current: string | null,
+  orderedIds: readonly string[],
+): string | null {
+  if (orderedIds.length === 0) {
+    return null
+  }
+  if (current != null && orderedIds.includes(current)) {
+    return current
+  }
+  return orderedIds[0]
+}
+
+/**
+ * Selected rig ID for DMX Preview, Cue Simulation, and DMX Console.
+ * Persisted in localStorage; validate against loaded rig lists (active vs all) in those UIs.
+ */
+export const previewRigIdAtom = atomWithStorage<string | null>(
+  LAST_USED_RIG_STORAGE_KEY,
+  null,
+  rigIdLocalStorage,
+)
 
 /**
  * Atom for last-known DMX values (channel -> value).
@@ -117,6 +142,25 @@ export const senderOpenDmxEnabledAtom = atom<boolean>(false)
 export const openDmxComPortAtom = atom<string>('')
 
 export const senderArtNetEnabledAtom = atom<boolean>(false)
+
+/** Maps main-process sender IDs (`getEnabledSenders` / `SENDER_DISABLE_ALL`) to toggle atoms. Excludes `ipc` (preview only). */
+const OUTPUT_SENDER_TOGGLE_ATOMS: Record<string, typeof senderSacnEnabledAtom> = {
+  sacn: senderSacnEnabledAtom,
+  artnet: senderArtNetEnabledAtom,
+  enttecpro: senderEnttecProEnabledAtom,
+  opendmx: senderOpenDmxEnabledAtom,
+}
+
+/** Sync UI toggles after those senders were stopped on the main process (e.g. leaving DMX Console). */
+export function resetOutputSenderToggleAtoms(disabledIds: readonly string[]): void {
+  const store = getDefaultStore()
+  for (const id of disabledIds) {
+    const a = OUTPUT_SENDER_TOGGLE_ATOMS[id]
+    if (a) {
+      store.set(a, false)
+    }
+  }
+}
 
 // ArtNet config derived from preferences with fallback defaults
 export const artNetConfigAtom = atom((get) => {

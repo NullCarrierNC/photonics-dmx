@@ -51,4 +51,24 @@ describe('DmxPublisher', () => {
     publisher.publish(new Map())
     expect(() => publisher.publish(new Map())).not.toThrow()
   })
+
+  it('setManualBuffer sends raw buffer and publish is ignored until clearManualBuffer', () => {
+    const config = createMockLightingConfig()
+    publisher.updateActiveRigs([{ id: 'r1', name: 'R1', active: true, config }])
+    mockSenderManager.send.mockClear()
+
+    publisher.setManualBuffer({ 1: 128, 2: 64 })
+    expect(mockSenderManager.send).toHaveBeenCalledWith(expect.objectContaining({ 1: 128, 2: 64 }))
+
+    mockSenderManager.send.mockClear()
+    const lights = new Map<string, import('../../types').RGBIO>()
+    lights.set('test-fixture-1', createMockRGBIP({ red: 255, green: 0, blue: 0 }))
+    publisher.publish(lights)
+    expect(mockSenderManager.send).not.toHaveBeenCalled()
+
+    publisher.clearManualBuffer()
+    mockSenderManager.send.mockClear()
+    publisher.publish(lights)
+    expect(mockSenderManager.send).toHaveBeenCalled()
+  })
 })
