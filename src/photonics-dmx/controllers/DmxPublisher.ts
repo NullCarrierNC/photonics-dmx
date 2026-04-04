@@ -10,7 +10,11 @@ import {
   normalizeFixtureConfig,
 } from '../types'
 import { DmxLightManager } from './DmxLightManager'
-import { castToChannelType, percentToDmx } from '../helpers/dmxHelpers'
+import {
+  castToChannelType,
+  mirrorDmxForMovingHeadInvert,
+  percentToDmx,
+} from '../helpers/dmxHelpers'
 import { SenderManager } from './SenderManager'
 import { LightStateManager } from './sequencer/LightStateManager'
 
@@ -158,8 +162,24 @@ export class DmxPublisher {
         let tiltOut: number
         if (isMovingHead) {
           const cfg = normalizeFixtureConfig(dmxLight.config)
-          panOut = pan != null ? percentToDmx(pan, cfg.panMin, cfg.panMax) : cfg.panHome
-          tiltOut = tilt != null ? percentToDmx(tilt, cfg.tiltMin, cfg.tiltMax) : cfg.tiltHome
+          const homePanDmx = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
+          const homeTiltDmx = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
+          if (pan != null) {
+            const panDmx = percentToDmx(pan, cfg.panMin, cfg.panMax)
+            panOut = cfg.invertPan
+              ? mirrorDmxForMovingHeadInvert(panDmx, cfg.panMin, cfg.panMax)
+              : panDmx
+          } else {
+            panOut = homePanDmx
+          }
+          if (tilt != null) {
+            const tiltDmx = percentToDmx(tilt, cfg.tiltMin, cfg.tiltMax)
+            tiltOut = cfg.invertTilt
+              ? mirrorDmxForMovingHeadInvert(tiltDmx, cfg.tiltMin, cfg.tiltMax)
+              : tiltDmx
+          } else {
+            tiltOut = homeTiltDmx
+          }
         } else {
           panOut = pan ?? dmxLight.config?.panHome ?? 0
           tiltOut = tilt ?? dmxLight.config?.tiltHome ?? 0

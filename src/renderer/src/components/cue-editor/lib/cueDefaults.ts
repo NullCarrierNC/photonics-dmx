@@ -38,8 +38,28 @@ const buildDefaultSetPositionAction = (): ActionNode => ({
     filter: { source: 'literal', value: 'all' },
   },
   position: {
-    pan: { source: 'literal', value: 50 },
-    tilt: { source: 'literal', value: 50 },
+    mode: 'direction',
+    bearing: { source: 'literal', value: 'downstage' },
+    angle: { source: 'literal', value: 20 },
+  },
+  timing: createDefaultActionTiming(),
+  layer: { source: 'literal', value: 120 },
+})
+
+const buildDefaultMotionPatternAction = (): ActionNode => ({
+  id: `action-${createId()}`,
+  type: 'action',
+  effectType: 'motion-pattern',
+  target: {
+    groups: { source: 'literal', value: 'front' },
+    filter: { source: 'literal', value: 'all' },
+  },
+  motionPattern: {
+    pattern: { source: 'literal', value: 'circle' },
+    speed: { source: 'literal', value: 0.5 },
+    size: { source: 'literal', value: 20 },
+    bearing: { source: 'literal', value: 'downstage' },
+    fanSpread: { source: 'literal', value: 0 },
   },
   timing: createDefaultActionTiming(),
   layer: { source: 'literal', value: 120 },
@@ -279,6 +299,7 @@ const createDefaultEffectFile = (mode: EffectMode): EffectFile => {
 export {
   buildDefaultAction,
   buildDefaultSetPositionAction,
+  buildDefaultMotionPatternAction,
   buildDefaultAudioEvent,
   buildDefaultYargEvent,
   createBlankCue,

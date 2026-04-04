@@ -97,6 +97,12 @@ describe('NodeExecutionEngine', () => {
       enableDebug: jest.fn(),
       debugLightLayers: jest.fn(),
       shutdown: jest.fn(),
+      cancelPanTiltClear: jest.fn(),
+      schedulePanTiltClear: jest.fn(),
+      addMotionPattern: jest.fn(),
+      getMotionPattern: jest.fn().mockReturnValue(undefined),
+      removeMotionPattern: jest.fn(),
+      updateMotionPatternConfig: jest.fn(),
     } as unknown as ILightingController
 
     mockLightManager = {
@@ -2765,6 +2771,78 @@ describe('NodeExecutionEngine', () => {
       expect(selectedLight?.type).toBe('light-array')
       // Index -1 should wrap to the last element (index 2)
       expect(selectedLight?.value).toEqual([mockLights[2]])
+    })
+  })
+
+  describe('set-position direction mode', () => {
+    it('uses panDirectionCW from fixture config when resolving bearing', () => {
+      const movingHead: TrackedLight = {
+        id: 'mh1',
+        position: 1,
+        config: {
+          ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
+          panHome: 50,
+          panRangeDeg: 540,
+          panDirectionCW: false,
+        },
+      }
+      mockLightManager.getLights = jest
+        .fn()
+        .mockReturnValue([movingHead]) as unknown as DmxLightManager['getLights']
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-position',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        position: {
+          mode: 'direction',
+          bearing: { source: 'literal', value: 90 },
+          angle: { source: 'literal', value: 0 },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: { source: 'literal', value: 'linear' },
+        },
+      }
+      const definition: YargNodeCueDefinition = {
+        id: 'position-cue',
+        name: 'Position Cue',
+        cueType: CueType.Stomp,
+        style: 'primary',
+        nodes: { events: [eventNode], actions: [actionNode], logic: [] },
+        connections: [{ from: 'event1', to: 'action1' }],
+      }
+
+      const engine = new NodeExecutionEngine(
+        NodeCueCompiler.compileYargCue(definition),
+        'test-group:position-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+
+      engine.startExecution(eventNode, createCueData('Strong'))
+
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
+      const effect = (mockSequencer.addEffect as jest.Mock).mock.calls[0]?.[1]
+      const pan = effect?.transitions?.[0]?.transform?.color?.pan
+      // 90° bearing on a 540° fixture = 16.666..%; CCW fixtures subtract from home.
+      expect(pan).toBeCloseTo(50 - (90 / 540) * 100, 5)
     })
   })
 

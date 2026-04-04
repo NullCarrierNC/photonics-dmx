@@ -1,3 +1,4 @@
+import type { ResolvedMotionPatternSetting } from '../../cues/node/compiler/ActionEffectFactory'
 import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types'
 import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes'
 import { LightTransitionController } from './LightTransitionController'
@@ -6,6 +7,17 @@ export interface FrameContext {
   frameStartTime: number
   deltaTime: number
   frameIndex: number
+}
+
+/** Active parametric motion run for {@link MotionPatternEngine}. */
+export interface ActiveMotionPattern {
+  name: string
+  config: ResolvedMotionPatternSetting
+  lights: TrackedLight[]
+  layer: number
+  startTime: number
+  /** Amplitude scales from 0 to full over this duration (ms). */
+  rampUpDurationMs: number
 }
 
 /**
@@ -305,6 +317,29 @@ export interface ILightingController {
    * Cancel a pending deferred pan/tilt clear (e.g. a new motion cue starts same tick).
    */
   cancelPanTiltClear(): void
+
+  /**
+   * Start continuous parametric motion (pan/tilt waveforms) on the given layer.
+   */
+  addMotionPattern(
+    name: string,
+    config: ResolvedMotionPatternSetting,
+    lights: TrackedLight[],
+    layer: number,
+    rampUpDurationMs: number,
+  ): void
+
+  /** Stop a parametric motion run and remove its layer state. */
+  removeMotionPattern(name: string): void
+
+  /** Active motion-pattern run, if any (for idempotent re-submission). */
+  getMotionPattern(name: string): ActiveMotionPattern | undefined
+
+  /**
+   * Update resolved motion-pattern fields on an active run without resetting phase (e.g. `bearingDeg` only).
+   * No-op if no pattern is registered for `name`.
+   */
+  updateMotionPatternConfig(name: string, config: ResolvedMotionPatternSetting): void
 
   /**
    * Add an effect with a completion callback.

@@ -4,16 +4,28 @@ import {
   TrackedLight,
   Effect,
   EffectTransition,
+  FixtureConfig,
   RGBIO,
   LocationGroup,
   Color,
   Brightness,
   BlendMode,
   LightTarget,
+  normalizeFixtureConfig,
 } from '../../../types'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import { getColor } from '../../../helpers/dmxHelpers'
-import { ActionNode, createDefaultActionTiming } from '../../types/nodeCueTypes'
+import { degreeOffsetToPercent, getColor } from '../../../helpers/dmxHelpers'
+import {
+  logicalPanPercentFromMotorDeg,
+  pickAliasedPanMotorDeg,
+} from '../../../helpers/panMotorAlias'
+import {
+  ActionNode,
+  createDefaultActionTiming,
+  type LinearSweepAxis,
+  type MotionPatternType,
+  type WaveformType,
+} from '../../types/nodeCueTypes'
 import { EasingType } from '../../../easing'
 import { VariableValue } from '../runtime/executionTypes'
 
@@ -42,10 +54,170 @@ export interface ResolvedActionTiming {
   level?: number
 }
 
-/** Resolved pan/tilt for set-position actions (0–100 % of fixture min–max). */
-export interface ResolvedPositionSetting {
-  pan: number
-  tilt: number
+/** Resolved set-position payload after ValueSource resolution. */
+export type ResolvedPositionSetting =
+  | { mode: 'absolute'; pan: number; tilt: number }
+  | { mode: 'direction'; bearingDeg: number; angleFromVerticalDeg: number }
+  | { mode: 'offset'; panOffsetDeg: number; tiltOffsetDeg: number }
+
+/** Stable fingerprint for set-position idempotency when the same effect name is re-submitted after completion. */
+export function buildSetPositionSubmissionFingerprint(
+  resolvedTarget: ResolvedActionTarget,
+  resolvedPosition: ResolvedPositionSetting,
+  resolvedLayer: number,
+  resolvedTiming: ResolvedActionTiming,
+): string {
+  return JSON.stringify({
+    target: resolvedTarget,
+    position: resolvedPosition,
+    layer: resolvedLayer,
+    duration: resolvedTiming.duration,
+    waitUntilCondition: resolvedTiming.waitUntilCondition,
+    waitUntilTime: resolvedTiming.waitUntilTime,
+  })
+}
+
+/** Resolved motion-pattern after ValueSource resolution; drives MotionPatternEngine. */
+export interface ResolvedMotionPatternSetting {
+  pattern: MotionPatternType
+  speedHz: number
+  sizeDeg: number
+  fanSpreadDeg: number
+  panWaveform: WaveformType
+  tiltWaveform: WaveformType
+  panAmplitudeDeg: number
+  tiltAmplitudeDeg: number
+  panPhaseOffsetDeg: number
+  /** Relative to base `speedHz` (e.g. figure-8 tilt uses 2). */
+  panFreqMultiplier: number
+  tiltFreqMultiplier: number
+  /** Only used when pattern is linear-sweep. */
+  linearSweepAxis: LinearSweepAxis
+  /** When true, circle patterns use spherical circle math (gimbal compensation). */
+  gimbalCompensation: boolean
+  /**
+   * Stage bearing in degrees for `circle` near-pole solver; ignored when home is far from the pole
+   * or when pattern is not `circle`. Omitted cues default to 180 (downstage) at resolve time.
+   */
+  bearingDeg: number
+}
+
+/** True when two resolved motion-pattern configs are equivalent for idempotent re-submission. */
+export function resolvedMotionPatternSettingsEqual(
+  a: ResolvedMotionPatternSetting,
+  b: ResolvedMotionPatternSetting,
+): boolean {
+  return (
+    a.pattern === b.pattern &&
+    a.speedHz === b.speedHz &&
+    a.sizeDeg === b.sizeDeg &&
+    a.fanSpreadDeg === b.fanSpreadDeg &&
+    a.panWaveform === b.panWaveform &&
+    a.tiltWaveform === b.tiltWaveform &&
+    a.panAmplitudeDeg === b.panAmplitudeDeg &&
+    a.tiltAmplitudeDeg === b.tiltAmplitudeDeg &&
+    a.panPhaseOffsetDeg === b.panPhaseOffsetDeg &&
+    a.panFreqMultiplier === b.panFreqMultiplier &&
+    a.tiltFreqMultiplier === b.tiltFreqMultiplier &&
+    a.linearSweepAxis === b.linearSweepAxis &&
+    a.gimbalCompensation === b.gimbalCompensation &&
+    a.bearingDeg === b.bearingDeg
+  )
+}
+
+/** Equality for fields that require restarting the motion pattern when they change (excludes bearing-only live updates). */
+export function resolvedMotionPatternSettingsEqualExceptBearing(
+  a: ResolvedMotionPatternSetting,
+  b: ResolvedMotionPatternSetting,
+): boolean {
+  return (
+    a.pattern === b.pattern &&
+    a.speedHz === b.speedHz &&
+    a.sizeDeg === b.sizeDeg &&
+    a.fanSpreadDeg === b.fanSpreadDeg &&
+    a.panWaveform === b.panWaveform &&
+    a.tiltWaveform === b.tiltWaveform &&
+    a.panAmplitudeDeg === b.panAmplitudeDeg &&
+    a.tiltAmplitudeDeg === b.tiltAmplitudeDeg &&
+    a.panPhaseOffsetDeg === b.panPhaseOffsetDeg &&
+    a.panFreqMultiplier === b.panFreqMultiplier &&
+    a.tiltFreqMultiplier === b.tiltFreqMultiplier &&
+    a.linearSweepAxis === b.linearSweepAxis &&
+    a.gimbalCompensation === b.gimbalCompensation
+  )
+}
+
+/** Same lights in the same order (by id). */
+export function trackedLightIdsEqualOrder(a: TrackedLight[], b: TrackedLight[]): boolean {
+  if (a.length !== b.length) {
+    return false
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i]!.id !== b[i]!.id) {
+      return false
+    }
+  }
+  return true
+}
+
+/**
+ * Converts resolved position (direction / offset / legacy absolute %) to absolute pan/tilt % for DMX.
+ */
+export function resolvePositionToAbsolutePercent(
+  resolved: ResolvedPositionSetting,
+  fixtureConfig: FixtureConfig | undefined,
+): { pan: number; tilt: number } {
+  const c = normalizeFixtureConfig(fixtureConfig)
+  const panDir = c.panDirectionCW ? 1 : -1
+
+  const clampAxis = (axis: 'pan' | 'tilt', raw: number): number => {
+    const clamped = clamp(raw, 0, 100)
+    if (raw < -1e-6 || raw > 100 + 1e-6) {
+      console.warn(
+        `[set-position] ${axis} clamped from ${raw.toFixed(2)}% to ${clamped.toFixed(2)}% (fixture range / home limits).`,
+      )
+    }
+    return clamped
+  }
+
+  if (resolved.mode === 'absolute') {
+    return {
+      pan: clampAxis('pan', resolved.pan),
+      tilt: clampAxis('tilt', resolved.tilt),
+    }
+  }
+  const panHomeDeg = (c.panHome / 100) * c.panRangeDeg
+
+  if (resolved.mode === 'offset') {
+    const rawPanMotorDeg = panHomeDeg + panDir * resolved.panOffsetDeg
+    const chosenPanMotorDeg = pickAliasedPanMotorDeg(
+      rawPanMotorDeg,
+      c.panRangeDeg,
+      panHomeDeg,
+      'intent',
+    )
+    const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
+    const tiltRaw = c.tiltHome + degreeOffsetToPercent(resolved.tiltOffsetDeg, c.tiltRangeDeg)
+    return {
+      pan: clampAxis('pan', panRaw),
+      tilt: clampAxis('tilt', tiltRaw),
+    }
+  }
+  const tiltStageZeroPct = (c.tiltStageDeg / c.tiltRangeDeg) * 100
+  const rawPanMotorDeg = c.panStageDeg + panDir * resolved.bearingDeg
+  const chosenPanMotorDeg = pickAliasedPanMotorDeg(
+    rawPanMotorDeg,
+    c.panRangeDeg,
+    panHomeDeg,
+    'intent',
+  )
+  const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
+  const tiltRaw =
+    tiltStageZeroPct + degreeOffsetToPercent(resolved.angleFromVerticalDeg, c.tiltRangeDeg)
+  return {
+    pan: clampAxis('pan', panRaw),
+    tilt: clampAxis('tilt', tiltRaw),
+  }
 }
 
 interface BuildEffectParams {
@@ -347,24 +519,35 @@ export class ActionEffectFactory {
         if (!pos) {
           return null
         }
-        const positionRgbio: RGBIO = {
-          red: 0,
-          green: 0,
-          blue: 0,
-          intensity: 0,
-          opacity: 0.0,
-          blendMode: 'replace',
-          pan: pos.pan,
-          tilt: pos.tilt,
-        }
-        effect = createSingleColorEffect({
-          lights,
-          layer,
-          waitFor,
-          color: positionRgbio,
-          timing: timing,
-          easing,
+
+        const transitions: EffectTransition[] = lights.map((light) => {
+          const { pan, tilt } = resolvePositionToAbsolutePercent(pos, light.config)
+          const positionRgbio: RGBIO = {
+            red: 0,
+            green: 0,
+            blue: 0,
+            intensity: 0,
+            opacity: 0.0,
+            blendMode: 'replace',
+            pan,
+            tilt,
+          }
+          return createSingleColorTransition({
+            lights: [light],
+            layer,
+            waitFor,
+            waitForTime,
+            color: positionRgbio,
+            timing,
+            easing,
+          })
         })
+
+        effect = {
+          id: 'single-color',
+          description: 'Single color effect',
+          transitions,
+        }
         break
       }
       case 'set-color': {

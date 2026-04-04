@@ -185,6 +185,10 @@ describe('YargCueHandler', () => {
       isLayerFreeForLight: jest.fn(),
       schedulePanTiltClear: jest.fn(),
       cancelPanTiltClear: jest.fn(),
+      addMotionPattern: jest.fn(),
+      getMotionPattern: jest.fn().mockReturnValue(undefined),
+      removeMotionPattern: jest.fn(),
+      updateMotionPatternConfig: jest.fn(),
       shutdown: jest.fn(),
     } as any
 

@@ -1,5 +1,4 @@
 import { Effect, EffectTransition, normalizeFixtureConfig, RGBIO, TrackedLight } from '../../types'
-import { dmxToPercent } from '../../helpers/dmxHelpers'
 import {
   IEffectManager,
   IEffectTransformer,
@@ -616,10 +615,10 @@ export class EffectManager implements IEffectManager {
         if (light.config) {
           const cfg = normalizeFixtureConfig(light.config)
           if (color.pan === undefined) {
-            color.pan = dmxToPercent(cfg.panHome, cfg.panMin, cfg.panMax)
+            color.pan = cfg.panHome
           }
           if (color.tilt === undefined) {
-            color.tilt = dmxToPercent(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
+            color.tilt = cfg.tiltHome
           }
         }
 

@@ -14,8 +14,10 @@ import {
   DmxFixture,
   FixtureTypes,
   FixtureConfig,
+  clampMergeMovingHeadFixtureConfig,
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
+import { dmxToPercent } from '../../photonics-dmx/helpers/dmxHelpers'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
@@ -1126,8 +1128,8 @@ export class ControllerManager {
     const baseConfig: FixtureConfig = normalizeFixtureConfig(light.config)
     const newConfig: FixtureConfig = {
       ...baseConfig,
-      panHome: panClamped,
-      tiltHome: tiltClamped,
+      panHome: dmxToPercent(panClamped, baseConfig.panMin, baseConfig.panMax),
+      tiltHome: dmxToPercent(tiltClamped, baseConfig.tiltMin, baseConfig.tiltMax),
     }
     const updatedLight: DmxLight = { ...light, config: newConfig }
     const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
@@ -1148,9 +1150,57 @@ export class ControllerManager {
       ...fixture,
       config: {
         ...fBase,
-        panHome: panClamped,
-        tiltHome: tiltClamped,
+        panHome: dmxToPercent(panClamped, fBase.panMin, fBase.panMax),
+        tiltHome: dmxToPercent(tiltClamped, fBase.tiltMin, fBase.tiltMax),
       },
+    }
+    await this.config.updateUserLights(newUserLights)
+
+    this.refreshActiveRigs()
+    return { success: true }
+  }
+
+  public async setConsoleFixtureConfig(payload: {
+    rigId: string
+    lightId: string
+    fixtureId: string
+    config: Partial<FixtureConfig>
+  }): Promise<{ success: true } | { success: false; error: string }> {
+    const { rigId, lightId, fixtureId, config: patch } = payload
+    const rig = this.config.getDmxRig(rigId)
+    if (!rig) {
+      return { success: false, error: 'Rig not found' }
+    }
+    const light = this.findLightInRig(rig, lightId)
+    if (!light) {
+      return { success: false, error: 'Light not found in rig' }
+    }
+    if (light.fixture !== FixtureTypes.RGBMH && light.fixture !== FixtureTypes.RGBWMH) {
+      return { success: false, error: 'Light is not a moving head fixture' }
+    }
+    if (light.fixtureId !== fixtureId) {
+      return { success: false, error: 'Fixture id does not match this light' }
+    }
+    const baseConfig = normalizeFixtureConfig(light.config)
+    const newConfig = clampMergeMovingHeadFixtureConfig(baseConfig, patch)
+    const updatedLight: DmxLight = { ...light, config: newConfig }
+    const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
+    await this.config.saveDmxRig({ ...rig, config: newRigConfig })
+
+    const userLights = this.config.getUserLights()
+    const fi = userLights.findIndex((f) => f.id === fixtureId)
+    if (fi < 0) {
+      return { success: false, error: 'Fixture template not found in My Lights' }
+    }
+    const fixture = userLights[fi]
+    if (fixture.fixture !== FixtureTypes.RGBMH && fixture.fixture !== FixtureTypes.RGBWMH) {
+      return { success: false, error: 'Fixture template is not a moving head' }
+    }
+    const fBase = normalizeFixtureConfig(fixture.config)
+    const newUserLights = [...userLights]
+    newUserLights[fi] = {
+      ...fixture,
+      config: clampMergeMovingHeadFixtureConfig(fBase, patch),
     }
     await this.config.updateUserLights(newUserLights)
 

@@ -102,6 +102,7 @@ export const LIGHT = {
   CONSOLE_SEND_DMX: 'console-send-dmx',
   CONSOLE_UPDATE_CHANNEL: 'console-update-channel',
   CONSOLE_SET_HOME: 'console-set-home',
+  CONSOLE_SET_FIXTURE_CONFIG: 'console-set-fixture-config',
 } as const
 
 // ---- Config ----

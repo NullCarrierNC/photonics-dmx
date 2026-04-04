@@ -6,6 +6,7 @@ interface LightChannelAssignmentSectionProps {
   title: string
   lights: DmxLight[]
   myLights: DmxFixture[]
+  rigId: string | null
   onLightChange: (light: DmxLight) => void
   highlightedLight: number | null
   onLightClick: (position: number) => void
@@ -16,6 +17,7 @@ const LightChannelAssignmentSection: React.FC<LightChannelAssignmentSectionProps
   title,
   lights,
   myLights,
+  rigId,
   onLightChange,
   highlightedLight,
   onLightClick,
@@ -34,6 +36,7 @@ const LightChannelAssignmentSection: React.FC<LightChannelAssignmentSectionProps
           <LightChannelsConfig
             light={light}
             myLights={myLights}
+            rigId={rigId}
             onChange={onLightChange}
             isHighlighted={highlightedLight === light.position}
             onClick={() => onLightClick(light.position)}

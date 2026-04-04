@@ -11,7 +11,10 @@ import { motionCueGraphPolicy } from './GraphExecutionPolicy'
 import type { MotionNodeCueDefinition } from '../../types/nodeCueTypes'
 
 /**
- * Motion node cue: YARG event graph with set-position actions; runs parallel to lighting cues.
+ * Motion node cue: YARG event graph with position / motion-pattern actions; runs parallel to lighting cues.
+ * Uses `motionCueGraphPolicy`: same entry events as visual cues (`cue-started`, `cue-called`, beat, etc.)
+ * but no initial setEffect clear. Re-submitted `motion-pattern` actions with the same resolved config
+ * are skipped so `cue-called` does not restart the waveform each tick.
  */
 export class MotionNodeCue implements INetCue {
   private readonly groupId: string

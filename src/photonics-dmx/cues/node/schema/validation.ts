@@ -117,14 +117,67 @@ const colorSchema: JSONSchemaType<{
 } as any
 
 const positionSchema = {
-  type: 'object' as const,
-  required: ['pan', 'tilt'],
+  oneOf: [
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['pan', 'tilt'],
+      properties: {
+        pan: valueSourceSchema,
+        tilt: valueSourceSchema,
+      },
+    },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['mode', 'bearing', 'angle'],
+      properties: {
+        mode: { type: 'string', const: 'direction' },
+        bearing: valueSourceSchema,
+        angle: valueSourceSchema,
+      },
+    },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['mode', 'pan', 'tilt'],
+      properties: {
+        mode: { type: 'string', const: 'offset' },
+        pan: valueSourceSchema,
+        tilt: valueSourceSchema,
+      },
+    },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['mode', 'pan', 'tilt'],
+      properties: {
+        mode: { type: 'string', const: 'absolute' },
+        pan: valueSourceSchema,
+        tilt: valueSourceSchema,
+      },
+    },
+  ],
+} as any
+
+const motionPatternSchema = {
+  type: 'object',
   additionalProperties: false,
+  required: ['pattern', 'speed', 'size'],
   properties: {
-    pan: valueSourceSchema,
-    tilt: valueSourceSchema,
+    pattern: valueSourceSchema,
+    speed: valueSourceSchema,
+    size: valueSourceSchema,
+    bearing: { ...valueSourceSchema, nullable: true },
+    fanSpread: { ...valueSourceSchema, nullable: true },
+    linearSweepAxis: { ...valueSourceSchema, nullable: true },
+    panWaveform: { ...valueSourceSchema, nullable: true },
+    tiltWaveform: { ...valueSourceSchema, nullable: true },
+    panAmplitude: { ...valueSourceSchema, nullable: true },
+    tiltAmplitude: { ...valueSourceSchema, nullable: true },
+    panPhaseOffset: { ...valueSourceSchema, nullable: true },
   },
-}
+} as any
 
 const timingSchema: JSONSchemaType<ActionTimingConfig> = {
   type: 'object',
@@ -618,7 +671,12 @@ const actionSchema: JSONSchemaType<ActionNode> = {
     effectType: { type: 'string', enum: NODE_EFFECT_TYPES },
     target: targetSchema,
     color: { ...colorSchema, nullable: true },
-    position: { ...positionSchema, nullable: true },
+    position: {
+      anyOf: [{ type: 'null' }, positionSchema],
+    } as any,
+    motionPattern: {
+      anyOf: [{ type: 'null' }, motionPatternSchema],
+    } as any,
     timing: timingSchema,
     layer: { ...valueSourceSchema, nullable: true },
     label: { type: 'string', nullable: true },
@@ -649,6 +707,14 @@ const actionSchema: JSONSchemaType<ActionNode> = {
       },
       then: {
         required: ['position'],
+      },
+    },
+    {
+      if: {
+        properties: { effectType: { const: 'motion-pattern' } },
+      },
+      then: {
+        required: ['motionPattern'],
       },
     },
   ],

@@ -2,7 +2,11 @@
  * ActionEffectFactory tests: buildEffect (set-color, blackout, invalid), resolveLights.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { ActionEffectFactory } from '../../../../cues/node/compiler/ActionEffectFactory'
+import {
+  ActionEffectFactory,
+  resolvePositionToAbsolutePercent,
+} from '../../../../cues/node/compiler/ActionEffectFactory'
+import { DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../../../types'
 import type { ActionNode } from '../../../../cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../cues/types/nodeCueTypes'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
@@ -167,5 +171,90 @@ describe('ActionEffectFactory', () => {
     const result = ActionEffectFactory.resolveLights(lightManager, target, variableResolver)
     expect(result).toEqual(customLights)
     expect(variableResolver).toHaveBeenCalledWith('myLights')
+  })
+})
+
+describe('resolvePositionToAbsolutePercent', () => {
+  const base = { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG, panHome: 50 }
+
+  it('direction mode: panDirectionCW false negates bearing offset relative to CW', () => {
+    const cw = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 90, angleFromVerticalDeg: 0 },
+      { ...base, panDirectionCW: true },
+    )
+    const ccw = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 90, angleFromVerticalDeg: 0 },
+      { ...base, panDirectionCW: false },
+    )
+    const offset = (90 / base.panRangeDeg) * 100
+    expect(cw.pan).toBeCloseTo(50 + offset, 5)
+    expect(ccw.pan).toBeCloseTo(50 - offset, 5)
+  })
+
+  it('offset mode: panDirectionCW false negates pan offset degrees', () => {
+    const cw = resolvePositionToAbsolutePercent(
+      { mode: 'offset', panOffsetDeg: 45, tiltOffsetDeg: 0 },
+      { ...base, panDirectionCW: true },
+    )
+    const ccw = resolvePositionToAbsolutePercent(
+      { mode: 'offset', panOffsetDeg: 45, tiltOffsetDeg: 0 },
+      { ...base, panDirectionCW: false },
+    )
+    const d = (45 / base.panRangeDeg) * 100
+    expect(cw.pan).toBeCloseTo(50 + d, 5)
+    expect(ccw.pan).toBeCloseTo(50 - d, 5)
+  })
+
+  it('direction mode anchors to panStageDeg, not panHome', () => {
+    const cfg = { ...base, panHome: 30, panStageDeg: 360, panRangeDeg: 540 }
+    const stageZeroPct = (360 / 540) * 100
+    const result = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 0, angleFromVerticalDeg: 0 },
+      cfg,
+    )
+    expect(result.pan).toBeCloseTo(stageZeroPct, 5)
+  })
+
+  it('direction mode anchors tilt to tiltStageDeg, not tiltHome', () => {
+    const cfg = { ...base, tiltHome: 30, tiltStageDeg: 120, tiltRangeDeg: 180 }
+    const tiltStageZeroPct = (120 / 180) * 100
+    const result = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 0, angleFromVerticalDeg: 0 },
+      cfg,
+    )
+    expect(result.tilt).toBeCloseTo(tiltStageZeroPct, 5)
+  })
+
+  it('offset mode still anchors to panHome (not panStageDeg)', () => {
+    const cfg = { ...base, panHome: 30, panStageDeg: 360, panRangeDeg: 540 }
+    const result = resolvePositionToAbsolutePercent(
+      { mode: 'offset', panOffsetDeg: 0, tiltOffsetDeg: 0 },
+      cfg,
+    )
+    expect(result.pan).toBeCloseTo(30, 5)
+  })
+
+  it('offset mode: panHome 0 uses 360° alias instead of negative percent when offset goes negative', () => {
+    const cfg = {
+      ...base,
+      panHome: 0,
+      panRangeDeg: 540,
+      panDirectionCW: false,
+      panStageDeg: 0,
+    }
+    const result = resolvePositionToAbsolutePercent(
+      { mode: 'offset', panOffsetDeg: 60, tiltOffsetDeg: 0 },
+      cfg,
+    )
+    expect(result.pan).toBeCloseTo((300 / 540) * 100, 4)
+  })
+
+  it('direction mode: panStage 360 keeps 360 alias over 0 when both are valid', () => {
+    const cfg = { ...base, panHome: 30, panStageDeg: 360, panRangeDeg: 540, panDirectionCW: true }
+    const result = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 0, angleFromVerticalDeg: 0 },
+      cfg,
+    )
+    expect(result.pan).toBeCloseTo((360 / 540) * 100, 5)
   })
 })

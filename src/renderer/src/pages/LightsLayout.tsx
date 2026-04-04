@@ -631,6 +631,7 @@ const LightsLayout = () => {
               title={rigName ? `${rigName} - Front Lights` : 'Front Lights'}
               lights={frontLights}
               myLights={myFixtures}
+              rigId={activeRigId}
               onLightChange={handleLightChange}
               highlightedLight={highlightedLight}
               onLightClick={handleLightClick}
@@ -642,6 +643,7 @@ const LightsLayout = () => {
                 title={rigName ? `${rigName} - Back Lights` : 'Back Lights'}
                 lights={backLights}
                 myLights={myFixtures}
+                rigId={activeRigId}
                 onLightChange={handleLightChange}
                 highlightedLight={highlightedLight}
                 onLightClick={handleLightClick}
@@ -655,6 +657,7 @@ const LightsLayout = () => {
                   title="Dedicated Strobe Lights"
                   lights={allPrimaryLights.filter((l) => l.group === 'strobe')}
                   myLights={myFixtures}
+                  rigId={activeRigId}
                   onLightChange={handleLightChange}
                   highlightedLight={highlightedLight}
                   onLightClick={handleLightClick}

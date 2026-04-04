@@ -24,33 +24,80 @@
           {
             "id": "motion-default-action-pos",
             "type": "action",
-            "effectType": "set-position",
+            "effectType": "motion-pattern",
             "target": {
               "groups": {
                 "source": "literal",
-                "value": "front"
+                "value": "front,back"
               },
               "filter": {
                 "source": "literal",
                 "value": "all"
               }
             },
-            "position": {
-              "pan": { "source": "literal", "value": 50 },
-              "tilt": { "source": "literal", "value": 50 }
-            },
             "timing": {
-              "waitForCondition": { "source": "literal", "value": "none" },
-              "waitForTime": { "source": "literal", "value": 0 },
-              "duration": { "source": "literal", "value": 800 },
-              "waitUntilCondition": { "source": "literal", "value": "none" },
-              "waitUntilTime": { "source": "literal", "value": 0 },
-              "easing": { "source": "literal", "value": "easeInOut" },
-              "level": { "source": "literal", "value": "normal" }
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
             },
-            "layer": { "source": "literal", "value": 120 }
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "circle"
+              },
+              "speed": {
+                "source": "literal",
+                "value": 0.3
+              },
+              "size": {
+                "source": "literal",
+                "value": 30
+              },
+              "bearing": {
+                "source": "literal",
+                "value": "downstage"
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              }
+            }
           }
-        ]
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
       },
       "connections": [
         {
@@ -59,7 +106,21 @@
         }
       ],
       "layout": {
-        "nodePositions": {}
+        "nodePositions": {
+          "motion-default-event-start": {
+            "x": 100,
+            "y": 100
+          },
+          "motion-default-action-pos": {
+            "x": 400,
+            "y": 100
+          }
+        },
+        "viewport": {
+          "x": -149.1580868930265,
+          "y": 159.5255567725448,
+          "zoom": 1.9861263234757207
+        }
       }
     }
   ],

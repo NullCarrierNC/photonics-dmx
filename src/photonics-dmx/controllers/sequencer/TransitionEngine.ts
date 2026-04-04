@@ -1,6 +1,5 @@
 import { performance } from 'perf_hooks'
 import { EffectTransition, normalizeFixtureConfig, RGBIO } from '../../types'
-import { dmxToPercent } from '../../helpers/dmxHelpers'
 import { LightTransitionController } from './LightTransitionController'
 import { FrameContext, LightEffectState, ILayerManager, ITransitionEngine } from './interfaces'
 import { IEffectManager } from './interfaces'
@@ -322,10 +321,10 @@ export class TransitionEngine implements ITransitionEngine {
     if (light.config) {
       const cfg = normalizeFixtureConfig(light.config)
       if (color.pan === undefined) {
-        color.pan = dmxToPercent(cfg.panHome, cfg.panMin, cfg.panMax)
+        color.pan = cfg.panHome
       }
       if (color.tilt === undefined) {
-        color.tilt = dmxToPercent(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
+        color.tilt = cfg.tiltHome
       }
     }
 

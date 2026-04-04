@@ -55,9 +55,8 @@ function cueLikeGraphPolicy(
   cueId: string,
   useInitialClearPolicy: boolean,
 ): GraphExecutionPolicy {
-  const entryEventTypes: EntryEventConfig = ['cue-started', 'cue-called']
   return {
-    entryEventTypes,
+    entryEventTypes: ['cue-started', 'cue-called'],
     queuing: true,
     revisitPolicy: 'strict',
     useInitialClearPolicy,
@@ -124,8 +123,7 @@ function cueLikeGraphPolicy(
         return et !== 'cue-started' && et !== 'cue-called'
       })
 
-      // cue-started runs only on first activation; cue-called every time
-      // other events run immediately
+      // cue-started runs only on first activation; cue-called every tick when present; other events when params match
       const ordered: BaseEventNode[] = []
       if (cueStarted.length > 0) {
         ordered.push(...cueStarted)
@@ -148,8 +146,9 @@ export function cueGraphPolicy(groupId: string, cueId: string): GraphExecutionPo
 }
 
 /**
- * Motion cue graph policy: same entry logic as visual cues but never uses initial setEffect clear,
- * so motion runs alongside running visual effects.
+ * Motion cue graph policy: never uses initial setEffect clear (motion runs alongside visuals).
+ * Entry events match visual cues (`cue-started`, `cue-called`, beat/instrument, etc.).
+ * Motion-pattern actions skip re-adding when the resolved config matches an active run (see NodeExecutionEngine).
  */
 export function motionCueGraphPolicy(groupId: string, cueId: string): GraphExecutionPolicy {
   return cueLikeGraphPolicy(groupId, cueId, false)

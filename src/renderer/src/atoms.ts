@@ -52,10 +52,7 @@ export const myValidDmxLightsAtom = atom((get) => {
     if (DmxLight.config) {
       const cfg = normalizeFixtureConfig(DmxLight.config)
       const areConfigChannelsValid =
-        cfg.panHome >= cfg.panMin &&
-        cfg.panHome <= cfg.panMax &&
-        cfg.tiltHome >= cfg.tiltMin &&
-        cfg.tiltHome <= cfg.tiltMax
+        cfg.panHome >= 0 && cfg.panHome <= 100 && cfg.tiltHome >= 0 && cfg.tiltHome <= 100
 
       return areChannelsValid && areConfigChannelsValid
     }

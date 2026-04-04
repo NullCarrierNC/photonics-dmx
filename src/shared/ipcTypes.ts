@@ -77,6 +77,7 @@ import type { AudioCueType } from '../photonics-dmx/cues/types/audioCueTypes'
 import type { AppPreferences } from '../services/configuration/ConfigurationManager'
 import type {
   DmxFixture,
+  FixtureConfig,
   LightingConfiguration,
   DmxRig,
   SenderConfig,
@@ -460,6 +461,15 @@ export interface IpcInvokeMap {
       fixtureId: string
       panHome: number
       tiltHome: number
+    }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.CONSOLE_SET_FIXTURE_CONFIG]: {
+    request: {
+      rigId: string
+      lightId: string
+      fixtureId: string
+      config: Partial<FixtureConfig>
     }
     response: IpcSuccessResult | IpcErrorResult
   }

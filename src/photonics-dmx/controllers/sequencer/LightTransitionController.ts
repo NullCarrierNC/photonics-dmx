@@ -262,6 +262,36 @@ export class LightTransitionController {
   }
 
   /**
+   * Writes pan/tilt (and transparent RGB) for a layer without a transition.
+   * Used by {@link MotionPatternEngine} so parametric motion participates in layer blending.
+   */
+  public setGeneratorLayerState(lightId: string, layer: number, state: RGBIO): void {
+    if (this._clearingTransitions) {
+      return
+    }
+    if (!this._currentLayerStates.has(lightId)) {
+      this._currentLayerStates.set(lightId, new Map())
+    }
+    this._currentLayerStates.get(lightId)!.set(layer, { ...state })
+  }
+
+  /**
+   * Removes generator-driven layer state and republishes merged output.
+   */
+  public removeGeneratorLayer(lightId: string, layer: number): void {
+    const currentLayerMap = this._currentLayerStates.get(lightId)
+    if (!currentLayerMap) {
+      return
+    }
+    currentLayerMap.delete(layer)
+    if (currentLayerMap.size === 0) {
+      this._currentLayerStates.delete(lightId)
+    }
+    this.calculateFinalColorForLight(lightId)
+    this._lightStateManager.publishLightStates()
+  }
+
+  /**
    * Removes all transitions for the given lights entirely.
    */
   public removeLights(lightIds: string[]): void {

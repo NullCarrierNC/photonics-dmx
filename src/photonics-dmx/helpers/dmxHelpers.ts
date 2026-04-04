@@ -36,6 +36,43 @@ export function dmxToPercent(dmx: number, min: number, max: number): number {
   return Math.max(0, Math.min(100, pct))
 }
 
+/**
+ * Converts a signed degree offset from fixture home into a percentage of the configured
+ * physical range (see FixtureConfig panRangeDeg / tiltRangeDeg).
+ */
+export function degreeOffsetToPercent(offsetDeg: number, rangeDeg: number): number {
+  if (!Number.isFinite(offsetDeg) || !Number.isFinite(rangeDeg) || rangeDeg <= 0) {
+    return 0
+  }
+  return (offsetDeg / rangeDeg) * 100
+}
+
+/**
+ * Mirrors a normalised percentage around a home percentage (both 0–100).
+ */
+export function mirrorPercentAroundHome(percent: number, homePercent: number): number {
+  const mirrored = 2 * homePercent - percent
+  return Math.max(0, Math.min(100, mirrored))
+}
+
+/**
+ * Inverts pan/tilt DMX for truss-mounted fixtures: end-for-end mirror across the channel span.
+ * Mounting inversion flips physical endpoints; it is independent of idle home percent.
+ */
+export function mirrorDmxForMovingHeadInvert(
+  dmx: number,
+  channelMin: number,
+  channelMax: number,
+): number {
+  const span = channelMax - channelMin
+  if (span <= 0) {
+    return Math.max(0, Math.min(255, Math.round(dmx)))
+  }
+  const d = Math.max(0, Math.min(255, Math.round(dmx)))
+  const mirrored = channelMin + channelMax - d
+  return Math.max(0, Math.min(255, Math.round(mirrored)))
+}
+
 // Global brightness configuration - will be set by the application
 let globalBrightnessConfig: { low: number; medium: number; high: number; max: number } | null = null
 

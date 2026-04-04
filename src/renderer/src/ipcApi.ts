@@ -29,6 +29,7 @@ import type {
   AudioGameModeConfig,
   AudioLightingData,
 } from '../../shared/ipcTypes'
+import type { FixtureConfig } from '../../photonics-dmx/types'
 
 // ---------------------------------------------------------------------------
 // Cue consistency window
@@ -296,6 +297,13 @@ export const setConsoleHome = (payload: {
   panHome: number
   tiltHome: number
 }) => window.api.invoke(LIGHT.CONSOLE_SET_HOME, payload)
+
+export const setConsoleFixtureConfig = (payload: {
+  rigId: string
+  lightId: string
+  fixtureId: string
+  config: Partial<FixtureConfig>
+}) => window.api.invoke(LIGHT.CONSOLE_SET_FIXTURE_CONFIG, payload)
 
 // ---------------------------------------------------------------------------
 // Listener management

@@ -2,7 +2,30 @@ import {
   getColor,
   setGlobalBrightnessConfig,
   getGlobalBrightnessConfig,
+  mirrorDmxForMovingHeadInvert,
+  percentToDmx,
 } from '../../helpers/dmxHelpers'
+
+describe('mirrorDmxForMovingHeadInvert', () => {
+  it('is an involution (double mirror returns original DMX)', () => {
+    const min = 0
+    const max = 255
+    for (const d of [0, 64, 128, 255]) {
+      const m = mirrorDmxForMovingHeadInvert(d, min, max)
+      const back = mirrorDmxForMovingHeadInvert(m, min, max)
+      expect(back).toBe(d)
+    }
+  })
+
+  it('maps logical mid to complementary wire value and back', () => {
+    const min = 0
+    const max = 255
+    const logical50 = percentToDmx(50, min, max)
+    const onWire = mirrorDmxForMovingHeadInvert(logical50, min, max)
+    expect(onWire).toBeGreaterThan(0)
+    expect(mirrorDmxForMovingHeadInvert(onWire, min, max)).toBe(logical50)
+  })
+})
 
 describe('dmxHelpers brightness configuration', () => {
   beforeEach(() => {

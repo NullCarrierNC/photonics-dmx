@@ -58,6 +58,12 @@ describe('EffectExecutionEngine', () => {
       }),
       removeEffectCallback: jest.fn(),
       removeEffect: jest.fn(),
+      cancelPanTiltClear: jest.fn(),
+      schedulePanTiltClear: jest.fn(),
+      addMotionPattern: jest.fn(),
+      getMotionPattern: jest.fn().mockReturnValue(undefined),
+      removeMotionPattern: jest.fn(),
+      updateMotionPatternConfig: jest.fn(),
     } as any
 
     mockLightManager = {

@@ -2,6 +2,7 @@ import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { LIGHT } from '../../shared/ipcChannels'
 import { ipcError } from './ipcResult'
+import type { FixtureConfig } from '../../photonics-dmx/types'
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -86,6 +87,28 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
         fixtureId: data.fixtureId,
         panHome: data.panHome,
         tiltHome: data.tiltHome,
+      })
+    } catch (error) {
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.CONSOLE_SET_FIXTURE_CONFIG, async (_, data: unknown) => {
+    if (
+      !isPlainObject(data) ||
+      typeof data.rigId !== 'string' ||
+      typeof data.lightId !== 'string' ||
+      typeof data.fixtureId !== 'string' ||
+      !isPlainObject(data.config)
+    ) {
+      return { success: false as const, error: 'Invalid console set fixture config payload' }
+    }
+    try {
+      return await controllerManager.setConsoleFixtureConfig({
+        rigId: data.rigId,
+        lightId: data.lightId,
+        fixtureId: data.fixtureId,
+        config: data.config as Partial<FixtureConfig>,
       })
     } catch (error) {
       return ipcError(error)

@@ -241,15 +241,45 @@ export class NodeCueCompiler {
         `Action '${action.label ?? action.id}' must target at least one group.`,
       )
     }
-    if (action.effectType === 'set-position' && !action.position) {
-      throw new NodeCueCompilationError(
-        `Action '${action.label ?? action.id}' (set-position) must include position (pan and tilt).`,
-      )
+    if (action.effectType === 'set-position') {
+      const pos = action.position
+      if (!pos) {
+        throw new NodeCueCompilationError(
+          `Action '${action.label ?? action.id}' (set-position) must include position.`,
+        )
+      }
+      const mode = pos.mode ?? 'absolute'
+      if (mode === 'direction') {
+        if (!pos.bearing || !pos.angle) {
+          throw new NodeCueCompilationError(
+            `Action '${action.label ?? action.id}' (set-position, direction mode) must include bearing and angle.`,
+          )
+        }
+      } else if (mode === 'offset') {
+        if (!pos.pan || !pos.tilt) {
+          throw new NodeCueCompilationError(
+            `Action '${action.label ?? action.id}' (set-position, offset mode) must include pan and tilt (degrees).`,
+          )
+        }
+      } else {
+        if (!pos.pan || !pos.tilt) {
+          throw new NodeCueCompilationError(
+            `Action '${action.label ?? action.id}' (set-position, absolute mode) must include pan and tilt.`,
+          )
+        }
+      }
     }
     if (action.effectType === 'set-color' && !action.color) {
       throw new NodeCueCompilationError(
         `Action '${action.label ?? action.id}' (set-color) must include color.`,
       )
+    }
+    if (action.effectType === 'motion-pattern') {
+      if (!action.motionPattern) {
+        throw new NodeCueCompilationError(
+          `Action '${action.label ?? action.id}' (motion-pattern) must include motionPattern.`,
+        )
+      }
     }
   }
 }
