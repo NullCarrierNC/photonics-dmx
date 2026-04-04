@@ -36,8 +36,8 @@
               }
             },
             "position": {
-              "pan": { "source": "literal", "value": 128 },
-              "tilt": { "source": "literal", "value": 96 }
+              "pan": { "source": "literal", "value": 50 },
+              "tilt": { "source": "literal", "value": 50 }
             },
             "timing": {
               "waitForCondition": { "source": "literal", "value": "none" },

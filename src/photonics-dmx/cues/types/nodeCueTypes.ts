@@ -449,7 +449,7 @@ export interface NodeColorSetting {
   opacity?: ValueSource // Can reference a number variable with opacity (0.0-1.0)
 }
 
-/** Pan/tilt in logical 0–255 range (matches RGBIO and DMX channel values). */
+/** Pan/tilt as normalised percentage: 0 = configured min, 100 = configured max (FixtureConfig). */
 export interface NodePositionSetting {
   pan: ValueSource
   tilt: ValueSource

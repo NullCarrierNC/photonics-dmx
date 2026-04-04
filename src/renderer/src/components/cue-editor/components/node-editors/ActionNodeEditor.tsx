@@ -67,13 +67,13 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
       {node.effectType === 'set-position' && (
         <>
           <ValueSourceEditor
-            label="Pan"
-            value={node.position?.pan ?? { source: 'literal', value: 128 }}
+            label="Pan (%)"
+            value={node.position?.pan ?? { source: 'literal', value: 50 }}
             onChange={(next) =>
               updateNode({
                 position: {
                   pan: next,
-                  tilt: node.position?.tilt ?? { source: 'literal', value: 128 },
+                  tilt: node.position?.tilt ?? { source: 'literal', value: 50 },
                 },
               })
             }
@@ -81,12 +81,12 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
             availableVariables={availableVariables}
           />
           <ValueSourceEditor
-            label="Tilt"
-            value={node.position?.tilt ?? { source: 'literal', value: 128 }}
+            label="Tilt (%)"
+            value={node.position?.tilt ?? { source: 'literal', value: 50 }}
             onChange={(next) =>
               updateNode({
                 position: {
-                  pan: node.position?.pan ?? { source: 'literal', value: 128 },
+                  pan: node.position?.pan ?? { source: 'literal', value: 50 },
                   tilt: next,
                 },
               })

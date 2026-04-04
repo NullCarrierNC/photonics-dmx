@@ -38,8 +38,8 @@ const buildDefaultSetPositionAction = (): ActionNode => ({
     filter: { source: 'literal', value: 'all' },
   },
   position: {
-    pan: { source: 'literal', value: 128 },
-    tilt: { source: 'literal', value: 128 },
+    pan: { source: 'literal', value: 50 },
+    tilt: { source: 'literal', value: 50 },
   },
   timing: createDefaultActionTiming(),
   layer: { source: 'literal', value: 120 },

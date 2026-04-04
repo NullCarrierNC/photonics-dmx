@@ -42,7 +42,7 @@ export interface ResolvedActionTiming {
   level?: number
 }
 
-/** Resolved pan/tilt for set-position actions (logical 0–255). */
+/** Resolved pan/tilt for set-position actions (0–100 % of fixture min–max). */
 export interface ResolvedPositionSetting {
   pan: number
   tilt: number

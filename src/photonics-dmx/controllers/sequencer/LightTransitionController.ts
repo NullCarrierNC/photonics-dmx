@@ -821,12 +821,12 @@ export class LightTransitionController {
       corrected.blendMode = 'replace'
     }
 
-    // Validate optional pan/tilt values
+    // Validate optional pan/tilt values (normalised 0–100 % of fixture range)
     if (corrected.pan !== undefined) {
-      corrected.pan = Math.max(-32768, Math.min(32767, corrected.pan))
+      corrected.pan = Math.max(0, Math.min(100, corrected.pan))
     }
     if (corrected.tilt !== undefined) {
-      corrected.tilt = Math.max(-32768, Math.min(32767, corrected.tilt))
+      corrected.tilt = Math.max(0, Math.min(100, corrected.tilt))
     }
 
     return corrected

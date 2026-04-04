@@ -52,7 +52,9 @@ export interface RGBIO {
   blue: number // 0-255
   intensity: number // 0-255
 
+  /** Normalised pan position: 0 = configured min, 100 = configured max (see FixtureConfig). */
   pan?: number
+  /** Normalised tilt position: 0 = configured min, 100 = configured max (see FixtureConfig). */
   tilt?: number
 
   opacity: number // 0.0 to 1.0, controls overall contribution strength
