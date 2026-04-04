@@ -62,6 +62,13 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
     }
   })
 
+  ipcMain.handle(LIGHT.SENDER_DISABLE_ALL, async () => {
+    const senderManager = controllerManager.getSenderManager()
+    const disabled = senderManager.getEnabledSenders()
+    await senderManager.disableAllSenders()
+    return { disabled }
+  })
+
   ipcMain.handle(LIGHT.UPDATE_SACN_CONFIG, async (_, config: unknown) => {
     try {
       if (!isPlainObject(config)) {

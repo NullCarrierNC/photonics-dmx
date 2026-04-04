@@ -8,6 +8,7 @@ import CueSimulation from '../pages/CueSimulation'
 import About from '../pages/About'
 import Preferences from '../pages/Preferences'
 import AudioSettings from '../pages/AudioSettings'
+import DmxConsole from '../pages/DmxConsole'
 import { openCueEditorWindow } from '../ipcApi'
 
 interface AppPageRouterProps {
@@ -26,6 +27,8 @@ export function AppPageRouter({ currentPage }: AppPageRouterProps): JSX.Element 
       return <MyLights />
     case Pages.LightLayout:
       return <LightsLayout />
+    case Pages.DmxConsole:
+      return <DmxConsole />
     case Pages.CuePreview:
       return <DmxPreview />
     case Pages.CueSimulation:

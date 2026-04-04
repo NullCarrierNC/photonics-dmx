@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { DmxRig } from '../../../photonics-dmx/types'
+import { resolveLastUsedRigId } from '../atoms'
 import { getActiveRigs } from '../ipcApi'
+import { DmxRigSelectField } from './DmxRigSelectField'
 
 interface DmxRigSelectorProps {
   selectedRigId: string | null
@@ -12,25 +14,34 @@ interface DmxRigSelectorProps {
  */
 const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ selectedRigId, onRigChange }) => {
   const [availableRigs, setAvailableRigs] = useState<DmxRig[]>([])
+  const selectedRigIdRef = useRef(selectedRigId)
+  selectedRigIdRef.current = selectedRigId
 
-  // Load active rigs
   useEffect(() => {
+    let cancelled = false
     const loadActiveRigs = async () => {
       try {
         const activeRigs: DmxRig[] = await getActiveRigs()
+        if (cancelled) return
         setAvailableRigs(activeRigs)
-
-        // Set default selected rig to the first available rig if none selected
-        if (activeRigs.length > 0 && selectedRigId === null) {
-          onRigChange(activeRigs[0].id)
+        const orderedIds = activeRigs.map((r) => r.id)
+        const currentId = selectedRigIdRef.current
+        const resolved = resolveLastUsedRigId(currentId, orderedIds)
+        if (resolved !== currentId) {
+          onRigChange(resolved)
         }
       } catch (error) {
         console.error('Failed to load active rigs:', error)
       }
     }
 
-    loadActiveRigs()
-  }, [selectedRigId, onRigChange])
+    void loadActiveRigs()
+    return () => {
+      cancelled = true
+    }
+    // Load once per mount; selection is owned by the parent after that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [])
 
   if (availableRigs.length === 0) {
     return (
@@ -44,19 +55,14 @@ const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ selectedRigId, onRigCha
 
   return (
     <div className="mb-6">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-        Preview DMX Rig:
-      </label>
-      <select
-        value={selectedRigId ?? ''}
-        onChange={(e) => onRigChange(e.target.value || null)}
-        className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[200px]">
-        {availableRigs.map((rig) => (
-          <option key={rig.id} value={rig.id}>
-            {rig.name}
-          </option>
-        ))}
-      </select>
+      <DmxRigSelectField
+        className=""
+        label="Preview DMX Rig:"
+        rigs={availableRigs}
+        selectedRigId={selectedRigId}
+        onChange={(id) => onRigChange(id || null)}
+        selectClassName="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-w-[200px]"
+      />
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
         For actual DMX output set the target rig(s) in Preferences.
       </p>

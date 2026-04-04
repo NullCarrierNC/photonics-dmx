@@ -25,6 +25,8 @@ export class DmxPublisher {
   private _immediateBlackoutData: Record<number, number> = {}
   /** Reused each frame to reduce GC */
   private _mergedBuffer: Record<number, number> = {}
+  /** When true, `publish` ignores light states; output comes only from `setManualBuffer`. */
+  private _manualMode = false
 
   constructor(senderManager: SenderManager, lightStateManager: LightStateManager) {
     this._sender = senderManager
@@ -44,7 +46,44 @@ export class DmxPublisher {
    * mapping the desired channels to each DMX fixture's channels.
    */
   public publish = (lights: Map<string, RGBIO>): void => {
+    if (this._manualMode) {
+      return
+    }
     this.publishNow(lights)
+  }
+
+  /**
+   * DMX Console: send a raw universe buffer and take over output until {@link clearManualBuffer}.
+   */
+  public setManualBuffer(buffer: Record<number, number>): void {
+    this._manualMode = true
+    for (const key of Object.keys(this._mergedBuffer)) {
+      delete this._mergedBuffer[Number(key)]
+    }
+    for (const [k, v] of Object.entries(buffer)) {
+      const ch = Number(k)
+      if (!Number.isFinite(ch) || ch < 1 || ch > 512) {
+        continue
+      }
+      this._mergedBuffer[ch] = Math.max(0, Math.min(255, Math.round(v)))
+    }
+    if (Object.keys(this._mergedBuffer).length > 0) {
+      try {
+        this._sender.send(this._mergedBuffer)
+      } catch (error) {
+        console.error('Failed to send manual DMX data:', error)
+      }
+    }
+  }
+
+  /**
+   * Resume cue-driven output from {@link LightStatesUpdated}.
+   */
+  public clearManualBuffer(): void {
+    this._manualMode = false
+    for (const key of Object.keys(this._mergedBuffer)) {
+      delete this._mergedBuffer[Number(key)]
+    }
   }
 
   /**
@@ -179,6 +218,7 @@ export class DmxPublisher {
 
   public async shutdown(): Promise<void> {
     try {
+      this.clearManualBuffer()
       // Remove all event listeners
       this._lightStateManager.removeAllListeners()
 
