@@ -40,6 +40,9 @@ const STEP_TITLES = [
 
 const REVIEW_STEP = STEP_TITLES.length - 1
 
+/** Steps where the user must press a capture button before Next is enabled. */
+const STEPS_REQUIRING_SET_CAPTURE = new Set([4, 5, 6])
+
 function channelsRecord(light: DmxLight): Record<string, number> {
   return light.channels as unknown as Record<string, number>
 }
@@ -206,6 +209,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   const [initError, setInitError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [stepsConfirmed, setStepsConfirmed] = useState<Set<number>>(() => new Set())
 
   const ch = light.channels as RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels
 
@@ -262,6 +266,9 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
 
   const panDmxLive = consoleBuffer[ch.pan] ?? 0
   const tiltDmxLive = consoleBuffer[ch.tilt] ?? 0
+
+  const canAdvance =
+    consoleReady && (!STEPS_REQUIRING_SET_CAPTURE.has(step) || stepsConfirmed.has(step))
 
   const handleSave = async () => {
     if (!light.id) {
@@ -461,14 +468,15 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
             <DmxSlider label="Tilt (DMX)" value={tiltDmxLive} onChange={setTiltDmx} />
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
                 setConfig((c) => ({
                   ...c,
                   panStageDeg: Math.round(
                     Math.max(0, Math.min(c.panRangeDeg, motorDegFromPanDmx(panDmxLive, c))),
                   ),
                 }))
-              }
+                setStepsConfirmed((prev) => new Set(prev).add(4))
+              }}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
               Set upstage
             </button>
@@ -489,14 +497,15 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
             <DmxSlider label="Tilt (DMX)" value={tiltDmxLive} onChange={setTiltDmx} />
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
                 setConfig((c) => ({
                   ...c,
                   tiltStageDeg: Math.round(
                     Math.max(0, Math.min(c.tiltRangeDeg, motorDegFromTiltDmx(tiltDmxLive, c))),
                   ),
                 }))
-              }
+                setStepsConfirmed((prev) => new Set(prev).add(5))
+              }}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
               Set vertical
             </button>
@@ -518,7 +527,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
             <DmxSlider label="Tilt (DMX)" value={tiltDmxLive} onChange={setTiltDmx} />
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
                 setConfig((c) => ({
                   ...c,
                   panHome: Math.round(
@@ -528,7 +537,8 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
                     rawDmxToLogicalHomePercent(tiltDmxLive, c.tiltMin, c.tiltMax, c.invertTilt),
                   ),
                 }))
-              }
+                setStepsConfirmed((prev) => new Set(prev).add(6))
+              }}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
               Set as Home
             </button>
@@ -588,12 +598,12 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
         <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
           Live DMX console mode — output is manual until you close this wizard.
         </p>
-        <div className="flex flex-wrap items-center gap-4 mb-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">DMX Output</span>
-          <SacnToggle />
-          <ArtNetToggle />
-          <EnttecProToggle />
-          <OpenDmxToggle />
+          <SacnToggle compact />
+          <ArtNetToggle compact />
+          <EnttecProToggle compact />
+          <OpenDmxToggle compact />
         </div>
         {progress}
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -621,7 +631,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
               <button
                 type="button"
                 onClick={() => setStep((s) => s + 1)}
-                disabled={!consoleReady}
+                disabled={!canAdvance}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50">
                 Next
               </button>
