@@ -156,7 +156,7 @@ describe('panTiltDmxToSphericalXY', () => {
     expect(ifZeroStage.xPct).toBeGreaterThan(90)
   })
 
-  it('down-firing: ±φ with same |φ| and same stage bearing gives the same dot direction', () => {
+  it('down-firing: ±φ with same |φ| and same stage bearing mirrors dot through disc centre', () => {
     const cfg: FixtureConfig = {
       panHome: 0,
       panMin: 0,
@@ -180,8 +180,8 @@ describe('panTiltDmxToSphericalXY', () => {
     const abovePoleTiltDmx = mirrorDmxForMovingHeadInvert(tiltAboveLogical, 0, 255)
     const below = panTiltDmxToSphericalXY(panDownstageDmx, belowPoleTiltDmx, cfg)
     const above = panTiltDmxToSphericalXY(panDownstageDmx, abovePoleTiltDmx, cfg)
-    expect(below.xPct).toBeCloseTo(above.xPct, 5)
-    expect(below.yPct).toBeCloseTo(above.yPct, 5)
+    expect(below.xPct).toBeCloseTo(-(above.xPct - 50) + 50, 5)
+    expect(below.yPct).toBeCloseTo(-(above.yPct - 50) + 50, 5)
   })
 
   it('down-firing (invertPan/invertTilt): same logical aim as non-inverted preview', () => {
@@ -209,6 +209,33 @@ describe('panTiltDmxToSphericalXY', () => {
     const b = panTiltDmxToSphericalXY(rawPan, rawTilt, inverted)
     expect(a.xPct).toBeCloseTo(b.xPct, 5)
     expect(a.yPct).toBeCloseTo(b.yPct, 5)
+  })
+
+  it('down-firing (Nod-like tilt above pole): same preview as up-firing for same logical pan/tilt', () => {
+    const base: FixtureConfig = {
+      panHome: 0,
+      panMin: 0,
+      panMax: 255,
+      panRangeDeg: 540,
+      panDirectionCW: false,
+      panStageDeg: 0,
+      tiltHome: 50,
+      tiltMin: 0,
+      tiltMax: 255,
+      tiltRangeDeg: 180,
+      tiltStageDeg: 90,
+      invertPan: false,
+      invertTilt: false,
+    }
+    const inverted: FixtureConfig = { ...base, invertPan: true, invertTilt: true }
+    const panLogical = percentToDmx((180 / base.panRangeDeg) * 100, 0, 255)
+    const tiltAboveLogical = percentToDmx((135 / base.tiltRangeDeg) * 100, 0, 255)
+    const rawPan = mirrorDmxForMovingHeadInvert(panLogical, 0, 255)
+    const rawTilt = mirrorDmxForMovingHeadInvert(tiltAboveLogical, 0, 255)
+    const up = panTiltDmxToSphericalXY(panLogical, tiltAboveLogical, base)
+    const down = panTiltDmxToSphericalXY(rawPan, rawTilt, inverted)
+    expect(up.xPct).toBeCloseTo(down.xPct, 5)
+    expect(up.yPct).toBeCloseTo(down.yPct, 5)
   })
 
   it('down-firing: horizontal beam matches stage bearing like up-firing (mirrored raw DMX)', () => {

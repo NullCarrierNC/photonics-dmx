@@ -456,8 +456,8 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                     }}
                     className="text-xs px-2 py-1 rounded border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 w-full">
                     {localConfig.invertPan && localConfig.invertTilt
-                      ? 'Up firing (normal pan + tilt)'
-                      : 'Down firing (invert pan + tilt)'}
+                      ? 'Down firing (invert pan + tilt)'
+                      : 'Up firing (normal pan + tilt)'}
                   </button>
                 </li>
               )}
