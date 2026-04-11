@@ -60,6 +60,7 @@ const buildDefaultMotionPatternAction = (): ActionNode => ({
     size: { source: 'literal', value: 20 },
     bearing: { source: 'literal', value: 'downstage' },
     fanSpread: { source: 'literal', value: 0 },
+    reverse: { source: 'literal', value: false },
   },
   timing: createDefaultActionTiming(),
   layer: { source: 'literal', value: 120 },

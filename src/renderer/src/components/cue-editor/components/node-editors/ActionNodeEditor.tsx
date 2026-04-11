@@ -16,6 +16,8 @@ import {
   STAGE_DIRECTION_OPTIONS,
   bearingLiteralToCanonicalSelectValue,
 } from '../../../../../../photonics-dmx/helpers/stageDirections'
+
+const STAGE_BEARING_VALID_LITERALS = STAGE_DIRECTION_OPTIONS.map((o) => o.value)
 import {
   LINEAR_SWEEP_AXES,
   MOTION_PATTERN_TYPES,
@@ -222,49 +224,39 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
             expected="number"
             availableVariables={availableVariables}
           />
+          <ValueSourceEditor
+            label="Reverse direction"
+            value={node.motionPattern.reverse ?? { source: 'literal', value: false }}
+            onChange={(next) =>
+              updateNode({
+                motionPattern: { ...node.motionPattern!, reverse: next },
+              })
+            }
+            expected="boolean"
+            availableVariables={availableVariables}
+          />
 
           {motionPatternLiteral === 'circle' && (
-            <>
-              {(node.motionPattern.bearing ?? { source: 'literal', value: 'downstage' }).source ===
-              'variable' ? (
-                <ValueSourceEditor
-                  label="Circle bearing (near vertical home)"
-                  value={node.motionPattern.bearing ?? { source: 'literal', value: 'downstage' }}
-                  onChange={(next) =>
-                    updateNode({
-                      motionPattern: { ...node.motionPattern!, bearing: next },
-                    })
-                  }
-                  expected="string"
-                  availableVariables={availableVariables}
-                />
-              ) : (
-                <label className="flex flex-col font-medium">
-                  Circle bearing (near vertical home)
-                  <select
-                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                    value={bearingLiteralToCanonicalSelectValue(
-                      node.motionPattern.bearing?.source === 'literal'
-                        ? node.motionPattern.bearing.value
-                        : 'downstage',
-                    )}
-                    onChange={(e) =>
-                      updateNode({
-                        motionPattern: {
-                          ...node.motionPattern!,
-                          bearing: { source: 'literal', value: e.target.value },
-                        },
-                      })
-                    }>
-                    {STAGE_DIRECTION_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </>
+            <ValueSourceEditor
+              label="Circle bearing (near vertical home)"
+              value={(() => {
+                const b = node.motionPattern.bearing ?? { source: 'literal', value: 'downstage' }
+                return b.source === 'literal'
+                  ? {
+                      source: 'literal' as const,
+                      value: bearingLiteralToCanonicalSelectValue(b.value),
+                    }
+                  : b
+              })()}
+              onChange={(next) =>
+                updateNode({
+                  motionPattern: { ...node.motionPattern!, bearing: next },
+                })
+              }
+              expected="string"
+              validLiterals={STAGE_BEARING_VALID_LITERALS}
+              availableVariables={availableVariables}
+            />
           )}
 
           {motionPatternLiteral === 'custom' && (
@@ -373,50 +365,30 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
 
           {positionMode === 'direction' && (
             <>
-              {(node.position?.bearing ?? { source: 'literal', value: 'downstage' }).source ===
-              'variable' ? (
-                <ValueSourceEditor
-                  label="Bearing (variable)"
-                  value={node.position?.bearing ?? { source: 'literal', value: 'downstage' }}
-                  onChange={(next) =>
-                    updateNode({
-                      position: {
-                        mode: 'direction',
-                        bearing: next,
-                        angle: node.position?.angle ?? { source: 'literal', value: 20 },
-                      },
-                    })
-                  }
-                  expected="string"
-                  availableVariables={availableVariables}
-                />
-              ) : (
-                <label className="flex flex-col font-medium">
-                  Bearing
-                  <select
-                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                    value={bearingLiteralToCanonicalSelectValue(
-                      node.position?.bearing?.source === 'literal'
-                        ? node.position.bearing.value
-                        : 'downstage',
-                    )}
-                    onChange={(e) =>
-                      updateNode({
-                        position: {
-                          mode: 'direction',
-                          bearing: { source: 'literal', value: e.target.value },
-                          angle: node.position?.angle ?? { source: 'literal', value: 20 },
-                        },
-                      })
-                    }>
-                    {STAGE_DIRECTION_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
+              <ValueSourceEditor
+                label="Bearing"
+                value={(() => {
+                  const b = node.position?.bearing ?? { source: 'literal', value: 'downstage' }
+                  return b.source === 'literal'
+                    ? {
+                        source: 'literal' as const,
+                        value: bearingLiteralToCanonicalSelectValue(b.value),
+                      }
+                    : b
+                })()}
+                onChange={(next) =>
+                  updateNode({
+                    position: {
+                      mode: 'direction',
+                      bearing: next,
+                      angle: node.position?.angle ?? { source: 'literal', value: 20 },
+                    },
+                  })
+                }
+                expected="string"
+                validLiterals={STAGE_BEARING_VALID_LITERALS}
+                availableVariables={availableVariables}
+              />
               <ValueSourceEditor
                 label="Angle from vertical (°)"
                 value={node.position?.angle ?? { source: 'literal', value: 20 }}

@@ -60,6 +60,27 @@ describe('resolveMotionPattern presets', () => {
     expect(r.bearingDeg).toBe(180)
   })
 
+  it('defaults reverse to false when omitted', () => {
+    const ctx = makeContext()
+    expect(resolveMotionPattern(literalPattern('circle'), ctx).reverse).toBe(false)
+  })
+
+  it('resolves literal reverse', () => {
+    const ctx = makeContext()
+    const r = resolveMotionPattern(
+      { ...literalPattern('circle'), reverse: { source: 'literal', value: true } },
+      ctx,
+    )
+    expect(r.reverse).toBe(true)
+  })
+
+  it('resolvedMotionPatternSettingsEqual includes reverse', () => {
+    const ctx = makeContext()
+    const a = resolveMotionPattern(literalPattern('circle'), ctx)
+    const b = { ...a, reverse: true }
+    expect(resolvedMotionPatternSettingsEqual(a, b)).toBe(false)
+  })
+
   it('circle resolves named bearing', () => {
     const ctx = makeContext()
     const r = resolveMotionPattern(

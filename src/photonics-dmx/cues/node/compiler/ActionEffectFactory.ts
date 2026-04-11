@@ -100,6 +100,8 @@ export interface ResolvedMotionPatternSetting {
    * or when pattern is not `circle`. Omitted cues default to 180 (downstage) at resolve time.
    */
   bearingDeg: number
+  /** When true, phase advances in the opposite direction (reverse orbit). */
+  reverse: boolean
 }
 
 /** True when two resolved motion-pattern configs are equivalent for idempotent re-submission. */
@@ -121,7 +123,8 @@ export function resolvedMotionPatternSettingsEqual(
     a.tiltFreqMultiplier === b.tiltFreqMultiplier &&
     a.linearSweepAxis === b.linearSweepAxis &&
     a.gimbalCompensation === b.gimbalCompensation &&
-    a.bearingDeg === b.bearingDeg
+    a.bearingDeg === b.bearingDeg &&
+    a.reverse === b.reverse
   )
 }
 
@@ -143,7 +146,8 @@ export function resolvedMotionPatternSettingsEqualExceptBearing(
     a.panFreqMultiplier === b.panFreqMultiplier &&
     a.tiltFreqMultiplier === b.tiltFreqMultiplier &&
     a.linearSweepAxis === b.linearSweepAxis &&
-    a.gimbalCompensation === b.gimbalCompensation
+    a.gimbalCompensation === b.gimbalCompensation &&
+    a.reverse === b.reverse
   )
 }
 

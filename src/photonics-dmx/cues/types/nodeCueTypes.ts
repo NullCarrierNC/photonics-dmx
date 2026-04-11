@@ -482,6 +482,8 @@ export interface NodeMotionPatternSetting {
   panAmplitude?: ValueSource
   tiltAmplitude?: ValueSource
   panPhaseOffset?: ValueSource
+  /** When true, orbit direction is reversed (e.g. counter-clockwise circle vs clockwise). */
+  reverse?: ValueSource
 }
 
 export interface NodeActionTarget {

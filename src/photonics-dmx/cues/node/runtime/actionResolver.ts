@@ -247,6 +247,10 @@ export function resolveMotionPattern(
       : sizeDeg
   }
 
+  const reverse = setting.reverse
+    ? Boolean(resolveValue('boolean', setting.reverse, context))
+    : false
+
   return {
     pattern,
     speedHz,
@@ -262,5 +266,6 @@ export function resolveMotionPattern(
     linearSweepAxis,
     gimbalCompensation,
     bearingDeg,
+    reverse,
   }
 }

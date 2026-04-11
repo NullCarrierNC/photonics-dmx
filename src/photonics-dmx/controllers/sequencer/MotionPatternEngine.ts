@@ -479,6 +479,7 @@ export class MotionPatternEngine {
       const cfg: ResolvedMotionPatternSetting = run.config
       const tSec = elapsedMs / 1000
       const basePhase = TWO_PI * cfg.speedHz * tSec
+      const dirSign = cfg.reverse ? -1 : 1
 
       const lightCount = run.lights.length
 
@@ -487,8 +488,9 @@ export class MotionPatternEngine {
         const fanRad = fanPhaseOffsetRad(i, lightCount, cfg.fanSpreadDeg)
 
         const phasePan =
-          cfg.panFreqMultiplier * (basePhase + fanRad) + (cfg.panPhaseOffsetDeg * Math.PI) / 180
-        const phaseTilt = cfg.tiltFreqMultiplier * (basePhase + fanRad)
+          cfg.panFreqMultiplier * dirSign * (basePhase + fanRad) +
+          (cfg.panPhaseOffsetDeg * Math.PI) / 180
+        const phaseTilt = cfg.tiltFreqMultiplier * dirSign * (basePhase + fanRad)
 
         let panOffsetDeg: number
         let tiltOffsetDeg: number

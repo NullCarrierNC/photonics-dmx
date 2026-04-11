@@ -817,6 +817,7 @@ const basePattern: ResolvedMotionPatternSetting = {
   linearSweepAxis: 'horizontal',
   gimbalCompensation: false,
   bearingDeg: 180,
+  reverse: false,
 }
 
 it('inverted fixtures still produce positive pan motion before DMX output mirroring', () => {
@@ -1055,4 +1056,32 @@ it('light 6 down-firing config: pan/tilt stays within range and draws orbit acro
   // If it hits the edge and is clamped without pan-flipping, minTilt/maxTilt would be exactly 100.
   // Ensure it's not permanently stuck at 100.
   expect(minTilt).toBeLessThan(95)
+})
+
+it('reverse flips pan oscillation direction for non-gimbal pattern', () => {
+  const light = { id: 'rev-test', position: 0, config: defaultMh }
+  const sampleDelta = (reverse: boolean): number => {
+    const lsm = new LightStateManager()
+    const ltc = new LightTransitionController(lsm)
+    const engine = new MotionPatternEngine(ltc)
+    engine.addPattern({
+      name: 'rev-sample',
+      config: { ...basePattern, reverse, speedHz: 1 },
+      lights: [light],
+      layer: 9,
+      startTime: 0,
+      rampUpDurationMs: 0,
+    })
+    engine.advanceFrame({ frameStartTime: 100, deltaTime: 16, frameIndex: 0 })
+    const pan1 = ltc.getLightState(light.id, 9).pan ?? 50
+    engine.advanceFrame({ frameStartTime: 180, deltaTime: 16, frameIndex: 1 })
+    const pan2 = ltc.getLightState(light.id, 9).pan ?? 50
+    return pan2 - pan1
+  }
+
+  const deltaFwd = sampleDelta(false)
+  const deltaRev = sampleDelta(true)
+  expect(Math.abs(deltaFwd)).toBeGreaterThan(1e-6)
+  expect(Math.sign(deltaFwd)).not.toBe(0)
+  expect(Math.sign(deltaRev)).toBe(-Math.sign(deltaFwd))
 })

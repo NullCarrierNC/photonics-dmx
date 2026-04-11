@@ -176,6 +176,7 @@ const motionPatternSchema = {
     panAmplitude: { ...valueSourceSchema, nullable: true },
     tiltAmplitude: { ...valueSourceSchema, nullable: true },
     panPhaseOffset: { ...valueSourceSchema, nullable: true },
+    reverse: { ...valueSourceSchema, nullable: true },
   },
 } as any
 
