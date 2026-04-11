@@ -156,7 +156,7 @@ describe('panTiltDmxToSphericalXY', () => {
     expect(ifZeroStage.xPct).toBeGreaterThan(90)
   })
 
-  it('down-firing: ±φ with same |φ| and same stage bearing mirrors dot through disc centre', () => {
+  it('down-firing: ±φ with same |φ| and same stage bearing keeps the same disc aim (no φ compass flip)', () => {
     const cfg: FixtureConfig = {
       panHome: 0,
       panMin: 0,
@@ -180,8 +180,8 @@ describe('panTiltDmxToSphericalXY', () => {
     const abovePoleTiltDmx = mirrorDmxForMovingHeadInvert(tiltAboveLogical, 0, 255)
     const below = panTiltDmxToSphericalXY(panDownstageDmx, belowPoleTiltDmx, cfg)
     const above = panTiltDmxToSphericalXY(panDownstageDmx, abovePoleTiltDmx, cfg)
-    expect(below.xPct).toBeCloseTo(-(above.xPct - 50) + 50, 5)
-    expect(below.yPct).toBeCloseTo(-(above.yPct - 50) + 50, 5)
+    expect(below.xPct).toBeCloseTo(above.xPct, 5)
+    expect(below.yPct).toBeCloseTo(above.yPct, 5)
   })
 
   it('down-firing (invertPan/invertTilt): same logical aim as non-inverted preview', () => {
@@ -211,7 +211,7 @@ describe('panTiltDmxToSphericalXY', () => {
     expect(a.yPct).toBeCloseTo(b.yPct, 5)
   })
 
-  it('down-firing (Nod-like tilt above pole): same preview as up-firing for same logical pan/tilt', () => {
+  it('down-firing (Nod-like tilt above pole): downstage logical aim stays on DS vs up-firing φ flip', () => {
     const base: FixtureConfig = {
       panHome: 0,
       panMin: 0,
@@ -234,8 +234,9 @@ describe('panTiltDmxToSphericalXY', () => {
     const rawTilt = mirrorDmxForMovingHeadInvert(tiltAboveLogical, 0, 255)
     const up = panTiltDmxToSphericalXY(panLogical, tiltAboveLogical, base)
     const down = panTiltDmxToSphericalXY(rawPan, rawTilt, inverted)
-    expect(up.xPct).toBeCloseTo(down.xPct, 5)
-    expect(up.yPct).toBeCloseTo(down.yPct, 5)
+    expect(Math.abs(down.xPct - 50)).toBeLessThan(8)
+    expect(down.yPct).toBeGreaterThan(50)
+    expect(up.yPct).toBeLessThan(50)
   })
 
   it('down-firing: horizontal beam matches stage bearing like up-firing (mirrored raw DMX)', () => {

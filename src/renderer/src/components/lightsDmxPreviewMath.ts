@@ -21,11 +21,16 @@ export interface SphericalXYOptions {
  * Colatitude φ = tiltMotorDeg − tiltStageDeg (same as the motion engine). Horizontal direction
  * uses stage-relative bearing B = mod360(panDir·(panMotorDeg − panStageDeg)), matching
  * direction-mode mapping motor = panStageDeg + panDir·bearing. The disc’s US/DS/SL/SR labels
- * match clockwise stage bearings (0° = upstage at top) via θ = mod360(B − 180°). **All mounts**
- * use u_x = sign(φ)·sin(θ), u_y = −sign(φ)·cos(θ) (sign(φ)=1 at the pole) so crossing the tilt
- * pole flips compass on the disc consistently with logical beam direction (e.g. tilt-only cues
- * like Nod). Radial distance still uses |φ| and asymmetric span toward tiltMin / tiltMax from
- * the pole.
+ * match clockwise stage bearings (0° = upstage at top) via θ = mod360(B − 180°).
+ *
+ * **Up-firing** (and mixed invertPan / invertTilt): u_x = sign(φ)·sin(θ), u_y = −sign(φ)·cos(θ)
+ * (sign(φ)=1 at the pole) so crossing the tilt pole flips compass on the disc with logical beam
+ * direction (e.g. tilt-only cues like Nod).
+ *
+ * **Down-firing** (invertPan and invertTilt both true, truss / inverted mount): u_x = −sin(θ),
+ * u_y = cos(θ) with no φ sign so horizontal aim matches physical stage (e.g. toward audience → DS)
+ * and does not flip when φ crosses the pole. Radial distance still uses |φ| and asymmetric span
+ * toward tiltMin / tiltMax from the pole.
  */
 export function panTiltDmxToSphericalXY(
   panDmx: number,
@@ -57,11 +62,19 @@ export function panTiltDmxToSphericalXY(
 
   const bearingTrigDeg = modPositive(stageBearingDeg - 180, 360)
   const panRad = bearingTrigDeg * DEG_TO_RAD
-  const sinPhi = Math.sin(phi0Deg * DEG_TO_RAD)
-  const atPole = Math.abs(sinPhi) < 1e-10
-  const phiSign = atPole ? 1 : Math.sign(sinPhi)
-  const ux = phiSign * Math.sin(panRad)
-  const uy = -phiSign * Math.cos(panRad)
+  const downFiring = c.invertPan && c.invertTilt
+  let ux: number
+  let uy: number
+  if (downFiring) {
+    ux = -Math.sin(panRad)
+    uy = Math.cos(panRad)
+  } else {
+    const sinPhi = Math.sin(phi0Deg * DEG_TO_RAD)
+    const atPole = Math.abs(sinPhi) < 1e-10
+    const phiSign = atPole ? 1 : Math.sign(sinPhi)
+    ux = phiSign * Math.sin(panRad)
+    uy = -phiSign * Math.cos(panRad)
+  }
 
   return {
     xPct: 50 + ux * radius * 50,
