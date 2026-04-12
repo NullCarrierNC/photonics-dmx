@@ -28,7 +28,12 @@ import LightsLayoutIntro from './LightsLayout/LightsLayoutIntro'
 const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
   { id: 'front', label: 'Front' },
   { id: 'front-back', label: 'Front and Back' },
+  { id: 'stacked', label: 'Stacked (Top and Bottom)' },
 ]
+
+function isTwoRowPrimaryLayout(layoutId: string): boolean {
+  return layoutId === 'front-back' || layoutId === 'stacked'
+}
 
 /**
  * Handles the light layout and channel configuration.
@@ -52,7 +57,7 @@ const LightsLayout = () => {
   )
 
   const initialAssignedToBack = useMemo(() => {
-    if (activeConfig?.lightLayout.id === 'front-back') {
+    if (activeConfig && isTwoRowPrimaryLayout(activeConfig.lightLayout.id)) {
       return activeConfig.backLights.length > 0 ? activeConfig.backLights.length : 'None'
     }
     return 'None'
@@ -142,8 +147,8 @@ const LightsLayout = () => {
     // Update selected strobe type
     setSelectedStrobe(activeConfig.strobeType)
 
-    // Update assigned to back count
-    if (activeConfig.lightLayout.id === 'front-back') {
+    // Update assigned to back / bottom count
+    if (isTwoRowPrimaryLayout(activeConfig.lightLayout.id)) {
       setAssignedToBack(
         activeConfig.backLights.length > 0 ? activeConfig.backLights.length : 'None',
       )
@@ -192,7 +197,7 @@ const LightsLayout = () => {
   const availableLayouts = useMemo(() => {
     return LIGHT_LAYOUTS.filter((layout) => {
       if (layout.id === 'front') return true
-      if (layout.id === 'front-back') return (selectedCount || 0) >= 2
+      if (layout.id === 'front-back' || layout.id === 'stacked') return (selectedCount || 0) >= 2
       return false
     })
   }, [selectedCount])
@@ -436,7 +441,7 @@ const LightsLayout = () => {
       setSelectedLayout(activeConfig.lightLayout.id)
       setSelectedStrobe(activeConfig.strobeType)
 
-      if (activeConfig.lightLayout.id === 'front-back') {
+      if (isTwoRowPrimaryLayout(activeConfig.lightLayout.id)) {
         setAssignedToBack(
           activeConfig.backLights.length > 0 ? activeConfig.backLights.length : 'None',
         )
@@ -532,8 +537,7 @@ const LightsLayout = () => {
 
     const updatedConfig = {
       numLights: selectedCount || 0,
-      lightLayout:
-        availableLayouts.find((layout) => layout.id === selectedLayout) || LIGHT_LAYOUTS[0],
+      lightLayout: LIGHT_LAYOUTS.find((layout) => layout.id === selectedLayout) || LIGHT_LAYOUTS[0],
       strobeType: selectedStrobe,
       frontLights: frontWithNewIds,
       backLights: backWithNewIds,
@@ -620,6 +624,7 @@ const LightsLayout = () => {
 
           {/* Light Layout Preview */}
           <LightLayoutPreview
+            layoutId={selectedLayout}
             frontCount={frontCount}
             backCount={backCount}
             highlightedLight={highlightedLight}
@@ -628,26 +633,50 @@ const LightsLayout = () => {
 
           <div className="mt-8 space-y-8">
             <LightChannelAssignmentSection
-              title={rigName ? `${rigName} - Front Lights` : 'Front Lights'}
+              title={
+                selectedLayout === 'stacked'
+                  ? rigName
+                    ? `${rigName} - Top Lights`
+                    : 'Top Lights'
+                  : rigName
+                    ? `${rigName} - Front Lights`
+                    : 'Front Lights'
+              }
               lights={frontLights}
               myLights={myFixtures}
               rigId={activeRigId}
               onLightChange={handleLightChange}
               highlightedLight={highlightedLight}
               onLightClick={handleLightClick}
-              lightLabel={(light, index) => `Front ${index + 1} (Position ${light.position})`}
+              lightLabel={(light, index) =>
+                selectedLayout === 'stacked'
+                  ? `Top ${index + 1} (Position ${light.position})`
+                  : `Front ${index + 1} (Position ${light.position})`
+              }
             />
 
-            {selectedLayout === 'front-back' && backLights.length > 0 && (
+            {isTwoRowPrimaryLayout(selectedLayout) && backLights.length > 0 && (
               <LightChannelAssignmentSection
-                title={rigName ? `${rigName} - Back Lights` : 'Back Lights'}
+                title={
+                  selectedLayout === 'stacked'
+                    ? rigName
+                      ? `${rigName} - Bottom Lights`
+                      : 'Bottom Lights'
+                    : rigName
+                      ? `${rigName} - Back Lights`
+                      : 'Back Lights'
+                }
                 lights={backLights}
                 myLights={myFixtures}
                 rigId={activeRigId}
                 onLightChange={handleLightChange}
                 highlightedLight={highlightedLight}
                 onLightClick={handleLightClick}
-                lightLabel={(light, index) => `Back ${index + 1} (Position ${light.position})`}
+                lightLabel={(light, index) =>
+                  selectedLayout === 'stacked'
+                    ? `Bottom ${index + 1} (Position ${light.position})`
+                    : `Back ${index + 1} (Position ${light.position})`
+                }
               />
             )}
 

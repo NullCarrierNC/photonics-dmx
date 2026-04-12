@@ -25,6 +25,8 @@ export {
 } from './lightsDmxPreviewMath'
 
 const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmxValues }) => {
+  const layoutId = lightingConfig.lightLayout?.id ?? 'front'
+  const isStacked = layoutId === 'stacked'
   /**
    * Helper function to calculate the light's color based on DMX values.
    */
@@ -189,6 +191,41 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
       Strobe
     </div>
   )
+
+  if (isStacked) {
+    return (
+      <div className="mt-4 pt-3 pb-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
+        <div className="flex flex-col items-center">
+          <div className="mb-1">
+            <MdTv size={30} className="text-gray-600 dark:text-gray-300" />
+          </div>
+
+          {lightingConfig?.frontLights.length > 0 && (
+            <div className="w-full flex flex-col items-center">
+              <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Top</div>
+              {renderLightRow(lightingConfig.frontLights)}
+            </div>
+          )}
+
+          {lightingConfig?.backLights.length > 0 && (
+            <div className="w-full flex flex-col items-center mt-2">
+              <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">
+                Bottom
+              </div>
+              {renderLightRow(lightingConfig.backLights)}
+            </div>
+          )}
+
+          {lightingConfig?.strobeType === ConfigStrobeType.Dedicated &&
+            lightingConfig.strobeLights.map((strobeLight) => renderStrobeIndicator(strobeLight))}
+
+          {((lightingConfig?.frontLights.length ?? 0) > 0 ||
+            (lightingConfig?.backLights.length ?? 0) > 0) &&
+            renderPeople()}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="mt-4 pt-3 pb-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
