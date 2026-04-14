@@ -2,7 +2,9 @@ import type { FixtureConfig } from '../../../photonics-dmx/types'
 import { normalizeFixtureConfig } from '../../../photonics-dmx/types'
 import {
   dmxToPercent,
+  logicalPanDir,
   mirrorDmxForMovingHeadInvert,
+  shouldMirrorTiltForStageRelative,
 } from '../../../photonics-dmx/helpers/dmxHelpers'
 
 function modPositive(x: number, m: number): number {
@@ -19,17 +21,14 @@ export interface SphericalXYOptions {
 /**
  * Top-down projection of beam direction from DMX pan/tilt.
  * Colatitude φ = tiltMotorDeg − tiltStageDeg (same as the motion engine). Horizontal direction
- * uses stage-relative bearing B = mod360(panDir·(panMotorDeg − panStageDeg)), matching
- * direction-mode mapping motor = panStageDeg + panDir·bearing. The disc’s US/DS/SL/SR labels
- * match clockwise stage bearings (0° = upstage at top) via θ = mod360(B − 180°).
+ * uses stage-relative bearing B = mod360(panDir·(panMotorDeg − panStageDeg)) with logical
+ * `panDir` from {@link logicalPanDir}, matching direction-mode mapping
+ * motor = panStageDeg + panDir·bearing. The disc’s US/DS/SL/SR labels match clockwise stage
+ * bearings (0° = upstage at top) via θ = mod360(B − 180°).
  *
- * **Up-firing** (and mixed invertPan / invertTilt): u_x = sign(φ)·sin(θ), u_y = −sign(φ)·cos(θ)
- * (sign(φ)=1 at the pole) so crossing the tilt pole flips compass on the disc with logical beam
- * direction (e.g. tilt-only cues like Nod).
- *
- * **Down-firing** (invertPan and invertTilt both true, truss / inverted mount): u_x = −sin(θ),
- * u_y = cos(θ) with no φ sign so horizontal aim matches physical stage (e.g. toward audience → DS)
- * and does not flip when φ crosses the pole. Radial distance still uses |φ| and asymmetric span
+ * u_x = sign(φ)·sin(θ), u_y = −sign(φ)·cos(θ) (sign(φ)=1 at the pole) so crossing the tilt pole
+ * flips compass on the disc with logical beam direction for floor and truss mounts (same gimbal
+ * geometry in logical motor space after DMX invert). Radial distance uses |φ| and asymmetric span
  * toward tiltMin / tiltMax from the pole.
  */
 export function panTiltDmxToSphericalXY(
@@ -51,7 +50,7 @@ export function panTiltDmxToSphericalXY(
   const tiltPct = dmxToPercent(tiltDmxLogical, c.tiltMin, c.tiltMax)
   const panMotorDeg = (panPct / 100) * c.panRangeDeg
   const tiltMotorDeg = (tiltPct / 100) * c.tiltRangeDeg
-  const panDir = c.panDirectionCW ? 1 : -1
+  const panDir = logicalPanDir(c)
   const stageBearingDeg = modPositive(panDir * (panMotorDeg - c.panStageDeg), 360)
   const poleDeg = options?.poleDegOverride ?? c.tiltStageDeg
   const phi0Deg = tiltMotorDeg - poleDeg
@@ -62,19 +61,17 @@ export function panTiltDmxToSphericalXY(
 
   const bearingTrigDeg = modPositive(stageBearingDeg - 180, 360)
   const panRad = bearingTrigDeg * DEG_TO_RAD
-  const downFiring = c.invertPan && c.invertTilt
-  let ux: number
-  let uy: number
-  if (downFiring) {
-    ux = -Math.sin(panRad)
-    uy = Math.cos(panRad)
-  } else {
-    const sinPhi = Math.sin(phi0Deg * DEG_TO_RAD)
-    const atPole = Math.abs(sinPhi) < 1e-10
-    const phiSign = atPole ? 1 : Math.sign(sinPhi)
-    ux = phiSign * Math.sin(panRad)
-    uy = -phiSign * Math.cos(panRad)
-  }
+  const sinPhi = Math.sin(phi0Deg * DEG_TO_RAD)
+  const atPole = Math.abs(sinPhi) < 1e-10
+  const phiSign = atPole ? 1 : Math.sign(sinPhi)
+  const homePhiDeg = (c.tiltHome / 100) * c.tiltRangeDeg - poleDeg
+  const homeSinPhi = Math.sin(homePhiDeg * DEG_TO_RAD)
+  const homePhiSign = Math.abs(homeSinPhi) < 1e-10 ? 0 : Math.sign(homeSinPhi)
+  const flipPhi =
+    shouldMirrorTiltForStageRelative(c) && homePhiSign !== 0 && homePhiSign === phiSign
+  const effectivePhiSign = flipPhi ? -phiSign : phiSign
+  const ux = effectivePhiSign * Math.sin(panRad)
+  const uy = -effectivePhiSign * Math.cos(panRad)
 
   return {
     xPct: 50 + ux * radius * 50,
@@ -105,7 +102,7 @@ export function panTiltDmxToWizardMotorSpaceXY(
   const tiltPct = dmxToPercent(tiltDmxLogical, c.tiltMin, c.tiltMax)
   const panDir = c.panDirectionCW ? 1 : -1
   const panMotorDeg = (panPct / 100) * c.panRangeDeg
-  const panAngleDeg = panDir * modPositive(panMotorDeg, 360)
+  const panAngleDeg = panDir * panMotorDeg
   const radius = Math.min(1, Math.max(0, tiltPct / 100))
   const panRad = (panAngleDeg * Math.PI) / 180
   const x = Math.sin(panRad) * radius

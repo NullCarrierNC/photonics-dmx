@@ -17,6 +17,12 @@ import { MotionCueRegistry } from '../../photonics-dmx/cues/registries/MotionCue
 /** Motion cue started from Cue Simulation; stopped explicitly or replaced by another start. */
 let activeSimulatedMotionCue: INetCue | null = null
 
+function stopActiveSimulatedMotionCue(controllerManager: ControllerManager): void {
+  activeSimulatedMotionCue?.onStop?.()
+  activeSimulatedMotionCue = null
+  controllerManager.getLightingController()?.schedulePanTiltClear()
+}
+
 /**
  * Set up simulation and test-effect IPC handlers (beat/keyframe/measure/instrument, test effects, system status, available cues).
  */
@@ -24,6 +30,10 @@ export function setupSimulationHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
+  controllerManager.setOnConsoleEnter(() => {
+    stopActiveSimulatedMotionCue(controllerManager)
+  })
+
   ipcMain.handle(LIGHT.GET_AUDIO_CUE_GROUPS, async () => {
     try {
       const registry = AudioCueRegistry.getInstance()
@@ -386,9 +396,7 @@ export function setupSimulationHandlers(
 
   ipcMain.handle(LIGHT.STOP_MOTION_CUE_SIMULATION, async () => {
     try {
-      activeSimulatedMotionCue?.onStop?.()
-      activeSimulatedMotionCue = null
-      controllerManager.getLightingController()?.schedulePanTiltClear()
+      stopActiveSimulatedMotionCue(controllerManager)
       return { success: true as const }
     } catch (error) {
       console.error('Error stopping motion cue simulation:', error)

@@ -1,6 +1,10 @@
 import { performance } from 'perf_hooks'
 import { normalizeFixtureConfig, RGBIO, TrackedLight } from '../../types'
-import { degreeOffsetToPercent } from '../../helpers/dmxHelpers'
+import {
+  degreeOffsetToPercent,
+  logicalPanDir,
+  shouldMirrorTiltForStageRelative,
+} from '../../helpers/dmxHelpers'
 import { logicalPanPercentFromMotorDeg, pickAliasedPanMotorDeg } from '../../helpers/panMotorAlias'
 import type { ResolvedMotionPatternSetting } from '../../cues/node/compiler/ActionEffectFactory'
 import type { ActiveMotionPattern, FrameContext } from './interfaces'
@@ -297,9 +301,14 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
   } = params
   const bearingDeg = bearingDegRaw ?? 180
   const c = normalizeFixtureConfig(fixtureConfig)
-  const tiltRange = c.tiltRangeDeg
-  const tiltHomeDeg = (c.tiltHome / 100) * tiltRange
-  const poleTiltDeg = c.tiltStageDeg
+  const mirrorTiltOffset = shouldMirrorTiltForStageRelative(c)
+  const cMotion = {
+    ...c,
+    tiltHome: mirrorTiltOffset ? 100 - c.tiltHome : c.tiltHome,
+  }
+  const tiltRange = cMotion.tiltRangeDeg
+  const tiltHomeDeg = (cMotion.tiltHome / 100) * tiltRange
+  const poleTiltDeg = cMotion.tiltStageDeg
   const phi0Deg = tiltHomeDeg - poleTiltDeg
   const tiltHeadroomDeg = Math.max(0, Math.min(tiltHomeDeg, tiltRange - tiltHomeDeg))
   const alphaDeg = Math.min(sizeDeg * ramp, tiltHeadroomDeg)
@@ -307,8 +316,8 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
     return { panOffsetDeg: 0, tiltOffsetDeg: 0 }
   }
 
-  const panHomeDeg = (c.panHome / 100) * c.panRangeDeg
-  const panRangeDeg = c.panRangeDeg
+  const panHomeDeg = (cMotion.panHome / 100) * cMotion.panRangeDeg
+  const panRangeDeg = cMotion.panRangeDeg
 
   const enclosesPole = Math.abs(phi0Deg) < alphaDeg - NEAR_POLE_EPS_DEG
   let phi0EffectiveDeg: number
@@ -318,13 +327,13 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
     circleCenterPanMotorDeg = panHomeDeg
   } else {
     phi0EffectiveDeg = alphaDeg
-    const panDir = c.panDirectionCW ? 1 : -1
+    const panDir = logicalPanDir(cMotion)
     // Match direction-mode set-position: same raw target and intent-based 360° alias pick
     // as resolvePositionToAbsolutePercent direction mode (bearing from panStageDeg).
-    const rawPanTarget = c.panStageDeg + panDir * bearingDeg
+    const rawPanTarget = cMotion.panStageDeg + panDir * bearingDeg
     circleCenterPanMotorDeg = pickAliasedPanMotorDeg(
       rawPanTarget,
-      c.panRangeDeg,
+      cMotion.panRangeDeg,
       panHomeDeg,
       'intent',
     )
@@ -391,7 +400,7 @@ function offsetDegToAbsolutePercent(
   preferredPanMotorDeg: number,
 ): { pan: number; tilt: number; chosenPanMotorDeg: number } {
   const c = normalizeFixtureConfig(fixtureConfig)
-  const panDir = c.panDirectionCW ? 1 : -1
+  const panDir = logicalPanDir(c)
   const panHomeDeg = (c.panHome / 100) * c.panRangeDeg
   const rawPanMotorDeg = panHomeDeg + panDir * panOffsetDeg
   const chosenPanMotorDeg = pickAliasedPanMotorDeg(
@@ -401,7 +410,8 @@ function offsetDegToAbsolutePercent(
     'continuity',
   )
   const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
-  const tiltRaw = c.tiltHome + degreeOffsetToPercent(tiltOffsetDeg, c.tiltRangeDeg)
+  const tiltDir = shouldMirrorTiltForStageRelative(c) ? -1 : 1
+  const tiltRaw = c.tiltHome + tiltDir * degreeOffsetToPercent(tiltOffsetDeg, c.tiltRangeDeg)
   return {
     pan: clampPercentAxis('pan', panRaw, lightId),
     tilt: clampPercentAxis('tilt', tiltRaw, lightId),

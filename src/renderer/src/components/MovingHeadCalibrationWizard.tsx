@@ -7,7 +7,10 @@ import {
   RgbMovingHeadDmxChannels,
   RgbwMovingHeadDmxChannels,
 } from '../../../photonics-dmx/types'
-import { percentToDmx } from '../../../photonics-dmx/helpers/dmxHelpers'
+import {
+  mirrorDmxForMovingHeadInvert,
+  percentToDmx,
+} from '../../../photonics-dmx/helpers/dmxHelpers'
 import {
   motorDegFromPanDmx,
   motorDegFromTiltDmx,
@@ -57,12 +60,20 @@ function buildInitialConsoleBuffer(light: DmxLight): Record<number, number> {
       case 'masterDimmer':
         buf[addr] = 255
         break
-      case 'pan':
-        buf[addr] = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
+      case 'pan': {
+        const logicalDmx = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
+        buf[addr] = cfg.invertPan
+          ? mirrorDmxForMovingHeadInvert(logicalDmx, cfg.panMin, cfg.panMax)
+          : logicalDmx
         break
-      case 'tilt':
-        buf[addr] = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
+      }
+      case 'tilt': {
+        const logicalDmx = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
+        buf[addr] = cfg.invertTilt
+          ? mirrorDmxForMovingHeadInvert(logicalDmx, cfg.tiltMin, cfg.tiltMax)
+          : logicalDmx
         break
+      }
       case 'red':
       case 'green':
       case 'blue':
@@ -122,9 +133,10 @@ function WizardBeamPreview({
   const tilt = buffer[ch.tilt] ?? 0
 
   const stageLabelsReady = step >= STAGE_LABELS_READY_STEP
+  const rawConsoleConfig: FixtureConfig = { ...config, invertPan: false, invertTilt: false }
   const { xPct, yPct } =
     step < STAGE_LABELS_READY_STEP
-      ? panTiltDmxToWizardMotorSpaceXY(pan, tilt, config)
+      ? panTiltDmxToWizardMotorSpaceXY(pan, tilt, rawConsoleConfig)
       : panTiltDmxToSphericalXY(pan, tilt, config)
 
   let bg = 'rgb(40,40,40)'

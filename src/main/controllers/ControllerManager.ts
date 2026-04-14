@@ -17,7 +17,7 @@ import {
   clampMergeMovingHeadFixtureConfig,
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
-import { dmxToPercent } from '../../photonics-dmx/helpers/dmxHelpers'
+import { rawDmxToLogicalHomePercent } from '../../photonics-dmx/helpers/movingHeadCalibration'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
@@ -71,6 +71,13 @@ function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
   return err !== null && typeof err === 'object' && 'code' in err && 'syscall' in err
 }
 
+type OutputSenderStateSnapshot = {
+  sacn: boolean
+  artnet: boolean
+  enttecpro: boolean
+  opendmx: boolean
+}
+
 export class ControllerManager {
   private config: ConfigurationManager
   private dmxLightManager: DmxLightManager | null = null
@@ -97,6 +104,8 @@ export class ControllerManager {
 
   /** Snapshot of listeners disabled while DMX Console is active */
   private consoleRestore: { yarg: boolean; rb3: boolean; audio: boolean } | null = null
+  /** Optional hook for subsystems that must stop when console/manual DMX takes over. */
+  private onConsoleEnter: (() => void) | null = null
 
   constructor() {
     this.config = new ConfigurationManager()
@@ -761,6 +770,13 @@ export class ControllerManager {
     this.senderManager!.setOnSenderEnabled(callback)
   }
 
+  /**
+   * Register a callback to run when console mode is entered.
+   */
+  public setOnConsoleEnter(callback: (() => void) | null): void {
+    this.onConsoleEnter = callback
+  }
+
   public getCueHandler(): YargCueHandler | Rb3CueHandler | null {
     return this.cueHandler
   }
@@ -835,6 +851,14 @@ export class ControllerManager {
 
     const wasYargEnabled = this.listenerCoordinator.getIsYargEnabled()
     const wasRb3Enabled = this.listenerCoordinator.getIsRb3Enabled()
+    const activeSendersBeforeRestart: OutputSenderStateSnapshot | null = this.senderManager
+      ? {
+          sacn: this.senderManager.isSenderEnabled('sacn'),
+          artnet: this.senderManager.isSenderEnabled('artnet'),
+          enttecpro: this.senderManager.isSenderEnabled('enttecpro'),
+          opendmx: this.senderManager.isSenderEnabled('opendmx'),
+        }
+      : null
 
     try {
       if (wasYargEnabled) {
@@ -851,6 +875,9 @@ export class ControllerManager {
 
       if (this.dmxPublisher) {
         await this.dmxPublisher.shutdown()
+      }
+      if (this.senderManager) {
+        await this.senderManager.shutdown()
       }
 
       // Ensure cue handler lifecycle is handled
@@ -879,6 +906,9 @@ export class ControllerManager {
     // Reinitialize
     try {
       await this.init()
+      if (this.consoleRestore !== null) {
+        this.dmxPublisher?.setManualBuffer({})
+      }
 
       // Restore previously active listeners
       if (wasYargEnabled) {
@@ -887,10 +917,104 @@ export class ControllerManager {
         await this.enableRb3()
       }
 
+      // Restore DMX output senders from persisted preferences so that output
+      // continues without requiring a manual toggle after any config change.
+      await this.restoreSenderOutputsFromPrefs(activeSendersBeforeRestart ?? undefined)
+
       console.log('Controllers restarted successfully')
     } catch (error) {
       console.error('Error reinitializing controllers:', error)
       throw error
+    }
+  }
+
+  /**
+   * Re-enable DMX output senders based on persisted preferences.
+   * Called after controller restart so that sACN / Art-Net / USB senders
+   * resume automatically without the user needing to toggle them off and on.
+   */
+  public async restoreSenderOutputsFromPrefs(
+    activeSenders?: OutputSenderStateSnapshot,
+  ): Promise<void> {
+    const prefs = this.config.getAllPreferences()
+    const outputConfig = prefs.dmxOutputConfig
+    if (!outputConfig) return
+
+    const sendersToRestore: OutputSenderStateSnapshot = activeSenders ?? {
+      sacn: outputConfig.sacnEnabled,
+      artnet: outputConfig.artNetEnabled,
+      enttecpro: outputConfig.enttecProEnabled,
+      opendmx: outputConfig.openDmxEnabled,
+    }
+
+    this.ensureSenderManager()
+    const sm = this.senderManager!
+
+    if (sendersToRestore.sacn) {
+      const sc = prefs.sacnConfig
+      try {
+        await sm.enableSender('sacn', 'sacn', {
+          sender: 'sacn',
+          universe: sc?.universe ?? 1,
+          networkInterface: sc?.networkInterface || undefined,
+          useUnicast: sc?.useUnicast ?? false,
+          unicastDestination: sc?.unicastDestination || undefined,
+        })
+        console.log('Restored sACN sender from preferences')
+      } catch (err) {
+        console.error('Failed to restore sACN sender after restart:', err)
+      }
+    }
+
+    if (sendersToRestore.artnet) {
+      const ac = prefs.artNetConfig
+      if (ac?.host) {
+        try {
+          await sm.enableSender('artnet', 'artnet', {
+            sender: 'artnet',
+            host: ac.host,
+            universe: ac.universe,
+            net: ac.net,
+            subnet: ac.subnet,
+            subuni: ac.subuni,
+            port: ac.port,
+          })
+          console.log('Restored Art-Net sender from preferences')
+        } catch (err) {
+          console.error('Failed to restore Art-Net sender after restart:', err)
+        }
+      }
+    }
+
+    if (sendersToRestore.enttecpro) {
+      const ec = prefs.enttecProConfig
+      if (ec?.port) {
+        try {
+          await sm.enableSender('enttecpro', 'enttecpro', {
+            sender: 'enttecpro',
+            devicePath: ec.port,
+          })
+          console.log('Restored Enttec Pro sender from preferences')
+        } catch (err) {
+          console.error('Failed to restore Enttec Pro sender after restart:', err)
+        }
+      }
+    }
+
+    if (sendersToRestore.opendmx) {
+      const oc = prefs.openDmxConfig
+      if (oc?.port) {
+        try {
+          await sm.enableSender('opendmx', 'opendmx', {
+            sender: 'opendmx',
+            devicePath: oc.port,
+            dmxSpeed: oc.dmxSpeed,
+          })
+          console.log('Restored OpenDMX sender from preferences')
+        } catch (err) {
+          console.error('Failed to restore OpenDMX sender after restart:', err)
+        }
+      }
     }
   }
 
@@ -994,6 +1118,7 @@ export class ControllerManager {
     if (!rig) {
       return { success: false, error: 'Rig not found' }
     }
+    this.onConsoleEnter?.()
     if (this.consoleRestore !== null) {
       this.dmxPublisher?.setManualBuffer({})
       return { success: true }
@@ -1028,16 +1153,10 @@ export class ControllerManager {
     const r = this.consoleRestore
     this.consoleRestore = null
     this.dmxPublisher?.clearManualBuffer()
-    if (this.consoleRestore !== null) {
-      return { success: true }
-    }
     if (r.yarg) {
       this.enableYarg()
     } else if (r.rb3) {
       await this.enableRb3()
-    }
-    if (this.consoleRestore !== null) {
-      return { success: true }
     }
     if (r.audio) {
       await this.enableAudio()
@@ -1128,8 +1247,18 @@ export class ControllerManager {
     const baseConfig: FixtureConfig = normalizeFixtureConfig(light.config)
     const newConfig: FixtureConfig = {
       ...baseConfig,
-      panHome: dmxToPercent(panClamped, baseConfig.panMin, baseConfig.panMax),
-      tiltHome: dmxToPercent(tiltClamped, baseConfig.tiltMin, baseConfig.tiltMax),
+      panHome: rawDmxToLogicalHomePercent(
+        panClamped,
+        baseConfig.panMin,
+        baseConfig.panMax,
+        baseConfig.invertPan,
+      ),
+      tiltHome: rawDmxToLogicalHomePercent(
+        tiltClamped,
+        baseConfig.tiltMin,
+        baseConfig.tiltMax,
+        baseConfig.invertTilt,
+      ),
     }
     const updatedLight: DmxLight = { ...light, config: newConfig }
     const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
@@ -1150,8 +1279,18 @@ export class ControllerManager {
       ...fixture,
       config: {
         ...fBase,
-        panHome: dmxToPercent(panClamped, fBase.panMin, fBase.panMax),
-        tiltHome: dmxToPercent(tiltClamped, fBase.tiltMin, fBase.tiltMax),
+        panHome: rawDmxToLogicalHomePercent(
+          panClamped,
+          fBase.panMin,
+          fBase.panMax,
+          fBase.invertPan,
+        ),
+        tiltHome: rawDmxToLogicalHomePercent(
+          tiltClamped,
+          fBase.tiltMin,
+          fBase.tiltMax,
+          fBase.invertTilt,
+        ),
       },
     }
     await this.config.updateUserLights(newUserLights)
@@ -1204,7 +1343,10 @@ export class ControllerManager {
     }
     await this.config.updateUserLights(newUserLights)
 
-    this.refreshActiveRigs()
+    // Restart so that the merged DmxLightManager and MotionPatternEngine's TrackedLight configs
+    // are rebuilt from the new FixtureConfig (invertPan, invertTilt, panDirectionCW, etc.).
+    // refreshActiveRigs() would only update DmxPublisher, leaving the sequencer stale.
+    await this.restartControllers()
     return { success: true }
   }
 

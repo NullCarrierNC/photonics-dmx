@@ -1,6 +1,7 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
-import { LIGHT } from '../../shared/ipcChannels'
+import { sendToAllWindows } from '../utils/windowUtils'
+import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { ipcError } from './ipcResult'
 import type { FixtureConfig } from '../../photonics-dmx/types'
 
@@ -104,12 +105,16 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false as const, error: 'Invalid console set fixture config payload' }
     }
     try {
-      return await controllerManager.setConsoleFixtureConfig({
+      const result = await controllerManager.setConsoleFixtureConfig({
         rigId: data.rigId,
         lightId: data.lightId,
         fixtureId: data.fixtureId,
         config: data.config as Partial<FixtureConfig>,
       })
+      if (result.success) {
+        sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
+      }
+      return result
     } catch (error) {
       return ipcError(error)
     }

@@ -60,6 +60,20 @@ describe('resolveMotionPattern presets', () => {
     expect(r.bearingDeg).toBe(180)
   })
 
+  it('Nod-style linear-sweep vertical resolves to tilt-only oscillation', () => {
+    const ctx = makeContext()
+    const r = resolveMotionPattern(
+      {
+        ...literalPattern('linear-sweep'),
+        linearSweepAxis: { source: 'literal', value: 'vertical' },
+      },
+      ctx,
+    )
+    expect(r.linearSweepAxis).toBe('vertical')
+    expect(r.panAmplitudeDeg).toBe(0)
+    expect(r.tiltAmplitudeDeg).toBe(40)
+  })
+
   it('defaults reverse to false when omitted', () => {
     const ctx = makeContext()
     expect(resolveMotionPattern(literalPattern('circle'), ctx).reverse).toBe(false)

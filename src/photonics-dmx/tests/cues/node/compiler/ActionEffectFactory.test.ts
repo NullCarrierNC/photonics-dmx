@@ -257,4 +257,62 @@ describe('resolvePositionToAbsolutePercent', () => {
     )
     expect(result.pan).toBeCloseTo((360 / 540) * 100, 5)
   })
+
+  it('direction mode: invertPan=true with panDirectionCW=true behaves like panDirectionCW=false (logicalPanDir XOR)', () => {
+    // logicalPanDir XOR: CW=true + invert=true → -1, same as CW=false + invert=false → -1
+    const withInvert = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 90, angleFromVerticalDeg: 0 },
+      { ...base, panDirectionCW: true, invertPan: true },
+    )
+    const withCCW = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 90, angleFromVerticalDeg: 0 },
+      { ...base, panDirectionCW: false, invertPan: false },
+    )
+    expect(withInvert.pan).toBeCloseTo(withCCW.pan!, 5)
+  })
+
+  it('offset mode: invertPan=true flips effective pan direction', () => {
+    const withInvert = resolvePositionToAbsolutePercent(
+      { mode: 'offset', panOffsetDeg: 45, tiltOffsetDeg: 0 },
+      { ...base, panDirectionCW: true, invertPan: true },
+    )
+    const withoutInvert = resolvePositionToAbsolutePercent(
+      { mode: 'offset', panOffsetDeg: 45, tiltOffsetDeg: 0 },
+      { ...base, panDirectionCW: true, invertPan: false },
+    )
+    // Inverted pan should move in the opposite direction
+    const center = base.panHome
+    expect(withInvert.pan! - center).toBeCloseTo(-(withoutInvert.pan! - center), 5)
+  })
+
+  it('direction mode: invertPan=true + panDirectionCW=false behaves like panDirectionCW=true (double negation)', () => {
+    // logicalPanDir XOR: CW=false + invert=true → 1, same as CW=true + invert=false → 1
+    const doubleNeg = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 90, angleFromVerticalDeg: 0 },
+      { ...base, panDirectionCW: false, invertPan: true },
+    )
+    const cwNormal = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 90, angleFromVerticalDeg: 0 },
+      { ...base, panDirectionCW: true, invertPan: false },
+    )
+    expect(doubleNeg.pan).toBeCloseTo(cwNormal.pan!, 5)
+  })
+
+  it('offset mode: invertTilt with mid-stage reference keeps zero offset anchored at tiltHome', () => {
+    const cfg = { ...base, invertTilt: true, tiltHome: 25, tiltStageDeg: 90, tiltRangeDeg: 180 }
+    const result = resolvePositionToAbsolutePercent(
+      { mode: 'offset', panOffsetDeg: 0, tiltOffsetDeg: 0 },
+      cfg,
+    )
+    expect(result.tilt).toBeCloseTo(25, 5)
+  })
+
+  it('direction mode: invertTilt keeps tilt anchored to calibrated stage vertical', () => {
+    const cfg = { ...base, invertTilt: true, tiltHome: 25, tiltStageDeg: 90, tiltRangeDeg: 180 }
+    const result = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 180, angleFromVerticalDeg: 20 },
+      cfg,
+    )
+    expect(result.tilt).toBeCloseTo(50 + (20 / 180) * 100, 5)
+  })
 })

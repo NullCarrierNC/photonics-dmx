@@ -162,8 +162,14 @@ export class DmxPublisher {
         let tiltOut: number
         if (isMovingHead) {
           const cfg = normalizeFixtureConfig(dmxLight.config)
-          const homePanDmx = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
-          const homeTiltDmx = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
+          const homePanDmxLogical = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
+          const homeTiltDmxLogical = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
+          const homePanDmx = cfg.invertPan
+            ? mirrorDmxForMovingHeadInvert(homePanDmxLogical, cfg.panMin, cfg.panMax)
+            : homePanDmxLogical
+          const homeTiltDmx = cfg.invertTilt
+            ? mirrorDmxForMovingHeadInvert(homeTiltDmxLogical, cfg.tiltMin, cfg.tiltMax)
+            : homeTiltDmxLogical
           if (pan != null) {
             const panDmx = percentToDmx(pan, cfg.panMin, cfg.panMax)
             panOut = cfg.invertPan

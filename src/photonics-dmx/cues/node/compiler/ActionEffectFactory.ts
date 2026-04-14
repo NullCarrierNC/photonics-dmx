@@ -14,7 +14,12 @@ import {
   normalizeFixtureConfig,
 } from '../../../types'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import { degreeOffsetToPercent, getColor } from '../../../helpers/dmxHelpers'
+import {
+  degreeOffsetToPercent,
+  getColor,
+  logicalPanDir,
+  shouldMirrorTiltForStageRelative,
+} from '../../../helpers/dmxHelpers'
 import {
   logicalPanPercentFromMotorDeg,
   pickAliasedPanMotorDeg,
@@ -172,7 +177,7 @@ export function resolvePositionToAbsolutePercent(
   fixtureConfig: FixtureConfig | undefined,
 ): { pan: number; tilt: number } {
   const c = normalizeFixtureConfig(fixtureConfig)
-  const panDir = c.panDirectionCW ? 1 : -1
+  const panDir = logicalPanDir(c)
 
   const clampAxis = (axis: 'pan' | 'tilt', raw: number): number => {
     const clamped = clamp(raw, 0, 100)
@@ -201,7 +206,9 @@ export function resolvePositionToAbsolutePercent(
       'intent',
     )
     const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
-    const tiltRaw = c.tiltHome + degreeOffsetToPercent(resolved.tiltOffsetDeg, c.tiltRangeDeg)
+    const tiltDir = shouldMirrorTiltForStageRelative(c) ? -1 : 1
+    const tiltRaw =
+      c.tiltHome + tiltDir * degreeOffsetToPercent(resolved.tiltOffsetDeg, c.tiltRangeDeg)
     return {
       pan: clampAxis('pan', panRaw),
       tilt: clampAxis('tilt', tiltRaw),

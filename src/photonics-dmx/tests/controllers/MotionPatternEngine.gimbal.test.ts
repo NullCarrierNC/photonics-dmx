@@ -7,15 +7,26 @@ import {
   type ResolvedMotionPatternSetting,
   resolvePositionToAbsolutePercent,
 } from '../../cues/node/compiler/ActionEffectFactory'
+import { resolveMotionPattern } from '../../cues/node/runtime/actionResolver'
+import { ExecutionContext } from '../../cues/node/runtime/ExecutionContext'
+import { logicalPanDir, mirrorDmxForMovingHeadInvert, percentToDmx } from '../../helpers/dmxHelpers'
 import { pickAliasedPanMotorDeg } from '../../helpers/panMotorAlias'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import type { FixtureConfig } from '../../types'
+import type { CueData } from '../../cues/types/cueTypes'
+import type { NodeMotionPatternSetting, YargEventNode } from '../../cues/types/nodeCueTypes'
+import { panTiltDmxToSphericalXY } from '../../../renderer/src/components/lightsDmxPreviewMath'
 
 const TWO_PI = Math.PI * 2
 const DEG_TO_RAD = Math.PI / 180
 const RAD_TO_DEG = 180 / Math.PI
 const NEAR_POLE_EPS_DEG = 1e-9
+
+function makeExecutionContext(): ExecutionContext {
+  const ev: YargEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
+  return new ExecutionContext(ev, {} as CueData, new Map(), new Map())
+}
 
 const defaultMh: FixtureConfig = {
   panHome: 50,
@@ -202,7 +213,7 @@ function effectiveCircleGeometry(
   if (!enclosesPole) {
     return { phi0Eff: phi0, panCenterDeg: panHomeDeg, alphaDeg, phi0 }
   }
-  const panDir = c.panDirectionCW ? 1 : -1
+  const panDir = logicalPanDir(c)
   const rawPanTarget = c.panStageDeg + panDir * bearingDeg
   const panCenterDeg = pickAliasedPanMotorDeg(rawPanTarget, c.panRangeDeg, panHomeDeg, 'intent')
   return {
@@ -820,7 +831,7 @@ const basePattern: ResolvedMotionPatternSetting = {
   reverse: false,
 }
 
-it('inverted fixtures still produce positive pan motion before DMX output mirroring', () => {
+it('invertPan flips logical panDir so sine offset aliases on 540° window (DMX mirror still downstream)', () => {
   const lsm = new LightStateManager()
   const ltc = new LightTransitionController(lsm)
   const engine = new MotionPatternEngine(ltc)
@@ -842,7 +853,10 @@ it('inverted fixtures still produce positive pan motion before DMX output mirror
   engine.advanceFrame({ frameStartTime: 250, deltaTime: 16, frameIndex: 1 })
 
   const state = ltc.getLightState(light.id, 2)
-  expect(state.pan).toBeCloseTo(10 + (60 / defaultMh.panRangeDeg) * 100, 5)
+  const panHomeDeg = (light.config.panHome / 100) * defaultMh.panRangeDeg
+  const rawMotor = panHomeDeg + -60
+  const chosen = pickAliasedPanMotorDeg(rawMotor, defaultMh.panRangeDeg, panHomeDeg, 'continuity')
+  expect(state.pan).toBeCloseTo((chosen / defaultMh.panRangeDeg) * 100, 5)
   expect(state.pan).toBeGreaterThan(10)
   expect(state.tilt).toBeCloseTo(light.config.tiltHome, 5)
 })
@@ -1084,4 +1098,290 @@ it('reverse flips pan oscillation direction for non-gimbal pattern', () => {
   expect(Math.abs(deltaFwd)).toBeGreaterThan(1e-6)
   expect(Math.sign(deltaFwd)).not.toBe(0)
   expect(Math.sign(deltaRev)).toBe(-Math.sign(deltaFwd))
+})
+
+/**
+ * Full pipeline integration: MotionPatternEngine → LightTransitionController → DmxPublisher →
+ * panTiltDmxToSphericalXY. Verifies that a floor fixture (invertPan=false) and a truss fixture
+ * (invertPan=true, invertTilt=true) with the same calibration produce the same stage-relative
+ * preview position at each motion tick.
+ *
+ * This test would have caught all four bugs fixed in the inversion pipeline:
+ *   1. DmxPublisher home fallback not mirroring  → home fallback tick would diverge
+ *   2. blendWithOpacity dropping pan/tilt        → motion state wouldn't reach publisher
+ *   3. MPE config staleness (invertPan unset)    → pan direction would diverge
+ *   4. SAVE_DMX_RIG / setConsoleFixtureConfig not restarting → would not apply here (IPC-level)
+ *
+ * Math invariant (when panStageDeg = panHome% × panRangeDeg and same for tilt):
+ *   floor bearing  = +1 × (logicalMotorDeg − stageDeg) = offset
+ *   truss bearing  = −1 × (un-mirrored-logicalMotorDeg − stageDeg) = −1 × (−offset) = offset ✓
+ */
+describe('full pipeline: inverted fixture motion to preview stage position', () => {
+  const floorConfig: FixtureConfig = {
+    ...defaultMh,
+    invertPan: false,
+    invertTilt: false,
+  }
+  // Identical geometry, physically mounted upside-down on truss
+  const trussConfig: FixtureConfig = {
+    ...defaultMh,
+    invertPan: true,
+    invertTilt: true,
+  }
+
+  /**
+   * Simulate one DMX pipeline tick for a light:
+   *  1. Get logical pan/tilt % from LightTransitionController (set by MotionPatternEngine)
+   *  2. Apply DmxPublisher invert logic: percentToDmx then optional mirrorDmxForMovingHeadInvert
+   *  3. Return wire DMX values
+   * This mirrors DmxPublisher.publishNow for moving-head fixtures.
+   */
+  function logicalPctToWireDmx(
+    pan: number,
+    tilt: number,
+    cfg: FixtureConfig,
+  ): { panDmx: number; tiltDmx: number } {
+    const panDmxLogical = percentToDmx(pan, cfg.panMin, cfg.panMax)
+    const tiltDmxLogical = percentToDmx(tilt, cfg.tiltMin, cfg.tiltMax)
+    return {
+      panDmx: cfg.invertPan
+        ? mirrorDmxForMovingHeadInvert(panDmxLogical, cfg.panMin, cfg.panMax)
+        : panDmxLogical,
+      tiltDmx: cfg.invertTilt
+        ? mirrorDmxForMovingHeadInvert(tiltDmxLogical, cfg.tiltMin, cfg.tiltMax)
+        : tiltDmxLogical,
+    }
+  }
+
+  function runPipelineTick(
+    config: FixtureConfig,
+    patternConfig: ResolvedMotionPatternSetting,
+    frameStartTime: number,
+    layer = 5,
+  ): { xPct: number; yPct: number } {
+    const id = config.invertPan ? 'truss-1' : 'floor-1'
+    const lsm = new LightStateManager()
+    const ltc = new LightTransitionController(lsm)
+    const engine = new MotionPatternEngine(ltc)
+    engine.addPattern({
+      name: 'test',
+      config: patternConfig,
+      lights: [{ id, position: 0, config }],
+      layer,
+      startTime: 0,
+      rampUpDurationMs: 0,
+    })
+    engine.advanceFrame({ frameStartTime, deltaTime: 16, frameIndex: 0 })
+    const state = ltc.getLightState(id, layer)
+    // pan/tilt from LTC are logical percentages; apply publisher invert math
+    const { panDmx, tiltDmx } = logicalPctToWireDmx(
+      state.pan ?? config.panHome,
+      state.tilt ?? config.tiltHome,
+      config,
+    )
+    return panTiltDmxToSphericalXY(panDmx, tiltDmx, config)
+  }
+
+  it('linear-sweep pan: floor and truss preview positions match at mid-sweep', () => {
+    const pattern: ResolvedMotionPatternSetting = {
+      ...basePattern,
+      panAmplitudeDeg: 60,
+      tiltAmplitudeDeg: 0,
+      speedHz: 1,
+    }
+    const floorXY = runPipelineTick(floorConfig, pattern, 250)
+    const trussXY = runPipelineTick(trussConfig, pattern, 250)
+    expect(trussXY.xPct).toBeCloseTo(floorXY.xPct, 1)
+    expect(trussXY.yPct).toBeCloseTo(floorXY.yPct, 1)
+  })
+
+  it('linear-sweep pan: preview positions match at multiple points across the sweep', () => {
+    const pattern: ResolvedMotionPatternSetting = {
+      ...basePattern,
+      panAmplitudeDeg: 45,
+      tiltAmplitudeDeg: 0,
+      speedHz: 1,
+    }
+    // Sample at 8 points across one full period (1 second = 1000ms)
+    for (let i = 0; i < 8; i++) {
+      const t = (i / 8) * 1000
+      const floorXY = runPipelineTick(floorConfig, pattern, t)
+      const trussXY = runPipelineTick(trussConfig, pattern, t)
+      expect(trussXY.xPct).toBeCloseTo(floorXY.xPct, 1)
+      expect(trussXY.yPct).toBeCloseTo(floorXY.yPct, 1)
+    }
+  })
+
+  it('tilt sweep: floor and truss preview positions match across the sweep', () => {
+    // Use even panMax=200 so panHome=50% maps to exactly 100 DMX, which mirrors to 100 (symmetric
+    // midpoint). This avoids the quantization artifact where panMax=255 gives 128 mirroring to 127.
+    const tiltTestFloor: FixtureConfig = { ...floorConfig, panMax: 200, panStageDeg: 270 }
+    const tiltTestTruss: FixtureConfig = { ...trussConfig, panMax: 200, panStageDeg: 270 }
+    const pattern: ResolvedMotionPatternSetting = {
+      ...basePattern,
+      panAmplitudeDeg: 0,
+      tiltAmplitudeDeg: 30,
+      panWaveform: 'sine',
+      tiltWaveform: 'sine',
+      speedHz: 1,
+    }
+    for (let i = 0; i < 8; i++) {
+      const t = (i / 8) * 1000
+      const floorXY = runPipelineTick(tiltTestFloor, pattern, t)
+      const trussXY = runPipelineTick(tiltTestTruss, pattern, t)
+      expect(trussXY.xPct).toBeCloseTo(floorXY.xPct, 1)
+      expect(trussXY.yPct).toBeCloseTo(floorXY.yPct, 1)
+    }
+  })
+
+  it('Nod (vertical linear-sweep): floor and truss stage-relative preview match with non-symmetric tiltStageDeg', () => {
+    // Simulates the real "Nod" cue: linear-sweep on the vertical axis, sizeDeg=20.
+    // Uses a non-symmetric calibration where tiltStageDeg (75°) ≠ tiltHome%×range (50%×180=90°).
+    // This exercises the case where tiltHome and tiltStageDeg are independently calibrated.
+    // Use panMax=200 to keep pan quantization symmetric (avoids ±0.5 DMX rounding drift).
+    const nodFloor: FixtureConfig = {
+      ...defaultMh,
+      panMax: 200,
+      panStageDeg: 270,
+      tiltStageDeg: 75,
+      invertPan: false,
+      invertTilt: false,
+    }
+    const nodTruss: FixtureConfig = {
+      ...nodFloor,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const nodPattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'linear-sweep' },
+        linearSweepAxis: { source: 'literal', value: 'vertical' },
+        speed: { source: 'literal', value: 2 },
+        size: { source: 'literal', value: 20 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    for (let i = 0; i < 8; i++) {
+      const t = (i / 8) * 500 // half-period at 2 Hz
+      const floorXY = runPipelineTick(nodFloor, nodPattern, t)
+      const trussXY = runPipelineTick(nodTruss, nodPattern, t)
+      expect(trussXY.xPct).toBeCloseTo(floorXY.xPct, 1)
+      expect(trussXY.yPct).toBeCloseTo(floorXY.yPct, 1)
+    }
+  })
+
+  it('Circle (gimbal-compensated): floor and truss stage-relative preview orbit the same stage area', () => {
+    // Simulates the real "Clockwise Sync" circle cue: gimbal-compensated, bearingDeg=180 (DS).
+    // The test verifies that the pan and tilt preview directions stay in phase between
+    // floor (invertPan=false, invertTilt=false) and truss (invertPan=true, invertTilt=true).
+    // Use symmetric panMax to avoid 127/128 midpoint quantization skew around x=50%.
+    const circleFloor: FixtureConfig = { ...floorConfig, panMax: 200 }
+    const circleTruss: FixtureConfig = { ...trussConfig, panMax: 200 }
+    const circlePattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'circle' },
+        bearing: { source: 'literal', value: 180 },
+        speed: { source: 'literal', value: 0.5 },
+        size: { source: 'literal', value: 25 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    for (let i = 0; i < 8; i++) {
+      const t = (i / 8) * 2000 // one full period at 0.5 Hz
+      const floorXY = runPipelineTick(circleFloor, circlePattern, t)
+      const trussXY = runPipelineTick(circleTruss, circlePattern, t)
+      // Allow a small (<1.5%) x drift due to quantization + alias path selection near the
+      // circle center where mirrored pan values can differ by a single DMX step.
+      expect(Math.abs(trussXY.xPct - floorXY.xPct)).toBeLessThan(1.5)
+      expect(Math.abs(trussXY.yPct - floorXY.yPct)).toBeLessThan(1.5)
+    }
+  })
+
+  const mixedTopCfg: FixtureConfig = {
+    ...defaultMh,
+    panHome: 0,
+    panDirectionCW: false,
+    panStageDeg: 0,
+    tiltHome: 76,
+    tiltStageDeg: 90,
+    invertPan: false,
+    invertTilt: false,
+  }
+  const mixedBottomCfg: FixtureConfig = {
+    ...defaultMh,
+    panHome: 100,
+    panDirectionCW: true,
+    panStageDeg: 540,
+    tiltHome: 25,
+    tiltStageDeg: 90,
+    invertPan: true,
+    invertTilt: true,
+  }
+
+  function runDirectionTargetPreview(
+    config: FixtureConfig,
+    bearingDeg: number,
+    angleFromVerticalDeg = 30,
+  ): { xPct: number; yPct: number } {
+    const logical = resolvePositionToAbsolutePercent(
+      {
+        mode: 'direction',
+        bearingDeg,
+        angleFromVerticalDeg,
+      },
+      config,
+    )
+    const { panDmx, tiltDmx } = logicalPctToWireDmx(logical.pan, logical.tilt, config)
+    return panTiltDmxToSphericalXY(panDmx, tiltDmx, config)
+  }
+
+  it('mixed real-world calibration: Nod keeps top and bottom stage position aligned', () => {
+    const nodPattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'linear-sweep' },
+        linearSweepAxis: { source: 'literal', value: 'vertical' },
+        speed: { source: 'literal', value: 2 },
+        size: { source: 'literal', value: 20 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+
+    for (let i = 0; i < 8; i++) {
+      const t = (i / 8) * 500
+      const topXY = runPipelineTick(mixedTopCfg, nodPattern, t)
+      const bottomXY = runPipelineTick(mixedBottomCfg, nodPattern, t)
+      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(2)
+      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(2)
+    }
+  })
+
+  it('mixed real-world calibration: Clockwise circle keeps top and bottom stage position aligned', () => {
+    const circlePattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'circle' },
+        bearing: { source: 'literal', value: 180 },
+        speed: { source: 'literal', value: 1 },
+        size: { source: 'literal', value: 30 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+
+    for (let i = 0; i < 12; i++) {
+      const t = (i / 12) * 1000
+      const topXY = runPipelineTick(mixedTopCfg, circlePattern, t)
+      const bottomXY = runPipelineTick(mixedBottomCfg, circlePattern, t)
+      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(2)
+      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(2)
+    }
+  })
+
+  it('mixed real-world calibration: direction mode keeps DS/US/SL/SR aligned across mounts', () => {
+    const bearings = [180, 0, 270, 90]
+    for (const bearing of bearings) {
+      const topXY = runDirectionTargetPreview(mixedTopCfg, bearing, 30)
+      const bottomXY = runDirectionTargetPreview(mixedBottomCfg, bearing, 30)
+      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(2)
+      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(2)
+    }
+  })
 })

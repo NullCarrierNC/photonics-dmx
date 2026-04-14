@@ -167,6 +167,23 @@ export function resetOutputSenderToggleAtoms(disabledIds: readonly string[]): vo
   }
 }
 
+/**
+ * Sync all output sender toggle atoms from a main-process sender status snapshot.
+ * Call this after CONTROLLERS_RESTARTED so that the UI reflects the actual runtime
+ * sender state (which may have been auto-restored from persisted preferences).
+ */
+export function syncOutputSenderAtoms(senderStatus: {
+  sacn: boolean
+  artnet: boolean
+  enttecpro: boolean
+  ipc: boolean
+}): void {
+  const store = getDefaultStore()
+  store.set(senderSacnEnabledAtom, senderStatus.sacn)
+  store.set(senderArtNetEnabledAtom, senderStatus.artnet)
+  store.set(senderEnttecProEnabledAtom, senderStatus.enttecpro)
+}
+
 // ArtNet config derived from preferences with fallback defaults
 export const artNetConfigAtom = atom((get) => {
   const prefs = get(lightingPrefsAtom)

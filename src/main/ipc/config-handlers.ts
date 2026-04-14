@@ -127,9 +127,13 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       // Save the rig
       await config.saveDmxRig(rig)
 
-      // If active state changed, refresh active rigs so DMX output picks up the change (senders stay running)
-      if (existingRig && previousActiveState !== rig.active) {
-        controllerManager.refreshActiveRigs()
+      // Restart controllers whenever the rig is (or was) active so that DmxPublisher, the merged
+      // DmxLightManager, and the sequencer/MotionPatternEngine all pick up any config changes.
+      // refreshActiveRigs() only updates DmxPublisher, leaving the sequencer with stale TrackedLight
+      // configs — which breaks invertPan/invertTilt handling in motion patterns.
+      const isNowOrWasActive = rig.active || previousActiveState
+      if (isNowOrWasActive) {
+        await controllerManager.restartControllers()
         sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 
@@ -150,9 +154,11 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       // Delete the rig
       await config.deleteDmxRig(id)
 
-      // If the deleted rig was active, refresh active rigs so DMX output picks up the change
+      // Restart so that DmxPublisher, merged DmxLightManager, and any running motion patterns
+      // release references to the deleted rig's TrackedLights. refreshActiveRigs() would only
+      // update DmxPublisher, leaving the sequencer with stale TrackedLight entries.
       if (wasActive) {
-        controllerManager.refreshActiveRigs()
+        await controllerManager.restartControllers()
         sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 

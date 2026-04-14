@@ -678,9 +678,9 @@ export class LightTransitionController {
         break
     }
 
-    // Handle optional properties
-    if (newState.pan !== undefined) out.pan = newState.pan
-    if (newState.tilt !== undefined) out.tilt = newState.tilt
+    // Handle optional properties: carry forward from the lower layer when the incoming layer omits them
+    out.pan = newState.pan !== undefined ? newState.pan : current.pan
+    out.tilt = newState.tilt !== undefined ? newState.tilt : current.tilt
 
     return out
   }
