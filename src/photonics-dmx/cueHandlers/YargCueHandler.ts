@@ -12,8 +12,10 @@ import { MotionCueRegistry } from '../cues/registries/MotionCueRegistry'
  * active/enabled groups, consistency tracking, stage-kit preference when applicable,
  * and default-group fallback when no active group implements the cue.
  *
- * Motion cues run in parallel via MotionCueRegistry.getRandomMotionCue() (enabled groups, optional
- * once-per-song lock from configuration).
+ * Motion cues run in parallel via MotionCueRegistry.getRandomMotionCue() when the visual cue type
+ * changes (not on re-queues of the same cue). Simulated cues (trackMode === 'simulated') skip
+ * random motion selection; use motion simulation IPC instead. Optional once-per-song lock from
+ * configuration applies to random selection.
  *
  * Reminder: setEffect clears all running effects, regardless of layer.
  * Layer 0 will maintain its state though.
@@ -154,26 +156,34 @@ class YargCueHandler extends BaseCueHandler {
       console.error(`No implementation found for cue: ${cueType}`)
     }
 
-    const motionCue = MotionCueRegistry.getInstance().getRandomMotionCue()
-    try {
-      if (motionCue) {
-        if (this.currentMotionCue && this.currentMotionCue !== motionCue) {
+    if (trackMode !== 'simulated') {
+      const isNewCue = historicCueData.executionCount === 1
+      const motionCue = isNewCue
+        ? MotionCueRegistry.getInstance().getRandomMotionCue()
+        : this.currentMotionCue
+
+      try {
+        if (motionCue) {
+          if (isNewCue && this.currentMotionCue && this.currentMotionCue !== motionCue) {
+            this.currentMotionCue.onStop?.()
+          }
+          if (isNewCue) {
+            this.currentMotionCue = motionCue
+            this._sequencer.cancelPanTiltClear()
+          }
+          await motionCue.execute(historicCueData, this._sequencer, this._lightManager)
+        } else if (isNewCue && this.currentMotionCue) {
           this.currentMotionCue.onStop?.()
+          this.currentMotionCue = null
+          this._sequencer.schedulePanTiltClear()
         }
-        this.currentMotionCue = motionCue
-        this._sequencer.cancelPanTiltClear()
-        await motionCue.execute(historicCueData, this._sequencer, this._lightManager)
-      } else if (this.currentMotionCue) {
-        this.currentMotionCue.onStop?.()
-        this.currentMotionCue = null
-        this._sequencer.schedulePanTiltClear()
-      }
-    } catch (error) {
-      console.error('Motion cue execution failed:', error)
-      if (motionCue && this.currentMotionCue === motionCue) {
-        this.currentMotionCue.onStop?.()
-        this.currentMotionCue = null
-        this._sequencer.schedulePanTiltClear()
+      } catch (error) {
+        console.error('Motion cue execution failed:', error)
+        if (motionCue && this.currentMotionCue === motionCue) {
+          this.currentMotionCue.onStop?.()
+          this.currentMotionCue = null
+          this._sequencer.schedulePanTiltClear()
+        }
       }
     }
 

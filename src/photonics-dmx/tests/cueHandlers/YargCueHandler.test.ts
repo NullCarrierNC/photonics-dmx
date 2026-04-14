@@ -466,6 +466,92 @@ describe('YargCueHandler', () => {
       await cueHandler.handleCue(CueType.Strobe_Off, mockCueData)
       expect(mockStrobeCue.onStopMock).toHaveBeenCalledTimes(1)
     })
+
+    describe('motion cue pairing', () => {
+      let getRandomMotionSpy: jest.SpiedFunction<() => INetCue | null>
+
+      function makeMotionCue(cueId: string, executeMock: jest.Mock<() => Promise<void>>): INetCue {
+        return {
+          cueId,
+          id: `instance-${cueId}`,
+          style: CueStyle.Primary,
+          execute: executeMock,
+        }
+      }
+
+      afterEach(() => {
+        getRandomMotionSpy?.mockRestore()
+        mockSequencer.cancelPanTiltClear.mockClear()
+        mockSequencer.schedulePanTiltClear.mockClear()
+      })
+
+      it('trackMode simulated does not call getRandomMotionCue or motion pan/tilt hooks', async () => {
+        const registryInstance = MotionCueRegistry.getInstance()
+        getRandomMotionSpy = jest.spyOn(registryInstance, 'getRandomMotionCue')
+
+        const simulatedData: CueData = {
+          ...mockCueData,
+          trackMode: 'simulated',
+          simulationCueGroup: 'mock-default',
+        }
+        await cueHandler.handleCue(CueType.Default, simulatedData)
+
+        expect(getRandomMotionSpy).not.toHaveBeenCalled()
+        expect(mockSequencer.cancelPanTiltClear).not.toHaveBeenCalled()
+      })
+
+      it('trackMode tracked runs random motion on first execution of a visual cue', async () => {
+        const executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionCue = makeMotionCue('motion-1', executeMock)
+        getRandomMotionSpy = jest
+          .spyOn(MotionCueRegistry.getInstance(), 'getRandomMotionCue')
+          .mockReturnValue(motionCue)
+
+        await cueHandler.handleCue(CueType.Default, mockCueData)
+
+        expect(getRandomMotionSpy).toHaveBeenCalledTimes(1)
+        expect(executeMock).toHaveBeenCalledTimes(1)
+        expect(mockSequencer.cancelPanTiltClear).toHaveBeenCalledTimes(1)
+      })
+
+      it('re-queue of same visual cue does not re-roll motion; executes existing motion again', async () => {
+        const executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionCue = makeMotionCue('motion-stable', executeMock)
+        getRandomMotionSpy = jest
+          .spyOn(MotionCueRegistry.getInstance(), 'getRandomMotionCue')
+          .mockReturnValue(motionCue)
+
+        await cueHandler.handleCue(CueType.Default, mockCueData)
+        await cueHandler.handleCue(CueType.Default, mockCueData)
+
+        expect(getRandomMotionSpy).toHaveBeenCalledTimes(1)
+        expect(executeMock).toHaveBeenCalledTimes(2)
+      })
+
+      it('changing visual cue type picks a new random motion cue', async () => {
+        const executeA = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const executeB = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionA = makeMotionCue('motion-a', executeA)
+        const motionB = makeMotionCue('motion-b', executeB)
+        let pick = 0
+        getRandomMotionSpy = jest
+          .spyOn(MotionCueRegistry.getInstance(), 'getRandomMotionCue')
+          .mockImplementation(() => {
+            pick += 1
+            return pick === 1 ? motionA : motionB
+          })
+
+        const verseCue = new MockPrimaryCue(CueType.Verse)
+        registry.getGroup('mock-default')!.cues.set(CueType.Verse, verseCue)
+
+        await cueHandler.handleCue(CueType.Default, mockCueData)
+        await cueHandler.handleCue(CueType.Verse, mockCueData)
+
+        expect(getRandomMotionSpy).toHaveBeenCalledTimes(2)
+        expect(executeA).toHaveBeenCalledTimes(1)
+        expect(executeB).toHaveBeenCalledTimes(1)
+      })
+    })
   })
 
   /**
