@@ -93,7 +93,7 @@ export interface ResolvedMotionPatternSetting {
   panAmplitudeDeg: number
   tiltAmplitudeDeg: number
   panPhaseOffsetDeg: number
-  /** Relative to base `speedHz` (e.g. figure-8 tilt uses 2). */
+  /** Relative to base `speedHz` (e.g. pendulum / figure-8 tilt uses 2). */
   panFreqMultiplier: number
   tiltFreqMultiplier: number
   /** Only used when pattern is linear-sweep. */

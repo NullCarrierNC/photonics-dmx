@@ -22,27 +22,35 @@ function literalPattern(pattern: string): NodeMotionPatternSetting {
 }
 
 describe('resolveMotionPattern presets', () => {
-  it('expands figure-8 with cosine tilt at 2x for a proper infinity Lissajous', () => {
+  it('expands pendulum with cosine tilt at 2x (parabolic back-and-forth)', () => {
     const ctx = makeContext()
-    const r = resolveMotionPattern(literalPattern('figure-8'), ctx)
+    const r = resolveMotionPattern(literalPattern('pendulum'), ctx)
     expect(r.panWaveform).toBe('sine')
     expect(r.tiltWaveform).toBe('cosine')
     expect(r.tiltFreqMultiplier).toBe(2)
   })
 
-  it('expands star with sine tilt at 2x (bowtie / star Lissajous)', () => {
+  it('expands figure-8 with sine tilt at 2x (infinity Lissajous)', () => {
     const ctx = makeContext()
-    const r = resolveMotionPattern(literalPattern('star'), ctx)
+    const r = resolveMotionPattern(literalPattern('figure-8'), ctx)
     expect(r.panWaveform).toBe('sine')
     expect(r.tiltWaveform).toBe('sine')
     expect(r.tiltFreqMultiplier).toBe(2)
     expect(r.gimbalCompensation).toBe(false)
   })
 
+  it('maps legacy star preset name to figure-8', () => {
+    const ctx = makeContext()
+    const r = resolveMotionPattern(literalPattern('star'), ctx)
+    expect(r.panWaveform).toBe('sine')
+    expect(r.tiltWaveform).toBe('sine')
+    expect(r.tiltFreqMultiplier).toBe(2)
+  })
+
   it('enables gimbal compensation only for circle preset', () => {
     const ctx = makeContext()
     expect(resolveMotionPattern(literalPattern('circle'), ctx).gimbalCompensation).toBe(true)
-    expect(resolveMotionPattern(literalPattern('figure-8'), ctx).gimbalCompensation).toBe(false)
+    expect(resolveMotionPattern(literalPattern('pendulum'), ctx).gimbalCompensation).toBe(false)
     expect(resolveMotionPattern(literalPattern('linear-sweep'), ctx).gimbalCompensation).toBe(false)
   })
 

@@ -449,7 +449,7 @@ export type WaveformType = (typeof WAVEFORM_TYPES)[number]
 export const MOTION_PATTERN_TYPES = [
   'circle',
   'figure-8',
-  'star',
+  'pendulum',
   'linear-sweep',
   'custom',
 ] as const

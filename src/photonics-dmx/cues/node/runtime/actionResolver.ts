@@ -146,7 +146,11 @@ const MOTION_PATTERN_SET = new Set<string>(MOTION_PATTERN_TYPES)
 const WAVEFORM_SET = new Set<string>(WAVEFORM_TYPES)
 
 function parseMotionPatternType(raw: string): MotionPatternType {
-  const s = raw.trim().toLowerCase()
+  let s = raw.trim().toLowerCase()
+  // Legacy preset name: same waveform as current figure-8 (infinity Lissajous).
+  if (s === 'star') {
+    s = 'figure-8'
+  }
   if (MOTION_PATTERN_SET.has(s)) {
     return s as MotionPatternType
   }
@@ -204,13 +208,13 @@ export function resolveMotionPattern(
     tiltAmplitudeDeg = sizeDeg
     gimbalCompensation = true
     bearingDeg = setting.bearing ? resolveBearingValue(setting.bearing, context) : 180
-  } else if (pattern === 'figure-8') {
+  } else if (pattern === 'pendulum') {
     panWaveform = 'sine'
     tiltWaveform = 'cosine'
     panAmplitudeDeg = sizeDeg
     tiltAmplitudeDeg = sizeDeg
     tiltFreqMultiplier = 2
-  } else if (pattern === 'star') {
+  } else if (pattern === 'figure-8') {
     panWaveform = 'sine'
     tiltWaveform = 'sine'
     panAmplitudeDeg = sizeDeg

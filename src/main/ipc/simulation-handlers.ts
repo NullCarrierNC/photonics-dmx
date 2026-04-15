@@ -13,6 +13,7 @@ import { createMockCueData } from './mockCueData'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { INetCue } from '../../photonics-dmx/cues/interfaces/INetCue'
 import { MotionCueRegistry } from '../../photonics-dmx/cues/registries/MotionCueRegistry'
+import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
 
 /** Motion cue started from Cue Simulation; stopped explicitly or replaced by another start. */
 let activeSimulatedMotionCue: INetCue | null = null
@@ -21,6 +22,20 @@ function stopActiveSimulatedMotionCue(controllerManager: ControllerManager): voi
   activeSimulatedMotionCue?.onStop?.()
   activeSimulatedMotionCue = null
   controllerManager.getLightingController()?.schedulePanTiltClear()
+}
+
+async function runActiveSimulatedMotionCue(
+  controllerManager: ControllerManager,
+  mockCueData: CueData,
+): Promise<void> {
+  if (!activeSimulatedMotionCue) return
+  const sequencer = controllerManager.getLightingController()
+  const lightManager = controllerManager.getDmxLightManager()
+  if (!sequencer || !lightManager) return
+  const maybePromise = activeSimulatedMotionCue.execute(mockCueData, sequencer, lightManager)
+  if (maybePromise instanceof Promise) {
+    await maybePromise
+  }
 }
 
 /**
@@ -139,34 +154,41 @@ export function setupSimulationHandlers(
         effectId?: string | null
       },
     ) => {
-      if (controllerManager.getLightingController()) {
-        if (data) {
-          const { venueSize = 'Small', bpm = 120, cueGroup, effectId } = data
-          const mockCueData = createMockCueData({
-            venueSize,
-            bpm,
-            effectId: effectId ?? undefined,
+      const lighting = controllerManager.getLightingController()
+      if (!lighting) return false
+
+      const mockCueData = data
+        ? createMockCueData({
+            venueSize: data.venueSize ?? 'Small',
+            bpm: data.bpm ?? 120,
+            effectId: data.effectId ?? undefined,
             beat: 'Strong',
             keyframe: 'Unknown',
-            simulationCueGroup: cueGroup,
+            simulationCueGroup: data.cueGroup,
           })
-          const cueHandler = controllerManager.getCueHandler()
-          if (cueHandler && effectId) {
-            const cueType = getCueTypeFromId(effectId)
-            if (cueType) {
-              try {
-                await cueHandler.handleCue(cueType, mockCueData)
-              } catch (error) {
-                console.error('Error handling cue in simulate beat:', error)
-              }
+        : createMockCueData({
+            beat: 'Strong',
+            keyframe: 'Unknown',
+          })
+
+      if (data) {
+        const { effectId } = data
+        const cueHandler = controllerManager.getCueHandler()
+        if (cueHandler && effectId) {
+          const cueType = getCueTypeFromId(effectId)
+          if (cueType) {
+            try {
+              await cueHandler.handleCue(cueType, mockCueData)
+            } catch (error) {
+              console.error('Error handling cue in simulate beat:', error)
             }
           }
-          sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
         }
-        controllerManager.getLightingController()?.onBeat()
-        return true
       }
-      return false
+      sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+      await runActiveSimulatedMotionCue(controllerManager, mockCueData)
+      lighting.onBeat()
+      return true
     },
   )
 
@@ -181,34 +203,41 @@ export function setupSimulationHandlers(
         effectId?: string | null
       },
     ) => {
-      if (controllerManager.getLightingController()) {
-        if (data) {
-          const { venueSize = 'Small', bpm = 120, cueGroup, effectId } = data
-          const mockCueData = createMockCueData({
-            venueSize,
-            bpm,
-            effectId: effectId ?? undefined,
+      const lighting = controllerManager.getLightingController()
+      if (!lighting) return false
+
+      const mockCueData = data
+        ? createMockCueData({
+            venueSize: data.venueSize ?? 'Small',
+            bpm: data.bpm ?? 120,
+            effectId: data.effectId ?? undefined,
             beat: 'Unknown',
             keyframe: 'Next',
-            simulationCueGroup: cueGroup,
+            simulationCueGroup: data.cueGroup,
           })
-          const cueHandler = controllerManager.getCueHandler()
-          if (cueHandler && effectId) {
-            const cueType = getCueTypeFromId(effectId)
-            if (cueType) {
-              try {
-                await cueHandler.handleCue(cueType, mockCueData)
-              } catch (error) {
-                console.error('Error handling cue in simulate keyframe:', error)
-              }
+        : createMockCueData({
+            beat: 'Unknown',
+            keyframe: 'Next',
+          })
+
+      if (data) {
+        const { effectId } = data
+        const cueHandler = controllerManager.getCueHandler()
+        if (cueHandler && effectId) {
+          const cueType = getCueTypeFromId(effectId)
+          if (cueType) {
+            try {
+              await cueHandler.handleCue(cueType, mockCueData)
+            } catch (error) {
+              console.error('Error handling cue in simulate keyframe:', error)
             }
           }
-          sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
         }
-        controllerManager.getLightingController()?.onKeyframe()
-        return true
       }
-      return false
+      sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+      await runActiveSimulatedMotionCue(controllerManager, mockCueData)
+      lighting.onKeyframe()
+      return true
     },
   )
 
@@ -223,34 +252,41 @@ export function setupSimulationHandlers(
         effectId?: string | null
       },
     ) => {
-      if (controllerManager.getLightingController()) {
-        if (data) {
-          const { venueSize = 'Small', bpm = 120, cueGroup, effectId } = data
-          const mockCueData = createMockCueData({
-            venueSize,
-            bpm,
-            effectId: effectId ?? undefined,
+      const lighting = controllerManager.getLightingController()
+      if (!lighting) return false
+
+      const mockCueData = data
+        ? createMockCueData({
+            venueSize: data.venueSize ?? 'Small',
+            bpm: data.bpm ?? 120,
+            effectId: data.effectId ?? undefined,
             beat: 'Measure',
             keyframe: 'Unknown',
-            simulationCueGroup: cueGroup,
+            simulationCueGroup: data.cueGroup,
           })
-          const cueHandler = controllerManager.getCueHandler()
-          if (cueHandler && effectId) {
-            const cueType = getCueTypeFromId(effectId)
-            if (cueType) {
-              try {
-                await cueHandler.handleCue(cueType, mockCueData)
-              } catch (error) {
-                console.error('Error handling cue in simulate measure:', error)
-              }
+        : createMockCueData({
+            beat: 'Measure',
+            keyframe: 'Unknown',
+          })
+
+      if (data) {
+        const { effectId } = data
+        const cueHandler = controllerManager.getCueHandler()
+        if (cueHandler && effectId) {
+          const cueType = getCueTypeFromId(effectId)
+          if (cueType) {
+            try {
+              await cueHandler.handleCue(cueType, mockCueData)
+            } catch (error) {
+              console.error('Error handling cue in simulate measure:', error)
             }
           }
-          sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
         }
-        controllerManager.getLightingController()?.onMeasure()
-        return true
       }
-      return false
+      sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+      await runActiveSimulatedMotionCue(controllerManager, mockCueData)
+      lighting.onMeasure()
+      return true
     },
   )
 
