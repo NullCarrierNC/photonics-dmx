@@ -23,8 +23,9 @@ export interface SphericalXYOptions {
  * Colatitude φ = tiltMotorDeg − tiltStageDeg (same as the motion engine). Horizontal direction
  * uses stage-relative bearing B = mod360(panDir·(panMotorDeg − panStageDeg)) with logical
  * `panDir` from {@link logicalPanDir}, matching direction-mode mapping
- * motor = panStageDeg + panDir·bearing. The disc’s US/DS/SL/SR labels match clockwise stage
- * bearings (0° = upstage at top) via θ = mod360(B − 180°).
+ * motor = panStageDeg + panDir·bearing. Preview discs use US/DS at top/bottom and, from the
+ * audience (house) perspective, SR on the house-left side and SL on the house-right side of the
+ * disc; θ = mod360(B − 180°) maps bearing to dot position on that disc.
  *
  * u_x = sign(φ)·sin(θ), u_y = −sign(φ)·cos(θ) (sign(φ)=1 at the pole) so crossing the tilt pole
  * flips compass on the disc with logical beam direction for floor and truss mounts (same gimbal

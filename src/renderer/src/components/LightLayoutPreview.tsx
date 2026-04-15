@@ -103,7 +103,9 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
                 Bottom
               </div>
               <div className="flex justify-center gap-x-4 mb-4">
-                {Array.from({ length: backCount }, (_, i) => renderLightCircle(frontCount + 1 + i))}
+                {Array.from({ length: backCount }, (_, i) =>
+                  renderLightCircle(frontCount + backCount - i),
+                )}
               </div>
             </div>
           )}

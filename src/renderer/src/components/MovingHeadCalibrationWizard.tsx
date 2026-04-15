@@ -173,8 +173,8 @@ function WizardBeamPreview({
           <>
             <span className={`absolute -top-0.5 left-1/2 -translate-x-1/2 ${labelClass}`}>US</span>
             <span className={`absolute bottom-0 left-1/2 -translate-x-1/2 ${labelClass}`}>DS</span>
-            <span className={`absolute left-0 top-1/2 -translate-y-1/2 ${labelClass}`}>SL</span>
-            <span className={`absolute right-0 top-1/2 -translate-y-1/2 ${labelClass}`}>SR</span>
+            <span className={`absolute left-0 top-1/2 -translate-y-1/2 ${labelClass}`}>SR</span>
+            <span className={`absolute right-0 top-1/2 -translate-y-1/2 ${labelClass}`}>SL</span>
           </>
         ) : (
           <span

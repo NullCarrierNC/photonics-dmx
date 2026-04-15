@@ -24,6 +24,38 @@ export {
   type SphericalXYOptions,
 } from './lightsDmxPreviewMath'
 
+const previewLegendEdgeClass =
+  'pointer-events-none absolute z-[1] text-[10px] sm:text-[11px] font-medium text-gray-600 dark:text-gray-400 leading-tight select-none'
+
+/** Full preview card with stage-direction labels on the outer border (audience perspective). */
+const DmxPreviewWithStageLegend: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="relative mt-4 rounded-lg bg-gray-200 dark:bg-gray-700 px-10 pt-9 pb-9 sm:px-14 sm:pt-10 sm:pb-10">
+    <span
+      className={`${previewLegendEdgeClass} top-2 sm:top-2.5 left-1/2 -translate-x-1/2 max-w-[min(92%,18rem)] text-center`}>
+      Upstage (rear of stage)
+    </span>
+    <span
+      className={`${previewLegendEdgeClass} bottom-2 sm:bottom-2.5 left-1/2 -translate-x-1/2 max-w-[min(92%,18rem)] text-center`}>
+      Downstage (toward audience)
+    </span>
+    <span
+      className={`${previewLegendEdgeClass} left-1.5 sm:left-3 top-1/2 -translate-y-1/2 w-[5.25rem] sm:w-[6rem] text-left`}>
+      Stage Right
+      <span className="block text-[9px] sm:text-[10px] font-normal text-gray-500 dark:text-gray-400">
+        (Audience Left)
+      </span>
+    </span>
+    <span
+      className={`${previewLegendEdgeClass} right-1.5 sm:right-3 top-1/2 -translate-y-1/2 w-[5.25rem] sm:w-[6rem] text-right`}>
+      Stage Left
+      <span className="block text-[9px] sm:text-[10px] font-normal text-gray-500 dark:text-gray-400">
+        (Audience Right)
+      </span>
+    </span>
+    <div className="relative z-0 flex flex-col items-center">{children}</div>
+  </div>
+)
+
 const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmxValues }) => {
   const layoutId = lightingConfig.lightLayout?.id ?? 'front'
   const isStacked = layoutId === 'stacked'
@@ -127,10 +159,10 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
             DS
           </span>
           <span className="absolute left-0 top-1/2 -translate-y-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
-            SL
+            SR
           </span>
           <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
-            SR
+            SL
           </span>
           <div
             className={`${baseCircleClasses} relative overflow-hidden`}
@@ -194,67 +226,23 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
 
   if (isStacked) {
     return (
-      <div className="mt-4 pt-3 pb-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
-        <div className="flex flex-col items-center">
-          <div className="mb-1">
-            <MdTv size={30} className="text-gray-600 dark:text-gray-300" />
-          </div>
-
-          {lightingConfig?.frontLights.length > 0 && (
-            <div className="w-full flex flex-col items-center">
-              <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Top</div>
-              {renderLightRow(lightingConfig.frontLights)}
-            </div>
-          )}
-
-          {lightingConfig?.backLights.length > 0 && (
-            <div className="w-full flex flex-col items-center mt-2">
-              <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">
-                Bottom
-              </div>
-              {renderLightRow(lightingConfig.backLights)}
-            </div>
-          )}
-
-          {lightingConfig?.strobeType === ConfigStrobeType.Dedicated &&
-            lightingConfig.strobeLights.map((strobeLight) => renderStrobeIndicator(strobeLight))}
-
-          {((lightingConfig?.frontLights.length ?? 0) > 0 ||
-            (lightingConfig?.backLights.length ?? 0) > 0) &&
-            renderPeople()}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="mt-4 pt-3 pb-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
-      <div className="flex flex-col items-center">
-        {/* Icon representing the lighting setup */}
+      <DmxPreviewWithStageLegend>
         <div className="mb-1">
           <MdTv size={30} className="text-gray-600 dark:text-gray-300" />
         </div>
 
-        {/* Render front lights */}
         {lightingConfig?.frontLights.length > 0 && (
           <div className="w-full flex flex-col items-center">
-            <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Front</div>
+            <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Top</div>
             {renderLightRow(lightingConfig.frontLights)}
           </div>
         )}
 
-        {/* Render strobe light if dedicated */}
-        {lightingConfig?.strobeType === ConfigStrobeType.Dedicated &&
-          lightingConfig.strobeLights.map((strobeLight) => renderStrobeIndicator(strobeLight))}
-
-        {/* Render people icons */}
-        {lightingConfig?.backLights.length > 0 && renderPeople()}
-
-        {/* Render back lights */}
         {lightingConfig?.backLights.length > 0 && (
-          <div className="w-full flex flex-col items-center mt-3">
-            <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Back</div>
-            {/* Render back lights in reverse order to match new natural ring progression */}
+          <div className="w-full flex flex-col items-center mt-2">
+            <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">
+              Bottom
+            </div>
             <div className="flex justify-center gap-x-4 mb-4">
               {[...lightingConfig.backLights]
                 .reverse()
@@ -262,8 +250,46 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
             </div>
           </div>
         )}
+
+        {lightingConfig?.strobeType === ConfigStrobeType.Dedicated &&
+          lightingConfig.strobeLights.map((strobeLight) => renderStrobeIndicator(strobeLight))}
+
+        {((lightingConfig?.frontLights.length ?? 0) > 0 ||
+          (lightingConfig?.backLights.length ?? 0) > 0) &&
+          renderPeople()}
+      </DmxPreviewWithStageLegend>
+    )
+  }
+
+  return (
+    <DmxPreviewWithStageLegend>
+      <div className="mb-1">
+        <MdTv size={30} className="text-gray-600 dark:text-gray-300" />
       </div>
-    </div>
+
+      {lightingConfig?.frontLights.length > 0 && (
+        <div className="w-full flex flex-col items-center">
+          <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Front</div>
+          {renderLightRow(lightingConfig.frontLights)}
+        </div>
+      )}
+
+      {lightingConfig?.strobeType === ConfigStrobeType.Dedicated &&
+        lightingConfig.strobeLights.map((strobeLight) => renderStrobeIndicator(strobeLight))}
+
+      {lightingConfig?.backLights.length > 0 && renderPeople()}
+
+      {lightingConfig?.backLights.length > 0 && (
+        <div className="w-full flex flex-col items-center mt-3">
+          <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">Back</div>
+          <div className="flex justify-center gap-x-4 mb-4">
+            {[...lightingConfig.backLights]
+              .reverse()
+              .map((light, index) => renderLightCircle(light, index))}
+          </div>
+        </div>
+      )}
+    </DmxPreviewWithStageLegend>
   )
 }
 
