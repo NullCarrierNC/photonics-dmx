@@ -345,7 +345,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
       {isStacked && (
         <mesh position={[0, 2.35, 0]} castShadow>
           <boxGeometry args={[9, 0.22, 0.42]} />
-          <meshStandardMaterial color="#2d2d38" roughness={0.7} metalness={0.15} />
+          <meshStandardMaterial color="#5a5a6a" roughness={0.55} metalness={0.12} />
         </mesh>
       )}
 
@@ -372,12 +372,12 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
       {[0, 1, 2, 3, 4].map((i) => (
         <mesh key={`aud-${i}`} position={[-1.8 + i * 0.9, 0.35, audienceZ]}>
           <cylinderGeometry args={[0.14, 0.16, 0.7, 10]} />
-          <meshStandardMaterial color="#4a4a58" />
+          <meshStandardMaterial color="#7a7a8c" roughness={0.65} metalness={0.08} />
         </mesh>
       ))}
 
       {adjustedItems.map((it) => {
-        const rgb = getDmxPreviewLightColor(it.light, dmxValues)
+        const rgb = getDmxPreviewLightColor(it.light, dmxValues, true)
         const dim = masterDimmer01(it.light, dmxValues)
         let dir: StageVector3
         if (isMovingHead(it.light)) {
@@ -405,21 +405,23 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
               movingHead={isMovingHead(it.light)}
               fixtureOrientation={it.fixtureOrientation}
             />
-            <FixtureBeam
-              position={beamPosition}
-              direction={dir}
-              rgb={rgb}
-              dimmer01={dim}
-              isMovingHead={isMovingHead(it.light)}
-              flareTexture={flareTex}
-            />
+            {dim > 0 && (
+              <FixtureBeam
+                position={beamPosition}
+                direction={dir}
+                rgb={rgb}
+                dimmer01={dim}
+                isMovingHead={isMovingHead(it.light)}
+                flareTexture={flareTex}
+              />
+            )}
           </group>
         )
       })}
 
       {lightingConfig.strobeType === ConfigStrobeType.Dedicated &&
         lightingConfig.strobeLights.map((sl, i) => {
-          const rgb = getDmxPreviewLightColor(sl, dmxValues)
+          const rgb = getDmxPreviewLightColor(sl, dmxValues, true)
           const dim = masterDimmer01(sl, dmxValues)
           const pos: [number, number, number] = [2.4 + (i % 3) * 0.4, 0.35, 2.2]
           return (

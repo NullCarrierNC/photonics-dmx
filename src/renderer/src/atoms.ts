@@ -106,6 +106,19 @@ export const previewRigIdAtom = atomWithStorage<string | null>(
   rigIdLocalStorage,
 )
 
+const PREVIEW_DIMENSION_STORAGE_KEY = 'photonics.dmx.previewDimension'
+
+const previewDimensionLocalStorage = createJSONStorage<'2d' | '3d'>(() => localStorage)
+
+/**
+ * DMX preview card: 2D disc vs 3D stage. Persisted so the choice survives navigation and app restarts.
+ */
+export const dmxPreviewDimensionAtom = atomWithStorage<'2d' | '3d'>(
+  PREVIEW_DIMENSION_STORAGE_KEY,
+  '2d',
+  previewDimensionLocalStorage,
+)
+
 /**
  * Atom for last-known DMX values (channel -> value).
  * Persists across page navigation so persistent cues (e.g. YARG menu) remain visible in preview.

@@ -1,4 +1,6 @@
-import React, { useState } from 'react'
+import React from 'react'
+import { useAtom } from 'jotai'
+import { dmxPreviewDimensionAtom } from '@renderer/atoms'
 import { MdTv } from 'react-icons/md'
 import { FaUser } from 'react-icons/fa'
 import {
@@ -98,7 +100,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
   const layoutId = lightingConfig.lightLayout?.id ?? 'front'
   const isStacked = layoutId === 'stacked'
   const isTwoRowsOnStage = layoutId === 'two-rows'
-  const [previewMode, setPreviewMode] = useState<'2d' | '3d'>('2d')
+  const [previewMode, setPreviewMode] = useAtom(dmxPreviewDimensionAtom)
 
   const getLightColor = (light: DmxFixture): string => getDmxPreviewLightColorCss(light, dmxValues)
 
