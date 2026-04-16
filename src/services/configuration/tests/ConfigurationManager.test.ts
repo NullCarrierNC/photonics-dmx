@@ -125,7 +125,7 @@ describe('ConfigurationManager', () => {
     test('should update lighting layout', async () => {
       const newLayout = {
         numLights: 4,
-        lightLayout: { id: 'front', label: 'Front' },
+        lightLayout: { id: 'front', label: 'Front only' },
         strobeType: ConfigStrobeType.None,
         frontLights: [],
         backLights: [],

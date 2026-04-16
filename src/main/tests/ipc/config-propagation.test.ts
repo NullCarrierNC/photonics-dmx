@@ -79,7 +79,7 @@ function makeRig(id: string, active: boolean) {
     active,
     config: {
       numLights: 0,
-      lightLayout: { id: 'front-back', label: 'Front and Back' },
+      lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
       strobeType: 'none',
       frontLights: [],
       backLights: [],

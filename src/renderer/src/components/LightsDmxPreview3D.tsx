@@ -14,19 +14,14 @@ import {
 } from '../../../photonics-dmx/types'
 import { getDmxPreviewLightColor } from './dmxPreviewLightColor'
 import {
-  isCeilingMountMovingHead,
   panTiltDmxToStageVector,
   staticWashBeamDirection,
   type StageVector3,
 } from './lightsDmxPreview3DMath'
 
-export type RowMountToggleKey = 'front' | 'back' | 'top' | 'bottom'
-
 export interface LightsDmxPreview3DProps {
   lightingConfig: LightingConfiguration
   dmxValues: Record<number, number>
-  /** When a row has no moving heads, use this for floor/ceiling (default floor). */
-  rowMountWhenNoMovingHead: Partial<Record<RowMountToggleKey, 'floor' | 'ceiling'>>
 }
 
 const MH_TYPES = new Set([FixtureTypes.RGBMH, FixtureTypes.RGBWMH])
@@ -40,35 +35,8 @@ function masterDimmer01(light: DmxFixture, dmxValues: Record<number, number>): n
   return Math.max(0, Math.min(1, d / 255))
 }
 
-function majorityStaticMount(lights: DmxFixture[]): 'floor' | 'ceiling' {
-  let ceiling = 0
-  let floor = 0
-  for (const l of lights) {
-    if (!isMovingHead(l)) continue
-    if (isCeilingMountMovingHead(l.config)) ceiling += 1
-    else floor += 1
-  }
-  if (ceiling === floor) return 'floor'
-  return ceiling > floor ? 'ceiling' : 'floor'
-}
-
-function resolveFixtureMount(
-  light: DmxFixture,
-  rowLights: DmxFixture[],
-  rowKey: RowMountToggleKey,
-  rowMountWhenNoMovingHead: Partial<Record<RowMountToggleKey, 'floor' | 'ceiling'>>,
-  stackedTopOrBottom: 'top' | 'bottom' | null,
-): 'floor' | 'ceiling' {
-  if (isMovingHead(light)) {
-    return isCeilingMountMovingHead(light.config) ? 'ceiling' : 'floor'
-  }
-  const hasMh = rowLights.some(isMovingHead)
-  if (hasMh) {
-    return majorityStaticMount(rowLights)
-  }
-  if (stackedTopOrBottom === 'top') return 'floor'
-  if (stackedTopOrBottom === 'bottom') return 'ceiling'
-  return rowMountWhenNoMovingHead[rowKey] ?? 'floor'
+function fixtureMount(light: DmxFixture): 'floor' | 'ceiling' {
+  return light.mount === 'ceiling' ? 'ceiling' : 'floor'
 }
 
 function rgbToThreeColor(rgb: { r: number; g: number; b: number }): THREE.Color {
@@ -247,22 +215,21 @@ const FixtureBeam: React.FC<{
   )
 }
 
-function StageContent({
-  lightingConfig,
-  dmxValues,
-  rowMountWhenNoMovingHead,
-}: LightsDmxPreview3DProps) {
+function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
   const layoutId = lightingConfig.lightLayout?.id ?? 'front'
   const isStacked = layoutId === 'stacked'
+  /** TV group at z = -1; gap along +z to audience centre is 4 m in front-back, 5 m otherwise. */
+  const audienceZ = layoutId === 'front-back' ? 3 : 4
+  const downstageLabelZ = layoutId === 'front-back' ? 4.5 : 5.5
   const flareTex = useMemo(() => createFlareTexture(), [])
 
   const items = useMemo(() => {
+    type RowKey = 'front' | 'back' | 'top' | 'bottom'
     type Item = {
       key: string
       light: DmxFixture
       position: [number, number, number]
-      rowKey: RowMountToggleKey
-      rowLights: DmxFixture[]
+      rowKey: RowKey
       stacked: 'top' | 'bottom' | null
     }
     const out: Item[] = []
@@ -287,7 +254,6 @@ function StageContent({
           light,
           position: [spreadX(front.length, i), topY, BAR_Z],
           rowKey: 'top',
-          rowLights: front,
           stacked: 'top',
         })
       })
@@ -297,13 +263,12 @@ function StageContent({
           light,
           position: [spreadX(back.length, i), botY, BAR_Z],
           rowKey: 'bottom',
-          rowLights: back,
           stacked: 'bottom',
         })
       })
     } else {
-      const frontZ = 1.25
-      const backZ = 0
+      const frontZ = 0
+      const backZ = layoutId === 'front-back' ? audienceZ + 2 : 1
       const front = lightingConfig.frontLights
       const back = [...lightingConfig.backLights].reverse()
       front.forEach((light, i) => {
@@ -312,7 +277,6 @@ function StageContent({
           light,
           position: [spreadX(front.length, i), 0.2, frontZ],
           rowKey: 'front',
-          rowLights: front,
           stacked: null,
         })
       })
@@ -322,23 +286,16 @@ function StageContent({
           light,
           position: [spreadX(back.length, i), 0.2, backZ],
           rowKey: 'back',
-          rowLights: back,
           stacked: null,
         })
       })
     }
     return out
-  }, [isStacked, lightingConfig])
+  }, [isStacked, layoutId, lightingConfig, audienceZ])
 
   const adjustedItems = useMemo(() => {
     return items.map((it) => {
-      const mount = resolveFixtureMount(
-        it.light,
-        it.rowLights,
-        it.rowKey,
-        rowMountWhenNoMovingHead,
-        it.stacked,
-      )
+      const mount = fixtureMount(it.light)
       let y = it.position[1]
       if (!isStacked) {
         y = mount === 'floor' ? 0.18 : 2.92
@@ -351,7 +308,7 @@ function StageContent({
           : 'up'
       return { ...it, position: pos, mount, fixtureOrientation }
     })
-  }, [items, isStacked, rowMountWhenNoMovingHead])
+  }, [items, isStacked])
 
   return (
     <>
@@ -380,7 +337,7 @@ function StageContent({
 
       <Suspense fallback={null}>
         <FloorLabel text="Upstage" position={[0, 0.02, -3]} />
-        <FloorLabel text="Downstage" position={[0, 0.02, 3.4]} />
+        <FloorLabel text="Downstage" position={[0, 0.02, downstageLabelZ]} />
         <FloorLabel text="Stage Right" position={[3.2, 0.02, 0]} yawRad={-Math.PI / 2} />
         <FloorLabel text="Stage Left" position={[-3.2, 0.02, 0]} yawRad={Math.PI / 2} />
       </Suspense>
@@ -413,7 +370,7 @@ function StageContent({
       </group>
 
       {[0, 1, 2, 3, 4].map((i) => (
-        <mesh key={`aud-${i}`} position={[-1.8 + i * 0.9, 0.35, 2]}>
+        <mesh key={`aud-${i}`} position={[-1.8 + i * 0.9, 0.35, audienceZ]}>
           <cylinderGeometry args={[0.14, 0.16, 0.7, 10]} />
           <meshStandardMaterial color="#4a4a58" />
         </mesh>
@@ -429,7 +386,9 @@ function StageContent({
           const tilt = dmxValues[ch.tilt] ?? 0
           dir = panTiltDmxToStageVector(pan, tilt, it.light.config)
         } else {
-          dir = staticWashBeamDirection(it.mount)
+          dir = staticWashBeamDirection(it.mount, {
+            flipUsDs: layoutId === 'front-back' && it.rowKey === 'back',
+          })
         }
         const headOffset = isMovingHead(it.light) ? 0.2 : 0
         const yOffset = it.fixtureOrientation === 'down' ? -headOffset : headOffset
@@ -537,22 +496,14 @@ function SceneEffects() {
   )
 }
 
-const LightsDmxPreview3D: React.FC<LightsDmxPreview3DProps> = ({
-  lightingConfig,
-  dmxValues,
-  rowMountWhenNoMovingHead,
-}) => {
+const LightsDmxPreview3D: React.FC<LightsDmxPreview3DProps> = ({ lightingConfig, dmxValues }) => {
   return (
     <div className="w-full h-[min(420px,55vh)] min-h-[280px] rounded-md overflow-hidden border border-gray-400/40 dark:border-gray-600/50">
       <Canvas
-        camera={{ position: [0, 2.2, 7.2], fov: 42, near: 0.1, far: 80 }}
+        camera={{ position: [0, 2.2, 9], fov: 42, near: 0.1, far: 80 }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
         dpr={[1, 2]}>
-        <StageContent
-          lightingConfig={lightingConfig}
-          dmxValues={dmxValues}
-          rowMountWhenNoMovingHead={rowMountWhenNoMovingHead}
-        />
+        <StageContent lightingConfig={lightingConfig} dmxValues={dmxValues} />
         <OrbitControls
           enablePan
           minPolarAngle={0.15}

@@ -6,6 +6,7 @@ import {
   shouldMirrorTiltForStageRelative,
 } from '../../helpers/dmxHelpers'
 import { logicalPanPercentFromMotorDeg, pickAliasedPanMotorDeg } from '../../helpers/panMotorAlias'
+import { reflectBearingUsDs } from '../../helpers/stageDirections'
 import type { ResolvedMotionPatternSetting } from '../../cues/node/compiler/ActionEffectFactory'
 import type { ActiveMotionPattern, FrameContext } from './interfaces'
 import type { WaveformType } from '../../cues/types/nodeCueTypes'
@@ -290,6 +291,8 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
   bearingDeg?: number
   /** Previous frame pan motor angle for continuity across valid lifts. */
   preferredPanMotorDeg?: number
+  /** When true, bearing reflects across SR-SL for back-row lights in front-back layout. */
+  bearingIsFlipped?: boolean
 }): { panOffsetDeg: number; tiltOffsetDeg: number } {
   const {
     sizeDeg,
@@ -298,8 +301,10 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
     fixtureConfig,
     bearingDeg: bearingDegRaw,
     preferredPanMotorDeg,
+    bearingIsFlipped,
   } = params
-  const bearingDeg = bearingDegRaw ?? 180
+  const baseBearing = bearingDegRaw ?? 180
+  const bearingDeg = bearingIsFlipped === true ? reflectBearingUsDs(baseBearing) : baseBearing
   const c = normalizeFixtureConfig(fixtureConfig)
   const mirrorTiltOffset = shouldMirrorTiltForStageRelative(c)
   const cMotion = {
@@ -518,6 +523,7 @@ export class MotionPatternEngine {
             fixtureConfig: light.config,
             bearingDeg: cfg.bearingDeg,
             preferredPanMotorDeg,
+            bearingIsFlipped: light.bearingIsFlipped,
           })
           panOffsetDeg = comp.panOffsetDeg
           tiltOffsetDeg = comp.tiltOffsetDeg

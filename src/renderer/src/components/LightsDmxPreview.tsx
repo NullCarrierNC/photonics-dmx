@@ -11,7 +11,7 @@ import {
 } from '../../../photonics-dmx/types'
 import { panTiltDmxToSphericalXY } from './lightsDmxPreviewMath'
 import { getDmxPreviewLightColorCss } from './dmxPreviewLightColor'
-import LightsDmxPreview3D, { type RowMountToggleKey } from './LightsDmxPreview3D'
+import LightsDmxPreview3D from './LightsDmxPreview3D'
 
 interface LightsDmxPreviewProps {
   lightingConfig: LightingConfiguration
@@ -47,34 +47,6 @@ const PreviewDimensionToggle: React.FC<{
         className={`px-3 py-1 text-sm font-medium rounded ${mode === '3d' ? 'bg-white dark:bg-gray-600 shadow' : 'text-gray-600 dark:text-gray-300'}`}
         onClick={() => onChange('3d')}>
         3D
-      </button>
-    </div>
-  </div>
-)
-
-const RowFloorCeilingToggle: React.FC<{
-  label: string
-  rowKey: RowMountToggleKey
-  value: 'floor' | 'ceiling'
-  onChange: (row: RowMountToggleKey, mount: 'floor' | 'ceiling') => void
-}> = ({ label, rowKey, value, onChange }) => (
-  <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
-    <span className="font-medium">{label}</span>
-    <div
-      className="inline-flex rounded border border-gray-400 dark:border-gray-500 p-0.5"
-      role="group"
-      aria-label={`${label} mount`}>
-      <button
-        type="button"
-        className={`px-2 py-0.5 rounded ${value === 'floor' ? 'bg-white dark:bg-gray-600' : ''}`}
-        onClick={() => onChange(rowKey, 'floor')}>
-        Floor
-      </button>
-      <button
-        type="button"
-        className={`px-2 py-0.5 rounded ${value === 'ceiling' ? 'bg-white dark:bg-gray-600' : ''}`}
-        onClick={() => onChange(rowKey, 'ceiling')}>
-        Ceiling
       </button>
     </div>
   </div>
@@ -125,14 +97,8 @@ const DmxPreviewWithStageLegend: React.FC<{
 const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmxValues }) => {
   const layoutId = lightingConfig.lightLayout?.id ?? 'front'
   const isStacked = layoutId === 'stacked'
+  const isTwoRowsOnStage = layoutId === 'two-rows'
   const [previewMode, setPreviewMode] = useState<'2d' | '3d'>('2d')
-  const [rowMountWhenNoMovingHead, setRowMountWhenNoMovingHead] = useState<
-    Partial<Record<RowMountToggleKey, 'floor' | 'ceiling'>>
-  >({})
-
-  const setRowMount = (row: RowMountToggleKey, mount: 'floor' | 'ceiling') => {
-    setRowMountWhenNoMovingHead((prev) => ({ ...prev, [row]: mount }))
-  }
 
   const getLightColor = (light: DmxFixture): string => getDmxPreviewLightColorCss(light, dmxValues)
 
@@ -249,49 +215,14 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
     </div>
   )
 
-  const topRowHasNoMovingHead =
-    lightingConfig.frontLights.length > 0 && !lightingConfig.frontLights.some(isMovingHead)
-  const bottomRowHasNoMovingHead =
-    lightingConfig.backLights.length > 0 && !lightingConfig.backLights.some(isMovingHead)
-  const frontRowHasNoMovingHead =
-    lightingConfig.frontLights.length > 0 && !lightingConfig.frontLights.some(isMovingHead)
-  const backRowHasNoMovingHead =
-    lightingConfig.backLights.length > 0 && !lightingConfig.backLights.some(isMovingHead)
-
-  const preview3d = (
-    <LightsDmxPreview3D
-      lightingConfig={lightingConfig}
-      dmxValues={dmxValues}
-      rowMountWhenNoMovingHead={rowMountWhenNoMovingHead}
-    />
-  )
+  const preview3d = <LightsDmxPreview3D lightingConfig={lightingConfig} dmxValues={dmxValues} />
 
   if (isStacked) {
     return (
       <DmxPreviewWithStageLegend showStageLegend={previewMode === '2d'}>
         <PreviewDimensionToggle mode={previewMode} onChange={setPreviewMode} />
         {previewMode === '3d' ? (
-          <>
-            <div className="mb-2 flex flex-wrap justify-center gap-x-4 gap-y-2 w-full max-w-2xl mx-auto">
-              {topRowHasNoMovingHead && (
-                <RowFloorCeilingToggle
-                  label="Top"
-                  rowKey="top"
-                  value={rowMountWhenNoMovingHead.top ?? 'floor'}
-                  onChange={setRowMount}
-                />
-              )}
-              {bottomRowHasNoMovingHead && (
-                <RowFloorCeilingToggle
-                  label="Bottom"
-                  rowKey="bottom"
-                  value={rowMountWhenNoMovingHead.bottom ?? 'floor'}
-                  onChange={setRowMount}
-                />
-              )}
-            </div>
-            {preview3d}
-          </>
+          preview3d
         ) : (
           <>
             <div className="mb-1">
@@ -336,27 +267,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
     <DmxPreviewWithStageLegend showStageLegend={previewMode === '2d'}>
       <PreviewDimensionToggle mode={previewMode} onChange={setPreviewMode} />
       {previewMode === '3d' ? (
-        <>
-          <div className="mb-2 flex flex-wrap justify-center gap-x-4 gap-y-2 w-full max-w-2xl mx-auto">
-            {frontRowHasNoMovingHead && (
-              <RowFloorCeilingToggle
-                label="Front"
-                rowKey="front"
-                value={rowMountWhenNoMovingHead.front ?? 'floor'}
-                onChange={setRowMount}
-              />
-            )}
-            {backRowHasNoMovingHead && (
-              <RowFloorCeilingToggle
-                label="Back"
-                rowKey="back"
-                value={rowMountWhenNoMovingHead.back ?? 'floor'}
-                onChange={setRowMount}
-              />
-            )}
-          </div>
-          {preview3d}
-        </>
+        preview3d
       ) : (
         <>
           <div className="mb-1">
@@ -375,19 +286,37 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
           {lightingConfig?.strobeType === ConfigStrobeType.Dedicated &&
             lightingConfig.strobeLights.map((strobeLight) => renderStrobeIndicator(strobeLight))}
 
-          {lightingConfig?.backLights.length > 0 && renderPeople()}
+          {isTwoRowsOnStage ? (
+            <>
+              {lightingConfig?.backLights.length > 0 && (
+                <div className="w-full flex flex-col items-center mt-3">
+                  <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">
+                    Back
+                  </div>
+                  {renderLightRow(lightingConfig.backLights)}
+                </div>
+              )}
+              {((lightingConfig?.frontLights.length ?? 0) > 0 ||
+                (lightingConfig?.backLights.length ?? 0) > 0) &&
+                renderPeople()}
+            </>
+          ) : (
+            <>
+              {lightingConfig?.backLights.length > 0 && renderPeople()}
 
-          {lightingConfig?.backLights.length > 0 && (
-            <div className="w-full flex flex-col items-center mt-3">
-              <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">
-                Back
-              </div>
-              <div className="flex justify-center gap-x-4 mb-4">
-                {[...lightingConfig.backLights]
-                  .reverse()
-                  .map((light, index) => renderLightCircle(light, index))}
-              </div>
-            </div>
+              {lightingConfig?.backLights.length > 0 && (
+                <div className="w-full flex flex-col items-center mt-3">
+                  <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">
+                    Back
+                  </div>
+                  <div className="flex justify-center gap-x-4 mb-4">
+                    {[...lightingConfig.backLights]
+                      .reverse()
+                      .map((light, index) => renderLightCircle(light, index))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

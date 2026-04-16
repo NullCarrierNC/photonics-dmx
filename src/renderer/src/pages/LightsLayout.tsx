@@ -26,13 +26,14 @@ import LightChannelAssignmentSection from './LightsLayout/LightChannelAssignment
 import LightsLayoutIntro from './LightsLayout/LightsLayoutIntro'
 
 const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
-  { id: 'front', label: 'Front' },
-  { id: 'front-back', label: 'Front and Back' },
-  { id: 'stacked', label: 'Stacked (Top and Bottom)' },
+  { id: 'front', label: 'Front only' },
+  { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
+  { id: 'stacked', label: 'Stacked (one on top of the other)' },
+  { id: 'front-back', label: 'Front and Back (back lights behind audience)' },
 ]
 
 function isTwoRowPrimaryLayout(layoutId: string): boolean {
-  return layoutId === 'front-back' || layoutId === 'stacked'
+  return layoutId === 'two-rows' || layoutId === 'front-back' || layoutId === 'stacked'
 }
 
 /**
@@ -93,7 +94,7 @@ const LightsLayout = () => {
             active: true,
             config: {
               numLights: 0,
-              lightLayout: { id: 'front', label: 'Front' },
+              lightLayout: { id: 'front', label: 'Front only' },
               strobeType: ConfigStrobeType.None,
               frontLights: [],
               backLights: [],
@@ -197,7 +198,8 @@ const LightsLayout = () => {
   const availableLayouts = useMemo(() => {
     return LIGHT_LAYOUTS.filter((layout) => {
       if (layout.id === 'front') return true
-      if (layout.id === 'front-back' || layout.id === 'stacked') return (selectedCount || 0) >= 2
+      if (layout.id === 'two-rows' || layout.id === 'front-back' || layout.id === 'stacked')
+        return (selectedCount || 0) >= 2
       return false
     })
   }, [selectedCount])
@@ -256,6 +258,7 @@ const LightsLayout = () => {
         channels: castChannels,
         config: selectedFixture.config || undefined, // Include config if present (e.g. MH lights)
         universe: selectedFixture.universe,
+        mount: 'floor' as const,
       }
     },
     [allPrimaryLights.length, myFixtures],
@@ -310,6 +313,7 @@ const LightsLayout = () => {
               channels: castChannels,
               config: firstFixture.config || undefined,
               universe: firstFixture.universe,
+              mount: 'floor' as const,
             })
           }
         }
@@ -653,6 +657,7 @@ const LightsLayout = () => {
                   ? `Top ${index + 1} (Position ${light.position})`
                   : `Front ${index + 1} (Position ${light.position})`
               }
+              isStacked={selectedLayout === 'stacked'}
             />
 
             {isTwoRowPrimaryLayout(selectedLayout) && backLights.length > 0 && (
@@ -677,6 +682,7 @@ const LightsLayout = () => {
                     ? `Bottom ${index + 1} (Position ${light.position})`
                     : `Back ${index + 1} (Position ${light.position})`
                 }
+                isStacked={selectedLayout === 'stacked'}
               />
             )}
 
@@ -691,6 +697,7 @@ const LightsLayout = () => {
                   highlightedLight={highlightedLight}
                   onLightClick={handleLightClick}
                   lightLabel={(light) => `Dedicated Strobe (Position ${light.position})`}
+                  isStacked={selectedLayout === 'stacked'}
                 />
               )}
           </div>

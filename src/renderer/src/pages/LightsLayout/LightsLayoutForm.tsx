@@ -72,7 +72,7 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
           onChange={(e) => {
             setSelectedLayout(e.target.value)
             const v = e.target.value
-            if (v !== 'front-back' && v !== 'stacked') {
+            if (v !== 'two-rows' && v !== 'front-back' && v !== 'stacked') {
               setAssignedToBack('None')
             } else {
               setAssignedToBack(allPrimaryLightsCountBack || 'None')
@@ -87,7 +87,9 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
         </select>
       </label>
 
-      {(selectedLayout === 'front-back' || selectedLayout === 'stacked') && (
+      {(selectedLayout === 'two-rows' ||
+        selectedLayout === 'front-back' ||
+        selectedLayout === 'stacked') && (
         <label className="flex flex-col items-start flex-1 min-w-[200px]">
           <span className="mb-2 text-gray-700 dark:text-gray-300">
             {selectedLayout === 'stacked' ? 'Assigned to Bottom' : 'Assigned to Back'}

@@ -24,6 +24,7 @@ import {
   logicalPanPercentFromMotorDeg,
   pickAliasedPanMotorDeg,
 } from '../../../helpers/panMotorAlias'
+import { reflectBearingUsDs } from '../../../helpers/stageDirections'
 import {
   ActionNode,
   createDefaultActionTiming,
@@ -171,10 +172,12 @@ export function trackedLightIdsEqualOrder(a: TrackedLight[], b: TrackedLight[]):
 
 /**
  * Converts resolved position (direction / offset / legacy absolute %) to absolute pan/tilt % for DMX.
+ * When `bearingIsFlipped`, direction-mode bearings reflect across SR-SL (US/DS swap) for back-row lights in front-back layout.
  */
 export function resolvePositionToAbsolutePercent(
   resolved: ResolvedPositionSetting,
   fixtureConfig: FixtureConfig | undefined,
+  bearingIsFlipped?: boolean,
 ): { pan: number; tilt: number } {
   const c = normalizeFixtureConfig(fixtureConfig)
   const panDir = logicalPanDir(c)
@@ -215,7 +218,9 @@ export function resolvePositionToAbsolutePercent(
     }
   }
   const tiltStageZeroPct = (c.tiltStageDeg / c.tiltRangeDeg) * 100
-  const rawPanMotorDeg = c.panStageDeg + panDir * resolved.bearingDeg
+  const bearingDeg =
+    bearingIsFlipped === true ? reflectBearingUsDs(resolved.bearingDeg) : resolved.bearingDeg
+  const rawPanMotorDeg = c.panStageDeg + panDir * bearingDeg
   const chosenPanMotorDeg = pickAliasedPanMotorDeg(
     rawPanMotorDeg,
     c.panRangeDeg,
@@ -532,7 +537,11 @@ export class ActionEffectFactory {
         }
 
         const transitions: EffectTransition[] = lights.map((light) => {
-          const { pan, tilt } = resolvePositionToAbsolutePercent(pos, light.config)
+          const { pan, tilt } = resolvePositionToAbsolutePercent(
+            pos,
+            light.config,
+            light.bearingIsFlipped,
+          )
           const positionRgbio: RGBIO = {
             red: 0,
             green: 0,

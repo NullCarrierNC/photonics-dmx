@@ -1,4 +1,5 @@
 import { randomBetween } from '../helpers/utils'
+import { backLightBearingIsFlipped } from '../helpers/stageDirections'
 import {
   LightingConfiguration,
   TrackedLight,
@@ -29,7 +30,7 @@ export class DmxLightManager {
    * Initializes the tracked light arrays based on the current configuration.
    */
   private initializeLights(): void {
-    //  console.log("Init",  this.config.frontLights);
+    const layoutId = this.config.lightLayout?.id
 
     this._frontLights = this.config.frontLights
       .filter((light) => light.id !== null)
@@ -46,6 +47,7 @@ export class DmxLightManager {
         id: light.id as string,
         position: light.position,
         config: light.config,
+        bearingIsFlipped: backLightBearingIsFlipped(layoutId, 'back'),
       }))
       .sort((a, b) => a.position - b.position)
 

@@ -93,12 +93,19 @@ export function panTiltDmxToStageVector(
   return normalizeVec(raw)
 }
 
-/** 45° toward downstage from floor (up-firing) or ceiling (down-firing) normal. */
-export function staticWashBeamDirection(mount: 'floor' | 'ceiling'): StageVector3 {
+/**
+ * 45° from floor (up-firing) or ceiling (down-firing) normal.
+ * When `flipUsDs`, the horizontal stage component points upstage (for static fixtures behind the audience).
+ */
+export function staticWashBeamDirection(
+  mount: 'floor' | 'ceiling',
+  options?: { flipUsDs?: boolean },
+): StageVector3 {
+  const zSign = options?.flipUsDs === true ? -1 : 1
   if (mount === 'floor') {
-    return normalizeVec({ x: 0, y: 1, z: 1 })
+    return normalizeVec({ x: 0, y: 1, z: zSign })
   }
-  return normalizeVec({ x: 0, y: -1, z: 1 })
+  return normalizeVec({ x: 0, y: -1, z: zSign })
 }
 
 export function isCeilingMountMovingHead(config: FixtureConfig | undefined): boolean {

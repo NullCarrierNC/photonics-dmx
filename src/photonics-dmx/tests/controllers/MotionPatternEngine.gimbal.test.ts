@@ -340,6 +340,27 @@ describe('gimbalCompensatedPanTiltOffsetsDeg', () => {
     expect(r.tiltOffsetDeg).toBe(0)
   })
 
+  it('near pole: bearingIsFlipped maps 180° to same orbit centre as 0°', () => {
+    const t = 0.7
+    const flipped = gimbalCompensatedPanTiltOffsetsDeg({
+      sizeDeg: 30,
+      phase: t,
+      ramp: 1,
+      fixtureConfig: defaultMh,
+      bearingDeg: 180,
+      bearingIsFlipped: true,
+    })
+    const ref = gimbalCompensatedPanTiltOffsetsDeg({
+      sizeDeg: 30,
+      phase: t,
+      ramp: 1,
+      fixtureConfig: defaultMh,
+      bearingDeg: 0,
+    })
+    expect(flipped.panOffsetDeg).toBeCloseTo(ref.panOffsetDeg, 3)
+    expect(flipped.tiltOffsetDeg).toBeCloseTo(ref.tiltOffsetDeg, 3)
+  })
+
   it('uses standard mode when home is far from pole (no bearing-offset)', () => {
     const far: FixtureConfig = { ...defaultMh, tiltHome: 80, tiltStageDeg: 90 }
     const r = gimbalCompensatedPanTiltOffsetsDeg({

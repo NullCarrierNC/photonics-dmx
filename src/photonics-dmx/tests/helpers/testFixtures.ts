@@ -37,7 +37,7 @@ export const createMockLightingConfig = (
   overrides?: Partial<LightingConfiguration>,
 ): LightingConfiguration => ({
   numLights: 4,
-  lightLayout: { id: 'front-back', label: 'Front and Back' },
+  lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
   strobeType: ConfigStrobeType.None,
   frontLights: [createMockDmxLight()],
   backLights: [],

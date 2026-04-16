@@ -315,4 +315,51 @@ describe('resolvePositionToAbsolutePercent', () => {
     )
     expect(result.tilt).toBeCloseTo(50 + (20 / 180) * 100, 5)
   })
+
+  it('direction mode: bearingIsFlipped maps DS to same pan as unflipped US (180° -> 0°)', () => {
+    const down = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 180, angleFromVerticalDeg: 0 },
+      base,
+    )
+    const flipped = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 180, angleFromVerticalDeg: 0 },
+      base,
+      true,
+    )
+    const up = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 0, angleFromVerticalDeg: 0 },
+      base,
+    )
+    expect(flipped.pan).toBeCloseTo(up.pan!, 5)
+    expect(flipped.tilt).toBeCloseTo(up.tilt!, 5)
+    expect(flipped.pan).not.toBeCloseTo(down.pan!, 3)
+  })
+
+  it('direction mode: bearingIsFlipped leaves stage-right (90°) unchanged', () => {
+    const sr = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 90, angleFromVerticalDeg: 0 },
+      base,
+    )
+    const srFlipped = resolvePositionToAbsolutePercent(
+      { mode: 'direction', bearingDeg: 90, angleFromVerticalDeg: 0 },
+      base,
+      true,
+    )
+    expect(srFlipped.pan).toBeCloseTo(sr.pan!, 5)
+    expect(srFlipped.tilt).toBeCloseTo(sr.tilt!, 5)
+  })
+
+  it('offset mode: bearingIsFlipped does not change pan/tilt', () => {
+    const o = resolvePositionToAbsolutePercent(
+      { mode: 'offset', panOffsetDeg: 30, tiltOffsetDeg: 10 },
+      base,
+    )
+    const of = resolvePositionToAbsolutePercent(
+      { mode: 'offset', panOffsetDeg: 30, tiltOffsetDeg: 10 },
+      base,
+      true,
+    )
+    expect(of.pan).toBeCloseTo(o.pan!, 5)
+    expect(of.tilt).toBeCloseTo(o.tilt!, 5)
+  })
 })

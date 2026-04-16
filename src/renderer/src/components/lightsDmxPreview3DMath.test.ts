@@ -307,6 +307,15 @@ describe('staticWashBeamDirection', () => {
     expect(v.y).toBeLessThan(-0.5)
     expect(v.z).toBeGreaterThan(0.5)
   })
+
+  it('flipUsDs aims static wash upstage for floor and ceiling', () => {
+    const f = staticWashBeamDirection('floor', { flipUsDs: true })
+    expectUnit(f)
+    expect(f.z).toBeLessThan(0)
+    const c = staticWashBeamDirection('ceiling', { flipUsDs: true })
+    expectUnit(c)
+    expect(c.z).toBeLessThan(0)
+  })
 })
 
 describe('isCeilingMountMovingHead', () => {

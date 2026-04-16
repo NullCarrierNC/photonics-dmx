@@ -432,6 +432,8 @@ export type TrackedLight = {
   id: string
   position: number
   config?: FixtureConfig
+  /** When true, direction-mode and circle-center bearings reflect across SR-SL (see backLightBearingIsFlipped). */
+  bearingIsFlipped?: boolean
 }
 
 export interface DmxFixture {
@@ -453,6 +455,8 @@ export interface DmxFixture {
     | RgbwMovingHeadDmxChannels
   config?: FixtureConfig
   universe?: number
+  /** Floor vs ceiling/truss placement for preview and static wash; default floor when omitted before migration. */
+  mount?: 'floor' | 'ceiling'
 }
 
 export interface DmxLight extends DmxFixture {
@@ -596,6 +600,8 @@ export interface DmxRig {
  */
 export interface DmxRigsConfig {
   rigs: DmxRig[]
+  /** Bumped once the legacy `front-back` → `two-rows` rename and initial mount backfill have run. */
+  schemaVersion?: number
 }
 
 /**

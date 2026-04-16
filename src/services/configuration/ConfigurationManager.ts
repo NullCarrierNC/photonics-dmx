@@ -8,6 +8,7 @@ import {
   DmxRig,
   DmxRigsConfig,
 } from '../../photonics-dmx/types'
+import { migrateDmxRigsConfig } from '../../photonics-dmx/helpers/lightingConfigMigration'
 
 import {
   type AudioConfig,
@@ -337,7 +338,7 @@ export class ConfigurationManager {
       }
 
       this.dmxRigs
-        .update({ rigs: [defaultRig] })
+        .update({ ...currentRigs, rigs: [defaultRig] })
         .catch((err) =>
           console.error('[Photonics Config] Failed to persist migrated DMX rigs:', err),
         )
@@ -686,10 +687,19 @@ export class ConfigurationManager {
   // DMX Rigs Methods
 
   /**
-   * Gets all DMX rigs
+   * Gets all DMX rigs (layout/mount migration applied on read; persisted when changed).
    */
   getDmxRigs(): DmxRig[] {
-    return this.dmxRigs.get().rigs
+    const current = this.dmxRigs.get()
+    const { config: migrated, changed } = migrateDmxRigsConfig(current)
+    if (changed) {
+      void this.dmxRigs
+        .update(migrated)
+        .catch((err) =>
+          console.error('[Photonics Config] Failed to persist migrated DMX rigs:', err),
+        )
+    }
+    return migrated.rigs
   }
 
   /**
@@ -714,7 +724,7 @@ export class ConfigurationManager {
       rigs.push(rig)
     }
 
-    await this.dmxRigs.update({ rigs })
+    await this.dmxRigs.update({ ...current, rigs })
   }
 
   /**
@@ -723,7 +733,7 @@ export class ConfigurationManager {
   async deleteDmxRig(id: string): Promise<void> {
     const current = this.dmxRigs.get()
     const rigs = current.rigs.filter((rig) => rig.id !== id)
-    await this.dmxRigs.update({ rigs })
+    await this.dmxRigs.update({ ...current, rigs })
   }
 
   /**

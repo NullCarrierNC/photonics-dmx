@@ -105,3 +105,16 @@ export function parseBearingFromResolvedValue(value: string | number): number {
   }
   return normalizeBearingDegrees(parsed)
 }
+
+/** True when a light's absolute stage bearings should reflect across the SR-SL axis (US/DS swap). */
+export function backLightBearingIsFlipped(
+  layoutId: string | undefined,
+  group: string | undefined,
+): boolean {
+  return layoutId === 'front-back' && group === 'back'
+}
+
+/** Reflect a stage bearing across the SR-SL axis: US<->DS, SR/SL unchanged. */
+export function reflectBearingUsDs(bearingDeg: number): number {
+  return normalizeBearingDegrees(180 - bearingDeg)
+}

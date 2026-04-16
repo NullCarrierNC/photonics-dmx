@@ -75,7 +75,7 @@ describe('DmxPublisher', () => {
       }
       const lightingConfig: LightingConfiguration = {
         numLights: 1,
-        lightLayout: { id: 'front-back', label: 'Front and Back' },
+        lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
         strobeType: 'none' as import('../../types').ConfigStrobeType,
         frontLights: [
           {
