@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DmxLight,
   FixtureConfig,
   FixtureTypes,
+  LightingConfiguration,
   normalizeFixtureConfig,
   RgbMovingHeadDmxChannels,
   RgbwMovingHeadDmxChannels,
@@ -29,6 +30,7 @@ import SacnToggle from './SacnToggle'
 import ArtNetToggle from './ArtNetToggle'
 import EnttecProToggle from './EnttecProToggle'
 import OpenDmxToggle from './OpenDmxToggle'
+import LightsDmxPreview3D from './LightsDmxPreview3D'
 
 const STEP_TITLES = [
   'Pan range',
@@ -204,6 +206,8 @@ function WizardBeamPreview({
 export interface MovingHeadCalibrationWizardProps {
   light: DmxLight
   rigId: string
+  /** Rig layout at wizard open (frozen for the 3D preview). */
+  lightingConfig: LightingConfiguration
   onClose: () => void
   onComplete: (updatedConfig: FixtureConfig) => void
 }
@@ -211,9 +215,11 @@ export interface MovingHeadCalibrationWizardProps {
 const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = ({
   light,
   rigId,
+  lightingConfig,
   onClose,
   onComplete,
 }) => {
+  const [rigLightingConfigSnapshot] = useState(() => lightingConfig)
   const [step, setStep] = useState(0)
   const [config, setConfig] = useState<FixtureConfig>(() => normalizeFixtureConfig(light.config))
   const [consoleBuffer, setConsoleBuffer] = useState<Record<number, number>>({})
@@ -224,6 +230,19 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   const [stepsConfirmed, setStepsConfirmed] = useState<Set<number>>(() => new Set())
 
   const ch = light.channels as RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels
+
+  const wizard3dLightingConfig = useMemo<LightingConfiguration>(() => {
+    const derivedMount: 'floor' | 'ceiling' =
+      config.invertPan && config.invertTilt ? 'ceiling' : 'floor'
+    const liveLight: DmxLight = { ...light, config, mount: derivedMount }
+    const replace = (arr: DmxLight[]): DmxLight[] =>
+      arr.map((l) => (l.id && light.id && l.id === light.id ? liveLight : l))
+    return {
+      ...rigLightingConfigSnapshot,
+      frontLights: replace(rigLightingConfigSnapshot.frontLights),
+      backLights: replace(rigLightingConfigSnapshot.backLights),
+    }
+  }, [rigLightingConfigSnapshot, light, config])
 
   const pushBuffer = useCallback(
     (updater: (prev: Record<number, number>) => Record<number, number>) => {
@@ -659,6 +678,11 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
             )}
           </div>
         </div>
+        {consoleReady && step >= STAGE_LABELS_READY_STEP && (
+          <div className="mt-4">
+            <LightsDmxPreview3D lightingConfig={wizard3dLightingConfig} dmxValues={consoleBuffer} />
+          </div>
+        )}
       </div>
     </div>
   )

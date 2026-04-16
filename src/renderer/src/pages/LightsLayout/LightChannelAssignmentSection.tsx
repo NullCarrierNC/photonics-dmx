@@ -1,6 +1,6 @@
 import React from 'react'
 import LightChannelsConfig from '../../components/LightChannelsConfig'
-import type { DmxLight, DmxFixture } from '../../../../photonics-dmx/types'
+import type { DmxLight, DmxFixture, LightingConfiguration } from '../../../../photonics-dmx/types'
 
 const MountToggle: React.FC<{
   value: 'floor' | 'ceiling'
@@ -35,6 +35,7 @@ interface LightChannelAssignmentSectionProps {
   lights: DmxLight[]
   myLights: DmxFixture[]
   rigId: string | null
+  lightingConfig: LightingConfiguration
   onLightChange: (light: DmxLight) => void
   highlightedLight: number | null
   onLightClick: (position: number) => void
@@ -48,6 +49,7 @@ const LightChannelAssignmentSection: React.FC<LightChannelAssignmentSectionProps
   lights,
   myLights,
   rigId,
+  lightingConfig,
   onLightChange,
   highlightedLight,
   onLightClick,
@@ -75,6 +77,7 @@ const LightChannelAssignmentSection: React.FC<LightChannelAssignmentSectionProps
             light={light}
             myLights={myLights}
             rigId={rigId}
+            lightingConfig={lightingConfig}
             onChange={onLightChange}
             isHighlighted={highlightedLight === light.position}
             onClick={() => onLightClick(light.position)}

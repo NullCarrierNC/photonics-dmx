@@ -110,17 +110,25 @@ const BeamFallback: React.FC<{
     group.current.quaternion.copy(quatFromYToDir(direction))
   }, [direction])
 
+  const matProps = {
+    color,
+    transparent: true,
+    opacity,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  } as const
+
   return (
     <group ref={group}>
       <mesh position={[0, length * 0.5, 0]}>
         <cylinderGeometry args={[radius, 0, length, 16, 1, true]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={opacity}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
+        <meshBasicMaterial {...matProps} />
+      </mesh>
+      {/* Wide end is open in the cylinder; a disk so the cone face is visible head-on. */}
+      <mesh position={[0, length, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[radius, 24]} />
+        <meshBasicMaterial {...matProps} />
       </mesh>
     </group>
   )
@@ -160,7 +168,7 @@ const FixtureBeam: React.FC<{
   const color = useMemo(() => rgbToThreeColor({ r, g, b }), [r, g, b])
   const dir = useMemo(() => vec3({ x: dx, y: dy, z: dz }).normalize(), [dx, dy, dz])
   const targetPos = useMemo(() => {
-    const d = 6
+    const d = 12
     return new THREE.Vector3(
       position[0] + dir.x * d,
       position[1] + dir.y * d,
@@ -185,7 +193,7 @@ const FixtureBeam: React.FC<{
   const flareOpacity = 0.55 * dimmer01 * Math.min(1, (rgb.r + rgb.g + rgb.b) / (3 * 255))
   const beamOpacity = 0.22 * dimmer01
   const angle = isMovingHead ? 0.15 : 0.26
-  const distance = 9
+  const distance = 18
 
   return (
     <group position={position}>
@@ -207,7 +215,7 @@ const FixtureBeam: React.FC<{
         direction={dir}
         color={color}
         opacity={beamOpacity}
-        length={5}
+        length={10}
         radius={isMovingHead ? 0.12 : 0.18}
       />
       <LensFlareBillboard color={color} opacity={flareOpacity} texture={flareTexture} />

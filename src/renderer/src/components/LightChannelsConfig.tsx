@@ -9,6 +9,7 @@ import {
   StrobeDmxChannels,
   FixtureConfig,
   normalizeFixtureConfig,
+  LightingConfiguration,
 } from '../../../photonics-dmx/types'
 import { LightIcon } from './LightIcon'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
@@ -23,6 +24,8 @@ interface LightChannelsConfigProps {
   myLights: DmxFixture[] // Light templates
   /** When set, moving-head fixtures can open the live calibration wizard. */
   rigId?: string | null
+  /** Current rig lighting config (for 3D preview in the calibration wizard). */
+  lightingConfig: LightingConfiguration
 }
 
 const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSpeed']
@@ -62,6 +65,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   isHighlighted,
   myLights,
   rigId,
+  lightingConfig,
 }) => {
   const [localChannels, setLocalChannels] = useState<
     RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels | StrobeDmxChannels | null
@@ -307,6 +311,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
           key={light.id}
           light={light}
           rigId={rigId}
+          lightingConfig={lightingConfig}
           onClose={() => setCalibrationOpen(false)}
           onComplete={(updatedConfig) => {
             onChange({ ...light, config: updatedConfig })

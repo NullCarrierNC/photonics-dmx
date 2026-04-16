@@ -8,6 +8,7 @@ import {
   DmxLight,
   FixtureTypes,
   DmxRig,
+  LightingConfiguration,
 } from '../../../photonics-dmx/types'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
 import { v4 as uuidv4 } from 'uuid'
@@ -475,6 +476,28 @@ const LightsLayout = () => {
     return allPrimaryLights.filter((l) => l.group === 'back')
   }, [allPrimaryLights])
 
+  /** Working rig config for previews (matches save shape). */
+  const currentLightingConfig = useMemo<LightingConfiguration>(() => {
+    const lightLayout =
+      LIGHT_LAYOUTS.find((layout) => layout.id === selectedLayout) || LIGHT_LAYOUTS[0]
+    const finalFront = allPrimaryLights.filter((l) => l.group === 'front')
+    const finalBack = allPrimaryLights.filter((l) => l.group === 'back')
+    let finalStrobe: DmxLight[] = []
+    if (selectedStrobe === ConfigStrobeType.AllCapable) {
+      finalStrobe = allPrimaryLights.filter((l) => l.isStrobeEnabled && l.group !== 'strobe')
+    } else if (selectedStrobe === ConfigStrobeType.Dedicated) {
+      finalStrobe = allPrimaryLights.filter((l) => l.group === 'strobe')
+    }
+    return {
+      numLights: selectedCount || 0,
+      lightLayout,
+      strobeType: selectedStrobe,
+      frontLights: finalFront,
+      backLights: finalBack,
+      strobeLights: finalStrobe,
+    }
+  }, [allPrimaryLights, selectedCount, selectedLayout, selectedStrobe])
+
   // Memo Check for Physical Strobe Fixtures in Source Lights
   const hasPhysicalStrobe = useMemo(() => {
     return true
@@ -649,6 +672,7 @@ const LightsLayout = () => {
               lights={frontLights}
               myLights={myFixtures}
               rigId={activeRigId}
+              lightingConfig={currentLightingConfig}
               onLightChange={handleLightChange}
               highlightedLight={highlightedLight}
               onLightClick={handleLightClick}
@@ -674,6 +698,7 @@ const LightsLayout = () => {
                 lights={backLights}
                 myLights={myFixtures}
                 rigId={activeRigId}
+                lightingConfig={currentLightingConfig}
                 onLightChange={handleLightChange}
                 highlightedLight={highlightedLight}
                 onLightClick={handleLightClick}
@@ -693,6 +718,7 @@ const LightsLayout = () => {
                   lights={allPrimaryLights.filter((l) => l.group === 'strobe')}
                   myLights={myFixtures}
                   rigId={activeRigId}
+                  lightingConfig={currentLightingConfig}
                   onLightChange={handleLightChange}
                   highlightedLight={highlightedLight}
                   onLightClick={handleLightClick}
