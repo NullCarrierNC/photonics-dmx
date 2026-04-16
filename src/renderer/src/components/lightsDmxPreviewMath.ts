@@ -27,7 +27,7 @@ export interface SphericalXYOptions {
  * audience (house) perspective, SR on the house-left side and SL on the house-right side of the
  * disc; θ = mod360(B − 180°) maps bearing to dot position on that disc.
  *
- * u_x = sign(φ)·sin(θ), u_y = −sign(φ)·cos(θ) (sign(φ)=1 at the pole) so crossing the tilt pole
+ * u_x = −sign(φ)·sin(θ), u_y = −sign(φ)·cos(θ) (sign(φ)=1 at the pole) so crossing the tilt pole
  * flips compass on the disc with logical beam direction for floor and truss mounts (same gimbal
  * geometry in logical motor space after DMX invert). Radial distance uses |φ| and asymmetric span
  * toward tiltMin / tiltMax from the pole.
@@ -71,7 +71,7 @@ export function panTiltDmxToSphericalXY(
   const flipPhi =
     shouldMirrorTiltForStageRelative(c) && homePhiSign !== 0 && homePhiSign === phiSign
   const effectivePhiSign = flipPhi ? -phiSign : phiSign
-  const ux = effectivePhiSign * Math.sin(panRad)
+  const ux = -effectivePhiSign * Math.sin(panRad)
   const uy = -effectivePhiSign * Math.cos(panRad)
 
   return {

@@ -118,7 +118,7 @@ describe('panTiltDmxToSphericalXY', () => {
       tiltHorizontalDmx,
       upfire,
     )
-    expect(panStageLeft.xPct).toBeLessThan(15)
+    expect(panStageLeft.xPct).toBeGreaterThan(85)
     expect(Math.abs(panStageLeft.yPct - 50)).toBeLessThan(8)
   })
 
@@ -146,14 +146,14 @@ describe('panTiltDmxToSphericalXY', () => {
       cfg,
     )
     expect(upstage.yPct).toBeLessThan(10)
-    // Same motor 90 would have been stage-right if panStage were 0 with panDir +1.
+    // Same motor 90 would have been stage-right (house-left edge) if panStage were 0 with panDir +1.
     const refZeroStage: FixtureConfig = { ...cfg, panStageDeg: 0 }
     const ifZeroStage = panTiltDmxToSphericalXY(
       percentToDmx((90 / cfg.panRangeDeg) * 100, 0, 255),
       tiltHorizontalDmx,
       refZeroStage,
     )
-    expect(ifZeroStage.xPct).toBeGreaterThan(90)
+    expect(ifZeroStage.xPct).toBeLessThan(10)
   })
 
   it('down-firing: ±φ with same |φ| and same stage bearing mirrors disc aim through centre (φ compass flip)', () => {
@@ -274,7 +274,7 @@ describe('panTiltDmxToSphericalXY', () => {
     expect(panDownstage.yPct).toBeGreaterThan(95)
     expect(Math.abs(panDownstage.xPct - 50)).toBeLessThan(8)
     const panStageLeft = panTiltDmxToSphericalXY(panStageLeftRaw, tiltHorizontalRaw, base)
-    expect(panStageLeft.xPct).toBeLessThan(15)
+    expect(panStageLeft.xPct).toBeGreaterThan(85)
     expect(Math.abs(panStageLeft.yPct - 50)).toBeLessThan(8)
   })
 

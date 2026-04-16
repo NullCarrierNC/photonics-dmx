@@ -70,7 +70,7 @@ describe('logicalPanDir (truss cheap vs expensive)', () => {
     expect(logicalPanDir(cfg)).toBe(1)
     const { panDmx, tiltDmx } = motorToRawDmx(270, 0, cfg)
     const p = panTiltDmxToSphericalXY(panDmx, tiltDmx, cfg)
-    expect(p.xPct).toBeLessThan(20)
+    expect(p.xPct).toBeGreaterThan(80)
     expect(Math.abs(p.yPct - 50)).toBeLessThan(10)
   })
 
@@ -79,7 +79,7 @@ describe('logicalPanDir (truss cheap vs expensive)', () => {
     expect(logicalPanDir(cfg)).toBe(-1)
     const { panDmx, tiltDmx } = motorToRawDmx(90, 0, cfg)
     const p = panTiltDmxToSphericalXY(panDmx, tiltDmx, cfg)
-    expect(p.xPct).toBeLessThan(20)
+    expect(p.xPct).toBeGreaterThan(80)
     expect(Math.abs(p.yPct - 50)).toBeLessThan(10)
   })
 })
