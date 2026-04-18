@@ -1,13 +1,12 @@
 import React from 'react'
-import { useAtom } from 'jotai'
-import { liveMonitorEnabledAtom } from '@renderer/atoms'
-
-export type CueTypeMode = 'yarg' | 'audio' | 'motion'
+import type { NodeCueKind } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 type CueEditorToolbarProps = {
-  cueMode: CueTypeMode
+  cuePlatform: 'yarg' | 'audio'
+  cueKind: NodeCueKind
   isEffectMode: boolean
-  onCueModeChange: (mode: CueTypeMode) => void
+  onCuePlatformChange: (platform: 'yarg' | 'audio') => void
+  onCueKindChange: (kind: NodeCueKind) => void
   onEffectToggle: (isEffect: boolean) => void
   onNewFile: () => void
   onSave: () => void
@@ -35,9 +34,11 @@ const segmentLeft = 'rounded-l'
 const segmentRight = 'rounded-r'
 
 const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
-  cueMode,
+  cuePlatform,
+  cueKind,
   isEffectMode,
-  onCueModeChange,
+  onCuePlatformChange,
+  onCueKindChange,
   onEffectToggle,
   onNewFile,
   onSave,
@@ -51,80 +52,74 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
   exportLabel,
   deleteLabel,
 }) => {
-  const [liveMonitor, setLiveMonitor] = useAtom(liveMonitorEnabledAtom)
+  const showCueEffectsToggle = cueKind === 'lighting' || isEffectMode
+
   return (
     <div className="relative flex justify-between items-center gap-4 flex-wrap">
       <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-700 dark:text-gray-200 pointer-events-none select-none">
         {isEffectMode ? 'Effect Editor' : 'Cue Editor'}
       </span>
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-0">
-          <button
-            type="button"
-            className={`${cueMode === 'yarg' ? segmentActive : segmentInactive} ${segmentLeft}`}
-            onClick={() => onCueModeChange('yarg')}>
-            YARG
-          </button>
-          <button
-            type="button"
-            className={`${cueMode === 'audio' ? segmentActive : segmentInactive} ${isEffectMode ? segmentRight : 'border-l-0'}`}
-            onClick={() => onCueModeChange('audio')}>
-            Audio
-          </button>
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-4">
+            <div className="flex w-56 shrink-0">
+              <button
+                type="button"
+                className={`min-w-0 flex-1 ${cuePlatform === 'yarg' ? segmentActive : segmentInactive} ${segmentLeft}`}
+                onClick={() => onCuePlatformChange('yarg')}>
+                YARG
+              </button>
+              <button
+                type="button"
+                className={`min-w-0 flex-1 ${cuePlatform === 'audio' ? segmentActive : segmentInactive} ${!isEffectMode ? segmentRight : 'border-l-0'}`}
+                onClick={() => onCuePlatformChange('audio')}>
+                Audio
+              </button>
+            </div>
+            {showCueEffectsToggle && (
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-xs font-medium ${!isEffectMode ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                  Cues
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isEffectMode}
+                  onClick={() => onEffectToggle(!isEffectMode)}
+                  className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+                    isEffectMode ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                  }`}>
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                      isEffectMode ? 'translate-x-4' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+                <span
+                  className={`text-xs font-medium ${isEffectMode ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                  Effects
+                </span>
+              </div>
+            )}
+          </div>
           {!isEffectMode && (
-            <button
-              type="button"
-              className={`${cueMode === 'motion' ? segmentActive : segmentInactive} border-l-0 ${segmentRight}`}
-              onClick={() => onCueModeChange('motion')}>
-              Motion
-            </button>
+            <div className="flex w-56 shrink-0">
+              <button
+                type="button"
+                className={`min-w-0 flex-1 ${cueKind === 'lighting' ? segmentActive : segmentInactive} ${segmentLeft}`}
+                onClick={() => onCueKindChange('lighting')}>
+                Lighting
+              </button>
+              <button
+                type="button"
+                className={`min-w-0 flex-1 ${cueKind === 'motion' ? segmentActive : segmentInactive} border-l-0 ${segmentRight}`}
+                onClick={() => onCueKindChange('motion')}>
+                Motion
+              </button>
+            </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`text-xs font-medium ${!isEffectMode ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
-            Cues
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={isEffectMode}
-            onClick={() => onEffectToggle(!isEffectMode)}
-            className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
-              isEffectMode ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-            }`}>
-            <span
-              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                isEffectMode ? 'translate-x-4' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
-          <span
-            className={`text-xs font-medium ${isEffectMode ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
-            Effects
-          </span>
-        </div>
-        {cueMode === 'audio' && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-              Live Monitor
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={liveMonitor}
-              onClick={() => setLiveMonitor(!liveMonitor)}
-              className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
-                liveMonitor ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-              }`}>
-              <span
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${
-                  liveMonitor ? 'translate-x-4' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-        )}
       </div>
       <div className="flex gap-2">
         <button

@@ -99,6 +99,7 @@ function sustainPatternCueDefinition(): YargNodeCueDefinition {
   return {
     id: 'parity-sustain',
     name: 'Parity Sustain',
+    kind: 'lighting',
     cueType: CueType.Strobe_Slow,
     style: 'primary',
     nodes: {
@@ -142,6 +143,7 @@ function cueCalledOnlyDefinition(): YargNodeCueDefinition {
   return {
     id: 'parity-frenzy',
     name: 'Parity Frenzy',
+    kind: 'lighting',
     cueType: CueType.Frenzy,
     style: 'primary',
     nodes: {

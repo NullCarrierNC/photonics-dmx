@@ -1,23 +1,26 @@
 {
   "version": 1,
-  "mode": "motion",
+  "mode": "audio",
   "group": {
-    "id": "motion-default",
-    "name": "Default motion",
-    "description": "Example motion pan/tilt (parallel with lighting)",
+    "id": "audio-motion-default",
+    "name": "Default audio motion",
+    "description": "Audio-reactive pan/tilt programs (parallel with lighting)",
     "isDefault": true
   },
   "cues": [
     {
       "id": "motion-default-cue",
       "name": "Default motion",
-      "description": "Moves pan/tilt on cue-started; layer above normal colour cues",
+      "description": "Moves pan/tilt on cue-started; layer above normal colour cues. Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "nodes": {
         "events": [
           {
             "id": "motion-default-event-start",
             "type": "event",
-            "eventType": "cue-started"
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "label": "Cue started"
           }
         ],
         "actions": [
@@ -125,12 +128,13 @@
           "y": 160.50796500733122,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "motion"
     },
     {
       "id": "motion-vogue",
       "name": "Vogue",
-      "description": "On each beat, every light moves to its own random stage bearing over 800ms (set-position).",
+      "description": "On each beat, every light moves to its own random stage bearing over 800ms (set-position). Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "variables": [
         {
           "name": "vogueLights",
@@ -162,7 +166,10 @@
           {
             "id": "vogue-event-beat",
             "type": "event",
-            "eventType": "beat"
+            "eventType": "audio-beat",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "cooldownMs": 100
           }
         ],
         "actions": [
@@ -313,12 +320,13 @@
           "y": 30.69628624478355,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "motion"
     },
     {
       "id": "motion-wave",
       "name": "Wave",
-      "description": "Horizontal linear sweep ±20° from home; half-cycle per beat (speed = BPM / 120).",
+      "description": "Horizontal linear sweep ±20° from home; half-cycle per beat (speed = BPM / 120). Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "variables": [
         {
           "name": "waveBpm",
@@ -338,7 +346,10 @@
           {
             "id": "wave-event-start",
             "type": "event",
-            "eventType": "cue-started"
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "label": "Cue started"
           }
         ],
         "actions": [
@@ -423,7 +434,7 @@
             "id": "wave-logic-bpm",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "bpm",
+            "dataProperty": "audio-bpm",
             "assignTo": "waveBpm"
           },
           {
@@ -485,12 +496,13 @@
           "y": 164.38928352279805,
           "zoom": 0.7315165961457313
         }
-      }
+      },
+      "kind": "motion"
     },
     {
       "id": "motion-nod",
       "name": "Nod",
-      "description": "Vertical linear sweep toward downstage and back; one full cycle per beat (speed = BPM / 60). Started on cue-started.",
+      "description": "Vertical linear sweep toward downstage and back; one full cycle per beat (speed = BPM / 60). Started on cue-started. Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "variables": [
         {
           "name": "nodBpm",
@@ -510,7 +522,10 @@
           {
             "id": "nod-event-start",
             "type": "event",
-            "eventType": "cue-started"
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "label": "Cue started"
           }
         ],
         "actions": [
@@ -595,7 +610,7 @@
             "id": "nod-logic-bpm",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "bpm",
+            "dataProperty": "audio-bpm",
             "assignTo": "nodBpm"
           },
           {
@@ -657,12 +672,13 @@
           "y": 82.39612234383821,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "motion"
     },
     {
       "id": "motion-cw-sync",
       "name": "Clockwise Sync",
-      "description": "Circle pattern; one full orbit per 4/4 measure (speed = BPM / 240).",
+      "description": "Circle pattern; one full orbit per 4/4 measure (speed = BPM / 240). Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "variables": [
         {
           "name": "cwBpm",
@@ -682,7 +698,10 @@
           {
             "id": "cw-event-start",
             "type": "event",
-            "eventType": "cue-started"
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "label": "Cue started"
           }
         ],
         "actions": [
@@ -767,7 +786,7 @@
             "id": "cw-logic-bpm",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "bpm",
+            "dataProperty": "audio-bpm",
             "assignTo": "cwBpm"
           },
           {
@@ -829,12 +848,13 @@
           "y": 75.03710546344519,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "motion"
     },
     {
       "id": "motion-ccw-sync",
       "name": "Counter-Clockwise Sync",
-      "description": "Same as Clockwise Sync with reverse direction.",
+      "description": "Same as Clockwise Sync with reverse direction. Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "variables": [
         {
           "name": "ccwBpm",
@@ -854,7 +874,10 @@
           {
             "id": "ccw-event-start",
             "type": "event",
-            "eventType": "cue-started"
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "label": "Cue started"
           }
         ],
         "actions": [
@@ -939,7 +962,7 @@
             "id": "ccw-logic-bpm",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "bpm",
+            "dataProperty": "audio-bpm",
             "assignTo": "ccwBpm"
           },
           {
@@ -1001,12 +1024,13 @@
           "y": 81.97813452547416,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "motion"
     },
     {
       "id": "motion-cw-fan",
       "name": "Clockwise Fan Spread",
-      "description": "Circle with 360° fan spread so fixtures are evenly phased around the orbit; measure-synced speed (BPM / 240).",
+      "description": "Circle with 360° fan spread so fixtures are evenly phased around the orbit; measure-synced speed (BPM / 240). Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "variables": [
         {
           "name": "cwfBpm",
@@ -1026,7 +1050,10 @@
           {
             "id": "cwf-event-start",
             "type": "event",
-            "eventType": "cue-started"
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "label": "Cue started"
           }
         ],
         "actions": [
@@ -1111,7 +1138,7 @@
             "id": "cwf-logic-bpm",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "bpm",
+            "dataProperty": "audio-bpm",
             "assignTo": "cwfBpm"
           },
           {
@@ -1173,12 +1200,13 @@
           "y": 75.44409689959139,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "motion"
     },
     {
       "id": "motion-ccw-fan",
       "name": "Counter-Clockwise Fan Spread",
-      "description": "Same as Clockwise Fan Spread with reverse direction.",
+      "description": "Same as Clockwise Fan Spread with reverse direction. Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "variables": [
         {
           "name": "ccwfBpm",
@@ -1198,7 +1226,10 @@
           {
             "id": "ccwf-event-start",
             "type": "event",
-            "eventType": "cue-started"
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "label": "Cue started"
           }
         ],
         "actions": [
@@ -1283,7 +1314,7 @@
             "id": "ccwf-logic-bpm",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "bpm",
+            "dataProperty": "audio-bpm",
             "assignTo": "ccwfBpm"
           },
           {
@@ -1345,12 +1376,13 @@
           "y": 75.1908211633563,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "motion"
     },
     {
       "id": "motion-pendulum",
       "name": "Pendulum",
-      "description": "Pan/tilt parabolic back-and-forth (sine pan, cosine tilt at 2x); one full cycle per two beats (speed = BPM / 120). Started on cue-started.",
+      "description": "Pan/tilt parabolic back-and-forth (sine pan, cosine tilt at 2x); one full cycle per two beats (speed = BPM / 120). Started on cue-started. Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "variables": [
         {
           "name": "penBpm",
@@ -1370,7 +1402,10 @@
           {
             "id": "pen-event-start",
             "type": "event",
-            "eventType": "cue-started"
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "label": "Cue started"
           }
         ],
         "actions": [
@@ -1451,7 +1486,7 @@
             "id": "pen-logic-bpm",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "bpm",
+            "dataProperty": "audio-bpm",
             "assignTo": "penBpm"
           },
           {
@@ -1513,12 +1548,13 @@
           "y": 82.39612234383821,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "motion"
     },
     {
       "id": "motion-figure8",
       "name": "Figure-8",
-      "description": "Infinity / figure-8 Lissajous in pan/tilt (sine pan, sine tilt at 2x); one full cycle per two beats (speed = BPM / 120). Started on cue-started.",
+      "description": "Infinity / figure-8 Lissajous in pan/tilt (sine pan, sine tilt at 2x); one full cycle per two beats (speed = BPM / 120). Started on cue-started. Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
       "variables": [
         {
           "name": "fig8Bpm",
@@ -1538,7 +1574,10 @@
           {
             "id": "fig8-event-start",
             "type": "event",
-            "eventType": "cue-started"
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "threshold": 0.5,
+            "label": "Cue started"
           }
         ],
         "actions": [
@@ -1619,7 +1658,7 @@
             "id": "fig8-logic-bpm",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "bpm",
+            "dataProperty": "audio-bpm",
             "assignTo": "fig8Bpm"
           },
           {
@@ -1681,7 +1720,8 @@
           "y": 82.39612234383821,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "motion"
     }
   ],
   "bundled": true

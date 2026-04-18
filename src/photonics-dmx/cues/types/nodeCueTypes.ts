@@ -7,7 +7,13 @@ import {
   AUDIO_CUE_DATA_PROPERTIES,
 } from '../../constants/nodeConstants'
 
-export type NodeCueMode = 'yarg' | 'audio' | 'motion'
+export type NodeCueMode = 'yarg' | 'audio'
+
+/** Lighting = colour/intensity cues; motion = pan/tilt / motion-pattern (parallel layer). */
+export type NodeCueKind = 'lighting' | 'motion'
+
+/** How often a random motion program is chosen from enabled groups. */
+export type MotionGroupSelectionMode = 'oncePerSong' | 'perCueChange' | 'none'
 
 // Effect mode - typed like cues
 export type EffectMode = 'yarg' | 'audio'
@@ -292,26 +298,39 @@ export interface EffectReference {
   name: string // Display name (cached for UI)
 }
 
-export interface YargNodeCueDefinition extends BaseCueDefinition {
+export interface YargLightingNodeCueDefinition extends BaseCueDefinition {
+  kind: 'lighting'
   cueType: CueType
   style: 'primary' | 'secondary'
   nodes: NodeGraph<YargEventNode, ActionNode>
 }
 
+/** YARG motion program: same event model as lighting; runs in parallel (random selection). */
+export interface YargMotionNodeCueDefinition extends BaseCueDefinition {
+  kind: 'motion'
+  nodes: NodeGraph<YargEventNode, ActionNode>
+}
+
+export type YargNodeCueDefinition = YargLightingNodeCueDefinition | YargMotionNodeCueDefinition
+
 /** Layering for audio node cues: primary = base look; secondary/strobe = overlay (addEffect). Strobe is excluded from Game Mode primary rotation. */
 export type AudioCueLayerStyle = 'primary' | 'secondary' | 'strobe'
 
-export interface AudioNodeCueDefinition extends BaseCueDefinition {
+export interface AudioLightingNodeCueDefinition extends BaseCueDefinition {
+  kind: 'lighting'
   cueTypeId: string
   /** Defaults to primary when omitted. Strobe uses the same runtime layering as secondary. */
   style?: AudioCueLayerStyle
   nodes: NodeGraph<AudioEventNodeUnion, ActionNode>
 }
 
-/** Motion cue: YARG event model, position-only actions. Runs in parallel with lighting cues. */
-export interface MotionNodeCueDefinition extends BaseCueDefinition {
-  nodes: NodeGraph<YargEventNode, ActionNode>
+/** Audio motion program: audio event graph; runs in parallel with lighting audio cues. */
+export interface AudioMotionNodeCueDefinition extends BaseCueDefinition {
+  kind: 'motion'
+  nodes: NodeGraph<AudioEventNodeUnion, ActionNode>
 }
+
+export type AudioNodeCueDefinition = AudioLightingNodeCueDefinition | AudioMotionNodeCueDefinition
 
 export interface YargNodeCueFile {
   version: 1
@@ -329,15 +348,7 @@ export interface AudioNodeCueFile {
   bundled?: boolean
 }
 
-export interface MotionNodeCueFile {
-  version: 1
-  mode: 'motion'
-  group: NodeCueGroupMeta
-  cues: MotionNodeCueDefinition[]
-  bundled?: boolean
-}
-
-export type NodeCueFile = YargNodeCueFile | AudioNodeCueFile | MotionNodeCueFile
+export type NodeCueFile = YargNodeCueFile | AudioNodeCueFile
 
 export interface BaseEventNode {
   id: string

@@ -1,5 +1,6 @@
 import React from 'react'
 import type {
+  NodeCueKind,
   NodeCueMode,
   LogicNode,
   NodeEffectType,
@@ -40,6 +41,7 @@ const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string =>
 
 interface NodeCreationSectionsProps {
   activeMode: NodeCueMode
+  cueKind: NodeCueKind
   editorMode: EditorMode
   addEventNode: (
     option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
@@ -55,17 +57,18 @@ interface NodeCreationSectionsProps {
 
 const EventNodesSection: React.FC<{
   activeMode: NodeCueMode
+  cueKind: NodeCueKind
   addEventNode: (
     option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
   ) => void
   addEventListenerNode?: () => void
-}> = ({ activeMode, addEventNode, addEventListenerNode }) => (
+}> = ({ activeMode, cueKind, addEventNode, addEventListenerNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Event Listeners</h3>
     <div className="grid grid-cols-2 gap-2 text-xs">
       <button
         className="border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
-        onClick={() => addEventNode(getDefaultEventOption(activeMode))}>
+        onClick={() => addEventNode(getDefaultEventOption(activeMode, cueKind))}>
         System Event Listener
       </button>
       {addEventListenerNode && (
@@ -254,6 +257,7 @@ const NotesSection: React.FC<{
 
 const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
   activeMode,
+  cueKind,
   editorMode,
   addEventNode,
   addActionNode,
@@ -269,6 +273,7 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
       {editorMode === 'cue' && (
         <EventNodesSection
           activeMode={activeMode}
+          cueKind={cueKind}
           addEventNode={addEventNode}
           addEventListenerNode={addEventListenerNode}
         />

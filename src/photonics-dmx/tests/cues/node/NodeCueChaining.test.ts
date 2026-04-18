@@ -18,6 +18,7 @@ describe('Node cue chaining', () => {
       id: 'test-cue',
       name: 'Chained Beat',
       description: '',
+      kind: 'lighting',
       cueType: CueType.Cool_Automatic,
       style: 'primary',
       nodes: {

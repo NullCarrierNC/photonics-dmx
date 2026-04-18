@@ -16,6 +16,7 @@ describe('Node cue validation', () => {
       id: 'test-cue',
       name: 'Test Cue',
       description: '',
+      kind: 'lighting',
       cueType: CueType.Chorus,
       style: 'primary',
       nodes: {
@@ -69,6 +70,7 @@ describe('Node cue validation', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'audio-cue',
       name: 'Audio Cue',
+      kind: 'lighting',
       cueTypeId: 'custom-audio',
       nodes: {
         events: [
@@ -124,6 +126,7 @@ describe('Node cue validation', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'audio-cue-started',
       name: 'Cue Started Setup',
+      kind: 'lighting',
       cueTypeId: 'custom-audio',
       nodes: {
         events: [
@@ -189,6 +192,7 @@ describe('Node cue validation', () => {
     const primaryDef: AudioNodeCueDefinition = {
       id: 'audio-primary-style',
       name: 'Primary',
+      kind: 'lighting',
       cueTypeId: 'custom-primary',
       style: 'primary',
       nodes: {
@@ -209,6 +213,7 @@ describe('Node cue validation', () => {
     const secondaryDef: AudioNodeCueDefinition = {
       id: 'audio-secondary-style',
       name: 'Secondary',
+      kind: 'lighting',
       cueTypeId: 'custom-secondary',
       style: 'secondary',
       nodes: {
@@ -246,6 +251,7 @@ describe('Node cue validation', () => {
     const strobeDef: AudioNodeCueDefinition = {
       id: 'audio-strobe-style',
       name: 'Strobe',
+      kind: 'lighting',
       cueTypeId: 'custom-strobe',
       style: 'strobe',
       nodes: {
@@ -276,6 +282,7 @@ describe('Node cue validation', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'hfc-cue',
       name: 'HFC Cue',
+      kind: 'lighting',
       cueTypeId: 'custom-audio',
       nodes: {
         events: [
@@ -305,6 +312,7 @@ describe('Node cue validation', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'trigger-cue',
       name: 'Trigger Cue',
+      kind: 'lighting',
       cueTypeId: 'custom-audio',
       nodes: {
         events: [
@@ -365,6 +373,7 @@ describe('Node cue validation', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'trigger-low-hz',
       name: 'Low Hz',
+      kind: 'lighting',
       cueTypeId: 'custom-audio',
       nodes: {
         events: [
@@ -397,6 +406,7 @@ describe('Node cue validation', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'bad-hz',
       name: 'Bad Hz',
+      kind: 'lighting',
       cueTypeId: 'custom-audio',
       nodes: {
         events: [
@@ -429,6 +439,7 @@ describe('Node cue validation', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'bad-hyst',
       name: 'Bad Hyst',
+      kind: 'lighting',
       cueTypeId: 'custom-audio',
       nodes: {
         events: [
@@ -462,6 +473,7 @@ describe('Node cue validation', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'bad-trigger-cue',
       name: 'Bad Trigger',
+      kind: 'lighting',
       cueTypeId: 'custom-audio',
       nodes: {
         events: [
@@ -493,6 +505,7 @@ describe('Node cue validation', () => {
     const definition: YargNodeCueDefinition = {
       id: 'logic-validate',
       name: 'Logic Validate',
+      kind: 'lighting',
       cueType: CueType.Chorus,
       style: 'primary',
       nodes: {
@@ -571,6 +584,7 @@ describe('Node cue validation', () => {
       id: 'test-cue',
       name: 'Test Cue',
       description: '',
+      kind: 'lighting',
       cueType: CueType.Chorus,
       style: 'primary',
       nodes: {
@@ -718,6 +732,7 @@ describe('Node cue validation', () => {
       const definition: YargNodeCueDefinition = {
         id: 'effect-cue',
         name: 'Effect Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -769,6 +784,7 @@ describe('Node cue validation', () => {
       const definition: YargNodeCueDefinition = {
         id: 'event-cue',
         name: 'Event Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -821,6 +837,7 @@ describe('Node cue validation', () => {
       const definition: YargNodeCueDefinition = {
         id: 'array-cue',
         name: 'Array Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -978,6 +995,21 @@ describe('Node cue validation', () => {
     const filePath = path.join(
       __dirname,
       '../../../../../resources/defaults/node-data/cues/audio/audio-rock.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateAudioNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+      }
+    }
+  })
+
+  it('validates bundled audio-motion-default.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/audio/audio-motion-default.json',
     )
     const raw = fs.readFileSync(filePath, 'utf8')
     const result = validateAudioNodeCueFile(JSON.parse(raw))

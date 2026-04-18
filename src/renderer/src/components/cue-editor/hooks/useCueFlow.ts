@@ -9,9 +9,9 @@ import {
 import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
+  NodeCueKind,
   NodeCueMode,
   YargNodeCueDefinition,
-  MotionNodeCueDefinition,
   YargEffectDefinition,
   EffectDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -23,6 +23,7 @@ import { useNodeCreation } from './useNodeCreation'
 
 type UseCueFlowParams = {
   activeMode: NodeCueMode
+  cueKind: NodeCueKind
   editorMode: 'cue' | 'effect'
   setIsDirty: (dirty: boolean) => void
   flowWrapperRef?: React.RefObject<HTMLDivElement>
@@ -31,6 +32,7 @@ type UseCueFlowParams = {
 
 const useCueFlow = ({
   activeMode,
+  cueKind,
   editorMode,
   setIsDirty,
   flowWrapperRef,
@@ -90,14 +92,13 @@ const useCueFlow = ({
     editorMode,
   })
 
-  const nodeCreation = useNodeCreation({ nodes, setNodes, activeMode, setIsDirty })
+  const nodeCreation = useNodeCreation({ nodes, setNodes, activeMode, cueKind, setIsDirty })
 
   const loadCueIntoFlow = useCallback(
     (
       cue:
         | YargNodeCueDefinition
         | AudioNodeCueDefinition
-        | MotionNodeCueDefinition
         | YargEffectDefinition
         | AudioEffectDefinition
         | null,

@@ -11,7 +11,7 @@
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
-import { CompiledYargCue, CompiledAudioCue, CompiledMotionCue } from '../compiler/NodeCueCompiler'
+import { CompiledYargCue, CompiledAudioCue } from '../compiler/NodeCueCompiler'
 import {
   ActionEffectFactory,
   ResolvedActionTarget,
@@ -98,7 +98,7 @@ export class NodeExecutionEngine {
     return NodeExecutionEngine.globalDebugEnabled
   }
 
-  private compiledCue: CompiledYargCue | CompiledAudioCue | CompiledMotionCue
+  private compiledCue: CompiledYargCue | CompiledAudioCue
   private cueId: string
   private activeContexts: Map<string, ExecutionContext> = new Map()
   private sequencer: ILightingController
@@ -134,7 +134,7 @@ export class NodeExecutionEngine {
   ) => void
 
   constructor(
-    compiledCue: CompiledYargCue | CompiledAudioCue | CompiledMotionCue,
+    compiledCue: CompiledYargCue | CompiledAudioCue,
     cueId: string,
     sequencer: ILightingController,
     lightManager: DmxLightManager,

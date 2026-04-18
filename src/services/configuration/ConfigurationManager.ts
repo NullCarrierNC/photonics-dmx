@@ -66,8 +66,19 @@ export interface AppPreferences {
   knownMotionCueGroups?: string[]
   /** Per-group list of disabled motion cue definition ids */
   disabledMotionCues?: Record<string, string[]>
-  /** Motion group selection: perCueChange = random each visual cue; oncePerSong = lock motion program for the song; none = no automatic motion */
+  /** YARG motion: perCueChange = random each lighting cue; oncePerSong = lock motion program for the song; none = no automatic motion */
   motionGroupSelectionMode?: 'oncePerSong' | 'perCueChange' | 'none'
+  enabledAudioMotionCueGroups?: string[]
+  knownAudioMotionCueGroups?: string[]
+  disabledAudioMotionCues?: Record<string, string[]>
+  /** Audio-reactive motion (parallel layer with lighting audio cues). */
+  audioMotionGroupSelectionMode?: 'oncePerSong' | 'perCueChange' | 'none'
+  /** Master switch: when false, YARG and audio automatic motion layers are off. Default true. */
+  motionEnabled?: boolean
+  /** Manual audio motion cue (null = auto random on primary change). */
+  activeAudioMotionCueRef?: { groupId: string; cueId: string } | null
+  /** Manual YARG motion cue (null = auto random on new primary cue). */
+  activeYargMotionCueRef?: { groupId: string; cueId: string } | null
   cueConsistencyWindow: number
   /** Cue group selection: 'withinSong' = can change during song; 'oncePerSong' = fixed at song start */
   cueGroupSelectionMode: 'oncePerSong' | 'withinSong'
@@ -139,6 +150,9 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledAudioCueGroups: [],
   cueConsistencyWindow: 60000,
   motionGroupSelectionMode: 'perCueChange',
+  motionEnabled: true,
+  activeAudioMotionCueRef: null,
+  activeYargMotionCueRef: null,
   cueGroupSelectionMode: 'withinSong',
   clockRate: 10, // 10ms (100 Hz) for smooth animations and strobe cues
   activeAudioCueType: '' as AudioCueType,
@@ -494,6 +508,40 @@ export class ConfigurationManager {
     await this.setPreference('disabledMotionCues', disabled)
   }
 
+  getEnabledAudioMotionCueGroups(): string[] | undefined {
+    return this.preferences.get().enabledAudioMotionCueGroups
+  }
+
+  async setEnabledAudioMotionCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('enabledAudioMotionCueGroups', groupIds)
+  }
+
+  getKnownAudioMotionCueGroups(): string[] | undefined {
+    return this.preferences.get().knownAudioMotionCueGroups
+  }
+
+  async setKnownAudioMotionCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('knownAudioMotionCueGroups', groupIds)
+  }
+
+  getDisabledAudioMotionCues(): Record<string, string[]> | undefined {
+    return this.preferences.get().disabledAudioMotionCues
+  }
+
+  async setDisabledAudioMotionCues(disabled: Record<string, string[]>): Promise<void> {
+    await this.setPreference('disabledAudioMotionCues', disabled)
+  }
+
+  getAudioMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    return this.preferences.get().audioMotionGroupSelectionMode ?? 'perCueChange'
+  }
+
+  async setAudioMotionGroupSelectionMode(
+    mode: 'oncePerSong' | 'perCueChange' | 'none',
+  ): Promise<void> {
+    await this.setPreference('audioMotionGroupSelectionMode', mode)
+  }
+
   /**
    * Gets the preferred audio cue type
    */
@@ -542,6 +590,30 @@ export class ConfigurationManager {
 
   async setMotionGroupSelectionMode(mode: 'oncePerSong' | 'perCueChange' | 'none'): Promise<void> {
     await this.setPreference('motionGroupSelectionMode', mode)
+  }
+
+  getMotionEnabled(): boolean {
+    return this.preferences.get().motionEnabled ?? true
+  }
+
+  async setMotionEnabled(enabled: boolean): Promise<void> {
+    await this.setPreference('motionEnabled', enabled)
+  }
+
+  getActiveAudioMotionCueRef(): { groupId: string; cueId: string } | null {
+    return this.preferences.get().activeAudioMotionCueRef ?? null
+  }
+
+  async setActiveAudioMotionCueRef(ref: { groupId: string; cueId: string } | null): Promise<void> {
+    await this.setPreference('activeAudioMotionCueRef', ref)
+  }
+
+  getActiveYargMotionCueRef(): { groupId: string; cueId: string } | null {
+    return this.preferences.get().activeYargMotionCueRef ?? null
+  }
+
+  async setActiveYargMotionCueRef(ref: { groupId: string; cueId: string } | null): Promise<void> {
+    await this.setPreference('activeYargMotionCueRef', ref)
   }
 
   /**

@@ -1,7 +1,12 @@
 # Node-Based Cue System
 
-JSON-defined node graphs for YARG cues and reusable effects. The visual cue editor (renderer) produces these JSON
-files; this subsystem loads, validates, compiles, and executes them.
+JSON-defined node graphs for YARG and audio cues (lighting and motion programs) and reusable effects. The visual
+cue editor (renderer) produces these JSON files; this subsystem loads, validates, compiles, and executes them.
+
+Cue files use `mode: 'yarg' | 'audio'` (paths under `node-data/cues/yarg/` and `node-data/cues/audio/`). Each cue
+definition includes a required `kind: 'lighting' | 'motion'`. Lighting cues drive colour/effect layers; motion
+programs share the same node graph model but are keyed by `id` and registered separately for random/locked
+selection alongside the active lighting cue for that platform.
 
 ## Data Flow
 
@@ -12,9 +17,9 @@ NodeCueLoader / EffectLoader   (load, validate, watch)
     ↓
 NodeCueCompiler / EffectCompiler   (compile graph → CompiledYargCue / CompiledAudioCue)
     ↓
-YargCueRegistry / EffectRegistry   (register for dispatch)
+YargCueRegistry / AudioCueRegistry / EffectRegistry   (register for dispatch)
     ↓
-YargNodeCue → GraphExecutionEngine → NodeExecutionEngine / EffectExecutionEngine   (execute at runtime)
+YargNodeCue / YargMotionNodeCue / AudioNodeCue / AudioMotionNodeCue → GraphExecutionEngine → NodeExecutionEngine / EffectExecutionEngine   (execute at runtime)
     ↓
 Sequencer   (effects)
 ```
@@ -57,8 +62,11 @@ node/
 | `CueSession` | Per-cue session state: variable stores, first-submission policy, cue-started flag |
 | `ExecutionStateMachine` | Lifecycle phases (IDLE, RUNNING, BLOCKED, COMPLETED, CANCELLED) per context |
 | `CompiledEffectIndex` | Cache of compiled effects for reuse across cues when loader provides it |
-| `YargNodeCue` | Runtime cue instance for YARG; receives game events, drives GraphExecutionEngine |
-| `AudioNodeCue` | Runtime cue instance for audio (early development) |
+| `YargNodeCue` | Runtime cue instance for YARG lighting; receives game events, drives GraphExecutionEngine |
+| `YargMotionNodeCue` | YARG motion program runtime (parallel with lighting; same graph execution model) |
+| `BaseAudioNodeCue` | Shared audio graph execution (events, triggers, variables, `NodeExecutionEngine`) for lighting and motion |
+| `AudioNodeCue` | Audio lighting runtime (`kind: 'lighting'`); primary/secondary/strobe slot semantics via `style` |
+| `AudioMotionNodeCue` | Audio motion runtime (`kind: 'motion'`); no lighting `style`; clamps detected BPM for fixture safety; receives `AudioCueData` |
 | `ExecutionContext` | Per-execution state: variables, light arrays, beat/measure, etc. |
 | `EffectRegistry` | Maps effect IDs to compiled effect definitions |
 | `valueResolver` | Resolves ValueSource (literal/variable) to concrete values |
@@ -85,7 +93,7 @@ node/
 Core types live in `../types/nodeCueTypes.ts`:
 
 - `NodeCueFile`, `YargNodeCueFile`, `AudioNodeCueFile` – File structure
-- `YargNodeCueDefinition`, `AudioNodeCueDefinition` – Cue definition
+- `YargNodeCueDefinition`, `AudioNodeCueDefinition` – Cue definition (discriminated by `kind`: lighting vs motion)
 - `YargEffectDefinition`, `AudioEffectDefinition` – Effect definition
 - `EventNode`, `ActionNode`, `LogicNode`, `EventRaiserNode`, `EffectRaiserNode`, `EffectListenerNode` – Node types
 - `ValueSource`, `VariableDefinition`, `Connection` – Supporting types

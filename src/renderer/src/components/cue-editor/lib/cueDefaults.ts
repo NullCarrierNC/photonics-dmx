@@ -5,12 +5,11 @@ import {
   type AudioNodeCueFile,
   type NodeCueFile,
   type NodeCueGroupMeta,
+  type NodeCueKind,
   type NodeCueMode,
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargNodeCueFile,
-  type MotionNodeCueDefinition,
-  type MotionNodeCueFile,
   type AudioEventNode,
   type AudioTriggerNode,
   type EffectFile,
@@ -124,10 +123,16 @@ export const buildDefaultAudioTrigger = (id?: string): AudioTriggerNode => ({
 
 const createDefaultCue = (
   mode: NodeCueMode,
-): YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition => {
+  kind: NodeCueKind,
+): YargNodeCueDefinition | AudioNodeCueDefinition => {
+  const isYarg = mode === 'yarg'
   const eventNode =
-    mode === 'yarg' || mode === 'motion' ? buildDefaultYargEvent() : buildDefaultAudioEvent()
-  const actionNode = mode === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
+    kind === 'motion' && !isYarg
+      ? buildDefaultAudioEvent()
+      : isYarg
+        ? buildDefaultYargEvent()
+        : buildDefaultAudioEvent()
+  const actionNode = kind === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
   const base = {
     id: `cue-${createId()}`,
     name: 'New Cue',
@@ -142,35 +147,49 @@ const createDefaultCue = (
     },
   }
 
-  if (mode === 'yarg') {
+  if (mode === 'yarg' && kind === 'lighting') {
     return {
       ...base,
+      kind: 'lighting',
       cueType: 'Chorus',
       style: 'primary',
     } as YargNodeCueDefinition
   }
 
-  if (mode === 'motion') {
+  if (mode === 'yarg' && kind === 'motion') {
     return {
       ...base,
-    } as MotionNodeCueDefinition
+      kind: 'motion',
+    } as YargNodeCueDefinition
+  }
+
+  if (mode === 'audio' && kind === 'lighting') {
+    return {
+      ...base,
+      kind: 'lighting',
+      cueTypeId: 'custom-audio-cue',
+      style: 'primary',
+    } as AudioNodeCueDefinition
   }
 
   return {
     ...base,
-    cueTypeId: 'custom-audio-cue',
-    style: 'primary',
+    kind: 'motion',
   } as AudioNodeCueDefinition
 }
 
 const createBlankCue = (
   mode: NodeCueMode,
-): YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition => {
+  kind: NodeCueKind,
+): YargNodeCueDefinition | AudioNodeCueDefinition => {
+  const isYarg = mode === 'yarg'
   const eventNode =
-    mode === 'yarg' || mode === 'motion'
-      ? buildDefaultYargCueStartedEvent()
-      : buildDefaultAudioEvent()
-  const actionNode = mode === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
+    kind === 'motion' && !isYarg
+      ? buildDefaultAudioEvent()
+      : isYarg
+        ? buildDefaultYargCueStartedEvent()
+        : buildDefaultAudioEvent()
+  const actionNode = kind === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
   const base = {
     id: `cue-${createId()}`,
     name: 'New Cue',
@@ -185,35 +204,47 @@ const createBlankCue = (
     },
   }
 
-  if (mode === 'yarg') {
+  if (mode === 'yarg' && kind === 'lighting') {
     return {
       ...base,
+      kind: 'lighting',
       cueType: 'Chorus',
       style: 'primary',
     } as YargNodeCueDefinition
   }
 
-  if (mode === 'motion') {
+  if (mode === 'yarg' && kind === 'motion') {
     return {
       ...base,
-    } as MotionNodeCueDefinition
+      kind: 'motion',
+    } as YargNodeCueDefinition
+  }
+
+  if (mode === 'audio' && kind === 'lighting') {
+    return {
+      ...base,
+      kind: 'lighting',
+      cueTypeId: 'custom-audio-cue',
+      style: 'primary',
+    } as AudioNodeCueDefinition
   }
 
   return {
     ...base,
-    cueTypeId: 'custom-audio-cue',
-    style: 'primary',
+    kind: 'motion',
   } as AudioNodeCueDefinition
 }
 
-const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
+const createDefaultFile = (mode: NodeCueMode, kind: NodeCueKind): NodeCueFile => {
   const group: NodeCueGroupMeta = {
     id: `node-group-${Date.now()}`,
     name:
       mode === 'yarg'
-        ? 'New YARG Group'
-        : mode === 'motion'
-          ? 'New Motion Group'
+        ? kind === 'motion'
+          ? 'New YARG Motion Group'
+          : 'New YARG Group'
+        : kind === 'motion'
+          ? 'New Audio Motion Group'
           : 'New Audio Group',
     description: '',
   }
@@ -223,26 +254,16 @@ const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
       version: 1,
       mode,
       group,
-      cues: [createBlankCue('yarg') as YargNodeCueDefinition],
+      cues: [createBlankCue('yarg', kind) as YargNodeCueDefinition],
       bundled: false,
     } as YargNodeCueFile
-  }
-
-  if (mode === 'motion') {
-    return {
-      version: 1,
-      mode,
-      group,
-      cues: [createBlankCue('motion') as MotionNodeCueDefinition],
-      bundled: false,
-    } as MotionNodeCueFile
   }
 
   return {
     version: 1,
     mode,
     group,
-    cues: [createBlankCue('audio') as AudioNodeCueDefinition],
+    cues: [createBlankCue('audio', kind) as AudioNodeCueDefinition],
     bundled: false,
   } as AudioNodeCueFile
 }

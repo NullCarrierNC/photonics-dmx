@@ -9,7 +9,7 @@ import {
   AudioLightingData,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
+import { AudioCueType, AudioMotionCueRef } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
 
 export interface AudioControllerDeps {
@@ -70,6 +70,8 @@ export class AudioController {
           activeCueType,
         })
       })
+      this.audioProcessor.setMotionEnabled(this.deps.config.getMotionEnabled())
+      this.audioProcessor.setManualMotionRef(this.deps.config.getActiveAudioMotionCueRef() ?? null)
       this.audioProcessor.start()
       const gameMode = this.deps.config.getAudioGameModeConfig()
       if (gameMode.enabled) {
@@ -277,5 +279,13 @@ export class AudioController {
 
   public isAudioGameModeActive(): boolean {
     return this.audioProcessor?.isGameModeEnabled() ?? false
+  }
+
+  public setMotionEnabled(enabled: boolean): void {
+    this.audioProcessor?.setMotionEnabled(enabled)
+  }
+
+  public setActiveAudioMotionCueRef(ref: AudioMotionCueRef | null): void {
+    this.audioProcessor?.setManualMotionRef(ref)
   }
 }

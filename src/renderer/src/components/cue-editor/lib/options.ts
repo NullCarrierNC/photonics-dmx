@@ -1,5 +1,6 @@
 import type {
   AudioEventType,
+  NodeCueKind,
   NodeCueMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { WaitCondition, YargEventType } from '../../../../../photonics-dmx/types'
@@ -61,16 +62,20 @@ const ACTION_WAIT_OPTIONS_AUDIO = [
   ...withDefaultLabels(AUDIO_EVENTS_BASE),
 ] as const
 
-const getActionWaitOptions = (mode: NodeCueMode) =>
-  mode === 'yarg' || mode === 'motion' ? ACTION_WAIT_OPTIONS_YARG : ACTION_WAIT_OPTIONS_AUDIO
+const getActionWaitOptions = (platform: NodeCueMode) =>
+  platform === 'yarg' ? ACTION_WAIT_OPTIONS_YARG : ACTION_WAIT_OPTIONS_AUDIO
 
-const getEventOptionsForMode = (mode: NodeCueMode) =>
-  mode === 'yarg' || mode === 'motion' ? YARG_EVENT_OPTIONS_CATEGORIZED : AUDIO_EVENT_OPTIONS
+const getEventOptionsForMode = (platform: NodeCueMode) =>
+  platform === 'yarg' ? YARG_EVENT_OPTIONS_CATEGORIZED : AUDIO_EVENT_OPTIONS
 
-const getDefaultEventOption = (mode: NodeCueMode) => {
-  if (mode === 'yarg' || mode === 'motion') {
+const getDefaultEventOption = (platform: NodeCueMode, kind: NodeCueKind = 'lighting') => {
+  if (platform === 'yarg') {
     const beat = YARG_EVENT_OPTIONS.find((option) => option.value === 'beat')
     return beat ?? YARG_EVENT_OPTIONS[0]
+  }
+  if (kind === 'motion') {
+    const cueStarted = AUDIO_EVENT_OPTIONS.find((option) => option.value === 'cue-started')
+    return cueStarted ?? AUDIO_EVENT_OPTIONS[0]
   }
   return AUDIO_EVENT_OPTIONS[0]
 }

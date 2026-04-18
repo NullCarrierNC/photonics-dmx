@@ -2,7 +2,13 @@ const STORAGE_PREFIX = 'photonics.nodeCueEditor'
 const LAST_FILE_STORAGE_KEY = `${STORAGE_PREFIX}.lastFilePath`
 const LAST_ACTIVE_MODE_KEY = `${STORAGE_PREFIX}.lastActiveMode`
 
-export type EditorModeKey = 'yarg-cue' | 'audio-cue' | 'motion-cue' | 'yarg-effect' | 'audio-effect'
+export type EditorModeKey =
+  | 'yarg-cue'
+  | 'audio-cue'
+  | 'yarg-motion-cue'
+  | 'audio-motion-cue'
+  | 'yarg-effect'
+  | 'audio-effect'
 
 const getStorage = (): Storage | null => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -111,7 +117,8 @@ const getLastActiveMode = (): EditorModeKey | null => {
     if (
       raw !== 'yarg-cue' &&
       raw !== 'audio-cue' &&
-      raw !== 'motion-cue' &&
+      raw !== 'yarg-motion-cue' &&
+      raw !== 'audio-motion-cue' &&
       raw !== 'yarg-effect' &&
       raw !== 'audio-effect'
     )

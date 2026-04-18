@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   CueData,
   InstrumentNoteType,
@@ -6,7 +6,13 @@ import {
 } from '../../../photonics-dmx/cues/types/cueTypes'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { setListenCueData } from '../ipcApi'
+import {
+  getActiveYargMotionCue,
+  getAvailableYargMotionCues,
+  getMotionEnabled,
+  getYargMotionCueGroups,
+  setListenCueData,
+} from '../ipcApi'
 import { useAtom } from 'jotai'
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms'
 
@@ -47,6 +53,10 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   // State for keyframe indicator
   const [keyframeReceived, setKeyframeReceived] = useState(false)
   const [lastKeyframeType, setLastKeyframeType] = useState<string | null>(null)
+
+  const [motionGlobalEnabled, setMotionGlobalEnabled] = useState(true)
+  const [motionPlayingLabel, setMotionPlayingLabel] = useState<string | null>(null)
+  const [motionPlayingGroupLabel, setMotionPlayingGroupLabel] = useState<string | null>(null)
 
   // State for instrument note indicators
   const [activeInstrumentNotes, setActiveInstrumentNotes] = useState<{
@@ -91,6 +101,73 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         return ''
     }
   }
+
+  const loadMotionLabels = useCallback(async () => {
+    try {
+      const me = await getMotionEnabled()
+      setMotionGlobalEnabled(me === true)
+      if (!me) {
+        setMotionPlayingGroupLabel(null)
+        setMotionPlayingLabel(null)
+        return
+      }
+      const activeRef = await getActiveYargMotionCue()
+      if (activeRef && typeof activeRef === 'object' && 'groupId' in activeRef) {
+        const ref = activeRef as { groupId: string; cueId: string }
+        const groups = await getYargMotionCueGroups()
+        const groupRow = groups?.find((g) => g.id === ref.groupId)
+        setMotionPlayingGroupLabel(groupRow?.name ?? ref.groupId)
+        const cues = await getAvailableYargMotionCues(ref.groupId)
+        const row = cues.find((c) => c.id === ref.cueId)
+        setMotionPlayingLabel(row?.name ?? ref.cueId)
+      } else {
+        setMotionPlayingGroupLabel(null)
+        setMotionPlayingLabel(null)
+      }
+    } catch {
+      setMotionPlayingGroupLabel(null)
+      setMotionPlayingLabel(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async; setState only after awaited IPC, no synchronous render cascade
+    void loadMotionLabels()
+    const onRefresh = () => void loadMotionLabels()
+    addIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onRefresh)
+    addIpcListener(RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED, onRefresh)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onRefresh)
+      removeIpcListener(RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED, onRefresh)
+    }
+  }, [loadMotionLabels])
+
+  useEffect(() => {
+    const onMotionCueChange = async (payload: {
+      ref: { groupId: string; cueId: string } | null
+    }) => {
+      if (!payload.ref) {
+        setMotionPlayingLabel(null)
+        setMotionPlayingGroupLabel(null)
+        return
+      }
+      try {
+        const groups = await getYargMotionCueGroups()
+        const groupRow = groups?.find((g) => g.id === payload.ref!.groupId)
+        setMotionPlayingGroupLabel(groupRow?.name ?? payload.ref.groupId)
+        const cues = await getAvailableYargMotionCues(payload.ref.groupId)
+        const row = cues.find((c) => c.id === payload.ref!.cueId)
+        setMotionPlayingLabel(row?.name ?? payload.ref.cueId)
+      } catch {
+        setMotionPlayingGroupLabel(payload.ref.groupId)
+        setMotionPlayingLabel(payload.ref.cueId)
+      }
+    }
+    addIpcListener(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, onMotionCueChange)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, onMotionCueChange)
+    }
+  }, [])
 
   const labelForDrumNote = (note: DrumNoteType) => {
     if (note === DrumNoteType.Kick) return 'KD'
@@ -645,9 +722,47 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
               </div>
             </div>
           </div>
+
+          {motionGlobalEnabled && (
+            <div className="mt-4 pt-3 border-t border-gray-300 dark:border-gray-600">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="min-w-0">
+                  <p>
+                    <span className="font-medium">Motion Cue Group:</span>{' '}
+                    <span className="text-sm">{motionPlayingGroupLabel ?? '—'}</span>
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <p>
+                    <span className="font-medium">Motion Cue:</span>{' '}
+                    <span className="text-sm">{motionPlayingLabel ?? '—'}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       ) : (
-        <p className="text-gray-500 dark:text-gray-400">No active YARG cue</p>
+        <>
+          {motionGlobalEnabled && (motionPlayingGroupLabel || motionPlayingLabel) ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="min-w-0">
+                <p>
+                  <span className="font-medium">Motion Cue Group:</span>{' '}
+                  <span className="text-sm">{motionPlayingGroupLabel ?? '—'}</span>
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p>
+                  <span className="font-medium">Motion Cue:</span>{' '}
+                  <span className="text-sm">{motionPlayingLabel ?? '—'}</span>
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400">No active YARG cue</p>
+          )}
+        </>
       )}
     </div>
   )

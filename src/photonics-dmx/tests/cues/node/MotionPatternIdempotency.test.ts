@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
-  MotionNodeCueDefinition,
+  YargMotionNodeCueDefinition,
   YargEventNode,
   ActionNode,
 } from '../../../cues/types/nodeCueTypes'
@@ -30,7 +30,7 @@ const minimalParams = (): CueData =>
     strobeState: 'Strobe_Off',
   }) as CueData
 
-function motionPatternOnlyCue(): MotionNodeCueDefinition {
+function motionPatternOnlyCue(): YargMotionNodeCueDefinition {
   const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const action: ActionNode = {
     id: 'mp1',
@@ -55,6 +55,7 @@ function motionPatternOnlyCue(): MotionNodeCueDefinition {
     layer: { source: 'literal', value: 120 },
   }
   return {
+    kind: 'motion',
     id: 'm1',
     name: 'Motion',
     nodes: { events: [ev], actions: [action], logic: [] },
@@ -132,7 +133,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
   it('does not call addMotionPattern again when config, layer, ramp, and lights match', () => {
     const def = motionPatternOnlyCue()
     session.initializeVariables(def.variables ?? [], [])
-    const compiled = NodeCueCompiler.compileMotionCue(def)
+    const compiled = NodeCueCompiler.compileYargCue(def)
     const engine = GraphExecutionEngine.forCue(
       compiled,
       cueId,
@@ -154,7 +155,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
   it('calls addMotionPattern again when an existing pattern has a different resolved config', () => {
     const def = motionPatternOnlyCue()
     session.initializeVariables(def.variables ?? [], [])
-    const compiled = NodeCueCompiler.compileMotionCue(def)
+    const compiled = NodeCueCompiler.compileYargCue(def)
     const engine = GraphExecutionEngine.forCue(
       compiled,
       cueId,
@@ -185,7 +186,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
   })
 
   it('updates bearing via updateMotionPatternConfig without restarting when other fields match', () => {
-    const def: MotionNodeCueDefinition = {
+    const def: YargMotionNodeCueDefinition = {
       ...motionPatternOnlyCue(),
       variables: [
         {
@@ -206,7 +207,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
       },
     }
     session.initializeVariables(def.variables ?? [], [])
-    const compiled = NodeCueCompiler.compileMotionCue(def)
+    const compiled = NodeCueCompiler.compileYargCue(def)
     const engine = GraphExecutionEngine.forCue(
       compiled,
       cueId,

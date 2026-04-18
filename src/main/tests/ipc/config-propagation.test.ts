@@ -27,6 +27,7 @@ const mockConfig = {
   getUserLights: jest.fn().mockReturnValue([]),
   getLightingLayout: jest.fn().mockReturnValue(null),
   updateUserLights: jest.fn().mockImplementation(() => Promise.resolve()),
+  getAllPreferences: jest.fn().mockReturnValue({}),
 }
 
 const mockControllerManager = {
@@ -51,17 +52,20 @@ jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: mockSendToAllWin
 jest.mock('../../../photonics-dmx/cues', () => ({}))
 jest.mock('../../../photonics-dmx/cues/registries/YargCueRegistry', () => ({
   YargCueRegistry: {
-    getInstance: jest.fn().mockReturnValue({ getEnabledGroups: jest.fn().mockReturnValue([]) }),
+    getInstance: jest.fn().mockReturnValue({
+      getRegisteredMotionGroupIds: jest.fn().mockReturnValue([]),
+      setEnabledMotionGroups: jest.fn(),
+      setDisabledMotionCues: jest.fn(),
+    }),
   },
 }))
 jest.mock('../../../photonics-dmx/cues/registries/AudioCueRegistry', () => ({
   AudioCueRegistry: {
-    getInstance: jest.fn().mockReturnValue({ getEnabledGroups: jest.fn().mockReturnValue([]) }),
-  },
-}))
-jest.mock('../../../photonics-dmx/cues/registries/MotionCueRegistry', () => ({
-  MotionCueRegistry: {
-    getInstance: jest.fn().mockReturnValue({ getEnabledGroups: jest.fn().mockReturnValue([]) }),
+    getInstance: jest.fn().mockReturnValue({
+      getRegisteredMotionGroupIds: jest.fn().mockReturnValue([]),
+      setEnabledMotionGroups: jest.fn(),
+      setDisabledMotionCues: jest.fn(),
+    }),
   },
 }))
 jest.mock('../../../photonics-dmx/helpers/dmxHelpers', () => ({

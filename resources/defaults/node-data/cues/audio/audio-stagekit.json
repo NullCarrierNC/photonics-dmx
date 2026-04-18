@@ -94,7 +94,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -176,7 +179,8 @@
           "y": 162.07353503958007,
           "zoom": 0.7557599641581135
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-silhouettes",
@@ -265,7 +269,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -347,7 +354,8 @@
           "y": 162.0735350395801,
           "zoom": 0.7557599641581135
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-flare-fast",
@@ -436,7 +444,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -518,7 +529,8 @@
           "y": 162.07353503958007,
           "zoom": 0.7557599641581135
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-flare-slow",
@@ -607,7 +619,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -689,7 +704,8 @@
           "y": 162.07353503958007,
           "zoom": 0.7557599641581135
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-cool-auto",
@@ -1036,7 +1052,8 @@
           "y": 134.2054870095694,
           "zoom": 1.0097512975966862
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-warm-auto",
@@ -1383,7 +1400,8 @@
           "y": 123.54975275928155,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-harmony",
@@ -1735,7 +1753,8 @@
           "y": 124.01831617697113,
           "zoom": 0.6121681962001025
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-searchlights",
@@ -2122,7 +2141,8 @@
           "y": -131.7180619090458,
           "zoom": 1.1180327900991907
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-score",
@@ -2352,7 +2372,8 @@
           "y": 73.2469381368719,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-strobe-slow",
@@ -2452,7 +2473,8 @@
           "zoom": 1.9984763839512443
         }
       },
-      "style": "strobe"
+      "style": "strobe",
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-strobe-medium",
@@ -2552,7 +2574,8 @@
           "zoom": 1.9984763839512443
         }
       },
-      "style": "strobe"
+      "style": "strobe",
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-strobe-fast",
@@ -2652,7 +2675,8 @@
           "zoom": 1.9984763839512443
         }
       },
-      "style": "strobe"
+      "style": "strobe",
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-strobe-fastest",
@@ -2752,7 +2776,8 @@
           "zoom": 1.9984763839512443
         }
       },
-      "style": "strobe"
+      "style": "strobe",
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-frenzy",
@@ -2832,7 +2857,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2889,7 +2917,8 @@
           "y": 123.03028304688632,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-menu",
@@ -2984,7 +3013,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3105,7 +3137,8 @@
           "y": 95.28193809095421,
           "zoom": 1.1180327900991907
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-audio-sweep",
@@ -3526,7 +3559,8 @@
           "y": 59.0367041918704,
           "zoom": 0.5358867312681463
         }
-      }
+      },
+      "kind": "lighting"
     }
   ],
   "bundled": true

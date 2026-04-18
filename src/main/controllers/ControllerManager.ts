@@ -50,8 +50,11 @@ import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { MotionCueRegistry } from '../../photonics-dmx/cues/registries/MotionCueRegistry'
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
+import {
+  AudioCueType,
+  AudioMotionCueRef,
+  YargMotionCueRef,
+} from '../../photonics-dmx/cues/types/audioCueTypes'
 import {
   NodeCueLoader,
   NodeCueListSummary,
@@ -124,7 +127,12 @@ export class ControllerManager {
       getEffectsController: () => this.effectsController,
       getDmxLightManager: () => this.dmxLightManager!,
       ensureInitialized: () => this.init(),
-      createCueHandler: (dmx, eff) => new YargCueHandler(dmx, eff),
+      createCueHandler: (dmx, eff) => {
+        const h = new YargCueHandler(dmx, eff)
+        h.setMotionEnabled(this.config.getMotionEnabled())
+        h.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)
+        return h
+      },
       setCueHandler: (h) => {
         this.cueHandler = h
       },
@@ -136,6 +144,8 @@ export class ControllerManager {
         const v = this.config.getPreference(key as keyof AppPreferences)
         return typeof v === 'number' ? v : 0
       },
+      getMotionEnabled: () => this.config.getMotionEnabled(),
+      getActiveYargMotionCueRef: () => this.config.getActiveYargMotionCueRef(),
       sendSenderError: (message: string) => {
         sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
       },
@@ -176,14 +186,15 @@ export class ControllerManager {
     await this.initializeSequencer()
     await this.initializeCueRegistry()
     await this.initializeAudioCueRegistry()
-    await this.initializeMotionCueRegistry()
+    await this.applyMotionPreferencesFromConfig()
     const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
     await copyDefaultData(process.resourcesPath, baseDir)
     await this.initializeEffectLoader() // Initialize effects BEFORE node cues
     await this.initializeNodeCueLoader()
     await this.applyYargEnabledGroupsFromConfig()
     await this.applyAudioEnabledGroupsFromConfig()
-    await this.applyMotionEnabledGroupsFromConfig()
+    await this.applyYargMotionEnabledGroupsFromConfig()
+    await this.applyAudioMotionEnabledGroupsFromConfig()
     await this.initializeListeners()
 
     this.isInitialized = true
@@ -324,15 +335,16 @@ export class ControllerManager {
   }
 
   /**
-   * Load motion cue registry preferences from configuration (groups register later via NodeCueLoader).
+   * Apply YARG and Audio motion preferences from configuration (groups register later via NodeCueLoader).
    */
-  private async initializeMotionCueRegistry(): Promise<void> {
-    const registry = MotionCueRegistry.getInstance()
-    const motionMode = this.config.getMotionGroupSelectionMode()
-    registry.setMotionSelectionMode(motionMode)
-    console.log('MotionCueRegistry initialized with motion group selection mode:', motionMode)
-    const disabledMotion = this.config.getDisabledMotionCues() ?? {}
-    registry.setDisabledCues(disabledMotion)
+  private async applyMotionPreferencesFromConfig(): Promise<void> {
+    const yarg = YargCueRegistry.getInstance()
+    const audio = AudioCueRegistry.getInstance()
+    yarg.setMotionSelectionMode(this.config.getMotionGroupSelectionMode())
+    yarg.setDisabledMotionCues(this.config.getDisabledMotionCues() ?? {})
+    audio.setMotionSelectionMode(this.config.getAudioMotionGroupSelectionMode())
+    audio.setDisabledMotionCues(this.config.getDisabledAudioMotionCues() ?? {})
+    console.log('YARG + Audio motion registries initialized (selection modes from preferences).')
   }
 
   /**
@@ -402,11 +414,11 @@ export class ControllerManager {
   }
 
   /**
-   * Re-apply motion enabled groups from configuration after all groups are registered.
+   * Re-apply YARG motion enabled groups from configuration after node cues are registered.
    */
-  private async applyMotionEnabledGroupsFromConfig(): Promise<void> {
-    const registry = MotionCueRegistry.getInstance()
-    const registeredIds = registry.getAllGroups()
+  private async applyYargMotionEnabledGroupsFromConfig(): Promise<void> {
+    const registry = YargCueRegistry.getInstance()
+    const registeredIds = registry.getRegisteredMotionGroupIds()
     let enabledGroupIds = this.config.getEnabledMotionCueGroups()
     const knownGroups = this.config.getKnownMotionCueGroups() ?? []
 
@@ -424,10 +436,39 @@ export class ControllerManager {
     }
 
     await this.config.setKnownMotionCueGroups(registeredIds)
-    registry.setEnabledGroups(enabledGroupIds)
+    registry.setEnabledMotionGroups(enabledGroupIds)
     const disabledMotion = this.config.getDisabledMotionCues() ?? {}
-    registry.setDisabledCues(disabledMotion)
-    console.log('MotionCueRegistry enabled groups re-applied from config:', enabledGroupIds)
+    registry.setDisabledMotionCues(disabledMotion)
+    console.log('YARG motion enabled groups re-applied from config:', enabledGroupIds)
+  }
+
+  /**
+   * Re-apply audio motion enabled groups from configuration after node cues are registered.
+   */
+  private async applyAudioMotionEnabledGroupsFromConfig(): Promise<void> {
+    const registry = AudioCueRegistry.getInstance()
+    const registeredIds = registry.getRegisteredMotionGroupIds()
+    let enabledGroupIds = this.config.getEnabledAudioMotionCueGroups()
+    const knownGroups = this.config.getKnownAudioMotionCueGroups() ?? []
+
+    if (!enabledGroupIds || enabledGroupIds.length === 0) {
+      enabledGroupIds = registeredIds
+      if (registeredIds.length > 0) {
+        await this.config.setEnabledAudioMotionCueGroups(enabledGroupIds)
+      }
+    } else {
+      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabledGroupIds = [...enabledGroupIds, ...newGroups]
+        await this.config.setEnabledAudioMotionCueGroups(enabledGroupIds)
+      }
+    }
+
+    await this.config.setKnownAudioMotionCueGroups(registeredIds)
+    registry.setEnabledMotionGroups(enabledGroupIds)
+    const disabledMotion = this.config.getDisabledAudioMotionCues() ?? {}
+    registry.setDisabledMotionCues(disabledMotion)
+    console.log('Audio motion enabled groups re-applied from config:', enabledGroupIds)
   }
 
   private async initializeNodeCueLoader(): Promise<void> {
@@ -443,7 +484,6 @@ export class ControllerManager {
       baseDir,
       yargRegistry: YargCueRegistry.getInstance(),
       audioRegistry: AudioCueRegistry.getInstance(),
-      motionRegistry: MotionCueRegistry.getInstance(),
       effectLoader: this.effectLoader ?? undefined,
     })
 
@@ -496,7 +536,10 @@ export class ControllerManager {
     if (!this.dmxLightManager || !this.effectsController) return
 
     // Create cue handler (default to YARG)
-    this.cueHandler = new YargCueHandler(this.dmxLightManager, this.effectsController)
+    const yargHandler = new YargCueHandler(this.dmxLightManager, this.effectsController)
+    yargHandler.setMotionEnabled(this.config.getMotionEnabled())
+    yargHandler.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)
+    this.cueHandler = yargHandler
   }
 
   /**
@@ -1096,8 +1139,28 @@ export class ControllerManager {
     await this.audioController.setAudioGameModeConfig(config)
   }
 
+  /**
+   * Apply global motion master toggle to YARG and audio motion handlers.
+   */
+  public setMotionEnabledGlobal(enabled: boolean): void {
+    if (this.cueHandler instanceof YargCueHandler) {
+      this.cueHandler.setMotionEnabled(enabled)
+    }
+    this.audioController.setMotionEnabled(enabled)
+  }
+
+  public setActiveAudioMotionCueRef(ref: AudioMotionCueRef | null): void {
+    this.audioController.setActiveAudioMotionCueRef(ref)
+  }
+
   public isAudioGameModeActive(): boolean {
     return this.audioController.isAudioGameModeActive()
+  }
+
+  public setActiveYargMotionCueRef(ref: YargMotionCueRef | null): void {
+    if (this.cueHandler instanceof YargCueHandler) {
+      this.cueHandler.setManualMotionRef(ref)
+    }
   }
 
   /**

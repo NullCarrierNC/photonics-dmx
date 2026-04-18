@@ -4,17 +4,28 @@ import {
   setCueConsistencyWindow,
   getCueGroupSelectionMode,
   setCueGroupSelectionMode,
-  getMotionGroupSelectionMode,
-  setMotionGroupSelectionMode,
+  getYargMotionGroupSelectionMode,
+  setYargMotionGroupSelectionMode,
+  getAudioMotionGroupSelectionMode,
+  setAudioMotionGroupSelectionMode,
 } from '../ipcApi'
 
 type CueGroupSelectionMode = 'oncePerSong' | 'withinSong'
 type MotionGroupSelectionMode = 'oncePerSong' | 'perCueChange' | 'none'
 
-const CueConsistencySettings: React.FC = () => {
+export interface CueConsistencySettingsProps {
+  /** When false, YARG/audio motion selection mode controls are disabled (global Motion master off). */
+  motionGloballyEnabled?: boolean
+}
+
+const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
+  motionGloballyEnabled = true,
+}) => {
   const [consistencyWindow, setConsistencyWindow] = useState(60000)
   const [selectionMode, setSelectionMode] = useState<CueGroupSelectionMode>('withinSong')
-  const [motionSelectionMode, setMotionSelectionModeState] =
+  const [yargMotionSelectionMode, setYargMotionSelectionModeState] =
+    useState<MotionGroupSelectionMode>('perCueChange')
+  const [audioMotionSelectionMode, setAudioMotionSelectionModeState] =
     useState<MotionGroupSelectionMode>('perCueChange')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -22,15 +33,19 @@ const CueConsistencySettings: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [windowResult, modeResult, motionModeResult] = await Promise.all([
+        const [windowResult, modeResult, yargMotionResult, audioMotionResult] = await Promise.all([
           getCueConsistencyWindow(),
           getCueGroupSelectionMode(),
-          getMotionGroupSelectionMode(),
+          getYargMotionGroupSelectionMode(),
+          getAudioMotionGroupSelectionMode(),
         ])
         if (windowResult.success) setConsistencyWindow(windowResult.windowMs)
         if (modeResult.success) setSelectionMode(modeResult.mode)
-        if (motionModeResult?.success === true && motionModeResult.mode) {
-          setMotionSelectionModeState(motionModeResult.mode)
+        if (yargMotionResult?.success === true && yargMotionResult.mode) {
+          setYargMotionSelectionModeState(yargMotionResult.mode)
+        }
+        if (audioMotionResult?.success === true && audioMotionResult.mode) {
+          setAudioMotionSelectionModeState(audioMotionResult.mode)
         }
       } catch (error) {
         console.error('Failed to load cue consistency settings:', error)
@@ -136,43 +151,84 @@ const CueConsistencySettings: React.FC = () => {
         </div>
         <div>
           <label
-            htmlFor="motion-group-selection-mode"
+            htmlFor="yarg-motion-group-selection-mode"
             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Motion Cue Selection Mode
+            YARG motion cue selection mode
           </label>
           <select
-            id="motion-group-selection-mode"
-            value={motionSelectionMode}
+            id="yarg-motion-group-selection-mode"
+            value={yargMotionSelectionMode}
             onChange={async (e) => {
               const mode = e.target.value as MotionGroupSelectionMode
               if (mode !== 'oncePerSong' && mode !== 'perCueChange' && mode !== 'none') return
-              setMotionSelectionModeState(mode)
+              setYargMotionSelectionModeState(mode)
               if (isSaving) return
               try {
                 setIsSaving(true)
-                const result = await setMotionGroupSelectionMode(mode)
+                const result = await setYargMotionGroupSelectionMode(mode)
                 if (!result.success) {
-                  console.error('Failed to save motion group selection mode:', result.error)
-                  setMotionSelectionModeState(motionSelectionMode)
+                  console.error('Failed to save YARG motion group selection mode:', result.error)
+                  setYargMotionSelectionModeState(yargMotionSelectionMode)
                 }
               } catch (error) {
-                console.error('Failed to save motion group selection mode:', error)
-                setMotionSelectionModeState(motionSelectionMode)
+                console.error('Failed to save YARG motion group selection mode:', error)
+                setYargMotionSelectionModeState(yargMotionSelectionMode)
               } finally {
                 setIsSaving(false)
               }
             }}
             className="block w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading || isSaving}>
+            disabled={isLoading || isSaving || !motionGloballyEnabled}>
             <option value="perCueChange">Per Cue Change</option>
             <option value="oncePerSong">Once Per Song</option>
             <option value="none">No Motion Cues</option>
           </select>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Controls how often a random motion program is chosen from enabled motion cue groups. Per
-            Cue Change: a new random motion cue when each YARG lighting cue fires. Once Per Song:
-            one random motion program is locked for the whole song. No Motion Cues: automatic motion
-            selection is disabled (use Cue Simulation to run motion manually).
+            Controls how often a random YARG motion program is chosen from enabled groups. Per Cue
+            Change: a new random motion cue when each YARG lighting cue fires. Once Per Song: one
+            random motion program is locked for the whole song. No Motion Cues: automatic YARG
+            motion selection is disabled (use Cue Simulation to run motion manually).
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="audio-motion-group-selection-mode"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Audio motion cue selection mode
+          </label>
+          <select
+            id="audio-motion-group-selection-mode"
+            value={audioMotionSelectionMode}
+            onChange={async (e) => {
+              const mode = e.target.value as MotionGroupSelectionMode
+              if (mode !== 'oncePerSong' && mode !== 'perCueChange' && mode !== 'none') return
+              setAudioMotionSelectionModeState(mode)
+              if (isSaving) return
+              try {
+                setIsSaving(true)
+                const result = await setAudioMotionGroupSelectionMode(mode)
+                if (!result.success) {
+                  console.error('Failed to save audio motion group selection mode:', result.error)
+                  setAudioMotionSelectionModeState(audioMotionSelectionMode)
+                }
+              } catch (error) {
+                console.error('Failed to save audio motion group selection mode:', error)
+                setAudioMotionSelectionModeState(audioMotionSelectionMode)
+              } finally {
+                setIsSaving(false)
+              }
+            }}
+            className="block w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading || isSaving || !motionGloballyEnabled}>
+            <option value="perCueChange">Per Primary Cue Change</option>
+            <option value="oncePerSong">Once Per Song</option>
+            <option value="none">No Audio Motion Cues</option>
+          </select>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Controls how often a random audio motion program is chosen. Per Primary Cue Change: a
+            new random motion cue when the primary audio lighting cue changes. Once Per Song: one
+            random motion program is locked for the whole song. No Audio Motion Cues: automatic
+            audio motion selection is disabled.
           </p>
         </div>
         <div>

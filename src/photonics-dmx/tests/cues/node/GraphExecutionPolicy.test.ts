@@ -6,7 +6,7 @@
 import { describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
-  MotionNodeCueDefinition,
+  YargMotionNodeCueDefinition,
   YargEventNode,
   ActionNode,
 } from '../../../cues/types/nodeCueTypes'
@@ -47,7 +47,7 @@ const minimalParams = (): CueData => ({
   timeSinceLastCue: 0,
 })
 
-function dualLifecycleCue(): MotionNodeCueDefinition {
+function dualLifecycleCue(): YargMotionNodeCueDefinition {
   const evStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
   const evCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const action: ActionNode = {
@@ -73,6 +73,7 @@ function dualLifecycleCue(): MotionNodeCueDefinition {
     layer: { source: 'literal', value: 120 },
   }
   return {
+    kind: 'motion',
     id: 'm1',
     name: 'Motion',
     nodes: { events: [evStart, evCalled], actions: [action], logic: [] },
@@ -85,7 +86,7 @@ function dualLifecycleCue(): MotionNodeCueDefinition {
 
 describe('GraphExecutionPolicy motion vs visual', () => {
   it('visual cue policy includes cue-called when cue-started has already fired', () => {
-    const compiled = NodeCueCompiler.compileMotionCue(dualLifecycleCue())
+    const compiled = NodeCueCompiler.compileYargCue(dualLifecycleCue())
     const policy = cueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, minimalParams(), { hasCueStartedFired: true })
     const types = nodes.map((n) => (n as YargEventNode).eventType)
@@ -94,7 +95,7 @@ describe('GraphExecutionPolicy motion vs visual', () => {
   })
 
   it('motion cue policy includes cue-called when cue-started has already fired (same as visual)', () => {
-    const compiled = NodeCueCompiler.compileMotionCue(dualLifecycleCue())
+    const compiled = NodeCueCompiler.compileYargCue(dualLifecycleCue())
     const policy = motionCueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, minimalParams(), { hasCueStartedFired: true })
     const types = nodes.map((n) => (n as YargEventNode).eventType)

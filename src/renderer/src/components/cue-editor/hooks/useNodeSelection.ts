@@ -178,8 +178,7 @@ export function useNodeSelection({
           const label = (() => {
             switch (node.data.kind) {
               case 'event': {
-                if (activeMode === 'yarg' || activeMode === 'motion')
-                  return (nextPayload as YargEventNode).eventType
+                if (activeMode === 'yarg') return (nextPayload as YargEventNode).eventType
                 const audioPayload = nextPayload as AudioEventNodeUnion
                 return audioPayload.eventType === 'audio-trigger'
                   ? (audioPayload as AudioTriggerNode).nodeLabel

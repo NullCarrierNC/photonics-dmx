@@ -18,6 +18,7 @@ import {
 import type {
   NodeCueFile,
   NodeCueMode,
+  NodeCueKind,
   EffectFile,
   EffectMode,
   DmxRig,
@@ -47,19 +48,35 @@ export const getCueGroupSelectionMode = () =>
 export const setCueGroupSelectionMode = (mode: 'oncePerSong' | 'withinSong') =>
   window.api.invoke(LIGHT.SET_CUE_GROUP_SELECTION_MODE, mode)
 
-export const getMotionGroupSelectionMode = () =>
-  window.api.invoke(LIGHT.GET_MOTION_GROUP_SELECTION_MODE, undefined)
+export const getYargMotionGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_YARG_MOTION_GROUP_SELECTION_MODE, undefined)
 
-export const setMotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
-  window.api.invoke(LIGHT.SET_MOTION_GROUP_SELECTION_MODE, mode)
+export const setYargMotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
+  window.api.invoke(LIGHT.SET_YARG_MOTION_GROUP_SELECTION_MODE, mode)
 
-export const getMotionCueGroups = () => window.api.invoke(LIGHT.GET_MOTION_CUE_GROUPS, undefined)
+export const getAudioMotionGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_AUDIO_MOTION_GROUP_SELECTION_MODE, undefined)
 
-export const getAvailableMotionCues = (groupId?: string) =>
-  window.api.invoke(LIGHT.GET_AVAILABLE_MOTION_CUES, groupId)
+export const setAudioMotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
+  window.api.invoke(LIGHT.SET_AUDIO_MOTION_GROUP_SELECTION_MODE, mode)
 
-export const startMotionCueSimulation = (groupId: string, cueId: string) =>
-  window.api.invoke(LIGHT.START_MOTION_CUE_SIMULATION, { groupId, cueId })
+export const getYargMotionCueGroups = () =>
+  window.api.invoke(LIGHT.GET_YARG_MOTION_CUE_GROUPS, undefined)
+
+export const getAudioMotionCueGroups = () =>
+  window.api.invoke(LIGHT.GET_AUDIO_MOTION_CUE_GROUPS, undefined)
+
+export const getAvailableYargMotionCues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_YARG_MOTION_CUES, groupId)
+
+export const getAvailableAudioMotionCues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES, groupId)
+
+export const startYargMotionCueSimulation = (groupId: string, cueId: string) =>
+  window.api.invoke(LIGHT.START_YARG_MOTION_CUE_SIMULATION, { groupId, cueId })
+
+export const startAudioMotionCueSimulation = (groupId: string, cueId: string) =>
+  window.api.invoke(LIGHT.START_AUDIO_MOTION_CUE_SIMULATION, { groupId, cueId })
 
 export const stopMotionCueSimulation = () =>
   window.api.invoke(LIGHT.STOP_MOTION_CUE_SIMULATION, undefined)
@@ -176,17 +193,29 @@ export const getDisabledAudioCues = () =>
 export const setDisabledAudioCues = (disabled: Record<string, string[]>) =>
   window.api.invoke(CONFIG.SET_DISABLED_AUDIO_CUES, disabled)
 
-export const getEnabledMotionCueGroups = () =>
-  window.api.invoke(CONFIG.GET_ENABLED_MOTION_CUE_GROUPS, undefined)
+export const getEnabledYargMotionCueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_YARG_MOTION_CUE_GROUPS, undefined)
 
-export const setEnabledMotionCueGroups = (groupIds: string[]) =>
-  window.api.invoke(CONFIG.SET_ENABLED_MOTION_CUE_GROUPS, groupIds)
+export const setEnabledYargMotionCueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_YARG_MOTION_CUE_GROUPS, groupIds)
 
-export const getDisabledMotionCues = () =>
-  window.api.invoke(CONFIG.GET_DISABLED_MOTION_CUES, undefined)
+export const getDisabledYargMotionCues = () =>
+  window.api.invoke(CONFIG.GET_DISABLED_YARG_MOTION_CUES, undefined)
 
-export const setDisabledMotionCues = (disabled: Record<string, string[]>) =>
-  window.api.invoke(CONFIG.SET_DISABLED_MOTION_CUES, disabled)
+export const setDisabledYargMotionCues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_YARG_MOTION_CUES, disabled)
+
+export const getEnabledAudioMotionCueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_AUDIO_MOTION_CUE_GROUPS, undefined)
+
+export const setEnabledAudioMotionCueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_AUDIO_MOTION_CUE_GROUPS, groupIds)
+
+export const getDisabledAudioMotionCues = () =>
+  window.api.invoke(CONFIG.GET_DISABLED_AUDIO_MOTION_CUES, undefined)
+
+export const setDisabledAudioMotionCues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_AUDIO_MOTION_CUES, disabled)
 
 export const getAudioReactiveCues = () =>
   window.api.invoke(CONFIG.GET_AUDIO_REACTIVE_CUES, undefined)
@@ -198,6 +227,23 @@ export const getAudioGameMode = () => window.api.invoke(CONFIG.GET_AUDIO_GAME_MO
 
 export const setAudioGameMode = (updates: Partial<AudioGameModeConfig>) =>
   window.api.invoke(CONFIG.SET_AUDIO_GAME_MODE, updates)
+
+export const getMotionEnabled = () => window.api.invoke(CONFIG.GET_MOTION_ENABLED, undefined)
+
+export const setMotionEnabled = (enabled: boolean) =>
+  window.api.invoke(CONFIG.SET_MOTION_ENABLED, enabled)
+
+export const getActiveAudioMotionCue = () =>
+  window.api.invoke(CONFIG.GET_ACTIVE_AUDIO_MOTION_CUE, undefined)
+
+export const setActiveAudioMotionCue = (ref: { groupId: string; cueId: string } | null) =>
+  window.api.invoke(CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE, ref)
+
+export const getActiveYargMotionCue = () =>
+  window.api.invoke(CONFIG.GET_ACTIVE_YARG_MOTION_CUE, undefined)
+
+export const setActiveYargMotionCue = (ref: { groupId: string; cueId: string } | null) =>
+  window.api.invoke(CONFIG.SET_ACTIVE_YARG_MOTION_CUE, ref)
 
 // ---------------------------------------------------------------------------
 // Stage kit
@@ -420,8 +466,8 @@ export const deleteNodeCueFile = (filePath: string) => window.api.invoke(NODE_CU
 export const validateNodeCue = (payload: { path?: string; content?: NodeCueFile }) =>
   window.api.invoke(NODE_CUES.VALIDATE, payload)
 
-export const getNodeCueTypes = (mode: NodeCueMode) =>
-  window.api.invoke(NODE_CUES.GET_CUE_TYPES, mode)
+export const getNodeCueTypes = (mode: NodeCueMode, kind?: NodeCueKind) =>
+  window.api.invoke(NODE_CUES.GET_CUE_TYPES, { mode, kind })
 
 export const importNodeCueFile = (mode?: NodeCueMode) => window.api.invoke(NODE_CUES.IMPORT, mode)
 

@@ -9,18 +9,24 @@ import {
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { ipcError } from './ipcResult'
-import { createMockCueData } from './mockCueData'
+import { createMockAudioCueData, createMockCueData } from './mockCueData'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { INetCue } from '../../photonics-dmx/cues/interfaces/INetCue'
-import { MotionCueRegistry } from '../../photonics-dmx/cues/registries/MotionCueRegistry'
+import { IAudioCue } from '../../photonics-dmx/cues/interfaces/IAudioCue'
 import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
 
-/** Motion cue started from Cue Simulation; stopped explicitly or replaced by another start. */
-let activeSimulatedMotionCue: INetCue | null = null
+/** YARG motion cue started from Cue Simulation; stopped explicitly or replaced by another start. */
+let activeSimulatedYargMotionCue: INetCue | null = null
+/** Audio motion cue started from Cue Simulation. */
+let activeSimulatedAudioMotionCue: IAudioCue | null = null
+let simulatedAudioMotionExecutionCount = 0
 
 function stopActiveSimulatedMotionCue(controllerManager: ControllerManager): void {
-  activeSimulatedMotionCue?.onStop?.()
-  activeSimulatedMotionCue = null
+  activeSimulatedYargMotionCue?.onStop?.()
+  activeSimulatedYargMotionCue = null
+  activeSimulatedAudioMotionCue?.onStop?.()
+  activeSimulatedAudioMotionCue = null
+  simulatedAudioMotionExecutionCount = 0
   controllerManager.getLightingController()?.schedulePanTiltClear()
 }
 
@@ -28,11 +34,26 @@ async function runActiveSimulatedMotionCue(
   controllerManager: ControllerManager,
   mockCueData: CueData,
 ): Promise<void> {
-  if (!activeSimulatedMotionCue) return
+  if (!activeSimulatedYargMotionCue) return
   const sequencer = controllerManager.getLightingController()
   const lightManager = controllerManager.getDmxLightManager()
   if (!sequencer || !lightManager) return
-  const maybePromise = activeSimulatedMotionCue.execute(mockCueData, sequencer, lightManager)
+  const maybePromise = activeSimulatedYargMotionCue.execute(mockCueData, sequencer, lightManager)
+  if (maybePromise instanceof Promise) {
+    await maybePromise
+  }
+}
+
+async function runActiveSimulatedAudioMotionCue(
+  controllerManager: ControllerManager,
+): Promise<void> {
+  if (!activeSimulatedAudioMotionCue) return
+  const sequencer = controllerManager.getLightingController()
+  const lightManager = controllerManager.getDmxLightManager()
+  if (!sequencer || !lightManager) return
+  simulatedAudioMotionExecutionCount++
+  const mockAudio = createMockAudioCueData(simulatedAudioMotionExecutionCount)
+  const maybePromise = activeSimulatedAudioMotionCue.execute(mockAudio, sequencer, lightManager)
   if (maybePromise instanceof Promise) {
     await maybePromise
   }
@@ -46,7 +67,15 @@ export function setupSimulationHandlers(
   controllerManager: ControllerManager,
 ): void {
   controllerManager.setOnConsoleEnter(() => {
+    const hadYargSim = activeSimulatedYargMotionCue !== null
     stopActiveSimulatedMotionCue(controllerManager)
+    if (hadYargSim) {
+      sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+        ref: null,
+        source: 'cleared',
+        manualFallback: false,
+      })
+    }
   })
 
   ipcMain.handle(LIGHT.GET_AUDIO_CUE_GROUPS, async () => {
@@ -187,6 +216,7 @@ export function setupSimulationHandlers(
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
       await runActiveSimulatedMotionCue(controllerManager, mockCueData)
+      await runActiveSimulatedAudioMotionCue(controllerManager)
       lighting.onBeat()
       return true
     },
@@ -236,6 +266,7 @@ export function setupSimulationHandlers(
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
       await runActiveSimulatedMotionCue(controllerManager, mockCueData)
+      await runActiveSimulatedAudioMotionCue(controllerManager)
       lighting.onKeyframe()
       return true
     },
@@ -285,6 +316,7 @@ export function setupSimulationHandlers(
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
       await runActiveSimulatedMotionCue(controllerManager, mockCueData)
+      await runActiveSimulatedAudioMotionCue(controllerManager)
       lighting.onMeasure()
       return true
     },
@@ -386,7 +418,7 @@ export function setupSimulationHandlers(
   )
 
   ipcMain.handle(
-    LIGHT.START_MOTION_CUE_SIMULATION,
+    LIGHT.START_YARG_MOTION_CUE_SIMULATION,
     async (_, data: { groupId: string; cueId: string }) => {
       try {
         const { groupId, cueId } = data ?? {}
@@ -401,16 +433,19 @@ export function setupSimulationHandlers(
         if (!lightManager || !sequencer) {
           return ipcError(new Error('Lighting system not available'))
         }
-        const group = MotionCueRegistry.getInstance().getGroup(groupId)
+        const group = YargCueRegistry.getInstance().getGroup(groupId)
         if (!group) {
-          return ipcError(new Error(`Motion group not found: ${groupId}`))
+          return ipcError(new Error(`YARG motion group not found: ${groupId}`))
         }
-        const cue = group.cues.get(cueId)
+        const cue = group.motionCues?.get(cueId)
         if (!cue) {
-          return ipcError(new Error(`Motion cue not found: ${groupId}/${cueId}`))
+          return ipcError(new Error(`YARG motion cue not found: ${groupId}/${cueId}`))
         }
-        activeSimulatedMotionCue?.onStop?.()
-        activeSimulatedMotionCue = null
+        activeSimulatedYargMotionCue?.onStop?.()
+        activeSimulatedYargMotionCue = null
+        activeSimulatedAudioMotionCue?.onStop?.()
+        activeSimulatedAudioMotionCue = null
+        simulatedAudioMotionExecutionCount = 0
         sequencer.cancelPanTiltClear()
         const mockCueData = createMockCueData({
           venueSize: 'Small',
@@ -421,10 +456,59 @@ export function setupSimulationHandlers(
         if (maybePromise instanceof Promise) {
           await maybePromise
         }
-        activeSimulatedMotionCue = cue
+        activeSimulatedYargMotionCue = cue
+        sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+          ref: { groupId, cueId },
+          source: 'auto',
+          manualFallback: false,
+        })
         return { success: true as const }
       } catch (error) {
-        console.error('Error starting motion cue simulation:', error)
+        console.error('Error starting YARG motion cue simulation:', error)
+        return ipcError(error)
+      }
+    },
+  )
+
+  ipcMain.handle(
+    LIGHT.START_AUDIO_MOTION_CUE_SIMULATION,
+    async (_, data: { groupId: string; cueId: string }) => {
+      try {
+        const { groupId, cueId } = data ?? {}
+        if (!groupId || !cueId) {
+          return ipcError(new Error('groupId and cueId are required'))
+        }
+        if (!controllerManager.getIsInitialized()) {
+          await controllerManager.init()
+        }
+        const lightManager = controllerManager.getDmxLightManager()
+        const sequencer = controllerManager.getLightingController()
+        if (!lightManager || !sequencer) {
+          return ipcError(new Error('Lighting system not available'))
+        }
+        const group = AudioCueRegistry.getInstance().getGroup(groupId)
+        if (!group) {
+          return ipcError(new Error(`Audio motion group not found: ${groupId}`))
+        }
+        const cue = group.motionCues?.get(cueId)
+        if (!cue) {
+          return ipcError(new Error(`Audio motion cue not found: ${groupId}/${cueId}`))
+        }
+        activeSimulatedYargMotionCue?.onStop?.()
+        activeSimulatedYargMotionCue = null
+        activeSimulatedAudioMotionCue?.onStop?.()
+        activeSimulatedAudioMotionCue = null
+        simulatedAudioMotionExecutionCount = 0
+        sequencer.cancelPanTiltClear()
+        const mockAudio = createMockAudioCueData(1)
+        const maybePromise = cue.execute(mockAudio, sequencer, lightManager)
+        if (maybePromise instanceof Promise) {
+          await maybePromise
+        }
+        activeSimulatedAudioMotionCue = cue
+        return { success: true as const }
+      } catch (error) {
+        console.error('Error starting audio motion cue simulation:', error)
         return ipcError(error)
       }
     },
@@ -432,7 +516,15 @@ export function setupSimulationHandlers(
 
   ipcMain.handle(LIGHT.STOP_MOTION_CUE_SIMULATION, async () => {
     try {
+      const hadYargSim = activeSimulatedYargMotionCue !== null
       stopActiveSimulatedMotionCue(controllerManager)
+      if (hadYargSim) {
+        sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+          ref: null,
+          source: 'cleared',
+          manualFallback: false,
+        })
+      }
       return { success: true as const }
     } catch (error) {
       console.error('Error stopping motion cue simulation:', error)

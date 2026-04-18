@@ -14,7 +14,6 @@ import {
   VariableDefinition,
   YargEventNode,
   YargNodeCueDefinition,
-  MotionNodeCueDefinition,
   ValueSource,
 } from '../../types/nodeCueTypes'
 
@@ -26,7 +25,7 @@ export class NodeCueCompilationError extends Error {
 }
 
 export interface CompiledNodeCue<TEvent extends BaseEventNode> {
-  definition: YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition
+  definition: YargNodeCueDefinition | AudioNodeCueDefinition
   eventMap: Map<string, TEvent>
   actionMap: Map<string, ActionNode>
   logicMap: Map<string, LogicNode>
@@ -41,7 +40,6 @@ export interface CompiledNodeCue<TEvent extends BaseEventNode> {
 
 export type CompiledYargCue = CompiledNodeCue<YargEventNode>
 export type CompiledAudioCue = CompiledNodeCue<AudioEventNodeUnion>
-export type CompiledMotionCue = CompiledNodeCue<YargEventNode>
 
 const getActionTiming = (action: ActionNode): ActionTimingConfig => ({
   ...createDefaultActionTiming(),
@@ -77,12 +75,8 @@ export class NodeCueCompiler {
     return this.buildCompiled(definition)
   }
 
-  public static compileMotionCue(definition: MotionNodeCueDefinition): CompiledMotionCue {
-    return this.buildCompiled(definition)
-  }
-
   private static buildCompiled<TEvent extends BaseEventNode>(
-    definition: YargNodeCueDefinition | AudioNodeCueDefinition | MotionNodeCueDefinition,
+    definition: YargNodeCueDefinition | AudioNodeCueDefinition,
   ): CompiledNodeCue<TEvent> {
     const events = definition.nodes.events as unknown as TEvent[]
     const actions = (definition.nodes.actions ?? []) as ActionNode[]
@@ -103,11 +97,11 @@ export class NodeCueCompiler {
       !effectRaisers.length
     ) {
       const cueId =
-        'cueType' in definition
-          ? definition.cueType
-          : 'cueTypeId' in definition
-            ? definition.cueTypeId
-            : definition.id
+        definition.kind === 'lighting'
+          ? 'cueType' in definition
+            ? definition.cueType
+            : definition.cueTypeId
+          : definition.id
       throw new NodeCueCompilationError(
         `At least one action, event raiser, event listener, or effect raiser node is required. Cue '${definition.name}' (${cueId}) has none.`,
       )

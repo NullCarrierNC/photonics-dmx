@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa'
 import {
-  getMotionCueGroups,
-  getAvailableMotionCues,
-  startMotionCueSimulation,
+  getYargMotionCueGroups,
+  getAvailableYargMotionCues,
+  startYargMotionCueSimulation,
   stopMotionCueSimulation,
 } from '../../ipcApi'
 
@@ -16,7 +16,7 @@ interface CueSimulationMotionProps {
 }
 
 /**
- * Collapsible motion group/cue selection and start/stop for simulating motion cues in Cue Simulation.
+ * Collapsible YARG motion group/cue selection and start/stop for simulating motion cues in Cue Simulation.
  */
 export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false)
@@ -30,7 +30,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     let cancelled = false
     const load = async () => {
       try {
-        const list = await getMotionCueGroups()
+        const list = await getYargMotionCueGroups()
         if (!cancelled && Array.isArray(list)) {
           setGroups(list)
         }
@@ -53,7 +53,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     let cancelled = false
     const load = async () => {
       try {
-        const list = await getAvailableMotionCues(groupId)
+        const list = await getAvailableYargMotionCues(groupId)
         if (!cancelled && Array.isArray(list)) {
           setCues(list)
           setCueId((prev) => {
@@ -75,7 +75,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     if (!groupId || !cueId || disabled || isStarting) return
     setIsStarting(true)
     try {
-      const result = await startMotionCueSimulation(groupId, cueId)
+      const result = await startYargMotionCueSimulation(groupId, cueId)
       if (!result.success) {
         console.error(
           'Failed to start motion cue simulation:',

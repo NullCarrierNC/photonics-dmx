@@ -2,23 +2,23 @@ import { INetCue, CueStyle } from '../../interfaces/INetCue'
 import { CueData } from '../../types/cueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import { CompiledMotionCue } from '../compiler/NodeCueCompiler'
+import { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import { EffectRegistry } from './EffectRegistry'
 import type { NodeRuntimeCallbacks } from './executionTypes'
 import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import { motionCueGraphPolicy } from './GraphExecutionPolicy'
-import type { MotionNodeCueDefinition } from '../../types/nodeCueTypes'
+import type { YargMotionNodeCueDefinition } from '../../types/nodeCueTypes'
 
 /**
- * Motion node cue: YARG event graph with position / motion-pattern actions; runs parallel to lighting cues.
- * Uses `motionCueGraphPolicy`: same entry events as visual cues (`cue-started`, `cue-called`, beat, etc.)
+ * YARG motion node cue: event graph with position / motion-pattern actions; runs parallel to lighting cues.
+ * Uses `motionCueGraphPolicy`: same entry events as lighting cues (`cue-started`, `cue-called`, beat, etc.)
  * but no initial setEffect clear. Re-submitted `motion-pattern` actions with the same resolved config
  * are skipped so `cue-called` does not restart the waveform each tick.
  */
-export class MotionNodeCue implements INetCue {
+export class YargMotionNodeCue implements INetCue {
   private readonly groupId: string
-  private readonly compiledCue: CompiledMotionCue
+  private readonly compiledCue: CompiledYargCue
   private readonly effectRegistry: EffectRegistry
   private readonly session: CueSession
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
@@ -26,7 +26,7 @@ export class MotionNodeCue implements INetCue {
 
   constructor(
     groupId: string,
-    compiledCue: CompiledMotionCue,
+    compiledCue: CompiledYargCue,
     effectRegistry?: EffectRegistry,
     runtimeCallbacks?: NodeRuntimeCallbacks,
   ) {
@@ -35,24 +35,24 @@ export class MotionNodeCue implements INetCue {
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
     this.session = new CueSession()
     this.runtimeCallbacks = runtimeCallbacks
-    const definition = compiledCue.definition as MotionNodeCueDefinition
+    const definition = compiledCue.definition as YargMotionNodeCueDefinition
     this.session.initializeVariables(definition.variables ?? [], compiledCue.groupVariables ?? [])
   }
 
   get cueId(): string {
-    return (this.compiledCue.definition as MotionNodeCueDefinition).id
+    return (this.compiledCue.definition as YargMotionNodeCueDefinition).id
   }
 
   get name(): string {
-    return (this.compiledCue.definition as MotionNodeCueDefinition).name
+    return (this.compiledCue.definition as YargMotionNodeCueDefinition).name
   }
 
   get id(): string {
-    return `${this.groupId}:${(this.compiledCue.definition as MotionNodeCueDefinition).id}`
+    return `${this.groupId}:${(this.compiledCue.definition as YargMotionNodeCueDefinition).id}`
   }
 
   get description(): string | undefined {
-    return (this.compiledCue.definition as MotionNodeCueDefinition).description
+    return (this.compiledCue.definition as YargMotionNodeCueDefinition).description
   }
 
   get style(): CueStyle {
@@ -65,7 +65,7 @@ export class MotionNodeCue implements INetCue {
     lightManager: DmxLightManager,
   ): void | Promise<void> {
     if (!this.engine) {
-      const definition = this.compiledCue.definition as MotionNodeCueDefinition
+      const definition = this.compiledCue.definition as YargMotionNodeCueDefinition
       const cueId = this.id
       const policy = motionCueGraphPolicy(this.groupId, cueId)
       this.engine = GraphExecutionEngine.forCue(

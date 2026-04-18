@@ -80,6 +80,7 @@ describe('Node cue logic runtime', () => {
     const definition: YargNodeCueDefinition = {
       id: 'logic-cue',
       name: 'Logic Cue',
+      kind: 'lighting',
       cueType: CueType.Chorus,
       style: 'primary',
       nodes: {
@@ -269,6 +270,7 @@ describe('Node cue logic runtime', () => {
       const definition: YargNodeCueDefinition = {
         id: 'shuffle-cue',
         name: 'Shuffle Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -345,6 +347,7 @@ describe('Node cue logic runtime', () => {
       const definition: YargNodeCueDefinition = {
         id: 'shuffle-cue',
         name: 'Shuffle Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -412,6 +415,7 @@ describe('Node cue logic runtime', () => {
       const definition: YargNodeCueDefinition = {
         id: 'rand-cue',
         name: 'Random Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -477,6 +481,7 @@ describe('Node cue logic runtime', () => {
       const definition: YargNodeCueDefinition = {
         id: 'rand-cue',
         name: 'Random Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -535,6 +540,7 @@ describe('Node cue logic runtime', () => {
       const definition: YargNodeCueDefinition = {
         id: 'rand-cue',
         name: 'Random Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -609,6 +615,7 @@ describe('Node cue logic runtime', () => {
       const definition: YargNodeCueDefinition = {
         id: 'rand-cue',
         name: 'Random Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -678,6 +685,7 @@ describe('Node cue logic runtime', () => {
       const definition: YargNodeCueDefinition = {
         id: 'debug-cue',
         name: 'Debug Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {

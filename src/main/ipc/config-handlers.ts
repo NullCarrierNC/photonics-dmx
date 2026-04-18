@@ -4,7 +4,6 @@ import { sendToAllWindows } from '../utils/windowUtils'
 import '../../photonics-dmx/cues'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { MotionCueRegistry } from '../../photonics-dmx/cues/registries/MotionCueRegistry'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers'
 import { DmxRig, DmxFixture } from '../../photonics-dmx/types'
@@ -369,12 +368,12 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     }
   })
 
-  ipcMain.handle(CONFIG.GET_ENABLED_MOTION_CUE_GROUPS, async () => {
-    const registry = MotionCueRegistry.getInstance()
+  ipcMain.handle(CONFIG.GET_ENABLED_YARG_MOTION_CUE_GROUPS, async () => {
+    const registry = YargCueRegistry.getInstance()
     const config = controllerManager.getConfig()
     const prefs = config.getAllPreferences()
     let enabled = prefs.enabledMotionCueGroups
-    const allGroups = registry.getAllGroups()
+    const allGroups = registry.getRegisteredMotionGroupIds()
     const knownMotionCueGroups = prefs.knownMotionCueGroups ?? []
 
     if (!enabled || enabled.length === 0) {
@@ -383,7 +382,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
         await config.setEnabledMotionCueGroups(enabled)
       }
       await config.setKnownMotionCueGroups(allGroups)
-      registry.setEnabledGroups(enabled)
+      registry.setEnabledMotionGroups(enabled)
     } else {
       const newGroups = allGroups.filter((id) => !knownMotionCueGroups.includes(id))
       if (newGroups.length > 0) {
@@ -391,52 +390,124 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
         await config.setEnabledMotionCueGroups(enabled)
       }
       await config.setKnownMotionCueGroups(allGroups)
-      registry.setEnabledGroups(enabled)
+      registry.setEnabledMotionGroups(enabled)
     }
 
     const disabledMotion = config.getDisabledMotionCues() ?? {}
-    registry.setDisabledCues(disabledMotion)
+    registry.setDisabledMotionCues(disabledMotion)
     return enabled
   })
 
-  ipcMain.handle(CONFIG.SET_ENABLED_MOTION_CUE_GROUPS, async (_, groupIds: string[]) => {
+  ipcMain.handle(CONFIG.SET_ENABLED_YARG_MOTION_CUE_GROUPS, async (_, groupIds: string[]) => {
     try {
       const validation = validateOptionalStringArray(groupIds, 'groupIds')
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
       await controllerManager.getConfig().setEnabledMotionCueGroups(groupIds)
-      const registry = MotionCueRegistry.getInstance()
-      registry.setEnabledGroups(groupIds)
+      const registry = YargCueRegistry.getInstance()
+      registry.setEnabledMotionGroups(groupIds)
       const disabledMotion = controllerManager.getConfig().getDisabledMotionCues() ?? {}
-      registry.setDisabledCues(disabledMotion)
-      sendToAllWindows(RENDERER_RECEIVE.MOTION_CUE_GROUPS_CHANGED, undefined)
-      console.log('Updated MotionCueRegistry enabled groups:', groupIds)
+      registry.setDisabledMotionCues(disabledMotion)
+      sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED, undefined)
+      console.log('Updated YARG motion enabled groups:', groupIds)
       return { success: true }
     } catch (error) {
-      console.error('Error setting enabled motion cue groups:', error)
+      console.error('Error setting enabled YARG motion cue groups:', error)
       return ipcError(error)
     }
   })
 
-  ipcMain.handle(CONFIG.GET_DISABLED_MOTION_CUES, async () => {
+  ipcMain.handle(CONFIG.GET_DISABLED_YARG_MOTION_CUES, async () => {
     const disabled = controllerManager.getConfig().getDisabledMotionCues() ?? {}
-    MotionCueRegistry.getInstance().setDisabledCues(disabled)
+    YargCueRegistry.getInstance().setDisabledMotionCues(disabled)
     return disabled
   })
 
-  ipcMain.handle(CONFIG.SET_DISABLED_MOTION_CUES, async (_, payload: unknown) => {
+  ipcMain.handle(CONFIG.SET_DISABLED_YARG_MOTION_CUES, async (_, payload: unknown) => {
     try {
-      const validation = validateDisabledCuesMap(payload, 'disabledMotionCues')
+      const validation = validateDisabledCuesMap(payload, 'disabledYargMotionCues')
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
       await controllerManager.getConfig().setDisabledMotionCues(validation.value)
-      MotionCueRegistry.getInstance().setDisabledCues(validation.value)
-      sendToAllWindows(RENDERER_RECEIVE.MOTION_CUE_GROUPS_CHANGED, undefined)
+      YargCueRegistry.getInstance().setDisabledMotionCues(validation.value)
+      sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED, undefined)
       return { success: true }
     } catch (error) {
-      console.error('Error setting disabled motion cues:', error)
+      console.error('Error setting disabled YARG motion cues:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_ENABLED_AUDIO_MOTION_CUE_GROUPS, async () => {
+    const registry = AudioCueRegistry.getInstance()
+    const config = controllerManager.getConfig()
+    const prefs = config.getAllPreferences()
+    let enabled = prefs.enabledAudioMotionCueGroups
+    const allGroups = registry.getRegisteredMotionGroupIds()
+    const knownGroups = prefs.knownAudioMotionCueGroups ?? []
+
+    if (!enabled || enabled.length === 0) {
+      enabled = allGroups
+      if (allGroups.length > 0) {
+        await config.setEnabledAudioMotionCueGroups(enabled)
+      }
+      await config.setKnownAudioMotionCueGroups(allGroups)
+      registry.setEnabledMotionGroups(enabled)
+    } else {
+      const newGroups = allGroups.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabled = [...enabled, ...newGroups]
+        await config.setEnabledAudioMotionCueGroups(enabled)
+      }
+      await config.setKnownAudioMotionCueGroups(allGroups)
+      registry.setEnabledMotionGroups(enabled)
+    }
+
+    const disabledMotion = config.getDisabledAudioMotionCues() ?? {}
+    registry.setDisabledMotionCues(disabledMotion)
+    return enabled
+  })
+
+  ipcMain.handle(CONFIG.SET_ENABLED_AUDIO_MOTION_CUE_GROUPS, async (_, groupIds: string[]) => {
+    try {
+      const validation = validateOptionalStringArray(groupIds, 'groupIds')
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      await controllerManager.getConfig().setEnabledAudioMotionCueGroups(groupIds)
+      const registry = AudioCueRegistry.getInstance()
+      registry.setEnabledMotionGroups(groupIds)
+      const disabledMotion = controllerManager.getConfig().getDisabledAudioMotionCues() ?? {}
+      registry.setDisabledMotionCues(disabledMotion)
+      sendToAllWindows(RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED, undefined)
+      console.log('Updated audio motion enabled groups:', groupIds)
+      return { success: true }
+    } catch (error) {
+      console.error('Error setting enabled audio motion cue groups:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_DISABLED_AUDIO_MOTION_CUES, async () => {
+    const disabled = controllerManager.getConfig().getDisabledAudioMotionCues() ?? {}
+    AudioCueRegistry.getInstance().setDisabledMotionCues(disabled)
+    return disabled
+  })
+
+  ipcMain.handle(CONFIG.SET_DISABLED_AUDIO_MOTION_CUES, async (_, payload: unknown) => {
+    try {
+      const validation = validateDisabledCuesMap(payload, 'disabledAudioMotionCues')
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      await controllerManager.getConfig().setDisabledAudioMotionCues(validation.value)
+      AudioCueRegistry.getInstance().setDisabledMotionCues(validation.value)
+      sendToAllWindows(RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED, undefined)
+      return { success: true }
+    } catch (error) {
+      console.error('Error setting disabled audio motion cues:', error)
       return ipcError(error)
     }
   })
@@ -494,6 +565,93 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true, config: validation.value }
     } catch (error) {
       console.error('Error setting audio game mode:', error)
+      return { ...ipcError(error), success: false }
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_MOTION_ENABLED, async () => {
+    return controllerManager.getConfig().getMotionEnabled()
+  })
+
+  ipcMain.handle(CONFIG.SET_MOTION_ENABLED, async (_, enabled: unknown) => {
+    try {
+      if (typeof enabled !== 'boolean') {
+        return { success: false, error: 'motion enabled must be a boolean' }
+      }
+      await controllerManager.getConfig().setMotionEnabled(enabled)
+      controllerManager.setMotionEnabledGlobal(enabled)
+      sendToAllWindows(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, enabled)
+      return { success: true }
+    } catch (error) {
+      console.error('Error setting motion enabled:', error)
+      return { ...ipcError(error), success: false }
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_ACTIVE_AUDIO_MOTION_CUE, async () => {
+    return controllerManager.getConfig().getActiveAudioMotionCueRef()
+  })
+
+  ipcMain.handle(CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE, async (_, ref: unknown) => {
+    try {
+      if (ref !== null && ref !== undefined) {
+        if (!isPlainObject(ref)) {
+          return { success: false, error: 'Invalid active audio motion cue ref' }
+        }
+        const groupId =
+          typeof (ref as { groupId?: unknown }).groupId === 'string'
+            ? (ref as { groupId: string }).groupId.trim()
+            : ''
+        const cueId =
+          typeof (ref as { cueId?: unknown }).cueId === 'string'
+            ? (ref as { cueId: string }).cueId.trim()
+            : ''
+        if (!groupId || !cueId) {
+          return { success: false, error: 'groupId and cueId are required' }
+        }
+        await controllerManager.getConfig().setActiveAudioMotionCueRef({ groupId, cueId })
+        controllerManager.setActiveAudioMotionCueRef({ groupId, cueId })
+        return { success: true }
+      }
+      await controllerManager.getConfig().setActiveAudioMotionCueRef(null)
+      controllerManager.setActiveAudioMotionCueRef(null)
+      return { success: true }
+    } catch (error) {
+      console.error('Error setting active audio motion cue:', error)
+      return { ...ipcError(error), success: false }
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_ACTIVE_YARG_MOTION_CUE, async () => {
+    return controllerManager.getConfig().getActiveYargMotionCueRef()
+  })
+
+  ipcMain.handle(CONFIG.SET_ACTIVE_YARG_MOTION_CUE, async (_, ref: unknown) => {
+    try {
+      if (ref !== null && ref !== undefined) {
+        if (!isPlainObject(ref)) {
+          return { success: false, error: 'Invalid active YARG motion cue ref' }
+        }
+        const groupId =
+          typeof (ref as { groupId?: unknown }).groupId === 'string'
+            ? (ref as { groupId: string }).groupId.trim()
+            : ''
+        const cueId =
+          typeof (ref as { cueId?: unknown }).cueId === 'string'
+            ? (ref as { cueId: string }).cueId.trim()
+            : ''
+        if (!groupId || !cueId) {
+          return { success: false, error: 'groupId and cueId are required' }
+        }
+        await controllerManager.getConfig().setActiveYargMotionCueRef({ groupId, cueId })
+        controllerManager.setActiveYargMotionCueRef({ groupId, cueId })
+        return { success: true }
+      }
+      await controllerManager.getConfig().setActiveYargMotionCueRef(null)
+      controllerManager.setActiveYargMotionCueRef(null)
+      return { success: true }
+    } catch (error) {
+      console.error('Error setting active YARG motion cue:', error)
       return { ...ipcError(error), success: false }
     }
   })

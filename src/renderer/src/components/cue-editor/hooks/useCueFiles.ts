@@ -3,9 +3,9 @@ import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/
 import type {
   AudioNodeCueDefinition,
   NodeCueFile,
+  NodeCueKind,
   NodeCueMode,
   YargNodeCueDefinition,
-  MotionNodeCueDefinition,
   EffectFile,
   YargEffectDefinition,
   AudioEffectDefinition,
@@ -36,7 +36,6 @@ type UseCueFilesParams = {
     cue:
       | YargNodeCueDefinition
       | AudioNodeCueDefinition
-      | MotionNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition
       | null,
@@ -56,10 +55,12 @@ const useCueFiles = ({
   const [effectFiles, setEffectFiles] = useState<EffectFileSummary[]>([])
   const [mode, setMode] = useState<NodeCueMode>(() => {
     const stored = getLastActiveMode()
-    if (stored === 'motion-cue') return 'motion'
-    if (stored?.startsWith('yarg')) return 'yarg'
     if (stored?.startsWith('audio')) return 'audio'
     return 'yarg'
+  })
+  const [cueKind, setCueKind] = useState<NodeCueKind>(() => {
+    const stored = getLastActiveMode()
+    return stored === 'yarg-motion-cue' || stored === 'audio-motion-cue' ? 'motion' : 'lighting'
   })
   const [editorMode, setEditorMode] = useState<EditorMode>(() => {
     const stored = getLastActiveMode()
@@ -80,7 +81,7 @@ const useCueFiles = ({
   const refreshFiles = useCallback(async () => {
     try {
       const summary = await listNodeCueFiles()
-      setFiles([...summary.yarg, ...summary.audio, ...summary.motion])
+      setFiles([...summary.yarg, ...summary.audio])
     } catch (error) {
       console.error('Failed to list node cue files', error)
     }
@@ -135,6 +136,7 @@ const useCueFiles = ({
     setSelectedCueId,
     setFilename,
     mode,
+    cueKind,
     setValidationErrors,
     setIsDirty,
     loadCueIntoFlow,
@@ -156,6 +158,14 @@ const useCueFiles = ({
     return cueFile.cues.find((cue) => cue.id === selectedCueId) ?? null
   }, [editorDoc, selectedCueId])
 
+  useEffect(() => {
+    if (!currentCueDefinition || !('kind' in currentCueDefinition)) return
+    const k = currentCueDefinition.kind
+    if (k === 'lighting' || k === 'motion') {
+      setCueKind(k)
+    }
+  }, [currentCueDefinition])
+
   const currentEffectDefinition = useMemo(() => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'effect') return null
     const effectFile = editorDoc.file as EffectFile
@@ -166,7 +176,6 @@ const useCueFiles = ({
     () => ({
       yarg: files.filter((file) => file.mode === 'yarg'),
       audio: files.filter((file) => file.mode === 'audio'),
-      motion: files.filter((file) => file.mode === 'motion'),
     }),
     [files],
   )
@@ -183,22 +192,27 @@ const useCueFiles = ({
     (nextMode: string) => {
       const isEffect = nextMode === 'yarg-effect' || nextMode === 'audio-effect'
       const cueMode: NodeCueMode =
-        nextMode === 'motion-cue' || nextMode === 'motion'
-          ? 'motion'
-          : nextMode === 'yarg-effect' || nextMode === 'yarg'
-            ? 'yarg'
-            : 'audio'
+        nextMode === 'yarg-effect' || nextMode === 'yarg-cue' || nextMode === 'yarg-motion-cue'
+          ? 'yarg'
+          : 'audio'
+      const nextKind: NodeCueKind =
+        nextMode === 'yarg-motion-cue' || nextMode === 'audio-motion-cue' ? 'motion' : 'lighting'
       const modeKey: EditorModeKey = isEffect
         ? cueMode === 'yarg'
           ? 'yarg-effect'
           : 'audio-effect'
-        : cueMode === 'yarg'
-          ? 'yarg-cue'
-          : cueMode === 'motion'
-            ? 'motion-cue'
-            : 'audio-cue'
+        : nextMode === 'yarg-motion-cue'
+          ? 'yarg-motion-cue'
+          : nextMode === 'audio-motion-cue'
+            ? 'audio-motion-cue'
+            : cueMode === 'yarg'
+              ? 'yarg-cue'
+              : 'audio-cue'
 
       setMode(cueMode)
+      if (!isEffect) {
+        setCueKind(nextKind)
+      }
       setEditorMode(isEffect ? 'effect' : 'cue')
       setLastActiveMode(modeKey)
 
@@ -237,6 +251,7 @@ const useCueFiles = ({
       setEditorDoc,
       setFilename,
       setMode,
+      setCueKind,
       setSelectedCueId,
       setIsDirty,
     ],
@@ -245,12 +260,8 @@ const useCueFiles = ({
   useEffect(() => {
     fileIO.refreshFiles()
     fileIO.refreshEffectFiles()
-    const handler = (payload: {
-      yarg: NodeCueFileSummary[]
-      audio: NodeCueFileSummary[]
-      motion: NodeCueFileSummary[]
-    }) => {
-      setFiles([...payload.yarg, ...payload.audio, ...payload.motion])
+    const handler = (payload: { yarg: NodeCueFileSummary[]; audio: NodeCueFileSummary[] }) => {
+      setFiles([...payload.yarg, ...payload.audio])
     }
     const effectHandler = (payload: { yarg: EffectFileSummary[]; audio: EffectFileSummary[] }) => {
       setEffectFiles([...payload.yarg, ...payload.audio])
@@ -265,14 +276,10 @@ const useCueFiles = ({
   }, [fileIO.refreshFiles, fileIO.refreshEffectFiles])
 
   useEffect(() => {
-    if (mode === 'motion') {
-      setAvailableCueTypes([])
-      return
-    }
-    getNodeCueTypes(mode)
+    getNodeCueTypes(mode, cueKind)
       .then((types: string[]) => setAvailableCueTypes(types.filter(isCueTypeSelectable)))
       .catch(() => setAvailableCueTypes([]))
-  }, [mode])
+  }, [mode, cueKind])
 
   useEffect(() => {
     if (!selectedCueId || !editorDoc) return
@@ -282,11 +289,16 @@ const useCueFiles = ({
       ? cueMode === 'yarg'
         ? 'yarg-effect'
         : 'audio-effect'
-      : cueMode === 'yarg'
-        ? 'yarg-cue'
-        : cueMode === 'motion'
-          ? 'motion-cue'
-          : 'audio-cue'
+      : (() => {
+          const currentCue = (editorDoc.file as NodeCueFile).cues.find(
+            (c) => c.id === selectedCueId,
+          )
+          const kind = currentCue?.kind
+          if (cueMode === 'yarg') {
+            return kind === 'motion' ? 'yarg-motion-cue' : 'yarg-cue'
+          }
+          return kind === 'motion' ? 'audio-motion-cue' : 'audio-cue'
+        })()
     setLastItemIdForMode(modeKey, selectedCueId)
   }, [selectedCueId, editorDoc])
 
@@ -324,6 +336,8 @@ const useCueFiles = ({
 
   return {
     mode,
+    cueKind,
+    setCueKind,
     activeMode,
     editorMode,
     files,

@@ -128,6 +128,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'chain-test',
       name: 'Chain Test',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -221,6 +222,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'beat-gate',
       name: 'Beat Gate',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -321,6 +323,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'array-target',
       name: 'Array Target',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -424,6 +427,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'string-conditional',
       name: 'String Conditional',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -505,6 +509,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'delay-test',
       name: 'Delay Test',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -583,6 +588,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'wait-until-beat',
       name: 'Wait Until Beat',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -662,6 +668,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'wait-until-count',
       name: 'Wait Until Count',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -761,6 +768,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'measure-keyframe',
       name: 'Measure + Keyframe',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -872,6 +880,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'measure-keyframe-count',
       name: 'Measure + Keyframe Count',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -991,6 +1000,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'note-counts',
       name: 'Note Counts',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1106,6 +1116,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'bass-keys-counts',
       name: 'Bass Keys Counts',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1207,6 +1218,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'math-duration',
       name: 'Math Duration',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1314,6 +1326,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'math-ops',
       name: 'Math Ops',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1422,6 +1435,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'init-fallback',
       name: 'Init/Conditional',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1524,6 +1538,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'variable-get',
       name: 'Variable Get',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1634,6 +1649,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'concat-length',
       name: 'Concat + Length',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1753,6 +1769,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'pairs-test',
       name: 'Pairs Test',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1871,6 +1888,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'target-groups',
       name: 'Target Groups',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1966,6 +1984,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'random-targets',
       name: 'Random Targets',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -2090,6 +2109,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'event-chain',
       name: 'Event Chain',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {

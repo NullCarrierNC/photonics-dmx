@@ -57,6 +57,7 @@ function minimalCueDefinition(): YargNodeCueDefinition {
   return {
     id: 'test-cue',
     name: 'Test Cue',
+    kind: 'lighting',
     cueType: CueType.Sweep,
     style: 'primary',
     nodes: { events: [eventNode], actions: [actionNode], logic: [] },
@@ -94,6 +95,7 @@ function sustainPatternCueDefinition(): YargNodeCueDefinition {
   return {
     id: 'sustain-cue',
     name: 'Sustain Cue',
+    kind: 'lighting',
     cueType: CueType.Sweep,
     style: 'primary',
     nodes: {
@@ -345,6 +347,7 @@ describe('GraphExecutionEngine', () => {
       const def: YargNodeCueDefinition = {
         id: 'drum-cue',
         name: 'Drum Cue',
+        kind: 'lighting',
         cueType: CueType.Sweep,
         style: 'primary',
         nodes: {

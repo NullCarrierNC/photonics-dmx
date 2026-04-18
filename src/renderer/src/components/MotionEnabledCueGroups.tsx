@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
 import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
 import {
-  getMotionCueGroups,
-  getEnabledMotionCueGroups,
-  setEnabledMotionCueGroups,
-  getAvailableMotionCues,
-  getDisabledMotionCues,
-  setDisabledMotionCues,
+  getYargMotionCueGroups,
+  getAudioMotionCueGroups,
+  getEnabledYargMotionCueGroups,
+  setEnabledYargMotionCueGroups,
+  getAvailableYargMotionCues,
+  getDisabledYargMotionCues,
+  setDisabledYargMotionCues,
+  getEnabledAudioMotionCueGroups,
+  setEnabledAudioMotionCueGroups,
+  getAvailableAudioMotionCues,
+  getDisabledAudioMotionCues,
+  setDisabledAudioMotionCues,
 } from '../ipcApi'
 
 interface MotionCueInfo {
@@ -48,7 +54,12 @@ function GroupEnableCheckbox(props: {
   )
 }
 
-const MotionEnabledCueGroups: React.FC = () => {
+export interface MotionEnabledCueGroupsProps {
+  /** YARG motion runs with YARG lighting; audio motion runs alongside audio-reactive lighting. */
+  platform: 'yarg' | 'audio'
+}
+
+const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platform }) => {
   const [allGroups, setAllGroups] = useState<MotionCueGroupDetails[]>([])
   const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([])
   const [disabledByGroup, setDisabledByGroup] = useState<Record<string, string[]>>({})
@@ -57,11 +68,15 @@ const MotionEnabledCueGroups: React.FC = () => {
   const fetchGroups = useCallback(async () => {
     try {
       setLoading(true)
-      const [groups, enabled, disabled] = await Promise.all([
-        getMotionCueGroups(),
-        getEnabledMotionCueGroups(),
-        getDisabledMotionCues(),
-      ])
+      const [groups, enabled, disabled] = await Promise.all(
+        platform === 'yarg'
+          ? [getYargMotionCueGroups(), getEnabledYargMotionCueGroups(), getDisabledYargMotionCues()]
+          : [
+              getAudioMotionCueGroups(),
+              getEnabledAudioMotionCueGroups(),
+              getDisabledAudioMotionCues(),
+            ],
+      )
 
       const mappedGroups: MotionCueGroupDetails[] = (
         groups as Array<{
@@ -84,7 +99,7 @@ const MotionEnabledCueGroups: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [platform])
 
   useEffect(() => {
     fetchGroups()
@@ -94,12 +109,18 @@ const MotionEnabledCueGroups: React.FC = () => {
     nextEnabled: string[],
     nextDisabled: Record<string, string[]>,
   ) => {
-    const enabledResult = await setEnabledMotionCueGroups(nextEnabled)
+    const enabledResult =
+      platform === 'yarg'
+        ? await setEnabledYargMotionCueGroups(nextEnabled)
+        : await setEnabledAudioMotionCueGroups(nextEnabled)
     if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
       console.error('Failed to save enabled motion cue groups')
       return
     }
-    const disabledResult = await setDisabledMotionCues(nextDisabled)
+    const disabledResult =
+      platform === 'yarg'
+        ? await setDisabledYargMotionCues(nextDisabled)
+        : await setDisabledAudioMotionCues(nextDisabled)
     if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
       console.error('Failed to save disabled motion cues')
       return
@@ -157,7 +178,11 @@ const MotionEnabledCueGroups: React.FC = () => {
 
     if (!group.isExpanded && group.cues.length === 0) {
       try {
-        const cueDetails = (await getAvailableMotionCues(groupId)) as MotionCueInfo[]
+        const cueDetails = (
+          platform === 'yarg'
+            ? await getAvailableYargMotionCues(groupId)
+            : await getAvailableAudioMotionCues(groupId)
+        ) as MotionCueInfo[]
 
         setAllGroups((prevGroups) =>
           prevGroups.map((g) =>
@@ -179,7 +204,11 @@ const MotionEnabledCueGroups: React.FC = () => {
     let cues = allGroups.find((g) => g.id === groupId)?.cues ?? []
     if (cues.length === 0) {
       try {
-        cues = (await getAvailableMotionCues(groupId)) as MotionCueInfo[]
+        cues = (
+          platform === 'yarg'
+            ? await getAvailableYargMotionCues(groupId)
+            : await getAvailableAudioMotionCues(groupId)
+        ) as MotionCueInfo[]
         setAllGroups((prev) =>
           prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
         )
@@ -218,10 +247,16 @@ const MotionEnabledCueGroups: React.FC = () => {
     await persistEnabledAndDisabled(nextEnabled, nextDisabled)
   }
 
+  const title = platform === 'yarg' ? 'YARG Motion Cue Groups' : 'Audio Motion Cue Groups'
+  const description =
+    platform === 'yarg'
+      ? 'YARG motion programs run in parallel with YARG lighting cues and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.'
+      : 'Audio motion programs run alongside audio-reactive lighting cues (same timing as your primary/secondary/strobe layers) and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.'
+
   if (loading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4 border-b pb-2">Motion Cue Groups</h2>
+        <h2 className="text-xl font-semibold mb-4 border-b pb-2">{title}</h2>
         <p>Loading motion cue groups...</p>
       </div>
     )
@@ -230,13 +265,9 @@ const MotionEnabledCueGroups: React.FC = () => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
-        Motion Cue Groups
+        {title}
       </h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        Motion cues run in parallel with YARG lighting cues and control pan/tilt on moving heads.
-        Enable the groups you want in the random pool. You can disable individual motion programs
-        within an enabled group; the group stays enabled if at least one program remains on.
-      </p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">{description}</p>
       <div className="space-y-4">
         {allGroups.map((group) => {
           const { checked, indeterminate } = getGroupCheckboxState(group)

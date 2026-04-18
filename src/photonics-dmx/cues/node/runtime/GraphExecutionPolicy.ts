@@ -3,7 +3,7 @@
  */
 
 import type { BaseEventNode } from '../../types/nodeCueTypes'
-import type { CompiledMotionCue, CompiledYargCue } from '../compiler/NodeCueCompiler'
+import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import type { CompiledEffect } from '../compiler/EffectCompiler'
 import type { CueData } from '../../types/cueTypes'
 import { isInstrumentEventTriggered } from '../../types/cueTypes'
@@ -41,7 +41,7 @@ export interface GraphExecutionPolicy {
    * Cue: event nodes from eventMap (triggered by params + entryContext.hasCueStartedFired); effect: single effect listener.
    */
   getEntryNodes(
-    compiled: CompiledYargCue | CompiledMotionCue | CompiledEffect<BaseEventNode>,
+    compiled: CompiledYargCue | CompiledEffect<BaseEventNode>,
     parameters: ExecutionParameters,
     entryContext?: { hasCueStartedFired?: boolean },
   ): BaseEventNode[]
@@ -63,7 +63,7 @@ function cueLikeGraphPolicy(
     canInvokeEffects: true,
     getLogPrefix: () => `cue:${groupId}:${cueId}`,
     getEntryNodes(compiled, parameters, entryContext): BaseEventNode[] {
-      const cue = compiled as CompiledYargCue | CompiledMotionCue
+      const cue = compiled as CompiledYargCue
       const hasCueStartedFired = entryContext?.hasCueStartedFired ?? false
       const cueData = parameters as CueData
 

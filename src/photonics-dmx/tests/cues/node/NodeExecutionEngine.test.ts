@@ -150,6 +150,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -262,6 +263,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -372,6 +374,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -479,6 +482,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -672,6 +676,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -741,6 +746,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -814,6 +820,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -883,6 +890,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'TestType' as CueType,
         style: 'primary',
         description: 'Test',
@@ -957,6 +965,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'TestType' as CueType,
         style: 'primary',
         description: 'Test',
@@ -1044,6 +1053,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'TestType' as CueType,
         style: 'primary',
         description: 'Test',
@@ -1237,6 +1247,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'TestType' as CueType,
         style: 'primary',
         description: 'Test',
@@ -1345,6 +1356,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1439,6 +1451,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1545,6 +1558,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1663,6 +1677,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1774,6 +1789,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1906,6 +1922,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2000,6 +2017,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2083,6 +2101,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2182,6 +2201,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2285,6 +2305,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2360,6 +2381,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2444,6 +2466,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2539,6 +2562,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2628,6 +2652,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2718,6 +2743,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2820,6 +2846,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'position-cue',
         name: 'Position Cue',
+        kind: 'lighting',
         cueType: CueType.Stomp,
         style: 'primary',
         nodes: { events: [eventNode], actions: [actionNode], logic: [] },
@@ -2878,6 +2905,7 @@ describe('NodeExecutionEngine', () => {
       const definition1: YargNodeCueDefinition = {
         id: 'cue-a',
         name: 'Cue A',
+        kind: 'lighting',
         cueType: CueType.Sweep,
         style: 'primary',
         nodes: { events: [eventNode], actions: [actionNode], logic: [] },
@@ -2886,6 +2914,7 @@ describe('NodeExecutionEngine', () => {
       const definition2: YargNodeCueDefinition = {
         id: 'cue-b',
         name: 'Cue B',
+        kind: 'lighting',
         cueType: CueType.Stomp,
         style: 'primary',
         nodes: {
