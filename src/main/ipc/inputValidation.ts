@@ -366,6 +366,8 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'knownAudioCueGroups',
   'cueConsistencyWindow',
   'motionCueMinimumHoldMs',
+  'motionCueProbabilityPercent',
+  'audioMotionCueProbabilityPercent',
   'cueGroupSelectionMode',
   'clockRate',
   'dmxOutputConfig',
@@ -422,6 +424,28 @@ export function validatePreferencesPayload(
     )
     if (!v.ok) return v
     cleaned.motionCueMinimumHoldMs = Math.round(v.value)
+  }
+
+  if ('motionCueProbabilityPercent' in cleaned) {
+    const v = validateNumberInRange(
+      cleaned.motionCueProbabilityPercent,
+      0,
+      100,
+      'motionCueProbabilityPercent',
+    )
+    if (!v.ok) return v
+    cleaned.motionCueProbabilityPercent = Math.round(v.value)
+  }
+
+  if ('audioMotionCueProbabilityPercent' in cleaned) {
+    const v = validateNumberInRange(
+      cleaned.audioMotionCueProbabilityPercent,
+      0,
+      100,
+      'audioMotionCueProbabilityPercent',
+    )
+    if (!v.ok) return v
+    cleaned.audioMotionCueProbabilityPercent = Math.round(v.value)
   }
 
   return { ok: true, value: cleaned as Partial<AppPreferences> }

@@ -48,6 +48,18 @@ export const getMotionCueMinHoldMs = () =>
 export const setMotionCueMinHoldMs = (minHoldMs: number) =>
   window.api.invoke(LIGHT.SET_MOTION_CUE_MIN_HOLD_MS, minHoldMs)
 
+export const getMotionCueProbabilityPercent = () =>
+  window.api.invoke(LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT, undefined)
+
+export const setMotionCueProbabilityPercent = (percent: number) =>
+  window.api.invoke(LIGHT.SET_MOTION_CUE_PROBABILITY_PERCENT, percent)
+
+export const getAudioMotionCueProbabilityPercent = () =>
+  window.api.invoke(LIGHT.GET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, undefined)
+
+export const setAudioMotionCueProbabilityPercent = (percent: number) =>
+  window.api.invoke(LIGHT.SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, percent)
+
 export const getCueGroupSelectionMode = () =>
   window.api.invoke(LIGHT.GET_CUE_GROUP_SELECTION_MODE, undefined)
 

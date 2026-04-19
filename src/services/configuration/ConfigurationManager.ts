@@ -82,6 +82,10 @@ export interface AppPreferences {
   cueConsistencyWindow: number
   /** Minimum time (ms) the current motion cue must run before auto re-pick on lighting/primary change. Manual motion selection is not gated. */
   motionCueMinimumHoldMs?: number
+  /** Probability (0-100) that an automatic YARG motion cue pick will play on a new lighting cue. A failed roll stops motion and returns fixtures to home. Manual motion selection bypasses the roll. Default 100. */
+  motionCueProbabilityPercent?: number
+  /** Probability (0-100) that an automatic audio motion cue pick will play on a primary cue change. A failed roll stops motion and returns fixtures to home. Manual motion selection bypasses the roll. Default 100. */
+  audioMotionCueProbabilityPercent?: number
   /** Cue group selection: 'withinSong' = can change during song; 'oncePerSong' = fixed at song start */
   cueGroupSelectionMode: 'oncePerSong' | 'withinSong'
   clockRate: number
@@ -152,6 +156,8 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledAudioCueGroups: [],
   cueConsistencyWindow: 60000,
   motionCueMinimumHoldMs: 5000,
+  motionCueProbabilityPercent: 100,
+  audioMotionCueProbabilityPercent: 100,
   motionGroupSelectionMode: 'perCueChange',
   motionEnabled: true,
   activeAudioMotionCueRef: null,
@@ -580,6 +586,24 @@ export class ConfigurationManager {
   async setMotionCueMinimumHoldMs(ms: number): Promise<void> {
     const clamped = Math.max(0, Math.min(600000, Math.round(ms)))
     await this.setPreference('motionCueMinimumHoldMs', clamped)
+  }
+
+  getMotionCueProbabilityPercent(): number {
+    return this.preferences.get().motionCueProbabilityPercent ?? 100
+  }
+
+  async setMotionCueProbabilityPercent(percent: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+    await this.setPreference('motionCueProbabilityPercent', clamped)
+  }
+
+  getAudioMotionCueProbabilityPercent(): number {
+    return this.preferences.get().audioMotionCueProbabilityPercent ?? 100
+  }
+
+  async setAudioMotionCueProbabilityPercent(percent: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+    await this.setPreference('audioMotionCueProbabilityPercent', clamped)
   }
 
   /**

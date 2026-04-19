@@ -44,6 +44,7 @@ export class AudioCueProcessor {
     preferredCueType?: AudioCueType,
     preferredSecondaryCueType?: AudioCueType | null,
     getMotionCueMinimumHoldMs?: () => number,
+    getMotionCueProbabilityPercent?: () => number,
   ) {
     this.lightManager = lightManager
     this.config = this.mergeAudioConfig(audioConfig)
@@ -52,6 +53,7 @@ export class AudioCueProcessor {
     this.currentSecondaryCueType = preferredSecondaryCueType ?? null
     this.cueHandler = new AudioCueHandler(lightManager, sequencer, {
       getMotionCueMinimumHoldMs,
+      getMotionCueProbabilityPercent,
     })
     this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType, null, false)
   }

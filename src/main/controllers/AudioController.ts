@@ -59,6 +59,7 @@ export class AudioController {
         preferredCueType,
         null,
         () => this.deps.config.getMotionCueMinimumHoldMs(),
+        () => this.deps.config.getAudioMotionCueProbabilityPercent(),
       )
       this.audioProcessor.setOnStrobeStateChange((active) => {
         const strobeCueType = this.audioProcessor?.getEffectiveStrobeCueType() ?? null

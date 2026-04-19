@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getCueConsistencyWindow,
   setCueConsistencyWindow,
@@ -10,7 +10,13 @@ import {
   setAudioMotionGroupSelectionMode,
   getMotionCueMinHoldMs,
   setMotionCueMinHoldMs,
+  getMotionCueProbabilityPercent,
+  setMotionCueProbabilityPercent,
+  getAudioMotionCueProbabilityPercent,
+  setAudioMotionCueProbabilityPercent,
 } from '../ipcApi'
+
+const PROBABILITY_SAVE_DEBOUNCE_MS = 300
 
 type CueGroupSelectionMode = 'oncePerSong' | 'withinSong'
 type MotionGroupSelectionMode = 'oncePerSong' | 'perCueChange' | 'none'
@@ -30,20 +36,42 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
   const [audioMotionSelectionMode, setAudioMotionSelectionModeState] =
     useState<MotionGroupSelectionMode>('perCueChange')
   const [motionMinHoldMs, setMotionMinHoldMsState] = useState(5000)
+  const [yargMotionProbability, setYargMotionProbability] = useState(100)
+  const [audioMotionProbability, setAudioMotionProbability] = useState(100)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+
+  const yargProbabilitySaveRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null
+    pendingValue: number | null
+    lastSentValue: number | null
+  }>({ timer: null, pendingValue: null, lastSentValue: null })
+  const audioProbabilitySaveRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null
+    pendingValue: number | null
+    lastSentValue: number | null
+  }>({ timer: null, pendingValue: null, lastSentValue: null })
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [windowResult, modeResult, yargMotionResult, audioMotionResult, minHoldResult] =
-          await Promise.all([
-            getCueConsistencyWindow(),
-            getCueGroupSelectionMode(),
-            getYargMotionGroupSelectionMode(),
-            getAudioMotionGroupSelectionMode(),
-            getMotionCueMinHoldMs(),
-          ])
+        const [
+          windowResult,
+          modeResult,
+          yargMotionResult,
+          audioMotionResult,
+          minHoldResult,
+          yargProbabilityResult,
+          audioProbabilityResult,
+        ] = await Promise.all([
+          getCueConsistencyWindow(),
+          getCueGroupSelectionMode(),
+          getYargMotionGroupSelectionMode(),
+          getAudioMotionGroupSelectionMode(),
+          getMotionCueMinHoldMs(),
+          getMotionCueProbabilityPercent(),
+          getAudioMotionCueProbabilityPercent(),
+        ])
         if (windowResult.success) setConsistencyWindow(windowResult.windowMs)
         if (modeResult.success) setSelectionMode(modeResult.mode)
         if (yargMotionResult?.success === true && yargMotionResult.mode) {
@@ -54,6 +82,20 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
         }
         if (minHoldResult?.success === true && typeof minHoldResult.minHoldMs === 'number') {
           setMotionMinHoldMsState(minHoldResult.minHoldMs)
+        }
+        if (
+          yargProbabilityResult?.success === true &&
+          typeof yargProbabilityResult.percent === 'number'
+        ) {
+          setYargMotionProbability(yargProbabilityResult.percent)
+          yargProbabilitySaveRef.current.lastSentValue = yargProbabilityResult.percent
+        }
+        if (
+          audioProbabilityResult?.success === true &&
+          typeof audioProbabilityResult.percent === 'number'
+        ) {
+          setAudioMotionProbability(audioProbabilityResult.percent)
+          audioProbabilitySaveRef.current.lastSentValue = audioProbabilityResult.percent
         }
       } catch (error) {
         console.error('Failed to load cue consistency settings:', error)
@@ -103,6 +145,152 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
     // Save when the user finishes editing (loses focus)
     handleConsistencyWindowChange(consistencyWindow)
   }
+
+  const sendProbability = useCallback(
+    async (
+      ref: React.MutableRefObject<{
+        timer: ReturnType<typeof setTimeout> | null
+        pendingValue: number | null
+        lastSentValue: number | null
+      }>,
+      save: (value: number) => Promise<{ success: true; percent: number } | { success: false }>,
+      reload: () => Promise<{ success: true; percent: number } | { success: false }>,
+      applyServerValue: (value: number) => void,
+      label: string,
+    ) => {
+      const pending = ref.current.pendingValue
+      if (pending == null) return
+      if (pending === ref.current.lastSentValue) {
+        ref.current.pendingValue = null
+        return
+      }
+      const valueToSend = pending
+      ref.current.pendingValue = null
+      try {
+        const result = await save(valueToSend)
+        if (result.success && typeof result.percent === 'number') {
+          ref.current.lastSentValue = result.percent
+          applyServerValue(result.percent)
+        } else {
+          console.error(`Failed to save ${label}`)
+          const reloaded = await reload()
+          if (reloaded.success && typeof reloaded.percent === 'number') {
+            ref.current.lastSentValue = reloaded.percent
+            applyServerValue(reloaded.percent)
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to save ${label}:`, error)
+        try {
+          const reloaded = await reload()
+          if (reloaded.success && typeof reloaded.percent === 'number') {
+            ref.current.lastSentValue = reloaded.percent
+            applyServerValue(reloaded.percent)
+          }
+        } catch (reloadError) {
+          console.error(`Failed to reload ${label}:`, reloadError)
+        }
+      }
+    },
+    [],
+  )
+
+  const armProbabilitySave = useCallback(
+    (
+      ref: React.MutableRefObject<{
+        timer: ReturnType<typeof setTimeout> | null
+        pendingValue: number | null
+        lastSentValue: number | null
+      }>,
+      value: number,
+      flush: () => void,
+    ) => {
+      ref.current.pendingValue = value
+      if (ref.current.timer) {
+        clearTimeout(ref.current.timer)
+      }
+      ref.current.timer = setTimeout(() => {
+        ref.current.timer = null
+        flush()
+      }, PROBABILITY_SAVE_DEBOUNCE_MS)
+    },
+    [],
+  )
+
+  const flushYargProbability = useCallback(() => {
+    if (yargProbabilitySaveRef.current.timer) {
+      clearTimeout(yargProbabilitySaveRef.current.timer)
+      yargProbabilitySaveRef.current.timer = null
+    }
+    void sendProbability(
+      yargProbabilitySaveRef,
+      setMotionCueProbabilityPercent,
+      getMotionCueProbabilityPercent,
+      setYargMotionProbability,
+      'YARG motion probability',
+    )
+  }, [sendProbability])
+
+  const flushAudioProbability = useCallback(() => {
+    if (audioProbabilitySaveRef.current.timer) {
+      clearTimeout(audioProbabilitySaveRef.current.timer)
+      audioProbabilitySaveRef.current.timer = null
+    }
+    void sendProbability(
+      audioProbabilitySaveRef,
+      setAudioMotionCueProbabilityPercent,
+      getAudioMotionCueProbabilityPercent,
+      setAudioMotionProbability,
+      'audio motion probability',
+    )
+  }, [sendProbability])
+
+  const handleYargProbabilityChange = useCallback(
+    (value: number) => {
+      const clamped = Math.max(0, Math.min(100, Math.round(value)))
+      setYargMotionProbability(clamped)
+      armProbabilitySave(yargProbabilitySaveRef, clamped, flushYargProbability)
+    },
+    [armProbabilitySave, flushYargProbability],
+  )
+
+  const handleAudioProbabilityChange = useCallback(
+    (value: number) => {
+      const clamped = Math.max(0, Math.min(100, Math.round(value)))
+      setAudioMotionProbability(clamped)
+      armProbabilitySave(audioProbabilitySaveRef, clamped, flushAudioProbability)
+    },
+    [armProbabilitySave, flushAudioProbability],
+  )
+
+  useEffect(() => {
+    const yargRef = yargProbabilitySaveRef
+    const audioRef = audioProbabilitySaveRef
+    return () => {
+      if (yargRef.current.timer) {
+        clearTimeout(yargRef.current.timer)
+        yargRef.current.timer = null
+      }
+      if (audioRef.current.timer) {
+        clearTimeout(audioRef.current.timer)
+        audioRef.current.timer = null
+      }
+      void sendProbability(
+        yargRef,
+        setMotionCueProbabilityPercent,
+        getMotionCueProbabilityPercent,
+        () => {},
+        'YARG motion probability',
+      )
+      void sendProbability(
+        audioRef,
+        setAudioMotionCueProbabilityPercent,
+        getAudioMotionCueProbabilityPercent,
+        () => {},
+        'audio motion probability',
+      )
+    }
+  }, [sendProbability])
 
   const handleMotionMinHoldChange = useCallback(
     async (value: number) => {
@@ -289,6 +477,68 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           </select>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
             Controls when a new motion cue is triggered in audio mode.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="yarg-motion-probability"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            YARG motion cue probability
+          </label>
+          <div className="flex items-center space-x-4">
+            <input
+              type="range"
+              id="yarg-motion-probability"
+              min={0}
+              max={100}
+              step={1}
+              value={yargMotionProbability}
+              onChange={(e) => handleYargProbabilityChange(parseInt(e.target.value, 10))}
+              onMouseUp={flushYargProbability}
+              onPointerUp={flushYargProbability}
+              onBlur={flushYargProbability}
+              className="flex-1 max-w-xs accent-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || !motionGloballyEnabled}
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300 w-12 text-right tabular-nums">
+              {yargMotionProbability}%
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Chance that a motion cue will play when a new YARG lighting cue starts. At 100% a motion
+            cue is always picked; at 0% motion is suppressed and fixtures return to their home
+            position. Manual motion selection always plays regardless of this value.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="audio-motion-probability"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Audio motion cue probability
+          </label>
+          <div className="flex items-center space-x-4">
+            <input
+              type="range"
+              id="audio-motion-probability"
+              min={0}
+              max={100}
+              step={1}
+              value={audioMotionProbability}
+              onChange={(e) => handleAudioProbabilityChange(parseInt(e.target.value, 10))}
+              onMouseUp={flushAudioProbability}
+              onPointerUp={flushAudioProbability}
+              onBlur={flushAudioProbability}
+              className="flex-1 max-w-xs accent-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || !motionGloballyEnabled}
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300 w-12 text-right tabular-nums">
+              {audioMotionProbability}%
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Chance that a motion cue will play when the primary audio cue changes. At 100% a motion
+            cue is always picked; at 0% motion is suppressed and fixtures return to their home
+            position. Manual motion selection always plays regardless of this value.
           </p>
         </div>
         <div>

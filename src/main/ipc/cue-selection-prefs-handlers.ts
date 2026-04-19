@@ -65,6 +65,56 @@ export function setupCueSelectionPrefsHandlers(
     }
   })
 
+  ipcMain.handle(LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT, async () => {
+    try {
+      const percent = controllerManager.getConfig().getMotionCueProbabilityPercent()
+      return { success: true, percent }
+    } catch (error) {
+      console.error('Error getting motion cue probability percent:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.SET_MOTION_CUE_PROBABILITY_PERCENT, async (_, percent: number) => {
+    try {
+      const validated = validateNumberInRange(percent, 0, 100, 'motionCueProbabilityPercent')
+      if (!validated.ok) {
+        return ipcError(new Error(validated.error))
+      }
+      await controllerManager.getConfig().setMotionCueProbabilityPercent(validated.value)
+      const stored = controllerManager.getConfig().getMotionCueProbabilityPercent()
+      return { success: true, percent: stored }
+    } catch (error) {
+      console.error('Error setting motion cue probability percent:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.GET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, async () => {
+    try {
+      const percent = controllerManager.getConfig().getAudioMotionCueProbabilityPercent()
+      return { success: true, percent }
+    } catch (error) {
+      console.error('Error getting audio motion cue probability percent:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, async (_, percent: number) => {
+    try {
+      const validated = validateNumberInRange(percent, 0, 100, 'audioMotionCueProbabilityPercent')
+      if (!validated.ok) {
+        return ipcError(new Error(validated.error))
+      }
+      await controllerManager.getConfig().setAudioMotionCueProbabilityPercent(validated.value)
+      const stored = controllerManager.getConfig().getAudioMotionCueProbabilityPercent()
+      return { success: true, percent: stored }
+    } catch (error) {
+      console.error('Error setting audio motion cue probability percent:', error)
+      return ipcError(error)
+    }
+  })
+
   ipcMain.handle(
     LIGHT.SET_CUE_GROUP_SELECTION_MODE,
     async (_, mode: 'oncePerSong' | 'withinSong') => {

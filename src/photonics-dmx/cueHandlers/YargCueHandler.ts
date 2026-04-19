@@ -34,6 +34,8 @@ const STROBE_TYPES: CueType[] = [
 
 export type YargCueHandlerOptions = {
   getMotionCueMinimumHoldMs?: () => number
+  /** Probability (0-100) that an automatic motion cue pick will play on a new lighting cue. Defaults to 100 (always). */
+  getMotionCueProbabilityPercent?: () => number
 }
 
 class YargCueHandler extends BaseCueHandler {
@@ -48,6 +50,7 @@ class YargCueHandler extends BaseCueHandler {
   private lastManualMotionRefForMotion: YargMotionCueRef | null | undefined = undefined
   private lastEmittedMotionKey: string | null = null
   private readonly getMotionCueMinimumHoldMs: () => number
+  private readonly getMotionCueProbabilityPercent: () => number
 
   public setManualMotionRef(ref: YargMotionCueRef | null): void {
     this.manualMotionRef = ref
@@ -97,6 +100,7 @@ class YargCueHandler extends BaseCueHandler {
   ) {
     super(lightManager, photonicsSequencer)
     this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
+    this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
   }
 
   public override notifySongStart(): void {
@@ -257,7 +261,10 @@ class YargCueHandler extends BaseCueHandler {
               })
             }
           } else {
-            motionCue = registry.getRandomMotionCue()
+            const probability = this.getMotionCueProbabilityPercent()
+            if (probability >= 100 || Math.random() * 100 < probability) {
+              motionCue = registry.getRandomMotionCue()
+            }
           }
 
           if (motionCue) {

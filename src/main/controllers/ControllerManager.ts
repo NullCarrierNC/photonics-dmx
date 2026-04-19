@@ -130,6 +130,7 @@ export class ControllerManager {
       createCueHandler: (dmx, eff) => {
         const h = new YargCueHandler(dmx, eff, {
           getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
+          getMotionCueProbabilityPercent: () => this.config.getMotionCueProbabilityPercent(),
         })
         h.setMotionEnabled(this.config.getMotionEnabled())
         h.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)
@@ -149,6 +150,7 @@ export class ControllerManager {
       getMotionEnabled: () => this.config.getMotionEnabled(),
       getActiveYargMotionCueRef: () => this.config.getActiveYargMotionCueRef(),
       getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
+      getMotionCueProbabilityPercent: () => this.config.getMotionCueProbabilityPercent(),
       sendSenderError: (message: string) => {
         sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
       },
@@ -541,6 +543,7 @@ export class ControllerManager {
     // Create cue handler (default to YARG)
     const yargHandler = new YargCueHandler(this.dmxLightManager, this.effectsController, {
       getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
+      getMotionCueProbabilityPercent: () => this.config.getMotionCueProbabilityPercent(),
     })
     yargHandler.setMotionEnabled(this.config.getMotionEnabled())
     yargHandler.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)

@@ -10,6 +10,8 @@ import { sendToAllWindows } from '../../main/utils/windowUtils'
 
 export type AudioCueHandlerOptions = {
   getMotionCueMinimumHoldMs?: () => number
+  /** Probability (0-100) that an automatic motion cue pick will play on a primary cue change. Defaults to 100 (always). */
+  getMotionCueProbabilityPercent?: () => number
 }
 
 /**
@@ -32,6 +34,7 @@ export class AudioCueHandler extends EventEmitter {
   private motionEnabled = true
   private executionCount = 0
   private readonly getMotionCueMinimumHoldMs: () => number
+  private readonly getMotionCueProbabilityPercent: () => number
 
   constructor(
     private lightManager: DmxLightManager,
@@ -41,6 +44,7 @@ export class AudioCueHandler extends EventEmitter {
     super()
     this.registry = AudioCueRegistry.getInstance()
     this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
+    this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
   }
 
   public isMotionLayerEnabled(): boolean {
@@ -223,8 +227,23 @@ export class AudioCueHandler extends EventEmitter {
     let source: 'manual' | 'auto' = 'auto'
     let manualFallback = false
 
-    if (this.manualMotionRef && !gameModeActive) {
-      motionCue = this.registry.getMotionCueImplementation(this.manualMotionRef)
+    const usingManualRef = this.manualMotionRef != null && !gameModeActive
+    if (!usingManualRef) {
+      const probability = this.getMotionCueProbabilityPercent()
+      if (probability < 100 && Math.random() * 100 >= probability) {
+        if (this.currentMotionCue) {
+          this.currentMotionCue.onStop?.()
+          this.currentMotionCue = null
+          this.currentMotionCueStartTime = null
+          this.sequencer.schedulePanTiltClear()
+          this.emitAudioMotionCueChange(null, 'cleared')
+        }
+        return
+      }
+    }
+
+    if (usingManualRef) {
+      motionCue = this.registry.getMotionCueImplementation(this.manualMotionRef!)
       if (motionCue) {
         source = 'manual'
       } else {
