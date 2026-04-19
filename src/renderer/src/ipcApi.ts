@@ -42,6 +42,12 @@ export const setCueConsistencyWindow = (windowMs: number) =>
 export const getCueConsistencyWindow = () =>
   window.api.invoke(LIGHT.GET_CUE_CONSISTENCY_WINDOW, undefined)
 
+export const getMotionCueMinHoldMs = () =>
+  window.api.invoke(LIGHT.GET_MOTION_CUE_MIN_HOLD_MS, undefined)
+
+export const setMotionCueMinHoldMs = (minHoldMs: number) =>
+  window.api.invoke(LIGHT.SET_MOTION_CUE_MIN_HOLD_MS, minHoldMs)
+
 export const getCueGroupSelectionMode = () =>
   window.api.invoke(LIGHT.GET_CUE_GROUP_SELECTION_MODE, undefined)
 

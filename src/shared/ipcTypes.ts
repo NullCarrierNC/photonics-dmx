@@ -390,6 +390,14 @@ export interface IpcInvokeMap {
     request: void
     response: { success: true; windowMs: number } | IpcErrorResult
   }
+  [LIGHT.GET_MOTION_CUE_MIN_HOLD_MS]: {
+    request: void
+    response: { success: true; minHoldMs: number } | IpcErrorResult
+  }
+  [LIGHT.SET_MOTION_CUE_MIN_HOLD_MS]: {
+    request: number
+    response: { success: true; minHoldMs: number } | IpcErrorResult
+  }
   [LIGHT.SET_CUE_GROUP_SELECTION_MODE]: {
     request: 'oncePerSong' | 'withinSong'
     response: { success: true; mode: 'oncePerSong' | 'withinSong' } | IpcErrorResult

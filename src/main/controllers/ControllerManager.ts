@@ -128,7 +128,9 @@ export class ControllerManager {
       getDmxLightManager: () => this.dmxLightManager!,
       ensureInitialized: () => this.init(),
       createCueHandler: (dmx, eff) => {
-        const h = new YargCueHandler(dmx, eff)
+        const h = new YargCueHandler(dmx, eff, {
+          getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
+        })
         h.setMotionEnabled(this.config.getMotionEnabled())
         h.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)
         return h
@@ -146,6 +148,7 @@ export class ControllerManager {
       },
       getMotionEnabled: () => this.config.getMotionEnabled(),
       getActiveYargMotionCueRef: () => this.config.getActiveYargMotionCueRef(),
+      getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
       sendSenderError: (message: string) => {
         sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
       },
@@ -536,7 +539,9 @@ export class ControllerManager {
     if (!this.dmxLightManager || !this.effectsController) return
 
     // Create cue handler (default to YARG)
-    const yargHandler = new YargCueHandler(this.dmxLightManager, this.effectsController)
+    const yargHandler = new YargCueHandler(this.dmxLightManager, this.effectsController, {
+      getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
+    })
     yargHandler.setMotionEnabled(this.config.getMotionEnabled())
     yargHandler.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)
     this.cueHandler = yargHandler

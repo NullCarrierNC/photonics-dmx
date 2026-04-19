@@ -4,9 +4,12 @@
 
 import {
   extractYargCueDataValue,
+  extractAudioCueDataValue,
   extractConfigDataValue,
 } from '../../../../cues/node/runtime/dataExtractors'
+import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import type { CueData } from '../../../../cues/types/cueTypes'
+import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import type { TrackedLight } from '../../../../types'
 
@@ -112,6 +115,40 @@ describe('dataExtractors', () => {
     it('extracts performer', () => {
       const cueData = minimalCueData({ performer: 2 })
       expect(extractYargCueDataValue('performer', cueData, 'my-cue')).toBe(2)
+    })
+  })
+
+  describe('extractAudioCueDataValue', () => {
+    function minimalAudioCueData(overrides?: Partial<AudioCueData['audioData']>): AudioCueData {
+      return {
+        timestamp: 0,
+        executionCount: 1,
+        audioData: {
+          timestamp: 0,
+          overallLevel: 0.5,
+          bpm: 120,
+          beatDetected: false,
+          energy: 0.5,
+          ...overrides,
+        },
+        config: DEFAULT_AUDIO_CONFIG,
+        enabledBandCount: 0,
+      }
+    }
+
+    it('audio-beat-duration-ms returns 500 when bpm is 0', () => {
+      const cueData = minimalAudioCueData({ bpm: 0 })
+      expect(extractAudioCueDataValue('audio-beat-duration-ms', cueData, 'cue-a')).toBe(500)
+    })
+
+    it('audio-beat-duration-ms returns 500 when bpm is undefined', () => {
+      const cueData = minimalAudioCueData({ bpm: undefined })
+      expect(extractAudioCueDataValue('audio-beat-duration-ms', cueData, 'cue-a')).toBe(500)
+    })
+
+    it('audio-beat-duration-ms returns round(60000/bpm) when bpm is positive', () => {
+      const cueData = minimalAudioCueData({ bpm: 100 })
+      expect(extractAudioCueDataValue('audio-beat-duration-ms', cueData, 'cue-a')).toBe(600)
     })
   })
 

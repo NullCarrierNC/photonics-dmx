@@ -199,6 +199,91 @@ describe('AudioMotionNodeCue', () => {
     expect(resolvedMotion.speedHz).toBe(AUDIO_MOTION_MAX_BPM)
   })
 
+  it('resolves audio-beat-duration-ms via cue-data into motion-pattern ramp (500 when bpm 0, 600 when bpm 100)', async () => {
+    const evStart: AudioEventNodeUnion = {
+      id: 'ev-start',
+      type: 'event',
+      eventType: 'cue-started',
+      threshold: 0.5,
+      triggerMode: 'edge',
+    }
+    const cueDataNode: LogicNode = {
+      id: 'logic-beat-ms',
+      type: 'logic',
+      logicType: 'cue-data',
+      dataProperty: 'audio-beat-duration-ms',
+      assignTo: 'beatMs',
+    }
+    const action: ActionNode = {
+      id: 'mp-dur',
+      type: 'action',
+      effectType: 'motion-pattern',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      motionPattern: {
+        pattern: { source: 'literal', value: 'circle' },
+        speed: { source: 'literal', value: 0.5 },
+        size: { source: 'literal', value: 30 },
+      },
+      timing: {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'variable', name: 'beatMs' },
+        waitUntilCondition: { source: 'literal', value: 'none' },
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+      layer: { source: 'literal', value: 120 },
+    }
+    const def: AudioMotionNodeCueDefinition = {
+      kind: 'motion',
+      id: 'motion-beat-ms-integration',
+      name: 'Beat ms integration',
+      nodes: {
+        events: [evStart],
+        actions: [action],
+        logic: [cueDataNode],
+      },
+      connections: [
+        { from: 'ev-start', to: 'logic-beat-ms' },
+        { from: 'logic-beat-ms', to: 'mp-dur' },
+      ],
+      layout: { nodePositions: {} },
+      variables: [{ name: 'beatMs', type: 'number', scope: 'cue', initialValue: 0 }],
+    }
+    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const cue = new AudioMotionNodeCue('g1', compiled)
+
+    const dataZero: AudioCueData = {
+      timestamp: 0,
+      executionCount: 1,
+      audioData: {
+        timestamp: 0,
+        overallLevel: 0.5,
+        bpm: 0,
+        beatDetected: false,
+        energy: 0.5,
+      },
+      config: DEFAULT_AUDIO_CONFIG,
+      enabledBandCount: 0,
+    }
+    await cue.execute(dataZero, sequencer, lightManager)
+    expect(sequencer.addMotionPattern).toHaveBeenCalled()
+    let ramp = (sequencer.addMotionPattern as jest.Mock).mock.calls[0][4] as number
+    expect(ramp).toBe(500)
+    ;(sequencer.addMotionPattern as jest.Mock).mockClear()
+    const cue100 = new AudioMotionNodeCue('g1', compiled)
+    const data100: AudioCueData = {
+      ...dataZero,
+      audioData: { ...dataZero.audioData, bpm: 100 },
+    }
+    await cue100.execute(data100, sequencer, lightManager)
+    expect(sequencer.addMotionPattern).toHaveBeenCalled()
+    ramp = (sequencer.addMotionPattern as jest.Mock).mock.calls[0][4] as number
+    expect(ramp).toBe(600)
+  })
+
   it('does not call removeAllEffects on execute', async () => {
     const def = minimalMotionDefinition()
     const compiled = NodeCueCompiler.compileAudioCue(def)

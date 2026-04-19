@@ -9,129 +9,6 @@
   },
   "cues": [
     {
-      "id": "motion-default-cue",
-      "name": "Default motion",
-      "description": "Moves pan/tilt on cue-started; layer above normal colour cues. Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
-      "nodes": {
-        "events": [
-          {
-            "id": "motion-default-event-start",
-            "type": "event",
-            "eventType": "cue-started",
-            "triggerMode": "edge",
-            "threshold": 0.5,
-            "label": "Cue started"
-          }
-        ],
-        "actions": [
-          {
-            "id": "motion-default-action-pos",
-            "type": "action",
-            "effectType": "motion-pattern",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 800
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "easeInOut"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 120
-            },
-            "motionPattern": {
-              "pattern": {
-                "source": "literal",
-                "value": "circle"
-              },
-              "speed": {
-                "source": "literal",
-                "value": 0.3
-              },
-              "size": {
-                "source": "literal",
-                "value": 30
-              },
-              "bearing": {
-                "source": "literal",
-                "value": "downstage"
-              },
-              "fanSpread": {
-                "source": "literal",
-                "value": 0
-              },
-              "reverse": {
-                "source": "literal",
-                "value": false
-              }
-            }
-          }
-        ],
-        "logic": [],
-        "eventRaisers": [],
-        "eventListeners": [],
-        "effectRaisers": [],
-        "notes": []
-      },
-      "connections": [
-        {
-          "from": "motion-default-event-start",
-          "to": "motion-default-action-pos"
-        }
-      ],
-      "layout": {
-        "nodePositions": {
-          "motion-default-event-start": {
-            "x": -3.028600998222828,
-            "y": 7.151440616697073
-          },
-          "motion-default-action-pos": {
-            "x": -9.894835045561194,
-            "y": 98.16065269708633
-          }
-        },
-        "viewport": {
-          "x": 604.846288516419,
-          "y": 160.50796500733122,
-          "zoom": 0.75
-        }
-      },
-      "kind": "motion"
-    },
-    {
       "id": "motion-vogue",
       "name": "Vogue",
       "description": "On each measure (every 4 detected beats), every light moves to its own random stage bearing over 800ms (set-position). Detected BPM is capped at 130 for fixture safety; beat triggers follow audio analysis, not a chart.",
@@ -175,6 +52,14 @@
       ],
       "nodes": {
         "events": [
+          {
+            "id": "vogue-event-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
           {
             "id": "vogue-event-beat",
             "type": "event",
@@ -247,6 +132,54 @@
           }
         ],
         "logic": [
+          {
+            "id": "vogue-init-measure-tick",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vMeasureTick",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "vogue-init-measure-mod",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vMeasureMod",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "vogue-init-current-index",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vogueCurrentIndex",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "vogue-init-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vogueBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": ""
+            }
+          },
           {
             "id": "vogue-logic-inc",
             "type": "logic",
@@ -331,6 +264,22 @@
       },
       "connections": [
         {
+          "from": "vogue-event-start",
+          "to": "vogue-init-measure-tick"
+        },
+        {
+          "from": "vogue-init-measure-tick",
+          "to": "vogue-init-measure-mod"
+        },
+        {
+          "from": "vogue-init-measure-mod",
+          "to": "vogue-init-current-index"
+        },
+        {
+          "from": "vogue-init-current-index",
+          "to": "vogue-init-bearing"
+        },
+        {
           "from": "vogue-logic-all-lights",
           "to": "vogue-logic-foreach"
         },
@@ -363,43 +312,63 @@
       ],
       "layout": {
         "nodePositions": {
+          "vogue-event-start": {
+            "x": -319.38606509171564,
+            "y": -121.54643159561823
+          },
           "vogue-event-beat": {
-            "x": 3.67962015978992,
-            "y": -6.178803622722626
+            "x": -24.156148561338398,
+            "y": -94.32540457296221
           },
           "vogue-action-pos": {
-            "x": -1.5696297828108072,
-            "y": 457.65537363663316
+            "x": -153.11992615339824,
+            "y": 623.1235543677847
           },
-          "vogue-logic-all-lights": {
-            "x": -9.402726575732231,
-            "y": 93.16629133746028
+          "vogue-init-measure-tick": {
+            "x": -327.1182230698069,
+            "y": -49.07136808763528
           },
-          "vogue-logic-foreach": {
-            "x": 2.1276985108852386,
-            "y": 212.5770269781351
+          "vogue-init-measure-mod": {
+            "x": -325.5717914741886,
+            "y": 24.95012701596619
           },
-          "vogue-logic-random-bearing": {
-            "x": 7.727705128490925,
-            "y": 350.95840483903885
+          "vogue-init-current-index": {
+            "x": -339.48967583475286,
+            "y": 109.7966432888951
+          },
+          "vogue-init-bearing": {
+            "x": -311.6539071136244,
+            "y": 190.00386477496926
           },
           "vogue-logic-inc": {
-            "x": -120,
-            "y": 20
+            "x": -33.399830645378756,
+            "y": -35.67153744225652
           },
           "vogue-logic-mod": {
-            "x": -120,
-            "y": 70
+            "x": -89.07136808763528,
+            "y": 62.26784202190879
           },
           "vogue-logic-measure-gate": {
-            "x": -120,
-            "y": 120
+            "x": -70.51418894021634,
+            "y": 172.57867425102017
+          },
+          "vogue-logic-all-lights": {
+            "x": -68.16712720922533,
+            "y": 295.74883036344954
+          },
+          "vogue-logic-foreach": {
+            "x": -130.86541871228337,
+            "y": 395.0559552610873
+          },
+          "vogue-logic-random-bearing": {
+            "x": -146.9154544333329,
+            "y": 536.5301963132276
           }
         },
         "viewport": {
-          "x": 600.6281330427155,
-          "y": 30.69628624478355,
-          "zoom": 0.75
+          "x": 447.9308477245352,
+          "y": 160.20638842855953,
+          "zoom": 0.6466500056216298
         }
       },
       "kind": "motion"
@@ -1133,8 +1102,8 @@
             "type": "event",
             "eventType": "cue-started",
             "triggerMode": "edge",
-            "threshold": 0.5,
-            "label": "Cue started"
+            "label": "Cue started",
+            "threshold": 0.5
           }
         ],
         "actions": [
@@ -1277,9 +1246,9 @@
           }
         },
         "viewport": {
-          "x": 597.9683078206144,
-          "y": 75.44409689959139,
-          "zoom": 0.75
+          "x": 472.50723000765913,
+          "y": 172.7431824293844,
+          "zoom": 0.6844689398964116
         }
       },
       "kind": "motion"
@@ -1849,6 +1818,14 @@
       "nodes": {
         "events": [
           {
+            "id": "vogue-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
+          {
             "id": "vogue-slow-event-beat",
             "type": "event",
             "eventType": "beat",
@@ -1920,6 +1897,54 @@
           }
         ],
         "logic": [
+          {
+            "id": "vogue-slow-init-measure-tick",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vMeasureTick",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "vogue-slow-init-measure-mod",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vMeasureMod",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "vogue-slow-init-current-index",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vogueSlowCurrentIndex",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "vogue-slow-init-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vogueSlowBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": ""
+            }
+          },
           {
             "id": "vogue-slow-logic-inc",
             "type": "logic",
@@ -2004,6 +2029,22 @@
       },
       "connections": [
         {
+          "from": "vogue-slow-event-start",
+          "to": "vogue-slow-init-measure-tick"
+        },
+        {
+          "from": "vogue-slow-init-measure-tick",
+          "to": "vogue-slow-init-measure-mod"
+        },
+        {
+          "from": "vogue-slow-init-measure-mod",
+          "to": "vogue-slow-init-current-index"
+        },
+        {
+          "from": "vogue-slow-init-current-index",
+          "to": "vogue-slow-init-bearing"
+        },
+        {
           "from": "vogue-slow-logic-all-lights",
           "to": "vogue-slow-logic-foreach"
         },
@@ -2036,43 +2077,63 @@
       ],
       "layout": {
         "nodePositions": {
+          "vogue-slow-event-start": {
+            "x": -339.4327616028638,
+            "y": -153.9774334582657
+          },
           "vogue-slow-event-beat": {
-            "x": 3.67962015978992,
-            "y": -6.178803622722626
+            "x": 9.588739022097002,
+            "y": -195.27060721654902
           },
           "vogue-slow-action-pos": {
-            "x": -1.5696297828108072,
-            "y": 457.65537363663316
+            "x": -16.342426938578512,
+            "y": 574.3604711671978
           },
-          "vogue-slow-logic-all-lights": {
-            "x": -9.402726575732231,
-            "y": 93.16629133746028
+          "vogue-slow-init-measure-tick": {
+            "x": -355.68283847420827,
+            "y": -77.0454405688464
           },
-          "vogue-slow-logic-foreach": {
-            "x": 2.1276985108852386,
-            "y": 212.5770269781351
+          "vogue-slow-init-measure-mod": {
+            "x": -355.6828384742082,
+            "y": 13.182069760763738
           },
-          "vogue-slow-logic-random-bearing": {
-            "x": 7.727705128490925,
-            "y": 350.95840483903885
+          "vogue-slow-init-current-index": {
+            "x": -394.0921110792042,
+            "y": 113.75053809941119
+          },
+          "vogue-slow-init-bearing": {
+            "x": -348.2964398963244,
+            "y": 196.5916498511374
           },
           "vogue-slow-logic-inc": {
-            "x": -120,
-            "y": 20
+            "x": -3.2949024694352147,
+            "y": -120.34157297979306
           },
           "vogue-slow-logic-mod": {
-            "x": -120,
-            "y": 70
+            "x": -23.97681848751006,
+            "y": -12.727664072299092
           },
           "vogue-slow-logic-measure-gate": {
-            "x": -120,
-            "y": 120
+            "x": 20.341572979793114,
+            "y": 103.74992312865561
+          },
+          "vogue-slow-logic-all-lights": {
+            "x": 5.370070580035417,
+            "y": 230.55330488609968
+          },
+          "vogue-slow-logic-foreach": {
+            "x": -12.645098644882466,
+            "y": 329.2821245086998
+          },
+          "vogue-slow-logic-random-bearing": {
+            "x": -7.04509202727678,
+            "y": 467.6635023696035
           }
         },
         "viewport": {
-          "x": 600.6281330427155,
-          "y": 30.69628624478355,
-          "zoom": 0.75
+          "x": 461.4694324698272,
+          "y": 282.2413175148849,
+          "zoom": 0.6769198747236393
         }
       },
       "kind": "motion"
@@ -3603,12 +3664,6 @@
           "initialValue": 0
         },
         {
-          "name": "srchAudBpm",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 120
-        },
-        {
           "name": "srchBeatMs",
           "type": "number",
           "scope": "cue",
@@ -3653,6 +3708,14 @@
       ],
       "nodes": {
         "events": [
+          {
+            "id": "srch-event-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
           {
             "id": "srch-event-beat",
             "type": "event",
@@ -3726,6 +3789,88 @@
         ],
         "logic": [
           {
+            "id": "srch-init-beat-count",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchBeatCount",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-mod",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchMod",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-current-index",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchCurrentIndex",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-pan",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchPan",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-tilt",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchTilt",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-beat-ms",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "audio-beat-duration-ms",
+            "assignTo": "srchBeatMs"
+          },
+          {
+            "id": "srch-init-calc-dur",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "srchBeatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "srchDur"
+          },
+          {
             "id": "srch-logic-inc",
             "type": "logic",
             "logicType": "math",
@@ -3770,25 +3915,10 @@
             }
           },
           {
-            "id": "srch-logic-audio-bpm",
+            "id": "srch-logic-beat-ms",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "audio-bpm",
-            "assignTo": "srchAudBpm"
-          },
-          {
-            "id": "srch-logic-ms-from-bpm",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "literal",
-              "value": 60000
-            },
-            "right": {
-              "source": "variable",
-              "name": "srchAudBpm"
-            },
+            "dataProperty": "audio-beat-duration-ms",
             "assignTo": "srchBeatMs"
           },
           {
@@ -3859,6 +3989,34 @@
       },
       "connections": [
         {
+          "from": "srch-event-start",
+          "to": "srch-init-beat-count"
+        },
+        {
+          "from": "srch-init-beat-count",
+          "to": "srch-init-mod"
+        },
+        {
+          "from": "srch-init-mod",
+          "to": "srch-init-current-index"
+        },
+        {
+          "from": "srch-init-current-index",
+          "to": "srch-init-pan"
+        },
+        {
+          "from": "srch-init-pan",
+          "to": "srch-init-tilt"
+        },
+        {
+          "from": "srch-init-tilt",
+          "to": "srch-init-beat-ms"
+        },
+        {
+          "from": "srch-init-beat-ms",
+          "to": "srch-init-calc-dur"
+        },
+        {
           "from": "srch-event-beat",
           "to": "srch-logic-inc"
         },
@@ -3872,15 +4030,11 @@
         },
         {
           "from": "srch-logic-gate",
-          "to": "srch-logic-audio-bpm",
+          "to": "srch-logic-beat-ms",
           "fromPort": "true"
         },
         {
-          "from": "srch-logic-audio-bpm",
-          "to": "srch-logic-ms-from-bpm"
-        },
-        {
-          "from": "srch-logic-ms-from-bpm",
+          "from": "srch-logic-beat-ms",
           "to": "srch-logic-calc-dur"
         },
         {
@@ -3907,59 +4061,87 @@
       ],
       "layout": {
         "nodePositions": {
+          "srch-event-start": {
+            "x": -350.35808815215546,
+            "y": -79.79411853871073
+          },
           "srch-event-beat": {
-            "x": 0,
-            "y": 0
+            "x": -2.018023561964526,
+            "y": -45.40553014420237
+          },
+          "srch-action-pos": {
+            "x": 13.405222455169849,
+            "y": 946.5947775448301
+          },
+          "srch-init-beat-count": {
+            "x": -356.54381453462844,
+            "y": -25.876234178146547
+          },
+          "srch-init-mod": {
+            "x": -347.265224960919,
+            "y": 41.959534542981714
+          },
+          "srch-init-current-index": {
+            "x": -358.0902461302466,
+            "y": 115.98102964658301
+          },
+          "srch-init-pan": {
+            "x": -339.5330669828277,
+            "y": 194.64181953703883
+          },
+          "srch-init-tilt": {
+            "x": -344.1723617696825,
+            "y": 267.11688304502195
+          },
+          "srch-init-beat-ms": {
+            "x": -350.35808815215546,
+            "y": 345.57045144940366
+          },
+          "srch-init-calc-dur": {
+            "x": -347.2652249609189,
+            "y": 439.69555729604224
           },
           "srch-logic-inc": {
-            "x": 0,
-            "y": 80
+            "x": -18.16221205768096,
+            "y": 18.450281360081192
           },
           "srch-logic-mod": {
-            "x": 0,
-            "y": 160
+            "x": -30.27035342946823,
+            "y": 110.55842273186857
           },
           "srch-logic-gate": {
-            "x": 0,
-            "y": 240
+            "x": -9.081106028840509,
+            "y": 203.67557588463808
           },
-          "srch-logic-audio-bpm": {
-            "x": -80,
-            "y": 320
-          },
-          "srch-logic-ms-from-bpm": {
-            "x": -80,
-            "y": 400
+          "srch-logic-beat-ms": {
+            "x": -71.92790575214178,
+            "y": 318.9909882190177
           },
           "srch-logic-calc-dur": {
-            "x": -80,
-            "y": 480
+            "x": -70.91889397115949,
+            "y": 427.2433180865215
           },
           "srch-logic-all-lights": {
-            "x": -80,
-            "y": 560
+            "x": -59.81976438035451,
+            "y": 530.738658351514
           },
           "srch-logic-foreach": {
             "x": -80,
             "y": 640
           },
           "srch-logic-rand-pan": {
-            "x": 80,
-            "y": 720
+            "x": -16.865130974298438,
+            "y": 766.4145419251847
           },
           "srch-logic-rand-tilt": {
-            "x": 80,
-            "y": 800
-          },
-          "srch-action-pos": {
-            "x": 80,
-            "y": 880
+            "x": 40.64854054169126,
+            "y": 851.4596008300962
           }
         },
         "viewport": {
-          "x": 400,
-          "y": 80,
-          "zoom": 0.65
+          "x": 447.9308477245352,
+          "y": 160.20638842855953,
+          "zoom": 0.6466500056216298
         }
       },
       "kind": "motion"
@@ -3969,12 +4151,6 @@
       "name": "Cross Beat",
       "description": "Each beat, even fixtures tilt 30 degrees toward stage-right while odd fixtures tilt 30 degrees toward stage-left; sides swap each beat. Duration tracks beat length from detected audio BPM.",
       "variables": [
-        {
-          "name": "cbAudBpm",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 120
-        },
         {
           "name": "cbBeatMs",
           "type": "number",
@@ -4002,6 +4178,14 @@
       ],
       "nodes": {
         "events": [
+          {
+            "id": "cb-event-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
           {
             "id": "cb-event-beat",
             "type": "event",
@@ -4143,25 +4327,53 @@
         ],
         "logic": [
           {
-            "id": "cb-logic-audio-bpm",
+            "id": "cb-init-beat-ms",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "audio-bpm",
-            "assignTo": "cbAudBpm"
+            "dataProperty": "audio-beat-duration-ms",
+            "assignTo": "cbBeatMs"
           },
           {
-            "id": "cb-logic-ms-from-bpm",
+            "id": "cb-init-flip",
             "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbFlip",
+            "valueType": "number",
+            "value": {
               "source": "literal",
-              "value": 60000
-            },
-            "right": {
-              "source": "variable",
-              "name": "cbAudBpm"
-            },
+              "value": 0
+            }
+          },
+          {
+            "id": "cb-init-even-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbEvenBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-right"
+            }
+          },
+          {
+            "id": "cb-init-odd-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbOddBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-left"
+            }
+          },
+          {
+            "id": "cb-logic-beat-ms",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "audio-beat-duration-ms",
             "assignTo": "cbBeatMs"
           },
           {
@@ -4249,11 +4461,27 @@
       },
       "connections": [
         {
-          "from": "cb-event-beat",
-          "to": "cb-logic-audio-bpm"
+          "from": "cb-event-start",
+          "to": "cb-init-beat-ms"
         },
         {
-          "from": "cb-logic-ms-from-bpm",
+          "from": "cb-init-beat-ms",
+          "to": "cb-init-flip"
+        },
+        {
+          "from": "cb-init-flip",
+          "to": "cb-init-even-bearing"
+        },
+        {
+          "from": "cb-init-even-bearing",
+          "to": "cb-init-odd-bearing"
+        },
+        {
+          "from": "cb-event-beat",
+          "to": "cb-logic-beat-ms"
+        },
+        {
+          "from": "cb-logic-beat-ms",
           "to": "cb-logic-flip-cond"
         },
         {
@@ -4289,14 +4517,14 @@
         {
           "from": "cb-logic-toggle",
           "to": "cb-action-odd"
-        },
-        {
-          "from": "cb-logic-audio-bpm",
-          "to": "cb-logic-ms-from-bpm"
         }
       ],
       "layout": {
         "nodePositions": {
+          "cb-event-start": {
+            "x": -350.7913650049966,
+            "y": -104.16997364168435
+          },
           "cb-event-beat": {
             "x": -2.8532932378908527,
             "y": -85.5987971367249
@@ -4309,17 +4537,29 @@
             "x": 109.95957899785367,
             "y": 545.7065864757815
           },
-          "cb-logic-audio-bpm": {
-            "x": -7.133233094727075,
-            "y": -25.625744471489043
+          "cb-init-beat-ms": {
+            "x": -388.8415225296219,
+            "y": -44.440262332619454
           },
-          "cb-logic-ms-from-bpm": {
-            "x": -11.413172951563354,
-            "y": 64.3473081937467
+          "cb-init-flip": {
+            "x": -378.97666687508945,
+            "y": 43.4747508465382
+          },
+          "cb-init-even-bearing": {
+            "x": -391.6600527166312,
+            "y": 110.2507876231266
+          },
+          "cb-init-odd-bearing": {
+            "x": -397.29711309064976,
+            "y": 186.89168005424722
+          },
+          "cb-logic-beat-ms": {
+            "x": -11.41317295156341,
+            "y": 12.204499734074943
           },
           "cb-logic-flip-cond": {
-            "x": 0,
-            "y": 160
+            "x": 4.227795280513874,
+            "y": 127.58690284939325
           },
           "cb-set-even-pos": {
             "x": -120,
@@ -4343,9 +4583,9 @@
           }
         },
         "viewport": {
-          "x": 531.5565139428319,
-          "y": 118.73289751962598,
-          "zoom": 0.70094442920925
+          "x": 451.24296796343174,
+          "y": 207.50057740987913,
+          "zoom": 0.7095897036044104
         }
       },
       "kind": "motion"
@@ -4355,12 +4595,6 @@
       "name": "Cross Beat Half",
       "description": "Same alternating even/odd tilt toward stage bearings as Cross Beat, but only on every second beat; movement duration spans two beats. Beat length from detected audio BPM.",
       "variables": [
-        {
-          "name": "cbhAudBpm",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 120
-        },
         {
           "name": "cbhBeatMs",
           "type": "number",
@@ -4406,6 +4640,14 @@
       ],
       "nodes": {
         "events": [
+          {
+            "id": "cbh-event-start",
+            "type": "event",
+            "eventType": "cue-started",
+            "triggerMode": "edge",
+            "label": "Cue started",
+            "threshold": 0.5
+          },
           {
             "id": "cbh-event-beat",
             "type": "event",
@@ -4547,6 +4789,88 @@
         ],
         "logic": [
           {
+            "id": "cbh-init-tick",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhTick",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cbh-init-mod",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhMod",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cbh-init-flip",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhFlip",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cbh-init-even-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhEvenBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-right"
+            }
+          },
+          {
+            "id": "cbh-init-odd-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhOddBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-left"
+            }
+          },
+          {
+            "id": "cbh-init-beat-ms",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "audio-beat-duration-ms",
+            "assignTo": "cbhBeatMs"
+          },
+          {
+            "id": "cbh-init-dur",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "cbhBeatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "cbhDur"
+          },
+          {
             "id": "cbh-logic-inc",
             "type": "logic",
             "logicType": "math",
@@ -4591,25 +4915,10 @@
             }
           },
           {
-            "id": "cbh-logic-audio-bpm",
+            "id": "cbh-logic-beat-ms",
             "type": "logic",
             "logicType": "cue-data",
-            "dataProperty": "audio-bpm",
-            "assignTo": "cbhAudBpm"
-          },
-          {
-            "id": "cbh-logic-ms-from-bpm",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "literal",
-              "value": 60000
-            },
-            "right": {
-              "source": "variable",
-              "name": "cbhAudBpm"
-            },
+            "dataProperty": "audio-beat-duration-ms",
             "assignTo": "cbhBeatMs"
           },
           {
@@ -4712,6 +5021,34 @@
       },
       "connections": [
         {
+          "from": "cbh-event-start",
+          "to": "cbh-init-tick"
+        },
+        {
+          "from": "cbh-init-tick",
+          "to": "cbh-init-mod"
+        },
+        {
+          "from": "cbh-init-mod",
+          "to": "cbh-init-flip"
+        },
+        {
+          "from": "cbh-init-flip",
+          "to": "cbh-init-even-bearing"
+        },
+        {
+          "from": "cbh-init-even-bearing",
+          "to": "cbh-init-odd-bearing"
+        },
+        {
+          "from": "cbh-init-odd-bearing",
+          "to": "cbh-init-beat-ms"
+        },
+        {
+          "from": "cbh-init-beat-ms",
+          "to": "cbh-init-dur"
+        },
+        {
           "from": "cbh-event-beat",
           "to": "cbh-logic-inc"
         },
@@ -4725,11 +5062,11 @@
         },
         {
           "from": "cbh-logic-beat-gate",
-          "to": "cbh-logic-audio-bpm",
+          "to": "cbh-logic-beat-ms",
           "fromPort": "true"
         },
         {
-          "from": "cbh-logic-ms-from-bpm",
+          "from": "cbh-logic-beat-ms",
           "to": "cbh-logic-dur"
         },
         {
@@ -4769,25 +5106,53 @@
         {
           "from": "cbh-logic-toggle",
           "to": "cbh-action-odd"
-        },
-        {
-          "from": "cbh-logic-audio-bpm",
-          "to": "cbh-logic-ms-from-bpm"
         }
       ],
       "layout": {
         "nodePositions": {
+          "cbh-event-start": {
+            "x": -253.28178486224138,
+            "y": -170.67572172733765
+          },
           "cbh-event-beat": {
             "x": 7.133233094727132,
             "y": -115.55837613457857
           },
           "cbh-action-even": {
-            "x": -147.95351789219012,
-            "y": 975.1658704855413
+            "x": -132.00950342648412,
+            "y": 911.3898126227173
           },
           "cbh-action-odd": {
-            "x": 125.51989806295524,
-            "y": 971.4269338473355
+            "x": 141.46391252866124,
+            "y": 907.6508759845115
+          },
+          "cbh-init-tick": {
+            "x": -254.69104995574597,
+            "y": -117.99233588579591
+          },
+          "cbh-init-mod": {
+            "x": -257.5095801427553,
+            "y": -49.80703401570304
+          },
+          "cbh-init-flip": {
+            "x": -258.91884523625987,
+            "y": 18.37826785438972
+          },
+          "cbh-init-even-bearing": {
+            "x": -281.4670867323342,
+            "y": 90.79136500499658
+          },
+          "cbh-init-odd-bearing": {
+            "x": -273.01149617130636,
+            "y": 180.11564327765893
+          },
+          "cbh-init-beat-ms": {
+            "x": -261.7373754232692,
+            "y": 279.30477720485396
+          },
+          "cbh-init-dur": {
+            "x": -260.3281103297646,
+            "y": 395.4050922541045
           },
           "cbh-logic-inc": {
             "x": 4.279939856836279,
@@ -4801,47 +5166,43 @@
             "x": 5.684341886080802e-14,
             "y": 142.9476089095656
           },
-          "cbh-logic-audio-bpm": {
-            "x": -7.133233094727075,
-            "y": 248.61377438320096
-          },
-          "cbh-logic-ms-from-bpm": {
-            "x": 0,
-            "y": 350
+          "cbh-logic-beat-ms": {
+            "x": 3.644058565805267,
+            "y": 273.40825657410346
           },
           "cbh-logic-dur": {
-            "x": 1.8694683191029071,
-            "y": 465.34288427424826
+            "x": 17.81348278480891,
+            "y": 401.56682641142424
           },
           "cbh-logic-flip-cond": {
-            "x": 14.955746552823257,
-            "y": 564.0375674652773
+            "x": 30.89976101852926,
+            "y": 500.2615096024533
           },
           "cbh-set-even-pos": {
-            "x": -124.39159504269128,
-            "y": 682.0795922518209
+            "x": -108.44758057698527,
+            "y": 618.3035343889969
           },
           "cbh-set-odd-neg": {
-            "x": -124.39159504269128,
-            "y": 762.0795922518209
+            "x": -108.44758057698527,
+            "y": 698.3035343889969
           },
           "cbh-set-even-neg": {
-            "x": 135.60840495730872,
-            "y": 682.0795922518209
+            "x": 151.55241942301473,
+            "y": 618.3035343889969
           },
           "cbh-set-odd-pos": {
-            "x": 135.60840495730872,
-            "y": 762.0795922518209
+            "x": 151.55241942301473,
+            "y": 698.3035343889969
           },
           "cbh-logic-toggle": {
-            "x": 5.608404957308721,
-            "y": 862.0795922518209
+            "x": 21.552419423014726,
+            "y": 798.3035343889969
           }
         },
         "viewport": {
-          "x": 437.81372518353976,
-          "y": 159.86732044728194,
-          "zoom": 0.5349114450251102
+          "x": 431.52800321827044,
+          "y": 155.06501643652007,
+          "zoom": 0.501755691278831
         }
       },
       "kind": "motion"

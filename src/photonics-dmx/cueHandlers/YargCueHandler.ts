@@ -32,16 +32,22 @@ const STROBE_TYPES: CueType[] = [
   CueType.Strobe_Off,
 ]
 
+export type YargCueHandlerOptions = {
+  getMotionCueMinimumHoldMs?: () => number
+}
+
 class YargCueHandler extends BaseCueHandler {
   private currentPrimaryCue: INetCue | null = null
   private currentSecondaryCue: INetCue | null = null
   private currentStrobeCue: INetCue | null = null
   private currentMotionCue: INetCue | null = null
+  private currentMotionCueStartTime: number | null = null
   private motionEnabled = true
   private manualMotionRef: YargMotionCueRef | null = null
   /** Tracks which manual ref was used for the last motion pick (undefined = not yet synced). */
   private lastManualMotionRefForMotion: YargMotionCueRef | null | undefined = undefined
   private lastEmittedMotionKey: string | null = null
+  private readonly getMotionCueMinimumHoldMs: () => number
 
   public setManualMotionRef(ref: YargMotionCueRef | null): void {
     this.manualMotionRef = ref
@@ -74,6 +80,7 @@ class YargCueHandler extends BaseCueHandler {
       if (this.currentMotionCue) {
         this.currentMotionCue.onStop?.()
         this.currentMotionCue = null
+        this.currentMotionCueStartTime = null
         this._sequencer.schedulePanTiltClear()
         this.emitYargMotionCueChange(null, 'cleared')
       }
@@ -83,8 +90,13 @@ class YargCueHandler extends BaseCueHandler {
     }
   }
 
-  constructor(lightManager: DmxLightManager, photonicsSequencer: ILightingController) {
+  constructor(
+    lightManager: DmxLightManager,
+    photonicsSequencer: ILightingController,
+    options?: YargCueHandlerOptions,
+  ) {
     super(lightManager, photonicsSequencer)
+    this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
   }
 
   public override notifySongStart(): void {
@@ -209,14 +221,19 @@ class YargCueHandler extends BaseCueHandler {
         if (this.currentMotionCue) {
           this.currentMotionCue.onStop?.()
           this.currentMotionCue = null
+          this.currentMotionCueStartTime = null
           this._sequencer.schedulePanTiltClear()
           this.emitYargMotionCueChange(null, 'cleared')
         }
       } else {
         const registry = YargCueRegistry.getInstance()
         const isNewCue = historicCueData.executionCount === 1
-        const needNewMotionPick =
-          isNewCue || this.manualMotionRef !== this.lastManualMotionRefForMotion
+        const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
+        const now = Date.now()
+        const minHold = this.getMotionCueMinimumHoldMs()
+        const heldLongEnough =
+          this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
+        const needNewMotionPick = isManualChange || (isNewCue && heldLongEnough)
 
         let motionCue: INetCue | null = null
 
@@ -244,10 +261,14 @@ class YargCueHandler extends BaseCueHandler {
           }
 
           if (motionCue) {
+            const prevMotion = this.currentMotionCue
             if (this.currentMotionCue && this.currentMotionCue !== motionCue) {
               this.currentMotionCue.onStop?.()
             }
             this.currentMotionCue = motionCue
+            if (prevMotion !== motionCue) {
+              this.currentMotionCueStartTime = now
+            }
             this._sequencer.cancelPanTiltClear()
             const ref = registry.findYargMotionCueRef(motionCue)
             if (ref) {
@@ -256,6 +277,7 @@ class YargCueHandler extends BaseCueHandler {
           } else if (this.currentMotionCue) {
             this.currentMotionCue.onStop?.()
             this.currentMotionCue = null
+            this.currentMotionCueStartTime = null
             this._sequencer.schedulePanTiltClear()
             this.emitYargMotionCueChange(null, 'cleared')
           }
@@ -272,6 +294,7 @@ class YargCueHandler extends BaseCueHandler {
           if (motionCue && this.currentMotionCue === motionCue) {
             this.currentMotionCue.onStop?.()
             this.currentMotionCue = null
+            this.currentMotionCueStartTime = null
             this._sequencer.schedulePanTiltClear()
             this.emitYargMotionCueChange(null, 'cleared')
           }
@@ -302,6 +325,7 @@ class YargCueHandler extends BaseCueHandler {
     if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()
       this.currentMotionCue = null
+      this.currentMotionCueStartTime = null
       this._sequencer.schedulePanTiltClear()
       this.emitYargMotionCueChange(null, 'cleared')
     }
@@ -473,6 +497,7 @@ class YargCueHandler extends BaseCueHandler {
     if (this.currentMotionCue) {
       this.currentMotionCue.onDestroy?.()
       this.currentMotionCue = null
+      this.currentMotionCueStartTime = null
     }
     super.shutdown()
   }

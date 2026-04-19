@@ -6,6 +6,7 @@ import {
   validateYargNodeCueFile,
   validateAudioNodeCueFile,
   validateYargEffectFile,
+  validateAudioEffectFile,
   validateEffectFile,
 } from '../../../cues/node/schema/validation'
 import { YargNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
@@ -1233,6 +1234,90 @@ describe('Node cue validation', () => {
       expect(result.errors.some((e) => e.includes('Duplicate effect id'))).toBe(true)
     })
 
+    it('validates a minimal Audio effect file', () => {
+      const result = validateAudioEffectFile({
+        version: 1,
+        mode: 'audio',
+        group: { id: 'effect-group-audio', name: 'Audio Effect Group' },
+        effects: [
+          {
+            id: 'eff-audio-1',
+            name: 'Test Audio Effect',
+            mode: 'audio',
+            nodes: {
+              events: [
+                {
+                  id: 'e1',
+                  type: 'event',
+                  eventType: 'beat',
+                  triggerMode: 'edge',
+                },
+              ],
+              actions: [],
+            },
+            connections: [],
+          },
+        ],
+      })
+      expect(result.valid).toBe(true)
+      expect(result.data?.effects).toHaveLength(1)
+      expect(result.mode).toBe('audio')
+    })
+
+    it('rejects duplicate effect ids for Audio (semantic)', () => {
+      const result = validateAudioEffectFile({
+        version: 1,
+        mode: 'audio',
+        group: { id: 'g', name: 'G' },
+        effects: [
+          {
+            id: 'dup',
+            name: 'First',
+            mode: 'audio',
+            nodes: { events: [], actions: [] },
+            connections: [],
+          },
+          {
+            id: 'dup',
+            name: 'Second',
+            mode: 'audio',
+            nodes: { events: [], actions: [] },
+            connections: [],
+          },
+        ],
+      })
+      expect(result.valid).toBe(false)
+      expect(result.errors.some((e) => e.includes('Duplicate effect id'))).toBe(true)
+    })
+
+    it('rejects Audio effect file when effects array is empty (schema)', () => {
+      const result = validateAudioEffectFile({
+        version: 1,
+        mode: 'audio',
+        group: { id: 'g', name: 'G' },
+        effects: [],
+      })
+      expect(result.valid).toBe(false)
+    })
+
+    it('rejects Audio effect when an effect has wrong mode (schema)', () => {
+      const result = validateAudioEffectFile({
+        version: 1,
+        mode: 'audio',
+        group: { id: 'g', name: 'G' },
+        effects: [
+          {
+            id: 'e1',
+            name: 'Wrong mode',
+            mode: 'yarg',
+            nodes: { events: [], actions: [] },
+            connections: [],
+          },
+        ],
+      })
+      expect(result.valid).toBe(false)
+    })
+
     it('validateEffectFile dispatches by mode', () => {
       expect(
         validateEffectFile({ version: 1, mode: 'yarg', group: { id: 'a', name: 'A' }, effects: [] })
@@ -1254,6 +1339,34 @@ describe('Node cue validation', () => {
       })
       expect(validYarg.valid).toBe(true)
       expect(validYarg.mode).toBe('yarg')
+
+      const validAudio = validateEffectFile({
+        version: 1,
+        mode: 'audio',
+        group: { id: 'ag', name: 'AG' },
+        effects: [
+          {
+            id: 'ae1',
+            name: 'AE',
+            mode: 'audio',
+            nodes: { events: [], actions: [] },
+            connections: [],
+          },
+        ],
+      })
+      expect(validAudio.valid).toBe(true)
+      expect(validAudio.mode).toBe('audio')
+    })
+
+    it('validates bundled audio-core-effects.json', () => {
+      const filePath = path.join(
+        __dirname,
+        '../../../../../resources/defaults/node-data/effects/audio/audio-core-effects.json',
+      )
+      const raw = fs.readFileSync(filePath, 'utf8')
+      const result = validateEffectFile(JSON.parse(raw))
+      expect(result.valid).toBe(true)
+      expect(result.mode).toBe('audio')
     })
 
     it('validates bundled audio-stagekit-effects.json', () => {

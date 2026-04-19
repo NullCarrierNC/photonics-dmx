@@ -13,6 +13,7 @@ export interface ListenerCoordinatorDeps {
   getPreference: (key: string) => number
   getMotionEnabled: () => boolean
   getActiveYargMotionCueRef: () => { groupId: string; cueId: string } | null
+  getMotionCueMinimumHoldMs: () => number
   sendSenderError: (message: string) => void
   sendToAllWindows: (channel: string, payload: unknown) => void
   setCueHandlerRef: (h: YargCueHandler | Rb3CueHandler | null) => void
@@ -54,7 +55,9 @@ export class ListenerCoordinator {
     if (this.cueHandler) {
       this.cueHandler.shutdown()
     }
-    this.cueHandler = new YargCueHandler(dmxLightManager, effectsController)
+    this.cueHandler = new YargCueHandler(dmxLightManager, effectsController, {
+      getMotionCueMinimumHoldMs: this.deps.getMotionCueMinimumHoldMs,
+    })
     this.cueHandler.setMotionEnabled(this.deps.getMotionEnabled())
     this.cueHandler.setManualMotionRef(this.deps.getActiveYargMotionCueRef())
     this.deps.setCueHandlerRef(this.cueHandler)

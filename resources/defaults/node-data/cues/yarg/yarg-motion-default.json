@@ -41,6 +41,11 @@
       "nodes": {
         "events": [
           {
+            "id": "vogue-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
             "id": "vogue-event-beat",
             "type": "event",
             "eventType": "measure"
@@ -110,6 +115,30 @@
         ],
         "logic": [
           {
+            "id": "vogue-init-index",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vogueCurrentIndex",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "vogue-init-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vogueBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": ""
+            }
+          },
+          {
             "id": "vogue-logic-all-lights",
             "type": "logic",
             "logicType": "config-data",
@@ -149,6 +178,14 @@
       },
       "connections": [
         {
+          "from": "vogue-event-start",
+          "to": "vogue-init-index"
+        },
+        {
+          "from": "vogue-init-index",
+          "to": "vogue-init-bearing"
+        },
+        {
           "from": "vogue-event-beat",
           "to": "vogue-logic-all-lights"
         },
@@ -168,6 +205,10 @@
       ],
       "layout": {
         "nodePositions": {
+          "vogue-event-start": {
+            "x": -251.25476934424466,
+            "y": -21.872887861834442
+          },
           "vogue-event-beat": {
             "x": 3.67962015978992,
             "y": -6.178803622722626
@@ -175,6 +216,14 @@
           "vogue-action-pos": {
             "x": -1.5696297828108072,
             "y": 457.65537363663316
+          },
+          "vogue-init-index": {
+            "x": -266.2553144121583,
+            "y": 68.75395174237428
+          },
+          "vogue-init-bearing": {
+            "x": -249.37970121075546,
+            "y": 176.25640454798577
           },
           "vogue-logic-all-lights": {
             "x": -9.402726575732231,
@@ -190,9 +239,9 @@
           }
         },
         "viewport": {
-          "x": 461.6281330427155,
-          "y": 147.69628624478355,
-          "zoom": 0.75
+          "x": 428.1338908588483,
+          "y": 168.49347352175772,
+          "zoom": 0.5333139538450561
         }
       },
       "kind": "motion"
@@ -1606,6 +1655,11 @@
       "nodes": {
         "events": [
           {
+            "id": "vogue-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
             "id": "vogue-slow-event-beat",
             "type": "event",
             "eventType": "measure"
@@ -1675,6 +1729,30 @@
         ],
         "logic": [
           {
+            "id": "vogue-slow-init-index",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vogueSlowCurrentIndex",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "vogue-slow-init-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "vogueSlowBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": ""
+            }
+          },
+          {
             "id": "vogue-slow-logic-all-lights",
             "type": "logic",
             "logicType": "config-data",
@@ -1714,6 +1792,14 @@
       },
       "connections": [
         {
+          "from": "vogue-slow-event-start",
+          "to": "vogue-slow-init-index"
+        },
+        {
+          "from": "vogue-slow-init-index",
+          "to": "vogue-slow-init-bearing"
+        },
+        {
           "from": "vogue-slow-event-beat",
           "to": "vogue-slow-logic-all-lights"
         },
@@ -1733,6 +1819,10 @@
       ],
       "layout": {
         "nodePositions": {
+          "vogue-slow-event-start": {
+            "x": -285.00599574705046,
+            "y": -10.622479060899195
+          },
           "vogue-slow-event-beat": {
             "x": 3.67962015978992,
             "y": -6.178803622722626
@@ -1740,6 +1830,14 @@
           "vogue-slow-action-pos": {
             "x": -1.5696297828108072,
             "y": 457.65537363663316
+          },
+          "vogue-slow-init-index": {
+            "x": -318.7572221498562,
+            "y": 95.00490561122308
+          },
+          "vogue-slow-init-bearing": {
+            "x": -286.8810638805397,
+            "y": 232.508448552662
           },
           "vogue-slow-logic-all-lights": {
             "x": -9.402726575732231,
@@ -1755,9 +1853,9 @@
           }
         },
         "viewport": {
-          "x": 461.6281330427155,
-          "y": 147.69628624478355,
-          "zoom": 0.75
+          "x": 428.1338908588483,
+          "y": 168.49347352175772,
+          "zoom": 0.5333139538450561
         }
       },
       "kind": "motion"
@@ -3306,6 +3404,11 @@
       "nodes": {
         "events": [
           {
+            "id": "srch-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
             "id": "srch-event-beat",
             "type": "event",
             "eventType": "beat"
@@ -3374,6 +3477,88 @@
           }
         ],
         "logic": [
+          {
+            "id": "srch-init-beat-count",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchBeatCount",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-mod",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchMod",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-current-index",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchCurrentIndex",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-pan",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchPan",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-tilt",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "srchTilt",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-init-beat-ms",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "beat-duration-ms",
+            "assignTo": "srchBeatMs"
+          },
+          {
+            "id": "srch-init-calc-dur",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "srchBeatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "srchDur"
+          },
           {
             "id": "srch-logic-inc",
             "type": "logic",
@@ -3493,6 +3678,34 @@
       },
       "connections": [
         {
+          "from": "srch-event-start",
+          "to": "srch-init-beat-count"
+        },
+        {
+          "from": "srch-init-beat-count",
+          "to": "srch-init-mod"
+        },
+        {
+          "from": "srch-init-mod",
+          "to": "srch-init-current-index"
+        },
+        {
+          "from": "srch-init-current-index",
+          "to": "srch-init-pan"
+        },
+        {
+          "from": "srch-init-pan",
+          "to": "srch-init-tilt"
+        },
+        {
+          "from": "srch-init-tilt",
+          "to": "srch-init-beat-ms"
+        },
+        {
+          "from": "srch-init-beat-ms",
+          "to": "srch-init-calc-dur"
+        },
+        {
           "from": "srch-event-beat",
           "to": "srch-logic-inc"
         },
@@ -3537,55 +3750,87 @@
       ],
       "layout": {
         "nodePositions": {
+          "srch-event-start": {
+            "x": -387.79997119765073,
+            "y": -7.958254523119763
+          },
           "srch-event-beat": {
             "x": 0,
             "y": 0
           },
+          "srch-action-pos": {
+            "x": 15.240913394902464,
+            "y": 947.6657194380487
+          },
+          "srch-init-beat-count": {
+            "x": -380.29969866369385,
+            "y": 45.167222411304806
+          },
+          "srch-init-mod": {
+            "x": -397.1753118650968,
+            "y": 111.4181762801536
+          },
+          "srch-init-current-index": {
+            "x": -402.8005162655644,
+            "y": 181.41926641598104
+          },
+          "srch-init-pan": {
+            "x": -393.42517559811836,
+            "y": 257.045560952276
+          },
+          "srch-init-tilt": {
+            "x": -395.30024373160757,
+            "y": 342.047196156017
+          },
+          "srch-init-beat-ms": {
+            "x": -395.30024373160757,
+            "y": 429.5474686899738
+          },
+          "srch-init-calc-dur": {
+            "x": -393.4251755981184,
+            "y": 545.1737632262689
+          },
           "srch-logic-inc": {
-            "x": 0,
-            "y": 80
+            "x": -1.8750681334892079,
+            "y": 68.74959119906475
           },
           "srch-logic-mod": {
             "x": 0,
             "y": 160
           },
           "srch-logic-gate": {
-            "x": 0,
-            "y": 240
+            "x": 11.25040880093536,
+            "y": 245.62520440046762
           },
           "srch-logic-beat-ms": {
-            "x": -80,
-            "y": 320
+            "x": -7.8791128603852485,
+            "y": 353.28656329520686
           },
           "srch-logic-calc-dur": {
-            "x": -80,
-            "y": 400
+            "x": -11.629249127363664,
+            "y": 450.1621764966096
           },
           "srch-logic-all-lights": {
-            "x": -80,
-            "y": 480
+            "x": -13.504317260852872,
+            "y": 541.4125852975451
           },
           "srch-logic-foreach": {
-            "x": -80,
-            "y": 560
+            "x": -24.75472606178812,
+            "y": 651.4136754333724
           },
           "srch-logic-rand-pan": {
-            "x": 80,
-            "y": 640
+            "x": 15.240913394902464,
+            "y": 787.6657194380487
           },
           "srch-logic-rand-tilt": {
-            "x": 80,
-            "y": 720
-          },
-          "srch-action-pos": {
-            "x": 80,
-            "y": 800
+            "x": 15.240913394902464,
+            "y": 867.6657194380487
           }
         },
         "viewport": {
-          "x": 400,
-          "y": 80,
-          "zoom": 0.65
+          "x": 427.1338908588483,
+          "y": 168.49347352175772,
+          "zoom": 0.5333139538450561
         }
       },
       "kind": "motion"
@@ -3622,6 +3867,11 @@
       ],
       "nodes": {
         "events": [
+          {
+            "id": "cb-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
           {
             "id": "cb-event-beat",
             "type": "event",
@@ -3760,6 +4010,49 @@
         ],
         "logic": [
           {
+            "id": "cb-init-beat-ms",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "beat-duration-ms",
+            "assignTo": "cbBeatMs"
+          },
+          {
+            "id": "cb-init-flip",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbFlip",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cb-init-even-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbEvenBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-right"
+            }
+          },
+          {
+            "id": "cb-init-odd-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbOddBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-left"
+            }
+          },
+          {
             "id": "cb-logic-beat-ms",
             "type": "logic",
             "logicType": "cue-data",
@@ -3851,6 +4144,22 @@
       },
       "connections": [
         {
+          "from": "cb-event-start",
+          "to": "cb-init-beat-ms"
+        },
+        {
+          "from": "cb-init-beat-ms",
+          "to": "cb-init-flip"
+        },
+        {
+          "from": "cb-init-flip",
+          "to": "cb-init-even-bearing"
+        },
+        {
+          "from": "cb-init-even-bearing",
+          "to": "cb-init-odd-bearing"
+        },
+        {
           "from": "cb-event-beat",
           "to": "cb-logic-beat-ms"
         },
@@ -3895,9 +4204,13 @@
       ],
       "layout": {
         "nodePositions": {
+          "cb-event-start": {
+            "x": -379.31931392343654,
+            "y": -99.3180839819251
+          },
           "cb-event-beat": {
-            "x": 0,
-            "y": 0
+            "x": 14.772797155767648,
+            "y": -81.25038435672218
           },
           "cb-action-even": {
             "x": -172.12466257668711,
@@ -3907,9 +4220,25 @@
             "x": 103.88417177914113,
             "y": 544.2650306748467
           },
+          "cb-init-beat-ms": {
+            "x": -376.36475449228294,
+            "y": -26.81793023923626
+          },
+          "cb-init-flip": {
+            "x": -380.79659363901334,
+            "y": 73.7505380994113
+          },
+          "cb-init-even-bearing": {
+            "x": -407.3876285193951,
+            "y": 163.97804842902144
+          },
+          "cb-init-odd-bearing": {
+            "x": -394.0921110792042,
+            "y": 237.95548188728708
+          },
           "cb-logic-beat-ms": {
-            "x": 0,
-            "y": 80
+            "x": 5.909118862307082,
+            "y": 47.49984625731099
           },
           "cb-logic-flip-cond": {
             "x": 0,
@@ -3937,9 +4266,9 @@
           }
         },
         "viewport": {
-          "x": 416.8027905638665,
-          "y": 37.04545454545456,
-          "zoom": 1.1723245109321059
+          "x": 461.4694324698272,
+          "y": 282.2413175148849,
+          "zoom": 0.6769198747236393
         }
       },
       "kind": "motion"
@@ -3995,9 +4324,14 @@
       "nodes": {
         "events": [
           {
+            "id": "cbh-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
             "id": "cbh-event-beat",
             "type": "event",
-            "eventType": "beat"
+            "eventType": "cue-called"
           }
         ],
         "actions": [
@@ -4131,6 +4465,88 @@
           }
         ],
         "logic": [
+          {
+            "id": "cbh-init-tick",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhTick",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cbh-init-mod",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhMod",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cbh-init-flip",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhFlip",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cbh-init-even-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhEvenBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-right"
+            }
+          },
+          {
+            "id": "cbh-init-odd-bearing",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhOddBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-left"
+            }
+          },
+          {
+            "id": "cbh-init-beat-ms",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "beat-duration-ms",
+            "assignTo": "cbhBeatMs"
+          },
+          {
+            "id": "cbh-init-dur",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "cbhBeatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "cbhDur"
+          },
           {
             "id": "cbh-logic-inc",
             "type": "logic",
@@ -4282,6 +4698,34 @@
       },
       "connections": [
         {
+          "from": "cbh-event-start",
+          "to": "cbh-init-tick"
+        },
+        {
+          "from": "cbh-init-tick",
+          "to": "cbh-init-mod"
+        },
+        {
+          "from": "cbh-init-mod",
+          "to": "cbh-init-flip"
+        },
+        {
+          "from": "cbh-init-flip",
+          "to": "cbh-init-even-bearing"
+        },
+        {
+          "from": "cbh-init-even-bearing",
+          "to": "cbh-init-odd-bearing"
+        },
+        {
+          "from": "cbh-init-odd-bearing",
+          "to": "cbh-init-beat-ms"
+        },
+        {
+          "from": "cbh-init-beat-ms",
+          "to": "cbh-init-dur"
+        },
+        {
           "from": "cbh-event-beat",
           "to": "cbh-logic-inc"
         },
@@ -4343,6 +4787,10 @@
       ],
       "layout": {
         "nodePositions": {
+          "cbh-event-start": {
+            "x": -377.160118189785,
+            "y": -30.11283270867159
+          },
           "cbh-event-beat": {
             "x": 12.839819570508666,
             "y": -21.399699284181224
@@ -4354,6 +4802,34 @@
           "cbh-action-odd": {
             "x": 90,
             "y": 820
+          },
+          "cbh-init-tick": {
+            "x": -386.0237964832457,
+            "y": 27.614523878249543
+          },
+          "cbh-init-mod": {
+            "x": -383.0692370520922,
+            "y": 89.77371961190124
+          },
+          "cbh-init-flip": {
+            "x": -387.50107619882243,
+            "y": 159.31931392343654
+          },
+          "cbh-init-even-bearing": {
+            "x": -412.6148313636275,
+            "y": 230.3421879505487
+          },
+          "cbh-init-odd-bearing": {
+            "x": -405.2284327857437,
+            "y": 302.8423416932375
+          },
+          "cbh-init-beat-ms": {
+            "x": -384.54651676766895,
+            "y": 376.8197751515031
+          },
+          "cbh-init-dur": {
+            "x": -393.4101950611295,
+            "y": 475.91096377457393
           },
           "cbh-logic-inc": {
             "x": 2.8532932378908527,
@@ -4401,9 +4877,9 @@
           }
         },
         "viewport": {
-          "x": 531.5565139428319,
-          "y": 118.73289751962598,
-          "zoom": 0.70094442920925
+          "x": 463.4694324698272,
+          "y": 277.2413175148849,
+          "zoom": 0.6769198747236393
         }
       },
       "kind": "motion"

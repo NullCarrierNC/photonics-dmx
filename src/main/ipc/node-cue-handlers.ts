@@ -105,12 +105,8 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     if (payload.path) {
       try {
         const file = await loader.readFile(payload.path)
-        return {
-          valid: true,
-          data: file,
-          errors: [],
-          mode: file.mode,
-        }
+        // readFile rejects invalid JSON/schema; still run the canonical validator for parity with the content branch.
+        return validateNodeCueFile(file)
       } catch (error) {
         return {
           valid: false,

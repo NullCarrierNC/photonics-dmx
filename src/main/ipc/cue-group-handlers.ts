@@ -1,17 +1,15 @@
 import { IpcMain } from 'electron'
-import { ControllerManager } from '../controllers/ControllerManager'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
 
 /**
- * Set up cue-group and consistency IPC handlers.
+ * Set up YARG cue group registry IPC handlers (active/enabled groups, source group, consistency status).
+ * Cue selection preferences (consistency window, motion min-hold, group selection mode) live in
+ * cue-selection-prefs-handlers.ts.
  */
-export function setupCueGroupHandlers(
-  ipcMain: IpcMain,
-  controllerManager: ControllerManager,
-): void {
+export function setupCueGroupHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(LIGHT.GET_CUE_GROUPS, async () => {
     const registry = YargCueRegistry.getInstance()
     const groupIds = registry.getAllGroups()
@@ -194,56 +192,6 @@ export function setupCueGroupHandlers(
       return { success: false, error: `No state found for cue: ${cueType}` }
     } catch (error) {
       console.error('Error getting cue source group:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.SET_CUE_CONSISTENCY_WINDOW, async (_, windowMs: number) => {
-    try {
-      controllerManager.getConfig().setCueConsistencyWindow(windowMs)
-      const registry = YargCueRegistry.getInstance()
-      registry.setCueConsistencyWindow(windowMs)
-      return { success: true, windowMs }
-    } catch (error) {
-      console.error('Error setting cue consistency window:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.GET_CUE_CONSISTENCY_WINDOW, async () => {
-    try {
-      const windowMs = controllerManager.getConfig().getCueConsistencyWindow()
-      return { success: true, windowMs }
-    } catch (error) {
-      console.error('Error getting cue consistency window:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(
-    LIGHT.SET_CUE_GROUP_SELECTION_MODE,
-    async (_, mode: 'oncePerSong' | 'withinSong') => {
-      try {
-        if (mode !== 'oncePerSong' && mode !== 'withinSong') {
-          return ipcError(new Error('Invalid mode: must be "oncePerSong" or "withinSong"'))
-        }
-        await controllerManager.getConfig().setCueGroupSelectionMode(mode)
-        const registry = YargCueRegistry.getInstance()
-        registry.setCueGroupSelectionMode(mode)
-        return { success: true, mode }
-      } catch (error) {
-        console.error('Error setting cue group selection mode:', error)
-        return ipcError(error)
-      }
-    },
-  )
-
-  ipcMain.handle(LIGHT.GET_CUE_GROUP_SELECTION_MODE, async () => {
-    try {
-      const mode = controllerManager.getConfig().getCueGroupSelectionMode()
-      return { success: true, mode }
-    } catch (error) {
-      console.error('Error getting cue group selection mode:', error)
       return ipcError(error)
     }
   })

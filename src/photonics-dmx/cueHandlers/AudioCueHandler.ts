@@ -8,6 +8,10 @@ import { DmxLightManager } from '../controllers/DmxLightManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { sendToAllWindows } from '../../main/utils/windowUtils'
 
+export type AudioCueHandlerOptions = {
+  getMotionCueMinimumHoldMs?: () => number
+}
+
 /**
  * Handler for audio-reactive lighting cues.
  * Primary slot: base look; optional secondary slot: overlays; optional strobe slot: energy-triggered strobes.
@@ -20,19 +24,34 @@ export class AudioCueHandler extends EventEmitter {
   private currentStrobeCue: IAudioCue | null = null
   /** Parallel motion layer; refreshed when the primary lighting cue changes. */
   private currentMotionCue: IAudioCue | null = null
+  private currentMotionCueStartTime: number | null = null
   private lastPrimaryForMotion: IAudioCue | null = null
   private lastManualMotionRef: AudioMotionCueRef | null | undefined = undefined
   private manualMotionRef: AudioMotionCueRef | null = null
   private lastEmittedMotionKey: string | null = null
   private motionEnabled = true
   private executionCount = 0
+  private readonly getMotionCueMinimumHoldMs: () => number
 
   constructor(
     private lightManager: DmxLightManager,
     private sequencer: ILightingController,
+    options?: AudioCueHandlerOptions,
   ) {
     super()
     this.registry = AudioCueRegistry.getInstance()
+    this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
+  }
+
+  public isMotionLayerEnabled(): boolean {
+    return this.motionEnabled
+  }
+
+  /** Clears motion min-hold timing so the next primary change can re-pick motion immediately. */
+  public resetMotionTracking(): void {
+    this.currentMotionCueStartTime = null
+    this.lastPrimaryForMotion = null
+    this.lastManualMotionRef = undefined
   }
 
   public setMotionEnabled(enabled: boolean): void {
@@ -43,12 +62,14 @@ export class AudioCueHandler extends EventEmitter {
     if (!enabled) {
       this.currentMotionCue?.onStop?.()
       this.currentMotionCue = null
+      this.currentMotionCueStartTime = null
       this.lastPrimaryForMotion = null
       this.lastManualMotionRef = undefined
       this.emitAudioMotionCueChange(null, 'cleared')
     } else {
       this.lastPrimaryForMotion = null
       this.lastManualMotionRef = undefined
+      this.currentMotionCueStartTime = null
     }
   }
 
@@ -162,15 +183,27 @@ export class AudioCueHandler extends EventEmitter {
       if (this.currentMotionCue) {
         this.currentMotionCue.onStop?.()
         this.currentMotionCue = null
+        this.currentMotionCueStartTime = null
         this.emitAudioMotionCueChange(null, 'cleared')
       }
       return
     }
 
-    const primaryUnchanged = this.currentPrimaryCue === this.lastPrimaryForMotion
-    const manualUnchanged = this.manualMotionRef === this.lastManualMotionRef
-    if (primaryUnchanged && manualUnchanged) {
+    const primaryChanged = this.currentPrimaryCue !== this.lastPrimaryForMotion
+    const manualChanged = this.manualMotionRef !== this.lastManualMotionRef
+    if (!primaryChanged && !manualChanged) {
       return
+    }
+
+    const bypassMinHold = manualChanged || gameModeActive
+    if (primaryChanged && !bypassMinHold) {
+      const minHold = this.getMotionCueMinimumHoldMs()
+      const now = Date.now()
+      const heldLongEnough =
+        this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
+      if (!heldLongEnough) {
+        return
+      }
     }
 
     this.lastPrimaryForMotion = this.currentPrimaryCue
@@ -180,6 +213,7 @@ export class AudioCueHandler extends EventEmitter {
       if (this.currentMotionCue) {
         this.currentMotionCue.onStop?.()
         this.currentMotionCue = null
+        this.currentMotionCueStartTime = null
         this.emitAudioMotionCueChange(null, 'cleared')
       }
       return
@@ -209,9 +243,14 @@ export class AudioCueHandler extends EventEmitter {
       source = 'auto'
     }
 
+    const nowMs = Date.now()
     if (motionCue && this.currentMotionCue !== motionCue) {
+      const prev = this.currentMotionCue
       this.currentMotionCue?.onStop?.()
       this.currentMotionCue = motionCue
+      if (prev !== motionCue) {
+        this.currentMotionCueStartTime = nowMs
+      }
       const ref = this.registry.findAudioMotionCueRef(motionCue)
       if (ref) {
         this.emitAudioMotionCueChange(ref, source, manualFallback)
@@ -220,6 +259,7 @@ export class AudioCueHandler extends EventEmitter {
       if (this.currentMotionCue) {
         this.currentMotionCue.onStop?.()
         this.currentMotionCue = null
+        this.currentMotionCueStartTime = null
         this.emitAudioMotionCueChange(null, 'cleared')
       }
     }
@@ -283,6 +323,7 @@ export class AudioCueHandler extends EventEmitter {
     this.currentStrobeCue = null
     this.currentMotionCue?.onStop?.()
     this.currentMotionCue = null
+    this.currentMotionCueStartTime = null
     this.lastPrimaryForMotion = null
     this.lastManualMotionRef = undefined
     this.executionCount = 0
@@ -301,6 +342,7 @@ export class AudioCueHandler extends EventEmitter {
     this.currentStrobeCue = null
     this.currentMotionCue?.onDestroy?.()
     this.currentMotionCue = null
+    this.currentMotionCueStartTime = null
     this.lastPrimaryForMotion = null
     this.lastManualMotionRef = undefined
     this.executionCount = 0

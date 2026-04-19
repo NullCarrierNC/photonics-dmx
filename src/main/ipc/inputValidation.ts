@@ -16,6 +16,7 @@ import {
   AUDIO_BAND_GAIN_MIN,
   type AudioGameModeConfig,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import type { Brightness, Color } from '../../photonics-dmx/types'
 
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
@@ -364,6 +365,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'enabledAudioCueGroups',
   'knownAudioCueGroups',
   'cueConsistencyWindow',
+  'motionCueMinimumHoldMs',
   'cueGroupSelectionMode',
   'clockRate',
   'dmxOutputConfig',
@@ -405,6 +407,23 @@ export function validatePreferencesPayload(
     return { ok: false, error: 'Preferences payload contains no valid preference keys' }
   }
 
+  if ('cueConsistencyWindow' in cleaned) {
+    const v = validateNumberInRange(cleaned.cueConsistencyWindow, 0, 600000, 'cueConsistencyWindow')
+    if (!v.ok) return v
+    cleaned.cueConsistencyWindow = Math.round(v.value)
+  }
+
+  if ('motionCueMinimumHoldMs' in cleaned) {
+    const v = validateNumberInRange(
+      cleaned.motionCueMinimumHoldMs,
+      0,
+      600000,
+      'motionCueMinimumHoldMs',
+    )
+    if (!v.ok) return v
+    cleaned.motionCueMinimumHoldMs = Math.round(v.value)
+  }
+
   return { ok: true, value: cleaned as Partial<AppPreferences> }
 }
 
@@ -421,7 +440,77 @@ const AUDIO_CONFIG_KEYS = new Set([
   'strobeEnabled',
   'strobeTriggerThreshold',
   'strobeProbability',
+  'idleDetection',
 ])
+
+const VALID_AUDIO_IDLE_COLORS = new Set<Color>([
+  'red',
+  'blue',
+  'yellow',
+  'green',
+  'cyan',
+  'orange',
+  'purple',
+  'chartreuse',
+  'teal',
+  'violet',
+  'magenta',
+  'vermilion',
+  'amber',
+  'white',
+  'black',
+  'transparent',
+])
+
+const VALID_AUDIO_IDLE_BRIGHTNESS = new Set<Brightness>(['low', 'medium', 'high', 'max', 'linear'])
+
+function validateIdleDetectionPayload(data: unknown): ValidationResult<Record<string, unknown>> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'idleDetection must be an object' }
+  }
+  const o = data as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+
+  if ('enabled' in o) {
+    if (typeof o.enabled !== 'boolean') {
+      return { ok: false, error: 'idleDetection.enabled must be a boolean' }
+    }
+    out.enabled = o.enabled
+  }
+  if ('thresholdPct' in o) {
+    const t = validateNumberInRange(o.thresholdPct, 0, 100, 'idleDetection.thresholdPct')
+    if (!t.ok) return t
+    out.thresholdPct = t.value
+  }
+  if ('minIdleSeconds' in o) {
+    const t = validateNumberInRange(o.minIdleSeconds, 0, 600, 'idleDetection.minIdleSeconds')
+    if (!t.ok) return t
+    out.minIdleSeconds = t.value
+  }
+  if ('resumeSeconds' in o) {
+    const t = validateNumberInRange(o.resumeSeconds, 0, 60, 'idleDetection.resumeSeconds')
+    if (!t.ok) return t
+    out.resumeSeconds = t.value
+  }
+  if ('idleColor' in o) {
+    if (!VALID_AUDIO_IDLE_COLORS.has(o.idleColor as Color)) {
+      return { ok: false, error: 'idleDetection.idleColor is not a valid color' }
+    }
+    out.idleColor = o.idleColor
+  }
+  if ('idleBrightness' in o) {
+    if (!VALID_AUDIO_IDLE_BRIGHTNESS.has(o.idleBrightness as Brightness)) {
+      return { ok: false, error: 'idleDetection.idleBrightness is not a valid brightness' }
+    }
+    out.idleBrightness = o.idleBrightness
+  }
+
+  if (Object.keys(out).length === 0) {
+    return { ok: false, error: 'idleDetection contains no valid keys' }
+  }
+
+  return { ok: true, value: out }
+}
 
 /**
  * Validates a single audio band definition
@@ -526,6 +615,12 @@ export function validateAudioConfigPayload(
           return t
         }
         cleaned[key] = t.value
+      } else if (key === 'idleDetection') {
+        const idResult = validateIdleDetectionPayload(data[key])
+        if (!idResult.ok) {
+          return idResult
+        }
+        cleaned[key] = idResult.value
       } else {
         cleaned[key] = data[key]
       }

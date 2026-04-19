@@ -50,6 +50,7 @@ const DEFAULT_CONFIG: AudioConfig = {
   strobeEnabled: DEFAULT_AUDIO_CONFIG.strobeEnabled,
   strobeTriggerThreshold: DEFAULT_AUDIO_CONFIG.strobeTriggerThreshold,
   strobeProbability: DEFAULT_AUDIO_CONFIG.strobeProbability,
+  idleDetection: { ...DEFAULT_AUDIO_CONFIG.idleDetection },
 }
 
 const BASS_MIN_HZ = 20

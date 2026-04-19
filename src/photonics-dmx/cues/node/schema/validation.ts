@@ -1862,6 +1862,40 @@ const yargEffectFileSchema: JSONSchemaType<YargEffectFile> = {
 
 const validateYargEffectSchema = ajv.compile<YargEffectFile>(yargEffectFileSchema)
 
+const audioEffectFileSchema: JSONSchemaType<AudioEffectFile> = {
+  type: 'object',
+  required: ['version', 'mode', 'group', 'effects'],
+  additionalProperties: false,
+  properties: {
+    version: { type: 'integer', const: 1 },
+    mode: { type: 'string', const: 'audio' },
+    group: effectGroupMetaSchema,
+    effects: {
+      type: 'array',
+      minItems: 1,
+      items: {
+        type: 'object',
+        required: ['id', 'name', 'mode'],
+        additionalProperties: true,
+        properties: {
+          id: stringIdSchema,
+          name: { type: 'string', minLength: 1 },
+          mode: { type: 'string', const: 'audio' },
+          description: { type: 'string', nullable: true },
+          nodes: { type: 'object', nullable: true },
+          connections: { type: 'array', nullable: true },
+          layout: { type: 'object', nullable: true },
+          variables: { type: 'array', nullable: true },
+          events: { type: 'array', nullable: true },
+        },
+      } as any,
+    },
+    bundled: { type: 'boolean', nullable: true },
+  },
+}
+
+const validateAudioEffectSchema = ajv.compile<AudioEffectFile>(audioEffectFileSchema)
+
 export interface EffectValidationResult<T = EffectFile> {
   valid: boolean
   data?: T
@@ -1917,13 +1951,11 @@ export const validateYargEffectFile = (value: unknown): EffectValidationResult<Y
 }
 
 /**
- * Validate Audio Effect File
- * Note: Simplified validation - expand schemas as needed
+ * Validate Audio Effect File (schema + semantic, parity with YARG effect validation).
  */
 export const validateAudioEffectFile = (
   value: unknown,
 ): EffectValidationResult<AudioEffectFile> => {
-  // Basic validation
   if (!value || typeof value !== 'object') {
     return {
       valid: false,
@@ -1932,57 +1964,36 @@ export const validateAudioEffectFile = (
   }
 
   const migrated = migrateEasingInEffectFile(value)
-  const file = migrated as any
-
-  // Check required fields
-  if (file.version !== 1) {
+  if (!validateAudioEffectSchema(migrated)) {
     return {
       valid: false,
-      errors: ['version must be 1'],
+      errors: formatErrors(validateAudioEffectSchema.errors as DefinedError[]),
+      mode: 'audio',
     }
   }
 
-  if (file.mode !== 'audio') {
-    return {
-      valid: false,
-      errors: ['mode must be "audio"'],
-    }
-  }
+  const file = migrated as AudioEffectFile
+  const semanticErrors: string[] = []
 
-  if (!file.group || !file.group.id || !file.group.name) {
-    return {
-      valid: false,
-      errors: ['group must have id and name'],
-    }
-  }
-
-  if (!Array.isArray(file.effects)) {
-    return {
-      valid: false,
-      errors: ['effects must be an array'],
-    }
-  }
-
-  // Basic effect validation
+  const effectIds = new Set<string>()
   for (const effect of file.effects) {
-    if (!effect.id || !effect.name || !effect.mode) {
-      return {
-        valid: false,
-        errors: ['Each effect must have id, name, and mode'],
-      }
+    if (effectIds.has(effect.id)) {
+      semanticErrors.push(`Duplicate effect id: '${effect.id}'`)
     }
+    effectIds.add(effect.id)
+  }
 
-    if (effect.mode !== 'audio') {
-      return {
-        valid: false,
-        errors: [`Effect ${effect.name} mode must be "audio"`],
-      }
+  if (semanticErrors.length > 0) {
+    return {
+      valid: false,
+      errors: semanticErrors,
+      mode: 'audio',
     }
   }
 
   return {
     valid: true,
-    data: file as AudioEffectFile,
+    data: file,
     errors: [],
     mode: 'audio',
   }

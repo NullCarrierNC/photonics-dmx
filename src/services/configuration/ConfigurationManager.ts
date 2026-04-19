@@ -80,6 +80,8 @@ export interface AppPreferences {
   /** Manual YARG motion cue (null = auto random on new primary cue). */
   activeYargMotionCueRef?: { groupId: string; cueId: string } | null
   cueConsistencyWindow: number
+  /** Minimum time (ms) the current motion cue must run before auto re-pick on lighting/primary change. Manual motion selection is not gated. */
+  motionCueMinimumHoldMs?: number
   /** Cue group selection: 'withinSong' = can change during song; 'oncePerSong' = fixed at song start */
   cueGroupSelectionMode: 'oncePerSong' | 'withinSong'
   clockRate: number
@@ -149,6 +151,7 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledCueGroups: ['stagekit'],
   enabledAudioCueGroups: [],
   cueConsistencyWindow: 60000,
+  motionCueMinimumHoldMs: 5000,
   motionGroupSelectionMode: 'perCueChange',
   motionEnabled: true,
   activeAudioMotionCueRef: null,
@@ -570,6 +573,15 @@ export class ConfigurationManager {
     await this.setPreference('cueConsistencyWindow', windowMs)
   }
 
+  getMotionCueMinimumHoldMs(): number {
+    return this.preferences.get().motionCueMinimumHoldMs ?? 5000
+  }
+
+  async setMotionCueMinimumHoldMs(ms: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(600000, Math.round(ms)))
+    await this.setPreference('motionCueMinimumHoldMs', clamped)
+  }
+
   /**
    * Gets the cue group selection mode preference
    */
@@ -711,11 +723,13 @@ export class ConfigurationManager {
    * Gets audio configuration
    */
   getAudioConfig(): AudioConfig {
-    const savedConfig = this.getPreference('audioConfig')
-
-    const config = savedConfig ? { ...DEFAULT_AUDIO_CONFIG, ...savedConfig } : DEFAULT_AUDIO_CONFIG
-
-    return { ...config, enabled: false }
+    const savedConfig = this.getPreference('audioConfig') as Partial<AudioConfig> | undefined
+    const merged = { ...DEFAULT_AUDIO_CONFIG, ...savedConfig }
+    const idleDetection = {
+      ...DEFAULT_AUDIO_CONFIG.idleDetection,
+      ...(savedConfig?.idleDetection ?? {}),
+    }
+    return { ...merged, idleDetection, enabled: false }
   }
 
   /**

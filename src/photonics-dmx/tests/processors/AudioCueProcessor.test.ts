@@ -1,15 +1,23 @@
 /**
  * AudioCueProcessor: strobe slot independent from secondary; getEffective* accessors.
  */
+jest.mock('../../../main/utils/windowUtils', () => ({
+  sendToAllWindows: jest.fn(),
+}))
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { AudioCueProcessor } from '../../processors/AudioCueProcessor'
+import { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { AudioCueRegistry } from '../../cues/registries/AudioCueRegistry'
 import { IAudioCue } from '../../cues/interfaces/IAudioCue'
 import { AudioCueType } from '../../cues/types/audioCueTypes'
 import { createMockLightingConfig } from '../helpers/testFixtures'
-import { DEFAULT_AUDIO_CONFIG } from '../../listeners/Audio/AudioConfig'
+import {
+  DEFAULT_AUDIO_CONFIG,
+  DEFAULT_AUDIO_IDLE_DETECTION,
+} from '../../listeners/Audio/AudioConfig'
+import { AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER } from '../../processors/audioIdleConstants'
 import { AudioLightingData } from '../../listeners/Audio/AudioTypes'
 
 const TEST_GROUP = 'audio-cue-processor-test-group'
@@ -90,6 +98,12 @@ describe('AudioCueProcessor', () => {
       strobeEnabled: true,
       strobeTriggerThreshold: 0.5,
       strobeProbability: 100,
+      idleDetection: {
+        ...DEFAULT_AUDIO_IDLE_DETECTION,
+        minIdleSeconds: 2,
+        resumeSeconds: 1,
+        thresholdPct: 50,
+      },
     }
 
     processor = new AudioCueProcessor(
@@ -98,6 +112,7 @@ describe('AudioCueProcessor', () => {
       audioConfig,
       'proc-primary',
       'proc-secondary',
+      () => 5000,
     )
     processor.start()
   })
@@ -123,6 +138,90 @@ describe('AudioCueProcessor', () => {
 
     expect(processor.getEffectiveSecondaryCueType()).toBe('proc-secondary')
     expect(processor.getEffectiveStrobeCueType()).toBe('proc-strobe')
+  })
+
+  it('applies idle look and skips cue execution when game mode idle threshold sustained', () => {
+    let t = 0
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => {
+      t += 500
+      return t
+    })
+    try {
+      processor.enableGameMode({ enabled: true, cueDurationMin: 5, cueDurationMax: 20 })
+      const primary = registry.getCueImplementation('proc-primary')!
+      ;(primary.execute as jest.Mock).mockClear()
+
+      for (let i = 0; i < 12; i += 1) {
+        processor.processAudioData({
+          ...minimalLightingData(0.01),
+          overallLevel: 0.01,
+          energy: 0.01,
+        })
+      }
+
+      expect(sequencer.setEffect).toHaveBeenCalledWith(
+        AUDIO_IDLE_EFFECT_NAME,
+        expect.anything(),
+        true,
+      )
+      expect((primary.execute as jest.Mock).mock.calls.length).toBeLessThan(12)
+    } finally {
+      nowSpy.mockRestore()
+      processor.disableGameMode()
+    }
+  })
+
+  it('idle: setMotionEnabled(false) on enter, no handleAudioData while idle, removeEffect and setMotionEnabled(true) on exit', () => {
+    const setMotionSpy = jest.spyOn(AudioCueHandler.prototype, 'setMotionEnabled')
+    const handleDataSpy = jest.spyOn(AudioCueHandler.prototype, 'handleAudioData')
+    let t = 0
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => {
+      t += 500
+      return t
+    })
+    try {
+      processor.enableGameMode({ enabled: true, cueDurationMin: 5, cueDurationMax: 20 })
+      setMotionSpy.mockClear()
+      handleDataSpy.mockClear()
+
+      for (let i = 0; i < 12; i += 1) {
+        processor.processAudioData({
+          ...minimalLightingData(0.01),
+          overallLevel: 0.01,
+          energy: 0.01,
+        })
+      }
+
+      expect(setMotionSpy).toHaveBeenCalledWith(false)
+      setMotionSpy.mockClear()
+      handleDataSpy.mockClear()
+
+      for (let i = 0; i < 4; i += 1) {
+        processor.processAudioData({
+          ...minimalLightingData(0.01),
+          overallLevel: 0.01,
+          energy: 0.01,
+        })
+      }
+      expect(handleDataSpy).not.toHaveBeenCalled()
+      expect(setMotionSpy).not.toHaveBeenCalled()
+
+      for (let i = 0; i < 10; i += 1) {
+        processor.processAudioData({
+          ...minimalLightingData(0.9),
+          overallLevel: 0.9,
+          energy: 0.9,
+        })
+      }
+
+      expect(sequencer.removeEffect).toHaveBeenCalledWith(AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER)
+      expect(setMotionSpy).toHaveBeenCalledWith(true)
+    } finally {
+      nowSpy.mockRestore()
+      setMotionSpy.mockRestore()
+      handleDataSpy.mockRestore()
+      processor.disableGameMode()
+    }
   })
 
   it('getEffectiveSecondaryCueType returns manual secondary only, not strobe', async () => {
