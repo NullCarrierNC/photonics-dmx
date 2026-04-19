@@ -78,7 +78,8 @@ export const WAIT_CONDITIONS_WITH_NONE_DELAY: WaitCondition[] = [...WAIT_CONDITI
 
 export const AUDIO_EVENT_OPTIONS: AudioEventType[] = [
   'cue-started',
-  'audio-beat',
+  'cue-called',
+  'beat',
   'audio-energy',
   'audio-trigger',
   'audio-centroid',

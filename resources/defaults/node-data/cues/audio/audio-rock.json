@@ -736,7 +736,7 @@
           {
             "id": "ev-rock-as-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.3

@@ -36,6 +36,8 @@ const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENTS_BASE]
 const YARG_EVENT_OPTIONS = withDefaultLabels(YARG_EVENT_TYPES)
 const AUDIO_EVENT_LABELS: Partial<Record<AudioEventType, string>> = {
   'cue-started': 'Cue Started (once per lifecycle)',
+  'cue-called': 'Cue Called (every call)',
+  'beat': 'Beat (audio detected)',
 }
 
 const AUDIO_EVENT_OPTIONS = [...withDefaultLabels(AUDIO_EVENTS_BASE)]
@@ -48,6 +50,9 @@ const AUDIO_EVENT_OPTIONS = [...withDefaultLabels(AUDIO_EVENTS_BASE)]
 // Categorized YARG event options - derived from shared constants
 const YARG_EVENT_OPTIONS_CATEGORIZED = getYargEventCategories()
 
+/** Audio analysis only fires discrete beat edges today (no measure/keyframe). */
+const AUDIO_ACTION_WAIT_CONDITIONS: WaitCondition[] = ['beat']
+
 // Wait options for ACTION TIMING - song events only (no system events)
 const ACTION_WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY]
 const ACTION_WAIT_OPTIONS_YARG = [
@@ -59,7 +64,7 @@ const ACTION_WAIT_OPTIONS_YARG = [
 const ACTION_WAIT_OPTIONS_AUDIO = [
   { value: 'none', label: 'None' },
   { value: 'delay', label: 'Delay' },
-  ...withDefaultLabels(AUDIO_EVENTS_BASE),
+  ...withDefaultLabels(AUDIO_ACTION_WAIT_CONDITIONS),
 ] as const
 
 const getActionWaitOptions = (platform: NodeCueMode) =>

@@ -100,6 +100,21 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Per-(layer, light) replace. Cancels any active or queued effect on each
+   * targeted slot and starts the new transitions immediately, easing from each
+   * light's current state. Use for state-target effects like non-blocking
+   * `set-position` where the latest submission must take effect now and queueing
+   * the new transition behind a stale in-flight one would desynchronise motion.
+   *
+   * @param name The name of the effect
+   * @param effect The effect configuration
+   * @param isPersistent If true, the effect re-queues itself after completing
+   */
+  public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
+    this.effectManager.replaceEffect(name, effect, isPersistent)
+  }
+
+  /**
    * Adds a new effect with a completion callback.
    * The callback will be fired when all lights in the effect complete their transitions.
    *

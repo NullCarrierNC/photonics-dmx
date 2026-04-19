@@ -751,7 +751,7 @@
           {
             "id": "ev-sk_audio_cool_auto-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -1099,7 +1099,7 @@
           {
             "id": "ev-sk_audio_warm_auto-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -1453,7 +1453,7 @@
           {
             "id": "ev-sk_audio_harmony-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -1806,7 +1806,7 @@
           {
             "id": "ev-sk_audio_search-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -2176,7 +2176,7 @@
           {
             "id": "ev-sk_audio_score-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -2392,7 +2392,7 @@
           {
             "id": "ev-sk_audio_strobe_slow-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -2493,7 +2493,7 @@
           {
             "id": "ev-sk_audio_strobe_medium-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -2594,7 +2594,7 @@
           {
             "id": "ev-sk_audio_strobe_fast-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -2695,7 +2695,7 @@
           {
             "id": "ev-sk_audio_strobe_fastest-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -2797,7 +2797,7 @@
           {
             "id": "ev-sk_audio_frenzy-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -2953,7 +2953,7 @@
           {
             "id": "ev-sk_audio_menu-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35
@@ -3184,7 +3184,7 @@
           {
             "id": "ev-sk_audio_sweep-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.35

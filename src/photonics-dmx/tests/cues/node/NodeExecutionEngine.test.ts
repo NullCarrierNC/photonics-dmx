@@ -63,6 +63,7 @@ describe('NodeExecutionEngine', () => {
     // Create mock sequencer
     mockSequencer = {
       addEffect: jest.fn(),
+      replaceEffect: jest.fn(),
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
         if (callback) setTimeout(() => callback(), 1)
       }),
@@ -2865,11 +2866,82 @@ describe('NodeExecutionEngine', () => {
 
       engine.startExecution(eventNode, createCueData('Strong'))
 
-      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
-      const effect = (mockSequencer.addEffect as jest.Mock).mock.calls[0]?.[1]
+      // Non-blocking set-position routes through replaceEffect (latest-wins per (layer, light))
+      // rather than addEffect, so a stale in-flight transition can never queue ahead of the
+      // new resolved position.
+      expect(mockSequencer.replaceEffect).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.addEffect).not.toHaveBeenCalled()
+      const effect = (mockSequencer.replaceEffect as jest.Mock).mock.calls[0]?.[1]
       const pan = effect?.transitions?.[0]?.transform?.color?.pan
       // 90° bearing on a 540° fixture = 16.666..%; CCW fixtures subtract from home.
       expect(pan).toBeCloseTo(50 - (90 / 540) * 100, 5)
+    })
+
+    it('replaces (not queues) on rapid re-submission so latest position wins', () => {
+      const movingHead: TrackedLight = {
+        id: 'mh1',
+        position: 1,
+        config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG },
+      }
+      mockLightManager.getLights = jest
+        .fn()
+        .mockReturnValue([movingHead]) as unknown as DmxLightManager['getLights']
+
+      cueLevelVarStore.set('bearing', { type: 'number', value: 90 })
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-position',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        position: {
+          mode: 'direction',
+          bearing: { source: 'variable', name: 'bearing' },
+          angle: { source: 'literal', value: 30 },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 500 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: { source: 'literal', value: 'easeInOut' },
+        },
+      }
+      const definition: YargNodeCueDefinition = {
+        id: 'crossbeat-style-cue',
+        name: 'Crossbeat Style Cue',
+        kind: 'lighting',
+        cueType: CueType.Stomp,
+        style: 'primary',
+        nodes: { events: [eventNode], actions: [actionNode], logic: [] },
+        connections: [{ from: 'event1', to: 'action1' }],
+      }
+
+      const engine = new NodeExecutionEngine(
+        NodeCueCompiler.compileYargCue(definition),
+        'test-group:crossbeat-style-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+
+      engine.startExecution(eventNode, createCueData('Strong'))
+      cueLevelVarStore.set('bearing', { type: 'number', value: 270 })
+      engine.startExecution(eventNode, createCueData('Weak'))
+
+      expect(mockSequencer.replaceEffect).toHaveBeenCalledTimes(2)
+      expect(mockSequencer.addEffect).not.toHaveBeenCalled()
     })
   })
 

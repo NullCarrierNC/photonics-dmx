@@ -169,6 +169,17 @@ export interface ITransitionEngine {
 export interface IEffectManager {
   addEffect(name: string, effect: Effect, isPersistent?: boolean): void
   setEffect(name: string, effect: Effect, isPersistent?: boolean): void
+  /**
+   * Cancels any active or queued effect on each (layer, light) targeted by the new
+   * effect and starts the new transitions immediately. Unlike `addEffect`, a
+   * same-name in-flight transition is replaced rather than queued. Mid-transition
+   * takeover eases from each light's current state to the new target.
+   *
+   * Used for state-target effects (e.g. non-blocking `set-position`) where the
+   * latest submission must take effect now and an in-flight stale transition
+   * would otherwise produce desynchronised motion.
+   */
+  replaceEffect(name: string, effect: Effect, isPersistent?: boolean): void
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   addEffectUnblockedNameWithCallback(
@@ -286,6 +297,11 @@ export interface IDebugMonitor {
 export interface ILightingController {
   addEffect(name: string, effect: Effect, isPersistent?: boolean): void
   setEffect(name: string, effect: Effect, isPersistent?: boolean): Promise<void>
+  /**
+   * Cancels any active or queued effect on each (layer, light) targeted by the new
+   * effect and starts the new transitions immediately. See {@link IEffectManager.replaceEffect}.
+   */
+  replaceEffect(name: string, effect: Effect, isPersistent?: boolean): void
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   addEffectUnblockedNameWithCallback(

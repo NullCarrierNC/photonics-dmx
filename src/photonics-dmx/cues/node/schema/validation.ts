@@ -1606,6 +1606,78 @@ export const validateYargNodeCueFile = (
 }
 
 /**
+ * Legacy audio cues used `audio-beat` for entry `eventType` and sometimes for action `waitForCondition` /
+ * `waitUntilCondition` literals. Renamed to `beat` (same as WaitCondition).
+ * Mutates in place; logs once per file when anything is rewritten.
+ */
+function normalizeLegacyAudioBeatAliases(value: unknown): void {
+  if (!value || typeof value !== 'object') {
+    return
+  }
+  const file = value as { group?: { id?: string }; cues?: unknown[] }
+  if (!Array.isArray(file.cues)) {
+    return
+  }
+  const groupId = file.group?.id ?? '(unknown)'
+  let changed = false
+
+  const fixLiteralValueSource = (vs: unknown): void => {
+    if (!vs || typeof vs !== 'object') {
+      return
+    }
+    const v = vs as { source?: string; value?: unknown }
+    if (v.source === 'literal' && v.value === 'audio-beat') {
+      v.value = 'beat'
+      changed = true
+    }
+  }
+
+  for (const cue of file.cues) {
+    if (!cue || typeof cue !== 'object') {
+      continue
+    }
+    const nodes = (cue as { nodes?: { events?: unknown[]; actions?: unknown[] } }).nodes
+    if (!nodes) {
+      continue
+    }
+
+    if (Array.isArray(nodes.events)) {
+      for (const ev of nodes.events) {
+        if (!ev || typeof ev !== 'object') {
+          continue
+        }
+        const e = ev as { eventType?: string }
+        if (e.eventType === 'audio-beat') {
+          e.eventType = 'beat'
+          changed = true
+        }
+      }
+    }
+
+    if (Array.isArray(nodes.actions)) {
+      for (const act of nodes.actions) {
+        if (!act || typeof act !== 'object') {
+          continue
+        }
+        const timing = (act as { timing?: unknown }).timing
+        if (!timing || typeof timing !== 'object') {
+          continue
+        }
+        const t = timing as { waitForCondition?: unknown; waitUntilCondition?: unknown }
+        fixLiteralValueSource(t.waitForCondition)
+        fixLiteralValueSource(t.waitUntilCondition)
+      }
+    }
+  }
+
+  if (changed) {
+    console.warn(
+      `[audio cue] '${groupId}': deprecated 'audio-beat' was renamed to 'beat' (entry events and/or action wait timing). Re-save in the editor to clear this warning.`,
+    )
+  }
+}
+
+/**
  * Migrates audio node cue file payload for backward compatibility (e.g. strip removed properties).
  * Returns a clone with deprecated fields removed so schema validation passes.
  */
@@ -1637,6 +1709,7 @@ function migrateAudioNodeCueFile(value: unknown): unknown {
 export const validateAudioNodeCueFile = (
   value: unknown,
 ): NodeCueValidationResult<AudioNodeCueFile> => {
+  normalizeLegacyAudioBeatAliases(value)
   const migrated = migrateEasingInNodeCueFile(migrateAudioNodeCueFile(value))
   if (!validateAudioSchema(migrated)) {
     return {

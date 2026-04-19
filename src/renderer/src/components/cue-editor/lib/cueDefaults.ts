@@ -99,7 +99,7 @@ const buildDefaultYargCueStartedEvent = (): YargEventNode => ({
 const buildDefaultAudioEvent = (): AudioEventNode => ({
   id: `event-${createId()}`,
   type: 'event',
-  eventType: 'audio-beat',
+  eventType: 'beat',
   threshold: 0.5,
   triggerMode: 'edge',
 })

@@ -35,9 +35,13 @@ type PersistentEffectRun = {
  * - Coordinates with SystemEffects for blackout handling
  * - Tracks layer-specific effect history
  *
- * Provides four key methods for effects:
+ * Provides five key methods for effects:
  * - addEffect: Adds an effect, replacing existing ones (if on same layer) or queueing
  * - setEffect: Like addEffect but clears all effects on all layers first
+ * - replaceEffect: Per-(layer, light) replace; cancels active/queued for the same
+ *   targets and starts the new transitions immediately, easing from current state.
+ *   Use for state-target effects like non-blocking set-position where the latest
+ *   submission must win.
  * - addEffectUnblockedName: Discards if effect with same name exists anywhere
  * - setEffectUnblockedName: Like addEffectUnblockedName but cancels existing effects
  */
@@ -204,6 +208,78 @@ export class EffectManager implements IEffectManager {
       isPersistent,
       persistentRunId,
     )
+  }
+
+  /**
+   * Per-(layer, light) replace. For each light targeted by the new effect on each
+   * layer it touches, cancels any active and queued effect on that slot (regardless
+   * of whether the active name matches) and starts the new transitions immediately.
+   *
+   * Mid-transition takeover is graceful: `startEffect` seeds each new transition
+   * from the light's current state, so the easing continues smoothly from wherever
+   * the light is now.
+   *
+   * Effects on other layers and on lights NOT targeted by the new effect are
+   * untouched.
+   *
+   * Intended for state-target effects (e.g. non-blocking `set-position`) whose
+   * resolved configuration changes every trigger and where queueing the new
+   * transition behind a stale in-flight one would cause desynchronised motion.
+   */
+  public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
+    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
+      console.warn('Replace cancelling blackout')
+      this.systemEffects.cancelBlackout()
+    }
+
+    if (effect.transitions.length === 0) {
+      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      return
+    }
+
+    const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
+      effect.transitions,
+    )
+
+    const hasLayer0 = transitionsByLayerAndLight.has(0)
+    if (hasLayer0) {
+      this._lastCalled0LayerEffect = name
+    }
+
+    const persistentRunId = isPersistent
+      ? this.registerPersistentRun(name, effect, transitionsByLayerAndLight)
+      : undefined
+
+    transitionsByLayerAndLight.forEach((layerMap, layer) => {
+      layerMap.forEach((transitionsForLight, lightId) => {
+        const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId)
+        if (!targetLight) {
+          console.warn(
+            `No tracked light found for ${lightId} on layer ${layer} when replacing effect ${name}`,
+          )
+          return
+        }
+
+        const activeEffect = this.layerManager.getActiveEffect(layer, lightId)
+        if (activeEffect) {
+          if (activeEffect.effectRunId) {
+            this.cancelPersistentRun(activeEffect.effectRunId)
+          }
+          this.layerManager.removeActiveEffect(layer, lightId)
+        }
+        this.layerManager.removeQueuedEffect(layer, lightId)
+
+        this.startEffect(
+          name,
+          effect,
+          [targetLight],
+          layer,
+          transitionsForLight,
+          isPersistent,
+          persistentRunId,
+        )
+      })
+    })
   }
 
   /**

@@ -448,7 +448,10 @@ export class EffectExecutionEngine {
           if (useSetEffect) {
             this.sequencer.setEffectUnblockedName(effectName, effect)
           } else {
-            this.sequencer.addEffect(effectName, effect)
+            // set-position is a state-target effect: each new resolved position
+            // must take effect immediately. Queueing behind a stale in-flight
+            // transition would desynchronise per-light motion across beats.
+            this.sequencer.replaceEffect(effectName, effect)
           }
           this.setPositionSubmissionFingerprint.set(effectName, positionFp)
           this.emitNodeExecution('deactivated', action.id)

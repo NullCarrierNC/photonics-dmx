@@ -65,7 +65,7 @@ function audioMotionOnlyFile(): AudioNodeCueFile {
   const ev: AudioEventNodeUnion = {
     id: 'ev-b',
     type: 'event',
-    eventType: 'audio-beat',
+    eventType: 'beat',
     threshold: 0.5,
     triggerMode: 'edge',
   }
@@ -169,5 +169,64 @@ describe('NodeCueLoader', () => {
     expect(group!.motionCues?.get('am1')).toBeDefined()
 
     expect(loader.getAvailableCueTypes('audio', 'motion')).toEqual([])
+  })
+
+  it('loads an Audio motion cue using cue-called as the entry event', async () => {
+    const evCalled: AudioEventNodeUnion = {
+      id: 'ev-called',
+      type: 'event',
+      eventType: 'cue-called',
+      threshold: 0,
+      triggerMode: 'edge',
+    }
+    const action: ActionNode = {
+      id: 'mp1',
+      type: 'action',
+      effectType: 'motion-pattern',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      motionPattern: {
+        pattern: { source: 'literal', value: 'circle' },
+        speed: { source: 'literal', value: 0.5 },
+        size: { source: 'literal', value: 30 },
+      },
+      timing: {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 400 },
+        waitUntilCondition: { source: 'literal', value: 'beat' },
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+      layer: { source: 'literal', value: 120 },
+    }
+    const cue: AudioMotionNodeCueDefinition = {
+      kind: 'motion',
+      id: 'am-cue-called',
+      name: 'Audio cue-called motion',
+      nodes: { events: [evCalled], actions: [action], logic: [] },
+      connections: [{ from: 'ev-called', to: 'mp1' }],
+      layout: { nodePositions: {} },
+    }
+    const file: AudioNodeCueFile = {
+      version: 1,
+      mode: 'audio',
+      group: { id: 'loader-test-audio-cue-called', name: 'Loader test audio cue-called' },
+      cues: [cue],
+    }
+
+    const v = validateAudioNodeCueFile(file)
+    expect(v.valid).toBe(true)
+
+    const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+    fs.mkdirSync(audioDir, { recursive: true })
+    fs.writeFileSync(path.join(audioDir, 'audio-cue-called.json'), JSON.stringify(file), 'utf-8')
+
+    await loader.loadAll()
+
+    const group = audioRegistry.getGroup('loader-test-audio-cue-called')
+    expect(group).toBeDefined()
+    expect(group!.motionCues?.get('am-cue-called')).toBeDefined()
   })
 })

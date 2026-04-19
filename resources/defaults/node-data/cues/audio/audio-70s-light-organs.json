@@ -497,7 +497,7 @@
           {
             "id": "ev-70s-strobe-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4
@@ -851,7 +851,7 @@
           {
             "id": "ev-70s-chase-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4
@@ -1418,7 +1418,7 @@
           {
             "id": "ev-70s-rchase-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4

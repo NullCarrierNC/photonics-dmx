@@ -181,15 +181,32 @@ export abstract class BaseAudioNodeCue {
       for (const event of this.compiledCue.eventMap.values()) {
         if (event.eventType !== 'cue-started') continue
         const eventContext: EventContext = { eventRawValue: 1 }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extended cue payload shape
-        const cueData = { ...safeData, eventContext } as any
-        this.executionEngine.startExecution(event, cueData)
+        const cueData: AudioCueData & { eventContext: EventContext } = {
+          ...safeData,
+          eventContext,
+        }
+        this.executionEngine.startExecution(
+          event,
+          cueData as unknown as import('../../types/cueTypes').CueData,
+        )
       }
       this.cueStartedFired = true
     }
 
     for (const event of this.compiledCue.eventMap.values()) {
       if (event.eventType === 'cue-started') {
+        continue
+      }
+      if (event.eventType === 'cue-called') {
+        const eventContext: EventContext = { eventRawValue: 1 }
+        const cueData: AudioCueData & { eventContext: EventContext } = {
+          ...safeData,
+          eventContext,
+        }
+        this.executionEngine.startExecution(
+          event,
+          cueData as unknown as import('../../types/cueTypes').CueData,
+        )
         continue
       }
       if (event.eventType === 'audio-trigger') {
@@ -212,9 +229,14 @@ export abstract class BaseAudioNodeCue {
         }
 
         const eventContext: EventContext = { eventRawValue: evaluation.intensity }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extended cue payload shape
-        const cueData = { ...safeData, eventContext } as any
-        this.executionEngine.startExecution(event, cueData)
+        const cueData: AudioCueData & { eventContext: EventContext } = {
+          ...safeData,
+          eventContext,
+        }
+        this.executionEngine.startExecution(
+          event,
+          cueData as unknown as import('../../types/cueTypes').CueData,
+        )
       } else {
         let actionStep: { actionId: string; delay: number } | null = null
         try {
@@ -535,7 +557,9 @@ export abstract class BaseAudioNodeCue {
     switch (eventType) {
       case 'cue-started':
         return 0
-      case 'audio-beat':
+      case 'cue-called':
+        return 0
+      case 'beat':
         return audioData.beatDetected ? 1 : 0
       case 'audio-energy':
         return clamp(audioData.energy ?? 0, 0, 1)

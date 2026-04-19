@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { jest } from '@jest/globals'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import {
   validateYargNodeCueFile,
@@ -77,7 +78,7 @@ describe('Node cue validation', () => {
           {
             id: 'event-1',
             type: 'event',
-            eventType: 'audio-beat',
+            eventType: 'beat',
             threshold: 0.5,
             triggerMode: 'edge',
           },
@@ -122,6 +123,70 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
+  it("normalizes legacy eventType 'audio-beat' to 'beat' and warns once per file", () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const file = {
+      version: 1,
+      mode: 'audio' as const,
+      group: { id: 'legacy-audio-group', name: 'Legacy' },
+      cues: [
+        {
+          id: 'legacy-cue',
+          name: 'Legacy',
+          kind: 'lighting' as const,
+          cueTypeId: 'custom-audio',
+          nodes: {
+            events: [
+              {
+                id: 'event-1',
+                type: 'event',
+                eventType: 'audio-beat',
+                threshold: 0.5,
+                triggerMode: 'edge',
+              },
+            ],
+            actions: [
+              {
+                id: 'action-1',
+                type: 'action',
+                effectType: 'set-color',
+                target: {
+                  groups: { source: 'literal', value: 'front' },
+                  filter: { source: 'literal', value: 'all' },
+                },
+                color: {
+                  name: { source: 'literal', value: 'red' },
+                  brightness: { source: 'literal', value: 'high' },
+                  blendMode: { source: 'literal', value: 'add' },
+                },
+                timing: {
+                  waitForCondition: { source: 'literal', value: 'none' },
+                  waitForTime: { source: 'literal', value: 0 },
+                  duration: { source: 'literal', value: 150 },
+                  waitUntilCondition: { source: 'literal', value: 'none' },
+                  waitUntilTime: { source: 'literal', value: 0 },
+                  easing: { source: 'literal', value: 'sinInOut' },
+                  level: { source: 'literal', value: 1 },
+                },
+              },
+            ],
+          },
+          connections: [{ from: 'event-1', to: 'action-1' }],
+          layout: { nodePositions: {} },
+        },
+      ],
+    }
+    const result = validateAudioNodeCueFile(file)
+    expect(result.valid).toBe(true)
+    if (!result.valid || !result.data) {
+      throw new Error('expected valid result with data')
+    }
+    const ev = result.data.cues[0].nodes.events[0]
+    expect(ev.eventType).toBe('beat')
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("deprecated 'audio-beat'"))
+    warnSpy.mockRestore()
+  })
+
   it('validates audio node cue with cue-started event type', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'audio-cue-started',
@@ -140,7 +205,7 @@ describe('Node cue validation', () => {
           {
             id: 'ev-beat',
             type: 'event',
-            eventType: 'audio-beat',
+            eventType: 'beat',
             threshold: 0.5,
             triggerMode: 'edge',
           },
@@ -188,6 +253,61 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('validates audio node cue with cue-called event type', () => {
+    const definition: AudioNodeCueDefinition = {
+      id: 'audio-cue-called',
+      name: 'Cue Called Sustain',
+      kind: 'motion',
+      nodes: {
+        events: [
+          {
+            id: 'ev-called',
+            type: 'event',
+            eventType: 'cue-called',
+            threshold: 0.5,
+            triggerMode: 'edge',
+          },
+        ],
+        actions: [
+          {
+            id: 'action-pos',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
+            },
+            color: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
+            },
+            timing: {
+              waitForCondition: { source: 'literal', value: 'none' },
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 100 },
+              waitUntilCondition: { source: 'literal', value: 'beat' },
+              waitUntilTime: { source: 'literal', value: 0 },
+              easing: { source: 'literal', value: 'linear' },
+              level: { source: 'literal', value: 1 },
+            },
+          },
+        ],
+      },
+      connections: [{ from: 'ev-called', to: 'action-pos' }],
+      layout: { nodePositions: {} },
+    }
+
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'audio-group', name: 'Audio Group' },
+      cues: [definition],
+    })
+
+    expect(result.valid).toBe(true)
+  })
+
   it('validates audio node cue with style primary and secondary', () => {
     const primaryDef: AudioNodeCueDefinition = {
       id: 'audio-primary-style',
@@ -200,7 +320,7 @@ describe('Node cue validation', () => {
           {
             id: 'event-1',
             type: 'event',
-            eventType: 'audio-beat',
+            eventType: 'beat',
             threshold: 0.5,
             triggerMode: 'edge',
           },
@@ -221,7 +341,7 @@ describe('Node cue validation', () => {
           {
             id: 'event-1',
             type: 'event',
-            eventType: 'audio-beat',
+            eventType: 'beat',
             threshold: 0.5,
             triggerMode: 'edge',
           },
@@ -259,7 +379,7 @@ describe('Node cue validation', () => {
           {
             id: 'event-1',
             type: 'event',
-            eventType: 'audio-beat',
+            eventType: 'beat',
             threshold: 0.5,
             triggerMode: 'edge',
           },

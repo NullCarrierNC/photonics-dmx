@@ -4,14 +4,14 @@
   "group": {
     "id": "yarg-motion-default",
     "name": "Default motion",
-    "description": "Photonics' Default YARG Motion Group",
+    "description": "Photonics' Default YARG motion library",
     "isDefault": true
   },
   "cues": [
     {
       "id": "motion-vogue",
       "name": "Vogue",
-      "description": "On each beat, every light moves to its own random stage bearing over 800ms (set-position).",
+      "description": "On each measure, every light moves to its own random stage bearing over 800ms (set-position).",
       "variables": [
         {
           "name": "vogueLights",
@@ -43,7 +43,7 @@
           {
             "id": "vogue-event-beat",
             "type": "event",
-            "eventType": "beat"
+            "eventType": "measure"
           }
         ],
         "actions": [
@@ -87,7 +87,7 @@
               },
               "waitUntilCondition": {
                 "source": "literal",
-                "value": "beat"
+                "value": "measure"
               },
               "waitUntilTime": {
                 "source": "literal",
@@ -1569,6 +1569,2841 @@
           "x": 594.1421887020115,
           "y": 82.39612234383821,
           "zoom": 0.75
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-vogue-slow",
+      "name": "Vogue (Slow)",
+      "description": "Slow: On each measure, every light moves to its own random stage bearing over 1600ms (set-position).",
+      "variables": [
+        {
+          "name": "vogueSlowLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "vogueSlowCurrentLight",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "vogueSlowCurrentIndex",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "vogueSlowBearing",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": ""
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "vogue-slow-event-beat",
+            "type": "event",
+            "eventType": "measure"
+          }
+        ],
+        "actions": [
+          {
+            "id": "vogue-slow-action-pos",
+            "type": "action",
+            "effectType": "set-position",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "vogueSlowCurrentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "position": {
+              "mode": "direction",
+              "bearing": {
+                "source": "variable",
+                "name": "vogueSlowBearing"
+              },
+              "angle": {
+                "source": "literal",
+                "value": 20
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1600
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "measure"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "vogue-slow-logic-all-lights",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "vogueSlowLights"
+          },
+          {
+            "id": "vogue-slow-logic-foreach",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "vogueSlowLights",
+            "currentLightVariable": "vogueSlowCurrentLight",
+            "currentIndexVariable": "vogueSlowCurrentIndex"
+          },
+          {
+            "id": "vogue-slow-logic-random-bearing",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-choice",
+            "choices": [
+              "downstage",
+              "stage-right",
+              "stage-left",
+              "upstage",
+              "se",
+              "ne",
+              "sw",
+              "nw"
+            ],
+            "assignTo": "vogueSlowBearing"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "vogue-slow-event-beat",
+          "to": "vogue-slow-logic-all-lights"
+        },
+        {
+          "from": "vogue-slow-logic-all-lights",
+          "to": "vogue-slow-logic-foreach"
+        },
+        {
+          "from": "vogue-slow-logic-foreach",
+          "to": "vogue-slow-logic-random-bearing",
+          "fromPort": "each"
+        },
+        {
+          "from": "vogue-slow-logic-random-bearing",
+          "to": "vogue-slow-action-pos"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "vogue-slow-event-beat": {
+            "x": 3.67962015978992,
+            "y": -6.178803622722626
+          },
+          "vogue-slow-action-pos": {
+            "x": -1.5696297828108072,
+            "y": 457.65537363663316
+          },
+          "vogue-slow-logic-all-lights": {
+            "x": -9.402726575732231,
+            "y": 93.16629133746028
+          },
+          "vogue-slow-logic-foreach": {
+            "x": -52.53896815578145,
+            "y": 201.91036031146837
+          },
+          "vogue-slow-logic-random-bearing": {
+            "x": 7.727705128490925,
+            "y": 350.95840483903885
+          }
+        },
+        "viewport": {
+          "x": 461.6281330427155,
+          "y": 147.69628624478355,
+          "zoom": 0.75
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-wave-slow",
+      "name": "Wave (Slow)",
+      "description": "Slow: Horizontal linear sweep ±20° from home; half-cycle per beat (speed = BPM / 240).",
+      "variables": [
+        {
+          "name": "waveBpmSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "waveSpeedSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "wave-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "wave-slow-action-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "linear-sweep"
+              },
+              "linearSweepAxis": {
+                "source": "literal",
+                "value": "horizontal"
+              },
+              "speed": {
+                "source": "variable",
+                "name": "waveSpeedSlow"
+              },
+              "size": {
+                "source": "literal",
+                "value": 20
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "wave-slow-logic-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "waveBpmSlow"
+          },
+          {
+            "id": "wave-slow-logic-speed",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "waveBpmSlow"
+            },
+            "right": {
+              "source": "literal",
+              "value": 240
+            },
+            "assignTo": "waveSpeedSlow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "wave-slow-event-start",
+          "to": "wave-slow-logic-bpm"
+        },
+        {
+          "from": "wave-slow-logic-bpm",
+          "to": "wave-slow-logic-speed"
+        },
+        {
+          "from": "wave-slow-logic-speed",
+          "to": "wave-slow-action-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "wave-slow-event-start": {
+            "x": -10.32931624352932,
+            "y": 1.0943906530737877
+          },
+          "wave-slow-action-motion": {
+            "x": 7.410998985171318,
+            "y": 326.3504655137658
+          },
+          "wave-slow-logic-bpm": {
+            "x": 10.957673477008939,
+            "y": 105.45375321060419
+          },
+          "wave-slow-logic-speed": {
+            "x": -3.003272434696555,
+            "y": 210.3963068164885
+          }
+        },
+        "viewport": {
+          "x": 600.6062101258669,
+          "y": 164.38928352279805,
+          "zoom": 0.7315165961457313
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-nod-slow",
+      "name": "Nod (Slow)",
+      "description": "Slow: Vertical linear sweep toward downstage and back; one full cycle per beat (speed = BPM / 120).",
+      "variables": [
+        {
+          "name": "nodBpmSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "nodSpeedSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "nod-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "nod-slow-action-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "linear-sweep"
+              },
+              "linearSweepAxis": {
+                "source": "literal",
+                "value": "vertical"
+              },
+              "speed": {
+                "source": "variable",
+                "name": "nodSpeedSlow"
+              },
+              "size": {
+                "source": "literal",
+                "value": 20
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "nod-slow-logic-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "nodBpmSlow"
+          },
+          {
+            "id": "nod-slow-logic-speed",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "nodBpmSlow"
+            },
+            "right": {
+              "source": "literal",
+              "value": 120
+            },
+            "assignTo": "nodSpeedSlow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "nod-slow-event-start",
+          "to": "nod-slow-logic-bpm"
+        },
+        {
+          "from": "nod-slow-logic-bpm",
+          "to": "nod-slow-logic-speed"
+        },
+        {
+          "from": "nod-slow-logic-speed",
+          "to": "nod-slow-action-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "nod-slow-event-start": {
+            "x": 7.47164848074317,
+            "y": -5.142417438328266
+          },
+          "nod-slow-action-motion": {
+            "x": 4.18859326466918,
+            "y": 318.7527578547597
+          },
+          "nod-slow-logic-bpm": {
+            "x": 11.432236863300204,
+            "y": 97.46139249578118
+          },
+          "nod-slow-logic-speed": {
+            "x": 5.3145598489791155,
+            "y": 208.93652665615082
+          }
+        },
+        "viewport": {
+          "x": 321.6636444288572,
+          "y": 198.95031019548327,
+          "zoom": 0.7304083219801781
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-cw-sync-slow",
+      "name": "Clockwise Sync (Slow)",
+      "description": "Slow: Circle pattern; one full orbit per 4/4 measure (speed = BPM / 480).",
+      "variables": [
+        {
+          "name": "cwBpmSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "cwSpeedSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0.5
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "cw-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "cw-slow-action-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "circle"
+              },
+              "speed": {
+                "source": "variable",
+                "name": "cwSpeedSlow"
+              },
+              "size": {
+                "source": "literal",
+                "value": 30
+              },
+              "bearing": {
+                "source": "literal",
+                "value": "downstage"
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "cw-slow-logic-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "cwBpmSlow"
+          },
+          {
+            "id": "cw-slow-logic-speed",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "cwBpmSlow"
+            },
+            "right": {
+              "source": "literal",
+              "value": 480
+            },
+            "assignTo": "cwSpeedSlow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "cw-slow-event-start",
+          "to": "cw-slow-logic-bpm"
+        },
+        {
+          "from": "cw-slow-logic-bpm",
+          "to": "cw-slow-logic-speed"
+        },
+        {
+          "from": "cw-slow-logic-speed",
+          "to": "cw-slow-action-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "cw-slow-event-start": {
+            "x": -10.885828396305442,
+            "y": 3.431894764304161
+          },
+          "cw-slow-action-motion": {
+            "x": 10.627741852775216,
+            "y": 329.8024906665087
+          },
+          "cw-slow-logic-bpm": {
+            "x": -3.2182476930320263,
+            "y": 95.84484956786036
+          },
+          "cw-slow-logic-speed": {
+            "x": 1.5398980155587196,
+            "y": 220.8240674547851
+          }
+        },
+        "viewport": {
+          "x": 600.0967824538238,
+          "y": 75.03710546344519,
+          "zoom": 0.75
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-ccw-sync-slow",
+      "name": "Counter-Clockwise Sync (Slow)",
+      "description": "Slow: Same as Clockwise Sync with reverse direction (speed = BPM / 480).",
+      "variables": [
+        {
+          "name": "ccwBpmSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "ccwSpeedSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0.5
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ccw-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "ccw-slow-action-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "circle"
+              },
+              "speed": {
+                "source": "variable",
+                "name": "ccwSpeedSlow"
+              },
+              "size": {
+                "source": "literal",
+                "value": 30
+              },
+              "bearing": {
+                "source": "literal",
+                "value": "downstage"
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": true
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "ccw-slow-logic-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "ccwBpmSlow"
+          },
+          {
+            "id": "ccw-slow-logic-speed",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "ccwBpmSlow"
+            },
+            "right": {
+              "source": "literal",
+              "value": 480
+            },
+            "assignTo": "ccwSpeedSlow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ccw-slow-event-start",
+          "to": "ccw-slow-logic-bpm"
+        },
+        {
+          "from": "ccw-slow-logic-bpm",
+          "to": "ccw-slow-logic-speed"
+        },
+        {
+          "from": "ccw-slow-logic-speed",
+          "to": "ccw-slow-action-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ccw-slow-event-start": {
+            "x": -7.119462439790368,
+            "y": -1.7052023485302925
+          },
+          "ccw-slow-action-motion": {
+            "x": 2.2926741633564234,
+            "y": 316.43017694726586
+          },
+          "ccw-slow-logic-bpm": {
+            "x": 8.82508991472423,
+            "y": 107.07233913242817
+          },
+          "ccw-slow-logic-speed": {
+            "x": 0.8323158491402864,
+            "y": 217.52243619784713
+          }
+        },
+        "viewport": {
+          "x": 599.3603896968998,
+          "y": 81.97813452547416,
+          "zoom": 0.75
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-cw-fan-slow",
+      "name": "Clockwise Fan Spread (Slow)",
+      "description": "Slow: Circle with 360° fan spread; measure-synced speed (BPM / 480).",
+      "variables": [
+        {
+          "name": "cwfBpmSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "cwfSpeedSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0.5
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "cwf-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "cwf-slow-action-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "circle"
+              },
+              "speed": {
+                "source": "variable",
+                "name": "cwfSpeedSlow"
+              },
+              "size": {
+                "source": "literal",
+                "value": 30
+              },
+              "bearing": {
+                "source": "literal",
+                "value": "downstage"
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 360
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "cwf-slow-logic-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "cwfBpmSlow"
+          },
+          {
+            "id": "cwf-slow-logic-speed",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "cwfBpmSlow"
+            },
+            "right": {
+              "source": "literal",
+              "value": 480
+            },
+            "assignTo": "cwfSpeedSlow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "cwf-slow-event-start",
+          "to": "cwf-slow-logic-bpm"
+        },
+        {
+          "from": "cwf-slow-logic-bpm",
+          "to": "cwf-slow-logic-speed"
+        },
+        {
+          "from": "cwf-slow-logic-speed",
+          "to": "cwf-slow-action-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "cwf-slow-event-start": {
+            "x": -6.471991561353207,
+            "y": 0.5395002998411655
+          },
+          "cwf-slow-action-motion": {
+            "x": -6.0910222213715315,
+            "y": 331.6095746345818
+          },
+          "cwf-slow-logic-bpm": {
+            "x": 11.889837373048067,
+            "y": 98.55194218829274
+          },
+          "cwf-slow-logic-speed": {
+            "x": 0.643757801502943,
+            "y": 217.9204871468246
+          }
+        },
+        "viewport": {
+          "x": 321.6636444288572,
+          "y": 198.95031019548327,
+          "zoom": 0.7304083219801781
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-ccw-fan-slow",
+      "name": "Counter-Clockwise Fan Spread (Slow)",
+      "description": "Slow: Same as Clockwise Fan Spread with reverse direction (BPM / 480).",
+      "variables": [
+        {
+          "name": "ccwfBpmSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "ccwfSpeedSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0.5
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "ccwf-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "ccwf-slow-action-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "circle"
+              },
+              "speed": {
+                "source": "variable",
+                "name": "ccwfSpeedSlow"
+              },
+              "size": {
+                "source": "literal",
+                "value": 30
+              },
+              "bearing": {
+                "source": "literal",
+                "value": "downstage"
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 360
+              },
+              "reverse": {
+                "source": "literal",
+                "value": true
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "ccwf-slow-logic-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "ccwfBpmSlow"
+          },
+          {
+            "id": "ccwf-slow-logic-speed",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "ccwfBpmSlow"
+            },
+            "right": {
+              "source": "literal",
+              "value": 480
+            },
+            "assignTo": "ccwfSpeedSlow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "ccwf-slow-event-start",
+          "to": "ccwf-slow-logic-bpm"
+        },
+        {
+          "from": "ccwf-slow-logic-bpm",
+          "to": "ccwf-slow-logic-speed"
+        },
+        {
+          "from": "ccwf-slow-logic-speed",
+          "to": "ccwf-slow-action-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "ccwf-slow-event-start": {
+            "x": 1.4537999778985977,
+            "y": 4.5834068544209
+          },
+          "ccwf-slow-action-motion": {
+            "x": -3.439624149352312,
+            "y": 328.2410700432956
+          },
+          "ccwf-slow-logic-bpm": {
+            "x": -3.1217597778886557,
+            "y": 93.51743071898818
+          },
+          "ccwf-slow-logic-speed": {
+            "x": 8.381803717464209,
+            "y": 213.5776757672429
+          }
+        },
+        "viewport": {
+          "x": 598.146682661958,
+          "y": 75.1908211633563,
+          "zoom": 0.75
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-pendulum-slow",
+      "name": "Pendulum (Slow)",
+      "description": "Slow: Pan/tilt parabolic back-and-forth (speed = BPM / 240).",
+      "variables": [
+        {
+          "name": "penBpmSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "penSpeedSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "pen-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "pen-slow-action-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "pendulum"
+              },
+              "speed": {
+                "source": "variable",
+                "name": "penSpeedSlow"
+              },
+              "size": {
+                "source": "literal",
+                "value": 25
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "pen-slow-logic-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "penBpmSlow"
+          },
+          {
+            "id": "pen-slow-logic-speed",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "penBpmSlow"
+            },
+            "right": {
+              "source": "literal",
+              "value": 240
+            },
+            "assignTo": "penSpeedSlow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "pen-slow-event-start",
+          "to": "pen-slow-logic-bpm"
+        },
+        {
+          "from": "pen-slow-logic-bpm",
+          "to": "pen-slow-logic-speed"
+        },
+        {
+          "from": "pen-slow-logic-speed",
+          "to": "pen-slow-action-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "pen-slow-event-start": {
+            "x": 7.47164848074317,
+            "y": -5.142417438328266
+          },
+          "pen-slow-action-motion": {
+            "x": 4.18859326466918,
+            "y": 318.7527578547597
+          },
+          "pen-slow-logic-bpm": {
+            "x": 11.432236863300204,
+            "y": 97.46139249578118
+          },
+          "pen-slow-logic-speed": {
+            "x": 5.3145598489791155,
+            "y": 208.93652665615082
+          }
+        },
+        "viewport": {
+          "x": 594.1421887020115,
+          "y": 82.39612234383821,
+          "zoom": 0.75
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-figure8-slow",
+      "name": "Figure-8 (Slow)",
+      "description": "Slow: Figure-8 Lissajous in pan/tilt (speed = BPM / 240).",
+      "variables": [
+        {
+          "name": "fig8BpmSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "fig8SpeedSlow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "fig8-slow-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fig8-slow-action-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "figure-8"
+              },
+              "speed": {
+                "source": "variable",
+                "name": "fig8SpeedSlow"
+              },
+              "size": {
+                "source": "literal",
+                "value": 25
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 0
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "fig8-slow-logic-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "fig8BpmSlow"
+          },
+          {
+            "id": "fig8-slow-logic-speed",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "fig8BpmSlow"
+            },
+            "right": {
+              "source": "literal",
+              "value": 240
+            },
+            "assignTo": "fig8SpeedSlow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fig8-slow-event-start",
+          "to": "fig8-slow-logic-bpm"
+        },
+        {
+          "from": "fig8-slow-logic-bpm",
+          "to": "fig8-slow-logic-speed"
+        },
+        {
+          "from": "fig8-slow-logic-speed",
+          "to": "fig8-slow-action-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fig8-slow-event-start": {
+            "x": 7.47164848074317,
+            "y": -5.142417438328266
+          },
+          "fig8-slow-action-motion": {
+            "x": 4.18859326466918,
+            "y": 318.7527578547597
+          },
+          "fig8-slow-logic-bpm": {
+            "x": 11.432236863300204,
+            "y": 97.46139249578118
+          },
+          "fig8-slow-logic-speed": {
+            "x": 5.3145598489791155,
+            "y": 208.93652665615082
+          }
+        },
+        "viewport": {
+          "x": 594.1421887020115,
+          "y": 82.39612234383821,
+          "zoom": 0.75
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-still",
+      "name": "Still",
+      "description": "No motion: returns all lights to their home position.",
+      "nodes": {
+        "events": [
+          {
+            "id": "still-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "still-action-home",
+            "type": "action",
+            "effectType": "set-position",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "position": {
+              "mode": "offset",
+              "pan": {
+                "source": "literal",
+                "value": 0
+              },
+              "tilt": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 500
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "still-event-start",
+          "to": "still-action-home"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "still-event-start": {
+            "x": 0,
+            "y": 0
+          },
+          "still-action-home": {
+            "x": 0,
+            "y": 120
+          }
+        },
+        "viewport": {
+          "x": 400,
+          "y": 100,
+          "zoom": 0.75
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-searchlights",
+      "name": "Searchlights",
+      "description": "Every 4 beats, each light wanders to random pan/tilt offsets within ±30° from home; movement duration spans 4 beats.",
+      "variables": [
+        {
+          "name": "srchBeatCount",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "srchMod",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "srchBeatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 600
+        },
+        {
+          "name": "srchLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "srchCurrentLight",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "srchCurrentIndex",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "srchPan",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "srchTilt",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "srchDur",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2400
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "srch-event-beat",
+            "type": "event",
+            "eventType": "beat"
+          }
+        ],
+        "actions": [
+          {
+            "id": "srch-action-pos",
+            "type": "action",
+            "effectType": "set-position",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "srchCurrentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "position": {
+              "mode": "offset",
+              "pan": {
+                "source": "variable",
+                "name": "srchPan"
+              },
+              "tilt": {
+                "source": "variable",
+                "name": "srchTilt"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "srchDur"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "srch-logic-inc",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "srchBeatCount"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "srchBeatCount"
+          },
+          {
+            "id": "srch-logic-mod",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "srchBeatCount"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "srchMod"
+          },
+          {
+            "id": "srch-logic-gate",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "srchMod"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "srch-logic-beat-ms",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "beat-duration-ms",
+            "assignTo": "srchBeatMs"
+          },
+          {
+            "id": "srch-logic-calc-dur",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "srchBeatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "srchDur"
+          },
+          {
+            "id": "srch-logic-all-lights",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "srchLights"
+          },
+          {
+            "id": "srch-logic-foreach",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "srchLights",
+            "currentLightVariable": "srchCurrentLight",
+            "currentIndexVariable": "srchCurrentIndex"
+          },
+          {
+            "id": "srch-logic-rand-pan",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-integer",
+            "min": {
+              "source": "literal",
+              "value": -30
+            },
+            "max": {
+              "source": "literal",
+              "value": 30
+            },
+            "assignTo": "srchPan"
+          },
+          {
+            "id": "srch-logic-rand-tilt",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-integer",
+            "min": {
+              "source": "literal",
+              "value": -30
+            },
+            "max": {
+              "source": "literal",
+              "value": 30
+            },
+            "assignTo": "srchTilt"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "srch-event-beat",
+          "to": "srch-logic-inc"
+        },
+        {
+          "from": "srch-logic-inc",
+          "to": "srch-logic-mod"
+        },
+        {
+          "from": "srch-logic-mod",
+          "to": "srch-logic-gate"
+        },
+        {
+          "from": "srch-logic-gate",
+          "to": "srch-logic-beat-ms",
+          "fromPort": "true"
+        },
+        {
+          "from": "srch-logic-beat-ms",
+          "to": "srch-logic-calc-dur"
+        },
+        {
+          "from": "srch-logic-calc-dur",
+          "to": "srch-logic-all-lights"
+        },
+        {
+          "from": "srch-logic-all-lights",
+          "to": "srch-logic-foreach"
+        },
+        {
+          "from": "srch-logic-foreach",
+          "to": "srch-logic-rand-pan",
+          "fromPort": "each"
+        },
+        {
+          "from": "srch-logic-rand-pan",
+          "to": "srch-logic-rand-tilt"
+        },
+        {
+          "from": "srch-logic-rand-tilt",
+          "to": "srch-action-pos"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "srch-event-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "srch-logic-inc": {
+            "x": 0,
+            "y": 80
+          },
+          "srch-logic-mod": {
+            "x": 0,
+            "y": 160
+          },
+          "srch-logic-gate": {
+            "x": 0,
+            "y": 240
+          },
+          "srch-logic-beat-ms": {
+            "x": -80,
+            "y": 320
+          },
+          "srch-logic-calc-dur": {
+            "x": -80,
+            "y": 400
+          },
+          "srch-logic-all-lights": {
+            "x": -80,
+            "y": 480
+          },
+          "srch-logic-foreach": {
+            "x": -80,
+            "y": 560
+          },
+          "srch-logic-rand-pan": {
+            "x": 80,
+            "y": 640
+          },
+          "srch-logic-rand-tilt": {
+            "x": 80,
+            "y": 720
+          },
+          "srch-action-pos": {
+            "x": 80,
+            "y": 800
+          }
+        },
+        "viewport": {
+          "x": 400,
+          "y": 80,
+          "zoom": 0.65
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-crossbeat",
+      "name": "Cross Beat",
+      "description": "Each beat, even fixtures tilt 30 degrees toward stage-right while odd fixtures tilt 30 degrees toward stage-left; sides swap each beat. Duration tracks beat length.",
+      "variables": [
+        {
+          "name": "cbBeatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 600
+        },
+        {
+          "name": "cbFlip",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "cbEvenBearing",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "stage-right"
+        },
+        {
+          "name": "cbOddBearing",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "stage-left"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "cb-event-beat",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "cb-action-even",
+            "type": "action",
+            "effectType": "set-position",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "even"
+              }
+            },
+            "position": {
+              "mode": "direction",
+              "bearing": {
+                "source": "variable",
+                "name": "cbEvenBearing"
+              },
+              "angle": {
+                "source": "literal",
+                "value": 30
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "cbBeatMs"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            }
+          },
+          {
+            "id": "cb-action-odd",
+            "type": "action",
+            "effectType": "set-position",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "odd"
+              }
+            },
+            "position": {
+              "mode": "direction",
+              "bearing": {
+                "source": "variable",
+                "name": "cbOddBearing"
+              },
+              "angle": {
+                "source": "literal",
+                "value": 30
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "cbBeatMs"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "cb-logic-beat-ms",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "beat-duration-ms",
+            "assignTo": "cbBeatMs"
+          },
+          {
+            "id": "cb-logic-flip-cond",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "cbFlip"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cb-set-even-pos",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbEvenBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-right"
+            }
+          },
+          {
+            "id": "cb-set-odd-neg",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbOddBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-left"
+            }
+          },
+          {
+            "id": "cb-set-even-neg",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbEvenBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-left"
+            }
+          },
+          {
+            "id": "cb-set-odd-pos",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbOddBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-right"
+            }
+          },
+          {
+            "id": "cb-logic-toggle",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "literal",
+              "value": 1
+            },
+            "right": {
+              "source": "variable",
+              "name": "cbFlip"
+            },
+            "assignTo": "cbFlip"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "cb-event-beat",
+          "to": "cb-logic-beat-ms"
+        },
+        {
+          "from": "cb-logic-beat-ms",
+          "to": "cb-logic-flip-cond"
+        },
+        {
+          "from": "cb-logic-flip-cond",
+          "to": "cb-set-even-pos",
+          "fromPort": "true"
+        },
+        {
+          "from": "cb-set-even-pos",
+          "to": "cb-set-odd-neg"
+        },
+        {
+          "from": "cb-set-odd-neg",
+          "to": "cb-logic-toggle"
+        },
+        {
+          "from": "cb-logic-flip-cond",
+          "to": "cb-set-even-neg",
+          "fromPort": "false"
+        },
+        {
+          "from": "cb-set-even-neg",
+          "to": "cb-set-odd-pos"
+        },
+        {
+          "from": "cb-set-odd-pos",
+          "to": "cb-logic-toggle"
+        },
+        {
+          "from": "cb-logic-toggle",
+          "to": "cb-action-even"
+        },
+        {
+          "from": "cb-logic-toggle",
+          "to": "cb-action-odd"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "cb-event-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "cb-action-even": {
+            "x": -172.12466257668711,
+            "y": 542.559018404908
+          },
+          "cb-action-odd": {
+            "x": 103.88417177914113,
+            "y": 544.2650306748467
+          },
+          "cb-logic-beat-ms": {
+            "x": 0,
+            "y": 80
+          },
+          "cb-logic-flip-cond": {
+            "x": 0,
+            "y": 160
+          },
+          "cb-set-even-pos": {
+            "x": -120,
+            "y": 260
+          },
+          "cb-set-odd-neg": {
+            "x": -120,
+            "y": 340
+          },
+          "cb-set-even-neg": {
+            "x": 120,
+            "y": 260
+          },
+          "cb-set-odd-pos": {
+            "x": 120,
+            "y": 340
+          },
+          "cb-logic-toggle": {
+            "x": 0,
+            "y": 440
+          }
+        },
+        "viewport": {
+          "x": 416.8027905638665,
+          "y": 37.04545454545456,
+          "zoom": 1.1723245109321059
+        }
+      },
+      "kind": "motion"
+    },
+    {
+      "id": "motion-crossbeat-half",
+      "name": "Cross Beat Half",
+      "description": "Same alternating even/odd tilt toward stage bearings as Cross Beat, but only on every second beat; movement duration spans two beats.",
+      "variables": [
+        {
+          "name": "cbhBeatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 600
+        },
+        {
+          "name": "cbhDur",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1200
+        },
+        {
+          "name": "cbhTick",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "cbhMod",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "cbhFlip",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0
+        },
+        {
+          "name": "cbhEvenBearing",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "stage-right"
+        },
+        {
+          "name": "cbhOddBearing",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "stage-left"
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "cbh-event-beat",
+            "type": "event",
+            "eventType": "beat"
+          }
+        ],
+        "actions": [
+          {
+            "id": "cbh-action-even",
+            "type": "action",
+            "effectType": "set-position",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "even"
+              }
+            },
+            "position": {
+              "mode": "direction",
+              "bearing": {
+                "source": "variable",
+                "name": "cbhEvenBearing"
+              },
+              "angle": {
+                "source": "literal",
+                "value": 30
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "cbhDur"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            }
+          },
+          {
+            "id": "cbh-action-odd",
+            "type": "action",
+            "effectType": "set-position",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "odd"
+              }
+            },
+            "position": {
+              "mode": "direction",
+              "bearing": {
+                "source": "variable",
+                "name": "cbhOddBearing"
+              },
+              "angle": {
+                "source": "literal",
+                "value": 30
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "cbhDur"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "cbh-logic-inc",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "cbhTick"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "cbhTick"
+          },
+          {
+            "id": "cbh-logic-mod",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "cbhTick"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "cbhMod"
+          },
+          {
+            "id": "cbh-logic-beat-gate",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "cbhMod"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cbh-logic-beat-ms",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "beat-duration-ms",
+            "assignTo": "cbhBeatMs"
+          },
+          {
+            "id": "cbh-logic-dur",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "cbhBeatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 2
+            },
+            "assignTo": "cbhDur"
+          },
+          {
+            "id": "cbh-logic-flip-cond",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "cbhFlip"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "cbh-set-even-pos",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhEvenBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-right"
+            }
+          },
+          {
+            "id": "cbh-set-odd-neg",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhOddBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-left"
+            }
+          },
+          {
+            "id": "cbh-set-even-neg",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhEvenBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-left"
+            }
+          },
+          {
+            "id": "cbh-set-odd-pos",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "cbhOddBearing",
+            "valueType": "string",
+            "value": {
+              "source": "literal",
+              "value": "stage-right"
+            }
+          },
+          {
+            "id": "cbh-logic-toggle",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "subtract",
+            "left": {
+              "source": "literal",
+              "value": 1
+            },
+            "right": {
+              "source": "variable",
+              "name": "cbhFlip"
+            },
+            "assignTo": "cbhFlip"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "cbh-event-beat",
+          "to": "cbh-logic-inc"
+        },
+        {
+          "from": "cbh-logic-inc",
+          "to": "cbh-logic-mod"
+        },
+        {
+          "from": "cbh-logic-mod",
+          "to": "cbh-logic-beat-gate"
+        },
+        {
+          "from": "cbh-logic-beat-gate",
+          "to": "cbh-logic-beat-ms",
+          "fromPort": "true"
+        },
+        {
+          "from": "cbh-logic-beat-ms",
+          "to": "cbh-logic-dur"
+        },
+        {
+          "from": "cbh-logic-dur",
+          "to": "cbh-logic-flip-cond"
+        },
+        {
+          "from": "cbh-logic-flip-cond",
+          "to": "cbh-set-even-pos",
+          "fromPort": "true"
+        },
+        {
+          "from": "cbh-set-even-pos",
+          "to": "cbh-set-odd-neg"
+        },
+        {
+          "from": "cbh-set-odd-neg",
+          "to": "cbh-logic-toggle"
+        },
+        {
+          "from": "cbh-logic-flip-cond",
+          "to": "cbh-set-even-neg",
+          "fromPort": "false"
+        },
+        {
+          "from": "cbh-set-even-neg",
+          "to": "cbh-set-odd-pos"
+        },
+        {
+          "from": "cbh-set-odd-pos",
+          "to": "cbh-logic-toggle"
+        },
+        {
+          "from": "cbh-logic-toggle",
+          "to": "cbh-action-even"
+        },
+        {
+          "from": "cbh-logic-toggle",
+          "to": "cbh-action-odd"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "cbh-event-beat": {
+            "x": 12.839819570508666,
+            "y": -21.399699284181224
+          },
+          "cbh-action-even": {
+            "x": -169.8922106609432,
+            "y": 832.8398195705086
+          },
+          "cbh-action-odd": {
+            "x": 90,
+            "y": 820
+          },
+          "cbh-logic-inc": {
+            "x": 2.8532932378908527,
+            "y": 34.333834526364626
+          },
+          "cbh-logic-mod": {
+            "x": 1.4266466189454263,
+            "y": 112.89371424003718
+          },
+          "cbh-logic-beat-gate": {
+            "x": 7.133233094727075,
+            "y": 192.880240572655
+          },
+          "cbh-logic-beat-ms": {
+            "x": 0,
+            "y": 290
+          },
+          "cbh-logic-dur": {
+            "x": 0,
+            "y": 370
+          },
+          "cbh-logic-flip-cond": {
+            "x": 0,
+            "y": 450
+          },
+          "cbh-set-even-pos": {
+            "x": -130,
+            "y": 540
+          },
+          "cbh-set-odd-neg": {
+            "x": -130,
+            "y": 620
+          },
+          "cbh-set-even-neg": {
+            "x": 130,
+            "y": 540
+          },
+          "cbh-set-odd-pos": {
+            "x": 130,
+            "y": 620
+          },
+          "cbh-logic-toggle": {
+            "x": 0,
+            "y": 720
+          }
+        },
+        "viewport": {
+          "x": 531.5565139428319,
+          "y": 118.73289751962598,
+          "zoom": 0.70094442920925
         }
       },
       "kind": "motion"

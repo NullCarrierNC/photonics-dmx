@@ -41,6 +41,7 @@ describe('EffectExecutionEngine', () => {
   beforeEach(() => {
     mockSequencer = {
       addEffect: jest.fn(),
+      replaceEffect: jest.fn(),
       setEffect: jest.fn(),
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
