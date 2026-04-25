@@ -15,7 +15,6 @@ import {
   type AudioGameModeConfig,
   DEFAULT_AUDIO_GAME_MODE,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
 import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
 import { type CueDomain, type CueDomainPrefs, mergePartialCueDomains } from './cueDomainTypes'
@@ -211,7 +210,18 @@ export class ConfigurationManager {
     await this.preferences.update(newPrefs)
   }
 
-  private async patchCueDomain(domain: CueDomain, patch: Partial<CueDomainPrefs>): Promise<void> {
+  /**
+   * Resets preferences to default values
+   */
+  async resetPreferencesToDefaults(): Promise<void> {
+    await this.preferences.update(DEFAULT_PREFERENCES)
+  }
+
+  /**
+   * Patch a single `cueDomains` entry. Not a simple `updatePreferences` partial merge: when
+   * `disabledCues` is present, it replaces the stored per-group map for that domain (important for IPC).
+   */
+  async updateCueDomain(domain: CueDomain, patch: Partial<CueDomainPrefs>): Promise<void> {
     const current = this.preferences.get()
     const base = current.cueDomains[domain]
     const next: CueDomainPrefs = { ...base, ...patch }
@@ -222,186 +232,7 @@ export class ConfigurationManager {
   }
 
   /**
-   * Resets preferences to default values
-   */
-  async resetPreferencesToDefaults(): Promise<void> {
-    await this.preferences.update(DEFAULT_PREFERENCES)
-  }
-
-  // Cue Group Preferences (stored in cueDomains)
-
-  getEnabledCueGroups(): string[] | undefined {
-    return this.preferences.get().cueDomains.yarg.enabledGroups
-  }
-
-  async setEnabledCueGroups(groupIds: string[]): Promise<void> {
-    await this.patchCueDomain('yarg', { enabledGroups: groupIds })
-  }
-
-  getKnownYargCueGroups(): string[] | undefined {
-    return this.preferences.get().cueDomains.yarg.knownGroups
-  }
-
-  async setKnownYargCueGroups(groupIds: string[]): Promise<void> {
-    await this.patchCueDomain('yarg', { knownGroups: groupIds })
-  }
-
-  getKnownAudioCueGroups(): string[] | undefined {
-    return this.preferences.get().cueDomains.audio.knownGroups
-  }
-
-  async setKnownAudioCueGroups(groupIds: string[]): Promise<void> {
-    await this.patchCueDomain('audio', { knownGroups: groupIds })
-  }
-
-  getEnabledAudioCueGroups(): string[] | undefined {
-    return this.preferences.get().cueDomains.audio.enabledGroups
-  }
-
-  async setEnabledAudioCueGroups(groupIds: string[]): Promise<void> {
-    await this.patchCueDomain('audio', { enabledGroups: groupIds })
-  }
-
-  getDisabledYargCues(): Record<string, string[]> | undefined {
-    return this.preferences.get().cueDomains.yarg.disabledCues
-  }
-
-  async setDisabledYargCues(disabled: Record<string, string[]>): Promise<void> {
-    await this.patchCueDomain('yarg', { disabledCues: { ...disabled } })
-  }
-
-  getDisabledAudioCues(): Record<string, string[]> | undefined {
-    return this.preferences.get().cueDomains.audio.disabledCues
-  }
-
-  async setDisabledAudioCues(disabled: Record<string, string[]>): Promise<void> {
-    await this.patchCueDomain('audio', { disabledCues: { ...disabled } })
-  }
-
-  getEnabledMotionCueGroups(): string[] | undefined {
-    return this.preferences.get().cueDomains.yargMotion.enabledGroups
-  }
-
-  async setEnabledMotionCueGroups(groupIds: string[]): Promise<void> {
-    await this.patchCueDomain('yargMotion', { enabledGroups: groupIds })
-  }
-
-  getKnownMotionCueGroups(): string[] | undefined {
-    return this.preferences.get().cueDomains.yargMotion.knownGroups
-  }
-
-  async setKnownMotionCueGroups(groupIds: string[]): Promise<void> {
-    await this.patchCueDomain('yargMotion', { knownGroups: groupIds })
-  }
-
-  getDisabledMotionCues(): Record<string, string[]> | undefined {
-    return this.preferences.get().cueDomains.yargMotion.disabledCues
-  }
-
-  async setDisabledMotionCues(disabled: Record<string, string[]>): Promise<void> {
-    await this.patchCueDomain('yargMotion', { disabledCues: { ...disabled } })
-  }
-
-  getEnabledAudioMotionCueGroups(): string[] | undefined {
-    return this.preferences.get().cueDomains.audioMotion.enabledGroups
-  }
-
-  async setEnabledAudioMotionCueGroups(groupIds: string[]): Promise<void> {
-    await this.patchCueDomain('audioMotion', { enabledGroups: groupIds })
-  }
-
-  getKnownAudioMotionCueGroups(): string[] | undefined {
-    return this.preferences.get().cueDomains.audioMotion.knownGroups
-  }
-
-  async setKnownAudioMotionCueGroups(groupIds: string[]): Promise<void> {
-    await this.patchCueDomain('audioMotion', { knownGroups: groupIds })
-  }
-
-  getDisabledAudioMotionCues(): Record<string, string[]> | undefined {
-    return this.preferences.get().cueDomains.audioMotion.disabledCues
-  }
-
-  async setDisabledAudioMotionCues(disabled: Record<string, string[]>): Promise<void> {
-    await this.patchCueDomain('audioMotion', { disabledCues: { ...disabled } })
-  }
-
-  getAudioMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
-    const m = this.preferences.get().cueDomains.audioMotion.selectionMode
-    if (m === 'oncePerSong' || m === 'perCueChange' || m === 'none') {
-      return m
-    }
-    return 'perCueChange'
-  }
-
-  async setAudioMotionGroupSelectionMode(
-    mode: 'oncePerSong' | 'perCueChange' | 'none',
-  ): Promise<void> {
-    await this.patchCueDomain('audioMotion', { selectionMode: mode })
-  }
-
-  /**
-   * Gets the preferred audio cue type
-   */
-  getActiveAudioCueType(): AudioCueType | undefined {
-    return this.preferences.get().activeAudioCueType
-  }
-
-  /**
-   * Persists the preferred audio cue type
-   */
-  async setActiveAudioCueType(cueType: AudioCueType): Promise<void> {
-    await this.setPreference('activeAudioCueType', cueType)
-  }
-
-  /**
-   * Gets the cue consistency window preference
-   */
-  getCueConsistencyWindow(): number {
-    return this.preferences.get().cueConsistencyWindow
-  }
-
-  /**
-   * Sets the cue consistency window preference
-   */
-  async setCueConsistencyWindow(windowMs: number): Promise<void> {
-    await this.setPreference('cueConsistencyWindow', windowMs)
-  }
-
-  getMotionCueMinimumHoldMs(): number {
-    return this.preferences.get().cueDomains.yargMotion.minimumHoldMs ?? 5000
-  }
-
-  async setMotionCueMinimumHoldMs(ms: number): Promise<void> {
-    const clamped = Math.max(0, Math.min(600000, Math.round(ms)))
-    const c = this.preferences.get()
-    await this.setPreference('cueDomains', {
-      ...c.cueDomains,
-      yargMotion: { ...c.cueDomains.yargMotion, minimumHoldMs: clamped },
-      audioMotion: { ...c.cueDomains.audioMotion, minimumHoldMs: clamped },
-    })
-  }
-
-  getMotionCueProbabilityPercent(): number {
-    return this.preferences.get().cueDomains.yargMotion.probabilityPercent ?? 100
-  }
-
-  async setMotionCueProbabilityPercent(percent: number): Promise<void> {
-    const clamped = Math.max(0, Math.min(100, Math.round(percent)))
-    await this.patchCueDomain('yargMotion', { probabilityPercent: clamped })
-  }
-
-  getAudioMotionCueProbabilityPercent(): number {
-    return this.preferences.get().cueDomains.audioMotion.probabilityPercent ?? 100
-  }
-
-  async setAudioMotionCueProbabilityPercent(percent: number): Promise<void> {
-    const clamped = Math.max(0, Math.min(100, Math.round(percent)))
-    await this.patchCueDomain('audioMotion', { probabilityPercent: clamped })
-  }
-
-  /**
-   * YARG *lighting* cue group changes: within song vs once per song.
+   * YARG *lighting* mode: coerces invalid stored values; use instead of reading `cueDomains` raw.
    */
   getCueGroupSelectionMode(): 'oncePerSong' | 'withinSong' {
     const m = this.preferences.get().cueDomains.yarg.selectionMode
@@ -409,10 +240,6 @@ export class ConfigurationManager {
       return m
     }
     return 'withinSong'
-  }
-
-  async setCueGroupSelectionMode(mode: 'oncePerSong' | 'withinSong'): Promise<void> {
-    await this.patchCueDomain('yarg', { selectionMode: mode })
   }
 
   getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
@@ -423,45 +250,38 @@ export class ConfigurationManager {
     return 'perCueChange'
   }
 
-  async setMotionGroupSelectionMode(mode: 'oncePerSong' | 'perCueChange' | 'none'): Promise<void> {
-    await this.patchCueDomain('yargMotion', { selectionMode: mode })
-  }
-
-  getMotionEnabled(): boolean {
-    return this.preferences.get().motionEnabled ?? true
-  }
-
-  async setMotionEnabled(enabled: boolean): Promise<void> {
-    await this.setPreference('motionEnabled', enabled)
-  }
-
-  getActiveAudioMotionCueRef(): { groupId: string; cueId: string } | null {
-    return this.preferences.get().cueDomains.audioMotion.activeCueRef ?? null
-  }
-
-  async setActiveAudioMotionCueRef(ref: { groupId: string; cueId: string } | null): Promise<void> {
-    await this.patchCueDomain('audioMotion', { activeCueRef: ref })
-  }
-
-  getActiveYargMotionCueRef(): { groupId: string; cueId: string } | null {
-    return this.preferences.get().cueDomains.yargMotion.activeCueRef ?? null
-  }
-
-  async setActiveYargMotionCueRef(ref: { groupId: string; cueId: string } | null): Promise<void> {
-    await this.patchCueDomain('yargMotion', { activeCueRef: ref })
+  getAudioMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    const m = this.preferences.get().cueDomains.audioMotion.selectionMode
+    if (m === 'oncePerSong' || m === 'perCueChange' || m === 'none') {
+      return m
+    }
+    return 'perCueChange'
   }
 
   /**
-   * Gets the clock rate preference (in milliseconds)
+   * Shared min-hold (ms) for YARG and audio motion; updates both motion domains in one write.
    */
-  getClockRate(): number {
-    return this.preferences.get().clockRate
+  async setMotionCueMinimumHoldMs(ms: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(600000, Math.round(ms)))
+    const c = this.preferences.get()
+    await this.setPreference('cueDomains', {
+      ...c.cueDomains,
+      yargMotion: { ...c.cueDomains.yargMotion, minimumHoldMs: clamped },
+      audioMotion: { ...c.cueDomains.audioMotion, minimumHoldMs: clamped },
+    })
   }
 
-  /**
-   * Sets the clock rate preference (in milliseconds)
-   * @param rate The clock rate in milliseconds (1-100ms)
-   */
+  async setMotionCueProbabilityPercent(percent: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+    await this.updateCueDomain('yargMotion', { probabilityPercent: clamped })
+  }
+
+  async setAudioMotionCueProbabilityPercent(percent: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+    await this.updateCueDomain('audioMotion', { probabilityPercent: clamped })
+  }
+
+  /** Clamps to 1–100 ms. */
   async setClockRate(rate: number): Promise<void> {
     const clampedRate = Math.max(1, Math.min(100, rate))
     await this.setPreference('clockRate', clampedRate)

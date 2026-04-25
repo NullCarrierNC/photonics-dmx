@@ -38,20 +38,24 @@ async function persistGroupEnableAfterNodeCueSave(
   const config = controllerManager.getConfig()
 
   if (mode === 'yarg') {
-    const enabled = config.getEnabledCueGroups() ?? []
+    const enabled = config.getPreference('cueDomains').yarg.enabledGroups ?? []
     if (!enabled.includes(groupId)) {
       const next = [...enabled, groupId]
-      await config.setEnabledCueGroups(next)
+      await config.updateCueDomain('yarg', { enabledGroups: next })
       YargCueRegistry.getInstance().setEnabledGroups(next)
-      await config.setKnownYargCueGroups(YargCueRegistry.getInstance().getAllGroups())
+      await config.updateCueDomain('yarg', {
+        knownGroups: YargCueRegistry.getInstance().getAllGroups(),
+      })
     }
   } else {
-    const enabled = config.getEnabledAudioCueGroups() ?? []
+    const enabled = config.getPreference('cueDomains').audio.enabledGroups ?? []
     if (!enabled.includes(groupId)) {
       const next = [...enabled, groupId]
-      await config.setEnabledAudioCueGroups(next)
+      await config.updateCueDomain('audio', { enabledGroups: next })
       AudioCueRegistry.getInstance().setEnabledGroups(next)
-      await config.setKnownAudioCueGroups(AudioCueRegistry.getInstance().getRegisteredGroups())
+      await config.updateCueDomain('audio', {
+        knownGroups: AudioCueRegistry.getInstance().getRegisteredGroups(),
+      })
       controllerManager.refreshAudioCueSelection()
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
     }

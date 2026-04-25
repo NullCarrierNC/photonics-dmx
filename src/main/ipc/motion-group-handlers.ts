@@ -79,7 +79,7 @@ export function setupMotionGroupHandlers(
             new Error('Invalid mode: must be "oncePerSong", "perCueChange", or "none"'),
           )
         }
-        await controllerManager.getConfig().setMotionGroupSelectionMode(mode)
+        await controllerManager.getConfig().updateCueDomain('yargMotion', { selectionMode: mode })
         YargCueRegistry.getInstance().setMotionSelectionMode(mode)
         return { success: true, mode }
       } catch (error) {
@@ -108,7 +108,7 @@ export function setupMotionGroupHandlers(
             new Error('Invalid mode: must be "oncePerSong", "perCueChange", or "none"'),
           )
         }
-        await controllerManager.getConfig().setAudioMotionGroupSelectionMode(mode)
+        await controllerManager.getConfig().updateCueDomain('audioMotion', { selectionMode: mode })
         AudioCueRegistry.getInstance().setMotionSelectionMode(mode)
         return { success: true, mode }
       } catch (error) {

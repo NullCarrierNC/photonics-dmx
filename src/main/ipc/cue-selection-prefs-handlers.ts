@@ -20,7 +20,7 @@ export function setupCueSelectionPrefsHandlers(
         return ipcError(new Error(validated.error))
       }
       const rounded = Math.round(validated.value)
-      await controllerManager.getConfig().setCueConsistencyWindow(rounded)
+      await controllerManager.getConfig().setPreference('cueConsistencyWindow', rounded)
       const registry = YargCueRegistry.getInstance()
       registry.setCueConsistencyWindow(rounded)
       return { success: true, windowMs: rounded }
@@ -32,7 +32,7 @@ export function setupCueSelectionPrefsHandlers(
 
   ipcMain.handle(LIGHT.GET_CUE_CONSISTENCY_WINDOW, async () => {
     try {
-      const windowMs = controllerManager.getConfig().getCueConsistencyWindow()
+      const windowMs = controllerManager.getConfig().getPreference('cueConsistencyWindow')
       return { success: true, windowMs }
     } catch (error) {
       console.error('Error getting cue consistency window:', error)
@@ -42,7 +42,8 @@ export function setupCueSelectionPrefsHandlers(
 
   ipcMain.handle(LIGHT.GET_MOTION_CUE_MIN_HOLD_MS, async () => {
     try {
-      const minHoldMs = controllerManager.getConfig().getMotionCueMinimumHoldMs()
+      const minHoldMs =
+        controllerManager.getConfig().getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000
       return { success: true, minHoldMs }
     } catch (error) {
       console.error('Error getting motion cue min hold:', error)
@@ -57,7 +58,8 @@ export function setupCueSelectionPrefsHandlers(
         return ipcError(new Error(validated.error))
       }
       await controllerManager.getConfig().setMotionCueMinimumHoldMs(validated.value)
-      const minHoldMs = controllerManager.getConfig().getMotionCueMinimumHoldMs()
+      const minHoldMs =
+        controllerManager.getConfig().getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000
       return { success: true, minHoldMs }
     } catch (error) {
       console.error('Error setting motion cue min hold:', error)
@@ -67,7 +69,9 @@ export function setupCueSelectionPrefsHandlers(
 
   ipcMain.handle(LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT, async () => {
     try {
-      const percent = controllerManager.getConfig().getMotionCueProbabilityPercent()
+      const percent =
+        controllerManager.getConfig().getPreference('cueDomains').yargMotion.probabilityPercent ??
+        100
       return { success: true, percent }
     } catch (error) {
       console.error('Error getting motion cue probability percent:', error)
@@ -82,7 +86,9 @@ export function setupCueSelectionPrefsHandlers(
         return ipcError(new Error(validated.error))
       }
       await controllerManager.getConfig().setMotionCueProbabilityPercent(validated.value)
-      const stored = controllerManager.getConfig().getMotionCueProbabilityPercent()
+      const stored =
+        controllerManager.getConfig().getPreference('cueDomains').yargMotion.probabilityPercent ??
+        100
       return { success: true, percent: stored }
     } catch (error) {
       console.error('Error setting motion cue probability percent:', error)
@@ -92,7 +98,9 @@ export function setupCueSelectionPrefsHandlers(
 
   ipcMain.handle(LIGHT.GET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, async () => {
     try {
-      const percent = controllerManager.getConfig().getAudioMotionCueProbabilityPercent()
+      const percent =
+        controllerManager.getConfig().getPreference('cueDomains').audioMotion.probabilityPercent ??
+        100
       return { success: true, percent }
     } catch (error) {
       console.error('Error getting audio motion cue probability percent:', error)
@@ -107,7 +115,9 @@ export function setupCueSelectionPrefsHandlers(
         return ipcError(new Error(validated.error))
       }
       await controllerManager.getConfig().setAudioMotionCueProbabilityPercent(validated.value)
-      const stored = controllerManager.getConfig().getAudioMotionCueProbabilityPercent()
+      const stored =
+        controllerManager.getConfig().getPreference('cueDomains').audioMotion.probabilityPercent ??
+        100
       return { success: true, percent: stored }
     } catch (error) {
       console.error('Error setting audio motion cue probability percent:', error)
@@ -122,7 +132,7 @@ export function setupCueSelectionPrefsHandlers(
         if (mode !== 'oncePerSong' && mode !== 'withinSong') {
           return ipcError(new Error('Invalid mode: must be "oncePerSong" or "withinSong"'))
         }
-        await controllerManager.getConfig().setCueGroupSelectionMode(mode)
+        await controllerManager.getConfig().updateCueDomain('yarg', { selectionMode: mode })
         const registry = YargCueRegistry.getInstance()
         registry.setCueGroupSelectionMode(mode)
         return { success: true, mode }
