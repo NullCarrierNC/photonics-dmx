@@ -80,7 +80,6 @@ changes ahead.
 See the [Project Status](https://photonics.rocks/project-status/) for more details.
 
 
-
 ## License
 
 Photonics is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html) (or later). See the LICENSE file for details.
@@ -143,6 +142,8 @@ $ npm run build:linux
 
 ```bash
 $ npm run lint
+# CI uses read-only lint (no --fix)
+$ npm run lint:check
 $ npm run typecheck
 ```
 
