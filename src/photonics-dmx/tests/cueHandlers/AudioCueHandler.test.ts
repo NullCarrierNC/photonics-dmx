@@ -81,7 +81,9 @@ describe('AudioCueHandler', () => {
       onBeat: jest.fn(),
     } as unknown as ILightingController
 
-    handler = new AudioCueHandler(lightManager, sequencer)
+    handler = new AudioCueHandler(lightManager, sequencer, {
+      getMotionCueMinimumHoldMs: () => 0,
+    })
 
     audioConfig = {
       ...DEFAULT_AUDIO_CONFIG,

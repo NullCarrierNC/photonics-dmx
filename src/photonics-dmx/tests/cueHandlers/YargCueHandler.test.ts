@@ -196,7 +196,9 @@ describe('YargCueHandler', () => {
       shutdown: jest.fn(),
     } as any
 
-    cueHandler = new YargCueHandler(mockLightManager, mockSequencer)
+    cueHandler = new YargCueHandler(mockLightManager, mockSequencer, {
+      getMotionCueMinimumHoldMs: () => 0,
+    })
     ;(sendToAllWindows as jest.Mock).mockClear()
   })
 
