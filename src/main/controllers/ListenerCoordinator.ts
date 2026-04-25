@@ -2,29 +2,29 @@ import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
 import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetworkListener'
 import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetworkListener'
+import { Rb3MenuCueHandler } from '../../photonics-dmx/cueHandlers/Rb3MenuCueHandler'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
-import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 
 export interface ListenerCoordinatorDeps {
   getDmxLightManager: () => DmxLightManager | null
   getEffectsController: () => ILightingController | null
-  getPreference: (key: string) => number
   getMotionEnabled: () => boolean
   getActiveYargMotionCueRef: () => { groupId: string; cueId: string } | null
   getMotionCueMinimumHoldMs: () => number
   getMotionCueProbabilityPercent: () => number
   sendSenderError: (message: string) => void
   sendToAllWindows: (channel: string, payload: unknown) => void
-  setCueHandlerRef: (h: YargCueHandler | Rb3CueHandler | null) => void
+  setCueHandlerRef: (h: YargCueHandler | null) => void
 }
 
 export class ListenerCoordinator {
   private yargListener: YargNetworkListener | null = null
   private rb3eListener: Rb3eNetworkListener | null = null
   private processorManager: ProcessorManager | null = null
-  private cueHandler: YargCueHandler | Rb3CueHandler | null = null
+  private cueHandler: YargCueHandler | null = null
+  private rb3MenuHandler: Rb3MenuCueHandler | null = null
   private isYargEnabled = false
   private isRb3Enabled = false
 
@@ -131,19 +131,17 @@ export class ListenerCoordinator {
       this.cueHandler = null
       this.deps.setCueHandlerRef(null)
     }
-    const debouncePeriod = this.deps.getPreference('effectDebounce')
     console.log('ListenerCoordinator: Creating ProcessorManager with mode: direct')
     this.processorManager = new ProcessorManager(dmxLightManager, effectsController, {
       mode: 'direct',
     })
-    this.cueHandler = new Rb3CueHandler(dmxLightManager, effectsController, debouncePeriod)
-    this.deps.setCueHandlerRef(this.cueHandler)
-    this.processorManager.setCueHandler(this.cueHandler)
+    this.rb3MenuHandler = new Rb3MenuCueHandler(dmxLightManager, effectsController)
+    this.processorManager.setCueHandler(this.rb3MenuHandler)
     this.rb3eListener = new Rb3eNetworkListener()
     this.processorManager.setNetworkListener(this.rb3eListener)
     this.rb3eListener.start()
     this.isRb3Enabled = true
-    console.log('RB3 listener enabled in cue-based mode using event-driven architecture')
+    console.log('RB3 listener enabled in direct StageKit mode')
   }
 
   public async disableRb3(): Promise<void> {
@@ -168,25 +166,14 @@ export class ListenerCoordinator {
       this.processorManager.destroy()
       this.processorManager = null
     }
-    if (this.cueHandler) {
-      this.cueHandler.shutdown()
-      this.cueHandler = null
-      this.deps.setCueHandlerRef(null)
+    if (this.rb3MenuHandler) {
+      this.rb3MenuHandler.shutdown()
+      this.rb3MenuHandler = null
     }
     this.isRb3Enabled = false
   }
 
-  public async switchRb3Mode(mode: 'direct' | 'cueBased'): Promise<void> {
-    if (!this.isRb3Enabled || !this.processorManager) {
-      console.log('Cannot switch RB3 mode: RB3 not enabled or processor manager not available')
-      return
-    }
-    console.log(`Switching RB3 mode from ${this.processorManager.getCurrentMode()} to ${mode}`)
-    this.processorManager.switchMode(mode)
-    console.log(`RB3 mode switched to: ${this.processorManager.getCurrentMode()}`)
-  }
-
-  public getRb3Mode(): 'direct' | 'cueBased' | 'none' {
+  public getRb3Mode(): 'direct' | 'none' {
     if (!this.isRb3Enabled || !this.processorManager) {
       return 'none'
     }
@@ -208,7 +195,7 @@ export class ListenerCoordinator {
     return this.isRb3Enabled
   }
 
-  public getCueHandler(): YargCueHandler | Rb3CueHandler | null {
+  public getCueHandler(): YargCueHandler | null {
     return this.cueHandler
   }
 

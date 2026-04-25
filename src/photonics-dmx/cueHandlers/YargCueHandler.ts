@@ -1,8 +1,8 @@
-import { CueData, CueType } from '../cues/types/cueTypes'
+import { EventEmitter } from 'events'
+import { CueData, CueType, DrumNoteType, InstrumentNoteType } from '../cues/types/cueTypes'
 import { YargMotionCueRef } from '../cues/types/audioCueTypes'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
-import { BaseCueHandler } from './BaseCueHandler'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
 import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -38,7 +38,10 @@ export type YargCueHandlerOptions = {
   getMotionCueProbabilityPercent?: () => number
 }
 
-class YargCueHandler extends BaseCueHandler {
+class YargCueHandler extends EventEmitter {
+  private readonly _lightManager: DmxLightManager
+  private readonly _sequencer: ILightingController
+  private readonly registry: YargCueRegistry
   private currentPrimaryCue: INetCue | null = null
   private currentSecondaryCue: INetCue | null = null
   private currentStrobeCue: INetCue | null = null
@@ -51,6 +54,12 @@ class YargCueHandler extends BaseCueHandler {
   private lastEmittedMotionKey: string | null = null
   private readonly getMotionCueMinimumHoldMs: () => number
   private readonly getMotionCueProbabilityPercent: () => number
+  private cueHistory: CueType[] = []
+  private currentCue?: CueType
+  private executionCount = 0
+  private cueStartTime = 0
+  private lastCueChangeTime = 0
+  private previousCueData?: Partial<CueData>
 
   public setManualMotionRef(ref: YargMotionCueRef | null): void {
     this.manualMotionRef = ref
@@ -98,23 +107,91 @@ class YargCueHandler extends BaseCueHandler {
     photonicsSequencer: ILightingController,
     options?: YargCueHandlerOptions,
   ) {
-    super(lightManager, photonicsSequencer)
+    super()
+    this._lightManager = lightManager
+    this._sequencer = photonicsSequencer
+    this.registry = YargCueRegistry.getInstance()
     this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
     this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
   }
 
-  public override notifySongStart(): void {
-    super.notifySongStart()
+  public notifySongStart(): void {
+    this.registry.onSongStart()
     YargCueRegistry.getInstance().onMotionSongStart()
   }
 
-  public override notifySongEnd(): void {
-    super.notifySongEnd()
+  public notifySongEnd(): void {
+    this.registry.onSongEnd()
     YargCueRegistry.getInstance().onMotionSongEnd()
   }
 
   public reset(): void {
-    super.reset()
+    this.registry.reset()
+    this.resetCueHistory()
+  }
+
+  private resetCueHistory(): void {
+    this.cueHistory = []
+    this.currentCue = undefined
+    this.executionCount = 0
+    this.cueStartTime = 0
+    this.lastCueChangeTime = 0
+    this.previousCueData = undefined
+  }
+
+  private addHistoryToCueData(cueType: CueType, parameters: CueData): CueData {
+    const now = Date.now()
+
+    if (this.currentCue !== cueType) {
+      if (this.currentCue && this.currentCue !== cueType) {
+        this.cueHistory.push(this.currentCue)
+
+        if (this.cueHistory.length > 5) {
+          this.cueHistory.shift()
+        }
+      }
+
+      this.currentCue = cueType
+      this.executionCount = 1
+      this.lastCueChangeTime = now
+      this.cueStartTime = now
+    } else {
+      this.executionCount++
+    }
+
+    const historicCueData: CueData = {
+      ...parameters,
+      previousCue:
+        this.cueHistory.length > 0 ? this.cueHistory[this.cueHistory.length - 1] : undefined,
+      cueHistory: [...this.cueHistory],
+      executionCount: this.executionCount,
+      cueStartTime: this.cueStartTime,
+      timeSinceLastCue: now - this.lastCueChangeTime,
+      previousFrame: this.previousCueData,
+    }
+
+    this.previousCueData = {
+      vocalNote: parameters.vocalNote,
+      harmony0Note: parameters.harmony0Note,
+      harmony1Note: parameters.harmony1Note,
+      harmony2Note: parameters.harmony2Note,
+      beat: parameters.beat,
+      keyframe: parameters.keyframe,
+    }
+
+    return historicCueData
+  }
+
+  public addCueHandledListener(listener: (data: CueData) => void): void {
+    this.on('cueHandled', listener)
+  }
+
+  public removeCueHandledListener(listener: (data: CueData) => void): void {
+    this.off('cueHandled', listener)
+  }
+
+  public setEffectDebouncePeriod(_time: number): void {
+    // Stored preference compatibility; node cue dispatch does not debounce cue events.
   }
 
   /**
@@ -130,6 +207,34 @@ class YargCueHandler extends BaseCueHandler {
   public handleMeasure(): void {
     this._sequencer.onBeat()
     this._sequencer.onMeasure()
+  }
+
+  public handleKeyframeFirst(): void {
+    this._sequencer.onKeyframeFirst()
+  }
+
+  public handleKeyframeNext(): void {
+    this._sequencer.onKeyframeNext()
+  }
+
+  public handleKeyframePrevious(): void {
+    this._sequencer.onKeyframePrevious()
+  }
+
+  public handleDrumNote(noteType: DrumNoteType, _data: CueData): void {
+    this._sequencer.onDrumNote(noteType)
+  }
+
+  public handleGuitarNote(noteType: InstrumentNoteType, _data: CueData): void {
+    this._sequencer.onGuitarNote(noteType)
+  }
+
+  public handleBassNote(noteType: InstrumentNoteType, _data: CueData): void {
+    this._sequencer.onBassNote(noteType)
+  }
+
+  public handleKeysNote(noteType: InstrumentNoteType, _data: CueData): void {
+    this._sequencer.onKeysNote(noteType)
   }
 
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
@@ -353,136 +458,8 @@ class YargCueHandler extends BaseCueHandler {
     this._sequencer.onKeyframe()
   }
 
-  protected async handleCueBigRockEnding(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.BigRockEnding, parameters)
-  }
-
-  protected async handleCueBlackout_Fast(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Blackout_Fast, _parameters)
-  }
-
-  protected async handleCueBlackout_Slow(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Blackout_Slow, _parameters)
-  }
-
-  protected async handleCueBlackout_Spotlight(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Blackout_Spotlight, _parameters)
-  }
-
-  protected async handleCueChorus(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Chorus, parameters)
-  }
-
-  protected async handleCueCool_Automatic(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Cool_Automatic, parameters)
-  }
-
-  protected async handleCueCool_Manual(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Cool_Manual, parameters)
-  }
-
-  protected async handleCueDefault(parameters: CueData): Promise<void> {
+  public async handleCueDefault(parameters: CueData): Promise<void> {
     await this.handleCue(CueType.Default, parameters)
-  }
-
-  protected async handleCueDischord(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Dischord, parameters)
-  }
-
-  protected async handleCueFlare_Fast(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Flare_Fast, parameters)
-  }
-
-  protected async handleCueFlare_Slow(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Flare_Slow, parameters)
-  }
-
-  protected async handleCueFrenzy(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Frenzy, parameters)
-  }
-
-  protected async handleCueHarmony(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Harmony, parameters)
-  }
-
-  protected async handleCueIntro(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Intro, parameters)
-  }
-
-  protected async handleCueKeyframe_First(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Keyframe_First, _parameters)
-  }
-
-  protected async handleCueKeyframe_Next(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Keyframe_Next, _parameters)
-  }
-
-  protected async handleCueKeyframe_Previous(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Keyframe_Previous, _parameters)
-  }
-
-  protected async handleCueMenu(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Menu, parameters)
-  }
-
-  protected async handleCueNoCue(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.NoCue, _parameters)
-  }
-
-  protected async handleCueScore(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Score, parameters)
-  }
-
-  protected async handleCueSearchlights(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Searchlights, parameters)
-  }
-
-  protected async handleCueSilhouettes(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Silhouettes, parameters)
-  }
-
-  protected async handleCueSilhouettes_Spotlight(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Silhouettes_Spotlight, parameters)
-  }
-
-  protected async handleCueStomp(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Stomp, parameters)
-  }
-
-  protected async handleCueStrobe_Fast(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Fast, parameters)
-  }
-
-  protected async handleCueStrobe_Fastest(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Fastest, parameters)
-  }
-
-  protected async handleCueStrobe_Medium(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Medium, parameters)
-  }
-
-  protected async handleCueStrobe_Off(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Off, parameters)
-  }
-
-  protected async handleCueStrobe_Slow(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Slow, parameters)
-  }
-
-  protected async handleCueSweep(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Sweep, parameters)
-  }
-
-  protected async handleCueVerse(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Verse, parameters)
-  }
-
-  protected async handleCueWarm_Automatic(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Warm_Automatic, parameters)
-  }
-
-  protected async handleCueWarm_Manual(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Warm_Manual, parameters)
   }
 
   /**
@@ -506,7 +483,7 @@ class YargCueHandler extends BaseCueHandler {
       this.currentMotionCue = null
       this.currentMotionCueStartTime = null
     }
-    super.shutdown()
+    this.removeAllListeners()
   }
 }
 

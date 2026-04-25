@@ -381,9 +381,6 @@ export const enableRb3 = () => window.api.send(CUE.RB3E_LISTENER_ENABLED, undefi
 
 export const disableRb3 = () => window.api.send(CUE.RB3E_LISTENER_DISABLED, undefined)
 
-export const switchRb3Mode = (mode: 'direct' | 'cueBased') =>
-  window.api.send(CUE.RB3E_SWITCH_MODE, mode)
-
 export const getYargEnabled = () => window.api.invoke(CUE.GET_YARG_ENABLED, undefined)
 
 export const getRb3Enabled = () => window.api.invoke(CUE.GET_RB3_ENABLED, undefined)

@@ -13,7 +13,20 @@ import {
   DrumNoteType,
 } from '../../cues/types/cueTypes'
 
-import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler'
+export interface YargCueRuntime {
+  notifySongStart(): void
+  notifySongEnd(): void
+  handleBeat(): void
+  handleMeasure(): void
+  handleKeyframeFirst(): void
+  handleKeyframeNext(): void
+  handleKeyframePrevious(): void
+  handleCue(cueType: CueType, parameters: CueData): Promise<void>
+  handleDrumNote(noteType: DrumNoteType, data: CueData): void
+  handleGuitarNote(noteType: InstrumentNoteType, data: CueData): void
+  handleBassNote(noteType: InstrumentNoteType, data: CueData): void
+  handleKeysNote(noteType: InstrumentNoteType, data: CueData): void
+}
 
 enum PlatformByte {
   Unknown = 0,
@@ -126,7 +139,7 @@ const IDENTICAL_FRAME_THROTTLE_MS = 1000 / 30
 
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
-  private cueHandler: BaseCueHandler
+  private cueHandler: YargCueRuntime
 
   //private logFilePath = path.join(app.getPath('documents'), 'yargLog.json');
   private listening = false
@@ -150,7 +163,7 @@ export class YargNetworkListener extends EventEmitter {
   private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' | null =
     null
 
-  constructor(cueHandler: BaseCueHandler) {
+  constructor(cueHandler: YargCueRuntime) {
     super() // Initialize EventEmitter
     this.cueHandler = cueHandler
 
