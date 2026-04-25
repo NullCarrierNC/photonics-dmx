@@ -16,8 +16,8 @@ import { setupConsoleHandlers } from './console-handlers'
  * @param controllerManager The controller manager instance
  * @param windowManager The window manager instance
  *
- * Note: setupLightHandlers composes sender, simulation, and cue-group handlers
- * internally (setupSenderHandlers, setupSimulationHandlers, setupCueGroupHandlers).
+ * Note: setupLightHandlers composes sender, simulation, cue-group registry, cue selection prefs,
+ * and motion-group handlers internally.
  */
 export function setupIpcHandlers(
   ipcMain: IpcMain,

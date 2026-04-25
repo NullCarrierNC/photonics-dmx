@@ -1,6 +1,9 @@
 /**
  * AudioCueHandler: primary + secondary + strobe slots execute independently (dedup same instance).
  */
+jest.mock('../../../main/utils/windowUtils', () => ({
+  sendToAllWindows: jest.fn(),
+}))
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
@@ -49,6 +52,7 @@ describe('AudioCueHandler', () => {
     registry.reset()
 
     const primary = makeCue('primary-a', 'primary')
+    const primaryB = makeCue('primary-b', 'primary')
     const secondary = makeCue('secondary-a', 'secondary')
     const strobe = makeCue('strobe-a', 'strobe')
 
@@ -58,6 +62,7 @@ describe('AudioCueHandler', () => {
       description: '',
       cues: new Map<AudioCueType, IAudioCue>([
         ['primary-a', primary],
+        ['primary-b', primaryB],
         ['secondary-a', secondary],
         ['strobe-a', strobe],
       ]),
@@ -76,7 +81,9 @@ describe('AudioCueHandler', () => {
       onBeat: jest.fn(),
     } as unknown as ILightingController
 
-    handler = new AudioCueHandler(lightManager, sequencer)
+    handler = new AudioCueHandler(lightManager, sequencer, {
+      getMotionCueMinimumHoldMs: () => 0,
+    })
 
     audioConfig = {
       ...DEFAULT_AUDIO_CONFIG,
@@ -102,6 +109,7 @@ describe('AudioCueHandler', () => {
       'secondary-a',
       'strobe-a',
       0,
+      false,
     )
 
     expect(primary.execute).toHaveBeenCalledTimes(1)
@@ -120,6 +128,7 @@ describe('AudioCueHandler', () => {
       'primary-a',
       'strobe-a',
       0,
+      false,
     )
 
     expect(primary.execute).toHaveBeenCalledTimes(1)
@@ -136,6 +145,7 @@ describe('AudioCueHandler', () => {
       'secondary-a',
       'strobe-a',
       0,
+      false,
     )
     expect(strobe.execute).toHaveBeenCalledTimes(1)
 
@@ -146,6 +156,7 @@ describe('AudioCueHandler', () => {
       'secondary-a',
       null,
       0,
+      false,
     )
 
     expect(strobe.onStop).toHaveBeenCalled()
@@ -155,7 +166,7 @@ describe('AudioCueHandler', () => {
     const primary = registry.getCueImplementation('primary-a')!
     const secondary = registry.getCueImplementation('secondary-a')!
 
-    handler.syncSlots('primary-a', 'secondary-a', 'strobe-a')
+    handler.syncSlots('primary-a', 'secondary-a', 'strobe-a', false)
     await handler.handleAudioData(
       minimalLighting(0.5),
       audioConfig,
@@ -163,9 +174,10 @@ describe('AudioCueHandler', () => {
       'secondary-a',
       'strobe-a',
       0,
+      false,
     )
 
-    handler.syncSlots('primary-a', 'secondary-a', null)
+    handler.syncSlots('primary-a', 'secondary-a', null, false)
 
     await handler.handleAudioData(
       minimalLighting(0.5),
@@ -174,9 +186,123 @@ describe('AudioCueHandler', () => {
       'secondary-a',
       null,
       0,
+      false,
     )
 
     expect(primary.onStop).not.toHaveBeenCalled()
     expect(secondary.onStop).not.toHaveBeenCalled()
+  })
+
+  it('runs motion cue in the same frame as lighting when primary is assigned', async () => {
+    const motion = makeCue('motion-m', 'secondary')
+    const getMotionSpy = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
+
+    await handler.handleAudioData(
+      minimalLighting(0.5),
+      audioConfig,
+      'primary-a',
+      null,
+      null,
+      8,
+      false,
+    )
+
+    expect(getMotionSpy).toHaveBeenCalled()
+    expect(motion.execute).toHaveBeenCalledTimes(1)
+    getMotionSpy.mockRestore()
+  })
+
+  it('stops motion cue on clearCurrentCue', async () => {
+    const motion = makeCue('motion-m2', 'secondary')
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
+
+    await handler.handleAudioData(
+      minimalLighting(0.5),
+      audioConfig,
+      'primary-a',
+      null,
+      null,
+      8,
+      false,
+    )
+    handler.clearCurrentCue()
+    expect(motion.onStop).toHaveBeenCalled()
+  })
+
+  it('calls onDestroy on motion cue in destroy()', async () => {
+    const motion = makeCue('motion-m3', 'secondary')
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
+
+    await handler.handleAudioData(
+      minimalLighting(0.5),
+      audioConfig,
+      'primary-a',
+      null,
+      null,
+      8,
+      false,
+    )
+    handler.destroy()
+    expect(motion.onDestroy).toHaveBeenCalled()
+  })
+
+  it('does not consult motion registry when motion is disabled', async () => {
+    const motion = makeCue('motion-off', 'secondary')
+    const getMotionSpy = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
+    handler.setMotionEnabled(false)
+    await handler.handleAudioData(
+      minimalLighting(0.5),
+      audioConfig,
+      'primary-a',
+      null,
+      null,
+      8,
+      false,
+    )
+    expect(getMotionSpy).not.toHaveBeenCalled()
+    expect(motion.execute).not.toHaveBeenCalled()
+    getMotionSpy.mockRestore()
+  })
+
+  it('picks motion once per primary cue change, not every audio frame', async () => {
+    const m1 = makeCue('mx1', 'secondary')
+    const m2 = makeCue('mx2', 'secondary')
+    let n = 0
+    const getMotionSpy = jest.spyOn(registry, 'getRandomMotionCue').mockImplementation(() => {
+      n++
+      return n === 1 ? m1 : m2
+    })
+    await handler.handleAudioData(
+      minimalLighting(0.5),
+      audioConfig,
+      'primary-a',
+      null,
+      null,
+      8,
+      false,
+    )
+    expect(getMotionSpy).toHaveBeenCalledTimes(1)
+    await handler.handleAudioData(
+      minimalLighting(0.5),
+      audioConfig,
+      'primary-a',
+      null,
+      null,
+      8,
+      false,
+    )
+    expect(getMotionSpy).toHaveBeenCalledTimes(1)
+    await handler.handleAudioData(
+      minimalLighting(0.5),
+      audioConfig,
+      'primary-b',
+      null,
+      null,
+      8,
+      false,
+    )
+    expect(getMotionSpy).toHaveBeenCalledTimes(2)
+    expect(m1.onStop).toHaveBeenCalledTimes(1)
+    getMotionSpy.mockRestore()
   })
 })

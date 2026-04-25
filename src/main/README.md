@@ -37,7 +37,7 @@ Handlers are registered in `ipc/index.ts`. Domain split:
 | Handler             | Channels  | Purpose                                                           |
 | ------------------- | --------- | ----------------------------------------------------------------- |
 | `config-handlers`   | CONFIG    | Prefs, rigs, lights, layout, audio config                         |
-| `light-handlers`    | LIGHT     | Composes sender-handlers, simulation-handlers, cue-group-handlers |
+| `light-handlers`    | LIGHT     | Composes sender, simulation, cue-group-registry, cue-selection-prefs, motion-group handlers |
 | `cue-handlers`      | CUE       | Cue style, debounce, listener toggles                             |
 | `node-cue-handlers` | NODE_CUES | Node cue CRUD, import/export, validate                            |
 | `effect-handlers`   | EFFECTS   | Effect CRUD, import/export, validate                              |

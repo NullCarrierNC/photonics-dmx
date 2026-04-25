@@ -24,14 +24,16 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
   updateNode,
 }) => {
   if (!EFFECT_TYPES_WITH_COLOR.includes(node.effectType)) return null
+  const color = node.color
+  if (!color) return null
   return (
     <>
       <ValueSourceEditor
         label="Color"
-        value={node.color.name}
+        value={color.name}
         onChange={(next) =>
           updateNode({
-            color: { ...node.color, name: next },
+            color: { ...color, name: next },
           })
         }
         expected="string"
@@ -40,10 +42,10 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
       />
       <ValueSourceEditor
         label="Brightness"
-        value={node.color.brightness}
+        value={color.brightness}
         onChange={(next) =>
           updateNode({
-            color: { ...node.color, brightness: next },
+            color: { ...color, brightness: next },
           })
         }
         expected="string"
@@ -52,10 +54,10 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
       />
       <ValueSourceEditor
         label="Blend Mode"
-        value={node.color.blendMode}
+        value={color.blendMode}
         onChange={(next) =>
           updateNode({
-            color: { ...node.color, blendMode: next },
+            color: { ...color, blendMode: next },
           })
         }
         expected="string"
@@ -64,10 +66,10 @@ const ActionColorFields: React.FC<ActionColorFieldsProps> = ({
       />
       <ValueSourceEditor
         label="Opacity (0.0 - 1.0)"
-        value={node.color.opacity}
+        value={color.opacity}
         onChange={(next) =>
           updateNode({
-            color: { ...node.color, opacity: next },
+            color: { ...color, opacity: next },
           })
         }
         expected="number"

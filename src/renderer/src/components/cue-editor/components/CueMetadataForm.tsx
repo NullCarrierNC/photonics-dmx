@@ -44,7 +44,10 @@ const CueMetadataForm: React.FC<Props> = ({
   onCueMetadataChange,
   onEffectMetadataChange,
 }) => {
-  const currentCueType = (currentCue as YargNodeCueDefinition | null)?.cueType
+  const currentCueType =
+    currentCue?.kind === 'lighting' && activeMode === 'yarg'
+      ? (currentCue as Extract<YargNodeCueDefinition, { kind: 'lighting' }>).cueType
+      : undefined
   const filteredCueTypes = availableCueTypes.filter(
     (type) => !usedCueTypes?.has(type) || type === currentCueType,
   )
@@ -138,13 +141,15 @@ const CueMetadataForm: React.FC<Props> = ({
               }}
             />
           </label>
-          {!isEffectMode && activeMode === 'yarg' && (
+          {!isEffectMode && activeMode === 'yarg' && currentCue?.kind === 'lighting' && (
             <>
               <label className="flex flex-col font-medium">
                 Game Event Trigger
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(currentCue as YargNodeCueDefinition).cueType}
+                  value={
+                    (currentCue as Extract<YargNodeCueDefinition, { kind: 'lighting' }>).cueType
+                  }
                   onChange={(event) =>
                     onCueMetadataChange({ cueType: event.target.value as CueType })
                   }>
@@ -159,7 +164,7 @@ const CueMetadataForm: React.FC<Props> = ({
                 Cue Style
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(currentCue as YargNodeCueDefinition).style}
+                  value={(currentCue as Extract<YargNodeCueDefinition, { kind: 'lighting' }>).style}
                   onChange={(event) =>
                     onCueMetadataChange({ style: event.target.value as 'primary' | 'secondary' })
                   }>
@@ -169,13 +174,15 @@ const CueMetadataForm: React.FC<Props> = ({
               </label>
             </>
           )}
-          {!isEffectMode && activeMode === 'audio' && (
+          {!isEffectMode && activeMode === 'audio' && currentCue?.kind === 'lighting' && (
             <>
               <label className="flex flex-col font-medium">
                 Cue Identifier
                 <input
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(currentCue as AudioNodeCueDefinition).cueTypeId}
+                  value={
+                    (currentCue as Extract<AudioNodeCueDefinition, { kind: 'lighting' }>).cueTypeId
+                  }
                   onChange={(event) => onCueMetadataChange({ cueTypeId: event.target.value })}
                 />
               </label>
@@ -183,7 +190,10 @@ const CueMetadataForm: React.FC<Props> = ({
                 Cue Style
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(currentCue as AudioNodeCueDefinition).style ?? 'primary'}
+                  value={
+                    (currentCue as Extract<AudioNodeCueDefinition, { kind: 'lighting' }>).style ??
+                    'primary'
+                  }
                   onChange={(event) =>
                     onCueMetadataChange({ style: event.target.value as AudioCueLayerStyle })
                   }>

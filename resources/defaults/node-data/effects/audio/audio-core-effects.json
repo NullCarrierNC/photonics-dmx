@@ -143,7 +143,10 @@
                 "source": "variable",
                 "name": "holdMs"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -207,7 +210,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "easeOut" },
+              "easing": {
+                "source": "literal",
+                "value": "easeOut"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -392,7 +398,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1

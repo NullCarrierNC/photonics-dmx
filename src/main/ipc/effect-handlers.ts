@@ -62,12 +62,8 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     if (payload.path) {
       try {
         const file = await loader.readFile(payload.path)
-        return {
-          valid: true,
-          data: file,
-          errors: [],
-          mode: file.mode,
-        }
+        // readFile rejects invalid JSON/schema; still run the canonical validator for parity with the content branch.
+        return validateEffectFile(file)
       } catch (error) {
         return {
           valid: false,

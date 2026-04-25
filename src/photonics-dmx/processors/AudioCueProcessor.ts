@@ -1,13 +1,18 @@
 import { AudioLightingData, AudioConfig, AudioGameModeConfig } from '../listeners/Audio/AudioTypes'
+import { DEFAULT_AUDIO_CONFIG, DEFAULT_AUDIO_IDLE_DETECTION } from '../listeners/Audio'
 
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
 import { pickStrobeCueType } from './audioStrobeHelpers'
 import { AudioGameModeManager } from './AudioGameModeManager'
+import { AudioIdleController } from './AudioIdleController'
+import { AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER } from './audioIdleConstants'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { ILightingController } from '../controllers/sequencer/interfaces'
-import { AudioCueType } from '../cues/types/audioCueTypes'
+import { AudioCueType, AudioMotionCueRef } from '../cues/types/audioCueTypes'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { getIntensityScale } from '../cues/audio/utils/bandUtils'
+import { getColor } from '../helpers/dmxHelpers'
+import { getEffectSingleColor } from '../effects/effectSingleColor'
 
 /**
  * AudioCueProcessor - Processes audio data using cue-based system
@@ -27,6 +32,10 @@ export class AudioCueProcessor {
   private strobeCueType: AudioCueType | null = null
   private onStrobeStateChange: ((active: boolean) => void) | null = null
   private onGameModeCueChange: ((cueType: AudioCueType) => void) | null = null
+  private readonly lightManager: DmxLightManager
+  private readonly idleController = new AudioIdleController()
+  private idleLookActive = false
+  private idleSuppressedMotion = false
 
   constructor(
     lightManager: DmxLightManager,
@@ -34,13 +43,38 @@ export class AudioCueProcessor {
     audioConfig: AudioConfig,
     preferredCueType?: AudioCueType,
     preferredSecondaryCueType?: AudioCueType | null,
+    getMotionCueMinimumHoldMs?: () => number,
+    getMotionCueProbabilityPercent?: () => number,
   ) {
-    this.config = audioConfig
+    this.lightManager = lightManager
+    this.config = this.mergeAudioConfig(audioConfig)
     this.registry = AudioCueRegistry.getInstance()
     this.currentPrimaryCueType = this.selectActiveCueType(preferredCueType)
     this.currentSecondaryCueType = preferredSecondaryCueType ?? null
-    this.cueHandler = new AudioCueHandler(lightManager, sequencer)
-    this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType, null)
+    this.cueHandler = new AudioCueHandler(lightManager, sequencer, {
+      getMotionCueMinimumHoldMs,
+      getMotionCueProbabilityPercent,
+    })
+    this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType, null, false)
+  }
+
+  private mergeAudioConfig(patch: AudioConfig): AudioConfig {
+    return {
+      ...DEFAULT_AUDIO_CONFIG,
+      ...patch,
+      idleDetection: {
+        ...DEFAULT_AUDIO_IDLE_DETECTION,
+        ...patch.idleDetection,
+      },
+    }
+  }
+
+  public setMotionEnabled(enabled: boolean): void {
+    this.cueHandler.setMotionEnabled(enabled)
+  }
+
+  public setManualMotionRef(ref: AudioMotionCueRef | null): void {
+    this.cueHandler.setManualMotionRef(ref)
   }
 
   /**
@@ -52,6 +86,7 @@ export class AudioCueProcessor {
       return
     }
     this.isActive = true
+    this.registry.onMotionSongStart()
     console.log(
       'AudioCueProcessor: Started with primary:',
       this.currentPrimaryCueType,
@@ -66,6 +101,7 @@ export class AudioCueProcessor {
   public stop(): void {
     if (!this.isActive) return
 
+    this.tearDownIdleState()
     this.isActive = false
     if (this.strobeActive) {
       this.strobeActive = false
@@ -75,6 +111,7 @@ export class AudioCueProcessor {
       this.strobeCueType = null
     }
     this.cueHandler.stop()
+    this.registry.onMotionSongEnd()
 
     // Clear all audio-related effects
     // Remove effects from layers 0-7 (frequency band layers)
@@ -89,7 +126,7 @@ export class AudioCueProcessor {
    * Update configuration
    */
   public updateConfig(config: AudioConfig): void {
-    this.config = config
+    this.config = this.mergeAudioConfig(config)
     console.log('AudioCueProcessor: Configuration updated')
   }
 
@@ -111,6 +148,24 @@ export class AudioCueProcessor {
     const processedData =
       this.config.linearResponse === false ? this.applyDiscreteResponse(data) : data
 
+    const gameModeActive = this.gameModeManager != null
+    const idleTransition = this.idleController.update({
+      overallLevel: processedData.overallLevel,
+      gameModeActive,
+      nowMs: now,
+      config: this.config.idleDetection,
+    })
+    if (idleTransition === 'enter') {
+      this.applyIdleLook()
+    }
+    if (idleTransition === 'exit') {
+      this.clearIdleLook()
+    }
+
+    if (this.idleController.getState() === 'idle') {
+      return
+    }
+
     if (this.gameModeManager) {
       this.gameModeManager.processFrame(processedData)
     }
@@ -131,6 +186,7 @@ export class AudioCueProcessor {
         baseSecondary,
         strobe,
         this.config.bands.length,
+        gameModeActive,
       )
       .catch((err) => console.error('AudioCueProcessor: handleAudioData error', err))
   }
@@ -157,12 +213,13 @@ export class AudioCueProcessor {
    */
   public enableGameMode(config: AudioGameModeConfig): void {
     this.disableGameMode()
+    this.idleController.reset()
     this.gameModeManager = new AudioGameModeManager(config)
     this.gameModeManager.setOnCueSwitch((cueType) => {
       this.onGameModeCueChange?.(cueType)
     })
     this.gameModeManager.start()
-    this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null)
+    this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null, true)
     console.log('AudioCueProcessor: Game Mode enabled')
   }
 
@@ -173,6 +230,7 @@ export class AudioCueProcessor {
     if (!this.gameModeManager) {
       return
     }
+    this.tearDownIdleState()
     this.gameModeManager.setOnCueSwitch(null)
     this.gameModeManager.stop()
     this.gameModeManager = null
@@ -180,6 +238,7 @@ export class AudioCueProcessor {
       this.currentPrimaryCueType,
       this.currentSecondaryCueType,
       this.getStrobeSlotSyncType(),
+      false,
     )
     console.log('AudioCueProcessor: Game Mode disabled')
   }
@@ -205,7 +264,7 @@ export class AudioCueProcessor {
   public refreshCueSelection(): void {
     if (this.gameModeManager) {
       this.gameModeManager.start()
-      this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null)
+      this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null, true)
       return
     }
 
@@ -229,6 +288,7 @@ export class AudioCueProcessor {
       this.currentPrimaryCueType,
       this.currentSecondaryCueType,
       this.getStrobeSlotSyncType(),
+      false,
     )
   }
 
@@ -249,6 +309,7 @@ export class AudioCueProcessor {
           this.currentPrimaryCueType,
           this.currentSecondaryCueType,
           this.getStrobeSlotSyncType(),
+          false,
         )
         console.log(`AudioCueProcessor: Active primary cue set to ${cueType}`)
       }
@@ -267,7 +328,12 @@ export class AudioCueProcessor {
     if (cueType == null || cueType === '') {
       if (this.currentSecondaryCueType != null) {
         this.currentSecondaryCueType = null
-        this.cueHandler.syncSlots(this.currentPrimaryCueType, null, this.getStrobeSlotSyncType())
+        this.cueHandler.syncSlots(
+          this.currentPrimaryCueType,
+          null,
+          this.getStrobeSlotSyncType(),
+          false,
+        )
       }
       return true
     }
@@ -284,6 +350,7 @@ export class AudioCueProcessor {
         this.currentPrimaryCueType,
         this.currentSecondaryCueType,
         this.getStrobeSlotSyncType(),
+        false,
       )
       console.log(`AudioCueProcessor: Active secondary cue set to ${cueType}`)
     }
@@ -370,6 +437,47 @@ export class AudioCueProcessor {
       ...audioData,
       overallLevel: mapValue(audioData.overallLevel),
       energy: mapValue(audioData.energy),
+    }
+  }
+
+  private tearDownIdleState(): void {
+    this.clearIdleLook()
+    this.idleController.reset()
+  }
+
+  private applyIdleLook(): void {
+    if (this.idleLookActive) {
+      return
+    }
+    this.idleSuppressedMotion = this.cueHandler.isMotionLayerEnabled()
+    if (this.idleSuppressedMotion) {
+      this.cueHandler.setMotionEnabled(false)
+    }
+    const lights = this.lightManager.getLights(['front', 'back'], ['all'])
+    const { idleColor, idleBrightness } = this.config.idleDetection
+    const color = getColor(idleColor, idleBrightness)
+    const effect = getEffectSingleColor({
+      color,
+      duration: 400,
+      lights,
+      layer: AUDIO_IDLE_LAYER,
+    })
+    void this.sequencer.setEffect(AUDIO_IDLE_EFFECT_NAME, effect, true)
+    this.idleLookActive = true
+  }
+
+  private clearIdleLook(): void {
+    const hadIdle = this.idleLookActive || this.idleSuppressedMotion
+    if (this.idleLookActive) {
+      this.sequencer.removeEffect(AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER)
+      this.idleLookActive = false
+    }
+    if (this.idleSuppressedMotion) {
+      this.cueHandler.setMotionEnabled(true)
+      this.idleSuppressedMotion = false
+    }
+    if (hadIdle) {
+      this.cueHandler.resetMotionTracking()
     }
   }
 

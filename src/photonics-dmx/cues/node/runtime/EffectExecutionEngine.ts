@@ -11,8 +11,14 @@ import { AudioCueData } from '../../types/audioCueTypes'
 import { CompiledEffect } from '../compiler/EffectCompiler'
 import {
   ActionEffectFactory,
+  ResolvedActionTarget,
   ResolvedColorSetting,
   ResolvedActionTiming,
+  ResolvedPositionSetting,
+  buildSetPositionSubmissionFingerprint,
+  resolvedMotionPatternSettingsEqual,
+  resolvedMotionPatternSettingsEqualExceptBearing,
+  trackedLightIdsEqualOrder,
 } from '../compiler/ActionEffectFactory'
 import {
   ActionNode,
@@ -26,8 +32,19 @@ import {
 import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
-import { resolveValue, getVariableStore } from './valueResolver'
-import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
+import {
+  resolveValue,
+  getVariableStore,
+  resolveLocationGroups,
+  resolveLightTarget,
+} from './valueResolver'
+import {
+  resolveActionTiming,
+  resolveActionColor,
+  resolveActionLayer,
+  resolveActionPosition,
+  resolveMotionPattern,
+} from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -60,6 +77,8 @@ export class EffectExecutionEngine {
   private firingIdle = false
   /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
+  private submittedMotionPatterns: Set<string> = new Set()
+  private setPositionSubmissionFingerprint: Map<string, string> = new Map()
   /** Callback-backed effects still running in sequencer for this engine instance. */
   private pendingCallbackEffects: Set<string> = new Set()
   /** When .use is true, the next effect submission must use setEffect (then set .use = false). */
@@ -322,7 +341,6 @@ export class EffectExecutionEngine {
   }
 
   /**
-  /**
    * Helper to get the var store for a named variable.
    */
   private getVarStore(varName: string, context: ExecutionContext): Map<string, VariableValue> {
@@ -349,6 +367,166 @@ export class EffectExecutionEngine {
 
     if (!lights || lights.length === 0) {
       console.warn(`No lights resolved for action ${action.id}, skipping`)
+      this.emitNodeExecution('deactivated', action.id)
+      this.continueToNextNodes(action.id, context)
+      return
+    }
+
+    if (action.effectType === 'set-position') {
+      if (!action.position) {
+        console.warn(`set-position action ${action.id} is missing position`)
+        this.emitNodeExecution('deactivated', action.id)
+        this.continueToNextNodes(action.id, context)
+        return
+      }
+      const resolvedPosition: ResolvedPositionSetting = resolveActionPosition(
+        action.position,
+        context,
+      )
+      const resolvedTiming = resolveActionTiming(action.timing, context)
+      const resolvedLayer = resolveActionLayer(action.layer, context)
+      const resolvedTarget: ResolvedActionTarget = {
+        groups: resolveLocationGroups(action.target.groups, context),
+        filter: resolveLightTarget(action.target.filter, context),
+      }
+      const iterIdx = context.getForEachIterationIndex()
+
+      const submitPositionAction = (): void => {
+        const effectName =
+          iterIdx >= 0
+            ? `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}:${iterIdx}`
+            : `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}`
+
+        const positionFp = buildSetPositionSubmissionFingerprint(
+          resolvedTarget,
+          resolvedPosition,
+          resolvedLayer,
+          resolvedTiming,
+        )
+        if (this.setPositionSubmissionFingerprint.get(effectName) === positionFp) {
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+          return
+        }
+
+        const effect = ActionEffectFactory.buildEffect({
+          action,
+          lights,
+          resolvedPosition,
+          resolvedTiming,
+          resolvedLayer,
+        })
+        if (!effect) {
+          console.warn(`Failed to create set-position effect for action ${action.id}`)
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+          return
+        }
+        const useSetEffect = this.getAndConsumeInitialClearPolicy()
+        const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
+        if (shouldBlock) {
+          context.registerActiveAction(action.id, action)
+          this.pendingCallbackEffects.add(effectName)
+          const callback = (): void => {
+            this.pendingCallbackEffects.delete(effectName)
+            this.submittedEffects.delete(effectName)
+            this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+            this.emitNodeExecution('deactivated', action.id)
+            context.advancePhase()
+            context.completeAction(action.id)
+            this.continueToNextNodes(action.id, context)
+            this.maybeFireIdle()
+          }
+          this.submittedEffects.set(effectName, resolvedLayer)
+          if (useSetEffect) {
+            this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
+          } else {
+            this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
+          }
+        } else {
+          this.submittedEffects.set(effectName, resolvedLayer)
+          if (useSetEffect) {
+            this.sequencer.setEffectUnblockedName(effectName, effect)
+          } else {
+            // set-position is a state-target effect: each new resolved position
+            // must take effect immediately. Queueing behind a stale in-flight
+            // transition would desynchronise per-light motion across beats.
+            this.sequencer.replaceEffect(effectName, effect)
+          }
+          this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+        }
+      }
+
+      submitPositionAction()
+      return
+    }
+
+    if (action.effectType === 'motion-pattern') {
+      if (!action.motionPattern) {
+        console.warn(`motion-pattern action ${action.id} is missing motionPattern`)
+        this.emitNodeExecution('deactivated', action.id)
+        this.continueToNextNodes(action.id, context)
+        return
+      }
+      const resolvedMotion = resolveMotionPattern(action.motionPattern, context)
+      const resolvedTiming = resolveActionTiming(action.timing, context)
+      const resolvedLayer = resolveActionLayer(action.layer, context)
+      if (
+        !Number.isFinite(resolvedMotion.speedHz) ||
+        resolvedMotion.speedHz <= 0 ||
+        !Number.isFinite(resolvedMotion.sizeDeg) ||
+        resolvedMotion.sizeDeg <= 0
+      ) {
+        console.warn(
+          `motion-pattern action ${action.id}: speed (Hz) and size (deg) must be finite and positive`,
+        )
+        this.emitNodeExecution('deactivated', action.id)
+        this.continueToNextNodes(action.id, context)
+        return
+      }
+      const iterIdx = context.getForEachIterationIndex()
+      const effectName =
+        iterIdx >= 0
+          ? `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}:${iterIdx}`
+          : `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}`
+      const rampUpMs = resolvedTiming.duration > 0 ? resolvedTiming.duration : 0
+
+      const existingPattern = this.sequencer.getMotionPattern(effectName)
+      if (
+        existingPattern &&
+        existingPattern.layer === resolvedLayer &&
+        existingPattern.rampUpDurationMs === rampUpMs &&
+        trackedLightIdsEqualOrder(existingPattern.lights, lights)
+      ) {
+        if (resolvedMotionPatternSettingsEqual(existingPattern.config, resolvedMotion)) {
+          this.submittedMotionPatterns.add(effectName)
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+          return
+        }
+        if (
+          resolvedMotionPatternSettingsEqualExceptBearing(existingPattern.config, resolvedMotion)
+        ) {
+          this.sequencer.updateMotionPatternConfig(effectName, resolvedMotion)
+          this.submittedMotionPatterns.add(effectName)
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+          return
+        }
+      }
+
+      this.sequencer.cancelPanTiltClear()
+      this.sequencer.addMotionPattern(effectName, resolvedMotion, lights, resolvedLayer, rampUpMs)
+      this.submittedMotionPatterns.add(effectName)
+      this.emitNodeExecution('deactivated', action.id)
+      this.continueToNextNodes(action.id, context)
+      return
+    }
+
+    if (!action.color) {
+      console.warn(`Action ${action.id} (${action.effectType}) is missing color`)
       this.emitNodeExecution('deactivated', action.id)
       this.continueToNextNodes(action.id, context)
       return
@@ -447,6 +625,7 @@ export class EffectExecutionEngine {
     // Try to resolve each chain step (only set-color actions can be chained)
     const resolveChainStep = (a: ActionNode): ChainStep | null => {
       if (a.effectType !== 'set-color') return null
+      if (!a.color) return null
 
       const layerNum = resolveActionLayer(a.layer, context)
       const rc = resolveActionColor(a.color, context)
@@ -851,6 +1030,13 @@ export class EffectExecutionEngine {
       }
     }
     this.submittedEffects.clear()
+    for (const name of this.submittedMotionPatterns) {
+      if (!skipEffectRemoval) {
+        this.sequencer.removeMotionPattern(name)
+      }
+    }
+    this.submittedMotionPatterns.clear()
+    this.setPositionSubmissionFingerprint.clear()
     this.pendingCallbackEffects.clear()
     this.onIdleCallback = undefined
   }

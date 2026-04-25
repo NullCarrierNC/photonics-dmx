@@ -35,7 +35,13 @@ const AUDIO_EVENT_TYPE_DOCS: Record<AudioEventType, { description: string; bestU
       bestUsedFor:
         'One-time initialization: config-data, math offsets, and variables before beat-driven effect raisers.',
     },
-    'audio-beat': {
+    'cue-called': {
+      description:
+        'Runs on every audio execute while the cue is active (same cadence as the audio processor).',
+      bestUsedFor:
+        'Sustain or re-apply effects each frame (e.g. hold set-position until the next beat when paired with waitUntil beat).',
+    },
+    'beat': {
       description: 'Fires when the in-app beat detector detects a beat (onset + tempo gating).',
       bestUsedFor: 'Kick/snare-style triggers, BPM-locked effects, and general rhythm response.',
     },

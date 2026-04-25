@@ -76,7 +76,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -116,7 +119,8 @@
           "y": 114.71862801416893,
           "zoom": 0.6101403985958002
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-silhouettes",
@@ -186,7 +190,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -222,7 +229,8 @@
           "y": 114.71862801416893,
           "zoom": 0.6101403985958002
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-flare-fast",
@@ -292,7 +300,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -328,7 +339,8 @@
           "y": 174.23034915966474,
           "zoom": 0.6704553503110334
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-flare-slow",
@@ -398,7 +410,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -434,7 +449,8 @@
           "y": 174.23034915966474,
           "zoom": 0.6704553503110334
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-menu",
@@ -509,7 +525,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -651,7 +670,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Sweep Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-cool-auto",
@@ -1019,7 +1039,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Rotation CCW"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-cool-manual",
@@ -1362,7 +1383,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Rotation CCW"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-warm-auto",
@@ -1705,7 +1727,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Rotation CCW"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-warm-manual",
@@ -2048,7 +2071,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Rotation CCW"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-harmony",
@@ -2433,7 +2457,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Rotation CW"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-searchlights",
@@ -2719,7 +2744,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Rotation CCW"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-score",
@@ -2944,7 +2970,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Rotation CCW"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-strobe-slow",
@@ -3169,7 +3196,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-strobe-medium",
@@ -3394,7 +3422,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-strobe-fast",
@@ -3619,7 +3648,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-strobe-fastest",
@@ -3844,7 +3874,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-default",
@@ -3933,7 +3964,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3997,7 +4031,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -4061,7 +4098,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -4125,7 +4165,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -4185,7 +4228,10 @@
                 "source": "literal",
                 "value": 200
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -4612,7 +4658,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-frenzy",
@@ -4687,7 +4734,10 @@
                 "source": "variable",
                 "name": "stepMs"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -4747,7 +4797,10 @@
                 "source": "variable",
                 "name": "stepMs"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -4807,7 +4860,10 @@
                 "source": "variable",
                 "name": "stepMs"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -5096,7 +5152,8 @@
           "initialValue": "yellow",
           "isParameter": false
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-stomp",
@@ -5175,7 +5232,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -5239,7 +5299,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -5303,7 +5366,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -5367,7 +5433,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -5431,7 +5500,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -5495,7 +5567,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -5652,7 +5727,8 @@
           "initialValue": 0,
           "isParameter": false
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-silhouettes-spotlight",
@@ -5727,7 +5803,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -5787,7 +5866,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -6049,7 +6131,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-dischord",
@@ -6470,7 +6553,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-sk-sweep",
@@ -6999,7 +7083,8 @@
           "initialValue": 0,
           "isParameter": false
         }
-      ]
+      ],
+      "kind": "lighting"
     }
   ],
   "bundled": true

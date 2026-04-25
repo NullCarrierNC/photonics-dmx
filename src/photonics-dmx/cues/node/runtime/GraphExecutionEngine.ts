@@ -83,7 +83,7 @@ export class GraphExecutionEngine {
   }
 
   /**
-   * Create engine for a cue graph (CompiledYargCue).
+   * Create engine for a cue graph (YARG or motion node cues).
    * Effect registry required for effect-raiser nodes.
    */
   static forCue(
@@ -276,6 +276,7 @@ export class GraphExecutionEngine {
     }
 
     if (
+      this.policy.useInitialClearPolicy &&
       this.session.setFirstSubmissionUsesSetEffect &&
       hasCueEvent &&
       !(this.session.getClearedForThisActivation?.() ?? false)

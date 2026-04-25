@@ -4,6 +4,7 @@ import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type {
   NodeCueMode,
+  NodeCueKind,
   YargNodeCueDefinition,
   AudioNodeCueDefinition,
   YargEffectDefinition,
@@ -15,6 +16,7 @@ import type { EditorDocument } from '../lib/types'
 
 type Props = {
   mode: NodeCueMode
+  cueKind: NodeCueKind
   isEffectMode: boolean
   fileList: NodeCueFileSummary[]
   effectFileList: EffectFileSummary[]
@@ -39,6 +41,7 @@ type Props = {
 
 const CueFileSidebar: React.FC<Props> = ({
   mode,
+  cueKind,
   isEffectMode,
   fileList,
   effectFileList,
@@ -59,28 +62,37 @@ const CueFileSidebar: React.FC<Props> = ({
   const addLabel = isEffectMode ? '+ Add Effect' : '+ Add Cue'
   const itemCountLabel = isEffectMode ? 'effect(s)' : 'cue(s)'
 
+  const kindLabel = cueKind === 'lighting' ? 'lighting' : 'motion'
+
   // Get the items list based on the loaded document type, sorted alphabetically by name
   const items = useMemo(() => {
-    const rawItems = editorDoc
-      ? editorDoc.mode === 'effect'
-        ? (editorDoc.file as EffectFile).effects
-        : (editorDoc.file as NodeCueFile).cues
-      : []
+    if (!editorDoc) return []
+    if (editorDoc.mode === 'effect') {
+      return [...(editorDoc.file as EffectFile).effects].sort((a, b) =>
+        (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
+      )
+    }
+    const cues = (editorDoc.file as NodeCueFile).cues
+    const rawItems = cues.filter((c) => c.kind === cueKind)
     return [...rawItems].sort((a, b) =>
       (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
     )
-  }, [editorDoc])
+  }, [editorDoc, cueKind])
 
   // Use the appropriate file list based on editor mode, sorted alphabetically by group name
-  const displayFileList = useMemo(
-    () =>
-      [...(isEffectMode ? effectFileList : fileList)].sort((a, b) =>
-        (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, {
-          sensitivity: 'base',
-        }),
-      ),
-    [isEffectMode, effectFileList, fileList],
-  )
+  const displayFileList = useMemo(() => {
+    const base = isEffectMode ? effectFileList : fileList
+    const filtered = isEffectMode
+      ? base
+      : (base as NodeCueFileSummary[]).filter((file) =>
+          cueKind === 'lighting' ? file.lightingCueCount > 0 : file.motionCueCount > 0,
+        )
+    return [...filtered].sort((a, b) =>
+      (a.groupName ?? '').localeCompare(b.groupName ?? '', undefined, {
+        sensitivity: 'base',
+      }),
+    )
+  }, [isEffectMode, effectFileList, fileList, cueKind])
 
   return (
     <aside className="bg-white dark:bg-gray-900 rounded-lg shadow-inner p-3 overflow-hidden flex flex-col flex-1 min-h-0">
@@ -92,7 +104,11 @@ const CueFileSidebar: React.FC<Props> = ({
       </div>
       <div className="space-y-2 overflow-y-auto flex-1 min-h-0">
         {displayFileList.length === 0 && (
-          <p className="text-xs text-gray-500">No files found. Create one to get started.</p>
+          <p className="text-xs text-gray-500">
+            {isEffectMode
+              ? 'No files found. Create one to get started.'
+              : `No ${mode.toUpperCase()} ${kindLabel} cue files found. Create one to get started.`}
+          </p>
         )}
         {displayFileList.map((file) => (
           <button
@@ -110,7 +126,9 @@ const CueFileSidebar: React.FC<Props> = ({
             <div className="text-[10px] text-gray-500">
               {isEffectMode
                 ? (file as EffectFileSummary).effectCount
-                : (file as NodeCueFileSummary).cueCount}{' '}
+                : cueKind === 'lighting'
+                  ? (file as NodeCueFileSummary).lightingCueCount
+                  : (file as NodeCueFileSummary).motionCueCount}{' '}
               {itemCountLabel}
             </div>
           </button>

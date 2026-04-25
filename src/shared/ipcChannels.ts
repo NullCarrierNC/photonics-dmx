@@ -87,15 +87,33 @@ export const LIGHT = {
   GET_CUE_SOURCE_GROUP: 'get-cue-source-group',
   SET_CUE_CONSISTENCY_WINDOW: 'set-cue-consistency-window',
   GET_CUE_CONSISTENCY_WINDOW: 'get-cue-consistency-window',
+  GET_MOTION_CUE_MIN_HOLD_MS: 'get-motion-cue-min-hold-ms',
+  SET_MOTION_CUE_MIN_HOLD_MS: 'set-motion-cue-min-hold-ms',
+  GET_MOTION_CUE_PROBABILITY_PERCENT: 'get-motion-cue-probability-percent',
+  SET_MOTION_CUE_PROBABILITY_PERCENT: 'set-motion-cue-probability-percent',
+  GET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT: 'get-audio-motion-cue-probability-percent',
+  SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT: 'set-audio-motion-cue-probability-percent',
   SET_CUE_GROUP_SELECTION_MODE: 'set-cue-group-selection-mode',
   GET_CUE_GROUP_SELECTION_MODE: 'get-cue-group-selection-mode',
   GET_CONSISTENCY_STATUS: 'get-consistency-status',
+  GET_YARG_MOTION_CUE_GROUPS: 'get-yarg-motion-cue-groups',
+  GET_AUDIO_MOTION_CUE_GROUPS: 'get-audio-motion-cue-groups',
+  GET_AVAILABLE_YARG_MOTION_CUES: 'get-available-yarg-motion-cues',
+  GET_AVAILABLE_AUDIO_MOTION_CUES: 'get-available-audio-motion-cues',
+  GET_YARG_MOTION_GROUP_SELECTION_MODE: 'get-yarg-motion-group-selection-mode',
+  SET_YARG_MOTION_GROUP_SELECTION_MODE: 'set-yarg-motion-group-selection-mode',
+  GET_AUDIO_MOTION_GROUP_SELECTION_MODE: 'get-audio-motion-group-selection-mode',
+  SET_AUDIO_MOTION_GROUP_SELECTION_MODE: 'set-audio-motion-group-selection-mode',
+  START_YARG_MOTION_CUE_SIMULATION: 'start-yarg-motion-cue-simulation',
+  START_AUDIO_MOTION_CUE_SIMULATION: 'start-audio-motion-cue-simulation',
+  STOP_MOTION_CUE_SIMULATION: 'stop-motion-cue-simulation',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
   CONSOLE_ENABLE: 'console-enable',
   CONSOLE_DISABLE: 'console-disable',
   CONSOLE_SEND_DMX: 'console-send-dmx',
   CONSOLE_UPDATE_CHANNEL: 'console-update-channel',
   CONSOLE_SET_HOME: 'console-set-home',
+  CONSOLE_SET_FIXTURE_CONFIG: 'console-set-fixture-config',
 } as const
 
 // ---- Config ----
@@ -128,10 +146,24 @@ export const CONFIG = {
   SET_DISABLED_YARG_CUES: 'set-disabled-yarg-cues',
   GET_DISABLED_AUDIO_CUES: 'get-disabled-audio-cues',
   SET_DISABLED_AUDIO_CUES: 'set-disabled-audio-cues',
+  GET_ENABLED_YARG_MOTION_CUE_GROUPS: 'get-enabled-yarg-motion-cue-groups',
+  SET_ENABLED_YARG_MOTION_CUE_GROUPS: 'set-enabled-yarg-motion-cue-groups',
+  GET_DISABLED_YARG_MOTION_CUES: 'get-disabled-yarg-motion-cues',
+  SET_DISABLED_YARG_MOTION_CUES: 'set-disabled-yarg-motion-cues',
+  GET_ENABLED_AUDIO_MOTION_CUE_GROUPS: 'get-enabled-audio-motion-cue-groups',
+  SET_ENABLED_AUDIO_MOTION_CUE_GROUPS: 'set-enabled-audio-motion-cue-groups',
+  GET_DISABLED_AUDIO_MOTION_CUES: 'get-disabled-audio-motion-cues',
+  SET_DISABLED_AUDIO_MOTION_CUES: 'set-disabled-audio-motion-cues',
   GET_AUDIO_REACTIVE_CUES: 'get-audio-reactive-cues',
   SET_ACTIVE_AUDIO_CUE: 'set-active-audio-cue',
   GET_AUDIO_GAME_MODE: 'get-audio-game-mode',
   SET_AUDIO_GAME_MODE: 'set-audio-game-mode',
+  GET_MOTION_ENABLED: 'get-motion-enabled',
+  SET_MOTION_ENABLED: 'set-motion-enabled',
+  GET_ACTIVE_AUDIO_MOTION_CUE: 'get-active-audio-motion-cue',
+  SET_ACTIVE_AUDIO_MOTION_CUE: 'set-active-audio-motion-cue',
+  GET_ACTIVE_YARG_MOTION_CUE: 'get-active-yarg-motion-cue',
+  SET_ACTIVE_YARG_MOTION_CUE: 'set-active-yarg-motion-cue',
   GET_STAGE_KIT_PRIORITY: 'get-stage-kit-priority',
   SET_STAGE_KIT_PRIORITY: 'set-stage-kit-priority',
 } as const
@@ -158,12 +190,22 @@ export const RENDERER_RECEIVE = {
   CONTROLLERS_RESTARTED: 'controllers-restarted',
   AUDIO_ENABLE: 'audio:enable',
   AUDIO_DISABLE: 'audio:disable',
-  /** Broadcast after SET_AUDIO_ENABLED so all windows sync Enable Audio UI (e.g. Live Monitor in Cue Editor). */
+  /** Broadcast after SET_AUDIO_ENABLED so all windows sync Enable Audio UI. */
   AUDIO_ENABLED_CHANGED: 'audio:enabled-changed',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
   AUDIO_GAME_MODE_UPDATE: 'audio:game-mode-update',
   /** Enabled audio cue groups or per-cue disables changed (Preferences → all windows). */
   AUDIO_CUE_GROUPS_CHANGED: 'audio:cue-groups-changed',
+  /** YARG motion enabled groups or per-cue disables changed (Preferences → all windows). */
+  YARG_MOTION_CUE_GROUPS_CHANGED: 'yarg-motion:cue-groups-changed',
+  /** Audio motion enabled groups or per-cue disables changed (Preferences → all windows). */
+  AUDIO_MOTION_CUE_GROUPS_CHANGED: 'audio-motion:cue-groups-changed',
+  /** Global motion master toggle changed (YARG + audio motion handlers). */
+  MOTION_ENABLED_CHANGED: 'motion:enabled-changed',
+  /** Active audio motion program changed (manual/auto selection result). */
+  AUDIO_MOTION_CUE_CHANGE: 'audio-motion:cue-active-change',
+  /** Active YARG motion program changed (manual/auto selection result). */
+  YARG_MOTION_CUE_CHANGE: 'yarg-motion:cue-active-change',
   /** Game Mode primary cue changed (main process → renderer). */
   AUDIO_GAME_MODE_CUE_CHANGE: 'audio:game-mode-cue-change',
   /** Strobe cue firing state (main process → renderer, on transitions). */

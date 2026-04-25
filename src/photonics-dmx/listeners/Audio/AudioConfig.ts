@@ -1,5 +1,15 @@
-import { AudioConfig, AudioBandDefinition } from './AudioTypes'
+import { AudioConfig, AudioBandDefinition, AudioIdleDetectionConfig } from './AudioTypes'
 import { RHYTHM_GAME_BANDS } from './AudioBandPresets'
+
+/** Defaults for Game Mode idle/menu detection (overall energy vs threshold). */
+export const DEFAULT_AUDIO_IDLE_DETECTION: AudioIdleDetectionConfig = {
+  enabled: true,
+  thresholdPct: 20,
+  minIdleSeconds: 5,
+  resumeSeconds: 3,
+  idleColor: 'blue',
+  idleBrightness: 'low',
+}
 
 /**
  * Default frequency band definitions (8-band Rhythm Game preset — shipped default).
@@ -32,6 +42,7 @@ export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   strobeEnabled: false,
   strobeTriggerThreshold: 0.8,
   strobeProbability: 100,
+  idleDetection: { ...DEFAULT_AUDIO_IDLE_DETECTION },
 }
 
 export default DEFAULT_AUDIO_CONFIG

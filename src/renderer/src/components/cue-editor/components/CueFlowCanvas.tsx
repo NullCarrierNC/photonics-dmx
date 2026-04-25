@@ -17,6 +17,8 @@ import {
   NODE_EFFECT_TYPES,
   type LogicNode,
   type NodeEffectType,
+  type NodeCueKind,
+  type NodeCueMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type {
   AudioEventNode,
@@ -43,7 +45,9 @@ type Props = {
   onRemoveNode: (nodeId: string) => void
   setReactFlowInstance: (instance: ReactFlowInstance) => void
   isValidConnection: (connection: Connection) => boolean
-  activeMode: 'yarg' | 'audio'
+  activeMode: NodeCueMode
+  /** When editing a cue graph, which kind (lighting vs motion). Effects use lighting defaults. */
+  activeCueKind?: NodeCueKind
   editorMode: 'cue' | 'effect'
   addEventNode: (
     option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
@@ -80,6 +84,7 @@ const CueFlowCanvas: React.FC<Props> = ({
   setReactFlowInstance,
   isValidConnection,
   activeMode,
+  activeCueKind = 'lighting',
   editorMode,
   addEventNode,
   addActionNode,
@@ -233,7 +238,7 @@ const CueFlowCanvas: React.FC<Props> = ({
                 className="block w-full text-left px-3 py-1 text-blue-800 dark:text-blue-100 bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/60"
                 onClick={() =>
                   handlePaneMenuClick(() =>
-                    addEventNode(getDefaultEventOption(activeMode), {
+                    addEventNode(getDefaultEventOption(activeMode, activeCueKind), {
                       x: paneContextMenu.flowX,
                       y: paneContextMenu.flowY,
                     }),

@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
+import type { NodeCueMode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 type Props = {
   isOpen: boolean
   isEffectMode: boolean
-  mode: 'yarg' | 'audio'
+  mode: NodeCueMode
   onCancel: () => void
   onSave: (metadata: {
     groupId: string

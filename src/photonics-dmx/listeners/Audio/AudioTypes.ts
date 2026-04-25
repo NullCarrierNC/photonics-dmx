@@ -1,3 +1,5 @@
+import type { Brightness, Color } from '../../types'
+
 /**
  * Audio analysis data structure for lighting control
  * Emitted by AudioInputListener as 'audio:data' events
@@ -143,6 +145,28 @@ export interface AudioConfig {
   strobeTriggerThreshold: number
   /** Probability (0–100 %) that the strobe fires when the threshold is exceeded (default: 100) */
   strobeProbability: number
+
+  /**
+   * When audio Game Mode is on, treat sustained low overall energy as menu/idle: static colour, no motion.
+   * Only evaluated while Game Mode is enabled.
+   */
+  idleDetection: AudioIdleDetectionConfig
+}
+
+/**
+ * Idle/menu detection for audio-reactive Game Mode (overall energy vs threshold).
+ */
+export interface AudioIdleDetectionConfig {
+  /** When false, idle detection is never applied. */
+  enabled: boolean
+  /** Overall energy (0–100 %) below this counts as “low” for entering idle. */
+  thresholdPct: number
+  /** Seconds overall energy must stay below the threshold before entering idle. */
+  minIdleSeconds: number
+  /** Seconds overall energy must stay at or above the threshold before resuming normal cues. */
+  resumeSeconds: number
+  idleColor: Color
+  idleBrightness: Brightness
 }
 
 /**

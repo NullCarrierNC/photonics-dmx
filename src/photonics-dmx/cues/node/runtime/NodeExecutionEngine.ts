@@ -17,6 +17,11 @@ import {
   ResolvedActionTarget,
   ResolvedColorSetting,
   ResolvedActionTiming,
+  ResolvedPositionSetting,
+  buildSetPositionSubmissionFingerprint,
+  resolvedMotionPatternSettingsEqual,
+  resolvedMotionPatternSettingsEqualExceptBearing,
+  trackedLightIdsEqualOrder,
 } from '../compiler/ActionEffectFactory'
 import {
   ActionNode,
@@ -43,7 +48,13 @@ import {
   resolveLightTarget,
   getVariableStore,
 } from './valueResolver'
-import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
+import {
+  resolveActionTiming,
+  resolveActionColor,
+  resolveActionLayer,
+  resolveActionPosition,
+  resolveMotionPattern,
+} from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -100,6 +111,10 @@ export class NodeExecutionEngine {
   private activeEffectEngines: Map<string, EffectExecutionEngine> = new Map()
   /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
+  /** motion-pattern effect names for cancelAll → removeMotionPattern. */
+  private submittedMotionPatterns: Set<string> = new Set()
+  /** Last submitted set-position payload per effect name (cue-called idempotency after transition ends). */
+  private setPositionSubmissionFingerprint: Map<string, string> = new Map()
   /** Node IDs that have emitted 'activated' but not yet 'deactivated', so cancelAll can flush them. */
   private pendingActivations: Set<string> = new Set()
   /**
@@ -466,10 +481,211 @@ export class NodeExecutionEngine {
         return
       }
 
+      if (actionNode.effectType === 'set-position') {
+        if (!actionNode.position) {
+          console.warn(`set-position action ${actionNode.id} is missing position`)
+          this.continueToNextNodes(actionNode.id, context)
+          return
+        }
+
+        const resolvedTarget: ResolvedActionTarget = {
+          groups: resolveLocationGroups(actionNode.target.groups, context),
+          filter: resolveLightTarget(actionNode.target.filter, context),
+        }
+        const resolvedPosition: ResolvedPositionSetting = resolveActionPosition(
+          actionNode.position,
+          context,
+        )
+        const resolvedTiming = resolveActionTiming(actionNode.timing, context)
+        const resolvedLayer = resolveActionLayer(actionNode.layer, context)
+
+        const resolvedAction = {
+          ...actionNode,
+          target: resolvedTarget,
+          timing: resolvedTiming,
+          layer: resolvedLayer,
+        } as ActionNode & {
+          target: ResolvedActionTarget
+          timing: ResolvedActionTiming
+          layer: number
+        }
+
+        const lights = ActionEffectFactory.resolveLights(
+          this.lightManager,
+          actionNode.target,
+          (varName: string) => {
+            const cueVar = context.cueLevelVarStore.get(varName)
+            const groupVar = context.groupLevelVarStore.get(varName)
+            return cueVar ?? groupVar
+          },
+        )
+
+        if (!lights || lights.length === 0) {
+          this.continueToNextNodes(actionNode.id, context)
+          return
+        }
+
+        const submitPositionAction = (): void => {
+          const iterIdx = context.getForEachIterationIndex()
+          const effectName =
+            iterIdx >= 0
+              ? `${this.cueId}:${actionNode.id}:${iterIdx}`
+              : `${this.cueId}:${actionNode.id}`
+
+          const positionFp = buildSetPositionSubmissionFingerprint(
+            resolvedTarget,
+            resolvedPosition,
+            resolvedLayer,
+            resolvedTiming,
+          )
+          if (this.setPositionSubmissionFingerprint.get(effectName) === positionFp) {
+            this.emitNodeExecution('deactivated', actionNode.id)
+            this.continueToNextNodes(actionNode.id, context)
+            return
+          }
+
+          const effect = ActionEffectFactory.buildEffect({
+            action: resolvedAction,
+            lights,
+            waitCondition: undefined,
+            waitTime: 0,
+            resolvedTarget,
+            resolvedTiming,
+            resolvedLayer,
+            resolvedPosition,
+          })
+
+          if (!effect) {
+            this.continueToNextNodes(actionNode.id, context)
+            return
+          }
+
+          const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
+          const useSetEffect = this.getAndConsumeInitialClearPolicy()
+
+          if (shouldBlock) {
+            context.registerActiveAction(actionNode.id, actionNode)
+            const callback = (): void => {
+              this.submittedEffects.delete(effectName)
+              this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+              this.emitNodeExecution('deactivated', actionNode.id)
+              context.completeAction(actionNode.id)
+            }
+            this.submittedEffects.set(effectName, resolvedLayer)
+            if (useSetEffect) {
+              this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
+            } else {
+              this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
+            }
+          } else {
+            this.submittedEffects.set(effectName, resolvedLayer)
+            if (useSetEffect) {
+              this.sequencer.setEffectUnblockedName(effectName, effect)
+            } else {
+              // set-position is a state-target effect: each new resolved position
+              // must take effect immediately. Queueing behind a stale in-flight
+              // transition would desynchronise per-light motion across beats.
+              this.sequencer.replaceEffect(effectName, effect)
+            }
+            this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+            this.emitNodeExecution('deactivated', actionNode.id)
+            this.continueToNextNodes(actionNode.id, context)
+          }
+        }
+
+        submitPositionAction()
+        return
+      }
+
+      if (actionNode.effectType === 'motion-pattern') {
+        if (!actionNode.motionPattern) {
+          console.warn(`motion-pattern action ${actionNode.id} is missing motionPattern`)
+          this.continueToNextNodes(actionNode.id, context)
+          return
+        }
+
+        const resolvedMotion = resolveMotionPattern(actionNode.motionPattern, context)
+        const resolvedTiming = resolveActionTiming(actionNode.timing, context)
+        const resolvedLayer = resolveActionLayer(actionNode.layer, context)
+
+        if (
+          !Number.isFinite(resolvedMotion.speedHz) ||
+          resolvedMotion.speedHz <= 0 ||
+          !Number.isFinite(resolvedMotion.sizeDeg) ||
+          resolvedMotion.sizeDeg <= 0
+        ) {
+          console.warn(
+            `motion-pattern action ${actionNode.id}: speed (Hz) and size (deg) must be finite and positive`,
+          )
+          this.continueToNextNodes(actionNode.id, context)
+          return
+        }
+
+        const lights = ActionEffectFactory.resolveLights(
+          this.lightManager,
+          actionNode.target,
+          (varName: string) => {
+            const cueVar = context.cueLevelVarStore.get(varName)
+            const groupVar = context.groupLevelVarStore.get(varName)
+            return cueVar ?? groupVar
+          },
+        )
+
+        if (!lights || lights.length === 0) {
+          this.continueToNextNodes(actionNode.id, context)
+          return
+        }
+
+        const iterIdx = context.getForEachIterationIndex()
+        const effectName =
+          iterIdx >= 0
+            ? `${this.cueId}:${actionNode.id}:${iterIdx}`
+            : `${this.cueId}:${actionNode.id}`
+
+        const rampUpMs = resolvedTiming.duration > 0 ? resolvedTiming.duration : 0
+
+        const existingPattern = this.sequencer.getMotionPattern(effectName)
+        if (
+          existingPattern &&
+          existingPattern.layer === resolvedLayer &&
+          existingPattern.rampUpDurationMs === rampUpMs &&
+          trackedLightIdsEqualOrder(existingPattern.lights, lights)
+        ) {
+          if (resolvedMotionPatternSettingsEqual(existingPattern.config, resolvedMotion)) {
+            this.submittedMotionPatterns.add(effectName)
+            this.emitNodeExecution('deactivated', actionNode.id)
+            this.continueToNextNodes(actionNode.id, context)
+            return
+          }
+          if (
+            resolvedMotionPatternSettingsEqualExceptBearing(existingPattern.config, resolvedMotion)
+          ) {
+            this.sequencer.updateMotionPatternConfig(effectName, resolvedMotion)
+            this.submittedMotionPatterns.add(effectName)
+            this.emitNodeExecution('deactivated', actionNode.id)
+            this.continueToNextNodes(actionNode.id, context)
+            return
+          }
+        }
+
+        this.sequencer.cancelPanTiltClear()
+        this.sequencer.addMotionPattern(effectName, resolvedMotion, lights, resolvedLayer, rampUpMs)
+        this.submittedMotionPatterns.add(effectName)
+        this.emitNodeExecution('deactivated', actionNode.id)
+        this.continueToNextNodes(actionNode.id, context)
+        return
+      }
+
       // Resolve target
       const resolvedTarget: ResolvedActionTarget = {
         groups: resolveLocationGroups(actionNode.target.groups, context),
         filter: resolveLightTarget(actionNode.target.filter, context),
+      }
+
+      if (!actionNode.color) {
+        console.warn(`Action ${actionNode.id} (${actionNode.effectType}) is missing color`)
+        this.continueToNextNodes(actionNode.id, context)
+        return
       }
 
       const resolvedColor = resolveActionColor(actionNode.color, context)
@@ -628,6 +844,12 @@ export class NodeExecutionEngine {
 
       const resolveChainStep = (a: ActionNode): ChainStep | null => {
         if (a.effectType === 'blackout') {
+          return null
+        }
+        if (a.effectType !== 'set-color') {
+          return null
+        }
+        if (!a.color) {
           return null
         }
 
@@ -1255,6 +1477,14 @@ export class NodeExecutionEngine {
       }
     }
     this.submittedEffects.clear()
+
+    for (const name of this.submittedMotionPatterns) {
+      if (!skipEffectRemoval) {
+        this.sequencer.removeMotionPattern(name)
+      }
+    }
+    this.submittedMotionPatterns.clear()
+    this.setPositionSubmissionFingerprint.clear()
 
     // Cancel all active effect engines
     for (const effectEngine of this.activeEffectEngines.values()) {

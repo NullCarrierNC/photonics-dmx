@@ -123,6 +123,10 @@ export function extractAudioCueDataValue(
       return cueData.audioData.peakFrequency ?? 0
     case 'audio-bpm':
       return cueData.audioData.bpm ?? 0
+    case 'audio-beat-duration-ms': {
+      const bpm = cueData.audioData.bpm ?? 0
+      return bpm > 0 ? Math.round(60000 / bpm) : 500
+    }
     case 'audio-beat-detected':
       return cueData.audioData.beatDetected
     case 'audio-overall-level':

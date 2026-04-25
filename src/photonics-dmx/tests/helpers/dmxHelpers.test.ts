@@ -2,7 +2,74 @@ import {
   getColor,
   setGlobalBrightnessConfig,
   getGlobalBrightnessConfig,
+  logicalPanDir,
+  mirrorDmxForMovingHeadInvert,
+  percentToDmx,
 } from '../../helpers/dmxHelpers'
+
+describe('logicalPanDir', () => {
+  it('CW=true, invertPan=false → 1 (physical observation matches logical)', () => {
+    expect(logicalPanDir({ panDirectionCW: true, invertPan: false })).toBe(1)
+  })
+
+  it('CW=true, invertPan=true → -1 (invert flips logical direction)', () => {
+    expect(logicalPanDir({ panDirectionCW: true, invertPan: true })).toBe(-1)
+  })
+
+  it('CW=false, invertPan=false → -1 (CCW fixture)', () => {
+    expect(logicalPanDir({ panDirectionCW: false, invertPan: false })).toBe(-1)
+  })
+
+  it('CW=false, invertPan=true → 1 (double negation restores CW logic)', () => {
+    expect(logicalPanDir({ panDirectionCW: false, invertPan: true })).toBe(1)
+  })
+})
+
+describe('mirrorDmxForMovingHeadInvert', () => {
+  it('is an involution (double mirror returns original DMX)', () => {
+    const min = 0
+    const max = 255
+    for (const d of [0, 64, 128, 255]) {
+      const m = mirrorDmxForMovingHeadInvert(d, min, max)
+      const back = mirrorDmxForMovingHeadInvert(m, min, max)
+      expect(back).toBe(d)
+    }
+  })
+
+  it('maps logical mid to complementary wire value and back', () => {
+    const min = 0
+    const max = 255
+    const logical50 = percentToDmx(50, min, max)
+    const onWire = mirrorDmxForMovingHeadInvert(logical50, min, max)
+    expect(onWire).toBeGreaterThan(0)
+    expect(mirrorDmxForMovingHeadInvert(onWire, min, max)).toBe(logical50)
+  })
+
+  it('boundary: dmx=min maps to max, dmx=max maps to min', () => {
+    expect(mirrorDmxForMovingHeadInvert(0, 0, 255)).toBe(255)
+    expect(mirrorDmxForMovingHeadInvert(255, 0, 255)).toBe(0)
+  })
+
+  it('non-standard range: min=10, max=200 preserves involution', () => {
+    const min = 10
+    const max = 200
+    for (const d of [10, 50, 105, 150, 200]) {
+      const m = mirrorDmxForMovingHeadInvert(d, min, max)
+      expect(m).toBeGreaterThanOrEqual(min)
+      expect(m).toBeLessThanOrEqual(max)
+      expect(mirrorDmxForMovingHeadInvert(m, min, max)).toBe(d)
+    }
+  })
+
+  it('asymmetric home: percentToDmx(25) mirrors to expected complement', () => {
+    const min = 0
+    const max = 255
+    const logical25 = percentToDmx(25, min, max)
+    const mirrored = mirrorDmxForMovingHeadInvert(logical25, min, max)
+    const expected = max - (logical25 - min)
+    expect(mirrored).toBe(expected)
+  })
+})
 
 describe('dmxHelpers brightness configuration', () => {
   beforeEach(() => {

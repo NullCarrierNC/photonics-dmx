@@ -15,4 +15,6 @@ export interface ICueGroup {
   description?: string
   /** Map of cue types to their implementations in this group */
   cues: Map<CueType, INetCue>
+  /** YARG motion programs in this group, keyed by cue definition id (parallel to lighting). */
+  motionCues?: Map<string, INetCue>
 }

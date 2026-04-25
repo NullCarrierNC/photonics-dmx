@@ -1,6 +1,11 @@
 import { atom, getDefaultStore } from 'jotai'
 import { atomWithStorage, createJSONStorage } from 'jotai/utils'
-import { DmxFixture, LightingConfiguration, DmxRig } from '../../photonics-dmx/types'
+import {
+  DmxFixture,
+  LightingConfiguration,
+  DmxRig,
+  normalizeFixtureConfig,
+} from '../../photonics-dmx/types'
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { Pages } from './types'
@@ -45,9 +50,9 @@ export const myValidDmxLightsAtom = atom((get) => {
 
     // Include configChannels if they exist and ensure their values are valid
     if (DmxLight.config) {
-      const { panHome, panMin, panMax, tiltHome, tiltMin, tiltMax } = DmxLight.config
+      const cfg = normalizeFixtureConfig(DmxLight.config)
       const areConfigChannelsValid =
-        panHome >= panMin && panHome <= panMax && tiltHome >= tiltMin && tiltHome <= tiltMax
+        cfg.panHome >= 0 && cfg.panHome <= 100 && cfg.tiltHome >= 0 && cfg.tiltHome <= 100
 
       return areChannelsValid && areConfigChannelsValid
     }
@@ -101,6 +106,19 @@ export const previewRigIdAtom = atomWithStorage<string | null>(
   rigIdLocalStorage,
 )
 
+const PREVIEW_DIMENSION_STORAGE_KEY = 'photonics.dmx.previewDimension'
+
+const previewDimensionLocalStorage = createJSONStorage<'2d' | '3d'>(() => localStorage)
+
+/**
+ * DMX preview card: 2D disc vs 3D stage. Persisted so the choice survives navigation and app restarts.
+ */
+export const dmxPreviewDimensionAtom = atomWithStorage<'2d' | '3d'>(
+  PREVIEW_DIMENSION_STORAGE_KEY,
+  '2d',
+  previewDimensionLocalStorage,
+)
+
 /**
  * Atom for last-known DMX values (channel -> value).
  * Persists across page navigation so persistent cues (e.g. YARG menu) remain visible in preview.
@@ -122,13 +140,6 @@ export const audioListenerEnabledAtom = atom<boolean>(false)
  * Updated by AudioCaptureManager, consumed by CuePreviewAudio
  */
 export const audioDataAtom = atom<AudioLightingData | null>(null)
-
-/**
- * Live Monitor toggle in Cue Editor (audio mode).
- * When true, the Cue Editor window captures audio and sends it to the main process
- * so trigger nodes can be evaluated in real time.
- */
-export const liveMonitorEnabledAtom = atom<boolean>(false)
 
 export const isSenderErrorAtom = atom<boolean>(false)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error message or serialized error
@@ -160,6 +171,23 @@ export function resetOutputSenderToggleAtoms(disabledIds: readonly string[]): vo
       store.set(a, false)
     }
   }
+}
+
+/**
+ * Sync all output sender toggle atoms from a main-process sender status snapshot.
+ * Call this after CONTROLLERS_RESTARTED so that the UI reflects the actual runtime
+ * sender state (which may have been auto-restored from persisted preferences).
+ */
+export function syncOutputSenderAtoms(senderStatus: {
+  sacn: boolean
+  artnet: boolean
+  enttecpro: boolean
+  ipc: boolean
+}): void {
+  const store = getDefaultStore()
+  store.set(senderSacnEnabledAtom, senderStatus.sacn)
+  store.set(senderArtNetEnabledAtom, senderStatus.artnet)
+  store.set(senderEnttecProEnabledAtom, senderStatus.enttecpro)
 }
 
 // ArtNet config derived from preferences with fallback defaults

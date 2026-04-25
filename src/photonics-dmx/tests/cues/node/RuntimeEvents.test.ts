@@ -154,6 +154,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -255,6 +256,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -364,6 +366,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -472,6 +475,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -545,6 +549,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -599,6 +604,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -647,6 +653,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-lifecycle',
         name: 'Lifecycle Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -707,6 +714,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-no-ref',
         name: 'No Ref Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -766,6 +774,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-full',
         name: 'Full Lifecycle Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -829,6 +838,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-transition',
         name: 'Transition Test Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -881,6 +891,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-secondary',
         name: 'Secondary Overlay Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'secondary',
         nodes: {
@@ -930,6 +941,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-primary-called-only',
         name: 'Primary Cue Called Only',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -983,6 +995,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-blocking',
         name: 'Blocking Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {

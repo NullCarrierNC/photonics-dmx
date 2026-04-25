@@ -124,6 +124,7 @@ export const AUDIO_CUE_DATA_PROPERTIES = [
   'audio-energy',
   'audio-peak-frequency',
   'audio-bpm',
+  'audio-beat-duration-ms',
   'audio-beat-detected',
   'audio-overall-level',
   'trigger-level',

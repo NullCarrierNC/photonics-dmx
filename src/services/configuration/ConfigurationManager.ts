@@ -8,6 +8,7 @@ import {
   DmxRig,
   DmxRigsConfig,
 } from '../../photonics-dmx/types'
+import { migrateDmxRigsConfig } from '../../photonics-dmx/helpers/lightingConfigMigration'
 
 import {
   type AudioConfig,
@@ -60,7 +61,31 @@ export interface AppPreferences {
   disabledYargCues?: Record<string, string[]>
   /** Per-group list of disabled audio cue type IDs */
   disabledAudioCues?: Record<string, string[]>
+  enabledMotionCueGroups?: string[]
+  /** IDs of motion cue groups seen in past runs; used to auto-enable only genuinely new groups */
+  knownMotionCueGroups?: string[]
+  /** Per-group list of disabled motion cue definition ids */
+  disabledMotionCues?: Record<string, string[]>
+  /** YARG motion: perCueChange = random each lighting cue; oncePerSong = lock motion program for the song; none = no automatic motion */
+  motionGroupSelectionMode?: 'oncePerSong' | 'perCueChange' | 'none'
+  enabledAudioMotionCueGroups?: string[]
+  knownAudioMotionCueGroups?: string[]
+  disabledAudioMotionCues?: Record<string, string[]>
+  /** Audio-reactive motion (parallel layer with lighting audio cues). */
+  audioMotionGroupSelectionMode?: 'oncePerSong' | 'perCueChange' | 'none'
+  /** Master switch: when false, YARG and audio automatic motion layers are off. Default true. */
+  motionEnabled?: boolean
+  /** Manual audio motion cue (null = auto random on primary change). */
+  activeAudioMotionCueRef?: { groupId: string; cueId: string } | null
+  /** Manual YARG motion cue (null = auto random on new primary cue). */
+  activeYargMotionCueRef?: { groupId: string; cueId: string } | null
   cueConsistencyWindow: number
+  /** Minimum time (ms) the current motion cue must run before auto re-pick on lighting/primary change. Manual motion selection is not gated. */
+  motionCueMinimumHoldMs?: number
+  /** Probability (0-100) that an automatic YARG motion cue pick will play on a new lighting cue. A failed roll stops motion and returns fixtures to home. Manual motion selection bypasses the roll. Default 100. */
+  motionCueProbabilityPercent?: number
+  /** Probability (0-100) that an automatic audio motion cue pick will play on a primary cue change. A failed roll stops motion and returns fixtures to home. Manual motion selection bypasses the roll. Default 100. */
+  audioMotionCueProbabilityPercent?: number
   /** Cue group selection: 'withinSong' = can change during song; 'oncePerSong' = fixed at song start */
   cueGroupSelectionMode: 'oncePerSong' | 'withinSong'
   clockRate: number
@@ -130,6 +155,13 @@ const DEFAULT_PREFERENCES: AppPreferences = {
   enabledCueGroups: ['stagekit'],
   enabledAudioCueGroups: [],
   cueConsistencyWindow: 60000,
+  motionCueMinimumHoldMs: 5000,
+  motionCueProbabilityPercent: 100,
+  audioMotionCueProbabilityPercent: 100,
+  motionGroupSelectionMode: 'perCueChange',
+  motionEnabled: true,
+  activeAudioMotionCueRef: null,
+  activeYargMotionCueRef: null,
   cueGroupSelectionMode: 'withinSong',
   clockRate: 10, // 10ms (100 Hz) for smooth animations and strobe cues
   activeAudioCueType: '' as AudioCueType,
@@ -329,7 +361,7 @@ export class ConfigurationManager {
       }
 
       this.dmxRigs
-        .update({ rigs: [defaultRig] })
+        .update({ ...currentRigs, rigs: [defaultRig] })
         .catch((err) =>
           console.error('[Photonics Config] Failed to persist migrated DMX rigs:', err),
         )
@@ -461,6 +493,64 @@ export class ConfigurationManager {
     await this.setPreference('disabledAudioCues', disabled)
   }
 
+  getEnabledMotionCueGroups(): string[] | undefined {
+    return this.preferences.get().enabledMotionCueGroups
+  }
+
+  async setEnabledMotionCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('enabledMotionCueGroups', groupIds)
+  }
+
+  getKnownMotionCueGroups(): string[] | undefined {
+    return this.preferences.get().knownMotionCueGroups
+  }
+
+  async setKnownMotionCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('knownMotionCueGroups', groupIds)
+  }
+
+  getDisabledMotionCues(): Record<string, string[]> | undefined {
+    return this.preferences.get().disabledMotionCues
+  }
+
+  async setDisabledMotionCues(disabled: Record<string, string[]>): Promise<void> {
+    await this.setPreference('disabledMotionCues', disabled)
+  }
+
+  getEnabledAudioMotionCueGroups(): string[] | undefined {
+    return this.preferences.get().enabledAudioMotionCueGroups
+  }
+
+  async setEnabledAudioMotionCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('enabledAudioMotionCueGroups', groupIds)
+  }
+
+  getKnownAudioMotionCueGroups(): string[] | undefined {
+    return this.preferences.get().knownAudioMotionCueGroups
+  }
+
+  async setKnownAudioMotionCueGroups(groupIds: string[]): Promise<void> {
+    await this.setPreference('knownAudioMotionCueGroups', groupIds)
+  }
+
+  getDisabledAudioMotionCues(): Record<string, string[]> | undefined {
+    return this.preferences.get().disabledAudioMotionCues
+  }
+
+  async setDisabledAudioMotionCues(disabled: Record<string, string[]>): Promise<void> {
+    await this.setPreference('disabledAudioMotionCues', disabled)
+  }
+
+  getAudioMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    return this.preferences.get().audioMotionGroupSelectionMode ?? 'perCueChange'
+  }
+
+  async setAudioMotionGroupSelectionMode(
+    mode: 'oncePerSong' | 'perCueChange' | 'none',
+  ): Promise<void> {
+    await this.setPreference('audioMotionGroupSelectionMode', mode)
+  }
+
   /**
    * Gets the preferred audio cue type
    */
@@ -489,6 +579,33 @@ export class ConfigurationManager {
     await this.setPreference('cueConsistencyWindow', windowMs)
   }
 
+  getMotionCueMinimumHoldMs(): number {
+    return this.preferences.get().motionCueMinimumHoldMs ?? 5000
+  }
+
+  async setMotionCueMinimumHoldMs(ms: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(600000, Math.round(ms)))
+    await this.setPreference('motionCueMinimumHoldMs', clamped)
+  }
+
+  getMotionCueProbabilityPercent(): number {
+    return this.preferences.get().motionCueProbabilityPercent ?? 100
+  }
+
+  async setMotionCueProbabilityPercent(percent: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+    await this.setPreference('motionCueProbabilityPercent', clamped)
+  }
+
+  getAudioMotionCueProbabilityPercent(): number {
+    return this.preferences.get().audioMotionCueProbabilityPercent ?? 100
+  }
+
+  async setAudioMotionCueProbabilityPercent(percent: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+    await this.setPreference('audioMotionCueProbabilityPercent', clamped)
+  }
+
   /**
    * Gets the cue group selection mode preference
    */
@@ -501,6 +618,38 @@ export class ConfigurationManager {
    */
   async setCueGroupSelectionMode(mode: 'oncePerSong' | 'withinSong'): Promise<void> {
     await this.setPreference('cueGroupSelectionMode', mode)
+  }
+
+  getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    return this.preferences.get().motionGroupSelectionMode ?? 'perCueChange'
+  }
+
+  async setMotionGroupSelectionMode(mode: 'oncePerSong' | 'perCueChange' | 'none'): Promise<void> {
+    await this.setPreference('motionGroupSelectionMode', mode)
+  }
+
+  getMotionEnabled(): boolean {
+    return this.preferences.get().motionEnabled ?? true
+  }
+
+  async setMotionEnabled(enabled: boolean): Promise<void> {
+    await this.setPreference('motionEnabled', enabled)
+  }
+
+  getActiveAudioMotionCueRef(): { groupId: string; cueId: string } | null {
+    return this.preferences.get().activeAudioMotionCueRef ?? null
+  }
+
+  async setActiveAudioMotionCueRef(ref: { groupId: string; cueId: string } | null): Promise<void> {
+    await this.setPreference('activeAudioMotionCueRef', ref)
+  }
+
+  getActiveYargMotionCueRef(): { groupId: string; cueId: string } | null {
+    return this.preferences.get().activeYargMotionCueRef ?? null
+  }
+
+  async setActiveYargMotionCueRef(ref: { groupId: string; cueId: string } | null): Promise<void> {
+    await this.setPreference('activeYargMotionCueRef', ref)
   }
 
   /**
@@ -598,11 +747,13 @@ export class ConfigurationManager {
    * Gets audio configuration
    */
   getAudioConfig(): AudioConfig {
-    const savedConfig = this.getPreference('audioConfig')
-
-    const config = savedConfig ? { ...DEFAULT_AUDIO_CONFIG, ...savedConfig } : DEFAULT_AUDIO_CONFIG
-
-    return { ...config, enabled: false }
+    const savedConfig = this.getPreference('audioConfig') as Partial<AudioConfig> | undefined
+    const merged = { ...DEFAULT_AUDIO_CONFIG, ...savedConfig }
+    const idleDetection = {
+      ...DEFAULT_AUDIO_CONFIG.idleDetection,
+      ...(savedConfig?.idleDetection ?? {}),
+    }
+    return { ...merged, idleDetection, enabled: false }
   }
 
   /**
@@ -646,10 +797,19 @@ export class ConfigurationManager {
   // DMX Rigs Methods
 
   /**
-   * Gets all DMX rigs
+   * Gets all DMX rigs (layout/mount migration applied on read; persisted when changed).
    */
   getDmxRigs(): DmxRig[] {
-    return this.dmxRigs.get().rigs
+    const current = this.dmxRigs.get()
+    const { config: migrated, changed } = migrateDmxRigsConfig(current)
+    if (changed) {
+      void this.dmxRigs
+        .update(migrated)
+        .catch((err) =>
+          console.error('[Photonics Config] Failed to persist migrated DMX rigs:', err),
+        )
+    }
+    return migrated.rigs
   }
 
   /**
@@ -674,7 +834,7 @@ export class ConfigurationManager {
       rigs.push(rig)
     }
 
-    await this.dmxRigs.update({ rigs })
+    await this.dmxRigs.update({ ...current, rigs })
   }
 
   /**
@@ -683,7 +843,7 @@ export class ConfigurationManager {
   async deleteDmxRig(id: string): Promise<void> {
     const current = this.dmxRigs.get()
     const rigs = current.rigs.filter((rig) => rig.id !== id)
-    await this.dmxRigs.update({ rigs })
+    await this.dmxRigs.update({ ...current, rigs })
   }
 
   /**

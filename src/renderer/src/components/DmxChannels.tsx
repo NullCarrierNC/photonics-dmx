@@ -1,5 +1,18 @@
 import React from 'react'
-import { DmxFixture } from '../../../photonics-dmx/types'
+import { DmxFixture, normalizeFixtureConfig } from '../../../photonics-dmx/types'
+
+function fixtureConfigLabel(key: string): string {
+  if (key === 'panDirectionCW') {
+    return 'Pan increases clockwise from above'
+  }
+  if (key === 'panStageDeg') {
+    return 'Pan upstage reference (deg)'
+  }
+  if (key === 'tiltStageDeg') {
+    return 'Tilt vertical reference (deg)'
+  }
+  return key
+}
 
 interface DmxChannelsProps {
   light: DmxFixture
@@ -42,7 +55,7 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
             <label
               htmlFor={channelName}
               className="text-sm capitalize w-1/3 text-gray-700 dark:text-gray-300">
-              {channelName}:
+              {allowZero ? fixtureConfigLabel(channelName) : channelName}:
             </label>
             {typeof value === 'number' ? (
               <input
@@ -100,7 +113,7 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
       {/* Config Channels - Allow zero if they exist */}
       {light.config &&
         renderChannels(
-          light.config as unknown as Record<string, number | boolean>,
+          normalizeFixtureConfig(light.config) as unknown as Record<string, number | boolean>,
           'Config Channels',
           true,
         )}

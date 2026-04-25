@@ -931,4 +931,159 @@ describe('LightTransitionController', () => {
       expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, upperState)
     })
   })
+
+  describe('pan/tilt carry-forward across layer blending', () => {
+    let ltcTest: LightTransitionController
+    let capturedState: RGBIO | undefined
+
+    beforeEach(() => {
+      capturedState = undefined
+      const lsm = {
+        setLightState: jest.fn((_, s: RGBIO) => {
+          capturedState = s
+        }),
+        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
+        publishLightStates: jest.fn(),
+        getTrackedLightIds: jest.fn().mockReturnValue([]),
+      }
+      ltcTest = new LightTransitionController(lsm as unknown as LightStateManager)
+    })
+
+    function setLayerAndCompute(lightId: string, layer: number, state: RGBIO): void {
+      const acc = ltcAccess(ltcTest)
+      if (!acc._currentLayerStates.has(lightId)) {
+        acc._currentLayerStates.set(lightId, new Map())
+      }
+      acc._currentLayerStates.get(lightId)!.set(layer, state)
+      acc.calculateFinalColorForLight(lightId)
+    }
+
+    it('pan/tilt from a lower layer are carried through a higher colour-only layer', () => {
+      const lightId = 'test-carry'
+      setLayerAndCompute(lightId, 10, {
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 0,
+        blendMode: 'replace',
+        pan: 42,
+        tilt: 77,
+      })
+      setLayerAndCompute(lightId, 20, {
+        red: 200,
+        green: 100,
+        blue: 50,
+        intensity: 255,
+        opacity: 1,
+        blendMode: 'replace',
+      })
+      expect(capturedState?.pan).toBe(42)
+      expect(capturedState?.tilt).toBe(77)
+    })
+
+    it('a higher layer that explicitly sets pan/tilt overrides the lower layer', () => {
+      const lightId = 'test-override'
+      setLayerAndCompute(lightId, 10, {
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 0,
+        blendMode: 'replace',
+        pan: 42,
+        tilt: 77,
+      })
+      setLayerAndCompute(lightId, 20, {
+        red: 200,
+        green: 100,
+        blue: 50,
+        intensity: 255,
+        opacity: 1,
+        blendMode: 'replace',
+        pan: 90,
+        tilt: 10,
+      })
+      expect(capturedState?.pan).toBe(90)
+      expect(capturedState?.tilt).toBe(10)
+    })
+
+    it('single layer with pan/tilt produces correct output', () => {
+      const lightId = 'test-single'
+      setLayerAndCompute(lightId, 10, {
+        red: 128,
+        green: 64,
+        blue: 32,
+        intensity: 255,
+        opacity: 1,
+        blendMode: 'replace',
+        pan: 55,
+        tilt: 30,
+      })
+      expect(capturedState?.pan).toBe(55)
+      expect(capturedState?.tilt).toBe(30)
+    })
+
+    it('no layers with pan/tilt produce undefined pan/tilt so publisher uses home fallback', () => {
+      const lightId = 'test-no-pt'
+      setLayerAndCompute(lightId, 10, {
+        red: 128,
+        green: 64,
+        blue: 32,
+        intensity: 255,
+        opacity: 1,
+        blendMode: 'replace',
+      })
+      expect(capturedState?.pan).toBeUndefined()
+      expect(capturedState?.tilt).toBeUndefined()
+    })
+
+    it('additive blend: pan/tilt carry forward from lower layer through colour-only additive layer', () => {
+      const lightId = 'test-carry-add'
+      setLayerAndCompute(lightId, 10, {
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 0,
+        blendMode: 'replace',
+        pan: 55,
+        tilt: 33,
+      })
+      setLayerAndCompute(lightId, 20, {
+        red: 100,
+        green: 100,
+        blue: 100,
+        intensity: 255,
+        opacity: 1,
+        blendMode: 'add',
+      })
+      expect(capturedState?.pan).toBe(55)
+      expect(capturedState?.tilt).toBe(33)
+    })
+
+    it('multiply blend: pan/tilt carry forward from lower layer through colour-only multiply layer', () => {
+      const lightId = 'test-carry-mul'
+      setLayerAndCompute(lightId, 10, {
+        red: 200,
+        green: 100,
+        blue: 50,
+        intensity: 200,
+        opacity: 1,
+        blendMode: 'replace',
+        pan: 20,
+        tilt: 80,
+      })
+      setLayerAndCompute(lightId, 20, {
+        red: 128,
+        green: 128,
+        blue: 128,
+        intensity: 200,
+        opacity: 1,
+        blendMode: 'multiply',
+      })
+      expect(capturedState?.pan).toBe(20)
+      expect(capturedState?.tilt).toBe(80)
+    })
+  })
 })

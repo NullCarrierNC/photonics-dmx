@@ -1,7 +1,18 @@
 import React from 'react'
 import LightType from './../components/LightType'
 import DmxChannels from './../components/DmxChannels'
-import { DmxFixture, FixtureTypes, LightTypes } from '../../../photonics-dmx/types'
+import {
+  DmxFixture,
+  FixtureConfig,
+  FixtureTypes,
+  LightTypes,
+  DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
+  normalizeFixtureConfig,
+} from '../../../photonics-dmx/types'
+
+function isFixtureConfigKey(name: string): name is keyof FixtureConfig {
+  return name in DEFAULT_MOVING_HEAD_FIXTURE_CONFIG
+}
 
 interface LightSettingsProps {
   currentLight: DmxFixture | null
@@ -33,20 +44,19 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
       ...currentLight,
       fixture: newType,
       channels: defaultType.channels,
-      config: defaultType.config ? { ...defaultType.config } : undefined,
+      config: defaultType.config ? normalizeFixtureConfig(defaultType.config) : undefined,
     })
   }
 
   // Updated handleChannelChange to accept number | boolean
   const handleChannelChange = (channelName: string, value: number | boolean) => {
-    if (currentLight.config && channelName in currentLight.config) {
-      // Type assertion to access configChannels properties safely
+    if (currentLight.config && isFixtureConfigKey(channelName)) {
       setCurrentLight({
         ...currentLight,
-        config: {
+        config: normalizeFixtureConfig({
           ...currentLight.config,
           [channelName]: value,
-        },
+        }),
       })
     } else {
       // Update regular channels

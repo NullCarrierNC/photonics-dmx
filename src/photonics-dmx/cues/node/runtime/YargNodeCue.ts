@@ -8,7 +8,7 @@ import type { NodeRuntimeCallbacks } from './executionTypes'
 import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import { cueGraphPolicy } from './GraphExecutionPolicy'
-import type { YargNodeCueDefinition } from '../../types/nodeCueTypes'
+import type { YargLightingNodeCueDefinition } from '../../types/nodeCueTypes'
 
 /**
  * YARG node cue: uses CueSession and GraphExecutionEngine.
@@ -34,24 +34,24 @@ export class YargNodeCue implements INetCue {
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
     this.session = new CueSession()
     this.runtimeCallbacks = runtimeCallbacks
-    const definition = compiledCue.definition as YargNodeCueDefinition
+    const definition = compiledCue.definition as YargLightingNodeCueDefinition
     this.session.initializeVariables(definition.variables ?? [], compiledCue.groupVariables ?? [])
   }
 
   get cueId(): string {
-    return (this.compiledCue.definition as YargNodeCueDefinition).cueType
+    return (this.compiledCue.definition as YargLightingNodeCueDefinition).cueType
   }
 
   get id(): string {
-    return `${this.groupId}:${(this.compiledCue.definition as YargNodeCueDefinition).id}`
+    return `${this.groupId}:${(this.compiledCue.definition as YargLightingNodeCueDefinition).id}`
   }
 
   get description(): string | undefined {
-    return (this.compiledCue.definition as YargNodeCueDefinition).description
+    return (this.compiledCue.definition as YargLightingNodeCueDefinition).description
   }
 
   get style(): CueStyle {
-    const s = (this.compiledCue.definition as YargNodeCueDefinition).style
+    const s = (this.compiledCue.definition as YargLightingNodeCueDefinition).style
     return s === 'secondary' ? CueStyle.Secondary : CueStyle.Primary
   }
 
@@ -61,7 +61,7 @@ export class YargNodeCue implements INetCue {
     lightManager: DmxLightManager,
   ): void | Promise<void> {
     if (!this.engine) {
-      const definition = this.compiledCue.definition as YargNodeCueDefinition
+      const definition = this.compiledCue.definition as YargLightingNodeCueDefinition
       const cueId = this.id
       const policy = cueGraphPolicy(this.groupId, cueId)
       this.engine = GraphExecutionEngine.forCue(

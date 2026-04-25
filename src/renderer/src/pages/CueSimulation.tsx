@@ -14,6 +14,7 @@ import CueRegistrySelector from '@renderer/components/CueRegistrySelector'
 import CueSimulationAbout from './CueSimulation/CueSimulationAbout'
 import CueSimulationActions from './CueSimulation/CueSimulationActions'
 import CueSimulationInstrument from './CueSimulation/CueSimulationInstrument'
+import CueSimulationMotion from './CueSimulation/CueSimulationMotion'
 import {
   startTestEffect,
   stopTestEffect,
@@ -25,6 +26,7 @@ import {
   simulateKeyframe,
   simulateMeasure,
   simulateInstrumentNote,
+  stopMotionCueSimulation,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
 
@@ -85,6 +87,9 @@ const CueSimulation: React.FC = () => {
       // Stop any running test effects when leaving the page
       stopTestEffect().catch((error) => {
         console.error('Error stopping test effect on unmount:', error)
+      })
+      stopMotionCueSimulation().catch((error) => {
+        console.error('Error stopping motion cue simulation on unmount:', error)
       })
       // Clear any pending save timeout
       if (saveTimeoutRef.current) {
@@ -513,6 +518,7 @@ const CueSimulation: React.FC = () => {
             onSimulateNote={handleSimulateInstrumentNote}
             disabled={!selectedGroupId}
           />
+          <CueSimulationMotion />
         </>
       )}
 

@@ -45,7 +45,7 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
             active: true,
             config: {
               numLights: 0,
-              lightLayout: { id: 'front', label: 'Front' },
+              lightLayout: { id: 'front', label: 'Front only' },
               strobeType: ConfigStrobeType.None,
               frontLights: [],
               backLights: [],

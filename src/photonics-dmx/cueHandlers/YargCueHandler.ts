@@ -1,8 +1,12 @@
 import { CueData, CueType } from '../cues/types/cueTypes'
+import { YargMotionCueRef } from '../cues/types/audioCueTypes'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { BaseCueHandler } from './BaseCueHandler'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
+import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { sendToAllWindows } from '../../main/utils/windowUtils'
 
 /**
  * YargCueHandler handles the cues called by the YARG network listener.
@@ -10,6 +14,11 @@ import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
  * Cue selection is delegated to YargCueRegistry.getCueImplementation(cueType, trackMode), which uses
  * active/enabled groups, consistency tracking, stage-kit preference when applicable,
  * and default-group fallback when no active group implements the cue.
+ *
+ * Motion cues run in parallel via YargCueRegistry.getRandomMotionCue() when the lighting cue type
+ * changes (not on re-queues of the same cue). Simulated cues (trackMode === 'simulated') skip
+ * random motion selection; use motion simulation IPC instead. Optional once-per-song lock from
+ * configuration applies to random selection.
  *
  * Reminder: setEffect clears all running effects, regardless of layer.
  * Layer 0 will maintain its state though.
@@ -23,13 +32,85 @@ const STROBE_TYPES: CueType[] = [
   CueType.Strobe_Off,
 ]
 
+export type YargCueHandlerOptions = {
+  getMotionCueMinimumHoldMs?: () => number
+  /** Probability (0-100) that an automatic motion cue pick will play on a new lighting cue. Defaults to 100 (always). */
+  getMotionCueProbabilityPercent?: () => number
+}
+
 class YargCueHandler extends BaseCueHandler {
   private currentPrimaryCue: INetCue | null = null
   private currentSecondaryCue: INetCue | null = null
   private currentStrobeCue: INetCue | null = null
+  private currentMotionCue: INetCue | null = null
+  private currentMotionCueStartTime: number | null = null
+  private motionEnabled = true
+  private manualMotionRef: YargMotionCueRef | null = null
+  /** Tracks which manual ref was used for the last motion pick (undefined = not yet synced). */
+  private lastManualMotionRefForMotion: YargMotionCueRef | null | undefined = undefined
+  private lastEmittedMotionKey: string | null = null
+  private readonly getMotionCueMinimumHoldMs: () => number
+  private readonly getMotionCueProbabilityPercent: () => number
 
-  constructor(lightManager: DmxLightManager, photonicsSequencer: ILightingController) {
+  public setManualMotionRef(ref: YargMotionCueRef | null): void {
+    this.manualMotionRef = ref
+    this.lastManualMotionRefForMotion = undefined
+  }
+
+  private emitYargMotionCueChange(
+    ref: YargMotionCueRef | null,
+    source: 'manual' | 'auto' | 'cleared',
+    manualFallback?: boolean,
+  ): void {
+    const key = ref ? `${ref.groupId}:${ref.cueId}` : 'null'
+    if (key === this.lastEmittedMotionKey && source !== 'cleared' && manualFallback !== true) {
+      return
+    }
+    this.lastEmittedMotionKey = key
+    sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+      ref,
+      source,
+      manualFallback: manualFallback === true,
+    })
+  }
+
+  public setMotionEnabled(enabled: boolean): void {
+    if (this.motionEnabled === enabled) {
+      return
+    }
+    this.motionEnabled = enabled
+    if (!enabled) {
+      if (this.currentMotionCue) {
+        this.currentMotionCue.onStop?.()
+        this.currentMotionCue = null
+        this.currentMotionCueStartTime = null
+        this._sequencer.schedulePanTiltClear()
+        this.emitYargMotionCueChange(null, 'cleared')
+      }
+      this.lastManualMotionRefForMotion = undefined
+    } else {
+      this.lastManualMotionRefForMotion = undefined
+    }
+  }
+
+  constructor(
+    lightManager: DmxLightManager,
+    photonicsSequencer: ILightingController,
+    options?: YargCueHandlerOptions,
+  ) {
     super(lightManager, photonicsSequencer)
+    this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
+    this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
+  }
+
+  public override notifySongStart(): void {
+    super.notifySongStart()
+    YargCueRegistry.getInstance().onMotionSongStart()
+  }
+
+  public override notifySongEnd(): void {
+    super.notifySongEnd()
+    YargCueRegistry.getInstance().onMotionSongEnd()
   }
 
   public reset(): void {
@@ -135,11 +216,100 @@ class YargCueHandler extends BaseCueHandler {
       }
 
       await cue.execute(historicCueData, this._sequencer, this._lightManager)
-      this.emit('cueHandled', historicCueData)
     } else {
       console.error(`No implementation found for cue: ${cueType}`)
-      this.emit('cueHandled', historicCueData)
     }
+
+    if (trackMode !== 'simulated') {
+      if (!this.motionEnabled) {
+        if (this.currentMotionCue) {
+          this.currentMotionCue.onStop?.()
+          this.currentMotionCue = null
+          this.currentMotionCueStartTime = null
+          this._sequencer.schedulePanTiltClear()
+          this.emitYargMotionCueChange(null, 'cleared')
+        }
+      } else {
+        const registry = YargCueRegistry.getInstance()
+        const isNewCue = historicCueData.executionCount === 1
+        const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
+        const now = Date.now()
+        const minHold = this.getMotionCueMinimumHoldMs()
+        const heldLongEnough =
+          this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
+        const needNewMotionPick = isManualChange || (isNewCue && heldLongEnough)
+
+        let motionCue: INetCue | null = null
+
+        if (needNewMotionPick) {
+          this.lastManualMotionRefForMotion = this.manualMotionRef
+          let pickSource: 'manual' | 'auto' = 'auto'
+          let pickManualFallback = false
+          if (this.manualMotionRef) {
+            motionCue = registry.getMotionCueImplementation(this.manualMotionRef)
+            if (motionCue) {
+              pickSource = 'manual'
+            } else {
+              pickManualFallback = true
+              motionCue = registry.getRandomMotionCue()
+              pickSource = 'auto'
+              sendToAllWindows(RENDERER_RECEIVE.DEBUG_LOG, {
+                message:
+                  'Selected YARG motion cue is unavailable (disabled or unknown); using a random motion program.',
+                variables: [],
+                timestamp: Date.now(),
+              })
+            }
+          } else {
+            const probability = this.getMotionCueProbabilityPercent()
+            if (probability >= 100 || Math.random() * 100 < probability) {
+              motionCue = registry.getRandomMotionCue()
+            }
+          }
+
+          if (motionCue) {
+            const prevMotion = this.currentMotionCue
+            if (this.currentMotionCue && this.currentMotionCue !== motionCue) {
+              this.currentMotionCue.onStop?.()
+            }
+            this.currentMotionCue = motionCue
+            if (prevMotion !== motionCue) {
+              this.currentMotionCueStartTime = now
+            }
+            this._sequencer.cancelPanTiltClear()
+            const ref = registry.findYargMotionCueRef(motionCue)
+            if (ref) {
+              this.emitYargMotionCueChange(ref, pickSource, pickManualFallback)
+            }
+          } else if (this.currentMotionCue) {
+            this.currentMotionCue.onStop?.()
+            this.currentMotionCue = null
+            this.currentMotionCueStartTime = null
+            this._sequencer.schedulePanTiltClear()
+            this.emitYargMotionCueChange(null, 'cleared')
+          }
+        } else {
+          motionCue = this.currentMotionCue
+        }
+
+        try {
+          if (motionCue) {
+            await motionCue.execute(historicCueData, this._sequencer, this._lightManager)
+          }
+        } catch (error) {
+          console.error('Motion cue execution failed:', error)
+          if (motionCue && this.currentMotionCue === motionCue) {
+            this.currentMotionCue.onStop?.()
+            this.currentMotionCue = null
+            this.currentMotionCueStartTime = null
+            this._sequencer.schedulePanTiltClear()
+            this.emitYargMotionCueChange(null, 'cleared')
+          }
+        }
+      }
+    }
+
+    this.emit('cueHandled', historicCueData)
   }
 
   /**
@@ -158,6 +328,13 @@ class YargCueHandler extends BaseCueHandler {
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
+    }
+    if (this.currentMotionCue) {
+      this.currentMotionCue.onStop?.()
+      this.currentMotionCue = null
+      this.currentMotionCueStartTime = null
+      this._sequencer.schedulePanTiltClear()
+      this.emitYargMotionCueChange(null, 'cleared')
     }
   }
 
@@ -323,6 +500,11 @@ class YargCueHandler extends BaseCueHandler {
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onDestroy?.()
       this.currentStrobeCue = null
+    }
+    if (this.currentMotionCue) {
+      this.currentMotionCue.onDestroy?.()
+      this.currentMotionCue = null
+      this.currentMotionCueStartTime = null
     }
     super.shutdown()
   }

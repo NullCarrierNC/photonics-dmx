@@ -6,9 +6,15 @@ import {
   StrobeDmxChannels,
   MovingHeadDmxChannels,
   DmxRig,
+  FixtureTypes,
+  normalizeFixtureConfig,
 } from '../types'
 import { DmxLightManager } from './DmxLightManager'
-import { castToChannelType } from '../helpers/dmxHelpers'
+import {
+  castToChannelType,
+  mirrorDmxForMovingHeadInvert,
+  percentToDmx,
+} from '../helpers/dmxHelpers'
 import { SenderManager } from './SenderManager'
 import { LightStateManager } from './sequencer/LightStateManager'
 
@@ -150,13 +156,48 @@ export class DmxPublisher {
         }
 
         const { red: r, green: g, blue: b, intensity, pan, tilt } = lightValue
+        const isMovingHead =
+          dmxLight.fixture === FixtureTypes.RGBMH || dmxLight.fixture === FixtureTypes.RGBWMH
+        let panOut: number
+        let tiltOut: number
+        if (isMovingHead) {
+          const cfg = normalizeFixtureConfig(dmxLight.config)
+          const homePanDmxLogical = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
+          const homeTiltDmxLogical = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
+          const homePanDmx = cfg.invertPan
+            ? mirrorDmxForMovingHeadInvert(homePanDmxLogical, cfg.panMin, cfg.panMax)
+            : homePanDmxLogical
+          const homeTiltDmx = cfg.invertTilt
+            ? mirrorDmxForMovingHeadInvert(homeTiltDmxLogical, cfg.tiltMin, cfg.tiltMax)
+            : homeTiltDmxLogical
+          if (pan != null) {
+            const panDmx = percentToDmx(pan, cfg.panMin, cfg.panMax)
+            panOut = cfg.invertPan
+              ? mirrorDmxForMovingHeadInvert(panDmx, cfg.panMin, cfg.panMax)
+              : panDmx
+          } else {
+            panOut = homePanDmx
+          }
+          if (tilt != null) {
+            const tiltDmx = percentToDmx(tilt, cfg.tiltMin, cfg.tiltMax)
+            tiltOut = cfg.invertTilt
+              ? mirrorDmxForMovingHeadInvert(tiltDmx, cfg.tiltMin, cfg.tiltMax)
+              : tiltDmx
+          } else {
+            tiltOut = homeTiltDmx
+          }
+        } else {
+          panOut = pan ?? dmxLight.config?.panHome ?? 0
+          tiltOut = tilt ?? dmxLight.config?.tiltHome ?? 0
+        }
+
         const channelsInput: { [key: string]: number } = {
           red: r,
           green: g,
           blue: b,
           masterDimmer: intensity,
-          pan: pan ?? dmxLight.config?.panHome ?? 0,
-          tilt: tilt ?? dmxLight.config?.tiltHome ?? 0,
+          pan: panOut,
+          tilt: tiltOut,
         }
 
         let dmxChannelData

@@ -3,7 +3,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
-import { NodeCueMode, NodeCueFile } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import { NodeCueMode, NodeCueFile, NodeCueKind } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
 import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeExecutionEngine'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
@@ -105,12 +105,8 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     if (payload.path) {
       try {
         const file = await loader.readFile(payload.path)
-        return {
-          valid: true,
-          data: file,
-          errors: [],
-          mode: file.mode,
-        }
+        // readFile rejects invalid JSON/schema; still run the canonical validator for parity with the content branch.
+        return validateNodeCueFile(file)
       } catch (error) {
         return {
           valid: false,
@@ -122,10 +118,13 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     throw new Error('Validation payload must include either content or path.')
   })
 
-  ipcMain.handle(NODE_CUES.GET_CUE_TYPES, async (_event, mode: NodeCueMode) => {
-    const loader = ensureLoader(controllerManager)
-    return loader.getAvailableCueTypes(mode)
-  })
+  ipcMain.handle(
+    NODE_CUES.GET_CUE_TYPES,
+    async (_event, payload: { mode: NodeCueMode; kind?: NodeCueKind }) => {
+      const loader = ensureLoader(controllerManager)
+      return loader.getAvailableCueTypes(payload.mode, payload.kind)
+    },
+  )
 
   ipcMain.handle(NODE_CUES.IMPORT, async (_event, preferredMode?: NodeCueMode) => {
     const loader = ensureLoader(controllerManager)

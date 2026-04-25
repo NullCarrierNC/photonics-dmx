@@ -4,6 +4,7 @@ import { FaUser } from 'react-icons/fa'
 import { ConfigStrobeType } from '../../../photonics-dmx/types'
 
 interface LightLayoutPreviewProps {
+  layoutId: string
   frontCount: number
   backCount: number
   highlightedLight: number | null
@@ -11,11 +12,15 @@ interface LightLayoutPreviewProps {
 }
 
 const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
+  layoutId,
   frontCount,
   backCount,
   highlightedLight,
   selectedStrobe,
 }) => {
+  const isStacked = layoutId === 'stacked'
+  const isTwoRowsOnStage = layoutId === 'two-rows'
+
   /**
    * Helper function to render individual light circles.
    * Highlights the light if it matches `highlightedLight`.
@@ -78,6 +83,44 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
     </div>
   )
 
+  if (isStacked) {
+    return (
+      <div className="mt-8 pt-2 pb-4 bg-gray-200 dark:bg-gray-700 rounded-lg">
+        <div className="flex flex-col items-center">
+          <div className="mb-4">
+            <MdTv size={48} className="text-gray-600 dark:text-gray-300" />
+          </div>
+
+          {frontCount > 0 && (
+            <div className="w-full flex flex-col items-center">
+              <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">Top</div>
+              {renderLightRow(1, frontCount)}
+            </div>
+          )}
+
+          {backCount > 0 && (
+            <div className="w-full flex flex-col items-center mt-2">
+              <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">
+                Bottom
+              </div>
+              <div className="flex justify-center gap-x-4 mb-4">
+                {Array.from({ length: backCount }, (_, i) =>
+                  renderLightCircle(frontCount + backCount - i),
+                )}
+              </div>
+            </div>
+          )}
+
+          {selectedStrobe === ConfigStrobeType.Dedicated && (
+            <div className="w-full flex justify-center">{renderStrobeIndicator()}</div>
+          )}
+
+          {(frontCount > 0 || backCount > 0) && renderPeople()}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="mt-8 pt-2 pb-4 bg-gray-200 dark:bg-gray-700 rounded-lg">
       <div className="flex flex-col items-center">
@@ -99,20 +142,35 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
           <div className="w-full flex justify-center">{renderStrobeIndicator()}</div>
         )}
 
-        {/* Render people icons between front and back */}
-        {backCount > 0 && renderPeople()}
+        {isTwoRowsOnStage ? (
+          <>
+            {backCount > 0 && (
+              <div className="w-full flex flex-col items-center mt-4">
+                <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">
+                  Back
+                </div>
+                {renderLightRow(frontCount + 1, frontCount + backCount)}
+              </div>
+            )}
+            {(frontCount > 0 || backCount > 0) && renderPeople()}
+          </>
+        ) : (
+          <>
+            {backCount > 0 && renderPeople()}
 
-        {/* Render back lights if applicable */}
-        {backCount > 0 && (
-          <div className="w-full flex flex-col items-center mt-4">
-            <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">Back</div>
-            {/* Render back lights in reverse order to match new natural ring progression */}
-            <div className="flex justify-center gap-x-4 mb-4">
-              {Array.from({ length: backCount }, (_, i) =>
-                renderLightCircle(frontCount + backCount - i),
-              )}
-            </div>
-          </div>
+            {backCount > 0 && (
+              <div className="w-full flex flex-col items-center mt-4">
+                <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">
+                  Back
+                </div>
+                <div className="flex justify-center gap-x-4 mb-4">
+                  {Array.from({ length: backCount }, (_, i) =>
+                    renderLightCircle(frontCount + backCount - i),
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

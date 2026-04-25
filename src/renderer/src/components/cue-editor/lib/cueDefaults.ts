@@ -5,6 +5,7 @@ import {
   type AudioNodeCueFile,
   type NodeCueFile,
   type NodeCueGroupMeta,
+  type NodeCueKind,
   type NodeCueMode,
   type YargEventNode,
   type YargNodeCueDefinition,
@@ -26,6 +27,43 @@ const createId = (): string => {
   }
   return `node-${Math.random().toString(36).slice(2, 10)}`
 }
+
+const buildDefaultSetPositionAction = (): ActionNode => ({
+  id: `action-${createId()}`,
+  type: 'action',
+  effectType: 'set-position',
+  target: {
+    groups: { source: 'literal', value: 'front' },
+    filter: { source: 'literal', value: 'all' },
+  },
+  position: {
+    mode: 'direction',
+    bearing: { source: 'literal', value: 'downstage' },
+    angle: { source: 'literal', value: 20 },
+  },
+  timing: createDefaultActionTiming(),
+  layer: { source: 'literal', value: 120 },
+})
+
+const buildDefaultMotionPatternAction = (): ActionNode => ({
+  id: `action-${createId()}`,
+  type: 'action',
+  effectType: 'motion-pattern',
+  target: {
+    groups: { source: 'literal', value: 'front' },
+    filter: { source: 'literal', value: 'all' },
+  },
+  motionPattern: {
+    pattern: { source: 'literal', value: 'circle' },
+    speed: { source: 'literal', value: 0.5 },
+    size: { source: 'literal', value: 20 },
+    bearing: { source: 'literal', value: 'downstage' },
+    fanSpread: { source: 'literal', value: 0 },
+    reverse: { source: 'literal', value: false },
+  },
+  timing: createDefaultActionTiming(),
+  layer: { source: 'literal', value: 120 },
+})
 
 const buildDefaultAction = (): ActionNode => ({
   id: `action-${createId()}`,
@@ -61,7 +99,7 @@ const buildDefaultYargCueStartedEvent = (): YargEventNode => ({
 const buildDefaultAudioEvent = (): AudioEventNode => ({
   id: `event-${createId()}`,
   type: 'event',
-  eventType: 'audio-beat',
+  eventType: 'beat',
   threshold: 0.5,
   triggerMode: 'edge',
 })
@@ -83,9 +121,18 @@ export const buildDefaultAudioTrigger = (id?: string): AudioTriggerNode => ({
   outputs: ['enter', 'during', 'exit'],
 })
 
-const createDefaultCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeCueDefinition => {
-  const eventNode = mode === 'yarg' ? buildDefaultYargEvent() : buildDefaultAudioEvent()
-  const actionNode = buildDefaultAction()
+const createDefaultCue = (
+  mode: NodeCueMode,
+  kind: NodeCueKind,
+): YargNodeCueDefinition | AudioNodeCueDefinition => {
+  const isYarg = mode === 'yarg'
+  const eventNode =
+    kind === 'motion' && !isYarg
+      ? buildDefaultAudioEvent()
+      : isYarg
+        ? buildDefaultYargEvent()
+        : buildDefaultAudioEvent()
+  const actionNode = kind === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
   const base = {
     id: `cue-${createId()}`,
     name: 'New Cue',
@@ -100,24 +147,49 @@ const createDefaultCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeC
     },
   }
 
-  if (mode === 'yarg') {
+  if (mode === 'yarg' && kind === 'lighting') {
     return {
       ...base,
+      kind: 'lighting',
       cueType: 'Chorus',
       style: 'primary',
     } as YargNodeCueDefinition
   }
 
+  if (mode === 'yarg' && kind === 'motion') {
+    return {
+      ...base,
+      kind: 'motion',
+    } as YargNodeCueDefinition
+  }
+
+  if (mode === 'audio' && kind === 'lighting') {
+    return {
+      ...base,
+      kind: 'lighting',
+      cueTypeId: 'custom-audio-cue',
+      style: 'primary',
+    } as AudioNodeCueDefinition
+  }
+
   return {
     ...base,
-    cueTypeId: 'custom-audio-cue',
-    style: 'primary',
+    kind: 'motion',
   } as AudioNodeCueDefinition
 }
 
-const createBlankCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeCueDefinition => {
-  const eventNode = mode === 'yarg' ? buildDefaultYargCueStartedEvent() : buildDefaultAudioEvent()
-  const actionNode = buildDefaultAction()
+const createBlankCue = (
+  mode: NodeCueMode,
+  kind: NodeCueKind,
+): YargNodeCueDefinition | AudioNodeCueDefinition => {
+  const isYarg = mode === 'yarg'
+  const eventNode =
+    kind === 'motion' && !isYarg
+      ? buildDefaultAudioEvent()
+      : isYarg
+        ? buildDefaultYargCueStartedEvent()
+        : buildDefaultAudioEvent()
+  const actionNode = kind === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
   const base = {
     id: `cue-${createId()}`,
     name: 'New Cue',
@@ -132,25 +204,48 @@ const createBlankCue = (mode: NodeCueMode): YargNodeCueDefinition | AudioNodeCue
     },
   }
 
-  if (mode === 'yarg') {
+  if (mode === 'yarg' && kind === 'lighting') {
     return {
       ...base,
+      kind: 'lighting',
       cueType: 'Chorus',
       style: 'primary',
     } as YargNodeCueDefinition
   }
 
+  if (mode === 'yarg' && kind === 'motion') {
+    return {
+      ...base,
+      kind: 'motion',
+    } as YargNodeCueDefinition
+  }
+
+  if (mode === 'audio' && kind === 'lighting') {
+    return {
+      ...base,
+      kind: 'lighting',
+      cueTypeId: 'custom-audio-cue',
+      style: 'primary',
+    } as AudioNodeCueDefinition
+  }
+
   return {
     ...base,
-    cueTypeId: 'custom-audio-cue',
-    style: 'primary',
+    kind: 'motion',
   } as AudioNodeCueDefinition
 }
 
-const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
+const createDefaultFile = (mode: NodeCueMode, kind: NodeCueKind): NodeCueFile => {
   const group: NodeCueGroupMeta = {
     id: `node-group-${Date.now()}`,
-    name: mode === 'yarg' ? 'New YARG Group' : 'New Audio Group',
+    name:
+      mode === 'yarg'
+        ? kind === 'motion'
+          ? 'New YARG Motion Group'
+          : 'New YARG Group'
+        : kind === 'motion'
+          ? 'New Audio Motion Group'
+          : 'New Audio Group',
     description: '',
   }
 
@@ -159,7 +254,7 @@ const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
       version: 1,
       mode,
       group,
-      cues: [createBlankCue('yarg') as YargNodeCueDefinition],
+      cues: [createBlankCue('yarg', kind) as YargNodeCueDefinition],
       bundled: false,
     } as YargNodeCueFile
   }
@@ -168,7 +263,7 @@ const createDefaultFile = (mode: NodeCueMode): NodeCueFile => {
     version: 1,
     mode,
     group,
-    cues: [createBlankCue('audio') as AudioNodeCueDefinition],
+    cues: [createBlankCue('audio', kind) as AudioNodeCueDefinition],
     bundled: false,
   } as AudioNodeCueFile
 }
@@ -225,6 +320,8 @@ const createDefaultEffectFile = (mode: EffectMode): EffectFile => {
 
 export {
   buildDefaultAction,
+  buildDefaultSetPositionAction,
+  buildDefaultMotionPatternAction,
   buildDefaultAudioEvent,
   buildDefaultYargEvent,
   createBlankCue,

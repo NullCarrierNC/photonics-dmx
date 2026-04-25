@@ -70,6 +70,7 @@ export const AUDIO_CUE_DATA_PROPERTY_META: CueDataPropertyMeta[] = [
   { id: 'audio-energy', label: 'Energy', type: 'number' },
   { id: 'audio-peak-frequency', label: 'Peak Frequency (Hz)', type: 'number' },
   { id: 'audio-bpm', label: 'BPM', type: 'number' },
+  { id: 'audio-beat-duration-ms', label: 'Beat Duration (ms)', type: 'number' },
   { id: 'audio-beat-detected', label: 'Beat Detected', type: 'boolean' },
   { id: 'audio-overall-level', label: 'Overall Level', type: 'number' },
   { id: 'trigger-level', label: 'Trigger Level', type: 'number' },

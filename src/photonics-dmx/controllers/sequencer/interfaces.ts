@@ -1,3 +1,4 @@
+import type { ResolvedMotionPatternSetting } from '../../cues/node/compiler/ActionEffectFactory'
 import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types'
 import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes'
 import { LightTransitionController } from './LightTransitionController'
@@ -6,6 +7,17 @@ export interface FrameContext {
   frameStartTime: number
   deltaTime: number
   frameIndex: number
+}
+
+/** Active parametric motion run for {@link MotionPatternEngine}. */
+export interface ActiveMotionPattern {
+  name: string
+  config: ResolvedMotionPatternSetting
+  lights: TrackedLight[]
+  layer: number
+  startTime: number
+  /** Amplitude scales from 0 to full over this duration (ms). */
+  rampUpDurationMs: number
 }
 
 /**
@@ -157,6 +169,17 @@ export interface ITransitionEngine {
 export interface IEffectManager {
   addEffect(name: string, effect: Effect, isPersistent?: boolean): void
   setEffect(name: string, effect: Effect, isPersistent?: boolean): void
+  /**
+   * Cancels any active or queued effect on each (layer, light) targeted by the new
+   * effect and starts the new transitions immediately. Unlike `addEffect`, a
+   * same-name in-flight transition is replaced rather than queued. Mid-transition
+   * takeover eases from each light's current state to the new target.
+   *
+   * Used for state-target effects (e.g. non-blocking `set-position`) where the
+   * latest submission must take effect now and an in-flight stale transition
+   * would otherwise produce desynchronised motion.
+   */
+  replaceEffect(name: string, effect: Effect, isPersistent?: boolean): void
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   addEffectUnblockedNameWithCallback(
@@ -274,6 +297,11 @@ export interface IDebugMonitor {
 export interface ILightingController {
   addEffect(name: string, effect: Effect, isPersistent?: boolean): void
   setEffect(name: string, effect: Effect, isPersistent?: boolean): Promise<void>
+  /**
+   * Cancels any active or queued effect on each (layer, light) targeted by the new
+   * effect and starts the new transitions immediately. See {@link IEffectManager.replaceEffect}.
+   */
+  replaceEffect(name: string, effect: Effect, isPersistent?: boolean): void
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   addEffectUnblockedNameWithCallback(
@@ -294,6 +322,40 @@ export interface ILightingController {
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>
   isLayerFreeForLight(layer: number, lightId: string): boolean
   setState(lights: TrackedLight[], color: RGBIO, time: number): void
+
+  /**
+   * Next frame: clear pan/tilt from layer state so fixtures use home in DmxPublisher.
+   * Used when motion cues stop without a replacement.
+   */
+  schedulePanTiltClear(): void
+
+  /**
+   * Cancel a pending deferred pan/tilt clear (e.g. a new motion cue starts same tick).
+   */
+  cancelPanTiltClear(): void
+
+  /**
+   * Start continuous parametric motion (pan/tilt waveforms) on the given layer.
+   */
+  addMotionPattern(
+    name: string,
+    config: ResolvedMotionPatternSetting,
+    lights: TrackedLight[],
+    layer: number,
+    rampUpDurationMs: number,
+  ): void
+
+  /** Stop a parametric motion run and remove its layer state. */
+  removeMotionPattern(name: string): void
+
+  /** Active motion-pattern run, if any (for idempotent re-submission). */
+  getMotionPattern(name: string): ActiveMotionPattern | undefined
+
+  /**
+   * Update resolved motion-pattern fields on an active run without resetting phase (e.g. `bearingDeg` only).
+   * No-op if no pattern is registered for `name`.
+   */
+  updateMotionPatternConfig(name: string, config: ResolvedMotionPatternSetting): void
 
   /**
    * Add an effect with a completion callback.

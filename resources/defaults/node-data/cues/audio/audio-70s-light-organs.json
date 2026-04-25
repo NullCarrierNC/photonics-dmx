@@ -144,7 +144,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -208,7 +211,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -272,7 +278,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -468,7 +477,8 @@
           "y": 23.287328734430275,
           "zoom": 0.9649936721805082
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-beat-strobe",
@@ -487,7 +497,7 @@
           {
             "id": "ev-70s-strobe-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4
@@ -566,7 +576,8 @@
           "y": 161.12843077396974,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-bass-cymbal",
@@ -677,7 +688,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -815,7 +829,8 @@
           "y": 75.35899595185384,
           "zoom": 0.7911373011854507
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-quarter-chase",
@@ -836,7 +851,7 @@
           {
             "id": "ev-70s-chase-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4
@@ -896,7 +911,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -960,7 +978,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1028,7 +1049,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1096,7 +1120,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1164,7 +1191,10 @@
                 "source": "literal",
                 "value": 100
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1359,7 +1389,8 @@
           "y": 33.93021922019466,
           "zoom": 0.7323429873168543
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-quarter-chase-random",
@@ -1387,7 +1418,7 @@
           {
             "id": "ev-70s-rchase-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4
@@ -1447,7 +1478,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1511,7 +1545,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1579,7 +1616,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1647,7 +1687,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1715,7 +1758,10 @@
                 "source": "literal",
                 "value": 100
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1926,7 +1972,8 @@
           "y": 33.93021922019466,
           "zoom": 0.7323429873168543
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-eight-band",
@@ -2137,7 +2184,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2201,7 +2251,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2265,7 +2318,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2329,7 +2385,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2393,7 +2452,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2457,7 +2519,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2521,7 +2586,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2585,7 +2653,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2838,7 +2909,8 @@
           "y": -107.22727272727269,
           "zoom": 0.5769962738160228
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-instrument-isolation",
@@ -2979,7 +3051,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3043,7 +3118,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3107,7 +3185,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3297,7 +3378,8 @@
           "y": 186.95143454093898,
           "zoom": 0.6792431422744739
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-layered-spectrum",
@@ -3421,7 +3503,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3485,7 +3570,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3549,7 +3637,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3662,7 +3753,8 @@
           "y": 0,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     }
   ],
   "bundled": true

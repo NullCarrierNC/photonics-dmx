@@ -17,6 +17,7 @@ import {
   LightingPreferences,
   senderOpenDmxEnabledAtom,
   openDmxComPortAtom,
+  syncOutputSenderAtoms,
 } from './atoms'
 import squareLogo from './assets/images/photonics-icon.png'
 import LeftMenu from './components/LeftMenu'
@@ -33,7 +34,16 @@ import ToastContainer from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
 import type { CueStateUpdatePayload } from '../../shared/ipcTypes'
-import { setAudioEnabled, savePrefs, getLightLibrary, getMyLights, getLightLayout } from './ipcApi'
+import {
+  setAudioEnabled,
+  savePrefs,
+  getLightLibrary,
+  getMyLights,
+  getLightLayout,
+  getSystemStatus,
+} from './ipcApi'
+import { registerIpcListener } from './utils/ipcHelpers'
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 
 /**
  * Main application component
@@ -300,6 +310,24 @@ export const App = (): JSX.Element => {
     },
     [setPrefs],
   )
+
+  // After a controller restart the main process auto-restores senders from preferences.
+  // Sync the renderer toggle atoms so the UI reflects the actual runtime sender state.
+  useEffect(() => {
+    const handleControllersRestarted = () => {
+      getSystemStatus()
+        .then((status) => {
+          if (status?.success && status.senderStatus) {
+            syncOutputSenderAtoms(status.senderStatus)
+          }
+        })
+        .catch((err) => {
+          console.error('App: failed to sync sender status after restart', err)
+        })
+    }
+
+    return registerIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted)
+  }, [])
 
   const handleToggleLeftMenu = async (): Promise<void> => {
     const newCollapsed = !isLeftMenuCollapsed

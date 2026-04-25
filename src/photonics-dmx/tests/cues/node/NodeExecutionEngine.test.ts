@@ -17,7 +17,7 @@ import { Beat, CueData, CueType } from '../../../cues/types/cueTypes'
 import { VariableValue } from '../../../cues/node/runtime/executionTypes'
 import type { CompiledEffect } from '../../../cues/node/runtime/EffectRegistry'
 import type { TrackedLight } from '../../../types'
-import type { FixtureConfig } from '../../../types'
+import { type FixtureConfig, DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../../types'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { sendToAllWindows } from '../../../../main/utils/windowUtils'
 
@@ -63,6 +63,7 @@ describe('NodeExecutionEngine', () => {
     // Create mock sequencer
     mockSequencer = {
       addEffect: jest.fn(),
+      replaceEffect: jest.fn(),
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
         if (callback) setTimeout(() => callback(), 1)
       }),
@@ -97,6 +98,12 @@ describe('NodeExecutionEngine', () => {
       enableDebug: jest.fn(),
       debugLightLayers: jest.fn(),
       shutdown: jest.fn(),
+      cancelPanTiltClear: jest.fn(),
+      schedulePanTiltClear: jest.fn(),
+      addMotionPattern: jest.fn(),
+      getMotionPattern: jest.fn().mockReturnValue(undefined),
+      removeMotionPattern: jest.fn(),
+      updateMotionPatternConfig: jest.fn(),
     } as unknown as ILightingController
 
     mockLightManager = {
@@ -144,6 +151,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -240,15 +248,7 @@ describe('NodeExecutionEngine', () => {
             {
               id: 'back1',
               position: 1,
-              config: {
-                panHome: 0,
-                panMin: 0,
-                panMax: 255,
-                tiltHome: 0,
-                tiltMin: 0,
-                tiltMax: 255,
-                invert: false,
-              },
+              config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG },
             },
           ]
         }
@@ -256,15 +256,7 @@ describe('NodeExecutionEngine', () => {
           {
             id: 'front1',
             position: 0,
-            config: {
-              panHome: 0,
-              panMin: 0,
-              panMax: 255,
-              tiltHome: 0,
-              tiltMin: 0,
-              tiltMax: 255,
-              invert: false,
-            },
+            config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG },
           },
         ]
       })
@@ -272,6 +264,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -382,6 +375,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -489,6 +483,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -682,6 +677,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -751,6 +747,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -824,6 +821,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -893,6 +891,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'TestType' as CueType,
         style: 'primary',
         description: 'Test',
@@ -967,6 +966,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'TestType' as CueType,
         style: 'primary',
         description: 'Test',
@@ -1054,6 +1054,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'TestType' as CueType,
         style: 'primary',
         description: 'Test',
@@ -1247,6 +1248,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'TestType' as CueType,
         style: 'primary',
         description: 'Test',
@@ -1355,6 +1357,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1449,6 +1452,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1555,6 +1559,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1673,6 +1678,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1784,6 +1790,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Default,
         style: 'primary',
         nodes: {
@@ -1916,6 +1923,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2010,6 +2018,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2093,6 +2102,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2192,6 +2202,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2295,6 +2306,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2370,6 +2382,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2416,11 +2429,11 @@ describe('NodeExecutionEngine', () => {
 
     it('should get all config-data array types', () => {
       const mockFrontLights: TrackedLight[] = [
-        { id: 'front1', position: 0, config: {} as FixtureConfig },
-        { id: 'front2', position: 1, config: {} as FixtureConfig },
+        { id: 'front1', position: 0, config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } },
+        { id: 'front2', position: 1, config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } },
       ]
       const mockBackLights: TrackedLight[] = [
-        { id: 'back1', position: 0, config: {} as FixtureConfig },
+        { id: 'back1', position: 0, config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } },
       ]
 
       mockLightManager.getLightsInGroup = jest.fn((groups: string | string[]) => {
@@ -2454,6 +2467,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2549,6 +2563,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2638,6 +2653,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2728,6 +2744,7 @@ describe('NodeExecutionEngine', () => {
       const definition: YargNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: CueType.Intro,
         style: 'primary',
         nodes: {
@@ -2784,6 +2801,150 @@ describe('NodeExecutionEngine', () => {
     })
   })
 
+  describe('set-position direction mode', () => {
+    it('uses panDirectionCW from fixture config when resolving bearing', () => {
+      const movingHead: TrackedLight = {
+        id: 'mh1',
+        position: 1,
+        config: {
+          ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
+          panHome: 50,
+          panRangeDeg: 540,
+          panDirectionCW: false,
+        },
+      }
+      mockLightManager.getLights = jest
+        .fn()
+        .mockReturnValue([movingHead]) as unknown as DmxLightManager['getLights']
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-position',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        position: {
+          mode: 'direction',
+          bearing: { source: 'literal', value: 90 },
+          angle: { source: 'literal', value: 0 },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: { source: 'literal', value: 'linear' },
+        },
+      }
+      const definition: YargNodeCueDefinition = {
+        id: 'position-cue',
+        name: 'Position Cue',
+        kind: 'lighting',
+        cueType: CueType.Stomp,
+        style: 'primary',
+        nodes: { events: [eventNode], actions: [actionNode], logic: [] },
+        connections: [{ from: 'event1', to: 'action1' }],
+      }
+
+      const engine = new NodeExecutionEngine(
+        NodeCueCompiler.compileYargCue(definition),
+        'test-group:position-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+
+      engine.startExecution(eventNode, createCueData('Strong'))
+
+      // Non-blocking set-position routes through replaceEffect (latest-wins per (layer, light))
+      // rather than addEffect, so a stale in-flight transition can never queue ahead of the
+      // new resolved position.
+      expect(mockSequencer.replaceEffect).toHaveBeenCalledTimes(1)
+      expect(mockSequencer.addEffect).not.toHaveBeenCalled()
+      const effect = (mockSequencer.replaceEffect as jest.Mock).mock.calls[0]?.[1]
+      const pan = effect?.transitions?.[0]?.transform?.color?.pan
+      // 90° bearing on a 540° fixture = 16.666..%; CCW fixtures subtract from home.
+      expect(pan).toBeCloseTo(50 - (90 / 540) * 100, 5)
+    })
+
+    it('replaces (not queues) on rapid re-submission so latest position wins', () => {
+      const movingHead: TrackedLight = {
+        id: 'mh1',
+        position: 1,
+        config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG },
+      }
+      mockLightManager.getLights = jest
+        .fn()
+        .mockReturnValue([movingHead]) as unknown as DmxLightManager['getLights']
+
+      cueLevelVarStore.set('bearing', { type: 'number', value: 90 })
+
+      const eventNode: YargEventNode = {
+        id: 'event1',
+        type: 'event',
+        eventType: 'beat',
+      }
+      const actionNode: ActionNode = {
+        id: 'action1',
+        type: 'action',
+        effectType: 'set-position',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        position: {
+          mode: 'direction',
+          bearing: { source: 'variable', name: 'bearing' },
+          angle: { source: 'literal', value: 30 },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 500 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: { source: 'literal', value: 'easeInOut' },
+        },
+      }
+      const definition: YargNodeCueDefinition = {
+        id: 'crossbeat-style-cue',
+        name: 'Crossbeat Style Cue',
+        kind: 'lighting',
+        cueType: CueType.Stomp,
+        style: 'primary',
+        nodes: { events: [eventNode], actions: [actionNode], logic: [] },
+        connections: [{ from: 'event1', to: 'action1' }],
+      }
+
+      const engine = new NodeExecutionEngine(
+        NodeCueCompiler.compileYargCue(definition),
+        'test-group:crossbeat-style-cue',
+        mockSequencer,
+        mockLightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+
+      engine.startExecution(eventNode, createCueData('Strong'))
+      cueLevelVarStore.set('bearing', { type: 'number', value: 270 })
+      engine.startExecution(eventNode, createCueData('Weak'))
+
+      expect(mockSequencer.replaceEffect).toHaveBeenCalledTimes(2)
+      expect(mockSequencer.addEffect).not.toHaveBeenCalled()
+    })
+  })
+
   describe('two cues sharing one groupId, one stops', () => {
     it('second cue can still run after first cue is stopped', async () => {
       const groupId = 'shared-group'
@@ -2816,6 +2977,7 @@ describe('NodeExecutionEngine', () => {
       const definition1: YargNodeCueDefinition = {
         id: 'cue-a',
         name: 'Cue A',
+        kind: 'lighting',
         cueType: CueType.Sweep,
         style: 'primary',
         nodes: { events: [eventNode], actions: [actionNode], logic: [] },
@@ -2824,6 +2986,7 @@ describe('NodeExecutionEngine', () => {
       const definition2: YargNodeCueDefinition = {
         id: 'cue-b',
         name: 'Cue B',
+        kind: 'lighting',
         cueType: CueType.Stomp,
         style: 'primary',
         nodes: {

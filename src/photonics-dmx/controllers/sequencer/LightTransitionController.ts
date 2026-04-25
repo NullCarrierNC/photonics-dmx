@@ -246,6 +246,52 @@ export class LightTransitionController {
   }
 
   /**
+   * Strips pan/tilt from every layer state so merged output omits them and DmxPublisher
+   * can fall back to fixture panHome/tiltHome. Invoked on the frame after motion cues stop.
+   */
+  public clearPanTilt(): void {
+    for (const [lightId, layerMap] of this._currentLayerStates) {
+      for (const [layer, state] of layerMap) {
+        const next: RGBIO = { ...state }
+        delete next.pan
+        delete next.tilt
+        layerMap.set(layer, next)
+      }
+      this.calculateFinalColorForLight(lightId)
+    }
+  }
+
+  /**
+   * Writes pan/tilt (and transparent RGB) for a layer without a transition.
+   * Used by {@link MotionPatternEngine} so parametric motion participates in layer blending.
+   */
+  public setGeneratorLayerState(lightId: string, layer: number, state: RGBIO): void {
+    if (this._clearingTransitions) {
+      return
+    }
+    if (!this._currentLayerStates.has(lightId)) {
+      this._currentLayerStates.set(lightId, new Map())
+    }
+    this._currentLayerStates.get(lightId)!.set(layer, { ...state })
+  }
+
+  /**
+   * Removes generator-driven layer state and republishes merged output.
+   */
+  public removeGeneratorLayer(lightId: string, layer: number): void {
+    const currentLayerMap = this._currentLayerStates.get(lightId)
+    if (!currentLayerMap) {
+      return
+    }
+    currentLayerMap.delete(layer)
+    if (currentLayerMap.size === 0) {
+      this._currentLayerStates.delete(lightId)
+    }
+    this.calculateFinalColorForLight(lightId)
+    this._lightStateManager.publishLightStates()
+  }
+
+  /**
    * Removes all transitions for the given lights entirely.
    */
   public removeLights(lightIds: string[]): void {
@@ -632,9 +678,9 @@ export class LightTransitionController {
         break
     }
 
-    // Handle optional properties
-    if (newState.pan !== undefined) out.pan = newState.pan
-    if (newState.tilt !== undefined) out.tilt = newState.tilt
+    // Handle optional properties: carry forward from the lower layer when the incoming layer omits them
+    out.pan = newState.pan !== undefined ? newState.pan : current.pan
+    out.tilt = newState.tilt !== undefined ? newState.tilt : current.tilt
 
     return out
   }
@@ -805,12 +851,12 @@ export class LightTransitionController {
       corrected.blendMode = 'replace'
     }
 
-    // Validate optional pan/tilt values
+    // Validate optional pan/tilt values (normalised 0–100 % of fixture range)
     if (corrected.pan !== undefined) {
-      corrected.pan = Math.max(-32768, Math.min(32767, corrected.pan))
+      corrected.pan = Math.max(0, Math.min(100, corrected.pan))
     }
     if (corrected.tilt !== undefined) {
-      corrected.tilt = Math.max(-32768, Math.min(32767, corrected.tilt))
+      corrected.tilt = Math.max(0, Math.min(100, corrected.tilt))
     }
 
     return corrected

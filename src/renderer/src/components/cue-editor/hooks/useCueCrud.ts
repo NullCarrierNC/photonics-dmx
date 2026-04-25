@@ -3,6 +3,7 @@ import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
   NodeCueFile,
+  NodeCueKind,
   NodeCueMode,
   YargNodeCueDefinition,
   YargEffectDefinition,
@@ -30,6 +31,8 @@ export type UseCueCrudParams = {
   setSelectedCueId: (id: string | null) => void
   setFilename: React.Dispatch<React.SetStateAction<string>>
   mode: NodeCueMode
+  /** Lighting vs motion for new cues and blank files (both YARG and Audio). */
+  cueKind: NodeCueKind
   setValidationErrors: (errors: string[]) => void
   setIsDirty: (dirty: boolean) => void
   loadCueIntoFlow: (
@@ -52,6 +55,7 @@ export function useCueCrud({
   setSelectedCueId,
   setFilename,
   mode,
+  cueKind,
   setValidationErrors,
   setIsDirty,
   loadCueIntoFlow,
@@ -104,7 +108,7 @@ export function useCueCrud({
           onError?.('Failed to save effect file: ' + error)
         }
       } else {
-        const file = createDefaultFile(mode)
+        const file = createDefaultFile(mode, cueKind)
         file.group.id = metadata.groupId
         file.group.name = metadata.groupName
         file.group.description = metadata.groupDescription
@@ -142,6 +146,7 @@ export function useCueCrud({
     [
       editorDoc?.mode,
       mode,
+      cueKind,
       onError,
       loadCueIntoFlow,
       refreshFiles,
@@ -158,7 +163,7 @@ export function useCueCrud({
     if (!editorDoc) setFilename('untitled.json')
     const baseDoc = editorDoc ?? {
       mode: 'cue' as const,
-      file: createDefaultFile(mode),
+      file: createDefaultFile(mode, cueKind),
       path: null,
     }
 
@@ -167,7 +172,7 @@ export function useCueCrud({
       return
     }
 
-    const newCue = createBlankCue(mode)
+    const newCue = createBlankCue(mode, cueKind)
     const baseCueFile = baseDoc.file as NodeCueFile
     const updatedCues = [...baseCueFile.cues, newCue]
     const updatedFile =
@@ -179,7 +184,16 @@ export function useCueCrud({
     setSelectedCueId(newCue.id)
     loadCueIntoFlow(newCue as YargNodeCueDefinition | AudioNodeCueDefinition)
     setIsDirty(true)
-  }, [editorDoc, mode, loadCueIntoFlow, setEditorDoc, setFilename, setSelectedCueId, setIsDirty])
+  }, [
+    editorDoc,
+    mode,
+    cueKind,
+    loadCueIntoFlow,
+    setEditorDoc,
+    setFilename,
+    setSelectedCueId,
+    setIsDirty,
+  ])
 
   const handleAddEffect = useCallback(() => {
     if (!editorDoc) setFilename('untitled.json')

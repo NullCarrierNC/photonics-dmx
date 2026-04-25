@@ -71,6 +71,7 @@ describe('AbstractCueHandler', () => {
     // Create a mock that implements ILightingController (Sequencer facade)
     sequencer = {
       addEffect: jest.fn(),
+      replaceEffect: jest.fn(),
       setEffect: jest.fn().mockImplementation(async () => {}),
       addEffectUnblockedName: jest.fn().mockReturnValue(true),
       setEffectUnblockedName: jest.fn().mockReturnValue(true),
@@ -100,6 +101,12 @@ describe('AbstractCueHandler', () => {
       removeEffectByLayer: jest.fn(),
       getActiveEffectsForLight: jest.fn(),
       isLayerFreeForLight: jest.fn(),
+      schedulePanTiltClear: jest.fn(),
+      cancelPanTiltClear: jest.fn(),
+      addMotionPattern: jest.fn(),
+      getMotionPattern: jest.fn().mockReturnValue(undefined),
+      removeMotionPattern: jest.fn(),
+      updateMotionPatternConfig: jest.fn(),
       shutdown: jest.fn(),
     } as ILightingController
 

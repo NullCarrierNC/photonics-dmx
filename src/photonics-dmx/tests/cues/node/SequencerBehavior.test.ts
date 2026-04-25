@@ -113,6 +113,7 @@ function cueDefinitionWithEventType(
   return {
     id: 'validation-cue',
     name: 'Validation Cue',
+    kind: 'lighting',
     cueType: CueType.Sweep,
     style: 'primary',
     nodes: { events: [eventNode], actions: [actionNode], logic: [] },

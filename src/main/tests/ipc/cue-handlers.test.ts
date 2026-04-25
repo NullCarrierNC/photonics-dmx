@@ -25,6 +25,7 @@ const mockControllerManager = {
   init: jest.fn(),
   startTestEffect: jest.fn(),
   stopTestEffect: jest.fn(),
+  setOnConsoleEnter: jest.fn(),
 }
 
 // Mock implementation with descriptions

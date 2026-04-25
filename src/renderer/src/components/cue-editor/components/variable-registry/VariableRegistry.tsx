@@ -7,6 +7,7 @@ import type {
   YargEffectDefinition,
   AudioEffectDefinition,
   EffectFile,
+  NodeCueKind,
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../../lib/types'
@@ -56,6 +57,9 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
   const activeMode: NodeCueMode = editorDoc?.file
     ? (editorDoc.file as NodeCueFile | EffectFile).mode
     : 'yarg'
+
+  const cueKind: NodeCueKind =
+    !isEffectMode && currentCue && 'kind' in currentCue ? currentCue.kind : 'lighting'
 
   const effectVariables = isEffectMode && currentEffect ? currentEffect.variables ?? [] : []
 
@@ -262,6 +266,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
         onSave={handleSave}
         onCancel={closeDialog}
         activeMode={activeMode}
+        cueKind={cueKind}
         isEffectMode={isEffectMode}
         editingVar={editingVar}
       />

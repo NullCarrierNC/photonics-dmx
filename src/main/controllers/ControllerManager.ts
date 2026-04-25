@@ -14,7 +14,10 @@ import {
   DmxFixture,
   FixtureTypes,
   FixtureConfig,
+  clampMergeMovingHeadFixtureConfig,
+  normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
+import { rawDmxToLogicalHomePercent } from '../../photonics-dmx/helpers/movingHeadCalibration'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
@@ -47,7 +50,11 @@ import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
+import {
+  AudioCueType,
+  AudioMotionCueRef,
+  YargMotionCueRef,
+} from '../../photonics-dmx/cues/types/audioCueTypes'
 import {
   NodeCueLoader,
   NodeCueListSummary,
@@ -65,6 +72,13 @@ interface NetworkErrorLike {
 
 function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
   return err !== null && typeof err === 'object' && 'code' in err && 'syscall' in err
+}
+
+type OutputSenderStateSnapshot = {
+  sacn: boolean
+  artnet: boolean
+  enttecpro: boolean
+  opendmx: boolean
 }
 
 export class ControllerManager {
@@ -93,6 +107,8 @@ export class ControllerManager {
 
   /** Snapshot of listeners disabled while DMX Console is active */
   private consoleRestore: { yarg: boolean; rb3: boolean; audio: boolean } | null = null
+  /** Optional hook for subsystems that must stop when console/manual DMX takes over. */
+  private onConsoleEnter: (() => void) | null = null
 
   constructor() {
     this.config = new ConfigurationManager()
@@ -111,7 +127,15 @@ export class ControllerManager {
       getEffectsController: () => this.effectsController,
       getDmxLightManager: () => this.dmxLightManager!,
       ensureInitialized: () => this.init(),
-      createCueHandler: (dmx, eff) => new YargCueHandler(dmx, eff),
+      createCueHandler: (dmx, eff) => {
+        const h = new YargCueHandler(dmx, eff, {
+          getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
+          getMotionCueProbabilityPercent: () => this.config.getMotionCueProbabilityPercent(),
+        })
+        h.setMotionEnabled(this.config.getMotionEnabled())
+        h.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)
+        return h
+      },
       setCueHandler: (h) => {
         this.cueHandler = h
       },
@@ -123,6 +147,10 @@ export class ControllerManager {
         const v = this.config.getPreference(key as keyof AppPreferences)
         return typeof v === 'number' ? v : 0
       },
+      getMotionEnabled: () => this.config.getMotionEnabled(),
+      getActiveYargMotionCueRef: () => this.config.getActiveYargMotionCueRef(),
+      getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
+      getMotionCueProbabilityPercent: () => this.config.getMotionCueProbabilityPercent(),
       sendSenderError: (message: string) => {
         sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
       },
@@ -163,12 +191,15 @@ export class ControllerManager {
     await this.initializeSequencer()
     await this.initializeCueRegistry()
     await this.initializeAudioCueRegistry()
+    await this.applyMotionPreferencesFromConfig()
     const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
     await copyDefaultData(process.resourcesPath, baseDir)
     await this.initializeEffectLoader() // Initialize effects BEFORE node cues
     await this.initializeNodeCueLoader()
     await this.applyYargEnabledGroupsFromConfig()
     await this.applyAudioEnabledGroupsFromConfig()
+    await this.applyYargMotionEnabledGroupsFromConfig()
+    await this.applyAudioMotionEnabledGroupsFromConfig()
     await this.initializeListeners()
 
     this.isInitialized = true
@@ -309,6 +340,19 @@ export class ControllerManager {
   }
 
   /**
+   * Apply YARG and Audio motion preferences from configuration (groups register later via NodeCueLoader).
+   */
+  private async applyMotionPreferencesFromConfig(): Promise<void> {
+    const yarg = YargCueRegistry.getInstance()
+    const audio = AudioCueRegistry.getInstance()
+    yarg.setMotionSelectionMode(this.config.getMotionGroupSelectionMode())
+    yarg.setDisabledMotionCues(this.config.getDisabledMotionCues() ?? {})
+    audio.setMotionSelectionMode(this.config.getAudioMotionGroupSelectionMode())
+    audio.setDisabledMotionCues(this.config.getDisabledAudioMotionCues() ?? {})
+    console.log('YARG + Audio motion registries initialized (selection modes from preferences).')
+  }
+
+  /**
    * Re-apply Yarg enabled groups from configuration after all groups are registered.
    * Node cue groups are registered in initializeNodeCueLoader(), and each registerGroup()
    * adds the group to enabled by default, which would overwrite a saved "disabled" preference.
@@ -372,6 +416,64 @@ export class ControllerManager {
     registry.setDisabledCues(disabledAudio)
     console.log('AudioCueRegistry enabled groups re-applied from config:', enabledGroupIds)
     this.refreshAudioCueSelection()
+  }
+
+  /**
+   * Re-apply YARG motion enabled groups from configuration after node cues are registered.
+   */
+  private async applyYargMotionEnabledGroupsFromConfig(): Promise<void> {
+    const registry = YargCueRegistry.getInstance()
+    const registeredIds = registry.getRegisteredMotionGroupIds()
+    let enabledGroupIds = this.config.getEnabledMotionCueGroups()
+    const knownGroups = this.config.getKnownMotionCueGroups() ?? []
+
+    if (!enabledGroupIds || enabledGroupIds.length === 0) {
+      enabledGroupIds = registeredIds
+      if (registeredIds.length > 0) {
+        await this.config.setEnabledMotionCueGroups(enabledGroupIds)
+      }
+    } else {
+      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabledGroupIds = [...enabledGroupIds, ...newGroups]
+        await this.config.setEnabledMotionCueGroups(enabledGroupIds)
+      }
+    }
+
+    await this.config.setKnownMotionCueGroups(registeredIds)
+    registry.setEnabledMotionGroups(enabledGroupIds)
+    const disabledMotion = this.config.getDisabledMotionCues() ?? {}
+    registry.setDisabledMotionCues(disabledMotion)
+    console.log('YARG motion enabled groups re-applied from config:', enabledGroupIds)
+  }
+
+  /**
+   * Re-apply audio motion enabled groups from configuration after node cues are registered.
+   */
+  private async applyAudioMotionEnabledGroupsFromConfig(): Promise<void> {
+    const registry = AudioCueRegistry.getInstance()
+    const registeredIds = registry.getRegisteredMotionGroupIds()
+    let enabledGroupIds = this.config.getEnabledAudioMotionCueGroups()
+    const knownGroups = this.config.getKnownAudioMotionCueGroups() ?? []
+
+    if (!enabledGroupIds || enabledGroupIds.length === 0) {
+      enabledGroupIds = registeredIds
+      if (registeredIds.length > 0) {
+        await this.config.setEnabledAudioMotionCueGroups(enabledGroupIds)
+      }
+    } else {
+      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabledGroupIds = [...enabledGroupIds, ...newGroups]
+        await this.config.setEnabledAudioMotionCueGroups(enabledGroupIds)
+      }
+    }
+
+    await this.config.setKnownAudioMotionCueGroups(registeredIds)
+    registry.setEnabledMotionGroups(enabledGroupIds)
+    const disabledMotion = this.config.getDisabledAudioMotionCues() ?? {}
+    registry.setDisabledMotionCues(disabledMotion)
+    console.log('Audio motion enabled groups re-applied from config:', enabledGroupIds)
   }
 
   private async initializeNodeCueLoader(): Promise<void> {
@@ -439,7 +541,13 @@ export class ControllerManager {
     if (!this.dmxLightManager || !this.effectsController) return
 
     // Create cue handler (default to YARG)
-    this.cueHandler = new YargCueHandler(this.dmxLightManager, this.effectsController)
+    const yargHandler = new YargCueHandler(this.dmxLightManager, this.effectsController, {
+      getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
+      getMotionCueProbabilityPercent: () => this.config.getMotionCueProbabilityPercent(),
+    })
+    yargHandler.setMotionEnabled(this.config.getMotionEnabled())
+    yargHandler.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)
+    this.cueHandler = yargHandler
   }
 
   /**
@@ -713,6 +821,13 @@ export class ControllerManager {
     this.senderManager!.setOnSenderEnabled(callback)
   }
 
+  /**
+   * Register a callback to run when console mode is entered.
+   */
+  public setOnConsoleEnter(callback: (() => void) | null): void {
+    this.onConsoleEnter = callback
+  }
+
   public getCueHandler(): YargCueHandler | Rb3CueHandler | null {
     return this.cueHandler
   }
@@ -787,6 +902,14 @@ export class ControllerManager {
 
     const wasYargEnabled = this.listenerCoordinator.getIsYargEnabled()
     const wasRb3Enabled = this.listenerCoordinator.getIsRb3Enabled()
+    const activeSendersBeforeRestart: OutputSenderStateSnapshot | null = this.senderManager
+      ? {
+          sacn: this.senderManager.isSenderEnabled('sacn'),
+          artnet: this.senderManager.isSenderEnabled('artnet'),
+          enttecpro: this.senderManager.isSenderEnabled('enttecpro'),
+          opendmx: this.senderManager.isSenderEnabled('opendmx'),
+        }
+      : null
 
     try {
       if (wasYargEnabled) {
@@ -803,6 +926,9 @@ export class ControllerManager {
 
       if (this.dmxPublisher) {
         await this.dmxPublisher.shutdown()
+      }
+      if (this.senderManager) {
+        await this.senderManager.shutdown()
       }
 
       // Ensure cue handler lifecycle is handled
@@ -831,6 +957,9 @@ export class ControllerManager {
     // Reinitialize
     try {
       await this.init()
+      if (this.consoleRestore !== null) {
+        this.dmxPublisher?.setManualBuffer({})
+      }
 
       // Restore previously active listeners
       if (wasYargEnabled) {
@@ -839,10 +968,104 @@ export class ControllerManager {
         await this.enableRb3()
       }
 
+      // Restore DMX output senders from persisted preferences so that output
+      // continues without requiring a manual toggle after any config change.
+      await this.restoreSenderOutputsFromPrefs(activeSendersBeforeRestart ?? undefined)
+
       console.log('Controllers restarted successfully')
     } catch (error) {
       console.error('Error reinitializing controllers:', error)
       throw error
+    }
+  }
+
+  /**
+   * Re-enable DMX output senders based on persisted preferences.
+   * Called after controller restart so that sACN / Art-Net / USB senders
+   * resume automatically without the user needing to toggle them off and on.
+   */
+  public async restoreSenderOutputsFromPrefs(
+    activeSenders?: OutputSenderStateSnapshot,
+  ): Promise<void> {
+    const prefs = this.config.getAllPreferences()
+    const outputConfig = prefs.dmxOutputConfig
+    if (!outputConfig) return
+
+    const sendersToRestore: OutputSenderStateSnapshot = activeSenders ?? {
+      sacn: outputConfig.sacnEnabled,
+      artnet: outputConfig.artNetEnabled,
+      enttecpro: outputConfig.enttecProEnabled,
+      opendmx: outputConfig.openDmxEnabled,
+    }
+
+    this.ensureSenderManager()
+    const sm = this.senderManager!
+
+    if (sendersToRestore.sacn) {
+      const sc = prefs.sacnConfig
+      try {
+        await sm.enableSender('sacn', 'sacn', {
+          sender: 'sacn',
+          universe: sc?.universe ?? 1,
+          networkInterface: sc?.networkInterface || undefined,
+          useUnicast: sc?.useUnicast ?? false,
+          unicastDestination: sc?.unicastDestination || undefined,
+        })
+        console.log('Restored sACN sender from preferences')
+      } catch (err) {
+        console.error('Failed to restore sACN sender after restart:', err)
+      }
+    }
+
+    if (sendersToRestore.artnet) {
+      const ac = prefs.artNetConfig
+      if (ac?.host) {
+        try {
+          await sm.enableSender('artnet', 'artnet', {
+            sender: 'artnet',
+            host: ac.host,
+            universe: ac.universe,
+            net: ac.net,
+            subnet: ac.subnet,
+            subuni: ac.subuni,
+            port: ac.port,
+          })
+          console.log('Restored Art-Net sender from preferences')
+        } catch (err) {
+          console.error('Failed to restore Art-Net sender after restart:', err)
+        }
+      }
+    }
+
+    if (sendersToRestore.enttecpro) {
+      const ec = prefs.enttecProConfig
+      if (ec?.port) {
+        try {
+          await sm.enableSender('enttecpro', 'enttecpro', {
+            sender: 'enttecpro',
+            devicePath: ec.port,
+          })
+          console.log('Restored Enttec Pro sender from preferences')
+        } catch (err) {
+          console.error('Failed to restore Enttec Pro sender after restart:', err)
+        }
+      }
+    }
+
+    if (sendersToRestore.opendmx) {
+      const oc = prefs.openDmxConfig
+      if (oc?.port) {
+        try {
+          await sm.enableSender('opendmx', 'opendmx', {
+            sender: 'opendmx',
+            devicePath: oc.port,
+            dmxSpeed: oc.dmxSpeed,
+          })
+          console.log('Restored OpenDMX sender from preferences')
+        } catch (err) {
+          console.error('Failed to restore OpenDMX sender after restart:', err)
+        }
+      }
     }
   }
 
@@ -924,8 +1147,28 @@ export class ControllerManager {
     await this.audioController.setAudioGameModeConfig(config)
   }
 
+  /**
+   * Apply global motion master toggle to YARG and audio motion handlers.
+   */
+  public setMotionEnabledGlobal(enabled: boolean): void {
+    if (this.cueHandler instanceof YargCueHandler) {
+      this.cueHandler.setMotionEnabled(enabled)
+    }
+    this.audioController.setMotionEnabled(enabled)
+  }
+
+  public setActiveAudioMotionCueRef(ref: AudioMotionCueRef | null): void {
+    this.audioController.setActiveAudioMotionCueRef(ref)
+  }
+
   public isAudioGameModeActive(): boolean {
     return this.audioController.isAudioGameModeActive()
+  }
+
+  public setActiveYargMotionCueRef(ref: YargMotionCueRef | null): void {
+    if (this.cueHandler instanceof YargCueHandler) {
+      this.cueHandler.setManualMotionRef(ref)
+    }
   }
 
   /**
@@ -946,6 +1189,7 @@ export class ControllerManager {
     if (!rig) {
       return { success: false, error: 'Rig not found' }
     }
+    this.onConsoleEnter?.()
     if (this.consoleRestore !== null) {
       this.dmxPublisher?.setManualBuffer({})
       return { success: true }
@@ -980,16 +1224,10 @@ export class ControllerManager {
     const r = this.consoleRestore
     this.consoleRestore = null
     this.dmxPublisher?.clearManualBuffer()
-    if (this.consoleRestore !== null) {
-      return { success: true }
-    }
     if (r.yarg) {
       this.enableYarg()
     } else if (r.rb3) {
       await this.enableRb3()
-    }
-    if (this.consoleRestore !== null) {
-      return { success: true }
     }
     if (r.audio) {
       await this.enableAudio()
@@ -1077,19 +1315,21 @@ export class ControllerManager {
     if (light.fixture !== FixtureTypes.RGBMH && light.fixture !== FixtureTypes.RGBWMH) {
       return { success: false, error: 'Light is not a moving head fixture' }
     }
-    const baseConfig: FixtureConfig = light.config ?? {
-      panHome: 0,
-      panMin: 0,
-      panMax: 255,
-      tiltHome: 0,
-      tiltMin: 0,
-      tiltMax: 255,
-      invert: false,
-    }
+    const baseConfig: FixtureConfig = normalizeFixtureConfig(light.config)
     const newConfig: FixtureConfig = {
       ...baseConfig,
-      panHome: panClamped,
-      tiltHome: tiltClamped,
+      panHome: rawDmxToLogicalHomePercent(
+        panClamped,
+        baseConfig.panMin,
+        baseConfig.panMax,
+        baseConfig.invertPan,
+      ),
+      tiltHome: rawDmxToLogicalHomePercent(
+        tiltClamped,
+        baseConfig.tiltMin,
+        baseConfig.tiltMax,
+        baseConfig.invertTilt,
+      ),
     }
     const updatedLight: DmxLight = { ...light, config: newConfig }
     const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
@@ -1104,27 +1344,80 @@ export class ControllerManager {
     if (fixture.fixture !== FixtureTypes.RGBMH && fixture.fixture !== FixtureTypes.RGBWMH) {
       return { success: false, error: 'Fixture template is not a moving head' }
     }
-    const fBase: FixtureConfig = fixture.config ?? {
-      panHome: 0,
-      panMin: 0,
-      panMax: 255,
-      tiltHome: 0,
-      tiltMin: 0,
-      tiltMax: 255,
-      invert: false,
-    }
+    const fBase: FixtureConfig = normalizeFixtureConfig(fixture.config)
     const newUserLights = [...userLights]
     newUserLights[fi] = {
       ...fixture,
       config: {
         ...fBase,
-        panHome: panClamped,
-        tiltHome: tiltClamped,
+        panHome: rawDmxToLogicalHomePercent(
+          panClamped,
+          fBase.panMin,
+          fBase.panMax,
+          fBase.invertPan,
+        ),
+        tiltHome: rawDmxToLogicalHomePercent(
+          tiltClamped,
+          fBase.tiltMin,
+          fBase.tiltMax,
+          fBase.invertTilt,
+        ),
       },
     }
     await this.config.updateUserLights(newUserLights)
 
     this.refreshActiveRigs()
+    return { success: true }
+  }
+
+  public async setConsoleFixtureConfig(payload: {
+    rigId: string
+    lightId: string
+    fixtureId: string
+    config: Partial<FixtureConfig>
+  }): Promise<{ success: true } | { success: false; error: string }> {
+    const { rigId, lightId, fixtureId, config: patch } = payload
+    const rig = this.config.getDmxRig(rigId)
+    if (!rig) {
+      return { success: false, error: 'Rig not found' }
+    }
+    const light = this.findLightInRig(rig, lightId)
+    if (!light) {
+      return { success: false, error: 'Light not found in rig' }
+    }
+    if (light.fixture !== FixtureTypes.RGBMH && light.fixture !== FixtureTypes.RGBWMH) {
+      return { success: false, error: 'Light is not a moving head fixture' }
+    }
+    if (light.fixtureId !== fixtureId) {
+      return { success: false, error: 'Fixture id does not match this light' }
+    }
+    const baseConfig = normalizeFixtureConfig(light.config)
+    const newConfig = clampMergeMovingHeadFixtureConfig(baseConfig, patch)
+    const updatedLight: DmxLight = { ...light, config: newConfig }
+    const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
+    await this.config.saveDmxRig({ ...rig, config: newRigConfig })
+
+    const userLights = this.config.getUserLights()
+    const fi = userLights.findIndex((f) => f.id === fixtureId)
+    if (fi < 0) {
+      return { success: false, error: 'Fixture template not found in My Lights' }
+    }
+    const fixture = userLights[fi]
+    if (fixture.fixture !== FixtureTypes.RGBMH && fixture.fixture !== FixtureTypes.RGBWMH) {
+      return { success: false, error: 'Fixture template is not a moving head' }
+    }
+    const fBase = normalizeFixtureConfig(fixture.config)
+    const newUserLights = [...userLights]
+    newUserLights[fi] = {
+      ...fixture,
+      config: clampMergeMovingHeadFixtureConfig(fBase, patch),
+    }
+    await this.config.updateUserLights(newUserLights)
+
+    // Restart so that the merged DmxLightManager and MotionPatternEngine's TrackedLight configs
+    // are rebuilt from the new FixtureConfig (invertPan, invertTilt, panDirectionCW, etc.).
+    // refreshActiveRigs() would only update DmxPublisher, leaving the sequencer stale.
+    await this.restartControllers()
     return { success: true }
   }
 

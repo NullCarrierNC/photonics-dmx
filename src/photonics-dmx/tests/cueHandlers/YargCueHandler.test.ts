@@ -1,3 +1,9 @@
+jest.mock('../../../main/utils/windowUtils', () => ({
+  sendToAllWindows: jest.fn(),
+}))
+
+import { sendToAllWindows } from '../../../main/utils/windowUtils'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
@@ -181,10 +187,19 @@ describe('YargCueHandler', () => {
       removeEffectByLayer: jest.fn(),
       getActiveEffectsForLight: jest.fn(),
       isLayerFreeForLight: jest.fn(),
+      schedulePanTiltClear: jest.fn(),
+      cancelPanTiltClear: jest.fn(),
+      addMotionPattern: jest.fn(),
+      getMotionPattern: jest.fn().mockReturnValue(undefined),
+      removeMotionPattern: jest.fn(),
+      updateMotionPatternConfig: jest.fn(),
       shutdown: jest.fn(),
     } as any
 
-    cueHandler = new YargCueHandler(mockLightManager, mockSequencer)
+    cueHandler = new YargCueHandler(mockLightManager, mockSequencer, {
+      getMotionCueMinimumHoldMs: () => 0,
+    })
+    ;(sendToAllWindows as jest.Mock).mockClear()
   })
 
   describe('handleBeat', () => {
@@ -457,6 +472,227 @@ describe('YargCueHandler', () => {
 
       await cueHandler.handleCue(CueType.Strobe_Off, mockCueData)
       expect(mockStrobeCue.onStopMock).toHaveBeenCalledTimes(1)
+    })
+
+    describe('motion cue pairing', () => {
+      let getRandomMotionSpy: jest.SpiedFunction<() => INetCue | null>
+
+      function makeMotionCue(cueId: string, executeMock: jest.Mock<() => Promise<void>>): INetCue {
+        return {
+          cueId,
+          id: `instance-${cueId}`,
+          style: CueStyle.Primary,
+          execute: executeMock,
+        }
+      }
+
+      afterEach(() => {
+        getRandomMotionSpy?.mockRestore()
+        mockSequencer.cancelPanTiltClear.mockClear()
+        mockSequencer.schedulePanTiltClear.mockClear()
+        ;(sendToAllWindows as jest.Mock).mockClear()
+      })
+
+      it('trackMode simulated does not call getRandomMotionCue or motion pan/tilt hooks', async () => {
+        const registryInstance = YargCueRegistry.getInstance()
+        getRandomMotionSpy = jest.spyOn(registryInstance, 'getRandomMotionCue')
+
+        const simulatedData: CueData = {
+          ...mockCueData,
+          trackMode: 'simulated',
+          simulationCueGroup: 'mock-default',
+        }
+        await cueHandler.handleCue(CueType.Default, simulatedData)
+
+        expect(getRandomMotionSpy).not.toHaveBeenCalled()
+        expect(mockSequencer.cancelPanTiltClear).not.toHaveBeenCalled()
+      })
+
+      it('trackMode tracked runs random motion on first execution of a visual cue', async () => {
+        const executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionCue = makeMotionCue('motion-1', executeMock)
+        getRandomMotionSpy = jest
+          .spyOn(YargCueRegistry.getInstance(), 'getRandomMotionCue')
+          .mockReturnValue(motionCue)
+
+        await cueHandler.handleCue(CueType.Default, mockCueData)
+
+        expect(getRandomMotionSpy).toHaveBeenCalledTimes(1)
+        expect(executeMock).toHaveBeenCalledTimes(1)
+        expect(mockSequencer.cancelPanTiltClear).toHaveBeenCalledTimes(1)
+      })
+
+      it('re-queue of same visual cue does not re-roll motion; executes existing motion again', async () => {
+        const executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionCue = makeMotionCue('motion-stable', executeMock)
+        getRandomMotionSpy = jest
+          .spyOn(YargCueRegistry.getInstance(), 'getRandomMotionCue')
+          .mockReturnValue(motionCue)
+
+        await cueHandler.handleCue(CueType.Default, mockCueData)
+        await cueHandler.handleCue(CueType.Default, mockCueData)
+
+        expect(getRandomMotionSpy).toHaveBeenCalledTimes(1)
+        expect(executeMock).toHaveBeenCalledTimes(2)
+      })
+
+      it('changing visual cue type picks a new random motion cue', async () => {
+        const executeA = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const executeB = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionA = makeMotionCue('motion-a', executeA)
+        const motionB = makeMotionCue('motion-b', executeB)
+        let pick = 0
+        getRandomMotionSpy = jest
+          .spyOn(YargCueRegistry.getInstance(), 'getRandomMotionCue')
+          .mockImplementation(() => {
+            pick += 1
+            return pick === 1 ? motionA : motionB
+          })
+
+        const verseCue = new MockPrimaryCue(CueType.Verse)
+        registry.getGroup('mock-default')!.cues.set(CueType.Verse, verseCue)
+
+        await cueHandler.handleCue(CueType.Default, mockCueData)
+        await cueHandler.handleCue(CueType.Verse, mockCueData)
+
+        expect(getRandomMotionSpy).toHaveBeenCalledTimes(2)
+        expect(executeA).toHaveBeenCalledTimes(1)
+        expect(executeB).toHaveBeenCalledTimes(1)
+      })
+
+      it('emits YARG_MOTION_CUE_CHANGE when random motion is selected', async () => {
+        const reg = YargCueRegistry.getInstance()
+        const executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionCue = makeMotionCue('motion-1', executeMock)
+        const randSpy = jest.spyOn(reg, 'getRandomMotionCue').mockReturnValue(motionCue)
+        const findSpy = jest
+          .spyOn(reg, 'findYargMotionCueRef')
+          .mockReturnValue({ groupId: 'mg', cueId: 'mc' })
+        try {
+          await cueHandler.handleCue(CueType.Default, mockCueData)
+
+          expect(sendToAllWindows).toHaveBeenCalledWith(
+            RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE,
+            expect.objectContaining({
+              ref: { groupId: 'mg', cueId: 'mc' },
+              source: 'auto',
+              manualFallback: false,
+            }),
+          )
+        } finally {
+          randSpy.mockRestore()
+          findSpy.mockRestore()
+        }
+      })
+
+      it('uses manual motion ref when set and emits manual source', async () => {
+        const reg = YargCueRegistry.getInstance()
+        const executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionCue = makeMotionCue('manual-m', executeMock)
+        const implSpy = jest.spyOn(reg, 'getMotionCueImplementation').mockReturnValue(motionCue)
+        const findSpy = jest
+          .spyOn(reg, 'findYargMotionCueRef')
+          .mockReturnValue({ groupId: 'g1', cueId: 'm1' })
+        const randSpy = jest.spyOn(reg, 'getRandomMotionCue')
+
+        cueHandler.setManualMotionRef({ groupId: 'g1', cueId: 'm1' })
+        try {
+          await cueHandler.handleCue(CueType.Default, mockCueData)
+
+          expect(randSpy).not.toHaveBeenCalled()
+          expect(sendToAllWindows).toHaveBeenCalledWith(
+            RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE,
+            expect.objectContaining({
+              ref: { groupId: 'g1', cueId: 'm1' },
+              source: 'manual',
+              manualFallback: false,
+            }),
+          )
+        } finally {
+          implSpy.mockRestore()
+          findSpy.mockRestore()
+          randSpy.mockRestore()
+        }
+      })
+
+      it('falls back to random when manual ref does not resolve and emits manualFallback', async () => {
+        const reg = YargCueRegistry.getInstance()
+        const executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionCue = makeMotionCue('fallback', executeMock)
+        const implSpy = jest.spyOn(reg, 'getMotionCueImplementation').mockReturnValue(null)
+        const randSpy = jest.spyOn(reg, 'getRandomMotionCue').mockReturnValue(motionCue)
+        const findSpy = jest
+          .spyOn(reg, 'findYargMotionCueRef')
+          .mockReturnValue({ groupId: 'mg', cueId: 'fb' })
+
+        cueHandler.setManualMotionRef({ groupId: 'bad', cueId: 'bad' })
+        try {
+          await cueHandler.handleCue(CueType.Default, mockCueData)
+
+          expect(sendToAllWindows).toHaveBeenCalledWith(
+            RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE,
+            expect.objectContaining({ source: 'auto', manualFallback: true }),
+          )
+        } finally {
+          implSpy.mockRestore()
+          randSpy.mockRestore()
+          findSpy.mockRestore()
+        }
+      })
+
+      it('emits YARG_MOTION_CUE_CHANGE only once when the same motion ref is picked on re-queue', async () => {
+        const reg = YargCueRegistry.getInstance()
+        const executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionCue = makeMotionCue('motion-dedupe', executeMock)
+        const randSpy = jest.spyOn(reg, 'getRandomMotionCue').mockReturnValue(motionCue)
+        const findSpy = jest
+          .spyOn(reg, 'findYargMotionCueRef')
+          .mockReturnValue({ groupId: 'mg', cueId: 'same' })
+        try {
+          await cueHandler.handleCue(CueType.Default, mockCueData)
+          await cueHandler.handleCue(CueType.Default, mockCueData)
+
+          const motionChangeCalls = (sendToAllWindows as jest.Mock).mock.calls.filter(
+            (call) => call[0] === RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE,
+          )
+          expect(motionChangeCalls.length).toBe(1)
+        } finally {
+          randSpy.mockRestore()
+          findSpy.mockRestore()
+        }
+      })
+
+      it('re-picks motion and re-emits YARG_MOTION_CUE_CHANGE after motion disable then enable', async () => {
+        const reg = YargCueRegistry.getInstance()
+        const executeMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        const motionCue = makeMotionCue('motion-reenable', executeMock)
+        const randSpy = jest.spyOn(reg, 'getRandomMotionCue').mockReturnValue(motionCue)
+        const findSpy = jest
+          .spyOn(reg, 'findYargMotionCueRef')
+          .mockReturnValue({ groupId: 'mg', cueId: 're' })
+        try {
+          await cueHandler.handleCue(CueType.Default, mockCueData)
+          expect(randSpy).toHaveBeenCalledTimes(1)
+
+          cueHandler.setMotionEnabled(false)
+          cueHandler.setMotionEnabled(true)
+          ;(sendToAllWindows as jest.Mock).mockClear()
+
+          await cueHandler.handleCue(CueType.Default, mockCueData)
+
+          expect(randSpy).toHaveBeenCalledTimes(2)
+          expect(sendToAllWindows).toHaveBeenCalledWith(
+            RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE,
+            expect.objectContaining({
+              ref: { groupId: 'mg', cueId: 're' },
+              source: 'auto',
+            }),
+          )
+        } finally {
+          randSpy.mockRestore()
+          findSpy.mockRestore()
+        }
+      })
     })
   })
 

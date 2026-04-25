@@ -7,6 +7,7 @@ import AudioBandSettings from '../components/AudioBandSettings'
 import AudioBeatDetection from '../components/AudioBeatDetection'
 import AudioSmoothingSettings from '../components/AudioSmoothingSettings'
 import AudioGameModeSettings from '../components/AudioGameModeSettings'
+import AudioIdleDetectionSettings from '../components/AudioIdleDetectionSettings'
 
 const AudioSettings: React.FC = () => {
   return (
@@ -40,6 +41,12 @@ const AudioSettings: React.FC = () => {
           random duration between the minimum and maximum values.
         </p>
         <AudioGameModeSettings />
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
+          <h3 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">
+            Idle / menu detection (Game Mode)
+          </h3>
+          <AudioIdleDetectionSettings />
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 dark:border-gray-700">
