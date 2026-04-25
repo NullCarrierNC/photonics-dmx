@@ -54,7 +54,6 @@ export const CUE = {
   YARG_LISTENER_DISABLED: 'yarg-listener-disabled',
   RB3E_LISTENER_ENABLED: 'rb3e-listener-enabled',
   RB3E_LISTENER_DISABLED: 'rb3e-listener-disabled',
-  RB3E_SWITCH_MODE: 'rb3e-switch-mode',
   SET_LISTEN_CUE_DATA: 'set-listen-cue-data',
   CUE_STYLE: 'cue-style',
   UPDATE_EFFECT_DEBOUNCE: 'update-effect-debounce',

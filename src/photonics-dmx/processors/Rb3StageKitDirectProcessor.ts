@@ -16,6 +16,7 @@ import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageK
 import { getColor } from '../helpers/dmxHelpers'
 import { CueData } from '../cues/types/cueTypes'
 import { Color, RGBIO, TrackedLight } from '../types'
+import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
 
 /**
  * StageKit data structure
@@ -75,7 +76,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     private lightManager: DmxLightManager,
     private photonicsSequencer: ILightingController,
     stageKitConfig: Partial<StageKitConfig> = {},
-    private cueHandler?: any, // Optional cue handler for menu state handling
+    private cueHandler?: Rb3MenuCueHandler | null,
   ) {
     super()
     console.log('StageKitDirectProcessor: Constructor called with dependencies:', {
@@ -1146,22 +1147,22 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Set the cue handler for menu state handling
    * @param cueHandler The cue handler instance
    */
-  public setCueHandler(cueHandler: any): void {
+  public setCueHandler(cueHandler: Rb3MenuCueHandler): void {
     this.cueHandler = cueHandler
     console.log('StageKitDirectProcessor: Cue handler updated')
   }
 
   /**
-   * Start the menu animation timer to call default cue every 1000ms
+   * Start the menu animation timer to drive RB3E-only menu frame every 1000ms
    */
   private startMenuAnimationTimer(): void {
     console.log('StageKitDirectProcessor: startMenuAnimationTimer called')
     // Clear any existing timer first
     this.clearMenuAnimationTimer()
 
-    if (!this.cueHandler || typeof this.cueHandler.handleCueDefault !== 'function') {
+    if (!this.cueHandler || typeof this.cueHandler.playMenuFrame !== 'function') {
       console.warn(
-        'StageKitDirectProcessor: Cannot start menu animation - no cue handler available',
+        'StageKitDirectProcessor: Cannot start menu animation - no menu cue handler available',
       )
       return
     }
@@ -1169,68 +1170,18 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     console.log('StageKitDirectProcessor: Starting menu animation timer (1000ms interval)')
 
     this.menuAnimationTimer = setInterval(() => {
-      // console.log(`StageKitDirectProcessor: Menu animation timer tick - current state: ${this._currentGameState}, cueHandler available: ${!!this.cueHandler}`);
       if (this._currentGameState === 'Menus' && this.cueHandler) {
-        // Create a basic CueData object for the cue handler
-        const cueData: CueData = {
-          datagramVersion: 1,
-          platform: 'RB3E',
-          currentScene: 'Menu',
-          pauseState: 'Unpaused',
-          venueSize: 'NoVenue',
-          beatsPerMinute: 0,
-          songSection: 'Unknown',
-          guitarNotes: [],
-          bassNotes: [],
-          drumNotes: [],
-          keysNotes: [],
-          vocalNote: 0,
-          harmony0Note: 0,
-          harmony1Note: 0,
-          harmony2Note: 0,
-          lightingCue: 'Default',
-          postProcessing: 'Default',
-          fogState: false,
-          strobeState: 'Strobe_Off',
-          performer: 0,
-          trackMode: 'tracked',
-          beat: 'Unknown',
-          keyframe: 'Unknown',
-          bonusEffect: false,
-          ledColor: '',
-          ledPositions: [],
-          rb3Platform: 'RB3E',
-          rb3BuildTag: '',
-          rb3SongName: '',
-          rb3SongArtist: '',
-          rb3SongShortName: '',
-          rb3VenueName: '',
-          rb3ScreenName: '',
-          rb3BandInfo: { members: [] },
-          rb3ModData: { identifyValue: '', string: '' },
-          totalScore: 0,
-          memberScores: [],
-          stars: 0,
-          sustainDurationMs: 0,
-          measureOrBeat: 0,
-          cueHistory: [],
-          executionCount: 1,
-          cueStartTime: Date.now(),
-          timeSinceLastCue: 0,
+        try {
+          this.cueHandler.playMenuFrame()
+        } catch (error) {
+          console.error('StageKitDirectProcessor: Error in menu cue playMenuFrame:', error)
         }
-
-        this.cueHandler.handleCueDefault(cueData).catch((error) => {
-          console.error(
-            'StageKitDirectProcessor: Error calling cue handler handleCueDefault in timer:',
-            error,
-          )
-        })
       }
     }, 1000)
   }
 
   /**
-   * Clear the menu animation timer
+   * Clear the menu animation timer and any RB3E menu-layer effects
    */
   private clearMenuAnimationTimer(): void {
     console.log('StageKitDirectProcessor: clearMenuAnimationTimer called')
@@ -1241,6 +1192,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     } else {
       console.log('StageKitDirectProcessor: No menu animation timer to clear')
     }
+    this.cueHandler?.clear()
   }
 
   /**

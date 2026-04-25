@@ -7,11 +7,9 @@ import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { ManualTestClock } from '../helpers/sequencerHarness'
 import { getColor } from '../../helpers/dmxHelpers'
-import { StageKitMenuCue } from '../../cues/yarg/handlers/stagekit/StageKitMenuCue'
-import { StageKitCoolManualCue } from '../../cues/yarg/handlers/stagekit/StageKitCoolManualCue'
-import { Effect, RGBIO } from '../../types'
+import { Effect } from '../../types'
 import { Clock } from '../../controllers/sequencer/Clock'
-import { CueData, CueType, DrumNoteType, defaultCueData } from '../../cues'
+import { DrumNoteType } from '../../cues'
 
 type SequencerHarness = {
   sequencer: Sequencer
@@ -65,24 +63,6 @@ function createStageKitLightManager() {
   return { manager, allLightIds }
 }
 
-const menuCueData: CueData = {
-  ...defaultCueData,
-  platform: 'Windows',
-  currentScene: 'Menu',
-  venueSize: 'Large',
-  lightingCue: CueType.Menu,
-  beatsPerMinute: 120,
-}
-
-const manualCueData: CueData = {
-  ...defaultCueData,
-  platform: 'Windows',
-  currentScene: 'Gameplay',
-  venueSize: 'Large',
-  lightingCue: CueType.Cool_Manual,
-  beatsPerMinute: 120,
-}
-
 describe('Sequencer integration lighting tests', () => {
   let harness: SequencerHarness
 
@@ -92,90 +72,6 @@ describe('Sequencer integration lighting tests', () => {
 
   afterEach(() => {
     harness.cleanup()
-  })
-
-  it('keeps StageKit Menu sweep order and colors consistent across cycles', async () => {
-    const { manager, allLightIds } = createStageKitLightManager()
-    const cue = new StageKitMenuCue()
-    await cue.execute(menuCueData, harness.sequencer, manager)
-
-    const observedFirstCycle: string[] = []
-    const observedSecondCycle: string[] = []
-
-    // Prime the sequencer so first capture observes post-start state
-    harness.advanceBy(1)
-
-    const captureActiveLight = (expectedIndex: number): string => {
-      const targetId = allLightIds[expectedIndex]
-      const state = harness.lightStateManager.getLightState(targetId)
-      expect(state).toBeTruthy()
-      return targetId
-    }
-
-    const advanceAndCapture = (expectedIndex: number): string => {
-      harness.advanceBy(250)
-      return captureActiveLight(expectedIndex)
-    }
-
-    for (let i = 0; i < allLightIds.length; i++) {
-      observedFirstCycle.push(advanceAndCapture(i))
-    }
-
-    for (let i = 0; i < allLightIds.length; i++) {
-      observedSecondCycle.push(advanceAndCapture(i))
-    }
-
-    expect(observedFirstCycle).toEqual(allLightIds)
-    expect(observedSecondCycle).toEqual(observedFirstCycle)
-  })
-
-  it('rotates StageKit Cool Manual lights only after keyframe events and blends additive layers', async () => {
-    const { manager, allLightIds } = createStageKitLightManager()
-    const cue = new StageKitCoolManualCue()
-    await cue.execute(manualCueData, harness.sequencer, manager)
-
-    // Snapshot the baseline state before any events fire
-    harness.advanceBy(1)
-    const baselineStates = new Map(
-      allLightIds.map((id) => [id, harness.lightStateManager.getLightState(id)]),
-    )
-
-    // Trigger keyframe event to start the rotations and allow transitions to run
-    harness.sequencer.onKeyframe()
-    harness.advanceBy(1)
-
-    const captureActiveSets = () => {
-      return new Map(allLightIds.map((id) => [id, harness.lightStateManager.getLightState(id)]))
-    }
-
-    const changedLights = (
-      before: Map<string, RGBIO | null>,
-      after: Map<string, RGBIO | null>,
-      channel: 'red' | 'green' | 'blue',
-    ): string[] => {
-      return allLightIds.filter((id) => {
-        const beforeState = before.get(id)
-        const afterState = after.get(id)
-        return (afterState?.[channel] ?? 0) > (beforeState?.[channel] ?? 0)
-      })
-    }
-
-    harness.sequencer.onKeyframe()
-    harness.advanceBy(1)
-    const afterFirstKeyframe = captureActiveSets()
-
-    harness.sequencer.onKeyframe()
-    harness.advanceBy(1)
-    const afterSecondKeyframe = captureActiveSets()
-
-    const blueActiveFirst = changedLights(baselineStates, afterFirstKeyframe, 'blue')
-    const blueActiveSecond = changedLights(afterFirstKeyframe, afterSecondKeyframe, 'blue')
-    const uniqueBlueLights = new Set([...blueActiveFirst, ...blueActiveSecond])
-    const greenActive = changedLights(baselineStates, afterSecondKeyframe, 'green')
-
-    expect(uniqueBlueLights.size).toBeGreaterThanOrEqual(1)
-    expect(uniqueBlueLights.size + (blueActiveSecond.length > 0 ? 1 : 0)).toBeGreaterThanOrEqual(2)
-    expect(greenActive.length).toBeGreaterThanOrEqual(1)
   })
 
   describe('event-gated transitions (beat/measure/drums)', () => {

@@ -23,7 +23,7 @@ Entry point and orchestration for the Photonics DMX desktop app. Runs in the Nod
 | Controller            | Role                                                                                        |
 | --------------------- | ------------------------------------------------------------------------------------------- |
 | `ControllerManager`   | Holds Sequencer, senders, listeners, NodeCueLoader, EffectLoader; coordinates init/shutdown |
-| `ListenerCoordinator` | YARG and RB3E listener enable/disable, mode switching                                       |
+| `ListenerCoordinator` | YARG and RB3E listener enable/disable                                                      |
 | `AudioController`     | Audio capture lifecycle (FFT data to renderer)                                              |
 | `TestEffectRunner`    | Simulates beat/keyframe/measure events for Cue Simulation                                   |
 | `senderErrorHandler`  | Unified sender error handling, debounce/dedup                                               |

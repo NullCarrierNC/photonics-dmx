@@ -222,7 +222,7 @@ export interface IpcInvokeMap {
   }
   [CUE.RB3E_GET_MODE]: {
     request: void
-    response: 'direct' | 'cueBased' | 'none'
+    response: 'direct' | 'none'
   }
   [CUE.RB3E_GET_STATS]: {
     request: void
@@ -740,7 +740,6 @@ export interface IpcSendMap {
   [CUE.YARG_LISTENER_DISABLED]: void
   [CUE.RB3E_LISTENER_ENABLED]: void
   [CUE.RB3E_LISTENER_DISABLED]: void
-  [CUE.RB3E_SWITCH_MODE]: 'direct' | 'cueBased'
   [CUE.SET_LISTEN_CUE_DATA]: boolean
   [CUE.CUE_STYLE]: 'simple' | 'complex'
   [CUE.UPDATE_EFFECT_DEBOUNCE]: number

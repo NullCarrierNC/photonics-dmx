@@ -1,5 +1,5 @@
 /**
- * ProcessorManager tests: mode switching, getCurrentMode, getProcessorStats, destroy.
+ * ProcessorManager tests: direct mode lifecycle, getCurrentMode, getProcessorStats, destroy.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
@@ -10,8 +10,6 @@ import {
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { createMockLightingConfig } from '../helpers/testFixtures'
-import { EventEmitter } from 'events'
-import type { AbstractCueHandler } from '../../cueHandlers/AbstractCueHandler'
 
 describe('ProcessorManager', () => {
   let mockLightManager: DmxLightManager
@@ -65,18 +63,6 @@ describe('ProcessorManager', () => {
     expect(stats.networkListenerActive).toBe(false)
   })
 
-  it('switchMode toggles from direct to cueBased when cue handler is set', () => {
-    const mockCueHandler = { handleCue: jest.fn() } as unknown as AbstractCueHandler
-    manager.setCueHandler(mockCueHandler)
-    manager.setNetworkListener(new EventEmitter())
-
-    manager.switchMode('cueBased')
-    expect(manager.getCurrentMode()).toBe('cueBased')
-
-    manager.switchMode('direct')
-    expect(manager.getCurrentMode()).toBe('direct')
-  })
-
   it('getCurrentMode returns initial mode', () => {
     expect(manager.getCurrentMode()).toBe('direct')
   })
@@ -99,7 +85,6 @@ describe('ProcessorManager', () => {
 
   it('isModeActive returns true for current mode', () => {
     expect(manager.isModeActive('direct')).toBe(true)
-    expect(manager.isModeActive('cueBased')).toBe(false)
   })
 
   it('destroy cleans up and getProcessorStats reflects no active processors', () => {

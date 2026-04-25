@@ -50,11 +50,6 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
     }
   })
 
-  // RB3 mode switching
-  ipcMain.on(CUE.RB3E_SWITCH_MODE, async (_, mode: 'direct' | 'cueBased') => {
-    await controllerManager.switchRb3Mode(mode)
-  })
-
   // Get RB3 current mode
   ipcMain.handle(CUE.RB3E_GET_MODE, () => {
     return controllerManager.getRb3Mode()

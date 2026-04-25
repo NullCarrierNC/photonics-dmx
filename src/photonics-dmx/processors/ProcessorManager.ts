@@ -1,24 +1,20 @@
 /**
- * ProcessorManager - Manages event processors for different handling modes
+ * ProcessorManager - Manages RB3E direct StageKit processing
  *
- * This manager can switch between different event processors (direct mode,
- * traditional cue mode, hybrid mode) and manages their lifecycle.
+ * This manager owns the RB3E direct StageKit processor lifecycle.
  */
 import { EventEmitter } from 'events'
 import { Rb3StageKitDirectProcessor } from './Rb3StageKitDirectProcessor'
-import { Rb3CueBasedProcessor } from './Rb3CueBasedProcessor'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { ILightingController } from '../controllers/sequencer/interfaces'
-import { AbstractCueHandler } from '../cueHandlers/AbstractCueHandler'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
+import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
 
 /**
- * Available processing modes
- *
- * Note: Only one mode can be active at a time to prevent conflicting DMX light states
+ * Available processing modes.
  */
-export type ProcessingMode = 'direct' | 'cueBased'
+export type ProcessingMode = 'direct'
 
 /**
  * Configuration for the processor manager
@@ -42,16 +38,12 @@ export class ProcessorManager extends EventEmitter {
   private currentMode: ProcessingMode = 'direct'
   private networkListener: EventEmitter | null = null
 
-  // Processors
   private stageKitDirectProcessor: Rb3StageKitDirectProcessor | null = null
-  private cueProcessor: Rb3CueBasedProcessor | null = null
 
-  // Dependencies
   private lightManager: DmxLightManager
   private photonicsSequencer: ILightingController
-  private cueHandler: AbstractCueHandler | null = null
+  private cueHandler: Rb3MenuCueHandler | null = null
 
-  // Configuration
   private config: ProcessorManagerConfig
 
   constructor(
@@ -64,11 +56,8 @@ export class ProcessorManager extends EventEmitter {
     this.photonicsSequencer = photonicsSequencer
     this.config = { ...DEFAULT_PROCESSOR_CONFIG, ...config }
 
-    // Validate that only one mode is specified to prevent conflicts
-    if (config.mode && !['direct', 'cueBased'].includes(config.mode)) {
-      throw new Error(
-        `Invalid mode: ${config.mode}. Only 'direct' or 'cueBased' modes are supported.`,
-      )
+    if (config.mode && config.mode !== 'direct') {
+      throw new Error(`Invalid mode: ${config.mode}. Only 'direct' mode is supported.`)
     }
 
     console.log('ProcessorManager initialized with config:', this.config)
@@ -101,54 +90,15 @@ export class ProcessorManager extends EventEmitter {
   }
 
   /**
-   * Set the cue handler for cue-based mode
+   * Set the cue handler used for RB3 menu animation.
    */
-  public setCueHandler(cueHandler: AbstractCueHandler): void {
+  public setCueHandler(cueHandler: Rb3MenuCueHandler): void {
     this.cueHandler = cueHandler
-
-    // Recreate traditional processor if it exists
-    if (this.cueProcessor) {
-      this.cueProcessor.destroy()
-      this.cueProcessor = new Rb3CueBasedProcessor(cueHandler)
-
-      // Listen for cue data events from the processor
-      this.cueProcessor.on('cueHandled', (cueData: CueData) => {
-        this.emitCueData(cueData)
-      })
-
-      if (this.networkListener && this.currentMode !== 'direct') {
-        this.cueProcessor.startListening(this.networkListener)
-      }
+    if (this.stageKitDirectProcessor) {
+      this.stageKitDirectProcessor.setCueHandler(cueHandler)
     }
 
     console.log('ProcessorManager: Cue handler set')
-  }
-
-  /**
-   * Switch processing mode
-   */
-  public switchMode(mode: ProcessingMode): void {
-    if (mode === this.currentMode) {
-      console.log(`ProcessorManager: Already in ${mode} mode`)
-      return
-    }
-
-    console.log(`ProcessorManager: Switching from ${this.currentMode} to ${mode} mode`)
-
-    // Stop current processors
-    this.stopAllProcessors()
-
-    // Update mode
-    this.currentMode = mode
-    this.config.mode = mode
-
-    // Start new processors
-    this.startProcessors()
-
-    // Emit mode change event
-    this.emit('modeChanged', { mode, timestamp: Date.now() })
-
-    console.log(`ProcessorManager: Successfully switched to ${mode} mode`)
   }
 
   /**
@@ -191,16 +141,7 @@ export class ProcessorManager extends EventEmitter {
     // Set up event listeners for processors
     this.setupProcessorEventListeners()
 
-    switch (this.currentMode) {
-      case 'direct':
-        this.startDirectMode()
-        break
-      case 'cueBased':
-        this.startCueBasedMode()
-        break
-      default:
-        console.error(`ProcessorManager: Unknown mode: ${this.currentMode}`)
-    }
+    this.startDirectMode()
   }
 
   /**
@@ -237,37 +178,12 @@ export class ProcessorManager extends EventEmitter {
   }
 
   /**
-   * Start cue-based mode
-   */
-  private startCueBasedMode(): void {
-    if (!this.cueHandler) {
-      console.error('ProcessorManager: Cannot start cue-based mode without cue handler')
-      return
-    }
-
-    if (!this.cueProcessor) {
-      this.cueProcessor = new Rb3CueBasedProcessor(this.cueHandler)
-    }
-
-    // Listen for cue data events from the processor
-    this.cueProcessor.on('cueHandled', (cueData: CueData) => {
-      this.emitCueData(cueData)
-    })
-
-    this.cueProcessor.startListening(this.networkListener!)
-    console.log('ProcessorManager: Cue-based mode started')
-  }
-
-  /**
    * Stop all processors
    */
   private stopAllProcessors(): void {
     if (this.networkListener) {
       if (this.stageKitDirectProcessor) {
         this.stageKitDirectProcessor.stopListening(this.networkListener)
-      }
-      if (this.cueProcessor) {
-        this.cueProcessor.stopListening(this.networkListener)
       }
     }
 
@@ -279,13 +195,6 @@ export class ProcessorManager extends EventEmitter {
    */
   public getStageKitDirectProcessor(): Rb3StageKitDirectProcessor | null {
     return this.stageKitDirectProcessor
-  }
-
-  /**
-   * Get traditional cue processor (for direct access if needed)
-   */
-  public getCueBasedProcessor(): Rb3CueBasedProcessor | null {
-    return this.cueProcessor
   }
 
   /**
@@ -307,7 +216,7 @@ export class ProcessorManager extends EventEmitter {
     return {
       currentMode: this.currentMode,
       stageKitProcessorActive: !!this.stageKitDirectProcessor,
-      traditionalProcessorActive: !!this.cueProcessor,
+      traditionalProcessorActive: false,
       networkListenerActive: !!this.networkListener,
     }
   }
@@ -319,13 +228,6 @@ export class ProcessorManager extends EventEmitter {
     // Set up event listeners for StageKit direct processor
     if (this.stageKitDirectProcessor) {
       this.stageKitDirectProcessor.on('cueHandled', (cueData: CueData) => {
-        this.emitCueData(cueData)
-      })
-    }
-
-    // Set up event listeners for cue-based processor
-    if (this.cueProcessor) {
-      this.cueProcessor.on('cueHandled', (cueData: CueData) => {
         this.emitCueData(cueData)
       })
     }
@@ -351,11 +253,6 @@ export class ProcessorManager extends EventEmitter {
     if (this.stageKitDirectProcessor) {
       this.stageKitDirectProcessor.destroy()
       this.stageKitDirectProcessor = null
-    }
-
-    if (this.cueProcessor) {
-      this.cueProcessor.destroy()
-      this.cueProcessor = null
     }
 
     // Remove all listeners

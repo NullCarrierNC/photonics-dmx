@@ -5,48 +5,22 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { YargNetworkListener } from '../../listeners/YARG/YargNetworkListener'
-import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler'
+import { YargNetworkListener, YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
 import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
-import { DmxLightManager } from '../../controllers/DmxLightManager'
-import { ILightingController } from '../../controllers/sequencer/interfaces'
-import { createMockLightingConfig } from '../helpers/testFixtures'
 
-class MockCueHandler extends BaseCueHandler {
+class MockCueHandler implements YargCueRuntime {
+  public notifySongStart = jest.fn()
+  public notifySongEnd = jest.fn()
+  public handleBeat = jest.fn()
+  public handleMeasure = jest.fn()
+  public handleKeyframeFirst = jest.fn()
+  public handleKeyframeNext = jest.fn()
+  public handleKeyframePrevious = jest.fn()
   public handleCue = jest.fn(async (_cueType: CueType, _parameters: CueData): Promise<void> => {})
-  public handleCueNoCue = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueDischord = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueChorus = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueDefault = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStomp = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueVerse = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueMenu = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueScore = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueBigRockEnding = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueBlackout_Fast = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueBlackout_Slow = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueBlackout_Spotlight = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueCool_Manual = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueCool_Automatic = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueWarm_Manual = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueWarm_Automatic = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueFlare_Fast = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueFlare_Slow = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueFrenzy = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueIntro = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueHarmony = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueSilhouettes = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueSilhouettes_Spotlight = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueSearchlights = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Fastest = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Fast = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Medium = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Slow = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Off = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueSweep = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueKeyframe_First = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueKeyframe_Next = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueKeyframe_Previous = jest.fn(async (_: CueData): Promise<void> => {})
+  public handleDrumNote = jest.fn()
+  public handleGuitarNote = jest.fn()
+  public handleBassNote = jest.fn()
+  public handleKeysNote = jest.fn()
 }
 
 const mockBind = jest.fn((_port: number, callback: () => void) => {
@@ -66,22 +40,12 @@ jest.mock('dgram', () => ({
 }))
 
 describe('YargNetworkListener', () => {
-  let lightManager: DmxLightManager
-  let mockSequencer: ILightingController
   let cueHandler: MockCueHandler
   let listener: YargNetworkListener
 
   beforeEach(() => {
     jest.clearAllMocks()
-    const config = createMockLightingConfig()
-    lightManager = new DmxLightManager(config)
-    mockSequencer = {
-      addEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-    } as unknown as ILightingController
-    cueHandler = new MockCueHandler(lightManager, mockSequencer)
+    cueHandler = new MockCueHandler()
     listener = new YargNetworkListener(cueHandler)
   })
 

@@ -11,8 +11,8 @@ If you see the term `light` this is the virtual representation used within the l
 
 ## Architecture Overview
 
-1. `Listeners`: listen for game data over the network. Specific implementations for YARG and RB3E. When a lighting cue is received the matching processor is called.
-2. `Processors`: handle game events and convert them to lighting effects. YARG uses cue-based processing while RB3E uses a Processor Manager to select between direct DMX control and cue-based processing. Currently only direct is active.
+1. `Listeners`: listen for game data over the network. Specific implementations for YARG and RB3E. When a lighting cue is received the matching runtime or processor is called.
+2. `Processors`: handle game events and convert them to lighting effects. YARG uses node cue processing while RB3E uses direct StageKit-to-DMX processing.
 3. `Sequencer`: the central coordinator of the lighting system that manages the lifecycle of effects and transitions. It oversees the EffectManager and other components.
 4. `EffectManager`: receives effect data and orchestrates the creation and management of transitions. Handles effect queueing and scheduling, assigns persistent runs, and restarts them only after every light in the run completes.
 5. `LightTransitionController`: processes transitions and interpolates colour states over time, applying easing functions and handling transform timing.
@@ -26,8 +26,7 @@ Configuration is handled by the `ConfigurationManager` and related services, whi
 
 ## Node-Based Cue System
 
-Photonics includes a node-based cue system that will eventually replace code-based cues. Cues and reusable effects
-are defined as JSON files with a graph of nodes (event listeners, logic, actions, event raisers) and executed at runtime.
+Photonics uses node-based cues for YARG and audio lighting. Cues and reusable effects are defined as JSON files with a graph of nodes (event listeners, logic, actions, event raisers) and executed at runtime.
 
 **Flow:** JSON file → Loader (validation) → Compiler → Registry → ExecutionEngine → Sequencer
 
@@ -48,13 +47,12 @@ ReactFlow-based UI for authoring these JSON files. See [cues/node/README.md](cue
 Photonics uses different processing approaches for YARG and RB3E:
 
 ### YARG Processing
-YARG uses **cue-based processing** where network cue events are directly converted to lighting cues through the `YargNetworkListener`. 
+YARG uses **node cue processing** where network cue events are routed through the `YargNetworkListener`, selected from `YargCueRegistry`, and executed by the node runtime. 
 
 
 ### RB3E Processing
-RB3E uses a **Processor Manager** that can switch between two processing modes:
+RB3E uses direct StageKit processing:
 
-#### Direct Mode (Default)
 The `Rb3StageKitDirectProcessor` provides direct DMX control by:
 - Receiving StageKit light data (4 color banks: Blue, Green, Yellow, Red with 8 positions each)
 - Mapping StageKit positions directly to DMX lights
@@ -62,15 +60,10 @@ The `Rb3StageKitDirectProcessor` provides direct DMX control by:
 - Handling strobe effects
 
 
-#### Cue-Based Mode
-The `Rb3CueBasedProcessor` provides cue-based lighting by converting RB3E events to lighting cues.
-This is NOT currently accessible. RB3E currently only implements the StageKit direct processing.
-
-
 ### Processor Selection
 The system automatically selects the appropriate processor:
-- **YARG**: Always uses cue-based processing
-- **RB3E**: Defaults to direct mode
+- **YARG**: Uses node cue processing
+- **RB3E**: Uses direct StageKit processing
 
 
 ### Additional Components
@@ -92,10 +85,9 @@ The `Clock` provides a single source of truth for all timing operations in the s
 
 ### Processing Components
 
-- `ProcessorManager`: Manages switching between direct DMX control and cue-based processing for RB3E.
+- `ProcessorManager`: Manages direct StageKit processing for RB3E.
 - `Rb3StageKitDirectProcessor`: Provides direct StageKit-to-DMX mapping for real-time lighting control.
 - `StageKitLightMapper`: Maps StageKit light positions to DMX light configurations.
-- `Rb3CueBasedProcessor`: Handles cue-based lighting for RB3E.
 
 
 
@@ -113,83 +105,7 @@ An `effect` is comprised by a series of `transitions`.
 Each `transition` consists of a `transform` which interpolates the `light state` over time.
 
 
-Consider the `stomp` cue: the lights all flash bright white and fade down. This is significantly slower than a strobe light flash:
-
-```Typescript
-protected handleCueStomp(_parameters: CueData): Promise<void> {
-    const white: RGBIO = getColor('white', 'max');
-    const lights = this.getLights(['front'], 'all');
-    const flash = getEffectFlashColor({
-      color: white,
-      startTrigger: 'none',
-      durationIn: 40,
-      holdTime: 0,
-      durationOut: 150,
-      lights: lights,
-      easing: EasingType.SIN_OUT,
-      layer: 101,
-    });
-    this._effects.addEffect('stomp', flash);
-  }
-
-export const getEffectFlashColor = ({
-    color,
-    startTrigger,
-    startWait = 0,
-    endTrigger = 'none',
-    endWait = 0,
-    durationIn,
-    holdTime,
-    durationOut,
-    lights,
-    layer = 0,
-    easing =  EasingType.SIN_OUT
-}: GetSingleColorEffectParams): Effect => {
-    const effect: Effect = {
-        id: "flash-color",
-        description: "Sets the light a color then quickly fades it out",
-        transitions: [
-            {
-                lights: lights,
-                layer: layer,
-                waitForCondition: startTrigger,
-                waitForTime: startWait,
-                transform: {
-                    color: color,
-                    easing: easing,
-                    duration: durationIn,
-                },
-                waitUntilCondition: "delay",
-                waitUntilTime: holdTime,
-            },
-            {
-                lights: lights,
-                layer: layer,
-                waitForCondition: endTrigger,
-                waitForTime: endWait,
-                transform: {
-                    color: {
-                        red: 0,
-                        green: 0,
-                        blue: 0,
-                        intensity: 0,
-                        opacity: 0.0,
-                        blendMode: 'replace',
-                    },
-                    easing: easing,
-                    duration: durationOut,
-                },
-                waitUntilCondition: "delay",
-                waitUntilTime: holdTime,
-            },
-        ],
-    };
-
-    return effect;
-};
-```
-
-The stomp transitions consists of two transforms:
+Consider the `stomp` cue: the lights all flash bright white and fade down. This is significantly slower than a strobe light flash. In the node cue graph, the stomp effect consists of two transforms:
 1. Fade in to full white over 40ms, hold for 0ms.
 2. Fade out to transparent over 150ms.
 

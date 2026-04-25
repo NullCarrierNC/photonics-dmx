@@ -1,7 +1,4 @@
-import {
-  ConfigurationManager,
-  AppPreferences,
-} from '../../services/configuration/ConfigurationManager'
+import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
@@ -19,7 +16,6 @@ import {
 } from '../../photonics-dmx/types'
 import { rawDmxToLogicalHomePercent } from '../../photonics-dmx/helpers/movingHeadCalibration'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
-import { Rb3CueHandler } from '../../photonics-dmx/cueHandlers/Rb3CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import {
   AudioConfig,
@@ -92,7 +88,7 @@ export class ControllerManager {
   private senderManager: SenderManager | null = null
   private senderErrorTrackingCallback: ((senderId: string) => void) | null = null
 
-  private cueHandler: YargCueHandler | Rb3CueHandler | null = null
+  private cueHandler: YargCueHandler | null = null
   private nodeCueLoader: NodeCueLoader | null = null
   private effectLoader: EffectLoader | null = null
 
@@ -143,10 +139,6 @@ export class ControllerManager {
     this.listenerCoordinator = new ListenerCoordinator({
       getDmxLightManager: () => this.dmxLightManager,
       getEffectsController: () => this.effectsController,
-      getPreference: (key: string) => {
-        const v = this.config.getPreference(key as keyof AppPreferences)
-        return typeof v === 'number' ? v : 0
-      },
       getMotionEnabled: () => this.config.getMotionEnabled(),
       getActiveYargMotionCueRef: () => this.config.getActiveYargMotionCueRef(),
       getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
@@ -598,16 +590,9 @@ export class ControllerManager {
   }
 
   /**
-   * Switch RB3 processing mode between direct and cue-based
-   */
-  public async switchRb3Mode(mode: 'direct' | 'cueBased'): Promise<void> {
-    await this.listenerCoordinator.switchRb3Mode(mode)
-  }
-
-  /**
    * Get current RB3 processing mode
    */
-  public getRb3Mode(): 'direct' | 'cueBased' | 'none' {
+  public getRb3Mode(): 'direct' | 'none' {
     return this.listenerCoordinator.getRb3Mode()
   }
 
@@ -828,7 +813,7 @@ export class ControllerManager {
     this.onConsoleEnter = callback
   }
 
-  public getCueHandler(): YargCueHandler | Rb3CueHandler | null {
+  public getCueHandler(): YargCueHandler | null {
     return this.cueHandler
   }
 
