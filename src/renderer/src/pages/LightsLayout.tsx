@@ -11,7 +11,6 @@ import {
   LightingConfiguration,
 } from '../../../photonics-dmx/types'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
-import { v4 as uuidv4 } from 'uuid'
 import {
   activeDmxLightsConfigAtom,
   myValidDmxLightsAtom,
@@ -90,7 +89,7 @@ const LightsLayout = () => {
         } else if (loadedRigs.length === 0) {
           // No rigs exist, create a default one
           const defaultRig: DmxRig = {
-            id: uuidv4(),
+            id: crypto.randomUUID(),
             name: 'Default Rig',
             active: true,
             config: {
@@ -248,7 +247,7 @@ const LightsLayout = () => {
       const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
 
       return {
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         fixtureId: selectedFixture.id!,
         position: totalExisting + 1,
         fixture: selectedFixture.fixture,
@@ -303,7 +302,7 @@ const LightsLayout = () => {
             const castChannels = castToChannelType(firstFixture.fixture, recalculatedChannels)
 
             updated.push({
-              id: uuidv4(),
+              id: crypto.randomUUID(),
               fixtureId: firstFixture.id!,
               position: i + 1,
               fixture: firstFixture.fixture,
@@ -522,10 +521,10 @@ const LightsLayout = () => {
   const mapLightsToNewIds = (lights: DmxLight[], idMap: Record<string, string>) => {
     return lights.map((light) => {
       // Fallback to a placeholder if the light’s ID is null/undefined (first use)
-      const originalId = light.id ?? uuidv4()
+      const originalId = light.id ?? crypto.randomUUID()
 
       if (!idMap[originalId]) {
-        idMap[originalId] = uuidv4()
+        idMap[originalId] = crypto.randomUUID()
       }
 
       return {
