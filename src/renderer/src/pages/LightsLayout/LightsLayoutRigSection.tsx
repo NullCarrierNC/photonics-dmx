@@ -1,5 +1,4 @@
 import React from 'react'
-import { v4 as uuidv4 } from 'uuid'
 import type { DmxRig } from '../../../../photonics-dmx/types'
 import { ConfigStrobeType } from '../../../../photonics-dmx/types'
 import { saveDmxRig } from '../../ipcApi'
@@ -40,7 +39,7 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
       <button
         onClick={async () => {
           const newRig: DmxRig = {
-            id: uuidv4(),
+            id: crypto.randomUUID(),
             name: `Rig ${rigs.length + 1}`,
             active: true,
             config: {

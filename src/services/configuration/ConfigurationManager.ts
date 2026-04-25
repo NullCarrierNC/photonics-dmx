@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid'
 import { ConfigFile } from './ConfigFile'
 import {
   DmxFixture,
@@ -354,7 +353,7 @@ export class ConfigurationManager {
       safeLayout.strobeLights.length > 0
     ) {
       const defaultRig: DmxRig = {
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         name: 'Default Rig',
         active: true,
         config: safeLayout,

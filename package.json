@@ -51,8 +51,7 @@
     "postprocessing": "^6.36.4",
     "reactflow": "11.11.1",
     "sacn": "4.6.1",
-    "three": "^0.170.0",
-    "uuid": "11.0.3"
+    "three": "^0.170.0"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",
@@ -89,7 +88,7 @@
     "terser": "5.37.0",
     "ts-jest": "^29.4.6",
     "typescript": "5.5.2",
-    "vite": "^5.4.19"
+    "vite": "^6.4.2"
   },
   "overrides": {
     "esbuild": "0.25.12"

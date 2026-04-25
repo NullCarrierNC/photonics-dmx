@@ -7,7 +7,6 @@ import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import { DmxFixture, FixtureTypes } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
 import { saveMyLights } from '../ipcApi'
-import { v4 as uuidv4 } from 'uuid'
 
 const MyLights = () => {
   const [myLights, setMyLights] = useAtom(myDmxLightsAtom)
@@ -32,7 +31,7 @@ const MyLights = () => {
     if (currentLight) {
       const lightToSave = {
         ...currentLight,
-        id: currentLight.id || uuidv4(), // Assign a unique id if it doesn't have one
+        id: currentLight.id || crypto.randomUUID(), // Assign a unique id if it doesn't have one
       }
 
       // Update the light library in Jotai state
