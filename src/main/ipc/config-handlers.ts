@@ -211,17 +211,12 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     const registry = YargCueRegistry.getInstance()
     const config = controllerManager.getConfig()
     const prefs = config.getAllPreferences()
-    let enabled = prefs.enabledCueGroups
+    let enabled = prefs.cueDomains.yarg.enabledGroups
     const allGroups = registry.getAllGroups()
-    const knownYargCueGroups = prefs.knownYargCueGroups ?? []
+    const knownYargCueGroups = prefs.cueDomains.yarg.knownGroups ?? []
 
-    if (enabled === undefined) {
-      enabled = allGroups
-      await config.setEnabledCueGroups(enabled)
-      await config.setKnownYargCueGroups(allGroups)
-      registry.setEnabledGroups(enabled)
-    } else {
-      // Auto-enable only genuinely new groups (not yet in known list); user-disabled groups stay disabled
+    // Auto-enable only genuinely new groups (not yet in known list); user-disabled groups stay disabled
+    {
       const newGroups = allGroups.filter((id) => !knownYargCueGroups.includes(id))
       if (newGroups.length > 0) {
         enabled = [...enabled, ...newGroups]
@@ -275,9 +270,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     const registry = AudioCueRegistry.getInstance()
     const config = controllerManager.getConfig()
     const prefs = config.getAllPreferences()
-    let enabled = prefs.enabledAudioCueGroups
+    let enabled = prefs.cueDomains.audio.enabledGroups
     const allGroups = registry.getRegisteredGroups()
-    const knownAudioCueGroups = prefs.knownAudioCueGroups ?? []
+    const knownAudioCueGroups = prefs.cueDomains.audio.knownGroups ?? []
 
     if (!enabled || enabled.length === 0) {
       enabled = allGroups
@@ -372,9 +367,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     const registry = YargCueRegistry.getInstance()
     const config = controllerManager.getConfig()
     const prefs = config.getAllPreferences()
-    let enabled = prefs.enabledMotionCueGroups
+    let enabled = prefs.cueDomains.yargMotion.enabledGroups
     const allGroups = registry.getRegisteredMotionGroupIds()
-    const knownMotionCueGroups = prefs.knownMotionCueGroups ?? []
+    const knownMotionCueGroups = prefs.cueDomains.yargMotion.knownGroups ?? []
 
     if (!enabled || enabled.length === 0) {
       enabled = allGroups
@@ -444,9 +439,9 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
     const registry = AudioCueRegistry.getInstance()
     const config = controllerManager.getConfig()
     const prefs = config.getAllPreferences()
-    let enabled = prefs.enabledAudioMotionCueGroups
+    let enabled = prefs.cueDomains.audioMotion.enabledGroups
     const allGroups = registry.getRegisteredMotionGroupIds()
-    const knownGroups = prefs.knownAudioMotionCueGroups ?? []
+    const knownGroups = prefs.cueDomains.audioMotion.knownGroups ?? []
 
     if (!enabled || enabled.length === 0) {
       enabled = allGroups

@@ -282,13 +282,11 @@ export class ControllerManager {
   private async initializeCueRegistry(): Promise<void> {
     const registry = YargCueRegistry.getInstance()
 
-    // Get enabled groups from configuration
-    const enabledGroupIds = this.config.getEnabledCueGroups()
-    if (enabledGroupIds) {
+    const enabledGroupIds = this.config.getEnabledCueGroups() ?? []
+    if (enabledGroupIds.length > 0) {
       registry.setEnabledGroups(enabledGroupIds)
       console.log('CueRegistry initialized with enabled groups:', enabledGroupIds)
     } else {
-      // If no preference is set, enable all available groups
       const allGroups = registry.getAllGroups()
       registry.setEnabledGroups(allGroups)
       console.log('CueRegistry initialized with all groups (no preference set):', allGroups)
@@ -355,12 +353,14 @@ export class ControllerManager {
   private async applyYargEnabledGroupsFromConfig(): Promise<void> {
     const registry = YargCueRegistry.getInstance()
     const registeredIds = registry.getAllGroups()
-    let enabledGroupIds = this.config.getEnabledCueGroups()
+    let enabledGroupIds = this.config.getEnabledCueGroups() ?? []
     const knownGroups = this.config.getKnownYargCueGroups() ?? []
 
-    if (enabledGroupIds === undefined) {
+    if (!enabledGroupIds || enabledGroupIds.length === 0) {
       enabledGroupIds = registeredIds
-      await this.config.setEnabledCueGroups(enabledGroupIds)
+      if (registeredIds.length > 0) {
+        await this.config.setEnabledCueGroups(enabledGroupIds)
+      }
     } else {
       const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
       if (newGroups.length > 0) {

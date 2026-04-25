@@ -1,5 +1,6 @@
 import { atom, getDefaultStore } from 'jotai'
-import { atomWithStorage, createJSONStorage } from 'jotai/utils'
+import { atomFamily, atomWithStorage, createJSONStorage } from 'jotai/utils'
+import type { CueDomain, CueDomainPrefs } from '../../services/configuration/cueDomainTypes'
 import {
   DmxFixture,
   LightingConfiguration,
@@ -249,7 +250,7 @@ export interface LightingPreferences {
     high: number
     max: number
   }
-  enabledCueGroups?: string[]
+  cueDomains?: Record<CueDomain, CueDomainPrefs>
   activeAudioCueType?: AudioCueType
   cueConsistencyWindow?: number
   allowMultipleActiveRigs?: boolean
@@ -302,6 +303,14 @@ export interface LightingPreferences {
 }
 
 export const lightingPrefsAtom = atom<LightingPreferences>({})
+
+/**
+ * Per-domain slice of `cueDomains` from loaded preferences (read-only; updates go through savePrefs or IPC).
+ */
+export const prefsCueDomainAtom = atomFamily((domain: CueDomain) =>
+  atom((get) => get(lightingPrefsAtom).cueDomains?.[domain]),
+)
+
 export const useComplexCuesAtom = atom<boolean>(false)
 
 /**

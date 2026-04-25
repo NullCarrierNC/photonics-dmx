@@ -71,6 +71,9 @@ describe('ConfigurationManager', () => {
         effectDebounce: 0,
         complex: true,
         enttecProConfig: { port: '' },
+        cueDomains: expect.objectContaining({
+          yarg: expect.objectContaining({ enabledGroups: expect.any(Array) }),
+        }),
       })
     })
 
@@ -203,7 +206,7 @@ describe('ConfigurationManager', () => {
       const lastWriteCall = writeCalls[writeCalls.length - 1]
       const content = lastWriteCall[1]
       const savedData = JSON.parse(content)
-      expect(savedData).toHaveProperty('version', 3)
+      expect(savedData).toHaveProperty('version', 4)
       expect(savedData).toHaveProperty('data')
       expect(savedData.data).toHaveProperty('effectDebounce', 100)
     })

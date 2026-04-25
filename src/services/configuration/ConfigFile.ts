@@ -145,9 +145,8 @@ export class ConfigFile<T> {
   /**
    * Applies a specific migration between versions
    */
-  private applyMigration(data: T, _fromVersion: number, _toVersion: number): T {
-    // Override this method in subclasses to implement specific migrations
-    // For now, return the data as-is (no migrations defined)
+  protected applyMigration(data: T, _fromVersion: number, _toVersion: number): T {
+    // Override in subclasses to implement version-specific migrations
     return data
   }
 
