@@ -15,7 +15,7 @@ Stored in `{appData}/Photonics.rocks/`:
 
 | File | Content |
 |------|---------|
-| `prefs.json` | AppPreferences (effect debounce, cue groups, sender config, brightness, etc.) |
+| `prefs.json` | AppPreferences
 | `lights.json` | User light definitions (fixtures, groups) |
 | `lightsLayout.json` | Physical layout order of lights |
 | `dmxRigs.json` | DMX rig definitions (universes, fixtures) |

@@ -125,11 +125,15 @@ export class ControllerManager {
       ensureInitialized: () => this.init(),
       createCueHandler: (dmx, eff) => {
         const h = new YargCueHandler(dmx, eff, {
-          getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
-          getMotionCueProbabilityPercent: () => this.config.getMotionCueProbabilityPercent(),
+          getMotionCueMinimumHoldMs: () =>
+            this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+          getMotionCueProbabilityPercent: () =>
+            this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
         })
-        h.setMotionEnabled(this.config.getMotionEnabled())
-        h.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)
+        h.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
+        h.setManualMotionRef(
+          this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
+        )
         return h
       },
       setCueHandler: (h) => {
@@ -139,10 +143,13 @@ export class ControllerManager {
     this.listenerCoordinator = new ListenerCoordinator({
       getDmxLightManager: () => this.dmxLightManager,
       getEffectsController: () => this.effectsController,
-      getMotionEnabled: () => this.config.getMotionEnabled(),
-      getActiveYargMotionCueRef: () => this.config.getActiveYargMotionCueRef(),
-      getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
-      getMotionCueProbabilityPercent: () => this.config.getMotionCueProbabilityPercent(),
+      getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
+      getActiveYargMotionCueRef: () =>
+        this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
+      getMotionCueMinimumHoldMs: () =>
+        this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+      getMotionCueProbabilityPercent: () =>
+        this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
       sendSenderError: (message: string) => {
         sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
       },
@@ -250,7 +257,7 @@ export class ControllerManager {
    */
   private async initializeSequencer(): Promise<void> {
     // Get clock rate from configuration
-    const clockRate = this.config.getClockRate()
+    const clockRate = this.config.getPreference('clockRate')
 
     // Create the shared Clock instance
     const clock = new Clock(clockRate)
@@ -282,20 +289,18 @@ export class ControllerManager {
   private async initializeCueRegistry(): Promise<void> {
     const registry = YargCueRegistry.getInstance()
 
-    // Get enabled groups from configuration
-    const enabledGroupIds = this.config.getEnabledCueGroups()
-    if (enabledGroupIds) {
+    const enabledGroupIds = this.config.getPreference('cueDomains').yarg.enabledGroups ?? []
+    if (enabledGroupIds.length > 0) {
       registry.setEnabledGroups(enabledGroupIds)
       console.log('CueRegistry initialized with enabled groups:', enabledGroupIds)
     } else {
-      // If no preference is set, enable all available groups
       const allGroups = registry.getAllGroups()
       registry.setEnabledGroups(allGroups)
       console.log('CueRegistry initialized with all groups (no preference set):', allGroups)
     }
 
     // Load cue consistency window from configuration
-    const consistencyWindow = this.config.getCueConsistencyWindow()
+    const consistencyWindow = this.config.getPreference('cueConsistencyWindow')
     registry.setCueConsistencyWindow(consistencyWindow)
     console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms')
 
@@ -304,7 +309,7 @@ export class ControllerManager {
     registry.setCueGroupSelectionMode(selectionMode)
     console.log('CueRegistry initialized with cue group selection mode:', selectionMode)
 
-    const disabledYarg = this.config.getDisabledYargCues() ?? {}
+    const disabledYarg = this.config.getPreference('cueDomains').yarg.disabledCues
     registry.setDisabledCues(disabledYarg)
   }
 
@@ -314,7 +319,7 @@ export class ControllerManager {
   private async initializeAudioCueRegistry(): Promise<void> {
     const registry = AudioCueRegistry.getInstance()
 
-    const enabledGroupIds = this.config.getEnabledAudioCueGroups()
+    const enabledGroupIds = this.config.getPreference('cueDomains').audio.enabledGroups
     if (enabledGroupIds && enabledGroupIds.length > 0) {
       registry.setEnabledGroups(enabledGroupIds)
       console.log('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
@@ -322,12 +327,12 @@ export class ControllerManager {
       const allGroups = registry.getRegisteredGroups()
       registry.setEnabledGroups(allGroups)
       if (allGroups.length > 0) {
-        this.config.setEnabledAudioCueGroups(allGroups)
+        void this.config.updateCueDomain('audio', { enabledGroups: allGroups })
       }
       console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
     }
 
-    const disabledAudio = this.config.getDisabledAudioCues() ?? {}
+    const disabledAudio = this.config.getPreference('cueDomains').audio.disabledCues
     registry.setDisabledCues(disabledAudio)
   }
 
@@ -338,9 +343,9 @@ export class ControllerManager {
     const yarg = YargCueRegistry.getInstance()
     const audio = AudioCueRegistry.getInstance()
     yarg.setMotionSelectionMode(this.config.getMotionGroupSelectionMode())
-    yarg.setDisabledMotionCues(this.config.getDisabledMotionCues() ?? {})
+    yarg.setDisabledMotionCues(this.config.getPreference('cueDomains').yargMotion.disabledCues)
     audio.setMotionSelectionMode(this.config.getAudioMotionGroupSelectionMode())
-    audio.setDisabledMotionCues(this.config.getDisabledAudioMotionCues() ?? {})
+    audio.setDisabledMotionCues(this.config.getPreference('cueDomains').audioMotion.disabledCues)
     console.log('YARG + Audio motion registries initialized (selection modes from preferences).')
   }
 
@@ -355,26 +360,29 @@ export class ControllerManager {
   private async applyYargEnabledGroupsFromConfig(): Promise<void> {
     const registry = YargCueRegistry.getInstance()
     const registeredIds = registry.getAllGroups()
-    let enabledGroupIds = this.config.getEnabledCueGroups()
-    const knownGroups = this.config.getKnownYargCueGroups() ?? []
+    const yargDomain = this.config.getPreference('cueDomains').yarg
+    let enabledGroupIds = yargDomain.enabledGroups ?? []
+    const knownGroups = yargDomain.knownGroups ?? []
 
-    if (enabledGroupIds === undefined) {
+    if (!enabledGroupIds || enabledGroupIds.length === 0) {
       enabledGroupIds = registeredIds
-      await this.config.setEnabledCueGroups(enabledGroupIds)
+      if (registeredIds.length > 0) {
+        await this.config.updateCueDomain('yarg', { enabledGroups: enabledGroupIds })
+      }
     } else {
       const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
       if (newGroups.length > 0) {
         enabledGroupIds = [...enabledGroupIds, ...newGroups]
-        await this.config.setEnabledCueGroups(enabledGroupIds)
+        await this.config.updateCueDomain('yarg', { enabledGroups: enabledGroupIds })
       }
     }
 
-    await this.config.setKnownYargCueGroups(registeredIds)
+    await this.config.updateCueDomain('yarg', { knownGroups: registeredIds })
     const restricted = enabledGroupIds.filter((id) => registeredIds.includes(id))
     registry.setEnabledGroups(restricted)
     console.log('CueRegistry enabled groups re-applied from config:', restricted)
 
-    const disabledYarg = this.config.getDisabledYargCues() ?? {}
+    const disabledYarg = this.config.getPreference('cueDomains').yarg.disabledCues
     registry.setDisabledCues(disabledYarg)
   }
 
@@ -386,25 +394,26 @@ export class ControllerManager {
   private async applyAudioEnabledGroupsFromConfig(): Promise<void> {
     const registry = AudioCueRegistry.getInstance()
     const registeredIds = registry.getRegisteredGroups()
-    let enabledGroupIds = this.config.getEnabledAudioCueGroups()
-    const knownGroups = this.config.getKnownAudioCueGroups() ?? []
+    const audioDomain = this.config.getPreference('cueDomains').audio
+    let enabledGroupIds = audioDomain.enabledGroups
+    const knownGroups = audioDomain.knownGroups ?? []
 
     if (!enabledGroupIds || enabledGroupIds.length === 0) {
       enabledGroupIds = registeredIds
       if (registeredIds.length > 0) {
-        await this.config.setEnabledAudioCueGroups(enabledGroupIds)
+        await this.config.updateCueDomain('audio', { enabledGroups: enabledGroupIds })
       }
     } else {
       const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
       if (newGroups.length > 0) {
         enabledGroupIds = [...enabledGroupIds, ...newGroups]
-        await this.config.setEnabledAudioCueGroups(enabledGroupIds)
+        await this.config.updateCueDomain('audio', { enabledGroups: enabledGroupIds })
       }
     }
 
-    await this.config.setKnownAudioCueGroups(registeredIds)
+    await this.config.updateCueDomain('audio', { knownGroups: registeredIds })
     registry.setEnabledGroups(enabledGroupIds)
-    const disabledAudio = this.config.getDisabledAudioCues() ?? {}
+    const disabledAudio = this.config.getPreference('cueDomains').audio.disabledCues
     registry.setDisabledCues(disabledAudio)
     console.log('AudioCueRegistry enabled groups re-applied from config:', enabledGroupIds)
     this.refreshAudioCueSelection()
@@ -416,25 +425,26 @@ export class ControllerManager {
   private async applyYargMotionEnabledGroupsFromConfig(): Promise<void> {
     const registry = YargCueRegistry.getInstance()
     const registeredIds = registry.getRegisteredMotionGroupIds()
-    let enabledGroupIds = this.config.getEnabledMotionCueGroups()
-    const knownGroups = this.config.getKnownMotionCueGroups() ?? []
+    const motionDomain = this.config.getPreference('cueDomains').yargMotion
+    let enabledGroupIds = motionDomain.enabledGroups
+    const knownGroups = motionDomain.knownGroups ?? []
 
     if (!enabledGroupIds || enabledGroupIds.length === 0) {
       enabledGroupIds = registeredIds
       if (registeredIds.length > 0) {
-        await this.config.setEnabledMotionCueGroups(enabledGroupIds)
+        await this.config.updateCueDomain('yargMotion', { enabledGroups: enabledGroupIds })
       }
     } else {
       const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
       if (newGroups.length > 0) {
         enabledGroupIds = [...enabledGroupIds, ...newGroups]
-        await this.config.setEnabledMotionCueGroups(enabledGroupIds)
+        await this.config.updateCueDomain('yargMotion', { enabledGroups: enabledGroupIds })
       }
     }
 
-    await this.config.setKnownMotionCueGroups(registeredIds)
+    await this.config.updateCueDomain('yargMotion', { knownGroups: registeredIds })
     registry.setEnabledMotionGroups(enabledGroupIds)
-    const disabledMotion = this.config.getDisabledMotionCues() ?? {}
+    const disabledMotion = this.config.getPreference('cueDomains').yargMotion.disabledCues
     registry.setDisabledMotionCues(disabledMotion)
     console.log('YARG motion enabled groups re-applied from config:', enabledGroupIds)
   }
@@ -445,25 +455,26 @@ export class ControllerManager {
   private async applyAudioMotionEnabledGroupsFromConfig(): Promise<void> {
     const registry = AudioCueRegistry.getInstance()
     const registeredIds = registry.getRegisteredMotionGroupIds()
-    let enabledGroupIds = this.config.getEnabledAudioMotionCueGroups()
-    const knownGroups = this.config.getKnownAudioMotionCueGroups() ?? []
+    const audioMotionDomain = this.config.getPreference('cueDomains').audioMotion
+    let enabledGroupIds = audioMotionDomain.enabledGroups
+    const knownGroups = audioMotionDomain.knownGroups ?? []
 
     if (!enabledGroupIds || enabledGroupIds.length === 0) {
       enabledGroupIds = registeredIds
       if (registeredIds.length > 0) {
-        await this.config.setEnabledAudioMotionCueGroups(enabledGroupIds)
+        await this.config.updateCueDomain('audioMotion', { enabledGroups: enabledGroupIds })
       }
     } else {
       const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
       if (newGroups.length > 0) {
         enabledGroupIds = [...enabledGroupIds, ...newGroups]
-        await this.config.setEnabledAudioMotionCueGroups(enabledGroupIds)
+        await this.config.updateCueDomain('audioMotion', { enabledGroups: enabledGroupIds })
       }
     }
 
-    await this.config.setKnownAudioMotionCueGroups(registeredIds)
+    await this.config.updateCueDomain('audioMotion', { knownGroups: registeredIds })
     registry.setEnabledMotionGroups(enabledGroupIds)
-    const disabledMotion = this.config.getDisabledAudioMotionCues() ?? {}
+    const disabledMotion = this.config.getPreference('cueDomains').audioMotion.disabledCues
     registry.setDisabledMotionCues(disabledMotion)
     console.log('Audio motion enabled groups re-applied from config:', enabledGroupIds)
   }
@@ -534,11 +545,15 @@ export class ControllerManager {
 
     // Create cue handler (default to YARG)
     const yargHandler = new YargCueHandler(this.dmxLightManager, this.effectsController, {
-      getMotionCueMinimumHoldMs: () => this.config.getMotionCueMinimumHoldMs(),
-      getMotionCueProbabilityPercent: () => this.config.getMotionCueProbabilityPercent(),
+      getMotionCueMinimumHoldMs: () =>
+        this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+      getMotionCueProbabilityPercent: () =>
+        this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
     })
-    yargHandler.setMotionEnabled(this.config.getMotionEnabled())
-    yargHandler.setManualMotionRef(this.config.getActiveYargMotionCueRef() ?? null)
+    yargHandler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
+    yargHandler.setManualMotionRef(
+      this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
+    )
     this.cueHandler = yargHandler
   }
 

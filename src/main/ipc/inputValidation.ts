@@ -12,6 +12,11 @@ import type {
 import { ConfigStrobeType } from '../../photonics-dmx/types'
 import type { AppPreferences } from '../../services/configuration/ConfigurationManager'
 import {
+  CUE_DOMAINS,
+  type CueDomain,
+  type CueDomainPrefs,
+} from '../../services/configuration/cueDomainTypes'
+import {
   AUDIO_BAND_GAIN_MAX,
   AUDIO_BAND_GAIN_MIN,
   type AudioGameModeConfig,
@@ -352,6 +357,111 @@ export function validatePathUnderAllowedRoots(
   return { ok: true, value: resolvedTarget }
 }
 
+function isStringArray(x: unknown): x is string[] {
+  return Array.isArray(x) && x.every((e) => typeof e === 'string')
+}
+
+/**
+ * Accepts a partial per-domain update for SAVE_PREFS (merged server-side with stored cueDomains).
+ */
+function validateCueDomainsPayload(
+  data: unknown,
+): ValidationResult<Partial<Record<CueDomain, Partial<CueDomainPrefs>>>> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'cueDomains must be a plain object' }
+  }
+  const src = data
+  const out: Partial<Record<CueDomain, Partial<CueDomainPrefs>>> = {}
+  for (const d of CUE_DOMAINS) {
+    if (!(d in src) || src[d] == null) {
+      continue
+    }
+    if (!isPlainObject(src[d])) {
+      return { ok: false, error: `cueDomains.${d} must be an object` }
+    }
+    const o = src[d] as Record<string, unknown>
+    const partial: Partial<CueDomainPrefs> = {}
+    if (o.enabledGroups != null) {
+      if (!isStringArray(o.enabledGroups)) {
+        return { ok: false, error: `cueDomains.${d}.enabledGroups must be a string[]` }
+      }
+      partial.enabledGroups = o.enabledGroups
+    }
+    if (o.knownGroups != null) {
+      if (!isStringArray(o.knownGroups)) {
+        return { ok: false, error: `cueDomains.${d}.knownGroups must be a string[]` }
+      }
+      partial.knownGroups = o.knownGroups
+    }
+    if (o.disabledCues != null) {
+      if (!isPlainObject(o.disabledCues)) {
+        return { ok: false, error: `cueDomains.${d}.disabledCues must be an object` }
+      }
+      for (const v of Object.values(o.disabledCues)) {
+        if (!isStringArray(v)) {
+          return { ok: false, error: `cueDomains.${d}.disabledCues values must be string[]` }
+        }
+      }
+
+      partial.disabledCues = o.disabledCues as Record<string, string[]>
+    }
+    if (o.selectionMode != null) {
+      if (
+        o.selectionMode !== 'oncePerSong' &&
+        o.selectionMode !== 'perCueChange' &&
+        o.selectionMode !== 'withinSong' &&
+        o.selectionMode !== 'none'
+      ) {
+        return { ok: false, error: `cueDomains.${d}.selectionMode is invalid` }
+      }
+      partial.selectionMode = o.selectionMode
+    }
+    if ('activeCueRef' in o) {
+      const ar = o.activeCueRef
+      if (ar === null) {
+        partial.activeCueRef = null
+      } else if (
+        isPlainObject(ar) &&
+        typeof ar.groupId === 'string' &&
+        typeof ar.cueId === 'string'
+      ) {
+        partial.activeCueRef = { groupId: ar.groupId, cueId: ar.cueId }
+      } else {
+        return { ok: false, error: `cueDomains.${d}.activeCueRef is invalid` }
+      }
+    }
+    if (o.probabilityPercent != null) {
+      if (typeof o.probabilityPercent !== 'number' || Number.isNaN(o.probabilityPercent)) {
+        return { ok: false, error: `cueDomains.${d}.probabilityPercent must be a number` }
+      }
+      const r = validateNumberInRange(
+        o.probabilityPercent,
+        0,
+        100,
+        `cueDomains.${d}.probabilityPercent`,
+      )
+      if (!r.ok) {
+        return r
+      }
+      partial.probabilityPercent = Math.round(r.value)
+    }
+    if (o.minimumHoldMs != null) {
+      if (typeof o.minimumHoldMs !== 'number' || Number.isNaN(o.minimumHoldMs)) {
+        return { ok: false, error: `cueDomains.${d}.minimumHoldMs must be a number` }
+      }
+      const r = validateNumberInRange(o.minimumHoldMs, 0, 600000, `cueDomains.${d}.minimumHoldMs`)
+      if (!r.ok) {
+        return r
+      }
+      partial.minimumHoldMs = Math.round(r.value)
+    }
+    if (Object.keys(partial).length > 0) {
+      out[d] = partial
+    }
+  }
+  return { ok: true, value: out }
+}
+
 const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'effectDebounce',
   'complex',
@@ -360,15 +470,8 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'artNetConfig',
   'sacnConfig',
   'brightness',
-  'enabledCueGroups',
-  'knownYargCueGroups',
-  'enabledAudioCueGroups',
-  'knownAudioCueGroups',
+  'cueDomains',
   'cueConsistencyWindow',
-  'motionCueMinimumHoldMs',
-  'motionCueProbabilityPercent',
-  'audioMotionCueProbabilityPercent',
-  'cueGroupSelectionMode',
   'clockRate',
   'dmxOutputConfig',
   'stageKitPrefs',
@@ -378,8 +481,6 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'activeAudioCueType',
   'audioGameMode',
   'motionEnabled',
-  'activeAudioMotionCueRef',
-  'activeYargMotionCueRef',
   'simulationSettings',
   'leftMenuCollapsed',
   'windowState',
@@ -415,37 +516,12 @@ export function validatePreferencesPayload(
     cleaned.cueConsistencyWindow = Math.round(v.value)
   }
 
-  if ('motionCueMinimumHoldMs' in cleaned) {
-    const v = validateNumberInRange(
-      cleaned.motionCueMinimumHoldMs,
-      0,
-      600000,
-      'motionCueMinimumHoldMs',
-    )
-    if (!v.ok) return v
-    cleaned.motionCueMinimumHoldMs = Math.round(v.value)
-  }
-
-  if ('motionCueProbabilityPercent' in cleaned) {
-    const v = validateNumberInRange(
-      cleaned.motionCueProbabilityPercent,
-      0,
-      100,
-      'motionCueProbabilityPercent',
-    )
-    if (!v.ok) return v
-    cleaned.motionCueProbabilityPercent = Math.round(v.value)
-  }
-
-  if ('audioMotionCueProbabilityPercent' in cleaned) {
-    const v = validateNumberInRange(
-      cleaned.audioMotionCueProbabilityPercent,
-      0,
-      100,
-      'audioMotionCueProbabilityPercent',
-    )
-    if (!v.ok) return v
-    cleaned.audioMotionCueProbabilityPercent = Math.round(v.value)
+  if ('cueDomains' in cleaned) {
+    const d = validateCueDomainsPayload(cleaned.cueDomains)
+    if (!d.ok) {
+      return d
+    }
+    cleaned.cueDomains = d.value
   }
 
   return { ok: true, value: cleaned as Partial<AppPreferences> }

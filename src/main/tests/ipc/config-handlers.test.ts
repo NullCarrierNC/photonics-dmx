@@ -9,19 +9,35 @@ const mockIpcMain = {
   on: jest.fn() as jest.MockedFunction<any>,
 }
 
+const baseCueDomains = () => ({
+  yarg: { disabledCues: {} as Record<string, string[]> },
+  audio: { disabledCues: {} as Record<string, string[]> },
+  yargMotion: {
+    activeCueRef: null as { groupId: string; cueId: string } | null,
+    disabledCues: {} as Record<string, string[]>,
+  },
+  audioMotion: {
+    activeCueRef: null as { groupId: string; cueId: string } | null,
+    disabledCues: {} as Record<string, string[]>,
+  },
+})
+
 const mockConfig = {
-  getMotionEnabled: jest.fn().mockReturnValue(true),
-  setMotionEnabled: jest.fn(async (_enabled: boolean) => {}) as jest.MockedFunction<
-    (enabled: boolean) => Promise<void>
+  getPreference: jest.fn().mockImplementation((key: unknown) => {
+    if (key === 'motionEnabled') {
+      return true
+    }
+    if (key === 'cueDomains') {
+      return baseCueDomains()
+    }
+    return undefined
+  }),
+  setPreference: jest.fn(async () => {}) as jest.MockedFunction<
+    (key: string, value: unknown) => Promise<void>
   >,
-  getActiveAudioMotionCueRef: jest.fn().mockReturnValue(null),
-  setActiveAudioMotionCueRef: jest.fn(
-    async (_ref: { groupId: string; cueId: string } | null) => {},
-  ) as jest.MockedFunction<(ref: { groupId: string; cueId: string } | null) => Promise<void>>,
-  getActiveYargMotionCueRef: jest.fn().mockReturnValue(null),
-  setActiveYargMotionCueRef: jest.fn(
-    async (_ref: { groupId: string; cueId: string } | null) => {},
-  ) as jest.MockedFunction<(ref: { groupId: string; cueId: string } | null) => Promise<void>>,
+  updateCueDomain: jest.fn(async () => {}) as jest.MockedFunction<
+    (domain: string, patch: Record<string, unknown>) => Promise<void>
+  >,
   getDmxRig: jest.fn(),
   saveDmxRig: jest.fn(async () => {}),
   deleteDmxRig: jest.fn(async () => {}),
@@ -94,30 +110,37 @@ describe('CONFIG motion IPC (config-handlers)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockConfig.getMotionEnabled.mockReturnValue(true)
-    mockConfig.getActiveAudioMotionCueRef.mockReturnValue(null)
-    mockConfig.setMotionEnabled.mockImplementation(async () => {})
-    mockConfig.setActiveAudioMotionCueRef.mockImplementation(async () => {})
-    mockConfig.getActiveYargMotionCueRef.mockReturnValue(null)
-    mockConfig.setActiveYargMotionCueRef.mockImplementation(async () => {})
+    mockConfig.getPreference.mockImplementation((key: unknown) => {
+      if (key === 'motionEnabled') {
+        return true
+      }
+      if (key === 'cueDomains') {
+        return baseCueDomains()
+      }
+      return undefined
+    })
+    mockConfig.setPreference.mockImplementation(async () => {})
+    mockConfig.updateCueDomain.mockImplementation(async () => {})
     handlers = captureHandlers()
     setupConfigHandlers(mockIpcMain as any, mockControllerManager as any)
   })
 
   describe('GET_MOTION_ENABLED / SET_MOTION_ENABLED', () => {
     it('GET_MOTION_ENABLED returns value from ConfigurationManager', async () => {
-      mockConfig.getMotionEnabled.mockReturnValue(false)
+      mockConfig.getPreference.mockImplementation((key: unknown) =>
+        key === 'motionEnabled' ? false : undefined,
+      )
       const handler = handlers.get(CONFIG.GET_MOTION_ENABLED)!
       const result = await handler({}, undefined)
       expect(result).toBe(false)
-      expect(mockConfig.getMotionEnabled).toHaveBeenCalled()
+      expect(mockConfig.getPreference).toHaveBeenCalledWith('motionEnabled')
     })
 
     it('SET_MOTION_ENABLED persists, applies handlers, and broadcasts', async () => {
       const handler = handlers.get(CONFIG.SET_MOTION_ENABLED)!
       const result = await handler({}, false)
       expect(result).toEqual({ success: true })
-      expect(mockConfig.setMotionEnabled).toHaveBeenCalledWith(false)
+      expect(mockConfig.setPreference).toHaveBeenCalledWith('motionEnabled', false)
       expect(mockControllerManager.setMotionEnabledGlobal).toHaveBeenCalledWith(false)
       expect(mockSendToAllWindows).toHaveBeenCalledWith(
         RENDERER_RECEIVE.MOTION_ENABLED_CHANGED,
@@ -129,7 +152,7 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       const handler = handlers.get(CONFIG.SET_MOTION_ENABLED)!
       const result = await handler({}, 'yes')
       expect(result).toMatchObject({ success: false, error: expect.any(String) })
-      expect(mockConfig.setMotionEnabled).not.toHaveBeenCalled()
+      expect(mockConfig.setPreference).not.toHaveBeenCalled()
       expect(mockControllerManager.setMotionEnabledGlobal).not.toHaveBeenCalled()
       expect(mockSendToAllWindows).not.toHaveBeenCalled()
     })
@@ -138,7 +161,11 @@ describe('CONFIG motion IPC (config-handlers)', () => {
   describe('GET_ACTIVE_AUDIO_MOTION_CUE / SET_ACTIVE_AUDIO_MOTION_CUE', () => {
     it('GET_ACTIVE_AUDIO_MOTION_CUE returns ref from ConfigurationManager', async () => {
       const ref = { groupId: 'g-audio', cueId: 'cue-1' }
-      mockConfig.getActiveAudioMotionCueRef.mockReturnValue(ref)
+      const cd = baseCueDomains()
+      cd.audioMotion.activeCueRef = ref
+      mockConfig.getPreference.mockImplementation((key: unknown) =>
+        key === 'cueDomains' ? cd : undefined,
+      )
       const handler = handlers.get(CONFIG.GET_ACTIVE_AUDIO_MOTION_CUE)!
       const result = await handler({}, undefined)
       expect(result).toEqual(ref)
@@ -148,9 +175,8 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       const handler = handlers.get(CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE)!
       const result = await handler({}, { groupId: '  g1  ', cueId: ' c1 ' })
       expect(result).toEqual({ success: true })
-      expect(mockConfig.setActiveAudioMotionCueRef).toHaveBeenCalledWith({
-        groupId: 'g1',
-        cueId: 'c1',
+      expect(mockConfig.updateCueDomain).toHaveBeenCalledWith('audioMotion', {
+        activeCueRef: { groupId: 'g1', cueId: 'c1' },
       })
       expect(mockControllerManager.setActiveAudioMotionCueRef).toHaveBeenCalledWith({
         groupId: 'g1',
@@ -162,7 +188,7 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       const handler = handlers.get(CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE)!
       const result = await handler({}, null)
       expect(result).toEqual({ success: true })
-      expect(mockConfig.setActiveAudioMotionCueRef).toHaveBeenCalledWith(null)
+      expect(mockConfig.updateCueDomain).toHaveBeenCalledWith('audioMotion', { activeCueRef: null })
       expect(mockControllerManager.setActiveAudioMotionCueRef).toHaveBeenCalledWith(null)
     })
 
@@ -170,21 +196,25 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       const handler = handlers.get(CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE)!
       const result = await handler({}, 'not-an-object')
       expect(result).toMatchObject({ success: false })
-      expect(mockConfig.setActiveAudioMotionCueRef).not.toHaveBeenCalled()
+      expect(mockConfig.updateCueDomain).not.toHaveBeenCalled()
     })
 
     it('SET_ACTIVE_AUDIO_MOTION_CUE rejects empty groupId or cueId after trim', async () => {
       const handler = handlers.get(CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE)!
       const result = await handler({}, { groupId: '', cueId: 'x' })
       expect(result).toMatchObject({ success: false })
-      expect(mockConfig.setActiveAudioMotionCueRef).not.toHaveBeenCalled()
+      expect(mockConfig.updateCueDomain).not.toHaveBeenCalled()
     })
   })
 
   describe('GET_ACTIVE_YARG_MOTION_CUE / SET_ACTIVE_YARG_MOTION_CUE', () => {
     it('GET_ACTIVE_YARG_MOTION_CUE returns ref from ConfigurationManager', async () => {
       const ref = { groupId: 'g-yarg', cueId: 'cue-m1' }
-      mockConfig.getActiveYargMotionCueRef.mockReturnValue(ref)
+      const cd = baseCueDomains()
+      cd.yargMotion.activeCueRef = ref
+      mockConfig.getPreference.mockImplementation((key: unknown) =>
+        key === 'cueDomains' ? cd : undefined,
+      )
       const handler = handlers.get(CONFIG.GET_ACTIVE_YARG_MOTION_CUE)!
       const result = await handler({}, undefined)
       expect(result).toEqual(ref)
@@ -194,9 +224,8 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       const handler = handlers.get(CONFIG.SET_ACTIVE_YARG_MOTION_CUE)!
       const result = await handler({}, { groupId: '  g1  ', cueId: ' c1 ' })
       expect(result).toEqual({ success: true })
-      expect(mockConfig.setActiveYargMotionCueRef).toHaveBeenCalledWith({
-        groupId: 'g1',
-        cueId: 'c1',
+      expect(mockConfig.updateCueDomain).toHaveBeenCalledWith('yargMotion', {
+        activeCueRef: { groupId: 'g1', cueId: 'c1' },
       })
       expect(mockControllerManager.setActiveYargMotionCueRef).toHaveBeenCalledWith({
         groupId: 'g1',
@@ -208,7 +237,7 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       const handler = handlers.get(CONFIG.SET_ACTIVE_YARG_MOTION_CUE)!
       const result = await handler({}, null)
       expect(result).toEqual({ success: true })
-      expect(mockConfig.setActiveYargMotionCueRef).toHaveBeenCalledWith(null)
+      expect(mockConfig.updateCueDomain).toHaveBeenCalledWith('yargMotion', { activeCueRef: null })
       expect(mockControllerManager.setActiveYargMotionCueRef).toHaveBeenCalledWith(null)
     })
 
@@ -216,14 +245,14 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       const handler = handlers.get(CONFIG.SET_ACTIVE_YARG_MOTION_CUE)!
       const result = await handler({}, 'not-an-object')
       expect(result).toMatchObject({ success: false })
-      expect(mockConfig.setActiveYargMotionCueRef).not.toHaveBeenCalled()
+      expect(mockConfig.updateCueDomain).not.toHaveBeenCalled()
     })
 
     it('SET_ACTIVE_YARG_MOTION_CUE rejects empty groupId or cueId after trim', async () => {
       const handler = handlers.get(CONFIG.SET_ACTIVE_YARG_MOTION_CUE)!
       const result = await handler({}, { groupId: '', cueId: 'x' })
       expect(result).toMatchObject({ success: false })
-      expect(mockConfig.setActiveYargMotionCueRef).not.toHaveBeenCalled()
+      expect(mockConfig.updateCueDomain).not.toHaveBeenCalled()
     })
   })
 })

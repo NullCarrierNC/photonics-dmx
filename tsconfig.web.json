@@ -7,6 +7,7 @@
     "src/preload/*.d.ts",
     "src/photonics-dmx/**/*",
     "src/mocks/**/*",
+    "src/services/**/*",
     "src/shared/**/*"
   ],
   "compilerOptions": {
@@ -14,9 +15,7 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@renderer/*": [
-        "src/renderer/src/*"
-      ]
+      "@renderer/*": ["src/renderer/src/*"]
     },
     "strictNullChecks": true
   }

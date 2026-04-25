@@ -51,15 +51,15 @@ export class AudioController {
     const audioConfig = this.deps.config.getAudioConfig()
     try {
       console.log('Enabling audio with Web Audio API...')
-      const preferredCueType = this.deps.config.getActiveAudioCueType()
+      const preferredCueType = this.deps.config.getPreference('activeAudioCueType')
       this.audioProcessor = new AudioCueProcessor(
         dmxLightManager,
         effectsController,
         audioConfig,
         preferredCueType,
         null,
-        () => this.deps.config.getMotionCueMinimumHoldMs(),
-        () => this.deps.config.getAudioMotionCueProbabilityPercent(),
+        () => this.deps.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+        () => this.deps.config.getPreference('cueDomains').audioMotion.probabilityPercent ?? 100,
       )
       this.audioProcessor.setOnStrobeStateChange((active) => {
         const strobeCueType = this.audioProcessor?.getEffectiveStrobeCueType() ?? null
@@ -73,14 +73,19 @@ export class AudioController {
           activeCueType,
         })
       })
-      this.audioProcessor.setMotionEnabled(this.deps.config.getMotionEnabled())
-      this.audioProcessor.setManualMotionRef(this.deps.config.getActiveAudioMotionCueRef() ?? null)
+      this.audioProcessor.setMotionEnabled(this.deps.config.getPreference('motionEnabled') ?? true)
+      this.audioProcessor.setManualMotionRef(
+        this.deps.config.getPreference('cueDomains').audioMotion.activeCueRef ?? null,
+      )
       this.audioProcessor.start()
       const gameMode = this.deps.config.getAudioGameModeConfig()
       if (gameMode.enabled) {
         this.audioProcessor.enableGameMode(gameMode)
       } else {
-        await this.deps.config.setActiveAudioCueType(this.audioProcessor.getManualPrimaryCueType())
+        await this.deps.config.setPreference(
+          'activeAudioCueType',
+          this.audioProcessor.getManualPrimaryCueType(),
+        )
       }
       if (this.audioDataHandler) {
         ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
@@ -152,7 +157,10 @@ export class AudioController {
     if (this.audioProcessor) {
       this.audioProcessor.refreshCueSelection()
       if (!this.deps.config.getAudioGameModeConfig().enabled) {
-        void this.deps.config.setActiveAudioCueType(this.audioProcessor.getManualPrimaryCueType())
+        void this.deps.config.setPreference(
+          'activeAudioCueType',
+          this.audioProcessor.getManualPrimaryCueType(),
+        )
       }
     }
   }
@@ -195,7 +203,7 @@ export class AudioController {
     if (this.audioProcessor) {
       return this.audioProcessor.getCurrentCueType()
     }
-    const saved = this.deps.config.getActiveAudioCueType()
+    const saved = this.deps.config.getPreference('activeAudioCueType')
     if (saved) {
       return saved
     }
@@ -220,7 +228,9 @@ export class AudioController {
         error: `Cue ${cueType} is not available in enabled groups`,
       }
     }
-    this.deps.config.setActiveAudioCueType(cueType)
+    void this.deps.config.setPreference('activeAudioCueType', cueType).catch((err) => {
+      console.error('Failed to persist active audio cue type:', err)
+    })
     if (this.audioProcessor) {
       const applied = this.audioProcessor.setActiveCueType(cueType)
       if (!applied) {

@@ -1,4 +1,5 @@
 import { ConfigFile } from './ConfigFile'
+import { PreferencesConfigFile } from './PreferencesConfigFile'
 import {
   DmxFixture,
   LightingConfiguration,
@@ -14,204 +15,23 @@ import {
   type AudioGameModeConfig,
   DEFAULT_AUDIO_GAME_MODE,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
+import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
+import { type CueDomain, type CueDomainPrefs, mergePartialCueDomains } from './cueDomainTypes'
+import {
+  applyLegacySenderFlatToNested,
+  hasStraySenderFlatKeys,
+  LEGACY_FLAT_SENDER_PREF_KEYS,
+} from './preferencesMigration'
 
-/**
- * Application preferences interface
- */
-export interface AppPreferences {
-  effectDebounce: number
-  complex: boolean
-  enttecProConfig?: {
-    port: string
-  }
-  openDmxConfig?: {
-    port: string
-    dmxSpeed: number
-  }
-  artNetConfig?: {
-    host: string
-    universe: number
-    net: number
-    subnet: number
-    subuni: number
-    port: number
-  }
-  sacnConfig?: {
-    universe: number
-    networkInterface?: string
-    unicastDestination?: string
-    useUnicast: boolean
-  }
-  brightness?: {
-    low: number
-    medium: number
-    high: number
-    max: number
-  }
-  enabledCueGroups: string[]
-  /** IDs of Yarg cue groups we have seen before; used to auto-enable only genuinely new groups */
-  knownYargCueGroups?: string[]
-  enabledAudioCueGroups?: string[]
-  /** IDs of audio cue groups we have seen before; used to auto-enable only genuinely new groups */
-  knownAudioCueGroups?: string[]
-  /** Per-group list of disabled cue IDs (YARG cue type strings) */
-  disabledYargCues?: Record<string, string[]>
-  /** Per-group list of disabled audio cue type IDs */
-  disabledAudioCues?: Record<string, string[]>
-  enabledMotionCueGroups?: string[]
-  /** IDs of motion cue groups seen in past runs; used to auto-enable only genuinely new groups */
-  knownMotionCueGroups?: string[]
-  /** Per-group list of disabled motion cue definition ids */
-  disabledMotionCues?: Record<string, string[]>
-  /** YARG motion: perCueChange = random each lighting cue; oncePerSong = lock motion program for the song; none = no automatic motion */
-  motionGroupSelectionMode?: 'oncePerSong' | 'perCueChange' | 'none'
-  enabledAudioMotionCueGroups?: string[]
-  knownAudioMotionCueGroups?: string[]
-  disabledAudioMotionCues?: Record<string, string[]>
-  /** Audio-reactive motion (parallel layer with lighting audio cues). */
-  audioMotionGroupSelectionMode?: 'oncePerSong' | 'perCueChange' | 'none'
-  /** Master switch: when false, YARG and audio automatic motion layers are off. Default true. */
-  motionEnabled?: boolean
-  /** Manual audio motion cue (null = auto random on primary change). */
-  activeAudioMotionCueRef?: { groupId: string; cueId: string } | null
-  /** Manual YARG motion cue (null = auto random on new primary cue). */
-  activeYargMotionCueRef?: { groupId: string; cueId: string } | null
-  cueConsistencyWindow: number
-  /** Minimum time (ms) the current motion cue must run before auto re-pick on lighting/primary change. Manual motion selection is not gated. */
-  motionCueMinimumHoldMs?: number
-  /** Probability (0-100) that an automatic YARG motion cue pick will play on a new lighting cue. A failed roll stops motion and returns fixtures to home. Manual motion selection bypasses the roll. Default 100. */
-  motionCueProbabilityPercent?: number
-  /** Probability (0-100) that an automatic audio motion cue pick will play on a primary cue change. A failed roll stops motion and returns fixtures to home. Manual motion selection bypasses the roll. Default 100. */
-  audioMotionCueProbabilityPercent?: number
-  /** Cue group selection: 'withinSong' = can change during song; 'oncePerSong' = fixed at song start */
-  cueGroupSelectionMode: 'oncePerSong' | 'withinSong'
-  clockRate: number
-
-  // Frontend-specific preferences
-  dmxOutputConfig?: {
-    sacnEnabled: boolean
-    artNetEnabled: boolean
-    enttecProEnabled: boolean
-    openDmxEnabled: boolean
-  }
-  stageKitPrefs?: {
-    yargPriority: 'prefer-for-tracked' | 'random' | 'never'
-  }
-  dmxSettingsPrefs?: {
-    artNetExpanded: boolean
-    enttecProExpanded: boolean
-    sacnExpanded: boolean
-    openDmxExpanded: boolean
-  }
-  allowMultipleActiveRigs?: boolean
-  audioConfig?: AudioConfig
-  activeAudioCueType?: AudioCueType
-  audioGameMode?: AudioGameModeConfig
-  simulationSettings?: {
-    registryType: 'YARG' | 'RB3E'
-    groupId: string
-    effectId: string | null
-    venueSize: 'NoVenue' | 'Small' | 'Large'
-    bpm: number
-    instrument: 'guitar' | 'bass' | 'keys' | 'drums'
-  }
-  leftMenuCollapsed?: boolean
-  windowState?: {
-    width: number
-    height: number
-    x?: number
-    y?: number
-  }
-  cueEditorWindowState?: {
-    width: number
-    height: number
-    x?: number
-    y?: number
-  }
-  audioPreviewWindowState?: {
-    width: number
-    height: number
-    x?: number
-    y?: number
-  }
-}
+export type { AppPreferences } from './configurationDefaults'
+export type { CueDomain, CueDomainPrefs } from './cueDomainTypes'
 
 /**
  * User's lights configuration interface
  */
 export interface UserLightsConfig {
   lights: DmxFixture[]
-}
-
-/**
- * Default configurations
- */
-const DEFAULT_PREFERENCES: AppPreferences = {
-  effectDebounce: 0,
-  complex: true,
-  enabledCueGroups: ['stagekit'],
-  enabledAudioCueGroups: [],
-  cueConsistencyWindow: 60000,
-  motionCueMinimumHoldMs: 5000,
-  motionCueProbabilityPercent: 100,
-  audioMotionCueProbabilityPercent: 100,
-  motionGroupSelectionMode: 'perCueChange',
-  motionEnabled: true,
-  activeAudioMotionCueRef: null,
-  activeYargMotionCueRef: null,
-  cueGroupSelectionMode: 'withinSong',
-  clockRate: 10, // 10ms (100 Hz) for smooth animations and strobe cues
-  activeAudioCueType: '' as AudioCueType,
-  audioGameMode: DEFAULT_AUDIO_GAME_MODE,
-
-  // Brightness configuration defaults
-  brightness: {
-    low: 40,
-    medium: 100,
-    high: 180,
-    max: 255,
-  },
-
-  // Frontend-specific preferences defaults
-  dmxOutputConfig: {
-    sacnEnabled: true,
-    artNetEnabled: false,
-    enttecProEnabled: false,
-    openDmxEnabled: false,
-  },
-  enttecProConfig: {
-    port: '',
-  },
-  openDmxConfig: {
-    port: '',
-    dmxSpeed: 40,
-  },
-  sacnConfig: {
-    universe: 1,
-    useUnicast: false,
-    unicastDestination: '',
-  },
-  stageKitPrefs: {
-    yargPriority: 'prefer-for-tracked',
-  },
-  dmxSettingsPrefs: {
-    artNetExpanded: false,
-    enttecProExpanded: false,
-    sacnExpanded: false,
-    openDmxExpanded: false,
-  },
-  allowMultipleActiveRigs: false,
-  audioConfig: DEFAULT_AUDIO_CONFIG,
-  cueEditorWindowState: {
-    width: 1200,
-    height: 900,
-  },
-  audioPreviewWindowState: {
-    width: 560,
-    height: 480,
-  },
 }
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {
@@ -238,21 +58,20 @@ const DEFAULT_DMX_RIGS: DmxRigsConfig = {
  * Simplified configuration manager using file-based organization
  */
 export class ConfigurationManager {
-  private preferences: ConfigFile<AppPreferences>
+  private preferences: PreferencesConfigFile
   private userLights: ConfigFile<UserLightsConfig>
   private lightingLayout: ConfigFile<LightingConfiguration>
   private dmxRigs: ConfigFile<DmxRigsConfig>
 
   constructor() {
-    // Initialize config files with version numbers
-    this.preferences = new ConfigFile('prefs.json', DEFAULT_PREFERENCES, 3)
+    this.preferences = new PreferencesConfigFile()
     this.userLights = new ConfigFile('lights.json', DEFAULT_USER_LIGHTS, 1)
     this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1)
     this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1)
 
     // Handle legacy lights format migration
     this.migrateLegacyLightsFormat()
-    this.migrateLegacyPreferences()
+    this.normalizeStraySenderFlatKeys()
     this.migrateToDmxRigs()
   }
 
@@ -278,48 +97,26 @@ export class ConfigurationManager {
   }
 
   /**
-   * Migrates legacy preference structures to the latest schema.
-   * Currently handles the v2 -> v3 transition, where USB sender settings
-   * move from flat fields (enttecProPort/openDmxPort/openDmxSpeed) into
-   * dedicated top-level config objects (enttecProConfig/openDmxConfig).
+   * v4+ prefs already nest USB sender config; if `enttecProPort` / `openDmxPort` / `openDmxSpeed`
+   * appear (e.g. manual file edit or pre-v4 stragglers), fold them into `enttecProConfig` and
+   * `openDmxConfig` and persist. Normal migration runs in PreferencesConfigFile v3→v4.
    */
-  private migrateLegacyPreferences(): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- prefs shape for partial merge
-    const currentPrefs = { ...this.preferences.get() } as any
-    let updated = false
-
-    const defaultEnttecConfig = { port: '' }
-
-    // v2 -> v3: migrate legacy enttecProPort into enttecProConfig
-    if (!currentPrefs.enttecProConfig) {
-      const legacyPort =
-        typeof currentPrefs.enttecProPort === 'string' ? currentPrefs.enttecProPort : ''
-      currentPrefs.enttecProConfig = { ...defaultEnttecConfig, port: legacyPort }
-      updated = true
-    } else if (typeof currentPrefs.enttecProConfig.port !== 'string') {
-      currentPrefs.enttecProConfig = {
-        ...defaultEnttecConfig,
-        ...currentPrefs.enttecProConfig,
-        port:
-          typeof currentPrefs.enttecProConfig.port === 'string'
-            ? currentPrefs.enttecProConfig.port
-            : '',
-      }
-      updated = true
+  private normalizeStraySenderFlatKeys(): void {
+    const full = { ...this.preferences.get() } as unknown as Record<string, unknown>
+    if (!hasStraySenderFlatKeys(full)) {
+      return
     }
 
-    if (currentPrefs.enttecProPort !== undefined) {
-      delete currentPrefs.enttecProPort
-      updated = true
+    const base = { ...this.preferences.get() } as AppPreferences
+    for (const k of LEGACY_FLAT_SENDER_PREF_KEYS) {
+      delete (base as unknown as Record<string, unknown>)[k]
     }
-
-    if (updated) {
-      this.preferences
-        .update(currentPrefs)
-        .catch((err) =>
-          console.error('[Photonics Config] Failed to persist migrated preferences:', err),
-        )
-    }
+    const next = applyLegacySenderFlatToNested(full, base)
+    this.preferences
+      .update(next)
+      .catch((err) =>
+        console.error('[Photonics Config] Failed to persist sender key cleanup:', err),
+      )
   }
 
   /**
@@ -400,7 +197,16 @@ export class ConfigurationManager {
    */
   async updatePreferences(updates: Partial<AppPreferences>): Promise<void> {
     const currentPrefs = this.preferences.get()
-    const newPrefs = { ...currentPrefs, ...updates }
+    let newPrefs: AppPreferences = { ...currentPrefs, ...updates }
+    if (updates.cueDomains) {
+      newPrefs = {
+        ...newPrefs,
+        cueDomains: mergePartialCueDomains(
+          currentPrefs.cueDomains,
+          updates.cueDomains as Partial<Record<CueDomain, Partial<CueDomainPrefs>>>,
+        ),
+      }
+    }
     await this.preferences.update(newPrefs)
   }
 
@@ -411,257 +217,71 @@ export class ConfigurationManager {
     await this.preferences.update(DEFAULT_PREFERENCES)
   }
 
-  // Cue Group Preferences
-
   /**
-   * Gets the enabled cue groups preference.
-   * Returns undefined if it has never been set.
+   * Patch a single `cueDomains` entry. Not a simple `updatePreferences` partial merge: when
+   * `disabledCues` is present, it replaces the stored per-group map for that domain (important for IPC).
    */
-  getEnabledCueGroups(): string[] | undefined {
-    return this.preferences.get().enabledCueGroups
-  }
-
-  /**
-   * Sets the enabled cue groups by their IDs
-   */
-  async setEnabledCueGroups(groupIds: string[]): Promise<void> {
-    await this.setPreference('enabledCueGroups', groupIds)
+  async updateCueDomain(domain: CueDomain, patch: Partial<CueDomainPrefs>): Promise<void> {
+    const current = this.preferences.get()
+    const base = current.cueDomains[domain]
+    const next: CueDomainPrefs = { ...base, ...patch }
+    if (Object.prototype.hasOwnProperty.call(patch, 'disabledCues') && patch.disabledCues) {
+      next.disabledCues = { ...patch.disabledCues }
+    }
+    await this.setPreference('cueDomains', { ...current.cueDomains, [domain]: next })
   }
 
   /**
-   * Gets the known Yarg cue group IDs (discovered in past runs); used to distinguish new groups from user-disabled ones.
+   * YARG *lighting* mode: coerces invalid stored values; use instead of reading `cueDomains` raw.
    */
-  getKnownYargCueGroups(): string[] | undefined {
-    return this.preferences.get().knownYargCueGroups
+  getCueGroupSelectionMode(): 'oncePerSong' | 'withinSong' {
+    const m = this.preferences.get().cueDomains.yarg.selectionMode
+    if (m === 'oncePerSong' || m === 'withinSong') {
+      return m
+    }
+    return 'withinSong'
   }
 
-  /**
-   * Sets the known Yarg cue group IDs (e.g. after loading all groups).
-   */
-  async setKnownYargCueGroups(groupIds: string[]): Promise<void> {
-    await this.setPreference('knownYargCueGroups', groupIds)
-  }
-
-  /**
-   * Gets the known audio cue group IDs (discovered in past runs); used to distinguish new groups from user-disabled ones.
-   */
-  getKnownAudioCueGroups(): string[] | undefined {
-    return this.preferences.get().knownAudioCueGroups
-  }
-
-  /**
-   * Sets the known audio cue group IDs (e.g. after loading all groups).
-   */
-  async setKnownAudioCueGroups(groupIds: string[]): Promise<void> {
-    await this.setPreference('knownAudioCueGroups', groupIds)
-  }
-
-  /**
-   * Gets the enabled audio cue groups preference
-   */
-  getEnabledAudioCueGroups(): string[] | undefined {
-    return this.preferences.get().enabledAudioCueGroups
-  }
-
-  /**
-   * Sets the enabled audio cue groups by their IDs
-   */
-  async setEnabledAudioCueGroups(groupIds: string[]): Promise<void> {
-    await this.setPreference('enabledAudioCueGroups', groupIds)
-  }
-
-  /**
-   * Per-group disabled YARG cue type IDs (empty or missing group = no cues disabled in that group).
-   */
-  getDisabledYargCues(): Record<string, string[]> | undefined {
-    return this.preferences.get().disabledYargCues
-  }
-
-  async setDisabledYargCues(disabled: Record<string, string[]>): Promise<void> {
-    await this.setPreference('disabledYargCues', disabled)
-  }
-
-  /**
-   * Per-group disabled audio cue type IDs.
-   */
-  getDisabledAudioCues(): Record<string, string[]> | undefined {
-    return this.preferences.get().disabledAudioCues
-  }
-
-  async setDisabledAudioCues(disabled: Record<string, string[]>): Promise<void> {
-    await this.setPreference('disabledAudioCues', disabled)
-  }
-
-  getEnabledMotionCueGroups(): string[] | undefined {
-    return this.preferences.get().enabledMotionCueGroups
-  }
-
-  async setEnabledMotionCueGroups(groupIds: string[]): Promise<void> {
-    await this.setPreference('enabledMotionCueGroups', groupIds)
-  }
-
-  getKnownMotionCueGroups(): string[] | undefined {
-    return this.preferences.get().knownMotionCueGroups
-  }
-
-  async setKnownMotionCueGroups(groupIds: string[]): Promise<void> {
-    await this.setPreference('knownMotionCueGroups', groupIds)
-  }
-
-  getDisabledMotionCues(): Record<string, string[]> | undefined {
-    return this.preferences.get().disabledMotionCues
-  }
-
-  async setDisabledMotionCues(disabled: Record<string, string[]>): Promise<void> {
-    await this.setPreference('disabledMotionCues', disabled)
-  }
-
-  getEnabledAudioMotionCueGroups(): string[] | undefined {
-    return this.preferences.get().enabledAudioMotionCueGroups
-  }
-
-  async setEnabledAudioMotionCueGroups(groupIds: string[]): Promise<void> {
-    await this.setPreference('enabledAudioMotionCueGroups', groupIds)
-  }
-
-  getKnownAudioMotionCueGroups(): string[] | undefined {
-    return this.preferences.get().knownAudioMotionCueGroups
-  }
-
-  async setKnownAudioMotionCueGroups(groupIds: string[]): Promise<void> {
-    await this.setPreference('knownAudioMotionCueGroups', groupIds)
-  }
-
-  getDisabledAudioMotionCues(): Record<string, string[]> | undefined {
-    return this.preferences.get().disabledAudioMotionCues
-  }
-
-  async setDisabledAudioMotionCues(disabled: Record<string, string[]>): Promise<void> {
-    await this.setPreference('disabledAudioMotionCues', disabled)
+  getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    const m = this.preferences.get().cueDomains.yargMotion.selectionMode
+    if (m === 'oncePerSong' || m === 'perCueChange' || m === 'none') {
+      return m
+    }
+    return 'perCueChange'
   }
 
   getAudioMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
-    return this.preferences.get().audioMotionGroupSelectionMode ?? 'perCueChange'
-  }
-
-  async setAudioMotionGroupSelectionMode(
-    mode: 'oncePerSong' | 'perCueChange' | 'none',
-  ): Promise<void> {
-    await this.setPreference('audioMotionGroupSelectionMode', mode)
-  }
-
-  /**
-   * Gets the preferred audio cue type
-   */
-  getActiveAudioCueType(): AudioCueType | undefined {
-    return this.preferences.get().activeAudioCueType
+    const m = this.preferences.get().cueDomains.audioMotion.selectionMode
+    if (m === 'oncePerSong' || m === 'perCueChange' || m === 'none') {
+      return m
+    }
+    return 'perCueChange'
   }
 
   /**
-   * Persists the preferred audio cue type
+   * Shared min-hold (ms) for YARG and audio motion; updates both motion domains in one write.
    */
-  async setActiveAudioCueType(cueType: AudioCueType): Promise<void> {
-    await this.setPreference('activeAudioCueType', cueType)
-  }
-
-  /**
-   * Gets the cue consistency window preference
-   */
-  getCueConsistencyWindow(): number {
-    return this.preferences.get().cueConsistencyWindow
-  }
-
-  /**
-   * Sets the cue consistency window preference
-   */
-  async setCueConsistencyWindow(windowMs: number): Promise<void> {
-    await this.setPreference('cueConsistencyWindow', windowMs)
-  }
-
-  getMotionCueMinimumHoldMs(): number {
-    return this.preferences.get().motionCueMinimumHoldMs ?? 5000
-  }
-
   async setMotionCueMinimumHoldMs(ms: number): Promise<void> {
     const clamped = Math.max(0, Math.min(600000, Math.round(ms)))
-    await this.setPreference('motionCueMinimumHoldMs', clamped)
-  }
-
-  getMotionCueProbabilityPercent(): number {
-    return this.preferences.get().motionCueProbabilityPercent ?? 100
+    const c = this.preferences.get()
+    await this.setPreference('cueDomains', {
+      ...c.cueDomains,
+      yargMotion: { ...c.cueDomains.yargMotion, minimumHoldMs: clamped },
+      audioMotion: { ...c.cueDomains.audioMotion, minimumHoldMs: clamped },
+    })
   }
 
   async setMotionCueProbabilityPercent(percent: number): Promise<void> {
     const clamped = Math.max(0, Math.min(100, Math.round(percent)))
-    await this.setPreference('motionCueProbabilityPercent', clamped)
-  }
-
-  getAudioMotionCueProbabilityPercent(): number {
-    return this.preferences.get().audioMotionCueProbabilityPercent ?? 100
+    await this.updateCueDomain('yargMotion', { probabilityPercent: clamped })
   }
 
   async setAudioMotionCueProbabilityPercent(percent: number): Promise<void> {
     const clamped = Math.max(0, Math.min(100, Math.round(percent)))
-    await this.setPreference('audioMotionCueProbabilityPercent', clamped)
+    await this.updateCueDomain('audioMotion', { probabilityPercent: clamped })
   }
 
-  /**
-   * Gets the cue group selection mode preference
-   */
-  getCueGroupSelectionMode(): 'oncePerSong' | 'withinSong' {
-    return this.preferences.get().cueGroupSelectionMode ?? 'withinSong'
-  }
-
-  /**
-   * Sets the cue group selection mode preference
-   */
-  async setCueGroupSelectionMode(mode: 'oncePerSong' | 'withinSong'): Promise<void> {
-    await this.setPreference('cueGroupSelectionMode', mode)
-  }
-
-  getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
-    return this.preferences.get().motionGroupSelectionMode ?? 'perCueChange'
-  }
-
-  async setMotionGroupSelectionMode(mode: 'oncePerSong' | 'perCueChange' | 'none'): Promise<void> {
-    await this.setPreference('motionGroupSelectionMode', mode)
-  }
-
-  getMotionEnabled(): boolean {
-    return this.preferences.get().motionEnabled ?? true
-  }
-
-  async setMotionEnabled(enabled: boolean): Promise<void> {
-    await this.setPreference('motionEnabled', enabled)
-  }
-
-  getActiveAudioMotionCueRef(): { groupId: string; cueId: string } | null {
-    return this.preferences.get().activeAudioMotionCueRef ?? null
-  }
-
-  async setActiveAudioMotionCueRef(ref: { groupId: string; cueId: string } | null): Promise<void> {
-    await this.setPreference('activeAudioMotionCueRef', ref)
-  }
-
-  getActiveYargMotionCueRef(): { groupId: string; cueId: string } | null {
-    return this.preferences.get().activeYargMotionCueRef ?? null
-  }
-
-  async setActiveYargMotionCueRef(ref: { groupId: string; cueId: string } | null): Promise<void> {
-    await this.setPreference('activeYargMotionCueRef', ref)
-  }
-
-  /**
-   * Gets the clock rate preference (in milliseconds)
-   */
-  getClockRate(): number {
-    return this.preferences.get().clockRate
-  }
-
-  /**
-   * Sets the clock rate preference (in milliseconds)
-   * @param rate The clock rate in milliseconds (1-100ms)
-   */
+  /** Clamps to 1–100 ms. */
   async setClockRate(rate: number): Promise<void> {
     const clampedRate = Math.max(1, Math.min(100, rate))
     await this.setPreference('clockRate', clampedRate)
