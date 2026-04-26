@@ -5,6 +5,7 @@ This document lists the licenses for third-party libraries used by Photonics.
 ## DMX and Lighting Control Libraries
 
 ### sacn
+
 **License:** MIT  
 **Website:** https://github.com/node-dmx/sacn  
 **Used for:** sACN DMX over network
@@ -34,6 +35,7 @@ SOFTWARE.
 ```
 
 ### dmx-ts
+
 **License:** MIT  
 **Website:** https://github.com/node-dmx/dmx-ts  
 **Used for:** ArtNet and Enttec Pro USB Support
@@ -65,6 +67,7 @@ SOFTWARE.
 ## UI and Application Framework
 
 ### @electron-toolkit/preload
+
 **License:** MIT  
 **Website:** https://github.com/alex8088/electron-toolkit  
 **Used for:** Electron preload utilities
@@ -94,6 +97,7 @@ SOFTWARE.
 ```
 
 ### @electron-toolkit/utils
+
 **License:** MIT  
 **Website:** https://github.com/alex8088/electron-toolkit  
 **Used for:** Electron utilities
@@ -123,6 +127,7 @@ SOFTWARE.
 ```
 
 ### jotai
+
 **License:** MIT  
 **Website:** https://github.com/pmndrs/jotai  
 **Used for:** State Management
@@ -152,6 +157,7 @@ SOFTWARE.
 ```
 
 ### react-icons
+
 **License:** MIT  
 **Website:** https://github.com/react-icons/react-icons  
 **Used for:** UI Icons
@@ -183,6 +189,7 @@ SOFTWARE.
 ## Utilities
 
 ### date-fns
+
 **License:** MIT  
 **Website:** https://github.com/date-fns/date-fns  
 **Used for:** Date Formatting and Manipulation
@@ -212,6 +219,7 @@ SOFTWARE.
 ```
 
 ### uuid
+
 **License:** MIT  
 **Website:** https://github.com/uuidjs/uuid  
 **Used for:** UUID Generation
@@ -241,6 +249,7 @@ SOFTWARE.
 ```
 
 ### electron-updater
+
 **License:** MIT  
 **Website:** https://github.com/electron-userland/electron-builder  
 **Used for:** Application Updates

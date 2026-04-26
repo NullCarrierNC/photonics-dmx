@@ -4,21 +4,21 @@ Shared services used across main and (where applicable) renderer. Currently focu
 
 ## configuration/
 
-| File | Role |
-|------|------|
+| File                   | Role                                                                                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ConfigurationManager` | Manages `AppPreferences`, user lights, lighting layout, DMX rigs, audio config. Loads/saves via ConfigFile. Migration support for config schema changes. |
-| `ConfigFile` | Async atomic JSON file I/O (write-temp-then-rename). Versioned persistence with migration. |
+| `ConfigFile`           | Async atomic JSON file I/O (write-temp-then-rename). Versioned persistence with migration.                                                               |
 
 ### Config Files
 
 Stored in `{appData}/Photonics.rocks/`:
 
-| File | Content |
-|------|---------|
-| `prefs.json` | AppPreferences
-| `lights.json` | User light definitions (fixtures, groups) |
-| `lightsLayout.json` | Physical layout order of lights |
-| `dmxRigs.json` | DMX rig definitions (universes, fixtures) |
+| File                | Content                                   |
+| ------------------- | ----------------------------------------- |
+| `prefs.json`        | AppPreferences                            |
+| `lights.json`       | User light definitions (fixtures, groups) |
+| `lightsLayout.json` | Physical layout order of lights           |
+| `dmxRigs.json`      | DMX rig definitions (universes, fixtures) |
 
 ## Related
 

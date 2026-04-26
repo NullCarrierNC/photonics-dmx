@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   source-checks:
-    name: lint, typecheck, and audit (windows)
+    name: lint, format, typecheck, and audit (windows)
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -28,6 +28,9 @@ jobs:
 
       - name: Lint
         run: npm run lint:check
+
+      - name: Format check
+        run: npm run format:check
 
       - name: Typecheck
         run: npm run typecheck

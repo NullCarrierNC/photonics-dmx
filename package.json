@@ -8,6 +8,7 @@
   "scripts": {
     "prepare": "husky",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "lint": "eslint . --fix",
     "lint:check": "eslint .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",

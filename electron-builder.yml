@@ -14,13 +14,13 @@ files:
   - '!dist/**/*.map'
   - '!node_modules/electron-debug'
 asarUnpack:
-  - "**/*.node"
-  - "**/node_modules/@serialport"
+  - '**/*.node'
+  - '**/node_modules/@serialport'
 extraResources:
   - from: resources/defaults
     to: defaults
     filter:
-      - "**/*"
+      - '**/*'
 win:
   executableName: Photonics
 nsis:
