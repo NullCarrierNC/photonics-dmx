@@ -26,9 +26,10 @@ class MockCueHandler implements YargCueRuntime {
 const mockBind = jest.fn((_port: number, callback: () => void) => {
   callback()
 })
-const mockClose = jest.fn((callback?: () => void) => {
+const defaultMockClose = (callback?: () => void) => {
   if (callback) callback()
-})
+}
+const mockClose = jest.fn(defaultMockClose)
 const mockOn = jest.fn()
 
 jest.mock('dgram', () => ({
@@ -49,9 +50,9 @@ describe('YargNetworkListener', () => {
     listener = new YargNetworkListener(cueHandler)
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     if (listener) {
-      listener.shutdown()
+      await listener.shutdown()
     }
   })
 
@@ -59,23 +60,51 @@ describe('YargNetworkListener', () => {
     expect(listener).toBeDefined()
   })
 
-  it('start binds the UDP socket and sets listening state', () => {
+  it('start binds the UDP socket and sets listening state', async () => {
     listener.start()
     expect(mockBind).toHaveBeenCalledWith(36107, expect.any(Function))
-    listener.stop()
+    await listener.stop()
     expect(mockClose).toHaveBeenCalled()
   })
 
-  it('stop closes the socket', () => {
+  it('stop closes the socket', async () => {
     listener.start()
-    listener.stop()
+    await listener.stop()
     expect(mockClose).toHaveBeenCalled()
   })
 
-  it('shutdown calls stop', () => {
+  it('shutdown calls stop', async () => {
     listener.start()
-    listener.shutdown()
+    await listener.shutdown()
     expect(mockClose).toHaveBeenCalled()
+  })
+
+  it('stop() Promise resolves only when the dgram close callback runs', async () => {
+    const pending: Array<() => void> = []
+    mockClose.mockImplementationOnce((cb?: () => void) => {
+      if (cb) pending.push(() => cb())
+    })
+    listener.start()
+    const stopP = listener.stop()
+    let resolved = false
+    void stopP.then(() => {
+      resolved = true
+    })
+    await Promise.resolve()
+    expect(resolved).toBe(false)
+    expect(pending).toHaveLength(1)
+    pending[0]!()
+    await stopP
+    expect(resolved).toBe(true)
+    mockClose.mockImplementation(defaultMockClose)
+  })
+
+  it('second start after await stop re-binds the UDP port', async () => {
+    listener.start()
+    await listener.stop()
+    mockBind.mockClear()
+    listener.start()
+    expect(mockBind).toHaveBeenCalledWith(36107, expect.any(Function))
   })
 
   describe('passive strobe shutdown', () => {

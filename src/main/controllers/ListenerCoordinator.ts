@@ -40,10 +40,12 @@ export class ListenerCoordinator {
         })
       return
     }
-    this.enableYargInternal()
+    void this.enableYargInternal().catch((error) => {
+      console.error('Error enabling YARG:', error)
+    })
   }
 
-  public enableYargInternal(): void {
+  public async enableYargInternal(): Promise<void> {
     const dmxLightManager = this.deps.getDmxLightManager()
     const effectsController = this.deps.getEffectsController()
     if (this.isYargEnabled || !effectsController || !dmxLightManager) {
@@ -51,7 +53,7 @@ export class ListenerCoordinator {
       return
     }
     if (this.isRb3Enabled) {
-      this.disableRb3()
+      await this.disableRb3()
     }
     if (this.cueHandler) {
       this.cueHandler.shutdown()
@@ -63,7 +65,9 @@ export class ListenerCoordinator {
     this.cueHandler.setMotionEnabled(this.deps.getMotionEnabled())
     this.cueHandler.setManualMotionRef(this.deps.getActiveYargMotionCueRef())
     this.deps.setCueHandlerRef(this.cueHandler)
-    this.yargListener?.shutdown()
+    if (this.yargListener) {
+      await this.yargListener.shutdown()
+    }
     this.yargListener = new YargNetworkListener(this.cueHandler)
     this.yargListener.on(
       'yarg-error',
@@ -92,15 +96,15 @@ export class ListenerCoordinator {
       }
     }
     if (this.yargListener) {
-      this.yargListener.shutdown()
+      await this.yargListener.shutdown()
       this.yargListener = null
     }
+    this.isYargEnabled = false
     if (this.cueHandler) {
       this.cueHandler.shutdown()
       this.cueHandler = null
       this.deps.setCueHandlerRef(null)
     }
-    this.isYargEnabled = false
   }
 
   public async enableRb3(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
@@ -159,9 +163,10 @@ export class ListenerCoordinator {
       }
     }
     if (this.rb3eListener) {
-      this.rb3eListener.shutdown()
+      await this.rb3eListener.shutdown()
       this.rb3eListener = null
     }
+    this.isRb3Enabled = false
     if (this.processorManager) {
       this.processorManager.destroy()
       this.processorManager = null
@@ -170,7 +175,6 @@ export class ListenerCoordinator {
       this.rb3MenuHandler.shutdown()
       this.rb3MenuHandler = null
     }
-    this.isRb3Enabled = false
   }
 
   public getRb3Mode(): 'direct' | 'none' {

@@ -121,22 +121,28 @@ export class Rb3eNetworkListener extends EventEmitter {
     })
   }
 
-  public stop() {
-    if (!this.listening) {
-      console.warn('RB3ENetworkListener is not running.')
-      return
+  /**
+   * Closes the UDP socket and resolves when the OS has released the port
+   * (required before a new listener can bind the same port).
+   */
+  public stop(): Promise<void> {
+    if (!this.server) {
+      this.listening = false
+      return Promise.resolve()
     }
-    if (this.server) {
-      this.server.close(() => {
+    return new Promise((resolve) => {
+      const sock = this.server!
+      sock.close(() => {
         console.log('RB3ENetworkListener server closed.')
         this.listening = false
         this.server = null
+        resolve()
       })
-    }
+    })
   }
 
-  public shutdown() {
-    this.stop()
+  public shutdown(): Promise<void> {
+    return this.stop()
   }
 
   private setupServerEvents() {
@@ -361,8 +367,8 @@ export class Rb3eNetworkListener extends EventEmitter {
     return data1.payload.equals(data2.payload)
   }
 
-  public destroy() {
-    this.stop()
+  public destroy(): Promise<void> {
+    return this.stop()
   }
 
   /**
