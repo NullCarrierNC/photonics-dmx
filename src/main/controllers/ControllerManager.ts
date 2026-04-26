@@ -3,18 +3,7 @@ import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager
 import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
-import {
-  LightingConfiguration,
-  ConfigStrobeType,
-  DmxRig,
-  DmxLight,
-  DmxFixture,
-  FixtureTypes,
-  FixtureConfig,
-  clampMergeMovingHeadFixtureConfig,
-  normalizeFixtureConfig,
-} from '../../photonics-dmx/types'
-import { rawDmxToLogicalHomePercent } from '../../photonics-dmx/helpers/movingHeadCalibration'
+import { LightingConfiguration, ConfigStrobeType, FixtureConfig } from '../../photonics-dmx/types'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import {
@@ -27,21 +16,19 @@ import { app } from 'electron'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { copyDefaultData } from '../utils/copyDefaultData'
 import * as path from 'path'
-import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
+import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
-import { SenderError, SenderId } from '../../photonics-dmx/senders/BaseSender'
 import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager'
-import { createSenderErrorHandler } from './senderErrorHandler'
-import {
-  isSenderErrorHandled,
-  markSenderErrorHandled,
-  getLastErrorHandledTime,
-  removeSenderErrorHandled,
-} from '../senderErrorTracking'
 import { TestEffectRunner } from './TestEffectRunner'
 import { ListenerCoordinator } from './ListenerCoordinator'
 import { AudioController } from './AudioController'
+import {
+  SenderLifecycleController,
+  type OutputSenderStateSnapshot,
+} from './SenderLifecycleController'
+import { ConsoleModeController } from './ConsoleModeController'
+import { RegistryInitializer } from './RegistryInitializer'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
@@ -51,31 +38,9 @@ import {
   AudioMotionCueRef,
   YargMotionCueRef,
 } from '../../photonics-dmx/cues/types/audioCueTypes'
-import {
-  NodeCueLoader,
-  NodeCueListSummary,
-} from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
+import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
-
-// Type for Node.js network errors (code, syscall, port, address) used in uncaught exception handling
-interface NetworkErrorLike {
-  code?: string
-  syscall?: string
-  port?: number
-  address?: string
-}
-
-function isNetworkErrorLike(err: unknown): err is NetworkErrorLike {
-  return err !== null && typeof err === 'object' && 'code' in err && 'syscall' in err
-}
-
-type OutputSenderStateSnapshot = {
-  sacn: boolean
-  artnet: boolean
-  enttecpro: boolean
-  opendmx: boolean
-}
 
 export class ControllerManager {
   private config: ConfigurationManager
@@ -85,8 +50,6 @@ export class ControllerManager {
   private sequencer: Sequencer | null = null
   private effectsController: ILightingController | null = null
   private dmxPublisher: DmxPublisher | null = null
-  private senderManager: SenderManager | null = null
-  private senderErrorTrackingCallback: ((senderId: string) => void) | null = null
 
   private cueHandler: YargCueHandler | null = null
   private nodeCueLoader: NodeCueLoader | null = null
@@ -95,25 +58,17 @@ export class ControllerManager {
   private pendingValidationErrors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }> = []
 
   private readonly testEffectRunner: TestEffectRunner
-  private readonly senderErrorHandler: (error: SenderError) => void
+  private readonly senderLifecycle: SenderLifecycleController
   private readonly listenerCoordinator: ListenerCoordinator
   private readonly audioController: AudioController
+  private readonly registryInit: RegistryInitializer
+  private readonly consoleMode: ConsoleModeController
 
   private isInitialized = false
 
-  /** Snapshot of listeners disabled while DMX Console is active */
-  private consoleRestore: { yarg: boolean; rb3: boolean; audio: boolean } | null = null
-  /** Optional hook for subsystems that must stop when console/manual DMX takes over. */
-  private onConsoleEnter: (() => void) | null = null
-
   constructor() {
     this.config = new ConfigurationManager()
-    this.senderManager = new SenderManager()
-    this.senderErrorHandler = createSenderErrorHandler(
-      () => this.getSenderManager(),
-      sendToAllWindows,
-    )
-    this.senderManager.onSendError(this.senderErrorHandler)
+    this.senderLifecycle = new SenderLifecycleController(() => this.config)
     this.testEffectRunner = new TestEffectRunner({
       getConfig: () => ({
         getPreference: (key: string) =>
@@ -164,19 +119,44 @@ export class ControllerManager {
       config: this.config,
       sendToAllWindows,
     })
-  }
-
-  /**
-   * Ensure sender manager exists
-   */
-  private ensureSenderManager(): void {
-    if (this.senderManager === null) {
-      this.senderManager = new SenderManager()
-      this.senderManager.onSendError(this.senderErrorHandler)
-      if (this.senderErrorTrackingCallback) {
-        this.senderManager.setOnSenderEnabled(this.senderErrorTrackingCallback)
-      }
-    }
+    this.registryInit = new RegistryInitializer({
+      getConfig: () => this.config,
+      sendToAllWindows,
+      pushValidationError: (e) => {
+        this.pendingValidationErrors.push(e)
+      },
+      refreshAudioCueSelection: () => {
+        this.refreshAudioCueSelection()
+      },
+      getNodeCueLoader: () => this.nodeCueLoader,
+      setNodeCueLoader: (l) => {
+        this.nodeCueLoader = l
+      },
+      getEffectLoader: () => this.effectLoader,
+      setEffectLoader: (l) => {
+        this.effectLoader = l
+      },
+    })
+    this.consoleMode = new ConsoleModeController({
+      getConfig: () => this.config,
+      ensureInitialized: () => this.init(),
+      getDmxPublisher: () => this.dmxPublisher,
+      getListenerSnapshot: () => ({
+        yarg: this.listenerCoordinator.getIsYargEnabled(),
+        rb3: this.listenerCoordinator.getIsRb3Enabled(),
+      }),
+      getIsAudioEnabled: () => this.getIsAudioEnabled(),
+      pauseYarg: () => this.disableYarg(),
+      pauseRb3: () => this.disableRb3(),
+      pauseAudio: () => this.disableAudio(),
+      restoreYarg: () => {
+        this.enableYarg()
+      },
+      restoreRb3: () => this.enableRb3(),
+      restoreAudio: () => this.enableAudio(),
+      refreshActiveRigs: () => this.refreshActiveRigs(),
+      restartControllers: () => this.restartControllers(),
+    })
   }
 
   /**
@@ -185,16 +165,16 @@ export class ControllerManager {
   public async init(): Promise<void> {
     if (this.isInitialized) return
 
-    this.ensureSenderManager()
+    this.senderLifecycle.ensureSenderManager()
     await this.initializeDmxManager()
     await this.initializeSequencer()
-    await this.initializeCueRegistry()
-    await this.initializeAudioCueRegistry()
+    await this.registryInit.initializeCueRegistry()
+    await this.registryInit.initializeAudioCueRegistry()
     await this.applyMotionPreferencesFromConfig()
     const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
     await copyDefaultData(process.resourcesPath, baseDir)
-    await this.initializeEffectLoader() // Initialize effects BEFORE node cues
-    await this.initializeNodeCueLoader()
+    await this.registryInit.initializeEffectLoader() // effects before node cues
+    await this.registryInit.initializeNodeCueLoader()
     await this.applyYargEnabledGroupsFromConfig()
     await this.applyAudioEnabledGroupsFromConfig()
     await this.applyYargMotionEnabledGroupsFromConfig()
@@ -274,66 +254,16 @@ export class ControllerManager {
     clock.start()
 
     // Set up DMX publisher (no longer takes DmxLightManager in constructor)
-    this.dmxPublisher = new DmxPublisher(this.senderManager!, this.lightStateManager)
+    this.dmxPublisher = new DmxPublisher(
+      this.senderLifecycle.getSenderManager(),
+      this.lightStateManager,
+    )
 
     // Load active rigs and set them up in the publisher
     const activeRigs = this.config.getActiveRigs()
     if (this.dmxPublisher && activeRigs.length > 0) {
       this.dmxPublisher.updateActiveRigs(activeRigs)
     }
-  }
-
-  /**
-   * Initialize the CueRegistry with enabled groups from configuration
-   */
-  private async initializeCueRegistry(): Promise<void> {
-    const registry = YargCueRegistry.getInstance()
-
-    const enabledGroupIds = this.config.getPreference('cueDomains').yarg.enabledGroups ?? []
-    if (enabledGroupIds.length > 0) {
-      registry.setEnabledGroups(enabledGroupIds)
-      console.log('CueRegistry initialized with enabled groups:', enabledGroupIds)
-    } else {
-      const allGroups = registry.getAllGroups()
-      registry.setEnabledGroups(allGroups)
-      console.log('CueRegistry initialized with all groups (no preference set):', allGroups)
-    }
-
-    // Load cue consistency window from configuration
-    const consistencyWindow = this.config.getPreference('cueConsistencyWindow')
-    registry.setCueConsistencyWindow(consistencyWindow)
-    console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms')
-
-    // Load cue group selection mode from configuration
-    const selectionMode = this.config.getCueGroupSelectionMode()
-    registry.setCueGroupSelectionMode(selectionMode)
-    console.log('CueRegistry initialized with cue group selection mode:', selectionMode)
-
-    const disabledYarg = this.config.getPreference('cueDomains').yarg.disabledCues
-    registry.setDisabledCues(disabledYarg)
-  }
-
-  /**
-   * Initialize the AudioCueRegistry with enabled groups from configuration
-   */
-  private async initializeAudioCueRegistry(): Promise<void> {
-    const registry = AudioCueRegistry.getInstance()
-
-    const enabledGroupIds = this.config.getPreference('cueDomains').audio.enabledGroups
-    if (enabledGroupIds && enabledGroupIds.length > 0) {
-      registry.setEnabledGroups(enabledGroupIds)
-      console.log('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
-    } else {
-      const allGroups = registry.getRegisteredGroups()
-      registry.setEnabledGroups(allGroups)
-      if (allGroups.length > 0) {
-        void this.config.updateCueDomain('audio', { enabledGroups: allGroups })
-      }
-      console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
-    }
-
-    const disabledAudio = this.config.getPreference('cueDomains').audio.disabledCues
-    registry.setDisabledCues(disabledAudio)
   }
 
   /**
@@ -477,64 +407,6 @@ export class ControllerManager {
     const disabledMotion = this.config.getPreference('cueDomains').audioMotion.disabledCues
     registry.setDisabledMotionCues(disabledMotion)
     console.log('Audio motion enabled groups re-applied from config:', enabledGroupIds)
-  }
-
-  private async initializeNodeCueLoader(): Promise<void> {
-    if (this.nodeCueLoader) {
-      return
-    }
-
-    // Ensure effect loader is initialized first
-    await this.initializeEffectLoader()
-
-    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
-    this.nodeCueLoader = new NodeCueLoader({
-      baseDir,
-      yargRegistry: YargCueRegistry.getInstance(),
-      audioRegistry: AudioCueRegistry.getInstance(),
-      effectLoader: this.effectLoader ?? undefined,
-    })
-
-    const summary = await this.nodeCueLoader.loadAll()
-    console.log(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
-    if (summary.failed > 0 && summary.errors.length > 0) {
-      summary.errors.forEach((err) => console.error('[NodeCueLoader]', err))
-      this.pendingValidationErrors.push({ source: 'node-cue', errors: summary.errors })
-    }
-    await this.nodeCueLoader.startWatching()
-
-    this.nodeCueLoader.on('changed', (payload: NodeCueListSummary) => {
-      sendToAllWindows(RENDERER_RECEIVE.NODE_CUES_CHANGED, payload)
-      this.refreshAudioCueSelection()
-    })
-  }
-
-  private async initializeEffectLoader(): Promise<void> {
-    if (this.effectLoader) {
-      return
-    }
-
-    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
-    this.effectLoader = new EffectLoader({ baseDir })
-
-    const summary = await this.effectLoader.loadAll()
-    console.log(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
-    if (summary.failed > 0 && summary.errors.length > 0) {
-      summary.errors.forEach((err) => console.error('[EffectLoader]', err))
-      this.pendingValidationErrors.push({ source: 'effect', errors: summary.errors })
-    }
-    await this.effectLoader.startWatching()
-
-    this.effectLoader.on('changed', async (payload: EffectListSummary) => {
-      sendToAllWindows(RENDERER_RECEIVE.EFFECTS_CHANGED, payload)
-      if (this.nodeCueLoader) {
-        try {
-          await this.nodeCueLoader.reload()
-        } catch (error) {
-          console.error('Failed to reload node cues after effect change:', error)
-        }
-      }
-    })
   }
 
   /**
@@ -698,13 +570,11 @@ export class ControllerManager {
         }
       }
 
-      if (this.senderManager) {
-        try {
-          await this.senderManager.shutdown()
-          console.log('ControllerManager shutdown: sender manager stopped')
-        } catch (err) {
-          console.error('Error shutting down sender manager:', err)
-        }
+      try {
+        await this.senderLifecycle.shutdownSenderOnAppExit()
+        console.log('ControllerManager shutdown: sender manager stopped')
+      } catch (err) {
+        console.error('Error shutting down sender manager:', err)
       }
 
       this.isInitialized = false
@@ -729,103 +599,23 @@ export class ControllerManager {
   }
 
   public getSenderManager(): SenderManager {
-    this.ensureSenderManager()
-    return this.senderManager!
+    return this.senderLifecycle.getSenderManager()
   }
 
   /**
    * Handles uncaught exceptions that are network sender errors.
-   * Resolves senderId, performs emergency removal if needed, and delegates to the same
-   * senderErrorHandler used for normal sender errors so all error handling is unified.
    * @returns true if the error was handled as a network sender error, false otherwise
    */
   public handleUncaughtException(error: unknown): boolean {
-    const isNetworkError =
-      isNetworkErrorLike(error) &&
-      (error.code === 'EHOSTUNREACH' ||
-        error.code === 'EHOSTDOWN' ||
-        error.code === 'ENETUNREACH' ||
-        error.code === 'ETIMEDOUT') &&
-      error.syscall === 'send'
-
-    if (!isNetworkError || !this.senderManager || !this.getIsInitialized()) {
-      return false
-    }
-
-    let senderId: string | null = null
-    if (isNetworkErrorLike(error)) {
-      const senderManager = this.senderManager
-      if (error.port != null) {
-        senderId = senderManager.getSenderIdByPort(error.port)
-      }
-      if (!senderId && error.port == null && error.address) {
-        if (senderManager.isSenderEnabled('artnet')) {
-          senderId = 'artnet'
-        } else if (senderManager.isSenderEnabled('sacn')) {
-          senderId = 'sacn'
-        }
-      }
-    }
-
-    if (!senderId) {
-      return false
-    }
-
-    const now = Date.now()
-    if (now - getLastErrorHandledTime(senderId) < 1000) {
-      return true
-    }
-    if (isSenderErrorHandled(senderId)) {
-      return true
-    }
-
-    try {
-      if (!this.senderManager.isSenderEnabled(senderId)) {
-        return false
-      }
-      markSenderErrorHandled(senderId, now)
-
-      const senderError = new SenderError(error, {
-        senderId: senderId as SenderId,
-        shouldDisable: true,
-      })
-
-      const sender = this.senderManager.getAndRemoveSenderForEmergency(senderId)
-      if (sender) {
-        console.error(`Network sender error (${senderId}):`, error)
-        sender.stop().catch((stopErr: unknown) => {
-          console.error(`Error stopping ${senderId} sender after network error:`, stopErr)
-        })
-        this.senderErrorHandler(senderError)
-      } else {
-        console.error(`Network sender error (${senderId}):`, error)
-        this.senderManager.markInitFailed(senderId)
-        this.senderManager.emitSenderError(senderError)
-      }
-      return true
-    } catch (err) {
-      console.error(`Error handling ${senderId} uncaught exception:`, err)
-      removeSenderErrorHandled(senderId)
-      return false
-    }
+    return this.senderLifecycle.handleUncaughtException(error, () => this.getIsInitialized())
   }
 
-  /**
-   * Set a callback for clearing sender error tracking when a sender is successfully enabled.
-   * This is used to allow senders to be re-enabled after network errors.
-   * @param callback Function to call with the sender ID when error tracking should be cleared
-   */
   public setSenderErrorTrackingCallback(callback: (senderId: string) => void): void {
-    this.senderErrorTrackingCallback = callback
-    this.ensureSenderManager()
-    this.senderManager!.setOnSenderEnabled(callback)
+    this.senderLifecycle.setSenderErrorTrackingCallback(callback)
   }
 
-  /**
-   * Register a callback to run when console mode is entered.
-   */
   public setOnConsoleEnter(callback: (() => void) | null): void {
-    this.onConsoleEnter = callback
+    this.consoleMode.setOnConsoleEnter(callback)
   }
 
   public getCueHandler(): YargCueHandler | null {
@@ -871,12 +661,12 @@ export class ControllerManager {
    * @returns Object containing status of each sender type
    */
   public getSenderStatus(): { sacn: boolean; artnet: boolean; enttecpro: boolean; ipc: boolean } {
-    this.ensureSenderManager()
+    const sm = this.senderLifecycle.getSenderManager()
     return {
-      sacn: this.senderManager!.isSenderEnabled('sacn'),
-      artnet: this.senderManager!.isSenderEnabled('artnet'),
-      enttecpro: this.senderManager!.isSenderEnabled('enttecpro'),
-      ipc: this.senderManager!.isSenderEnabled('ipc'),
+      sacn: sm.isSenderEnabled('sacn'),
+      artnet: sm.isSenderEnabled('artnet'),
+      enttecpro: sm.isSenderEnabled('enttecpro'),
+      ipc: sm.isSenderEnabled('ipc'),
     }
   }
 
@@ -902,14 +692,7 @@ export class ControllerManager {
 
     const wasYargEnabled = this.listenerCoordinator.getIsYargEnabled()
     const wasRb3Enabled = this.listenerCoordinator.getIsRb3Enabled()
-    const activeSendersBeforeRestart: OutputSenderStateSnapshot | null = this.senderManager
-      ? {
-          sacn: this.senderManager.isSenderEnabled('sacn'),
-          artnet: this.senderManager.isSenderEnabled('artnet'),
-          enttecpro: this.senderManager.isSenderEnabled('enttecpro'),
-          opendmx: this.senderManager.isSenderEnabled('opendmx'),
-        }
-      : null
+    const activeSendersBeforeRestart = this.senderLifecycle.getActiveOutputSenderSnapshotIfAny()
 
     try {
       if (wasYargEnabled) {
@@ -927,9 +710,7 @@ export class ControllerManager {
       if (this.dmxPublisher) {
         await this.dmxPublisher.shutdown()
       }
-      if (this.senderManager) {
-        await this.senderManager.shutdown()
-      }
+      await this.senderLifecycle.resetSenderForControllerRestart()
 
       // Ensure cue handler lifecycle is handled
       if (this.cueHandler) {
@@ -944,7 +725,6 @@ export class ControllerManager {
       this.effectsController = null
       this.dmxPublisher = null
       this.cueHandler = null
-      this.senderManager = null
 
       // Mark as not initialized
       this.isInitialized = false
@@ -957,9 +737,7 @@ export class ControllerManager {
     // Reinitialize
     try {
       await this.init()
-      if (this.consoleRestore !== null) {
-        this.dmxPublisher?.setManualBuffer({})
-      }
+      this.consoleMode.onControllersReinitializedWhileConsoleOpen()
 
       // Restore previously active listeners
       if (wasYargEnabled) {
@@ -970,7 +748,9 @@ export class ControllerManager {
 
       // Restore DMX output senders from persisted preferences so that output
       // continues without requiring a manual toggle after any config change.
-      await this.restoreSenderOutputsFromPrefs(activeSendersBeforeRestart ?? undefined)
+      await this.senderLifecycle.restoreSenderOutputsFromPrefs(
+        activeSendersBeforeRestart ?? undefined,
+      )
 
       console.log('Controllers restarted successfully')
     } catch (error) {
@@ -987,86 +767,7 @@ export class ControllerManager {
   public async restoreSenderOutputsFromPrefs(
     activeSenders?: OutputSenderStateSnapshot,
   ): Promise<void> {
-    const prefs = this.config.getAllPreferences()
-    const outputConfig = prefs.dmxOutputConfig
-    if (!outputConfig) return
-
-    const sendersToRestore: OutputSenderStateSnapshot = activeSenders ?? {
-      sacn: outputConfig.sacnEnabled,
-      artnet: outputConfig.artNetEnabled,
-      enttecpro: outputConfig.enttecProEnabled,
-      opendmx: outputConfig.openDmxEnabled,
-    }
-
-    this.ensureSenderManager()
-    const sm = this.senderManager!
-
-    if (sendersToRestore.sacn) {
-      const sc = prefs.sacnConfig
-      try {
-        await sm.enableSender('sacn', 'sacn', {
-          sender: 'sacn',
-          universe: sc?.universe ?? 1,
-          networkInterface: sc?.networkInterface || undefined,
-          useUnicast: sc?.useUnicast ?? false,
-          unicastDestination: sc?.unicastDestination || undefined,
-        })
-        console.log('Restored sACN sender from preferences')
-      } catch (err) {
-        console.error('Failed to restore sACN sender after restart:', err)
-      }
-    }
-
-    if (sendersToRestore.artnet) {
-      const ac = prefs.artNetConfig
-      if (ac?.host) {
-        try {
-          await sm.enableSender('artnet', 'artnet', {
-            sender: 'artnet',
-            host: ac.host,
-            universe: ac.universe,
-            net: ac.net,
-            subnet: ac.subnet,
-            subuni: ac.subuni,
-            port: ac.port,
-          })
-          console.log('Restored Art-Net sender from preferences')
-        } catch (err) {
-          console.error('Failed to restore Art-Net sender after restart:', err)
-        }
-      }
-    }
-
-    if (sendersToRestore.enttecpro) {
-      const ec = prefs.enttecProConfig
-      if (ec?.port) {
-        try {
-          await sm.enableSender('enttecpro', 'enttecpro', {
-            sender: 'enttecpro',
-            devicePath: ec.port,
-          })
-          console.log('Restored Enttec Pro sender from preferences')
-        } catch (err) {
-          console.error('Failed to restore Enttec Pro sender after restart:', err)
-        }
-      }
-    }
-
-    if (sendersToRestore.opendmx) {
-      const oc = prefs.openDmxConfig
-      if (oc?.port) {
-        try {
-          await sm.enableSender('opendmx', 'opendmx', {
-            sender: 'opendmx',
-            devicePath: oc.port,
-            dmxSpeed: oc.dmxSpeed,
-          })
-          console.log('Restored OpenDMX sender from preferences')
-        } catch (err) {
-          console.error('Failed to restore OpenDMX sender after restart:', err)
-        }
-      }
-    }
+    return this.senderLifecycle.restoreSenderOutputsFromPrefs(activeSenders)
   }
 
   /**
@@ -1178,65 +879,20 @@ export class ControllerManager {
     this.audioController.setBroadcastAudioMirror(fn)
   }
 
-  /**
-   * DMX Console: pause cue/audio listeners and take over DMX output with a manual buffer.
-   */
   public async enableConsoleMode(
     rigId: string,
   ): Promise<{ success: true } | { success: false; error: string }> {
-    await this.init()
-    const rig = this.config.getDmxRig(rigId)
-    if (!rig) {
-      return { success: false, error: 'Rig not found' }
-    }
-    this.onConsoleEnter?.()
-    if (this.consoleRestore !== null) {
-      this.dmxPublisher?.setManualBuffer({})
-      return { success: true }
-    }
-    this.consoleRestore = {
-      yarg: this.listenerCoordinator.getIsYargEnabled(),
-      rb3: this.listenerCoordinator.getIsRb3Enabled(),
-      audio: this.getIsAudioEnabled(),
-    }
-    if (this.consoleRestore.yarg) {
-      await this.disableYarg()
-    }
-    if (this.consoleRestore.rb3) {
-      await this.disableRb3()
-    }
-    if (this.consoleRestore.audio) {
-      await this.disableAudio()
-    }
-    this.dmxPublisher?.setManualBuffer({})
-    return { success: true }
+    return this.consoleMode.enableConsoleMode(rigId)
   }
 
-  /**
-   * Resume normal cue-driven output and restore listeners that were active before the console.
-   */
   public async disableConsoleMode(): Promise<
     { success: true } | { success: false; error: string }
   > {
-    if (this.consoleRestore === null) {
-      return { success: true }
-    }
-    const r = this.consoleRestore
-    this.consoleRestore = null
-    this.dmxPublisher?.clearManualBuffer()
-    if (r.yarg) {
-      this.enableYarg()
-    } else if (r.rb3) {
-      await this.enableRb3()
-    }
-    if (r.audio) {
-      await this.enableAudio()
-    }
-    return { success: true }
+    return this.consoleMode.disableConsoleMode()
   }
 
   public sendConsoleDmx(buffer: Record<number, number>): void {
-    this.dmxPublisher?.setManualBuffer(buffer)
+    this.consoleMode.sendConsoleDmx(buffer)
   }
 
   public async updateConsoleChannel(payload: {
@@ -1246,49 +902,7 @@ export class ControllerManager {
     channelName: string
     channelNumber: number
   }): Promise<{ success: true } | { success: false; error: string }> {
-    const { rigId, lightId, fixtureId, channelName, channelNumber } = payload
-    if (!Number.isFinite(channelNumber) || channelNumber < 1 || channelNumber > 512) {
-      return { success: false, error: 'Channel number must be between 1 and 512' }
-    }
-    const rig = this.config.getDmxRig(rigId)
-    if (!rig) {
-      return { success: false, error: 'Rig not found' }
-    }
-    const light = this.findLightInRig(rig, lightId)
-    if (!light) {
-      return { success: false, error: 'Light not found in rig' }
-    }
-    const channels = light.channels as unknown as Record<string, number>
-    if (!Object.prototype.hasOwnProperty.call(channels, channelName)) {
-      return { success: false, error: `Unknown channel: ${channelName}` }
-    }
-    const updatedLight: DmxLight = {
-      ...light,
-      channels: { ...channels, [channelName]: channelNumber } as unknown as DmxLight['channels'],
-    }
-    const newConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
-    const updatedRig: DmxRig = { ...rig, config: newConfig }
-    await this.config.saveDmxRig(updatedRig)
-
-    const userLights = this.config.getUserLights()
-    const fi = userLights.findIndex((f) => f.id === fixtureId)
-    if (fi < 0) {
-      return { success: false, error: 'Fixture template not found in My Lights' }
-    }
-    const fixture = userLights[fi]
-    const fch = fixture.channels as unknown as Record<string, number>
-    if (!Object.prototype.hasOwnProperty.call(fch, channelName)) {
-      return { success: false, error: `Channel ${channelName} not on fixture template` }
-    }
-    const newUserLights = [...userLights]
-    newUserLights[fi] = {
-      ...fixture,
-      channels: { ...fch, [channelName]: channelNumber } as unknown as DmxFixture['channels'],
-    }
-    await this.config.updateUserLights(newUserLights)
-
-    this.refreshActiveRigs()
-    return { success: true }
+    return this.consoleMode.updateConsoleChannel(payload)
   }
 
   public async setConsoleHome(payload: {
@@ -1298,76 +912,7 @@ export class ControllerManager {
     panHome: number
     tiltHome: number
   }): Promise<{ success: true } | { success: false; error: string }> {
-    const { rigId, lightId, fixtureId, panHome, tiltHome } = payload
-    if (!Number.isFinite(panHome) || !Number.isFinite(tiltHome)) {
-      return { success: false, error: 'panHome and tiltHome must be finite numbers' }
-    }
-    const panClamped = Math.max(0, Math.min(255, Math.round(panHome)))
-    const tiltClamped = Math.max(0, Math.min(255, Math.round(tiltHome)))
-    const rig = this.config.getDmxRig(rigId)
-    if (!rig) {
-      return { success: false, error: 'Rig not found' }
-    }
-    const light = this.findLightInRig(rig, lightId)
-    if (!light) {
-      return { success: false, error: 'Light not found in rig' }
-    }
-    if (light.fixture !== FixtureTypes.RGBMH && light.fixture !== FixtureTypes.RGBWMH) {
-      return { success: false, error: 'Light is not a moving head fixture' }
-    }
-    const baseConfig: FixtureConfig = normalizeFixtureConfig(light.config)
-    const newConfig: FixtureConfig = {
-      ...baseConfig,
-      panHome: rawDmxToLogicalHomePercent(
-        panClamped,
-        baseConfig.panMin,
-        baseConfig.panMax,
-        baseConfig.invertPan,
-      ),
-      tiltHome: rawDmxToLogicalHomePercent(
-        tiltClamped,
-        baseConfig.tiltMin,
-        baseConfig.tiltMax,
-        baseConfig.invertTilt,
-      ),
-    }
-    const updatedLight: DmxLight = { ...light, config: newConfig }
-    const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
-    await this.config.saveDmxRig({ ...rig, config: newRigConfig })
-
-    const userLights = this.config.getUserLights()
-    const fi = userLights.findIndex((f) => f.id === fixtureId)
-    if (fi < 0) {
-      return { success: false, error: 'Fixture template not found in My Lights' }
-    }
-    const fixture = userLights[fi]
-    if (fixture.fixture !== FixtureTypes.RGBMH && fixture.fixture !== FixtureTypes.RGBWMH) {
-      return { success: false, error: 'Fixture template is not a moving head' }
-    }
-    const fBase: FixtureConfig = normalizeFixtureConfig(fixture.config)
-    const newUserLights = [...userLights]
-    newUserLights[fi] = {
-      ...fixture,
-      config: {
-        ...fBase,
-        panHome: rawDmxToLogicalHomePercent(
-          panClamped,
-          fBase.panMin,
-          fBase.panMax,
-          fBase.invertPan,
-        ),
-        tiltHome: rawDmxToLogicalHomePercent(
-          tiltClamped,
-          fBase.tiltMin,
-          fBase.tiltMax,
-          fBase.invertTilt,
-        ),
-      },
-    }
-    await this.config.updateUserLights(newUserLights)
-
-    this.refreshActiveRigs()
-    return { success: true }
+    return this.consoleMode.setConsoleHome(payload)
   }
 
   public async setConsoleFixtureConfig(payload: {
@@ -1376,67 +921,8 @@ export class ControllerManager {
     fixtureId: string
     config: Partial<FixtureConfig>
   }): Promise<{ success: true } | { success: false; error: string }> {
-    const { rigId, lightId, fixtureId, config: patch } = payload
-    const rig = this.config.getDmxRig(rigId)
-    if (!rig) {
-      return { success: false, error: 'Rig not found' }
-    }
-    const light = this.findLightInRig(rig, lightId)
-    if (!light) {
-      return { success: false, error: 'Light not found in rig' }
-    }
-    if (light.fixture !== FixtureTypes.RGBMH && light.fixture !== FixtureTypes.RGBWMH) {
-      return { success: false, error: 'Light is not a moving head fixture' }
-    }
-    if (light.fixtureId !== fixtureId) {
-      return { success: false, error: 'Fixture id does not match this light' }
-    }
-    const baseConfig = normalizeFixtureConfig(light.config)
-    const newConfig = clampMergeMovingHeadFixtureConfig(baseConfig, patch)
-    const updatedLight: DmxLight = { ...light, config: newConfig }
-    const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
-    await this.config.saveDmxRig({ ...rig, config: newRigConfig })
-
-    const userLights = this.config.getUserLights()
-    const fi = userLights.findIndex((f) => f.id === fixtureId)
-    if (fi < 0) {
-      return { success: false, error: 'Fixture template not found in My Lights' }
-    }
-    const fixture = userLights[fi]
-    if (fixture.fixture !== FixtureTypes.RGBMH && fixture.fixture !== FixtureTypes.RGBWMH) {
-      return { success: false, error: 'Fixture template is not a moving head' }
-    }
-    const fBase = normalizeFixtureConfig(fixture.config)
-    const newUserLights = [...userLights]
-    newUserLights[fi] = {
-      ...fixture,
-      config: clampMergeMovingHeadFixtureConfig(fBase, patch),
-    }
-    await this.config.updateUserLights(newUserLights)
-
-    // Restart so that the merged DmxLightManager and MotionPatternEngine's TrackedLight configs
-    // are rebuilt from the new FixtureConfig (invertPan, invertTilt, panDirectionCW, etc.).
-    // refreshActiveRigs() would only update DmxPublisher, leaving the sequencer stale.
-    await this.restartControllers()
-    return { success: true }
-  }
-
-  private findLightInRig(rig: DmxRig, lightId: string): DmxLight | null {
-    const all = [...rig.config.frontLights, ...rig.config.backLights, ...rig.config.strobeLights]
-    const found = all.find((l) => l.id === lightId)
-    return found ?? null
-  }
-
-  private replaceLightInRigConfig(
-    config: LightingConfiguration,
-    lightId: string,
-    replacement: DmxLight,
-  ): LightingConfiguration {
-    return {
-      ...config,
-      frontLights: config.frontLights.map((l) => (l.id === lightId ? replacement : l)),
-      backLights: config.backLights.map((l) => (l.id === lightId ? replacement : l)),
-      strobeLights: config.strobeLights.map((l) => (l.id === lightId ? replacement : l)),
-    }
+    return this.consoleMode.setConsoleFixtureConfig(payload)
   }
 }
+
+export type { OutputSenderStateSnapshot } from './SenderLifecycleController'
