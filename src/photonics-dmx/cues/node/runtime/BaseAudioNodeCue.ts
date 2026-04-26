@@ -92,7 +92,7 @@ export abstract class BaseAudioNodeCue {
   private groupLevelVarStore: Map<string, VariableValue>
   private executionEngine?: NodeExecutionEngine
   private effectRegistry: EffectRegistry
-  /** True after `cue-started` events have run for this activation; reset in onStop/onDestroy. */
+  /** True after `cue-started` events have run for this activation; reset in onStop. */
   private cueStartedFired = false
   /**
    * When `use` is true, the next graph effect submission uses setEffect (clears sequencer).
@@ -302,23 +302,6 @@ export abstract class BaseAudioNodeCue {
   }
 
   onStop(): void {
-    const skipEffectRemoval = this.skipEffectRemovalOnStop()
-    if (this.executionEngine) {
-      this.executionEngine.cancelAll(skipEffectRemoval)
-    }
-
-    this.cueStartedFired = false
-    this.eventStates.clear()
-    this.triggerPhase.clear()
-    this.triggerEnterTime.clear()
-    this.lastTriggerTime.clear()
-    this.activeLevelEffects.clear()
-    this.smoothedBandEnergy.clear()
-    this.cueLevelVarStore.clear()
-    BaseAudioNodeCue.cueLevelVarStores.delete(this.id)
-  }
-
-  onDestroy(): void {
     const skipEffectRemoval = this.skipEffectRemovalOnStop()
     if (this.executionEngine) {
       this.executionEngine.cancelAll(skipEffectRemoval)

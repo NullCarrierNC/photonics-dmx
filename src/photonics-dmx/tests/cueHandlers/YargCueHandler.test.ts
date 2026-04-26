@@ -3,8 +3,8 @@
  *
  * `YargNodeCue` instances are singletons in `YargCueRegistry`, so their
  * `CueSession` (which gates `cue-started`) survives a YARG disable. The handler's
- * shutdown must call `onStop()` (the lifecycle method that resets the session
- * and nulls the engine) rather than `onDestroy()` (a no-op for node cues).
+ * shutdown must call `onStop()` on each tracked slot so the next activation can
+ * fire `cue-started` from a clean state.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
@@ -22,7 +22,6 @@ import { DmxLightManager } from '../../controllers/DmxLightManager'
 type CueLifecycleMocks = {
   execute: jest.Mock
   onStop: jest.Mock
-  onDestroy: jest.Mock
 }
 
 function makeFakeCue(style: CueStyle, id: string): INetCue & CueLifecycleMocks {
@@ -32,7 +31,6 @@ function makeFakeCue(style: CueStyle, id: string): INetCue & CueLifecycleMocks {
     style,
     execute: jest.fn(),
     onStop: jest.fn(),
-    onDestroy: jest.fn(),
   } as unknown as INetCue & CueLifecycleMocks
 }
 
@@ -89,10 +87,9 @@ describe('YargCueHandler shutdown lifecycle', () => {
     handler.shutdown()
 
     expect(primary.onStop).toHaveBeenCalledTimes(1)
-    expect(primary.onDestroy).not.toHaveBeenCalled()
   })
 
-  it('shutdown stops every tracked cue slot (primary, secondary, strobe, motion) without calling onDestroy', () => {
+  it('shutdown stops every tracked cue slot (primary, secondary, strobe, motion)', () => {
     const handler = new YargCueHandler(makeLightManager(), makeSequencer())
 
     const primary = makeFakeCue(CueStyle.Primary, 'primary')
@@ -119,11 +116,6 @@ describe('YargCueHandler shutdown lifecycle', () => {
     expect(secondary.onStop).toHaveBeenCalledTimes(1)
     expect(strobe.onStop).toHaveBeenCalledTimes(1)
     expect(motion.onStop).toHaveBeenCalledTimes(1)
-
-    expect(primary.onDestroy).not.toHaveBeenCalled()
-    expect(secondary.onDestroy).not.toHaveBeenCalled()
-    expect(strobe.onDestroy).not.toHaveBeenCalled()
-    expect(motion.onDestroy).not.toHaveBeenCalled()
 
     expect(internals.currentPrimaryCue).toBeNull()
     expect(internals.currentSecondaryCue).toBeNull()

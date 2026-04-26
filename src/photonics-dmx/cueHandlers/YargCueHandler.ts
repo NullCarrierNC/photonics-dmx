@@ -469,7 +469,7 @@ class YargCueHandler extends EventEmitter {
    * literally destroyed when this handler tears down; the same instances are reused
    * by the next handler. We call `onStop()` so each cue's `CueSession` is reset
    * (`cueStartedFired` cleared, engine nulled) and the next activation can fire
-   * `cue-started` from a clean state. `onDestroy()` is a no-op for node cues.
+   * `cue-started` from a clean state.
    */
   public shutdown(): void {
     if (this.currentPrimaryCue) {
