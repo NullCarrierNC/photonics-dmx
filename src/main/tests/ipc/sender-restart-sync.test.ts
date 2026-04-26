@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals'
 import { ControllerManager } from '../../controllers/ControllerManager'
+import { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
 
 type SenderManagerLike = {
   enableSender: jest.Mock<any>
@@ -14,10 +15,20 @@ function makeManagerForRestore(prefs: Record<string, unknown>): {
   const senderManager: SenderManagerLike = {
     enableSender: jest.fn().mockImplementation(() => Promise.resolve()),
   }
+  const config = { getAllPreferences: () => prefs }
+  const sl = Object.create(SenderLifecycleController.prototype) as {
+    getConfig: () => typeof config
+    senderManager: SenderManagerLike
+    senderErrorHandler: (e: unknown) => void
+    senderErrorTrackingCallback: null
+  }
+  sl.getConfig = () => config
+  sl.senderManager = senderManager
+  sl.senderErrorHandler = () => {}
+  sl.senderErrorTrackingCallback = null
   const manager = Object.create(ControllerManager.prototype) as any
-  manager.config = { getAllPreferences: () => prefs }
-  manager.senderManager = senderManager
-  manager.ensureSenderManager = jest.fn()
+  manager.config = config
+  manager.senderLifecycle = sl
   return { manager: manager as ControllerManager, senderManager }
 }
 
@@ -130,11 +141,7 @@ describe('ControllerManager sender restore lifecycle', () => {
 
   it('restartControllers always performs post-init sender restore', async () => {
     const setManualBuffer = jest.fn()
-    const senderManager = {
-      isSenderEnabled: jest.fn((id: string) => id === 'sacn'),
-      shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-    }
-    const fake = {
+    const fake: any = {
       listenerCoordinator: {
         getIsYargEnabled: jest.fn().mockReturnValue(false),
         getIsRb3Enabled: jest.fn().mockReturnValue(false),
@@ -159,16 +166,27 @@ describe('ControllerManager sender restore lifecycle', () => {
         this.dmxPublisher = { setManualBuffer }
         return Promise.resolve()
       }),
+    }
+    fake.senderLifecycle = {
+      resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+      getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue({
+        sacn: true,
+        artnet: false,
+        enttecpro: false,
+        opendmx: false,
+      }),
       restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      senderManager,
+    }
+    fake.consoleMode = {
+      onControllersReinitializedWhileConsoleOpen: jest.fn(),
     }
 
     await ControllerManager.prototype.restartControllers.call(fake)
 
-    expect(senderManager.shutdown).toHaveBeenCalledTimes(1)
+    expect(fake.senderLifecycle.resetSenderForControllerRestart).toHaveBeenCalledTimes(1)
     expect(fake.init).toHaveBeenCalledTimes(1)
-    expect(fake.restoreSenderOutputsFromPrefs).toHaveBeenCalledTimes(1)
-    expect(fake.restoreSenderOutputsFromPrefs).toHaveBeenCalledWith({
+    expect(fake.senderLifecycle.restoreSenderOutputsFromPrefs).toHaveBeenCalledTimes(1)
+    expect(fake.senderLifecycle.restoreSenderOutputsFromPrefs).toHaveBeenCalledWith({
       sacn: true,
       artnet: false,
       enttecpro: false,
@@ -179,11 +197,7 @@ describe('ControllerManager sender restore lifecycle', () => {
 
   it('restartControllers reapplies manual mode when console mode is active', async () => {
     const setManualBuffer = jest.fn()
-    const senderManager = {
-      isSenderEnabled: jest.fn((id: string) => id === 'sacn'),
-      shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
-    }
-    const fake = {
+    const fake: any = {
       listenerCoordinator: {
         getIsYargEnabled: jest.fn().mockReturnValue(false),
         getIsRb3Enabled: jest.fn().mockReturnValue(false),
@@ -208,8 +222,23 @@ describe('ControllerManager sender restore lifecycle', () => {
         this.dmxPublisher = { setManualBuffer }
         return Promise.resolve()
       }),
+    }
+    fake.senderLifecycle = {
+      resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+      getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue({
+        sacn: true,
+        artnet: false,
+        enttecpro: false,
+        opendmx: false,
+      }),
       restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
-      senderManager,
+    }
+    fake.consoleMode = {
+      onControllersReinitializedWhileConsoleOpen: () => {
+        if (fake.consoleRestore != null) {
+          fake.dmxPublisher?.setManualBuffer({})
+        }
+      },
     }
 
     await ControllerManager.prototype.restartControllers.call(fake)
@@ -255,51 +284,23 @@ describe('ControllerManager sender restore lifecycle', () => {
     })
   })
 
-  it('enableConsoleMode stops active simulation via onConsoleEnter callback', async () => {
-    const onConsoleEnter = jest.fn()
-    const setManualBuffer = jest.fn()
-    const fake = {
-      init: jest.fn().mockImplementation(() => Promise.resolve()),
-      config: {
-        getDmxRig: jest.fn().mockReturnValue({ id: 'rig-1' }),
-      },
-      onConsoleEnter,
-      consoleRestore: null,
-      listenerCoordinator: {
-        getIsYargEnabled: jest.fn().mockReturnValue(false),
-        getIsRb3Enabled: jest.fn().mockReturnValue(false),
-      },
-      getIsAudioEnabled: jest.fn().mockReturnValue(false),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
-      dmxPublisher: { setManualBuffer },
-    }
-
+  it('ControllerManager enableConsoleMode delegates to ConsoleModeController', async () => {
+    const enableConsoleMode = jest
+      .fn<(rigId: string) => Promise<{ success: true }>>()
+      .mockResolvedValue({ success: true })
+    const fake = { consoleMode: { enableConsoleMode } }
     const result = await ControllerManager.prototype.enableConsoleMode.call(fake, 'rig-1')
-
+    expect(enableConsoleMode).toHaveBeenCalledWith('rig-1')
     expect(result).toEqual({ success: true })
-    expect(onConsoleEnter).toHaveBeenCalledTimes(1)
-    expect(setManualBuffer).toHaveBeenCalledWith({})
   })
 
-  it('disableConsoleMode always restores saved listeners and audio after clearing manual mode', async () => {
-    const clearManualBuffer = jest.fn()
-    const fake = {
-      consoleRestore: { yarg: false, rb3: true, audio: true },
-      dmxPublisher: { clearManualBuffer },
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
-    }
-
+  it('ControllerManager disableConsoleMode delegates to ConsoleModeController', async () => {
+    const disableConsoleMode = jest
+      .fn<() => Promise<{ success: true }>>()
+      .mockResolvedValue({ success: true })
+    const fake = { consoleMode: { disableConsoleMode } }
     const result = await ControllerManager.prototype.disableConsoleMode.call(fake)
-
+    expect(disableConsoleMode).toHaveBeenCalledTimes(1)
     expect(result).toEqual({ success: true })
-    expect(clearManualBuffer).toHaveBeenCalledTimes(1)
-    expect(fake.enableYarg).not.toHaveBeenCalled()
-    expect(fake.enableRb3).toHaveBeenCalledTimes(1)
-    expect(fake.enableAudio).toHaveBeenCalledTimes(1)
-    expect(fake.consoleRestore).toBeNull()
   })
 })
