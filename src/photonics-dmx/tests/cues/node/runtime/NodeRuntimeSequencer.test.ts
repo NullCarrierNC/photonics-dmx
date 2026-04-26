@@ -471,89 +471,94 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('blocks execution through delay nodes', async () => {
-    const eventNode: YargEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
+    jest.useFakeTimers()
+    try {
+      const eventNode: YargEventNode = {
+        id: 'event-1',
+        type: 'event',
+        eventType: 'beat',
+      }
+
+      const delayNode: LogicNode = {
+        id: 'delay-1',
+        type: 'logic',
+        logicType: 'delay',
+        delayTime: { source: 'literal', value: 20 },
+      }
+
+      const actionNode: ActionNode = {
+        id: 'action-1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'blue' },
+          brightness: { source: 'literal', value: 'high' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 0 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+
+      const definition: YargNodeCueDefinition = {
+        id: 'delay-test',
+        name: 'Delay Test',
+        kind: 'lighting',
+        cueType: CueType.Default,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [delayNode],
+          eventRaisers: [],
+          eventListeners: [],
+          effectRaisers: [],
+        },
+        connections: [
+          { from: 'event-1', to: 'delay-1' },
+          { from: 'delay-1', to: 'action-1' },
+        ],
+      }
+
+      const engine = new NodeExecutionEngine(
+        compileCue(definition),
+        'test-group:delay-test',
+        harness.sequencer,
+        harness.lightManager,
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+
+      engine.startExecution(eventNode, createCueData())
+      harness.advanceBy(1)
+
+      const lightId = harness.frontLightIds[0]
+      const beforeDelay = harness.getLightState(lightId)
+      expect(beforeDelay?.intensity ?? 0).toBe(0)
+
+      jest.advanceTimersByTime(25)
+      harness.advanceBy(1)
+
+      const afterDelay = harness.getLightState(lightId)
+      const expected = getColor('blue', 'high')
+      expect(afterDelay).toMatchObject({
+        red: expected.red,
+        green: expected.green,
+        blue: expected.blue,
+        blendMode: expected.blendMode,
+      })
+    } finally {
+      jest.useRealTimers()
     }
-
-    const delayNode: LogicNode = {
-      id: 'delay-1',
-      type: 'logic',
-      logicType: 'delay',
-      delayTime: { source: 'literal', value: 20 },
-    }
-
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: YargNodeCueDefinition = {
-      id: 'delay-test',
-      name: 'Delay Test',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [delayNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'delay-1' },
-        { from: 'delay-1', to: 'action-1' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:delay-test',
-      harness.sequencer,
-      harness.lightManager,
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const lightId = harness.frontLightIds[0]
-    const beforeDelay = harness.getLightState(lightId)
-    expect(beforeDelay?.intensity ?? 0).toBe(0)
-
-    jest.advanceTimersByTime(25)
-    harness.advanceBy(1)
-
-    const afterDelay = harness.getLightState(lightId)
-    const expected = getColor('blue', 'high')
-    expect(afterDelay).toMatchObject({
-      red: expected.red,
-      green: expected.green,
-      blue: expected.blue,
-      blendMode: expected.blendMode,
-    })
   })
 
   it('waits until beat to complete action', () => {

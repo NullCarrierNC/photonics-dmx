@@ -63,6 +63,7 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore (define in dts)
+  // Preload not context-isolated; window.api is declared in env.d.ts for that dev setup.
+  // @ts-expect-error -- assign api when contextIsolation is false
   window.api = api
 }
