@@ -2,6 +2,7 @@
  * Lightweight IPC tests for motion preference channels registered in config-handlers.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { ConfigStrobeType } from '../../../photonics-dmx/types'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 const mockIpcMain = {
@@ -39,7 +40,8 @@ const mockConfig = {
     (domain: string, patch: Record<string, unknown>) => Promise<void>
   >,
   getDmxRig: jest.fn(),
-  saveDmxRig: jest.fn(async () => {}),
+  drainConfigCorruptRecovery: jest.fn().mockReturnValue([]),
+  saveDmxRig: jest.fn(async () => {}) as jest.MockedFunction<(rig: object) => Promise<void>>,
   deleteDmxRig: jest.fn(async () => {}),
   getDmxRigs: jest.fn(async () => []),
   getLightLibrary: jest.fn().mockReturnValue([]),
@@ -253,6 +255,43 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       const result = await handler({}, { groupId: '', cueId: 'x' })
       expect(result).toMatchObject({ success: false })
       expect(mockConfig.updateCueDomain).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('SAVE_DMX_RIG', () => {
+    const validLayout = {
+      numLights: 0,
+      lightLayout: { id: 'default-layout', label: 'Default' },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [],
+      backLights: [],
+      strobeLights: [],
+    }
+
+    it('rejects when rig config fails lighting layout validation', async () => {
+      const handler = handlers.get(CONFIG.SAVE_DMX_RIG)!
+      const result = await handler(
+        {},
+        { id: 'r1', name: 'R', active: true, config: { numLights: 'bad' } },
+      )
+      expect(result).toMatchObject({
+        success: false,
+        error: expect.stringContaining('DmxRig.config'),
+      })
+      expect(mockConfig.saveDmxRig).not.toHaveBeenCalled()
+    })
+
+    it('persists validated rig', async () => {
+      mockConfig.getDmxRig.mockReturnValue(null)
+      const handler = handlers.get(CONFIG.SAVE_DMX_RIG)!
+      const result = await handler(
+        {},
+        { id: 'r1', name: 'My rig', active: true, config: validLayout },
+      )
+      expect(result).toEqual({ success: true })
+      expect(mockConfig.saveDmxRig).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'r1', name: 'My rig', active: true, config: validLayout }),
+      )
     })
   })
 })

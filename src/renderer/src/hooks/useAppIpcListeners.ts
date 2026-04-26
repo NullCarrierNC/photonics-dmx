@@ -6,7 +6,13 @@ import type { LightingPreferences } from '../atoms'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { AudioCaptureManager } from '../services/AudioCaptureManager'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAppVersion, getPrefs, getValidationErrors, saveLightLayout } from '../ipcApi'
+import {
+  getAppVersion,
+  getCorruptRecoveryEvents,
+  getPrefs,
+  getValidationErrors,
+  saveLightLayout,
+} from '../ipcApi'
 import type { CueStateUpdatePayload } from '../../../shared/ipcTypes'
 
 export interface UseAppIpcListenersParams {
@@ -25,6 +31,9 @@ export interface UseAppIpcListenersParams {
   handleCueValidationErrors: (
     errors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>,
   ) => void
+  handleConfigCorruptRecovered: (payload: {
+    files: { fileName: string; message?: string }[]
+  }) => void
   handleAudioEnable: (config: AudioConfig) => void | Promise<void>
   handleAudioDisable: (payload: undefined) => void
   handleAudioConfigUpdate: (config: AudioConfig | undefined) => void
@@ -50,6 +59,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     handleCueStateUpdate,
     handleSenderStartFailure,
     handleCueValidationErrors,
+    handleConfigCorruptRecovered,
     handleAudioEnable,
     handleAudioDisable,
     handleAudioConfigUpdate,
@@ -162,6 +172,19 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable)
     addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable)
     addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate)
+    addIpcListener(RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED, handleConfigCorruptRecovered)
+
+    const fetchConfigCorruptRecovery = async (): Promise<void> => {
+      try {
+        const { files } = await getCorruptRecoveryEvents()
+        if (files.length > 0) {
+          handleConfigCorruptRecovered({ files })
+        }
+      } catch (error) {
+        console.error('Failed to fetch config corrupt recovery events:', error)
+      }
+    }
+    void fetchConfigCorruptRecovery()
 
     const saveLayout = async () => {
       if (activeConfig) {
@@ -185,6 +208,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate)
+      removeIpcListener(RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED, handleConfigCorruptRecovered)
 
       if (audioCaptureManager) {
         audioCaptureManager.stop()
@@ -199,6 +223,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     handleCueStateUpdate,
     handleSenderStartFailure,
     handleCueValidationErrors,
+    handleConfigCorruptRecovered,
     handleAudioEnable,
     handleAudioDisable,
     handleAudioConfigUpdate,

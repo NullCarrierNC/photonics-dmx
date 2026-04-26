@@ -13,6 +13,7 @@ jest.mock('fs', () => ({
   readFileSync: jest.fn(),
   writeFileSync: jest.fn(),
   mkdirSync: jest.fn(),
+  renameSync: jest.fn(),
 }))
 
 jest.mock('fs/promises', () => ({
@@ -209,6 +210,116 @@ describe('ConfigurationManager', () => {
       expect(savedData).toHaveProperty('version', 4)
       expect(savedData).toHaveProperty('data')
       expect(savedData.data).toHaveProperty('effectDebounce', 100)
+    })
+  })
+
+  describe('Corrupt config on disk (Phase 3)', () => {
+    it('renames an unparsable prefs file, uses defaults, and reports recovery', () => {
+      ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('prefs.json')) {
+          return '{ "broken": true'
+        }
+        if (path.includes('lights.json')) {
+          return JSON.stringify({ lights: [] })
+        }
+        if (path.includes('lightsLayout.json')) {
+          return JSON.stringify({
+            numLights: 0,
+            lightLayout: { id: 'default-layout', label: 'Default Layout' },
+            strobeType: ConfigStrobeType.None,
+            frontLights: [],
+            backLights: [],
+            strobeLights: [],
+          })
+        }
+        if (path.includes('dmxRigs.json')) {
+          return JSON.stringify({ version: 1, data: { rigs: [] } })
+        }
+        return '{}'
+      })
+      const cm = new ConfigurationManager()
+      expect(fs.renameSync).toHaveBeenCalled()
+      const renameCall = (fs.renameSync as jest.Mock).mock.calls.find((c) =>
+        String(c[0]).endsWith('prefs.json'),
+      )
+      expect(renameCall).toBeDefined()
+      expect(String(renameCall![1])).toMatch(/\.corrupt-.*\.json$/)
+      expect(String(renameCall![1])).toContain('prefs')
+
+      const reported = cm.drainConfigCorruptRecovery()
+      expect(reported.some((r) => r.fileName === 'prefs.json' && r.reason === 'parse')).toBe(true)
+    })
+
+    it('does not write default prefs to disk if preserving the corrupt file by rename fails', () => {
+      ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('prefs.json')) {
+          return '{ "broken": true'
+        }
+        if (path.includes('lights.json')) {
+          return JSON.stringify({ lights: [] })
+        }
+        if (path.includes('lightsLayout.json')) {
+          return JSON.stringify({
+            numLights: 0,
+            lightLayout: { id: 'default-layout', label: 'Default Layout' },
+            strobeType: ConfigStrobeType.None,
+            frontLights: [],
+            backLights: [],
+            strobeLights: [],
+          })
+        }
+        if (path.includes('dmxRigs.json')) {
+          return JSON.stringify({ version: 1, data: { rigs: [] } })
+        }
+        return '{}'
+      })
+      ;(fs.renameSync as jest.Mock).mockImplementation((from: string) => {
+        if (String(from).includes('prefs.json')) {
+          throw new Error('EBUSY')
+        }
+      })
+      ;(fsPromises.writeFile as jest.Mock).mockClear()
+      new ConfigurationManager()
+      const prefsWrites = (fsPromises.writeFile as jest.Mock).mock.calls.filter((c) =>
+        String(c[0]).toLowerCase().includes('prefs'),
+      )
+      expect(prefsWrites).toHaveLength(0)
+    })
+
+    it('renames a valid JSON file that fails schema validation, uses defaults, and reports recovery', () => {
+      ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('dmxRigs.json')) {
+          return JSON.stringify({ version: 1, data: { rigs: 1 } })
+        }
+        if (path.includes('prefs.json')) {
+          return JSON.stringify({ effectDebounce: 0, complex: true })
+        }
+        if (path.includes('lights.json')) {
+          return JSON.stringify({ lights: [] })
+        }
+        if (path.includes('lightsLayout.json')) {
+          return JSON.stringify({
+            numLights: 0,
+            lightLayout: { id: 'default-layout', label: 'Default Layout' },
+            strobeType: ConfigStrobeType.None,
+            frontLights: [],
+            backLights: [],
+            strobeLights: [],
+          })
+        }
+        return '{}'
+      })
+      const cm = new ConfigurationManager()
+      expect(fs.renameSync).toHaveBeenCalled()
+      const nameMatch = (fs.renameSync as jest.Mock).mock.calls.find((c) =>
+        String(c[0]).endsWith('dmxRigs.json'),
+      )
+      expect(nameMatch).toBeDefined()
+
+      const reported = cm.drainConfigCorruptRecovery()
+      expect(reported.some((r) => r.fileName === 'dmxRigs.json' && r.reason === 'schema')).toBe(
+        true,
+      )
     })
   })
 })

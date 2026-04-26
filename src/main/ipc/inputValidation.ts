@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as net from 'net'
 import type {
   ArtNetSenderConfig,
+  DmxRig,
   IpcSenderConfig,
   LightingConfiguration,
   SacnSenderConfig,
@@ -329,6 +330,34 @@ export function validateLightingConfiguration(
     strobeLights: data.strobeLights as LightingConfiguration['strobeLights'],
   }
   return { ok: true, value }
+}
+
+export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'DmxRig must be a plain object' }
+  }
+  if (typeof data.id !== 'string' || data.id.trim().length === 0) {
+    return { ok: false, error: 'DmxRig.id must be a non-empty string' }
+  }
+  if (typeof data.name !== 'string' || data.name.trim().length === 0) {
+    return { ok: false, error: 'DmxRig.name must be a non-empty string' }
+  }
+  if (typeof data.active !== 'boolean') {
+    return { ok: false, error: 'DmxRig.active must be a boolean' }
+  }
+  const cfg = validateLightingConfiguration(data.config)
+  if (!cfg.ok) {
+    return { ok: false, error: `DmxRig.config: ${cfg.error}` }
+  }
+  return {
+    ok: true,
+    value: {
+      id: data.id.trim(),
+      name: data.name.trim(),
+      active: data.active,
+      config: cfg.value,
+    },
+  }
 }
 
 export function validatePathUnderAllowedRoots(

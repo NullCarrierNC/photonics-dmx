@@ -63,6 +63,16 @@ describe('migratePrefsV3ToV4', () => {
     expect(out.openDmxConfig!.port).toBe('/dev/cu.usb')
     expect(out.openDmxConfig!.dmxSpeed).toBe(30)
   })
+
+  it('is idempotent when the input is already a merged v4 object', () => {
+    const flatV3 = {
+      effectDebounce: 1,
+      enabledCueGroups: ['a'],
+    }
+    const once = migratePrefsV3ToV4(flatV3, DEFAULT_PREFERENCES)
+    const again = migratePrefsV3ToV4(once, DEFAULT_PREFERENCES)
+    expect(again).toEqual(once)
+  })
 })
 
 describe('applyLegacySenderFlatToNested', () => {

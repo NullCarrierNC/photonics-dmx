@@ -129,6 +129,8 @@ export const CONFIG = {
   DELETE_DMX_RIG: 'delete-dmx-rig',
   GET_APP_VERSION: 'get-app-version',
   GET_VALIDATION_ERRORS: 'get-validation-errors',
+  /** Drain buffered config file parse/schema recovery events (see Phase 3). */
+  GET_CORRUPT_RECOVERY_EVENTS: 'get-corrupt-recovery-events',
   GET_PREFS: 'get-prefs',
   SAVE_PREFS: 'save-prefs',
   GET_ENABLED_CUE_GROUPS: 'get-enabled-cue-groups',
@@ -213,6 +215,8 @@ export const RENDERER_RECEIVE = {
   AUDIO_DATA_MIRROR: 'audio:data-mirror',
   CUE_STATE_UPDATE: 'cue-state-update',
   DMX_VALUES: 'dmx-values',
+  /** A persisted JSON file failed parse or schema; bad file was renamed, defaults were written. */
+  CONFIG_CORRUPT_RECOVERED: 'config:corrupt-recovered',
   CUE_HANDLED: 'cue-handled',
   NODE_CUES_CHANGED: 'node-cues:changed',
   EFFECTS_CHANGED: 'effects:changed',

@@ -7,6 +7,7 @@
  *   - Bug 3: setConsoleFixtureConfig only called refreshActiveRigs, leaving sequencer stale
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { ConfigStrobeType } from '../../../photonics-dmx/types'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { LIGHT } from '../../../shared/ipcChannels'
 
@@ -84,7 +85,7 @@ function makeRig(id: string, active: boolean) {
     config: {
       numLights: 0,
       lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
-      strobeType: 'none',
+      strobeType: ConfigStrobeType.None,
       frontLights: [],
       backLights: [],
       strobeLights: [],

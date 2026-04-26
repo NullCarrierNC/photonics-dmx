@@ -125,6 +125,18 @@ export const App = (): JSX.Element => {
     [showToast],
   )
 
+  const handleConfigCorruptRecovered = useCallback(
+    (payload: { files: { fileName: string; message?: string }[] }): void => {
+      const list = payload.files.map((f) => f.fileName).join(', ')
+      showToast(
+        `A local settings file was invalid. Defaults were restored; your original file was saved as a backup. (${list})`,
+        'warning',
+        10000,
+      )
+    },
+    [showToast],
+  )
+
   // Handler for cue state updates
   const handleCueStateUpdate = useCallback(
     (cueState: CueStateUpdatePayload): void => {
@@ -395,6 +407,7 @@ export const App = (): JSX.Element => {
     handleCueStateUpdate,
     handleSenderStartFailure,
     handleCueValidationErrors,
+    handleConfigCorruptRecovered,
     handleAudioEnable,
     handleAudioDisable,
     handleAudioConfigUpdate,

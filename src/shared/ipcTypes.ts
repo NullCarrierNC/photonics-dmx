@@ -78,6 +78,7 @@ import type {
 import type { CueData, CueType } from '../photonics-dmx/cues/types/cueTypes'
 import type { AudioCueType } from '../photonics-dmx/cues/types/audioCueTypes'
 import type { AppPreferences } from '../services/configuration/ConfigurationManager'
+import type { ConfigCorruptInfo } from '../services/configuration/configCorruptTypes'
 import type {
   DmxFixture,
   FixtureConfig,
@@ -560,7 +561,7 @@ export interface IpcInvokeMap {
     response: DmxRig[]
   }
   [CONFIG.SAVE_DMX_RIG]: {
-    request: DmxRig
+    request: unknown
     response: IpcSuccessResult | IpcErrorResult
   }
   [CONFIG.DELETE_DMX_RIG]: {
@@ -574,6 +575,10 @@ export interface IpcInvokeMap {
   [CONFIG.GET_VALIDATION_ERRORS]: {
     request: void
     response: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>
+  }
+  [CONFIG.GET_CORRUPT_RECOVERY_EVENTS]: {
+    request: void
+    response: { files: ConfigCorruptInfo[] }
   }
   [CONFIG.GET_PREFS]: {
     request: void
@@ -814,6 +819,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_DATA_MIRROR]: AudioLightingData
   [RENDERER_RECEIVE.CUE_STATE_UPDATE]: CueStateUpdatePayload
   [RENDERER_RECEIVE.DMX_VALUES]: { universeBuffer: Record<number, number> }
+  [RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED]: { files: ConfigCorruptInfo[] }
   [RENDERER_RECEIVE.CUE_HANDLED]: CueData
   [RENDERER_RECEIVE.NODE_CUES_CHANGED]: NodeCueListSummary
   [RENDERER_RECEIVE.EFFECTS_CHANGED]: EffectListSummary

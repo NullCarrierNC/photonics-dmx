@@ -6,7 +6,6 @@ import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegi
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers'
-import { DmxRig } from '../../photonics-dmx/types'
 import { ipcError } from './ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import {
@@ -18,6 +17,7 @@ import {
   validateAudioConfigPayload,
   validateAudioGameModePayload,
   validateDisabledCuesMap,
+  validateDmxRigPayload,
 } from './inputValidation'
 
 /**
@@ -116,11 +116,13 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   })
 
   // Save or update a DMX rig
-  ipcMain.handle(CONFIG.SAVE_DMX_RIG, async (_, rig: DmxRig) => {
+  ipcMain.handle(CONFIG.SAVE_DMX_RIG, async (_, payload: unknown) => {
     try {
-      if (!isPlainObject(rig) || typeof rig.id !== 'string' || rig.id.trim().length === 0) {
-        return { success: false, error: 'Invalid DMX rig payload' }
+      const validation = validateDmxRigPayload(payload)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
       }
+      const rig = validation.value
       const config = controllerManager.getConfig()
       const existingRig = config.getDmxRig(rig.id)
       const previousActiveState = existingRig?.active ?? false
@@ -140,7 +142,7 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
       return { success: true }
     } catch (error) {
-      console.error(`Error saving DMX rig ${rig.id}:`, error)
+      console.error('Error saving DMX rig:', error)
       return ipcError(error)
     }
   })
@@ -178,6 +180,11 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
   // Get and clear buffered validation errors from cue/effect load (before window existed)
   ipcMain.handle(CONFIG.GET_VALIDATION_ERRORS, () => {
     return controllerManager.flushValidationErrors()
+  })
+
+  // Drain and return config file parse/schema recovery events (main window should invoke after listeners mount)
+  ipcMain.handle(CONFIG.GET_CORRUPT_RECOVERY_EVENTS, () => {
+    return { files: controllerManager.getConfig().drainConfigCorruptRecovery() }
   })
 
   // Get app preferences

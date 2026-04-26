@@ -297,6 +297,9 @@ export const getAppVersion = () => window.api.invoke(CONFIG.GET_APP_VERSION, und
 
 export const getValidationErrors = () => window.api.invoke(CONFIG.GET_VALIDATION_ERRORS, undefined)
 
+export const getCorruptRecoveryEvents = () =>
+  window.api.invoke(CONFIG.GET_CORRUPT_RECOVERY_EVENTS, undefined)
+
 // ---------------------------------------------------------------------------
 // System status
 // ---------------------------------------------------------------------------
