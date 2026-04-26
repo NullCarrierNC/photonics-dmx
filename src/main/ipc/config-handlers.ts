@@ -6,12 +6,13 @@ import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegi
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers'
-import { DmxRig, DmxFixture } from '../../photonics-dmx/types'
+import { DmxRig } from '../../photonics-dmx/types'
 import { ipcError } from './ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import {
   isPlainObject,
   validateLightingConfiguration,
+  validateDmxFixturesArray,
   validateOptionalStringArray,
   validatePreferencesPayload,
   validateAudioConfigPayload,
@@ -37,13 +38,14 @@ export function setupConfigHandlers(ipcMain: IpcMain, controllerManager: Control
 
   // Save user's lights
   ipcMain.on(CONFIG.SAVE_MY_LIGHTS, (_, data: unknown) => {
-    if (!Array.isArray(data)) {
-      console.error('SAVE_MY_LIGHTS: payload must be an array')
+    const v = validateDmxFixturesArray(data, 'myLights')
+    if (!v.ok) {
+      console.error('SAVE_MY_LIGHTS: invalid payload:', v.error)
       return
     }
     controllerManager
       .getConfig()
-      .updateUserLights(data as DmxFixture[])
+      .updateUserLights(v.value)
       .catch((err) => {
         console.error('SAVE_MY_LIGHTS failed:', err)
       })

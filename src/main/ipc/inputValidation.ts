@@ -21,7 +21,8 @@ import {
   AUDIO_BAND_GAIN_MIN,
   type AudioGameModeConfig,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import type { Brightness, Color } from '../../photonics-dmx/types'
+import type { Brightness, Color, DmxFixture } from '../../photonics-dmx/types'
+import { FixtureTypes } from '../../photonics-dmx/types'
 
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
@@ -789,4 +790,43 @@ export function validateAudioGameModePayload(
   }
 
   return { ok: true, value: merged }
+}
+
+const FIXTURE_TYPE_VALUES = new Set<string>(Object.values(FixtureTypes))
+
+/**
+ * Structural validation for CONFIG.SAVE_MY_LIGHTS (user-edited DMX fixture list from the renderer).
+ */
+export function validateDmxFixturesArray(
+  value: unknown,
+  fieldName: string = 'lights',
+): ValidationResult<DmxFixture[]> {
+  if (!Array.isArray(value)) {
+    return { ok: false, error: `${fieldName} must be an array` }
+  }
+  for (let i = 0; i < value.length; i++) {
+    const el = value[i]
+    if (!isPlainObject(el)) {
+      return { ok: false, error: `${fieldName}[${i}] must be an object` }
+    }
+    if (el.id != null && typeof el.id !== 'string') {
+      return { ok: false, error: `${fieldName}[${i}].id must be string or null` }
+    }
+    if (typeof el.position !== 'number' || !Number.isFinite(el.position)) {
+      return { ok: false, error: `${fieldName}[${i}].position must be a number` }
+    }
+    if (el.fixture == null || !FIXTURE_TYPE_VALUES.has(String(el.fixture))) {
+      return { ok: false, error: `${fieldName}[${i}].fixture must be a valid fixture type` }
+    }
+    if (typeof el.label !== 'string' || typeof el.name !== 'string') {
+      return { ok: false, error: `${fieldName}[${i}].label and name must be strings` }
+    }
+    if (typeof el.isStrobeEnabled !== 'boolean') {
+      return { ok: false, error: `${fieldName}[${i}].isStrobeEnabled must be a boolean` }
+    }
+    if (!isPlainObject(el.channels)) {
+      return { ok: false, error: `${fieldName}[${i}].channels must be an object` }
+    }
+  }
+  return { ok: true, value: value as DmxFixture[] }
 }

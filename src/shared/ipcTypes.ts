@@ -94,6 +94,15 @@ import type {
 // ---------------------------------------------------------------------------
 // Shared response shapes
 // ---------------------------------------------------------------------------
+//
+// Invoke (ipcMain.handle) conventions:
+// - Read-only / query channels may return a plain DTO, null, or a typed union; see IpcInvokeMap.
+// - State-changing and validation-gated channels should return IpcSuccessResult, { success: true, ... }
+//   with a payload, or IpcErrorResult, so the renderer can branch on result.success without
+//   treating thrown errors as a second control path.
+// - Use ipcError() / ipcSuccess() from main/ipc/ipcResult in handlers. Throw only for unexpected
+//   failures; document channels that still reject in IpcInvokeMap.
+//
 
 export interface IpcErrorResult {
   success: false
@@ -200,11 +209,11 @@ export interface IpcInvokeMap {
   // ---- Shell ----
   [SHELL.SHOW_ITEM_IN_FOLDER]: {
     request: string
-    response: string
+    response: IpcSuccessResult | IpcErrorResult
   }
   [SHELL.OPEN_PATH]: {
     request: string
-    response: string
+    response: IpcErrorResult | { success: true; result: string }
   }
   [SHELL.RUN_NODE_SCRIPT]: {
     request: { scriptName: string; args: string[] }
