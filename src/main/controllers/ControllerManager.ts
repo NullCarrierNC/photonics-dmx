@@ -21,8 +21,7 @@ import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
 import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager'
 import { TestEffectRunner } from './TestEffectRunner'
-import { ListenerCoordinator } from './ListenerCoordinator'
-import { AudioController } from './AudioController'
+import { ListenerLifecycleController } from './ListenerLifecycleController'
 import {
   SenderLifecycleController,
   type OutputSenderStateSnapshot,
@@ -42,6 +41,24 @@ import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoade
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
 
+/**
+ * Runtime lifecycle of the main-process controller graph.
+ *
+ * Transitions (call graph):
+ * - [construction] → `initializing` (until first successful `init()`)
+ * - `init()` (cold): `initializing` → `running` when complete. Idempotent when already `running` + initialized.
+ * - `restartControllers()`: `running` or `consoleMode` → `restarting` for teardown/reinit, then
+ *   `running` or `consoleMode` (restored) when complete.
+ * - `enableConsoleMode` (after success): `running` → `consoleMode`. `disableConsoleMode`: `consoleMode` → `running`.
+ * - `shutdown()`: from `initializing` (if early exit) or `running` or `restarting` or `consoleMode` → `shuttingDown`.
+ */
+export type LifecyclePhase =
+  | 'initializing'
+  | 'running'
+  | 'restarting'
+  | 'consoleMode'
+  | 'shuttingDown'
+
 export class ControllerManager {
   private config: ConfigurationManager
   private dmxLightManager: DmxLightManager | null = null
@@ -59,12 +76,12 @@ export class ControllerManager {
 
   private readonly testEffectRunner: TestEffectRunner
   private readonly senderLifecycle: SenderLifecycleController
-  private readonly listenerCoordinator: ListenerCoordinator
-  private readonly audioController: AudioController
+  private readonly listenerLifecycle: ListenerLifecycleController
   private readonly registryInit: RegistryInitializer
   private readonly consoleMode: ConsoleModeController
 
   private isInitialized = false
+  private lifecyclePhase: LifecyclePhase = 'initializing'
 
   constructor() {
     this.config = new ConfigurationManager()
@@ -95,30 +112,32 @@ export class ControllerManager {
         this.cueHandler = h
       },
     })
-    this.listenerCoordinator = new ListenerCoordinator({
-      getDmxLightManager: () => this.dmxLightManager,
-      getEffectsController: () => this.effectsController,
-      getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
-      getActiveYargMotionCueRef: () =>
-        this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
-      getMotionCueMinimumHoldMs: () =>
-        this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
-      getMotionCueProbabilityPercent: () =>
-        this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
-      sendSenderError: (message: string) => {
-        sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
+    this.listenerLifecycle = new ListenerLifecycleController(
+      {
+        getDmxLightManager: () => this.dmxLightManager,
+        getEffectsController: () => this.effectsController,
+        getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
+        getActiveYargMotionCueRef: () =>
+          this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
+        getMotionCueMinimumHoldMs: () =>
+          this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+        getMotionCueProbabilityPercent: () =>
+          this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
+        sendSenderError: (message: string) => {
+          sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
+        },
+        sendToAllWindows,
+        setCueHandlerRef: (h) => {
+          this.cueHandler = h
+        },
       },
-      sendToAllWindows,
-      setCueHandlerRef: (h) => {
-        this.cueHandler = h
+      {
+        getDmxLightManager: () => this.dmxLightManager,
+        getEffectsController: () => this.effectsController,
+        config: this.config,
+        sendToAllWindows,
       },
-    })
-    this.audioController = new AudioController({
-      getDmxLightManager: () => this.dmxLightManager,
-      getEffectsController: () => this.effectsController,
-      config: this.config,
-      sendToAllWindows,
-    })
+    )
     this.registryInit = new RegistryInitializer({
       getConfig: () => this.config,
       sendToAllWindows,
@@ -142,8 +161,8 @@ export class ControllerManager {
       ensureInitialized: () => this.init(),
       getDmxPublisher: () => this.dmxPublisher,
       getListenerSnapshot: () => ({
-        yarg: this.listenerCoordinator.getIsYargEnabled(),
-        rb3: this.listenerCoordinator.getIsRb3Enabled(),
+        yarg: this.listenerLifecycle.yargRb3.getIsYargEnabled(),
+        rb3: this.listenerLifecycle.yargRb3.getIsRb3Enabled(),
       }),
       getIsAudioEnabled: () => this.getIsAudioEnabled(),
       pauseYarg: () => this.disableYarg(),
@@ -159,11 +178,28 @@ export class ControllerManager {
     })
   }
 
+  private assertPhase(allowed: readonly LifecyclePhase[], context: string): void {
+    if (!allowed.includes(this.lifecyclePhase)) {
+      throw new Error(
+        `ControllerManager: invalid lifecycle for ${context} (phase=${this.lifecyclePhase}, allowed=[${allowed.join(
+          ', ',
+        )}])`,
+      )
+    }
+  }
+
+  public getLifecyclePhase(): LifecyclePhase {
+    return this.lifecyclePhase
+  }
+
   /**
    * Initialize all controllers and systems
    */
   public async init(): Promise<void> {
-    if (this.isInitialized) return
+    if (this.isInitialized) {
+      return
+    }
+    this.assertPhase(['initializing', 'restarting'], 'init')
 
     this.senderLifecycle.ensureSenderManager()
     await this.initializeDmxManager()
@@ -182,6 +218,7 @@ export class ControllerManager {
     await this.initializeListeners()
 
     this.isInitialized = true
+    this.lifecyclePhase = 'running'
   }
 
   /**
@@ -452,68 +489,70 @@ export class ControllerManager {
    * Enable YARG listener
    */
   public enableYarg(): void {
-    this.listenerCoordinator.enableYarg(this.isInitialized, () => this.init())
+    this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
   }
 
   /**
    * Disable YARG listener
    */
   public async disableYarg(): Promise<void> {
-    await this.listenerCoordinator.disableYarg()
+    await this.listenerLifecycle.yargRb3.disableYarg()
   }
 
   /**
    * Enable Rb3 listener
    */
   public async enableRb3(): Promise<void> {
-    await this.listenerCoordinator.enableRb3(this.isInitialized, () => this.init())
+    await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
   }
 
   /**
    * Disable Rb3 listener
    */
   public async disableRb3(): Promise<void> {
-    await this.listenerCoordinator.disableRb3()
+    await this.listenerLifecycle.yargRb3.disableRb3()
   }
 
   /**
    * Get current RB3 processing mode
    */
   public getRb3Mode(): 'direct' | 'none' {
-    return this.listenerCoordinator.getRb3Mode()
+    return this.listenerLifecycle.yargRb3.getRb3Mode()
   }
 
   /**
    * Get RB3 processor statistics
    */
   public getRb3ProcessorStats(): ReturnType<ProcessorManager['getProcessorStats']> | null {
-    return this.listenerCoordinator.getRb3ProcessorStats()
+    return this.listenerLifecycle.yargRb3.getRb3ProcessorStats()
   }
 
   /**
    * Shutdown all controllers and systems
    */
   public async shutdown(): Promise<void> {
+    this.assertPhase(['initializing', 'running', 'restarting', 'consoleMode'], 'shutdown')
+    this.lifecyclePhase = 'shuttingDown'
     console.log('ControllerManager shutdown: starting')
 
     try {
       // Shutdown in reverse order of initialization
       try {
-        await this.listenerCoordinator.disableYarg()
+        await this.listenerLifecycle.yargRb3.disableYarg()
         console.log('ControllerManager shutdown: YARG disabled')
       } catch (err) {
         console.error('Error disabling YARG:', err)
       }
 
       try {
-        await this.listenerCoordinator.disableRb3()
+        await this.listenerLifecycle.yargRb3.disableRb3()
         console.log('ControllerManager shutdown: RB3 disabled')
       } catch (err) {
         console.error('Error disabling RB3:', err)
       }
 
       try {
-        await this.audioController.disableAudio()
+        await this.listenerLifecycle.audio.disableAudio()
         console.log('ControllerManager shutdown: Audio disabled')
       } catch (err) {
         console.error('Error disabling Audio:', err)
@@ -631,7 +670,7 @@ export class ControllerManager {
   }
 
   public getProcessorManager(): ProcessorManager | null {
-    return this.listenerCoordinator.getProcessorManager()
+    return this.listenerLifecycle.yargRb3.getProcessorManager()
   }
 
   public getDmxPublisher(): DmxPublisher | null {
@@ -649,11 +688,11 @@ export class ControllerManager {
   }
 
   public getIsYargEnabled(): boolean {
-    return this.listenerCoordinator.getIsYargEnabled()
+    return this.listenerLifecycle.yargRb3.getIsYargEnabled()
   }
 
   public getIsRb3Enabled(): boolean {
-    return this.listenerCoordinator.getIsRb3Enabled()
+    return this.listenerLifecycle.yargRb3.getIsRb3Enabled()
   }
 
   /**
@@ -688,11 +727,14 @@ export class ControllerManager {
    * This shuts down existing controllers and reinitializes them
    */
   public async restartControllers(): Promise<void> {
+    this.assertPhase(['running', 'consoleMode'], 'restartControllers')
+    this.lifecyclePhase = 'restarting'
     console.log('Restarting controllers to apply configuration changes')
 
-    const wasYargEnabled = this.listenerCoordinator.getIsYargEnabled()
-    const wasRb3Enabled = this.listenerCoordinator.getIsRb3Enabled()
+    const wasYargEnabled = this.listenerLifecycle.yargRb3.getIsYargEnabled()
+    const wasRb3Enabled = this.listenerLifecycle.yargRb3.getIsRb3Enabled()
     const activeSendersBeforeRestart = this.senderLifecycle.getActiveOutputSenderSnapshotIfAny()
+    const wasConsoleMode = this.consoleMode.getConsoleRestore() !== null
 
     try {
       if (wasYargEnabled) {
@@ -737,6 +779,7 @@ export class ControllerManager {
     // Reinitialize
     try {
       await this.init()
+      this.lifecyclePhase = wasConsoleMode ? 'consoleMode' : 'running'
       this.consoleMode.onControllersReinitializedWhileConsoleOpen()
 
       // Restore previously active listeners
@@ -774,49 +817,49 @@ export class ControllerManager {
    * Enable audio listener and processor
    */
   public async enableAudio(): Promise<void> {
-    await this.audioController.enableAudio(this.isInitialized, () => this.init())
+    await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
   }
 
   /**
    * Disable audio processing
    */
   public async disableAudio(): Promise<void> {
-    await this.audioController.disableAudio()
+    await this.listenerLifecycle.audio.disableAudio()
   }
 
   /**
    * Update audio configuration while audio is running
    */
   public updateAudioConfig(config: AudioConfig): void {
-    this.audioController.updateAudioConfig(config)
+    this.listenerLifecycle.audio.updateAudioConfig(config)
   }
 
   /**
    * Refresh active audio cue selection when enabled groups change
    */
   public refreshAudioCueSelection(): void {
-    this.audioController.refreshAudioCueSelection()
+    this.listenerLifecycle.audio.refreshAudioCueSelection()
   }
 
   /**
    * Get the current audio cue selection
    */
   public getActiveAudioCueType(): AudioCueType {
-    return this.audioController.getActiveAudioCueType()
+    return this.listenerLifecycle.audio.getActiveAudioCueType()
   }
 
   /**
    * Secondary cue driving the overlay slot (manual secondary or active strobe cue).
    */
   public getActiveSecondaryCueType(): AudioCueType | null {
-    return this.audioController.getActiveSecondaryCueType()
+    return this.listenerLifecycle.audio.getActiveSecondaryCueType()
   }
 
   /**
    * Persist and apply a new audio cue selection
    */
   public setActiveAudioCueType(cueType: AudioCueType): { success: boolean; error?: string } {
-    return this.audioController.setActiveAudioCueType(cueType)
+    return this.listenerLifecycle.audio.setActiveAudioCueType(cueType)
   }
 
   /**
@@ -830,22 +873,22 @@ export class ControllerManager {
     groupName: string
     groupDescription: string
   }> {
-    return this.audioController.getAudioCueOptions()
+    return this.listenerLifecycle.audio.getAudioCueOptions()
   }
 
   /**
    * Get audio enabled state
    */
   public getIsAudioEnabled(): boolean {
-    return this.audioController.getIsAudioEnabled()
+    return this.listenerLifecycle.audio.getIsAudioEnabled()
   }
 
   public getAudioGameModeConfig(): AudioGameModeConfig {
-    return this.audioController.getAudioGameModeConfig()
+    return this.listenerLifecycle.audio.getAudioGameModeConfig()
   }
 
   public async setAudioGameModeConfig(config: AudioGameModeConfig): Promise<void> {
-    await this.audioController.setAudioGameModeConfig(config)
+    await this.listenerLifecycle.audio.setAudioGameModeConfig(config)
   }
 
   /**
@@ -855,15 +898,15 @@ export class ControllerManager {
     if (this.cueHandler instanceof YargCueHandler) {
       this.cueHandler.setMotionEnabled(enabled)
     }
-    this.audioController.setMotionEnabled(enabled)
+    this.listenerLifecycle.audio.setMotionEnabled(enabled)
   }
 
   public setActiveAudioMotionCueRef(ref: AudioMotionCueRef | null): void {
-    this.audioController.setActiveAudioMotionCueRef(ref)
+    this.listenerLifecycle.audio.setActiveAudioMotionCueRef(ref)
   }
 
   public isAudioGameModeActive(): boolean {
-    return this.audioController.isAudioGameModeActive()
+    return this.listenerLifecycle.audio.isAudioGameModeActive()
   }
 
   public setActiveYargMotionCueRef(ref: YargMotionCueRef | null): void {
@@ -876,19 +919,31 @@ export class ControllerManager {
    * Routes analysed audio frames to the Audio Preview window (wired from IPC setup).
    */
   public setAudioMirrorBroadcaster(fn: (data: AudioLightingData) => void): void {
-    this.audioController.setBroadcastAudioMirror(fn)
+    this.listenerLifecycle.audio.setBroadcastAudioMirror(fn)
   }
 
   public async enableConsoleMode(
     rigId: string,
   ): Promise<{ success: true } | { success: false; error: string }> {
-    return this.consoleMode.enableConsoleMode(rigId)
+    await this.init()
+    if (this.lifecyclePhase !== 'consoleMode') {
+      this.assertPhase(['running'], 'enableConsoleMode')
+    }
+    const r = await this.consoleMode.enableConsoleMode(rigId)
+    if (r.success) {
+      this.lifecyclePhase = 'consoleMode'
+    }
+    return r
   }
 
   public async disableConsoleMode(): Promise<
     { success: true } | { success: false; error: string }
   > {
-    return this.consoleMode.disableConsoleMode()
+    const r = await this.consoleMode.disableConsoleMode()
+    if (r.success && this.lifecyclePhase === 'consoleMode') {
+      this.lifecyclePhase = 'running'
+    }
+    return r
   }
 
   public sendConsoleDmx(buffer: Record<number, number>): void {

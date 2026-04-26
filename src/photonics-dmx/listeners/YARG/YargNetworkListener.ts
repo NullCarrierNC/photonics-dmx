@@ -207,23 +207,28 @@ export class YargNetworkListener extends EventEmitter {
     })
   }
 
-  public stop() {
-    if (!this.listening) {
-      console.warn('YargNetworkListener is not running.')
-      return
+  /**
+   * Closes the UDP socket and resolves when the OS has released the port
+   * (required before a new listener can bind the same port).
+   */
+  public stop(): Promise<void> {
+    if (!this.server) {
+      this.listening = false
+      return Promise.resolve()
     }
-
-    if (this.server) {
-      this.server.close(() => {
+    return new Promise((resolve) => {
+      const sock = this.server!
+      sock.close(() => {
         console.log('YargNetworkListener server closed.')
         this.listening = false
         this.server = null
+        resolve()
       })
-    }
+    })
   }
 
-  public shutdown() {
-    this.stop()
+  public shutdown(): Promise<void> {
+    return this.stop()
   }
 
   private setupServerEvents() {
@@ -953,11 +958,11 @@ export class YargNetworkListener extends EventEmitter {
     this.lastScene = currentScene
   }
 
-  public destroy() {
+  public async destroy(): Promise<void> {
     if (this.flushTimer) {
       clearInterval(this.flushTimer)
       this.flushTimer = null
     }
-    this.stop()
+    return this.stop()
   }
 }
