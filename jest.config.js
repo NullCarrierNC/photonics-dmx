@@ -8,18 +8,19 @@ module.exports = {
   },
   testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  // Set to true when running coverage (e.g. npm run test:coverage). Left false for default test run
-  // because babel-plugin-istanbul instrumentation can break test loading in this setup.
+  // `npm test` stays fast; `npm run test:coverage` runs `jest --coverage` (V8 provider).
   collectCoverage: false,
+  coverageProvider: 'v8',
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
   coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
+  // Ratcheted from a Jest --coverage run (global totals); floor(percent) - 1
   coverageThreshold: {
     global: {
-      statements: 30,
-      branches: 25,
-      functions: 25,
-      lines: 30,
+      statements: 68,
+      branches: 66,
+      functions: 54,
+      lines: 68,
     },
   },
   setupFilesAfterEnv: ['<rootDir>/src/photonics-dmx/tests/jest.setup.ts'],
