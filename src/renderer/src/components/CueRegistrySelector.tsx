@@ -57,7 +57,10 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
       const enabledGroupIds = await getEnabledCueGroups()
       const allGroups = await getCueGroups()
 
-      const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id))
+      // Motion-only groups (no lighting cue types) are chosen under Motion Cue Simulation.
+      const enabledGroups = allGroups.filter(
+        (g: CueGroup) => enabledGroupIds.includes(g.id) && g.cueTypes.length > 0,
+      )
 
       console.log(`Enabled groups:`, enabledGroups)
       setGroups(enabledGroups)
