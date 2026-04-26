@@ -39,6 +39,8 @@ type CueGroup = {
   cueTypes: string[]
 }
 
+const isYargVisualCueGroup = (g: CueGroup) => g.cueTypes.length > 0
+
 const CueSimulation: React.FC = () => {
   const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom)
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null)
@@ -121,17 +123,14 @@ const CueSimulation: React.FC = () => {
             setSelectedInstrument(savedSettings.instrument)
           }
           if (savedSettings.groupId) {
-            // Store saved effect ID for later loading
-            if (savedSettings.effectId) {
-              savedEffectIdRef.current = savedSettings.effectId
-            }
-            // Set group ID first, which will trigger group loading
-            setSelectedGroupId(savedSettings.groupId)
-            // Get group display name
             try {
               const allGroups = await getCueGroups()
               const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId)
-              if (group) {
+              if (group && isYargVisualCueGroup(group)) {
+                if (savedSettings.effectId) {
+                  savedEffectIdRef.current = savedSettings.effectId
+                }
+                setSelectedGroupId(savedSettings.groupId)
                 setSelectedGroup(group.name)
               }
             } catch (error) {
@@ -349,16 +348,19 @@ const CueSimulation: React.FC = () => {
       // Handle group selection - only single groups are supported
       if (groupIds.length === 1) {
         const groupId = groupIds[0]
-        setSelectedGroupId(groupId) // Store the actual group ID
         // Clear selected effect when group changes so EffectsDropdown will show "- Select -"
         setSelectedEffect(null)
 
-        // Get group details to determine display name
         try {
           const allGroups = await getCueGroups()
-          const group = allGroups.find((g: CueGroup) => g.id === groupId)
-          const displayName = group ? group.name : groupId
-
+          const group = allGroups.find((g: CueGroup) => g.id === groupId && isYargVisualCueGroup(g))
+          if (!group) {
+            setSelectedGroup('')
+            setSelectedGroupId('')
+            return
+          }
+          setSelectedGroupId(groupId)
+          const displayName = group.name
           // Only update state if the selection actually changed
           setSelectedGroup((prevSelectedGroup) => {
             if (prevSelectedGroup !== displayName) {
@@ -368,7 +370,8 @@ const CueSimulation: React.FC = () => {
           })
         } catch (error) {
           console.error('Error fetching group details:', error)
-          setSelectedGroup(groupId)
+          setSelectedGroup('')
+          setSelectedGroupId('')
         }
       } else {
         // No group selected - reset to empty state
@@ -396,11 +399,23 @@ const CueSimulation: React.FC = () => {
         } else {
           // Single group selection
           const groups = await getCueGroups()
-          const group = groups.find((g: CueGroup) => g.id === selectedGroupId)
+          const group = groups.find(
+            (g: CueGroup) => g.id === selectedGroupId && isYargVisualCueGroup(g),
+          )
           if (group) {
             setCurrentGroup(group)
 
             // Don't fetch effects here - let the EffectsDropdown handle it
+          } else {
+            setSelectedGroupId('')
+            setSelectedGroup('')
+            setSelectedEffect(null)
+            setCurrentGroup({
+              id: 'none',
+              name: 'No Group Selected',
+              description: 'Please select a cue group to view its effects.',
+              cueTypes: [],
+            })
           }
         }
       } catch (error) {
