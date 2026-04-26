@@ -3,6 +3,7 @@ import { IpcMain, app, shell } from 'electron'
 import path from 'path'
 import { SHELL } from '../../shared/ipcChannels'
 import { validatePathUnderAllowedRoots } from './inputValidation'
+import { ipcError, ipcSuccess } from './ipcResult'
 
 /**
  * Set up shell-related IPC handlers
@@ -14,10 +15,10 @@ export function setupShellHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(SHELL.SHOW_ITEM_IN_FOLDER, async (_event, filePath: string) => {
     const validatedPath = validatePathUnderAllowedRoots(filePath)
     if (!validatedPath.ok) {
-      return validatedPath.error
+      return ipcError(validatedPath.error)
     }
     shell.showItemInFolder(validatedPath.value)
-    return ''
+    return ipcSuccess()
   })
 
   /**
@@ -26,9 +27,10 @@ export function setupShellHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(SHELL.OPEN_PATH, async (_event, filePath: string) => {
     const validatedPath = validatePathUnderAllowedRoots(filePath)
     if (!validatedPath.ok) {
-      return validatedPath.error
+      return ipcError(validatedPath.error)
     }
-    return shell.openPath(validatedPath.value)
+    const result = await shell.openPath(validatedPath.value)
+    return { success: true, result } as const
   })
 
   /**

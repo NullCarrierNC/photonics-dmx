@@ -15,6 +15,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
+    "any:budget": "node scripts/any-budget.mjs",
     "start": "electron-vite preview",
     "dev": "cross-env NODE_OPTIONS=--trace-warnings electron-vite dev",
     "build": "npm run typecheck && electron-vite build",

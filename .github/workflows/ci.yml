@@ -35,6 +35,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Explicit any budget
+        run: npm run any:budget
+
       - name: Security audit
         run: npm audit --audit-level=high
 

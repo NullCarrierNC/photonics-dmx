@@ -1,0 +1,3 @@
+199
+Auto-generated: total matches for `as any` and typed `: any` in src/**/*.ts(x).
+Lower this when reducing explicit any; do not increase without a deliberate pass.
