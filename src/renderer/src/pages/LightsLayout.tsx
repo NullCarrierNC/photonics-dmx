@@ -3,7 +3,6 @@ import LightLayoutPreview from '../components/LightLayoutPreview'
 import { useAtom } from 'jotai'
 
 import {
-  ConfigLightLayoutType,
   ConfigStrobeType,
   DmxLight,
   FixtureTypes,
@@ -18,23 +17,19 @@ import {
   dmxRigsAtom,
   activeRigIdAtom,
 } from '@renderer/atoms'
-import { getDmxRigs, getDmxRig, saveDmxRig } from '../ipcApi'
-
 import LightsLayoutRigSection from './LightsLayout/LightsLayoutRigSection'
 import LightsLayoutForm from './LightsLayout/LightsLayoutForm'
 import LightChannelAssignmentSection from './LightsLayout/LightChannelAssignmentSection'
 import LightsLayoutIntro from './LightsLayout/LightsLayoutIntro'
-
-const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
-  { id: 'front', label: 'Front only' },
-  { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
-  { id: 'stacked', label: 'Stacked (one on top of the other)' },
-  { id: 'front-back', label: 'Front and Back (back lights behind audience)' },
-]
-
-function isTwoRowPrimaryLayout(layoutId: string): boolean {
-  return layoutId === 'two-rows' || layoutId === 'front-back' || layoutId === 'stacked'
-}
+import { saveDmxRig } from '../ipcApi'
+import {
+  LIGHT_LAYOUTS,
+  isTwoRowPrimaryLayout,
+  splitLights,
+  createDmxLightInstance,
+} from './LightsLayout/lightsLayoutHelpers'
+import { useLightsLayoutRig } from './LightsLayout/useLightsLayoutRig'
+import { useLightsLayoutActiveConfigSync } from './LightsLayout/useLightsLayoutActiveConfigSync'
 
 /**
  * Handles the light layout and channel configuration.
@@ -46,8 +41,6 @@ const LightsLayout = () => {
   const [myFixtureLibrary] = useAtom(myDmxLightsAtom)
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
   const [activeRigId, setActiveRigId] = useAtom(activeRigIdAtom)
-
-  const [rigName, setRigName] = useState<string>('')
 
   const [selectedCount, setSelectedCount] = useState<number | null>(() => {
     if (activeConfig?.numLights === 0) return null
@@ -76,123 +69,32 @@ const LightsLayout = () => {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
 
-  // Load rigs on mount
-  useEffect(() => {
-    const loadRigs = async () => {
-      try {
-        const loadedRigs = await getDmxRigs()
-        setRigs(loadedRigs || [])
-
-        // If no active rig selected, select first rig or create default
-        if (!activeRigId && loadedRigs.length > 0) {
-          setActiveRigId(loadedRigs[0].id)
-        } else if (loadedRigs.length === 0) {
-          // No rigs exist, create a default one
-          const defaultRig: DmxRig = {
-            id: crypto.randomUUID(),
-            name: 'Default Rig',
-            active: true,
-            config: {
-              numLights: 0,
-              lightLayout: { id: 'front', label: 'Front only' },
-              strobeType: ConfigStrobeType.None,
-              frontLights: [],
-              backLights: [],
-              strobeLights: [],
-            },
-          }
-          await saveDmxRig(defaultRig)
-          setRigs([defaultRig])
-          setActiveRigId(defaultRig.id)
-        }
-      } catch (error) {
-        console.error('Failed to load DMX rigs:', error)
-      }
-    }
-
-    loadRigs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: load rigs once
-  }, [setActiveRigId, setRigs])
-
-  // Load active rig configuration when rig selection changes
-  useEffect(() => {
-    const loadRigConfig = async () => {
-      if (!activeRigId) return
-
-      try {
-        const rig = await getDmxRig(activeRigId)
-        if (rig) {
-          setRigName(rig.name)
-          setActiveLightsConfig(rig.config)
-        }
-      } catch (error) {
-        console.error('Failed to load rig configuration:', error)
-      }
-    }
-
-    if (activeRigId) {
-      loadRigConfig()
-    }
-  }, [activeRigId, setActiveLightsConfig])
-
-  // Update all dependent state when activeConfig changes (e.g., when switching rigs)
-  useEffect(() => {
-    if (!activeConfig) return
-
-    // Update selected count
-    setSelectedCount(activeConfig.numLights > 0 ? activeConfig.numLights : null)
-
-    // Update selected layout
-    setSelectedLayout(activeConfig.lightLayout.id)
-
-    // Update selected strobe type
-    setSelectedStrobe(activeConfig.strobeType)
-
-    // Update assigned to back / bottom count
-    if (isTwoRowPrimaryLayout(activeConfig.lightLayout.id)) {
-      setAssignedToBack(
-        activeConfig.backLights.length > 0 ? activeConfig.backLights.length : 'None',
-      )
-    } else {
-      setAssignedToBack('None')
-    }
-
-    // Update allPrimaryLights from the config
-    const front = activeConfig.frontLights || []
-    const back = activeConfig.backLights || []
-    const strobe = activeConfig.strobeLights || []
-    // Only include strobe lights in the working array when Dedicated; for AllCapable
-    // they are copies of front lights (same IDs) and would cause ghost duplicates when editing.
-    const strobeForMerge =
-      activeConfig.strobeType === ConfigStrobeType.Dedicated
-        ? strobe.map((l) => ({ ...l, group: 'strobe' as const }))
-        : []
-    const merged = [
-      ...front.map((l) => ({ ...l, group: 'front' as const })),
-      ...back.map((l) => ({ ...l, group: 'back' as const })),
-      ...strobeForMerge,
-    ]
-    setAllPrimaryLights(merged)
-
-    // Update dedicated strobe count if applicable
-    if (activeConfig.strobeType === ConfigStrobeType.Dedicated) {
-      setDedicatedStrobeCount(strobe.length > 0 ? strobe.length : 0)
-    } else {
-      setDedicatedStrobeCount(0)
-    }
-  }, [activeConfig])
-
-  //  Single Array for All Primary Lights
   const [allPrimaryLights, setAllPrimaryLights] = useState<DmxLight[]>(() => {
     const front = activeConfig?.frontLights || []
     const back = activeConfig?.backLights || []
-    // Mark each as front/back
     const merged = [
       ...front.map((l) => ({ ...l, group: 'front' as const })),
       ...back.map((l) => ({ ...l, group: 'back' as const })),
     ]
     return merged
   })
+
+  const { rigName, setRigName } = useLightsLayoutRig(
+    activeRigId,
+    setRigs,
+    setActiveRigId,
+    setActiveLightsConfig,
+  )
+
+  useLightsLayoutActiveConfigSync(
+    activeConfig,
+    setSelectedCount,
+    setSelectedLayout,
+    setAssignedToBack,
+    setSelectedStrobe,
+    setDedicatedStrobeCount,
+    setAllPrimaryLights,
+  )
 
   //  Available Layouts
   const availableLayouts = useMemo(() => {
@@ -204,62 +106,9 @@ const LightsLayout = () => {
     })
   }, [selectedCount])
 
-  //  Helper to Split Front and Back Counts
-  const splitLights = (count: number, assignedBack: number | 'None') => {
-    if (assignedBack === 'None' || assignedBack === 0) {
-      return { frontCount: count, backCount: 0 }
-    }
-    const frontCount = count - assignedBack
-    const backCount = assignedBack
-    return { frontCount, backCount }
-  }
-
-  //  Create a New Light Instance
   const createLightInstance = useCallback(
     (group: 'front' | 'back' | 'strobe') => {
-      const totalExisting = allPrimaryLights.length
-      const templateIndex = totalExisting % myFixtures.length
-      const selectedFixture = myFixtures[templateIndex]
-
-      // Calculate the new master dimmer channel
-      const newMasterDimmer = 1 + totalExisting * 10
-
-      // Calculate channel offsets from the template
-      const templateChannels = selectedFixture.channels
-      const offsets: { [key: string]: number } = {}
-      Object.entries(templateChannels).forEach(([channelName, value]) => {
-        if (channelName !== 'masterDimmer') {
-          offsets[channelName] = value - templateChannels.masterDimmer
-        }
-      })
-
-      // Recalculate all channels using the new master dimmer and template offsets
-      const recalculatedChannels: { [key: string]: number } = {}
-      Object.entries(templateChannels).forEach(([channelName, _]) => {
-        if (channelName === 'masterDimmer') {
-          recalculatedChannels[channelName] = newMasterDimmer
-        } else {
-          recalculatedChannels[channelName] = newMasterDimmer + (offsets[channelName] || 0)
-        }
-      })
-
-      // Cast the channels to the correct type based on the fixture
-      const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
-
-      return {
-        id: crypto.randomUUID(),
-        fixtureId: selectedFixture.id!,
-        position: totalExisting + 1,
-        fixture: selectedFixture.fixture,
-        label: selectedFixture.label,
-        name: selectedFixture.name,
-        isStrobeEnabled: selectedFixture.isStrobeEnabled,
-        group,
-        channels: castChannels,
-        config: selectedFixture.config || undefined, // Include config if present (e.g. MH lights)
-        universe: selectedFixture.universe,
-        mount: 'floor' as const,
-      }
+      return createDmxLightInstance(group, allPrimaryLights.length, myFixtures)
     },
     [allPrimaryLights.length, myFixtures],
   )
