@@ -267,18 +267,6 @@ export interface IpcInvokeMap {
     request: void
     response: Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
   }
-  [LIGHT.GET_ACTIVE_CUE_GROUPS]: {
-    request: void
-    response: Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
-  }
-  [LIGHT.ACTIVATE_CUE_GROUP]: {
-    request: string
-    response: IpcSuccessResult | IpcErrorResult
-  }
-  [LIGHT.DEACTIVATE_CUE_GROUP]: {
-    request: string
-    response: IpcSuccessResult | IpcErrorResult
-  }
   [LIGHT.ENABLE_CUE_GROUP]: {
     request: string
     response: IpcSuccessResult | IpcErrorResult
@@ -286,17 +274,6 @@ export interface IpcInvokeMap {
   [LIGHT.DISABLE_CUE_GROUP]: {
     request: string
     response: IpcSuccessResult | IpcErrorResult
-  }
-  [LIGHT.SET_ACTIVE_CUE_GROUPS]: {
-    request: string[]
-    response:
-      | {
-          success: true
-          activeGroups: string[]
-          invalidGroups?: string[]
-          disabledGroups?: string[]
-        }
-      | IpcErrorResult
   }
   [LIGHT.GET_NETWORK_INTERFACES]: {
     request: void

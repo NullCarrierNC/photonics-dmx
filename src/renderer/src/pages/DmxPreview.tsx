@@ -5,7 +5,6 @@ import LightsDmxPreview from '@renderer/components/LightsDmxPreview'
 import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
 import CuePreview from '@renderer/components/CuePreview'
-import ActiveGroupsSelector from '@renderer/components/ActiveCueGroupsSelector'
 import DmxRigSelector from '@renderer/components/DmxRigSelector'
 import AudioCueSelectorPanel from '@renderer/components/AudioCueSelectorPanel'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
@@ -31,7 +30,6 @@ const DmxPreview: React.FC = () => {
       </p>
 
       <DmxSettingsAccordion startOpen={true} />
-      <ActiveGroupsSelector />
 
       {/* Rig Selector */}
       <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />

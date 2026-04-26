@@ -5,7 +5,7 @@ import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
 
 /**
- * Set up YARG cue group registry IPC handlers (active/enabled groups, source group, consistency status).
+ * Set up YARG cue group registry IPC handlers (enabled groups, source group, consistency status).
  * Cue selection preferences (consistency window, motion min-hold, group selection mode) live in
  * cue-selection-prefs-handlers.ts.
  */
@@ -22,68 +22,6 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
         cueTypes: group ? Array.from(group.cues.keys()) : [],
       }
     })
-  })
-
-  ipcMain.handle(LIGHT.GET_ACTIVE_CUE_GROUPS, async () => {
-    const registry = YargCueRegistry.getInstance()
-    const activeGroupIds = registry.getActiveGroups()
-    console.log('Active group IDs:', activeGroupIds)
-    return activeGroupIds.map((groupId) => {
-      const group = registry.getGroup(groupId)
-      console.log(`Group ${groupId}:`, group ? 'found' : 'not found')
-      return {
-        id: groupId,
-        name: group!.name,
-        description: group!.description,
-        cueTypes: group ? Array.from(group.cues.keys()) : [],
-      }
-    })
-  })
-
-  ipcMain.handle(LIGHT.ACTIVATE_CUE_GROUP, async (_, groupId: string) => {
-    try {
-      const registry = YargCueRegistry.getInstance()
-      const group = registry.getGroup(groupId)
-      if (!group) {
-        return { success: false, error: `Group '${groupId}' not found` }
-      }
-      const result = registry.activateGroup(groupId)
-      if (result) {
-        console.log(`Activated cue group: ${group.name}`)
-        return { success: true }
-      }
-      console.error(`Failed to activate group '${group.name}'. It may not be enabled.`)
-      return {
-        success: false,
-        error: `Failed to activate group '${group.name}'. It may not be enabled.`,
-      }
-    } catch (error) {
-      console.error('Error activating cue group:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.DEACTIVATE_CUE_GROUP, async (_, groupId: string) => {
-    try {
-      const registry = YargCueRegistry.getInstance()
-      const group = registry.getGroup(groupId)
-      if (!group) {
-        return { success: false, error: `Group '${groupId}' not found` }
-      }
-      const result = registry.deactivateGroup(groupId)
-      if (result) {
-        console.log(`Deactivated cue group: ${group.name}`)
-        return { success: true }
-      }
-      console.error(`Failed to deactivate group '${group.name}'. It may be the default group.`)
-      return {
-        success: false,
-        error: `Failed to deactivate group '${group.name}'. It may be the default group.`,
-      }
-    } catch (error) {
-      console.error('Error deactivating cue group:', error)
-      return ipcError(error)
-    }
   })
 
   ipcMain.handle(LIGHT.ENABLE_CUE_GROUP, async (_, groupId: string) => {
@@ -125,51 +63,6 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       }
     } catch (error) {
       console.error('Error disabling cue group:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.SET_ACTIVE_CUE_GROUPS, async (_, groupIds: string[]) => {
-    try {
-      const registry = YargCueRegistry.getInstance()
-      const invalidGroups: string[] = []
-      const disabledGroups: string[] = []
-      const validGroupIds: string[] = []
-      const enabledGroupIds = registry.getEnabledGroups()
-
-      for (const groupId of groupIds) {
-        if (!registry.getGroup(groupId)) {
-          invalidGroups.push(groupId)
-        } else if (!enabledGroupIds.includes(groupId)) {
-          disabledGroups.push(groupId)
-        } else {
-          validGroupIds.push(groupId)
-        }
-      }
-
-      if (invalidGroups.length > 0) {
-        console.error(`Cannot set active groups: groups not found: ${invalidGroups.join(', ')}`)
-      }
-      if (disabledGroups.length > 0) {
-        console.error(`Cannot set active groups: groups not enabled: ${disabledGroups.join(', ')}`)
-      }
-      if (validGroupIds.length === 0) {
-        return {
-          success: false,
-          error: `No valid groups provided. Invalid: ${invalidGroups.join(', ')}, Disabled: ${disabledGroups.join(', ')}`,
-        }
-      }
-
-      registry.setActiveGroups(validGroupIds)
-      console.log(`Set active cue groups: ${validGroupIds.join(', ')}`)
-      return {
-        success: true,
-        activeGroups: validGroupIds,
-        invalidGroups: invalidGroups.length > 0 ? invalidGroups : undefined,
-        disabledGroups: disabledGroups.length > 0 ? disabledGroups : undefined,
-      }
-    } catch (error) {
-      console.error('Error setting active cue groups:', error)
       return ipcError(error)
     }
   })
