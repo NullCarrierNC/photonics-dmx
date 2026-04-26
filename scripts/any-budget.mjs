@@ -1,37 +1,60 @@
 /**
- * Counts explicit `any` usage in src (`as any` and type annotations `: any`) and
- * compares to metrics/explicit-any-budget.txt so new PRs must not increase the
- * count without an intentional budget update.
+ * Counts `@typescript-eslint/no-explicit-any` report instances under `src/` and compares
+ * to metrics/explicit-any-budget.txt so new PRs must not increase the count without an
+ * intentional budget update.
  */
+import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { glob } from 'glob'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
 const BUDGET_FILE = join(root, 'metrics', 'explicit-any-budget.txt')
+const RULE_ID = '@typescript-eslint/no-explicit-any'
 
-function countExplicitAnys(source) {
-  const asAny = source.match(/\bas any\b/g)?.length ?? 0
-  const colonAny = source.match(/:\s*any\b/g)?.length ?? 0
-  return asAny + colonAny
+/**
+ * @returns {string} ESLint JSON output
+ */
+function eslintJsonForSrc() {
+  const args = [
+    'eslint',
+    'src',
+    '--ext',
+    '.ts',
+    '--ext',
+    '.tsx',
+    '--format',
+    'json',
+    '--no-error-on-unmatched-pattern',
+    '--max-warnings',
+    '1000000',
+  ]
+  return execFileSync('npx', args, { cwd: root, encoding: 'utf8' })
 }
 
-const files = (await glob('src/**/*.ts', { cwd: root })).concat(
-  await glob('src/**/*.tsx', { cwd: root }),
-)
-let current = 0
-for (const rel of files) {
-  const text = readFileSync(join(root, rel), 'utf8')
-  current += countExplicitAnys(text)
+function countExplicitAnysEslint() {
+  const raw = eslintJsonForSrc()
+  /** @type {Array<{ messages: Array<{ ruleId?: string | null }> }>} */
+  const fileReports = JSON.parse(raw)
+  let count = 0
+  for (const file of fileReports) {
+    for (const m of file.messages) {
+      if (m.ruleId === RULE_ID) {
+        count++
+      }
+    }
+  }
+  return count
 }
+
+const current = countExplicitAnysEslint()
 
 if (process.argv.includes('--write')) {
   mkdirSync(join(root, 'metrics'), { recursive: true })
   const lines = [
     String(current),
-    'Auto-generated: total matches for `as any` and typed `: any` in src/**/*.ts(x).',
+    'Auto-generated: `npx eslint src` messages for @typescript-eslint/no-explicit-any.',
     'Lower this when reducing explicit any; do not increase without a deliberate pass.',
   ]
   writeFileSync(BUDGET_FILE, `${lines.join('\n')}\n`, 'utf8')

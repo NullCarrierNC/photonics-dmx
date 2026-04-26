@@ -1,5 +1,11 @@
 import { ConfigFile } from './ConfigFile'
 import { PreferencesConfigFile } from './PreferencesConfigFile'
+import type { ConfigCorruptInfo } from './configCorruptTypes'
+import {
+  validateDmxRigsData,
+  validateLightingLayoutData,
+  validateUserLightsData,
+} from './configDataValidators'
 import {
   DmxFixture,
   LightingConfiguration,
@@ -62,12 +68,34 @@ export class ConfigurationManager {
   private userLights: ConfigFile<UserLightsConfig>
   private lightingLayout: ConfigFile<LightingConfiguration>
   private dmxRigs: ConfigFile<DmxRigsConfig>
+  private configCorruptRecovery: ConfigCorruptInfo[] = []
+
+  /** Clears and returns batched config recovery events (for one main → renderer send). */
+  public drainConfigCorruptRecovery(): ConfigCorruptInfo[] {
+    const out = this.configCorruptRecovery
+    this.configCorruptRecovery = []
+    return out
+  }
 
   constructor() {
-    this.preferences = new PreferencesConfigFile()
-    this.userLights = new ConfigFile('lights.json', DEFAULT_USER_LIGHTS, 1)
-    this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1)
-    this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1)
+    const onCorrupt = (info: ConfigCorruptInfo): void => {
+      this.configCorruptRecovery.push(info)
+    }
+
+    this.preferences = new PreferencesConfigFile({ onCorruptRecovery: onCorrupt })
+    this.userLights = new ConfigFile('lights.json', DEFAULT_USER_LIGHTS, 1, {
+      onCorruptRecovery: onCorrupt,
+      validate: validateUserLightsData,
+      coerceUnversioned: (raw) => (Array.isArray(raw) ? { lights: raw } : raw) as UserLightsConfig,
+    })
+    this.lightingLayout = new ConfigFile('lightsLayout.json', DEFAULT_LIGHTING_LAYOUT, 1, {
+      onCorruptRecovery: onCorrupt,
+      validate: validateLightingLayoutData,
+    })
+    this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1, {
+      onCorruptRecovery: onCorrupt,
+      validate: validateDmxRigsData,
+    })
 
     // Handle legacy lights format migration
     this.migrateLegacyLightsFormat()
