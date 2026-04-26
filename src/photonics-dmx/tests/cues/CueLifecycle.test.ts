@@ -11,7 +11,6 @@ class TestLifecycleCue implements INetCue {
   style = CueStyle.Primary
   onStopCalled = false
   onPauseCalled = false
-  onDestroyCalled = false
 
   async execute(
     _parameters: CueData,
@@ -28,10 +27,6 @@ class TestLifecycleCue implements INetCue {
   onPause(): void {
     this.onPauseCalled = true
   }
-
-  onDestroy(): void {
-    this.onDestroyCalled = true
-  }
 }
 
 describe('ICue Lifecycle Methods', () => {
@@ -44,22 +39,17 @@ describe('ICue Lifecycle Methods', () => {
   it('should have lifecycle methods available', () => {
     expect(testCue.onStop).toBeDefined()
     expect(testCue.onPause).toBeDefined()
-    expect(testCue.onDestroy).toBeDefined()
   })
 
   it('should track when lifecycle methods are called', () => {
     expect(testCue.onStopCalled).toBe(false)
     expect(testCue.onPauseCalled).toBe(false)
-    expect(testCue.onDestroyCalled).toBe(false)
 
     testCue.onStop()
     expect(testCue.onStopCalled).toBe(true)
 
     testCue.onPause()
     expect(testCue.onPauseCalled).toBe(true)
-
-    testCue.onDestroy()
-    expect(testCue.onDestroyCalled).toBe(true)
   })
 
   it('should allow multiple calls to lifecycle methods', () => {
@@ -67,8 +57,8 @@ describe('ICue Lifecycle Methods', () => {
     testCue.onStop()
     expect(testCue.onStopCalled).toBe(true)
 
-    testCue.onDestroy()
-    testCue.onDestroy()
-    expect(testCue.onDestroyCalled).toBe(true)
+    testCue.onPause()
+    testCue.onPause()
+    expect(testCue.onPauseCalled).toBe(true)
   })
 })

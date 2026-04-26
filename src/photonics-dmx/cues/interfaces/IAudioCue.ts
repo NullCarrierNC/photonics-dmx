@@ -42,9 +42,4 @@ export interface IAudioCue {
    * Called when the cue is paused
    */
   onPause?(): void
-
-  /**
-   * Called when the cue is completely removed/destroyed
-   */
-  onDestroy?(): void
 }

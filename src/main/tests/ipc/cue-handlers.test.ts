@@ -57,10 +57,6 @@ class MockCueImplementation implements INetCue {
   onPause(): void {
     // Mock lifecycle method
   }
-
-  onDestroy(): void {
-    // Mock lifecycle method
-  }
 }
 
 // Import the module under test - need to mock this import

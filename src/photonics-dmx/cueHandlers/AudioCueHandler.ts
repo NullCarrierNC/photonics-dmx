@@ -353,18 +353,6 @@ export class AudioCueHandler extends EventEmitter {
    * Cleanup
    */
   public destroy(): void {
-    this.currentPrimaryCue?.onDestroy?.()
-    this.currentPrimaryCue = null
-    this.currentSecondaryCue?.onDestroy?.()
-    this.currentSecondaryCue = null
-    this.currentStrobeCue?.onDestroy?.()
-    this.currentStrobeCue = null
-    this.currentMotionCue?.onDestroy?.()
-    this.currentMotionCue = null
-    this.currentMotionCueStartTime = null
-    this.lastPrimaryForMotion = null
-    this.lastManualMotionRef = undefined
-    this.executionCount = 0
-    this.lastEmittedMotionKey = null
+    this.clearCurrentCue()
   }
 }

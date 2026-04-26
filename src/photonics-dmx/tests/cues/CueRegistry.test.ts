@@ -35,10 +35,6 @@ class MockCueImplementation implements INetCue {
   onPause(): void {
     // Mock lifecycle method
   }
-
-  onDestroy(): void {
-    // Mock lifecycle method
-  }
 }
 
 describe('YargCueRegistry', () => {

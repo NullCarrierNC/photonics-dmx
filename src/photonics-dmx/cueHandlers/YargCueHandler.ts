@@ -463,23 +463,29 @@ class YargCueHandler extends EventEmitter {
   }
 
   /**
-   * Clean up resources and call destroy lifecycle on any executing cue.
+   * Clean up resources and stop any executing cue.
+   *
+   * Node cue instances are singletons held by `YargCueRegistry`, so they are not
+   * literally destroyed when this handler tears down; the same instances are reused
+   * by the next handler. We call `onStop()` so each cue's `CueSession` is reset
+   * (`cueStartedFired` cleared, engine nulled) and the next activation can fire
+   * `cue-started` from a clean state.
    */
   public shutdown(): void {
     if (this.currentPrimaryCue) {
-      this.currentPrimaryCue.onDestroy?.()
+      this.currentPrimaryCue.onStop?.()
       this.currentPrimaryCue = null
     }
     if (this.currentSecondaryCue) {
-      this.currentSecondaryCue.onDestroy?.()
+      this.currentSecondaryCue.onStop?.()
       this.currentSecondaryCue = null
     }
     if (this.currentStrobeCue) {
-      this.currentStrobeCue.onDestroy?.()
+      this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
     }
     if (this.currentMotionCue) {
-      this.currentMotionCue.onDestroy?.()
+      this.currentMotionCue.onStop?.()
       this.currentMotionCue = null
       this.currentMotionCueStartTime = null
     }

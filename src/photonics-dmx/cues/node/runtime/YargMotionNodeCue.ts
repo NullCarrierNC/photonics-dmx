@@ -94,8 +94,4 @@ export class YargMotionNodeCue implements INetCue {
   onPause(): void {
     // Optional INetCue lifecycle
   }
-
-  onDestroy(): void {
-    // Optional INetCue lifecycle
-  }
 }

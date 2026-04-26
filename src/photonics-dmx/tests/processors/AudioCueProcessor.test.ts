@@ -31,7 +31,6 @@ function makeCue(cueType: AudioCueType, style: IAudioCue['style']): IAudioCue {
     style,
     execute: jest.fn(async () => {}) as IAudioCue['execute'],
     onStop: jest.fn(),
-    onDestroy: jest.fn(),
   }
 }
 
