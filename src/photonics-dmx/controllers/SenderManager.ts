@@ -1,5 +1,5 @@
 // src/managers/SenderManager.ts
-import { EventEmitter } from 'stream'
+import { EventEmitter } from 'node:events'
 import { BaseSender, SenderError } from '../senders/BaseSender'
 import { IpcSender } from '../senders/IpcSender'
 import { ArtNetSender } from '../senders/ArtNetSender'

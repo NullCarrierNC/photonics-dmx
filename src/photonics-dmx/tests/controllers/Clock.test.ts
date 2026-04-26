@@ -1,14 +1,17 @@
+import { beforeEach, afterEach, describe, expect, it, jest } from '@jest/globals'
 import { Clock } from '../../controllers/sequencer/Clock'
 
 describe('Clock', () => {
   let clock: Clock
 
   beforeEach(() => {
+    jest.useFakeTimers()
     clock = new Clock()
   })
 
   afterEach(() => {
     clock.destroy()
+    jest.useRealTimers()
   })
 
   describe('constructor', () => {
