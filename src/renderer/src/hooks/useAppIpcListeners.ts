@@ -1,22 +1,13 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 
-import type { LightingConfiguration } from '../../../photonics-dmx/types'
 import type { LightingPreferences } from '../atoms'
-import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
-import type { AudioCaptureManager } from '../services/AudioCaptureManager'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import {
-  getAppVersion,
-  getCorruptRecoveryEvents,
-  getPrefs,
-  getValidationErrors,
-  saveLightLayout,
-} from '../ipcApi'
+import { getAppVersion, getCorruptRecoveryEvents, getPrefs, getValidationErrors } from '../ipcApi'
 import type { CueStateUpdatePayload } from '../../../shared/ipcTypes'
+import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 
 export interface UseAppIpcListenersParams {
-  activeConfig: LightingConfiguration | null
   setAppVer: (v: string) => void
   setPrefs: (prefs: LightingPreferences) => void
   setEnttecProComPort: (port: string) => void
@@ -37,201 +28,187 @@ export interface UseAppIpcListenersParams {
   handleAudioEnable: (config: AudioConfig) => void | Promise<void>
   handleAudioDisable: (payload: undefined) => void
   handleAudioConfigUpdate: (config: AudioConfig | undefined) => void
-  audioCaptureManagerRef: React.RefObject<AudioCaptureManager | null>
+}
+
+function useLatestRef<T>(value: T) {
+  const r = useRef(value)
+  useLayoutEffect(() => {
+    r.current = value
+  }, [value])
+  return r
+}
+
+async function loadAndApplyPrefs(
+  p: UseAppIpcListenersParams,
+  isCancelled: () => boolean,
+): Promise<void> {
+  if (isCancelled()) {
+    return
+  }
+  const { setPrefs, setEnttecProComPort, setOpenDmxComPort, setIsLeftMenuCollapsed } = p
+  const prefs = await getPrefs()
+  if (isCancelled()) {
+    return
+  }
+  console.log('\n Prefs', prefs)
+
+  const updatedPrefs = { ...prefs }
+
+  const defaultDmxOutputConfig = {
+    sacnEnabled: false,
+    artNetEnabled: false,
+    enttecProEnabled: false,
+    openDmxEnabled: false,
+  }
+  if (!prefs.dmxOutputConfig) {
+    console.log('No saved DMX output config, using defaults:', defaultDmxOutputConfig)
+    updatedPrefs.dmxOutputConfig = defaultDmxOutputConfig
+  } else {
+    updatedPrefs.dmxOutputConfig = { ...defaultDmxOutputConfig, ...prefs.dmxOutputConfig }
+  }
+
+  const defaultEnttecProConfig = { port: '' }
+  if (!prefs.enttecProConfig) {
+    console.log('No saved Enttec Pro config, using defaults:', defaultEnttecProConfig)
+    updatedPrefs.enttecProConfig = defaultEnttecProConfig
+  } else {
+    updatedPrefs.enttecProConfig = { ...defaultEnttecProConfig, ...prefs.enttecProConfig }
+  }
+  setEnttecProComPort(updatedPrefs.enttecProConfig?.port ?? '')
+
+  const defaultOpenDmxConfig = { port: '', dmxSpeed: 40 }
+  if (!prefs.openDmxConfig) {
+    console.log('No saved OpenDMX config, using defaults:', defaultOpenDmxConfig)
+    updatedPrefs.openDmxConfig = defaultOpenDmxConfig
+  } else {
+    updatedPrefs.openDmxConfig = { ...defaultOpenDmxConfig, ...prefs.openDmxConfig }
+  }
+  setOpenDmxComPort(updatedPrefs.openDmxConfig?.port ?? '')
+
+  if (!prefs.stageKitPrefs) {
+    const defaultStageKitPrefs = {
+      yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never',
+    }
+    console.log('No saved Stage Kit preferences, using defaults:', defaultStageKitPrefs)
+    updatedPrefs.stageKitPrefs = defaultStageKitPrefs
+  }
+
+  const defaultDmxSettingsPrefs = {
+    artNetExpanded: false,
+    enttecProExpanded: false,
+    sacnExpanded: false,
+    openDmxExpanded: false,
+  }
+  if (!prefs.dmxSettingsPrefs) {
+    console.log('No saved DMX settings preferences, using defaults:', defaultDmxSettingsPrefs)
+    updatedPrefs.dmxSettingsPrefs = defaultDmxSettingsPrefs
+  } else {
+    updatedPrefs.dmxSettingsPrefs = { ...defaultDmxSettingsPrefs, ...prefs.dmxSettingsPrefs }
+  }
+
+  setPrefs(updatedPrefs)
+
+  if (prefs.leftMenuCollapsed !== undefined) {
+    setIsLeftMenuCollapsed(prefs.leftMenuCollapsed)
+  }
 }
 
 /**
- * Sets up IPC listeners for the main app window: preferences load, sender/cue/audio
- * events, and cleanup on unmount.
+ * Sets up IPC listeners for the main app window. Subscriptions register once; handlers always see
+ * the latest props via a ref. Initial fetches (version, prefs, validation, corrupt recovery) run
+ * on mount only — not on unrelated state changes (e.g. layout config edits).
  */
 export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
-  const {
-    activeConfig,
-    setAppVer,
-    setPrefs,
-    setEnttecProComPort,
-    setOpenDmxComPort,
-    setIsLeftMenuCollapsed,
-    handleSenderError,
-    handleYargError,
-    handleNodeCueRuntimeError,
-    handleSenderNetworkError,
-    handleCueStateUpdate,
-    handleSenderStartFailure,
-    handleCueValidationErrors,
-    handleConfigCorruptRecovered,
-    handleAudioEnable,
-    handleAudioDisable,
-    handleAudioConfigUpdate,
-    audioCaptureManagerRef,
-  } = params
-
-  const isInitialMount = useRef(true)
+  const latest = useLatestRef(params)
 
   useEffect(() => {
-    const audioCaptureManager = audioCaptureManagerRef.current
-    const fetchAppVersion = async () => {
-      if (isInitialMount.current) {
-        isInitialMount.current = false
-        try {
-          const ver = await getAppVersion()
-          setAppVer(ver)
-        } catch (error) {
-          console.error('Failed to get app version:', error)
+    let cancelled = false
+    const isCancelled = () => cancelled
+
+    void (async () => {
+      try {
+        const ver = await getAppVersion()
+        if (!isCancelled()) {
+          latest.current.setAppVer(ver)
         }
-        return
+      } catch (error) {
+        console.error('Failed to get app version:', error)
       }
-    }
+    })()
 
-    const loadPrefs = async () => {
-      const prefs = await getPrefs()
-      console.log('\n Prefs', prefs)
-
-      const updatedPrefs = { ...prefs }
-
-      const defaultDmxOutputConfig = {
-        sacnEnabled: false,
-        artNetEnabled: false,
-        enttecProEnabled: false,
-        openDmxEnabled: false,
+    void (async () => {
+      try {
+        await loadAndApplyPrefs(latest.current, isCancelled)
+      } catch (error) {
+        console.error('Failed to load preferences:', error)
       }
-      if (!prefs.dmxOutputConfig) {
-        console.log('No saved DMX output config, using defaults:', defaultDmxOutputConfig)
-        updatedPrefs.dmxOutputConfig = defaultDmxOutputConfig
-      } else {
-        updatedPrefs.dmxOutputConfig = { ...defaultDmxOutputConfig, ...prefs.dmxOutputConfig }
-      }
+    })()
 
-      const defaultEnttecProConfig = { port: '' }
-      if (!prefs.enttecProConfig) {
-        console.log('No saved Enttec Pro config, using defaults:', defaultEnttecProConfig)
-        updatedPrefs.enttecProConfig = defaultEnttecProConfig
-      } else {
-        updatedPrefs.enttecProConfig = { ...defaultEnttecProConfig, ...prefs.enttecProConfig }
-      }
-      setEnttecProComPort(updatedPrefs.enttecProConfig?.port ?? '')
-
-      const defaultOpenDmxConfig = { port: '', dmxSpeed: 40 }
-      if (!prefs.openDmxConfig) {
-        console.log('No saved OpenDMX config, using defaults:', defaultOpenDmxConfig)
-        updatedPrefs.openDmxConfig = defaultOpenDmxConfig
-      } else {
-        updatedPrefs.openDmxConfig = { ...defaultOpenDmxConfig, ...prefs.openDmxConfig }
-      }
-      setOpenDmxComPort(updatedPrefs.openDmxConfig?.port ?? '')
-
-      if (!prefs.stageKitPrefs) {
-        const defaultStageKitPrefs = {
-          yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never',
-        }
-        console.log('No saved Stage Kit preferences, using defaults:', defaultStageKitPrefs)
-        updatedPrefs.stageKitPrefs = defaultStageKitPrefs
-      }
-
-      const defaultDmxSettingsPrefs = {
-        artNetExpanded: false,
-        enttecProExpanded: false,
-        sacnExpanded: false,
-        openDmxExpanded: false,
-      }
-      if (!prefs.dmxSettingsPrefs) {
-        console.log('No saved DMX settings preferences, using defaults:', defaultDmxSettingsPrefs)
-        updatedPrefs.dmxSettingsPrefs = defaultDmxSettingsPrefs
-      } else {
-        updatedPrefs.dmxSettingsPrefs = { ...defaultDmxSettingsPrefs, ...prefs.dmxSettingsPrefs }
-      }
-
-      setPrefs(updatedPrefs)
-
-      if (prefs.leftMenuCollapsed !== undefined) {
-        setIsLeftMenuCollapsed(prefs.leftMenuCollapsed)
-      }
-    }
-
-    fetchAppVersion()
-    loadPrefs()
-
-    const flushValidationErrors = async () => {
+    void (async () => {
       try {
         const errors = await getValidationErrors()
-        if (errors.length > 0) {
-          handleCueValidationErrors(errors)
+        if (!isCancelled() && errors.length > 0) {
+          latest.current.handleCueValidationErrors(errors)
         }
       } catch (error) {
         console.error('Failed to fetch validation errors:', error)
       }
-    }
-    flushValidationErrors()
+    })()
 
-    addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
-    addIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
-    addIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, handleNodeCueRuntimeError)
-    addIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError)
-    addIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate)
-    addIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure)
-    addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable)
-    addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable)
-    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate)
-    addIpcListener(RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED, handleConfigCorruptRecovered)
-
-    const fetchConfigCorruptRecovery = async (): Promise<void> => {
+    void (async () => {
       try {
         const { files } = await getCorruptRecoveryEvents()
-        if (files.length > 0) {
-          handleConfigCorruptRecovered({ files })
+        if (!isCancelled() && files.length > 0) {
+          latest.current.handleConfigCorruptRecovered({ files })
         }
       } catch (error) {
         console.error('Failed to fetch config corrupt recovery events:', error)
       }
-    }
-    void fetchConfigCorruptRecovery()
-
-    const saveLayout = async () => {
-      if (activeConfig) {
-        try {
-          await saveLightLayout(activeConfig)
-        } catch (error) {
-          console.error('Failed to save light layout:', error)
-        }
-      }
-    }
-
-    saveLayout()
+    })()
 
     return () => {
-      removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, handleSenderError)
-      removeIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
-      removeIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, handleNodeCueRuntimeError)
-      removeIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, handleSenderNetworkError)
-      removeIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, handleCueStateUpdate)
-      removeIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, handleSenderStartFailure)
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEnable)
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioDisable)
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioConfigUpdate)
-      removeIpcListener(RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED, handleConfigCorruptRecovered)
-
-      if (audioCaptureManager) {
-        audioCaptureManager.stop()
-      }
+      cancelled = true
     }
-  }, [
-    activeConfig,
-    handleSenderError,
-    handleYargError,
-    handleNodeCueRuntimeError,
-    handleSenderNetworkError,
-    handleCueStateUpdate,
-    handleSenderStartFailure,
-    handleCueValidationErrors,
-    handleConfigCorruptRecovered,
-    handleAudioEnable,
-    handleAudioDisable,
-    handleAudioConfigUpdate,
-    setEnttecProComPort,
-    setOpenDmxComPort,
-    setPrefs,
-    setAppVer,
-    setIsLeftMenuCollapsed,
-    audioCaptureManagerRef,
-  ])
+  }, [latest])
+
+  useEffect(() => {
+    const p = () => latest.current
+    const onSenderError = (msg: string) => p().handleSenderError(msg)
+    const onYargError = (msg: string) => p().handleYargError(msg)
+    const onNodeCueRuntimeError = (msg: string) => p().handleNodeCueRuntimeError(msg)
+    const onSenderNetworkError = (data: { sender: string; error: string; autoDisabled: boolean }) =>
+      p().handleSenderNetworkError(data)
+    const onCueStateUpdate = (state: CueStateUpdatePayload) => p().handleCueStateUpdate(state)
+    const onSenderStartFailed = (data: { sender: string; error: string }) =>
+      p().handleSenderStartFailure(data)
+    const onAudioEnable = (config: AudioConfig) => p().handleAudioEnable(config)
+    const onAudioDisable = () => p().handleAudioDisable(undefined)
+    const onAudioConfigUpdate = (c: AudioConfig | undefined) => p().handleAudioConfigUpdate(c)
+    const onConfigCorrupt = (ev: { files: { fileName: string; message?: string }[] }) =>
+      p().handleConfigCorruptRecovered(ev)
+
+    addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, onSenderError)
+    addIpcListener(RENDERER_RECEIVE.YARG_ERROR, onYargError)
+    addIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, onNodeCueRuntimeError)
+    addIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, onSenderNetworkError)
+    addIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, onCueStateUpdate)
+    addIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, onSenderStartFailed)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, onAudioEnable)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, onAudioDisable)
+    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onAudioConfigUpdate)
+    addIpcListener(RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED, onConfigCorrupt)
+
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, onSenderError)
+      removeIpcListener(RENDERER_RECEIVE.YARG_ERROR, onYargError)
+      removeIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, onNodeCueRuntimeError)
+      removeIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, onSenderNetworkError)
+      removeIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, onCueStateUpdate)
+      removeIpcListener(RENDERER_RECEIVE.SENDER_START_FAILED, onSenderStartFailed)
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, onAudioEnable)
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, onAudioDisable)
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onAudioConfigUpdate)
+      removeIpcListener(RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED, onConfigCorrupt)
+    }
+  }, [latest])
 }

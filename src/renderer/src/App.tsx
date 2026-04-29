@@ -56,7 +56,7 @@ export const App = (): JSX.Element => {
   // State atoms
   const setMyLights = useSetAtom(myDmxLightsAtom)
   const setLightLibrary = useSetAtom(dmxLightsLibraryAtom)
-  const [activeConfig, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
+  const [, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
   const [currentPage] = useAtom(currentPageAtom)
   const { isDarkMode, toggleDarkMode } = useDarkMode()
   const [, setPrefs] = useAtom(lightingPrefsAtom)
@@ -394,7 +394,6 @@ export const App = (): JSX.Element => {
   }, [setActiveLightsConfig])
 
   useAppIpcListeners({
-    activeConfig,
     setAppVer,
     setPrefs: setPrefs as (prefs: LightingPreferences) => void,
     setEnttecProComPort,
@@ -411,8 +410,13 @@ export const App = (): JSX.Element => {
     handleAudioEnable,
     handleAudioDisable,
     handleAudioConfigUpdate,
-    audioCaptureManagerRef,
   })
+
+  useEffect(() => {
+    return () => {
+      audioCaptureManagerRef.current?.stop()
+    }
+  }, [])
 
   const sidebarWidth = isLeftMenuCollapsed ? 80 : 218
 

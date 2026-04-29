@@ -63,7 +63,7 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // Preload not context-isolated; window.api is declared in env.d.ts for that dev setup.
-  // @ts-expect-error -- assign api when contextIsolation is false
-  window.api = api
+  // Preload not context-isolated; `tsconfig.node` may not apply `index.d.ts` global merge to this file
+  const w = window as typeof window & { api: typeof api }
+  w.api = api
 }

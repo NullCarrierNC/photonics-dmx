@@ -12,6 +12,7 @@
   ],
   "compilerOptions": {
     "composite": true,
+    "outDir": "out/types/web",
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
