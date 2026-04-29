@@ -4,7 +4,24 @@ import {
   AUDIO_CUE_DATA_PROPERTIES,
   ALL_CONFIG_DATA_PROPERTIES,
 } from '../../../constants/nodeConstants'
-import { LogicNode } from '../../types/nodeCueTypes'
+import type {
+  ArrayLengthLogicNode,
+  ConcatLightsLogicNode,
+  ConditionalLogicNode,
+  ConfigDataLogicNode,
+  CueDataLogicNode,
+  CreatePairsLogicNode,
+  DebuggerLogicNode,
+  DelayLogicNode,
+  ForEachLightLogicNode,
+  LightsFromIndexLogicNode,
+  LogicNode,
+  MathLogicNode,
+  RandomLogicNode,
+  ReverseLightsLogicNode,
+  ShuffleLightsLogicNode,
+  VariableLogicNode,
+} from '../../types/nodeCueTypes'
 import { LOGIC_COMPARATORS, MATH_OPERATORS } from './helpers'
 import { stringIdSchema, valueSourceSchema } from './primitives'
 
@@ -16,7 +33,7 @@ const CUE_DATA_PROPERTIES = [
 // Use shared config data properties
 const CONFIG_DATA_PROPERTIES = ALL_CONFIG_DATA_PROPERTIES
 
-const variableLogicSchema: JSONSchemaType<LogicNode> = {
+const variableLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'mode', 'varName', 'valueType'],
   additionalProperties: false,
@@ -38,9 +55,9 @@ const variableLogicSchema: JSONSchemaType<LogicNode> = {
     },
     value: { ...valueSourceSchema, nullable: true },
   },
-} as any
+} as unknown as JSONSchemaType<VariableLogicNode>
 
-const mathLogicSchema: JSONSchemaType<LogicNode> = {
+const mathLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'operator', 'left', 'right'],
   additionalProperties: false,
@@ -59,9 +76,9 @@ const mathLogicSchema: JSONSchemaType<LogicNode> = {
     right: valueSourceSchema,
     assignTo: { type: 'string', nullable: true },
   },
-} as any
+} as unknown as JSONSchemaType<MathLogicNode>
 
-const conditionalLogicSchema: JSONSchemaType<LogicNode> = {
+const conditionalLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'comparator', 'left', 'right'],
   additionalProperties: false,
@@ -79,9 +96,9 @@ const conditionalLogicSchema: JSONSchemaType<LogicNode> = {
     left: valueSourceSchema,
     right: valueSourceSchema,
   },
-} as any
+} as unknown as JSONSchemaType<ConditionalLogicNode>
 
-const cueDataLogicSchema: JSONSchemaType<LogicNode> = {
+const cueDataLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'dataProperty'],
   additionalProperties: false,
@@ -98,9 +115,9 @@ const cueDataLogicSchema: JSONSchemaType<LogicNode> = {
     dataProperty: { type: 'string', enum: CUE_DATA_PROPERTIES },
     assignTo: { type: 'string', nullable: true },
   },
-} as any
+} as unknown as JSONSchemaType<CueDataLogicNode>
 
-const configDataLogicSchema: JSONSchemaType<LogicNode> = {
+const configDataLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'dataProperty'],
   additionalProperties: false,
@@ -117,9 +134,9 @@ const configDataLogicSchema: JSONSchemaType<LogicNode> = {
     dataProperty: { type: 'string', enum: CONFIG_DATA_PROPERTIES },
     assignTo: { type: 'string', nullable: true },
   },
-} as any
+} as unknown as JSONSchemaType<ConfigDataLogicNode>
 
-const lightsFromIndexLogicSchema: JSONSchemaType<LogicNode> = {
+const lightsFromIndexLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'sourceVariable', 'index', 'assignTo'],
   additionalProperties: false,
@@ -137,9 +154,9 @@ const lightsFromIndexLogicSchema: JSONSchemaType<LogicNode> = {
     index: valueSourceSchema,
     assignTo: { type: 'string' },
   },
-} as any
+} as unknown as JSONSchemaType<LightsFromIndexLogicNode>
 
-const arrayLengthLogicSchema: JSONSchemaType<LogicNode> = {
+const arrayLengthLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
   additionalProperties: false,
@@ -156,9 +173,9 @@ const arrayLengthLogicSchema: JSONSchemaType<LogicNode> = {
     sourceVariable: { type: 'string' },
     assignTo: { type: 'string' },
   },
-} as any
+} as unknown as JSONSchemaType<ArrayLengthLogicNode>
 
-const reverseLightsLogicSchema: JSONSchemaType<LogicNode> = {
+const reverseLightsLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
   additionalProperties: false,
@@ -175,9 +192,9 @@ const reverseLightsLogicSchema: JSONSchemaType<LogicNode> = {
     sourceVariable: { type: 'string' },
     assignTo: { type: 'string' },
   },
-} as any
+} as unknown as JSONSchemaType<ReverseLightsLogicNode>
 
-const createPairsLogicSchema: JSONSchemaType<LogicNode> = {
+const createPairsLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'pairType', 'sourceVariable', 'assignTo'],
   additionalProperties: false,
@@ -195,9 +212,9 @@ const createPairsLogicSchema: JSONSchemaType<LogicNode> = {
     sourceVariable: { type: 'string' },
     assignTo: { type: 'string' },
   },
-} as any
+} as unknown as JSONSchemaType<CreatePairsLogicNode>
 
-const concatLightsLogicSchema: JSONSchemaType<LogicNode> = {
+const concatLightsLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'sourceVariables', 'assignTo'],
   additionalProperties: false,
@@ -218,9 +235,9 @@ const concatLightsLogicSchema: JSONSchemaType<LogicNode> = {
     },
     assignTo: { type: 'string' },
   },
-} as any
+} as unknown as JSONSchemaType<ConcatLightsLogicNode>
 
-const delayLogicSchema: JSONSchemaType<LogicNode> = {
+const delayLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'delayTime'],
   additionalProperties: false,
@@ -236,9 +253,9 @@ const delayLogicSchema: JSONSchemaType<LogicNode> = {
     },
     delayTime: valueSourceSchema,
   },
-} as any
+} as unknown as JSONSchemaType<DelayLogicNode>
 
-const debuggerLogicSchema: JSONSchemaType<LogicNode> = {
+const debuggerLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'message', 'variablesToLog'],
   additionalProperties: false,
@@ -258,9 +275,9 @@ const debuggerLogicSchema: JSONSchemaType<LogicNode> = {
       items: { type: 'string' },
     },
   },
-} as any
+} as unknown as JSONSchemaType<DebuggerLogicNode>
 
-const randomLogicSchema: JSONSchemaType<LogicNode> = {
+const randomLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'mode', 'assignTo'],
   additionalProperties: false,
@@ -286,9 +303,9 @@ const randomLogicSchema: JSONSchemaType<LogicNode> = {
     count: { ...valueSourceSchema, nullable: true },
     assignTo: { type: 'string' },
   },
-} as any
+} as unknown as JSONSchemaType<RandomLogicNode>
 
-const shuffleLightsLogicSchema: JSONSchemaType<LogicNode> = {
+const shuffleLightsLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
   additionalProperties: false,
@@ -305,9 +322,9 @@ const shuffleLightsLogicSchema: JSONSchemaType<LogicNode> = {
     sourceVariable: { type: 'string' },
     assignTo: { type: 'string' },
   },
-} as any
+} as unknown as JSONSchemaType<ShuffleLightsLogicNode>
 
-const forEachLightLogicSchema: JSONSchemaType<LogicNode> = {
+const forEachLightLogicSchema = {
   type: 'object',
   required: [
     'id',
@@ -333,9 +350,9 @@ const forEachLightLogicSchema: JSONSchemaType<LogicNode> = {
     currentIndexVariable: { type: 'string' },
     groupSize: { ...valueSourceSchema, nullable: true },
   },
-} as any
+} as unknown as JSONSchemaType<ForEachLightLogicNode>
 
-export const logicNodeSchema: JSONSchemaType<LogicNode> = {
+export const logicNodeSchema = {
   oneOf: [
     variableLogicSchema,
     mathLogicSchema,
@@ -353,4 +370,4 @@ export const logicNodeSchema: JSONSchemaType<LogicNode> = {
     shuffleLightsLogicSchema,
     forEachLightLogicSchema,
   ],
-} as any
+} as unknown as JSONSchemaType<LogicNode>

@@ -1,5 +1,11 @@
 import { JSONSchemaType } from 'ajv'
-import { AudioEffectFile, EffectGroupMeta, YargEffectFile } from '../../types/nodeCueTypes'
+import type {
+  AudioEffectDefinition,
+  AudioEffectFile,
+  EffectGroupMeta,
+  YargEffectDefinition,
+  YargEffectFile,
+} from '../../types/nodeCueTypes'
 import { ajv } from './helpers'
 import { stringIdSchema } from './primitives'
 
@@ -40,7 +46,7 @@ const yargEffectFileSchema: JSONSchemaType<YargEffectFile> = {
           variables: { type: 'array', nullable: true },
           events: { type: 'array', nullable: true },
         },
-      } as any,
+      } as unknown as JSONSchemaType<YargEffectDefinition>,
     },
     bundled: { type: 'boolean', nullable: true },
   },
@@ -72,7 +78,7 @@ const audioEffectFileSchema: JSONSchemaType<AudioEffectFile> = {
           variables: { type: 'array', nullable: true },
           events: { type: 'array', nullable: true },
         },
-      } as any,
+      } as unknown as JSONSchemaType<AudioEffectDefinition>,
     },
     bundled: { type: 'boolean', nullable: true },
   },

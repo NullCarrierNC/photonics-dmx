@@ -846,6 +846,68 @@ describe('Node cue validation', () => {
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
     })
+
+    describe('effect raiser and effect listener', () => {
+      it('rejects effect raiser with wrong type discriminator', () => {
+        const cue = validCue()
+        ;(cue.nodes as { effectRaisers?: unknown[] }).effectRaisers = [
+          { id: 'r1', type: 'effect-raisers', effectId: 'eff' },
+        ]
+        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+        expect(result.valid).toBe(false)
+        expect(result.errors.length).toBeGreaterThan(0)
+      })
+
+      it('rejects effect raiser with unknown additional property', () => {
+        const cue = validCue()
+        ;(cue.nodes as { effectRaisers?: unknown[] }).effectRaisers = [
+          {
+            id: 'r1',
+            type: 'effect-raiser',
+            effectId: 'eff',
+            unknownProp: 'x',
+          },
+        ]
+        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+        expect(result.valid).toBe(false)
+        expect(result.errors.length).toBeGreaterThan(0)
+      })
+
+      it('rejects effect raiser missing effectId', () => {
+        const cue = validCue()
+        ;(cue.nodes as { effectRaisers?: unknown[] }).effectRaisers = [
+          { id: 'r1', type: 'effect-raiser' },
+        ]
+        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+        expect(result.valid).toBe(false)
+        expect(result.errors.length).toBeGreaterThan(0)
+      })
+
+      it('rejects effect raiser with non-ValueSource parameterValues entry', () => {
+        const cue = validCue()
+        ;(cue.nodes as { effectRaisers?: unknown[] }).effectRaisers = [
+          {
+            id: 'r1',
+            type: 'effect-raiser',
+            effectId: 'eff',
+            parameterValues: { p: 42 },
+          },
+        ]
+        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+        expect(result.valid).toBe(false)
+        expect(result.errors.length).toBeGreaterThan(0)
+      })
+
+      it('rejects effect listener with unknown additional property', () => {
+        const cue = validCue()
+        ;(cue.nodes as { effectListeners?: unknown[] }).effectListeners = [
+          { id: 'l1', type: 'effect-listener', spurious: true },
+        ]
+        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+        expect(result.valid).toBe(false)
+        expect(result.errors.length).toBeGreaterThan(0)
+      })
+    })
   })
 
   describe('node variety coverage', () => {
