@@ -22,6 +22,7 @@ import type {
   EffectFile,
   EffectMode,
   DmxRig,
+  DmxFixture,
   LightingConfiguration,
   SenderConfig,
   AudioCueType,
@@ -137,8 +138,7 @@ export const getLightLibrary = () => window.api.invoke(CONFIG.GET_LIGHT_LIBRARY,
 
 export const getMyLights = () => window.api.invoke(CONFIG.GET_MY_LIGHTS, undefined)
 
-export const saveMyLights = (data: import('../../shared/ipcTypes').DmxFixture[]) =>
-  window.api.send(CONFIG.SAVE_MY_LIGHTS, data)
+export const saveMyLights = (data: DmxFixture[]) => window.api.invoke(CONFIG.SAVE_MY_LIGHTS, data)
 
 export const getLightLayout = (filename: string) =>
   window.api.invoke(CONFIG.GET_LIGHT_LAYOUT, filename)
@@ -320,10 +320,10 @@ export const getRb3Stats = () => window.api.invoke(CUE.RB3E_GET_STATS, undefined
 // Sender management
 // ---------------------------------------------------------------------------
 
-export const enableSender = (config: SenderConfig) => window.api.send(LIGHT.SENDER_ENABLE, config)
+export const enableSender = (config: SenderConfig) => window.api.invoke(LIGHT.SENDER_ENABLE, config)
 
 export const disableSender = (config: { sender: string }) =>
-  window.api.send(LIGHT.SENDER_DISABLE, config)
+  window.api.invoke(LIGHT.SENDER_DISABLE, config)
 
 export const disableAllOutputSenders = () => window.api.invoke(LIGHT.SENDER_DISABLE_ALL, undefined)
 

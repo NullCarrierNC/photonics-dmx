@@ -3,7 +3,7 @@ import * as os from 'os'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
 import type { SacnSenderConfig } from '../../photonics-dmx/types'
-import { ipcError } from './ipcResult'
+import { ipcError, ipcSuccess } from './ipcResult'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import {
   isPlainObject,
@@ -16,49 +16,50 @@ import {
  * Set up sender-related IPC handlers (enable/disable, sACN config, network interfaces).
  */
 export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  ipcMain.on(LIGHT.SENDER_ENABLE, async (_, data: unknown) => {
+  ipcMain.handle(LIGHT.SENDER_ENABLE, async (_, data: unknown) => {
+    const payloadValidation = validateSenderEnablePayload(data)
+    if (!payloadValidation.ok) {
+      sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, payloadValidation.error)
+      return { success: false as const, error: payloadValidation.error }
+    }
+    const config = payloadValidation.value
+    const sender = config.sender
+    const senderManager = controllerManager.getSenderManager()
+
+    if (senderManager.isSenderEnabled(sender)) {
+      return ipcSuccess()
+    }
+
     try {
-      const payloadValidation = validateSenderEnablePayload(data)
-      if (!payloadValidation.ok) {
-        console.error(payloadValidation.error)
-        return
-      }
-      const config = payloadValidation.value
-      const sender = config.sender
-      const senderManager = controllerManager.getSenderManager()
-
-      if (senderManager.isSenderEnabled(sender)) {
-        console.debug(`Sender "${sender}" is already enabled`)
-        return
-      }
-
-      console.log(`Enabling ${sender} sender with config:`, config)
-      try {
-        await senderManager.enableSender(sender, sender, config)
-        console.log(`Successfully enabled ${sender} sender`)
-      } catch (error) {
-        console.error(`Failed to enable ${sender} sender:`, error)
-        sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
-          sender: sender,
-          error: ipcError(error).error,
-        })
-        throw error
-      }
+      await senderManager.enableSender(sender, sender, config)
+      return ipcSuccess()
     } catch (error) {
-      console.error('Error enabling sender:', error)
+      const err = ipcError(error)
+      sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
+        sender,
+        error: err.error,
+      })
+      return err
     }
   })
 
-  ipcMain.on(LIGHT.SENDER_DISABLE, (_, data: { sender: unknown }) => {
+  ipcMain.handle(LIGHT.SENDER_DISABLE, async (_, data: unknown) => {
+    if (data === null || typeof data !== 'object' || !('sender' in data)) {
+      const msg = 'Invalid sender disable payload'
+      sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, msg)
+      return { success: false as const, error: msg }
+    }
+    const senderValidation = validateSenderId((data as { sender: unknown }).sender)
+    if (!senderValidation.ok) {
+      sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, senderValidation.error)
+      return { success: false, error: senderValidation.error }
+    }
     try {
-      const senderValidation = validateSenderId(data?.sender)
-      if (!senderValidation.ok) {
-        console.error(senderValidation.error)
-        return
-      }
-      controllerManager.getSenderManager().disableSender(senderValidation.value)
+      await controllerManager.getSenderManager().disableSender(senderValidation.value)
+      return ipcSuccess()
     } catch (error) {
       console.error('Error disabling sender:', error)
+      return ipcError(error)
     }
   })
 

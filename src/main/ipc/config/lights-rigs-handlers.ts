@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
-import { ipcError } from '../ipcResult'
+import { ipcError, ipcSuccess } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
   validateLightingConfiguration,
@@ -21,18 +21,18 @@ export function registerLightsRigsConfigHandlers(
     return controllerManager.getConfig().getUserLights()
   })
 
-  ipcMain.on(CONFIG.SAVE_MY_LIGHTS, (_, data: unknown) => {
+  ipcMain.handle(CONFIG.SAVE_MY_LIGHTS, async (_, data: unknown) => {
     const v = validateDmxFixturesArray(data, 'myLights')
     if (!v.ok) {
-      console.error('SAVE_MY_LIGHTS: invalid payload:', v.error)
-      return
+      return { success: false, error: v.error }
     }
-    controllerManager
-      .getConfig()
-      .updateUserLights(v.value)
-      .catch((err) => {
-        console.error('SAVE_MY_LIGHTS failed:', err)
-      })
+    try {
+      await controllerManager.getConfig().updateUserLights(v.value)
+      return ipcSuccess()
+    } catch (err) {
+      console.error('SAVE_MY_LIGHTS failed:', err)
+      return ipcError(err)
+    }
   })
 
   ipcMain.handle(CONFIG.GET_LIGHT_LAYOUT, async (_, filename: string) => {
