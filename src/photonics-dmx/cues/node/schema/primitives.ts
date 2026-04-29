@@ -4,14 +4,11 @@ import {
   EffectReference,
   EventDefinition,
   NodeActionConfig,
+  NodeMotionPatternSetting,
+  NodePositionSetting,
   ValueSource,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
-
-/**
- * Ajv + JSONSchemaType for union/conditional oneOf shapes often need a cast: keep casts local
- * to this file with narrow eslint disables instead of a file-wide any ban.
- */
 export const stringIdSchema: JSONSchemaType<string> = {
   type: 'string',
   minLength: 1,
@@ -51,7 +48,7 @@ export const valueSourceSchema: JSONSchemaType<ValueSource> = {
       },
     },
   ],
-} as any
+} as unknown as JSONSchemaType<ValueSource>
 
 export const colorSchema: JSONSchemaType<{
   name: ValueSource
@@ -68,7 +65,12 @@ export const colorSchema: JSONSchemaType<{
     blendMode: { ...valueSourceSchema, nullable: true },
     opacity: { ...valueSourceSchema, nullable: true },
   },
-} as any
+} as unknown as JSONSchemaType<{
+  name: ValueSource
+  brightness: ValueSource
+  blendMode?: ValueSource
+  opacity?: ValueSource
+}>
 
 export const positionSchema = {
   oneOf: [
@@ -112,7 +114,7 @@ export const positionSchema = {
       },
     },
   ],
-} as any
+} as unknown as JSONSchemaType<NodePositionSetting>
 
 export const motionPatternSchema = {
   type: 'object',
@@ -132,7 +134,7 @@ export const motionPatternSchema = {
     panPhaseOffset: { ...valueSourceSchema, nullable: true },
     reverse: { ...valueSourceSchema, nullable: true },
   },
-} as any
+} as unknown as JSONSchemaType<NodeMotionPatternSetting>
 
 export const timingSchema: JSONSchemaType<ActionTimingConfig> = {
   type: 'object',
@@ -149,7 +151,7 @@ export const timingSchema: JSONSchemaType<ActionTimingConfig> = {
     easing: { ...valueSourceSchema, nullable: true },
     level: { ...valueSourceSchema, nullable: true },
   },
-} as any
+} as unknown as JSONSchemaType<ActionTimingConfig>
 
 export const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
   type: 'object',
@@ -160,7 +162,7 @@ export const actionConfigSchema: JSONSchemaType<NodeActionConfig> = {
   },
 }
 
-export const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
+export const variableDefinitionSchema = {
   type: 'object',
   required: ['name', 'type', 'scope', 'initialValue'],
   additionalProperties: false,
@@ -171,14 +173,12 @@ export const variableDefinitionSchema: JSONSchemaType<VariableDefinition> = {
       enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type', 'event'],
     },
     scope: { type: 'string', enum: ['cue', 'cue-group'] },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ajv tuple union
-    initialValue: { type: ['number', 'boolean', 'string', 'array'] } as any,
+    initialValue: { type: ['number', 'boolean', 'string', 'array'] },
     description: { type: 'string', nullable: true },
     isParameter: { type: 'boolean', nullable: true },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- array of strings, nullable
-    validValues: { type: 'array', items: { type: 'string' }, nullable: true } as any,
+    validValues: { type: 'array', items: { type: 'string' }, nullable: true },
   },
-}
+} as unknown as JSONSchemaType<VariableDefinition>
 
 export const eventDefinitionSchema: JSONSchemaType<EventDefinition> = {
   type: 'object',

@@ -35,9 +35,11 @@ export const formatErrors = (errors: DefinedError[] | null | undefined): string[
   return errors.map((err) => {
     const instancePath = err.instancePath || 'file'
     const message = err.message || 'Invalid value'
-    if (err.params && 'allowedValues' in err.params) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ajv params for allowedValues
-      return `${instancePath}: ${message} (${(err.params as any).allowedValues.join(', ')})`
+    if (err.params && typeof err.params === 'object' && 'allowedValues' in err.params) {
+      const p = err.params as { allowedValues: unknown }
+      if (Array.isArray(p.allowedValues) && p.allowedValues.length > 0) {
+        return `${instancePath}: ${message} (${(p.allowedValues as string[]).join(', ')})`
+      }
     }
     return `${instancePath}: ${message}`
   })

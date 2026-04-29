@@ -1,5 +1,12 @@
 import { JSONSchemaType } from 'ajv'
-import { AudioNodeCueFile, NodeCueGroupMeta, YargNodeCueFile } from '../../types/nodeCueTypes'
+import type {
+  AudioNodeCueDefinition,
+  AudioNodeCueFile,
+  AudioEventNodeUnion,
+  NodeCueGroupMeta,
+  YargNodeCueDefinition,
+  YargNodeCueFile,
+} from '../../types/nodeCueTypes'
 import { ajv } from './helpers'
 import { logicNodeSchema } from './logic'
 import {
@@ -7,6 +14,8 @@ import {
   audioEventSchema,
   audioTriggerSchema,
   connectionSchema,
+  effectListenerNodeSchema,
+  effectRaiserNodeSchema,
   eventListenerNodeSchema,
   eventRaiserNodeSchema,
   layoutSchema,
@@ -66,15 +75,13 @@ const yargLightingCueSchema = {
         effectRaisers: {
           type: 'array',
           nullable: true,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Simplified schema for now
-          items: { type: 'object' } as any,
+          items: effectRaiserNodeSchema,
           default: [],
         },
         effectListeners: {
           type: 'array',
           nullable: true,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          items: { type: 'object' } as any, // Not used in cues, only in effects
+          items: effectListenerNodeSchema,
           default: [],
         },
         notes: {
@@ -155,13 +162,13 @@ const yargMotionCueSchema = {
         effectRaisers: {
           type: 'array',
           nullable: true,
-          items: { type: 'object' } as any,
+          items: effectRaiserNodeSchema,
           default: [],
         },
         effectListeners: {
           type: 'array',
           nullable: true,
-          items: { type: 'object' } as any,
+          items: effectListenerNodeSchema,
           default: [],
         },
         notes: {
@@ -202,7 +209,7 @@ const yargMotionCueSchema = {
 
 const yargCueSchema = {
   oneOf: [yargLightingCueSchema, yargMotionCueSchema],
-} as any
+} as unknown as JSONSchemaType<YargNodeCueDefinition>
 
 const audioLightingCueSchema = {
   type: 'object',
@@ -224,8 +231,9 @@ const audioLightingCueSchema = {
           type: 'array',
           minItems: 1,
           // audio-trigger first: same shape is rejected by audioEventSchema (wrong enum, extra props, missing triggerMode)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          items: { anyOf: [audioTriggerSchema, audioEventSchema] } as any,
+          items: {
+            anyOf: [audioTriggerSchema, audioEventSchema],
+          } as unknown as JSONSchemaType<AudioEventNodeUnion>,
         },
         actions: {
           type: 'array',
@@ -252,13 +260,13 @@ const audioLightingCueSchema = {
         effectRaisers: {
           type: 'array',
           nullable: true,
-          items: { type: 'object' } as any,
+          items: effectRaiserNodeSchema,
           default: [],
         },
         effectListeners: {
           type: 'array',
           nullable: true,
-          items: { type: 'object' } as any,
+          items: effectListenerNodeSchema,
           default: [],
         },
         notes: {
@@ -312,8 +320,9 @@ const audioMotionCueSchema = {
         events: {
           type: 'array',
           minItems: 1,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          items: { anyOf: [audioTriggerSchema, audioEventSchema] } as any,
+          items: {
+            anyOf: [audioTriggerSchema, audioEventSchema],
+          } as unknown as JSONSchemaType<AudioEventNodeUnion>,
         },
         actions: {
           type: 'array',
@@ -340,13 +349,13 @@ const audioMotionCueSchema = {
         effectRaisers: {
           type: 'array',
           nullable: true,
-          items: { type: 'object' } as any,
+          items: effectRaiserNodeSchema,
           default: [],
         },
         effectListeners: {
           type: 'array',
           nullable: true,
-          items: { type: 'object' } as any,
+          items: effectListenerNodeSchema,
           default: [],
         },
         notes: {
@@ -385,7 +394,7 @@ const audioMotionCueSchema = {
 
 const audioCueSchema = {
   oneOf: [audioLightingCueSchema, audioMotionCueSchema],
-} as any
+} as unknown as JSONSchemaType<AudioNodeCueDefinition>
 
 const groupSchema: JSONSchemaType<NodeCueGroupMeta> = {
   type: 'object',
@@ -440,10 +449,6 @@ const audioFileSchema: JSONSchemaType<AudioNodeCueFile> = {
   },
 }
 
-export const validateYargSchema = ajv.compile(
-  yargFileSchema as any,
-) as import('ajv').ValidateFunction<YargNodeCueFile>
+export const validateYargSchema = ajv.compile<YargNodeCueFile>(yargFileSchema)
 
-export const validateAudioSchema = ajv.compile(
-  audioFileSchema as any,
-) as import('ajv').ValidateFunction<AudioNodeCueFile>
+export const validateAudioSchema = ajv.compile<AudioNodeCueFile>(audioFileSchema)

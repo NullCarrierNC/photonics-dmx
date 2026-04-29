@@ -2,11 +2,17 @@ import { JSONSchemaType } from 'ajv'
 import {
   ActionNode,
   AudioEventNode,
+  AudioTriggerNode,
+  EffectEventListenerNode,
+  EffectRaiserNode,
   EventListenerNode,
   EventRaiserNode,
   NodeActionTarget,
   NodeLayoutMetadata,
+  NodeMotionPatternSetting,
+  NodePositionSetting,
   NotesNode,
+  ValueSource,
   YargEventNode,
 } from '../../types/nodeCueTypes'
 import { NODE_EFFECT_TYPES } from '../../types/nodeCueTypes'
@@ -60,6 +66,51 @@ export const eventListenerNodeSchema: JSONSchemaType<EventListenerNode> = {
   },
 }
 
+export const effectRaiserNodeSchema = {
+  type: 'object',
+  required: ['id', 'type', 'effectId'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'effect-raiser' },
+    effectId: { type: 'string', minLength: 1 },
+    label: { type: 'string', nullable: true },
+    inputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    isPersistent: { type: 'boolean', nullable: true },
+    parameterValues: {
+      type: 'object',
+      nullable: true,
+      additionalProperties: valueSourceSchema,
+      required: [],
+    } as unknown as JSONSchemaType<Record<string, ValueSource> | undefined>,
+  },
+} as unknown as JSONSchemaType<EffectRaiserNode>
+
+export const effectListenerNodeSchema: JSONSchemaType<EffectEventListenerNode> = {
+  type: 'object',
+  required: ['id', 'type'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'effect-listener' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+  },
+}
+
 export const notesNodeSchema: JSONSchemaType<NotesNode> = {
   type: 'object',
   required: ['id', 'type', 'note'],
@@ -74,7 +125,7 @@ export const notesNodeSchema: JSONSchemaType<NotesNode> = {
   },
 }
 
-export const targetSchema: JSONSchemaType<NodeActionTarget> = {
+export const targetSchema = {
   type: 'object',
   required: ['groups', 'filter'],
   additionalProperties: false,
@@ -82,9 +133,9 @@ export const targetSchema: JSONSchemaType<NodeActionTarget> = {
     groups: valueSourceSchema,
     filter: valueSourceSchema,
   },
-} as any
+} as unknown as JSONSchemaType<NodeActionTarget>
 
-export const actionSchema: JSONSchemaType<ActionNode> = {
+export const actionSchema = {
   type: 'object',
   required: ['id', 'type', 'effectType', 'target', 'timing'],
   additionalProperties: true, // Allow editor/backup metadata (e.g. position) to be ignored
@@ -96,10 +147,10 @@ export const actionSchema: JSONSchemaType<ActionNode> = {
     color: { ...colorSchema, nullable: true },
     position: {
       anyOf: [{ type: 'null' }, positionSchema],
-    } as any,
+    } as unknown as JSONSchemaType<NodePositionSetting | null>,
     motionPattern: {
       anyOf: [{ type: 'null' }, motionPatternSchema],
-    } as any,
+    } as unknown as JSONSchemaType<NodeMotionPatternSetting | null>,
     timing: timingSchema,
     layer: { ...valueSourceSchema, nullable: true },
     label: { type: 'string', nullable: true },
@@ -141,7 +192,7 @@ export const actionSchema: JSONSchemaType<ActionNode> = {
       },
     },
   ],
-} as any
+} as unknown as JSONSchemaType<ActionNode>
 
 export const yargEventSchema: JSONSchemaType<YargEventNode> = {
   type: 'object',
@@ -265,7 +316,7 @@ export const audioTriggerSchema = {
       maxItems: 3,
     },
   },
-} as any
+} as unknown as JSONSchemaType<AudioTriggerNode>
 
 export const connectionSchema: JSONSchemaType<{
   from: string
