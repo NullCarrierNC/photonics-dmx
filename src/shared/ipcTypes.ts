@@ -218,7 +218,7 @@ export interface IpcInvokeMap {
   }
   [SHELL.RUN_NODE_SCRIPT]: {
     request: { scriptName: string; args: string[] }
-    response: { stdout: string; stderr: string }
+    response: { success: true; stdout: string; stderr: string } | IpcErrorResult
   }
 
   // ---- Cue / listeners ----

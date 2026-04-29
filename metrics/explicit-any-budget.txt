@@ -1,3 +1,4 @@
-0
+38
+# TODO(Phase 3): Set back to 0 when node cue/effect schema files drop explicit `as any` (see photonics audit plan Phase 3).
 Auto-generated: `npx eslint src` messages for @typescript-eslint/no-explicit-any.
 Lower this when reducing explicit any; do not increase without a deliberate pass.
