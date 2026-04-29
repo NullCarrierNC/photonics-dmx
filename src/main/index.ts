@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { installDefaultSessionContentSecurityPolicy } from './rendererSessionSecurity'
 import { Application } from './application'
 
 // Global reference to application for error handling
@@ -66,6 +67,8 @@ process.on('SIGTERM', async () => {
 
 // Handle app lifecycle events
 app.whenReady().then(() => {
+  installDefaultSessionContentSecurityPolicy()
+
   // Set up the app
   electronApp.setAppUserModelId('rocks.photonics')
 

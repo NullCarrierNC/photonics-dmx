@@ -4,6 +4,7 @@ import { is } from '@electron-toolkit/utils'
 import type { ControllerManager } from './controllers/ControllerManager'
 import { RENDERER_RECEIVE } from '../shared/ipcChannels'
 import type { AudioLightingData } from '../photonics-dmx/listeners/Audio/AudioTypes'
+import { denyWebContentsWillNavigate } from './rendererSessionSecurity'
 
 export class WindowManager {
   private mainWindow: BrowserWindow | null = null
@@ -234,6 +235,7 @@ export class WindowManager {
       shell.openExternal(details.url)
       return { action: 'deny' }
     })
+    denyWebContentsWillNavigate(this.mainWindow.webContents)
 
     // Load the renderer
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -311,6 +313,7 @@ export class WindowManager {
       shell.openExternal(details.url)
       return { action: 'deny' }
     })
+    denyWebContentsWillNavigate(this.cueEditorWindow.webContents)
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       this.cueEditorWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}?window=cue-editor`)
@@ -410,6 +413,7 @@ export class WindowManager {
       shell.openExternal(details.url)
       return { action: 'deny' }
     })
+    denyWebContentsWillNavigate(this.audioPreviewWindow.webContents)
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       this.audioPreviewWindow.loadURL(

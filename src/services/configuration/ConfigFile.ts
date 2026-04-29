@@ -295,8 +295,14 @@ export class ConfigFile<T> {
    * Updates the data and saves to file
    */
   async update(newData: T): Promise<void> {
-    this.data = newData
-    await this.save(newData)
+    const previous = this.data
+    try {
+      await this.save(newData)
+      this.data = newData
+    } catch (err) {
+      this.data = previous
+      throw err
+    }
   }
 
   /**
