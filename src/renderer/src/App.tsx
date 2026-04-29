@@ -31,6 +31,7 @@ import { AudioCaptureManager } from './services/AudioCaptureManager'
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { useToast } from './hooks/useToast'
 import ToastContainer from './components/Toast'
+import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
 import type { CueStateUpdatePayload } from '../../shared/ipcTypes'
@@ -475,6 +476,7 @@ export const App = (): JSX.Element => {
         <StatusBar />
       </div>
       <ToastContainer toasts={toasts} onDismiss={hideToast} />
+      <ConfirmModalHost />
     </div>
   )
 }

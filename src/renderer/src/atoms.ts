@@ -68,6 +68,25 @@ export const myValidDmxLightsAtom = atom((get) => {
 export const activeDmxLightsConfigAtom = atom<LightingConfiguration | null>(null)
 
 /**
+ * True while the Light Layout page has unsaved edits (drives leave navigation / beforeunload).
+ */
+export const lightsLayoutHasUnsavedChangesAtom = atom(false)
+
+export type ConfirmRequest = {
+  title: string
+  message: string
+  confirmLabel?: string
+  cancelLabel?: string
+  danger?: boolean
+  resolve: (ok: boolean) => void
+}
+
+/**
+ * When set, `ConfirmModalHost` shows a global confirmation dialog.
+ */
+export const confirmRequestAtom = atom<ConfirmRequest | null>(null)
+
+/**
  * Atom for storing all DMX rigs
  */
 export const dmxRigsAtom = atom<DmxRig[]>([])
