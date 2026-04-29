@@ -4,11 +4,14 @@ import { useAtom } from 'jotai'
 import LightSettings from '../components/LightSettings'
 import LightChannelsPreview from '../components/LightChannelsPreview'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
+import ToastContainer from '../components/Toast'
 import { DmxFixture, FixtureTypes } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
 import { saveMyLights } from '../ipcApi'
+import { useToast } from '../hooks/useToast'
 
 const MyLights = () => {
+  const { toasts, showToast, hideToast } = useToast()
   const [myLights, setMyLights] = useAtom(myDmxLightsAtom)
   const [myLightsSorted] = useAtom(sortedMyDmxLightsAtom)
 
@@ -27,38 +30,41 @@ const MyLights = () => {
     })
   }
 
-  const handleSave = () => {
-    if (currentLight) {
-      const lightToSave = {
-        ...currentLight,
-        id: currentLight.id || crypto.randomUUID(), // Assign a unique id if it doesn't have one
-      }
-
-      // Update the light library in Jotai state
-      setMyLights((prev) => {
-        const existingIndex = prev.findIndex((light) => light.id === lightToSave.id)
-        if (existingIndex >= 0) {
-          const updatedLibrary = [...prev]
-          updatedLibrary[existingIndex] = lightToSave
-          saveMyLights(updatedLibrary)
-          return updatedLibrary
-        }
-        const newLibrary = [...prev, lightToSave]
-        saveMyLights(newLibrary)
-        return newLibrary
-      })
-
-      setCurrentLight(null)
+  const handleSave = async () => {
+    if (!currentLight) return
+    const lightToSave: DmxFixture = {
+      ...currentLight,
+      id: currentLight.id || crypto.randomUUID(),
     }
+
+    const existingIndex = myLights.findIndex((light) => light.id === lightToSave.id)
+    const nextLibrary =
+      existingIndex >= 0
+        ? (() => {
+            const u = [...myLights]
+            u[existingIndex] = lightToSave
+            return u
+          })()
+        : [...myLights, lightToSave]
+
+    setMyLights(nextLibrary)
+    const result = await saveMyLights(nextLibrary)
+    if (!result.success) {
+      showToast(result.error, 'error', 5000)
+      return
+    }
+    setCurrentLight(null)
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (currentLight && currentLight.id) {
       const updatedMyLights = myLights.filter((light) => light.id !== currentLight.id)
-
       setMyLights(updatedMyLights)
-      saveMyLights(updatedMyLights)
-
+      const result = await saveMyLights(updatedMyLights)
+      if (!result.success) {
+        showToast(result.error, 'error', 5000)
+        return
+      }
       setCurrentLight(null)
       setShowDeleteModal(false)
     }
@@ -77,6 +83,7 @@ const MyLights = () => {
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
+      <ToastContainer toasts={toasts} onDismiss={hideToast} />
       <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">My Lights</h1>
 
       {/* prettier-ignore */}

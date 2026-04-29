@@ -3,7 +3,8 @@
  *
  * Three maps tie every channel to its payload type:
  *   IpcInvokeMap      - channels using ipcMain.handle / ipcRenderer.invoke (request → response)
- *   IpcSendMap        - channels using ipcMain.on / ipcRenderer.send (fire-and-forget)
+ *   IpcSendMap        - channels using ipcMain.on / ipcRenderer.send (fire-and-forget; state
+ *                       mutations with user-visible failure use IpcInvokeMap)
  *   IpcEventMap       - channels using webContents.send / ipcRenderer.on (main → renderer push)
  *   IpcRendererSendMap - renderer → main one-way push (not request/response)
  *
@@ -466,6 +467,14 @@ export interface IpcInvokeMap {
     }
     response: IpcSuccessResult | IpcErrorResult
   }
+  [LIGHT.SENDER_ENABLE]: {
+    request: SenderConfig
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.SENDER_DISABLE]: {
+    request: { sender: string }
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [LIGHT.SENDER_DISABLE_ALL]: {
     request: void
     response: { disabled: string[] }
@@ -516,6 +525,10 @@ export interface IpcInvokeMap {
   [CONFIG.GET_MY_LIGHTS]: {
     request: void
     response: DmxFixture[]
+  }
+  [CONFIG.SAVE_MY_LIGHTS]: {
+    request: DmxFixture[]
+    response: IpcSuccessResult | IpcErrorResult
   }
   [CONFIG.GET_LIGHT_LAYOUT]: {
     request: string
@@ -734,10 +747,7 @@ export interface IpcSendMap {
   [CUE.SET_LISTEN_CUE_DATA]: boolean
   [CUE.CUE_STYLE]: 'simple' | 'complex'
   [CUE.UPDATE_EFFECT_DEBOUNCE]: number
-  [LIGHT.SENDER_ENABLE]: SenderConfig
-  [LIGHT.SENDER_DISABLE]: { sender: string }
   [LIGHT.CONSOLE_SEND_DMX]: Record<number, number>
-  [CONFIG.SAVE_MY_LIGHTS]: DmxFixture[]
 }
 
 export type IpcSendChannel = keyof IpcSendMap
