@@ -1,6 +1,8 @@
 import { useAtom } from 'jotai'
 import { enttecProComPortAtom, senderEnttecProEnabledAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('EnttecProToggle')
 
 interface EnttecProToggleProps {
   disabled?: boolean
@@ -18,10 +20,10 @@ const EnttecProToggle = ({ disabled = false, compact = false }: EnttecProToggleP
 
     if (newState) {
       enableSender({ sender: 'enttecpro', devicePath: comPort })
-      console.log('EnttecPro enabled')
+      log.info('EnttecPro enabled')
     } else {
       disableSender({ sender: 'enttecpro' })
-      console.log('EnttecPro disabled')
+      log.info('EnttecPro disabled')
     }
   }
 

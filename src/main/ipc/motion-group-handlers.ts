@@ -4,6 +4,8 @@ import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegi
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('motion-group-handlers')
 
 /**
  * IPC handlers for YARG and audio motion cue groups and motion selection mode.
@@ -16,7 +18,7 @@ export function setupMotionGroupHandlers(
     try {
       return YargCueRegistry.getInstance().getYargMotionGroupsInfo()
     } catch (error) {
-      console.error('Error getting YARG motion cue groups:', error)
+      log.error('Error getting YARG motion cue groups:', error)
       return []
     }
   })
@@ -25,7 +27,7 @@ export function setupMotionGroupHandlers(
     try {
       return AudioCueRegistry.getInstance().getAudioMotionGroupsInfo()
     } catch (error) {
-      console.error('Error getting audio motion cue groups:', error)
+      log.error('Error getting audio motion cue groups:', error)
       return []
     }
   })
@@ -40,7 +42,7 @@ export function setupMotionGroupHandlers(
       }
       return registry.getYargMotionCueDetails(targetGroupId)
     } catch (error) {
-      console.error('Error getting available YARG motion cues:', error)
+      log.error('Error getting available YARG motion cues:', error)
       return []
     }
   })
@@ -55,7 +57,7 @@ export function setupMotionGroupHandlers(
       }
       return registry.getAudioMotionCueDetails(targetGroupId)
     } catch (error) {
-      console.error('Error getting available audio motion cues:', error)
+      log.error('Error getting available audio motion cues:', error)
       return []
     }
   })
@@ -65,7 +67,7 @@ export function setupMotionGroupHandlers(
       const mode = controllerManager.getConfig().getMotionGroupSelectionMode()
       return { success: true, mode }
     } catch (error) {
-      console.error('Error getting YARG motion group selection mode:', error)
+      log.error('Error getting YARG motion group selection mode:', error)
       return ipcError(error)
     }
   })
@@ -83,7 +85,7 @@ export function setupMotionGroupHandlers(
         YargCueRegistry.getInstance().setMotionSelectionMode(mode)
         return { success: true, mode }
       } catch (error) {
-        console.error('Error setting YARG motion group selection mode:', error)
+        log.error('Error setting YARG motion group selection mode:', error)
         return ipcError(error)
       }
     },
@@ -94,7 +96,7 @@ export function setupMotionGroupHandlers(
       const mode = controllerManager.getConfig().getAudioMotionGroupSelectionMode()
       return { success: true, mode }
     } catch (error) {
-      console.error('Error getting audio motion group selection mode:', error)
+      log.error('Error getting audio motion group selection mode:', error)
       return ipcError(error)
     }
   })
@@ -112,7 +114,7 @@ export function setupMotionGroupHandlers(
         AudioCueRegistry.getInstance().setMotionSelectionMode(mode)
         return { success: true, mode }
       } catch (error) {
-        console.error('Error setting audio motion group selection mode:', error)
+        log.error('Error setting audio motion group selection mode:', error)
         return ipcError(error)
       }
     },

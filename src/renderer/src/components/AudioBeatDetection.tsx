@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { getAudioConfig, saveAudioConfig } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioBeatDetection')
 
 const AudioBeatDetection: React.FC = () => {
   const [threshold, setThreshold] = useState(0.3)
@@ -17,7 +19,7 @@ const AudioBeatDetection: React.FC = () => {
           setMinInterval(config.beatDetection.minInterval || 100)
         }
       } catch (error) {
-        console.error('Failed to load beat detection settings:', error)
+        log.error('Failed to load beat detection settings:', error)
       }
     }
 
@@ -38,7 +40,7 @@ const AudioBeatDetection: React.FC = () => {
 
       await saveAudioConfig({ beatDetection })
     } catch (error) {
-      console.error('Failed to save beat detection settings:', error)
+      log.error('Failed to save beat detection settings:', error)
     } finally {
       setIsSaving(false)
     }

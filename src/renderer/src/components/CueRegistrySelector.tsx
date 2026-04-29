@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getEnabledCueGroups, getCueGroups } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('CueRegistrySelector')
 
 type CueRegistryType = 'YARG' | 'RB3E'
 
@@ -52,7 +54,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
 
   const fetchGroups = useCallback(async () => {
     try {
-      console.log('Fetching enabled cue groups...')
+      log.info('Fetching enabled cue groups...')
 
       const enabledGroupIds = await getEnabledCueGroups()
       const allGroups = await getCueGroups()
@@ -62,7 +64,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
         (g: CueGroup) => enabledGroupIds.includes(g.id) && g.cueTypes.length > 0,
       )
 
-      console.log(`Enabled groups:`, enabledGroups)
+      log.info(`Enabled groups:`, enabledGroups)
       setGroups(enabledGroups)
 
       if (selectedGroup === '') {
@@ -77,7 +79,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
         isInitialMount.current = false
       }
     } catch (error) {
-      console.error('Error fetching cue groups:', error)
+      log.error('Error fetching cue groups:', error)
     }
   }, [handleGroupChangeCallback, selectedGroup])
 

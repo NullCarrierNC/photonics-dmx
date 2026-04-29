@@ -11,6 +11,8 @@ import {
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { AudioCueType, AudioMotionCueRef } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('AudioController')
 
 export interface AudioControllerDeps {
   getDmxLightManager: () => DmxLightManager | null
@@ -35,7 +37,7 @@ export class AudioController {
 
   public async enableAudio(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
     if (!isInitialized) {
-      console.log('Initializing system before enabling Audio')
+      log.info('Initializing system before enabling Audio')
       await initAsync()
     }
     await this.enableAudioInternal()
@@ -45,12 +47,12 @@ export class AudioController {
     const dmxLightManager = this.deps.getDmxLightManager()
     const effectsController = this.deps.getEffectsController()
     if (this.isAudioEnabled || !effectsController || !dmxLightManager) {
-      console.log('Cannot enable Audio: already enabled or missing required components')
+      log.info('Cannot enable Audio: already enabled or missing required components')
       return
     }
     const audioConfig = this.deps.config.getAudioConfig()
     try {
-      console.log('Enabling audio with Web Audio API...')
+      log.info('Enabling audio with Web Audio API...')
       const preferredCueType = this.deps.config.getPreference('activeAudioCueType')
       this.audioProcessor = new AudioCueProcessor(
         dmxLightManager,
@@ -100,11 +102,11 @@ export class AudioController {
       }
       ipcMain.on(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)
-      console.log('Sent audio:enable to renderer')
+      log.info('Sent audio:enable to renderer')
       this.isAudioEnabled = true
-      console.log('Audio enabled successfully')
+      log.info('Audio enabled successfully')
     } catch (error) {
-      console.error('Failed to enable audio:', error)
+      log.error('Failed to enable audio:', error)
       throw error
     }
   }
@@ -113,21 +115,21 @@ export class AudioController {
     if (!this.isAudioEnabled) {
       return
     }
-    console.log('Disabling audio...')
+    log.info('Disabling audio...')
     const effectsController = this.deps.getEffectsController()
     if (effectsController) {
       try {
         effectsController.removeAllEffects()
         await effectsController.blackout(0)
-        console.log(
+        log.info(
           'AudioController: Cleared all running effects and initiated blackout when disabling Audio',
         )
       } catch (error) {
-        console.error('Error clearing effects when disabling Audio:', error)
+        log.error('Error clearing effects when disabling Audio:', error)
       }
     }
     this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
-    console.log('Sent audio:disable to renderer')
+    log.info('Sent audio:disable to renderer')
     if (this.audioDataHandler) {
       ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.audioDataHandler = null
@@ -139,7 +141,7 @@ export class AudioController {
       this.audioProcessor = null
     }
     this.isAudioEnabled = false
-    console.log('Audio disabled successfully')
+    log.info('Audio disabled successfully')
   }
 
   public updateAudioConfig(config: AudioConfig): void {
@@ -150,7 +152,7 @@ export class AudioController {
     const mergedConfig = { ...currentConfig, ...config }
     this.deps.config.setAudioConfig(mergedConfig)
     this.audioProcessor.updateConfig(mergedConfig)
-    console.log('AudioCueProcessor configuration updated')
+    log.info('AudioCueProcessor configuration updated')
   }
 
   public refreshAudioCueSelection(): void {
@@ -229,7 +231,7 @@ export class AudioController {
       }
     }
     void this.deps.config.setPreference('activeAudioCueType', cueType).catch((err) => {
-      console.error('Failed to persist active audio cue type:', err)
+      log.error('Failed to persist active audio cue type:', err)
     })
     if (this.audioProcessor) {
       const applied = this.audioProcessor.setActiveCueType(cueType)

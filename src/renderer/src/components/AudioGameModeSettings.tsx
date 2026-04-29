@@ -3,6 +3,8 @@ import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import type { AudioGameModeConfig } from '../../../shared/ipcTypes'
 import { getAudioGameMode, setAudioGameMode } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioGameModeSettings')
 
 const CUE_DURATION_ABS_MIN = 5
 const CUE_DURATION_ABS_MAX = 120
@@ -25,7 +27,7 @@ const AudioGameModeSettings: React.FC = () => {
         const config = await getAudioGameMode()
         applyConfig(config)
       } catch (e) {
-        console.error('Failed to load audio game mode settings', e)
+        log.error('Failed to load audio game mode settings', e)
         setError('Failed to load Game Mode settings')
       } finally {
         setLoading(false)
@@ -55,7 +57,7 @@ const AudioGameModeSettings: React.FC = () => {
         applyConfig(result.config)
       }
     } catch (e) {
-      console.error('Failed to save audio game mode', e)
+      log.error('Failed to save audio game mode', e)
       setError('Failed to save Game Mode settings')
       try {
         const config = await getAudioGameMode()

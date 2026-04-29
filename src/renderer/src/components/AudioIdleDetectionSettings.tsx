@@ -5,6 +5,8 @@ import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAudioConfig, saveAudioConfig, getAudioGameMode } from '../ipcApi'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { DEFAULT_AUDIO_IDLE_DETECTION } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioIdleDetectionSettings')
 
 const COLORS: Color[] = [
   'red',
@@ -62,7 +64,7 @@ const AudioIdleDetectionSettings: React.FC = () => {
         applyIdleFromConfig(audioCfg)
         setGameModeEnabled(gm.enabled)
       } catch (e) {
-        console.error('Failed to load idle detection settings', e)
+        log.error('Failed to load idle detection settings', e)
       } finally {
         setLoading(false)
       }
@@ -91,12 +93,12 @@ const AudioIdleDetectionSettings: React.FC = () => {
         }
         const result = await saveAudioConfig({ idleDetection: merged })
         if (!result.success) {
-          console.error('Failed to save idle detection:', result.error)
+          log.error('Failed to save idle detection:', result.error)
           const cfg = await getAudioConfig()
           applyIdleFromConfig(cfg)
         }
       } catch (e) {
-        console.error('Failed to save idle detection', e)
+        log.error('Failed to save idle detection', e)
         const cfg = await getAudioConfig()
         applyIdleFromConfig(cfg)
       } finally {

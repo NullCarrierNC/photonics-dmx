@@ -59,6 +59,8 @@ import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluat
 import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { sendToAllWindows } from '../../../../main/utils/windowUtils'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('NodeExecutionEngine')
 
 type ChainStep = {
   action: ActionNode
@@ -191,11 +193,11 @@ export class NodeExecutionEngine {
     if (!this.debugEnabled && !NodeExecutionEngine.globalDebugEnabled) return
     // Use console.log (not debug) so it shows up consistently in packaged builds.
     if (data === undefined) {
-      console.log(`[NodeCue] ${this.cueId} ${message}`)
+      log.info(`[NodeCue] ${this.cueId} ${message}`)
       return
     }
 
-    console.log(`[NodeCue] ${this.cueId} ${message}`, this.debugPreview(data))
+    log.info(`[NodeCue] ${this.cueId} ${message}`, this.debugPreview(data))
   }
 
   private debugPreview(value: unknown): unknown {
@@ -340,7 +342,7 @@ export class NodeExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${eventNode.id}: ${msg}`)
-      console.error(`Error starting execution for event ${eventNode.id}:`, error)
+      log.error(`Error starting execution for event ${eventNode.id}:`, error)
     }
   }
 
@@ -443,7 +445,7 @@ export class NodeExecutionEngine {
     }
 
     // Unknown node type - skip and continue
-    console.warn(`Unknown node type for node ${nodeId}`)
+    log.warn(`Unknown node type for node ${nodeId}`)
     this.continueToNextNodes(nodeId, context)
   }
 
@@ -471,7 +473,7 @@ export class NodeExecutionEngine {
             }
           })
           .catch((error) => {
-            console.error(`Error during blackout for action node ${actionNode.id}:`, error)
+            log.error(`Error during blackout for action node ${actionNode.id}:`, error)
             // Continue execution despite error
             if (context.hasVisited(actionNode.id)) {
               this.emitNodeExecution('deactivated', actionNode.id)
@@ -483,7 +485,7 @@ export class NodeExecutionEngine {
 
       if (actionNode.effectType === 'set-position') {
         if (!actionNode.position) {
-          console.warn(`set-position action ${actionNode.id} is missing position`)
+          log.warn(`set-position action ${actionNode.id} is missing position`)
           this.continueToNextNodes(actionNode.id, context)
           return
         }
@@ -599,7 +601,7 @@ export class NodeExecutionEngine {
 
       if (actionNode.effectType === 'motion-pattern') {
         if (!actionNode.motionPattern) {
-          console.warn(`motion-pattern action ${actionNode.id} is missing motionPattern`)
+          log.warn(`motion-pattern action ${actionNode.id} is missing motionPattern`)
           this.continueToNextNodes(actionNode.id, context)
           return
         }
@@ -614,7 +616,7 @@ export class NodeExecutionEngine {
           !Number.isFinite(resolvedMotion.sizeDeg) ||
           resolvedMotion.sizeDeg <= 0
         ) {
-          console.warn(
+          log.warn(
             `motion-pattern action ${actionNode.id}: speed (Hz) and size (deg) must be finite and positive`,
           )
           this.continueToNextNodes(actionNode.id, context)
@@ -683,7 +685,7 @@ export class NodeExecutionEngine {
       }
 
       if (!actionNode.color) {
-        console.warn(`Action ${actionNode.id} (${actionNode.effectType}) is missing color`)
+        log.warn(`Action ${actionNode.id} (${actionNode.effectType}) is missing color`)
         this.continueToNextNodes(actionNode.id, context)
         return
       }
@@ -998,7 +1000,7 @@ export class NodeExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${actionNode.id}: ${msg}`)
-      console.error(`Error executing action node ${actionNode.id}:`, error)
+      log.error(`Error executing action node ${actionNode.id}:`, error)
       this.emitNodeExecution('deactivated', actionNode.id)
     }
   }
@@ -1053,7 +1055,7 @@ export class NodeExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
-      console.error(`Error executing logic node ${nodeId}:`, error)
+      log.error(`Error executing logic node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
     }
   }
@@ -1112,7 +1114,7 @@ export class NodeExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
-      console.error(`Error executing delay node ${nodeId}:`, error)
+      log.error(`Error executing delay node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
     }
   }
@@ -1126,7 +1128,7 @@ export class NodeExecutionEngine {
 
       // Skip if no event selected
       if (!eventName) {
-        console.warn(`Event raiser ${raiserNode.id} has no event selected, skipping`)
+        log.warn(`Event raiser ${raiserNode.id} has no event selected, skipping`)
         this.continueToNextNodes(raiserNode.id, context)
         return
       }
@@ -1144,7 +1146,7 @@ export class NodeExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${raiserNode.id}: ${msg}`)
-      console.error(`Error executing event raiser node ${raiserNode.id}:`, error)
+      log.error(`Error executing event raiser node ${raiserNode.id}:`, error)
       this.emitNodeExecution('deactivated', raiserNode.id)
     }
   }
@@ -1158,7 +1160,7 @@ export class NodeExecutionEngine {
 
       // Skip if no effect selected
       if (!effectId) {
-        console.warn(`Effect raiser ${raiserNode.id} has no effect selected, skipping`)
+        log.warn(`Effect raiser ${raiserNode.id} has no effect selected, skipping`)
         this.continueToNextNodes(raiserNode.id, context)
         return
       }
@@ -1187,7 +1189,7 @@ export class NodeExecutionEngine {
 
       if (!compiledEffect) {
         // Gracefully handle missing effect (may have been deleted)
-        console.warn(
+        log.warn(
           `Effect ${effectId} not found (missing dependency), skipping effect raiser ${raiserNode.id}`,
         )
         this.emitNodeExecution('deactivated', raiserNode.id)
@@ -1241,7 +1243,7 @@ export class NodeExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${raiserNode.id}: ${msg}`)
-      console.error(`Error executing effect raiser node ${raiserNode.id}:`, error)
+      log.error(`Error executing effect raiser node ${raiserNode.id}:`, error)
       this.emitNodeExecution('deactivated', raiserNode.id)
     }
   }
@@ -1293,7 +1295,7 @@ export class NodeExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${listenerNode.id}: ${msg}`)
-      console.error(`Error starting listener execution for ${listenerNode.id}:`, error)
+      log.error(`Error starting listener execution for ${listenerNode.id}:`, error)
     }
   }
 

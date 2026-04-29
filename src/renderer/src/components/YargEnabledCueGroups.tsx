@@ -9,6 +9,9 @@ import {
   getDisabledYargCues,
   setDisabledYargCues,
 } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('YargEnabledCueGroups')
 
 interface CueInfo {
   id: string
@@ -74,9 +77,9 @@ const YargEnabledCueGroups: React.FC = () => {
       setDisabledByGroup(disabled)
     } catch (e) {
       if (e instanceof Error) {
-        console.error('Failed to fetch cue groups:', e.message)
+        log.error('Failed to fetch cue groups:', e.message)
       } else {
-        console.error('An unknown error occurred:', e)
+        log.error('An unknown error occurred:', e)
       }
     } finally {
       setLoading(false)
@@ -93,12 +96,12 @@ const YargEnabledCueGroups: React.FC = () => {
   ) => {
     const enabledResult = await setEnabledCueGroups(nextEnabled)
     if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
-      console.error('Failed to save enabled cue groups')
+      log.error('Failed to save enabled cue groups')
       return
     }
     const disabledResult = await setDisabledYargCues(nextDisabled)
     if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
-      console.error('Failed to save disabled YARG cues')
+      log.error('Failed to save disabled YARG cues')
       return
     }
     setEnabledGroupIds(nextEnabled)
@@ -163,7 +166,7 @@ const YargEnabledCueGroups: React.FC = () => {
         )
         return
       } catch (error) {
-        console.error('Error fetching cue details:', error)
+        log.error('Error fetching cue details:', error)
       }
     }
 
@@ -181,7 +184,7 @@ const YargEnabledCueGroups: React.FC = () => {
           prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
         )
       } catch (e) {
-        console.error('Failed to load cues for toggle:', e)
+        log.error('Failed to load cues for toggle:', e)
         return
       }
     }

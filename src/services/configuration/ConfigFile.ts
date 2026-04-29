@@ -7,6 +7,9 @@ import {
   type ConfigCorruptInfo,
   type ConfigCorruptReason,
 } from './configCorruptTypes'
+import { createLogger } from '../../shared/logger'
+
+const log = createLogger('ConfigFile')
 
 /**
  * In-memory result of config validation after load/migration.
@@ -54,7 +57,7 @@ export class ConfigFile<T> {
 
     // Log the storage directory (only once per process)
     if (!global.__PHOTONICS_CONFIG_LOGGED__) {
-      console.log(`[Photonics Config] JSON storage directory: ${configDir}`)
+      log.info(`[Photonics Config] JSON storage directory: ${configDir}`)
       global.__PHOTONICS_CONFIG_LOGGED__ = true
     }
 
@@ -75,9 +78,9 @@ export class ConfigFile<T> {
     if (!fs.existsSync(configDir)) {
       try {
         fs.mkdirSync(configDir, { recursive: true })
-        console.log(`Created configuration directory: ${configDir}`)
+        log.info(`Created configuration directory: ${configDir}`)
       } catch (error) {
-        console.error(`Error creating configuration directory ${configDir}:`, error)
+        log.error(`Error creating configuration directory ${configDir}:`, error)
         throw new Error(`Failed to create configuration directory: ${error}`)
       }
     }
@@ -95,7 +98,7 @@ export class ConfigFile<T> {
         fs.renameSync(this.filePath, dest)
         canWriteDefaults = true
       } catch (e) {
-        console.error(
+        log.error(
           `[Photonics Config] Could not preserve corrupt file by renaming ${this.filePath} → ${dest}:`,
           e,
         )
@@ -123,17 +126,17 @@ export class ConfigFile<T> {
       message: message || undefined,
     })
     if (canWriteDefaults) {
-      console.log(
+      log.info(
         `[Photonics Config] Using default configuration (recovered from ${reason} on ${this.filePath})`,
       )
       this.save(this.defaultData).catch((err) =>
-        console.error(
+        log.error(
           `[Photonics Config] Failed to save default config to ${this.filePath} after recovery:`,
           err,
         ),
       )
     } else {
-      console.error(
+      log.error(
         `[Photonics Config] Not writing default config to ${this.filePath}: could not move corrupt file aside; using in-memory defaults so the app can start.`,
       )
     }
@@ -145,9 +148,9 @@ export class ConfigFile<T> {
    */
   private load(): T {
     if (!fs.existsSync(this.filePath)) {
-      console.log(`Configuration file not found: ${this.filePath}, creating default`)
+      log.info(`Configuration file not found: ${this.filePath}, creating default`)
       this.save(this.defaultData).catch((err) =>
-        console.error(`[Photonics Config] Failed to save default config to ${this.filePath}:`, err),
+        log.error(`[Photonics Config] Failed to save default config to ${this.filePath}:`, err),
       )
       return this.defaultData
     }
@@ -156,7 +159,7 @@ export class ConfigFile<T> {
     try {
       fileContent = fs.readFileSync(this.filePath, 'utf-8')
     } catch (error) {
-      console.error(`[Photonics Config] Failed to read ${this.filePath}:`, error)
+      log.error(`[Photonics Config] Failed to read ${this.filePath}:`, error)
       return this.defaultData
     }
 
@@ -164,7 +167,7 @@ export class ConfigFile<T> {
     try {
       parsed = JSON.parse(fileContent)
     } catch (error) {
-      console.error(`[Photonics Config] JSON parse failed for ${this.filePath}:`, error)
+      log.error(`[Photonics Config] JSON parse failed for ${this.filePath}:`, error)
       return this.recoverToDefault('parse', { parseOrMigrateError: error })
     }
 
@@ -185,7 +188,7 @@ export class ConfigFile<T> {
         migratedNeedsPersist = true
       }
     } catch (error) {
-      console.error(
+      log.error(
         `[Photonics Config] Migration or shape handling failed for ${this.filePath}:`,
         error,
       )
@@ -196,22 +199,19 @@ export class ConfigFile<T> {
       const v = this.validate(data)
       if (!v.valid) {
         const schemaText = v.errors.join('; ')
-        console.error(
-          `[Photonics Config] Schema validation failed for ${this.filePath}:`,
-          schemaText,
-        )
+        log.error(`[Photonics Config] Schema validation failed for ${this.filePath}:`, schemaText)
         return this.recoverToDefault('schema', { schemaText })
       }
     }
 
     if (migratedNeedsPersist) {
       this.save(data).catch((err) =>
-        console.error(`[Photonics Config] Failed to save migrated data to ${this.filePath}:`, err),
+        log.error(`[Photonics Config] Failed to save migrated data to ${this.filePath}:`, err),
       )
     }
 
     if (!this.hasLoggedLoad) {
-      console.log(
+      log.info(
         `[Photonics Config] Loaded configuration from ${this.filePath} (v${this.currentVersion})`,
       )
       this.hasLoggedLoad = true
@@ -236,7 +236,7 @@ export class ConfigFile<T> {
       return data
     }
 
-    console.log(`[Photonics Config] Migrating configuration from v${fromVersion} to v${toVersion}`)
+    log.info(`[Photonics Config] Migrating configuration from v${fromVersion} to v${toVersion}`)
 
     // Apply migrations in sequence
     let migratedData = data
@@ -279,7 +279,7 @@ export class ConfigFile<T> {
       } catch {
         // ignore cleanup failure
       }
-      console.error(`Error saving configuration to ${this.filePath}:`, error)
+      log.error(`Error saving configuration to ${this.filePath}:`, error)
       throw new Error(`Failed to save configuration: ${error}`)
     }
   }

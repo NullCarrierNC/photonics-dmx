@@ -7,6 +7,8 @@
   },
   "include": [
     "src/photonics-dmx/tests/window-globals.d.ts",
+    "src/shared/**/*.ts",
+    "src/main/logging/**/*.ts",
     "src/main/tests/**/*.ts",
     "src/photonics-dmx/tests/**/*.ts",
     "src/photonics-dmx/**/*.test.ts",

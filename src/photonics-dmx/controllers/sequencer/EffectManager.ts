@@ -9,6 +9,8 @@ import {
 } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
 import { performance } from 'perf_hooks'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('EffectManager')
 
 /**
  * Tracks the lifecycle of a persistent effect that should restart only after
@@ -178,12 +180,12 @@ export class EffectManager implements IEffectManager {
    */
   public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      console.warn('Add cancelling blackout')
+      log.warn('Add cancelling blackout')
       this.systemEffects.cancelBlackout()
     }
 
     if (effect.transitions.length === 0) {
-      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return
     }
 
@@ -228,12 +230,12 @@ export class EffectManager implements IEffectManager {
    */
   public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      console.warn('Replace cancelling blackout')
+      log.warn('Replace cancelling blackout')
       this.systemEffects.cancelBlackout()
     }
 
     if (effect.transitions.length === 0) {
-      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return
     }
 
@@ -254,7 +256,7 @@ export class EffectManager implements IEffectManager {
       layerMap.forEach((transitionsForLight, lightId) => {
         const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId)
         if (!targetLight) {
-          console.warn(
+          log.warn(
             `No tracked light found for ${lightId} on layer ${layer} when replacing effect ${name}`,
           )
           return
@@ -292,12 +294,12 @@ export class EffectManager implements IEffectManager {
    */
   public setEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     if (this.systemEffects.isBlackoutActive()) {
-      console.warn('Cancelling blackout for setEffect')
+      log.warn('Cancelling blackout for setEffect')
       this.systemEffects.cancelBlackout()
     }
 
     if (effect.transitions.length === 0) {
-      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return
     }
 
@@ -340,12 +342,12 @@ export class EffectManager implements IEffectManager {
     isPersistent: boolean = false,
   ): boolean {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      console.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
+      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
       return false
     }
 
     if (effect.transitions.length === 0) {
-      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return false
     }
 
@@ -439,7 +441,7 @@ export class EffectManager implements IEffectManager {
       layerMap.forEach((transitionsForLight, lightId) => {
         const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId)
         if (!targetLight) {
-          console.warn(
+          log.warn(
             `No tracked light found for ${lightId} on layer ${layer} when applying effect ${name}`,
           )
           return
@@ -499,12 +501,12 @@ export class EffectManager implements IEffectManager {
     isPersistent: boolean = false,
   ): boolean {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      console.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
+      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
       return false
     }
 
     if (effect.transitions.length === 0) {
-      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return false
     }
 
@@ -515,7 +517,7 @@ export class EffectManager implements IEffectManager {
     )
 
     if (effectAlreadyRunning) {
-      console.warn(
+      log.warn(
         `Not setting effect "${name}" because an effect with the same name is already running. Preventing timing issues.`,
       )
       return false
@@ -573,7 +575,7 @@ export class EffectManager implements IEffectManager {
   public removeAllEffects(): void {
     // Cancel any active blackouts first
     if (this.systemEffects.isBlackoutActive()) {
-      console.warn('Cancelling blackout for removeAllEffects')
+      log.warn('Cancelling blackout for removeAllEffects')
       this.systemEffects.cancelBlackout()
     }
 
@@ -932,12 +934,12 @@ export class EffectManager implements IEffectManager {
    */
   public setState(lights: TrackedLight[], color: RGBIO, time: number): void {
     if (lights.length === 0) {
-      console.warn('No lights provided to setState')
+      log.warn('No lights provided to setState')
       return
     }
 
     if (this.systemEffects.isBlackoutActive()) {
-      console.warn('Cancelling blackout to set light states')
+      log.warn('Cancelling blackout to set light states')
       this.systemEffects.cancelBlackout()
     }
 

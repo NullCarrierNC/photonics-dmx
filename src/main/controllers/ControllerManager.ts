@@ -40,6 +40,9 @@ import {
 import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
+import { createLogger } from '../../shared/logger'
+
+const log = createLogger('ControllerManager')
 
 /**
  * Runtime lifecycle of the main-process controller graph.
@@ -231,7 +234,7 @@ export class ControllerManager {
     const activeRigs = this.config.getActiveRigs()
 
     if (activeRigs.length === 0) {
-      console.warn('No active DMX rigs found. DMX output will be disabled.')
+      log.warn('No active DMX rigs found. DMX output will be disabled.')
       // Create empty manager for backward compatibility
       const emptyConfig = {
         numLights: 0,
@@ -245,7 +248,7 @@ export class ControllerManager {
       return
     }
 
-    console.log(`Initializing ${activeRigs.length} active DMX rig(s)`)
+    log.info(`Initializing ${activeRigs.length} active DMX rig(s)`)
 
     // Create merged configuration from all active rigs for backward compatibility
     // This allows processors and cue handlers to work with all lights
@@ -313,7 +316,7 @@ export class ControllerManager {
     yarg.setDisabledMotionCues(this.config.getPreference('cueDomains').yargMotion.disabledCues)
     audio.setMotionSelectionMode(this.config.getAudioMotionGroupSelectionMode())
     audio.setDisabledMotionCues(this.config.getPreference('cueDomains').audioMotion.disabledCues)
-    console.log('YARG + Audio motion registries initialized (selection modes from preferences).')
+    log.info('YARG + Audio motion registries initialized (selection modes from preferences).')
   }
 
   /**
@@ -347,7 +350,7 @@ export class ControllerManager {
     await this.config.updateCueDomain('yarg', { knownGroups: registeredIds })
     const restricted = enabledGroupIds.filter((id) => registeredIds.includes(id))
     registry.setEnabledGroups(restricted)
-    console.log('CueRegistry enabled groups re-applied from config:', restricted)
+    log.info('CueRegistry enabled groups re-applied from config:', restricted)
 
     const disabledYarg = this.config.getPreference('cueDomains').yarg.disabledCues
     registry.setDisabledCues(disabledYarg)
@@ -382,7 +385,7 @@ export class ControllerManager {
     registry.setEnabledGroups(enabledGroupIds)
     const disabledAudio = this.config.getPreference('cueDomains').audio.disabledCues
     registry.setDisabledCues(disabledAudio)
-    console.log('AudioCueRegistry enabled groups re-applied from config:', enabledGroupIds)
+    log.info('AudioCueRegistry enabled groups re-applied from config:', enabledGroupIds)
     this.refreshAudioCueSelection()
   }
 
@@ -413,7 +416,7 @@ export class ControllerManager {
     registry.setEnabledMotionGroups(enabledGroupIds)
     const disabledMotion = this.config.getPreference('cueDomains').yargMotion.disabledCues
     registry.setDisabledMotionCues(disabledMotion)
-    console.log('YARG motion enabled groups re-applied from config:', enabledGroupIds)
+    log.info('YARG motion enabled groups re-applied from config:', enabledGroupIds)
   }
 
   /**
@@ -443,7 +446,7 @@ export class ControllerManager {
     registry.setEnabledMotionGroups(enabledGroupIds)
     const disabledMotion = this.config.getPreference('cueDomains').audioMotion.disabledCues
     registry.setDisabledMotionCues(disabledMotion)
-    console.log('Audio motion enabled groups re-applied from config:', enabledGroupIds)
+    log.info('Audio motion enabled groups re-applied from config:', enabledGroupIds)
   }
 
   /**
@@ -533,29 +536,29 @@ export class ControllerManager {
   public async shutdown(): Promise<void> {
     this.assertPhase(['initializing', 'running', 'restarting', 'consoleMode'], 'shutdown')
     this.lifecyclePhase = 'shuttingDown'
-    console.log('ControllerManager shutdown: starting')
+    log.info('ControllerManager shutdown: starting')
 
     try {
       // Shutdown in reverse order of initialization
       try {
         await this.listenerLifecycle.yargRb3.disableYarg()
-        console.log('ControllerManager shutdown: YARG disabled')
+        log.info('ControllerManager shutdown: YARG disabled')
       } catch (err) {
-        console.error('Error disabling YARG:', err)
+        log.error('Error disabling YARG:', err)
       }
 
       try {
         await this.listenerLifecycle.yargRb3.disableRb3()
-        console.log('ControllerManager shutdown: RB3 disabled')
+        log.info('ControllerManager shutdown: RB3 disabled')
       } catch (err) {
-        console.error('Error disabling RB3:', err)
+        log.error('Error disabling RB3:', err)
       }
 
       try {
         await this.listenerLifecycle.audio.disableAudio()
-        console.log('ControllerManager shutdown: Audio disabled')
+        log.info('ControllerManager shutdown: Audio disabled')
       } catch (err) {
-        console.error('Error disabling Audio:', err)
+        log.error('Error disabling Audio:', err)
       }
 
       if (this.nodeCueLoader) {
@@ -563,9 +566,9 @@ export class ControllerManager {
           await this.nodeCueLoader.dispose()
           this.nodeCueLoader.removeAllListeners()
           this.nodeCueLoader = null
-          console.log('ControllerManager shutdown: node cue loader stopped')
+          log.info('ControllerManager shutdown: node cue loader stopped')
         } catch (err) {
-          console.error('Error shutting down node cue loader:', err)
+          log.error('Error shutting down node cue loader:', err)
         }
       }
 
@@ -574,9 +577,9 @@ export class ControllerManager {
           await this.effectLoader.dispose()
           this.effectLoader.removeAllListeners()
           this.effectLoader = null
-          console.log('ControllerManager shutdown: effect loader stopped')
+          log.info('ControllerManager shutdown: effect loader stopped')
         } catch (err) {
-          console.error('Error shutting down effect loader:', err)
+          log.error('Error shutting down effect loader:', err)
         }
       }
 
@@ -585,41 +588,41 @@ export class ControllerManager {
         try {
           this.cueHandler.shutdown()
           this.cueHandler = null
-          console.log('ControllerManager shutdown: cue handler stopped')
+          log.info('ControllerManager shutdown: cue handler stopped')
         } catch (err) {
-          console.error('Error shutting down cue handler:', err)
+          log.error('Error shutting down cue handler:', err)
         }
       }
 
       if (this.effectsController) {
         try {
           await this.effectsController.shutdown()
-          console.log('ControllerManager shutdown: effects controller stopped')
+          log.info('ControllerManager shutdown: effects controller stopped')
         } catch (err) {
-          console.error('Error shutting down effects controller:', err)
+          log.error('Error shutting down effects controller:', err)
         }
       }
 
       if (this.dmxPublisher) {
         try {
           await this.dmxPublisher.shutdown()
-          console.log('ControllerManager shutdown: DMX publisher stopped')
+          log.info('ControllerManager shutdown: DMX publisher stopped')
         } catch (err) {
-          console.error('Error shutting down DMX publisher:', err)
+          log.error('Error shutting down DMX publisher:', err)
         }
       }
 
       try {
         await this.senderLifecycle.shutdownSenderOnAppExit()
-        console.log('ControllerManager shutdown: sender manager stopped')
+        log.info('ControllerManager shutdown: sender manager stopped')
       } catch (err) {
-        console.error('Error shutting down sender manager:', err)
+        log.error('Error shutting down sender manager:', err)
       }
 
       this.isInitialized = false
-      console.log('ControllerManager shutdown: completed')
+      log.info('ControllerManager shutdown: completed')
     } catch (err) {
-      console.error('Error during controller manager shutdown:', err)
+      log.error('Error during controller manager shutdown:', err)
       throw err
     }
   }
@@ -719,7 +722,7 @@ export class ControllerManager {
     }
     const activeRigs = this.config.getActiveRigs()
     this.dmxPublisher.updateActiveRigs(activeRigs)
-    console.log('Refreshed active rigs for DMX output:', activeRigs.length, 'rig(s)')
+    log.info('Refreshed active rigs for DMX output:', activeRigs.length, 'rig(s)')
   }
 
   /**
@@ -729,7 +732,7 @@ export class ControllerManager {
   public async restartControllers(): Promise<void> {
     this.assertPhase(['running', 'consoleMode'], 'restartControllers')
     this.lifecyclePhase = 'restarting'
-    console.log('Restarting controllers to apply configuration changes')
+    log.info('Restarting controllers to apply configuration changes')
 
     const wasYargEnabled = this.listenerLifecycle.yargRb3.getIsYargEnabled()
     const wasRb3Enabled = this.listenerLifecycle.yargRb3.getIsRb3Enabled()
@@ -771,9 +774,9 @@ export class ControllerManager {
       // Mark as not initialized
       this.isInitialized = false
 
-      console.log('Controllers shutdown completed, reinitializing')
+      log.info('Controllers shutdown completed, reinitializing')
     } catch (error) {
-      console.error('Error shutting down controllers:', error)
+      log.error('Error shutting down controllers:', error)
     }
 
     // Reinitialize
@@ -795,9 +798,9 @@ export class ControllerManager {
         activeSendersBeforeRestart ?? undefined,
       )
 
-      console.log('Controllers restarted successfully')
+      log.info('Controllers restarted successfully')
     } catch (error) {
-      console.error('Error reinitializing controllers:', error)
+      log.error('Error reinitializing controllers:', error)
       throw error
     }
   }

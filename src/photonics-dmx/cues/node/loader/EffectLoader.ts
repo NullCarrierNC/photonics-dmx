@@ -4,6 +4,8 @@ import * as path from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import { validateEffectFile } from '../schema/validation'
 import { EffectFile, EffectMode, EffectReference } from '../../types/nodeCueTypes'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('EffectLoader')
 
 export interface EffectFileSummary {
   path: string
@@ -296,7 +298,7 @@ export class EffectLoader extends EventEmitter {
       await this.loadFile(mode, filePath)
       this.emit('changed', this.getSummary())
     } catch (error) {
-      console.error('Failed to reload effect file', filePath, error)
+      log.error('Failed to reload effect file', filePath, error)
     }
   }
 

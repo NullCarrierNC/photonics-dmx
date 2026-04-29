@@ -4,6 +4,8 @@ import { getEffectSingleColor } from '../effects/effectSingleColor'
 import { getColor } from '../helpers/dmxHelpers'
 import { randomBetween } from '../helpers/utils'
 import { Effect, RGBIO } from '../types'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('Rb3MenuCueHandler')
 
 const BASE_EFFECT_NAME = 'rb3-menu-base'
 const PER_LIGHT_EFFECT_PREFIX = 'rb3-menu-light-'
@@ -49,7 +51,7 @@ export class Rb3MenuCueHandler {
       duration: 10,
     })
     this.sequencer.setEffect(BASE_EFFECT_NAME, base, true).catch((error) => {
-      console.error('Rb3MenuCueHandler: setEffect base failed:', error)
+      log.error('Rb3MenuCueHandler: setEffect base failed:', error)
     })
 
     for (let i = 0; i < lights.length; i++) {

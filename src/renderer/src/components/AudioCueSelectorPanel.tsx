@@ -12,6 +12,9 @@ import {
   setActiveAudioCue,
   setActiveAudioMotionCue,
 } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('AudioCueSelectorPanel')
 
 interface AudioCueOption {
   id: string
@@ -130,7 +133,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
           setMotionPlayingLabel(null)
         }
       } catch (e) {
-        console.error('Failed to load audio motion picker state', e)
+        log.error('Failed to load audio motion picker state', e)
         setMotionPlayingGroupLabel(null)
         setMotionPlayingLabel(null)
       }
@@ -161,7 +164,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setError(response?.error || 'Unable to load audio cue state')
       }
     } catch (err) {
-      console.error('Failed to load audio reactive cues', err)
+      log.error('Failed to load audio reactive cues', err)
       setError('Failed to load audio cue state')
     } finally {
       if (!silent) {
@@ -345,7 +348,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setError(result?.error || 'Unable to update cue selection')
       }
     } catch (err) {
-      console.error('Failed to set active audio cue', err)
+      log.error('Failed to set active audio cue', err)
       setError('Failed to set active cue')
     } finally {
       setSaving(false)
@@ -388,7 +391,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         }
       }
     } catch (e) {
-      console.error(e)
+      log.error('Unable to update motion cue', e)
       setError('Unable to update motion cue')
     } finally {
       setSavingMotion(false)
@@ -405,7 +408,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setError('Unable to save motion selection')
       }
     } catch (e) {
-      console.error(e)
+      log.error('Unable to save motion selection', e)
     } finally {
       setSavingMotion(false)
     }

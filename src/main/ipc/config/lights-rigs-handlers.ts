@@ -8,6 +8,9 @@ import {
   validateDmxFixturesArray,
   validateDmxRigPayload,
 } from '../inputValidation'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('Ipc.LightsRigs')
 
 export function registerLightsRigsConfigHandlers(
   ipcMain: IpcMain,
@@ -30,7 +33,7 @@ export function registerLightsRigsConfigHandlers(
       await controllerManager.getConfig().updateUserLights(v.value)
       return ipcSuccess()
     } catch (err) {
-      console.error('SAVE_MY_LIGHTS failed:', err)
+      log.error('SAVE_MY_LIGHTS failed:', err)
       return ipcError(err)
     }
   })
@@ -39,7 +42,7 @@ export function registerLightsRigsConfigHandlers(
     try {
       return controllerManager.getConfig().getLightingLayout()
     } catch (error) {
-      console.error(`Error fetching light layout for ${filename}:`, error)
+      log.error(`Error fetching light layout for ${filename}:`, error)
       throw error
     }
   })
@@ -58,7 +61,7 @@ export function registerLightsRigsConfigHandlers(
 
       return { success: true }
     } catch (error) {
-      console.error('Error saving light layout:', error)
+      log.error('Error saving light layout:', error)
       return ipcError(error)
     }
   })
@@ -67,7 +70,7 @@ export function registerLightsRigsConfigHandlers(
     try {
       return controllerManager.getConfig().getDmxRigs()
     } catch (error) {
-      console.error('Error fetching DMX rigs:', error)
+      log.error('Error fetching DMX rigs:', error)
       throw error
     }
   })
@@ -76,7 +79,7 @@ export function registerLightsRigsConfigHandlers(
     try {
       return controllerManager.getConfig().getDmxRig(id)
     } catch (error) {
-      console.error(`Error fetching DMX rig ${id}:`, error)
+      log.error(`Error fetching DMX rig ${id}:`, error)
       throw error
     }
   })
@@ -85,7 +88,7 @@ export function registerLightsRigsConfigHandlers(
     try {
       return controllerManager.getConfig().getActiveRigs()
     } catch (error) {
-      console.error('Error fetching active DMX rigs:', error)
+      log.error('Error fetching active DMX rigs:', error)
       throw error
     }
   })
@@ -111,7 +114,7 @@ export function registerLightsRigsConfigHandlers(
 
       return { success: true }
     } catch (error) {
-      console.error('Error saving DMX rig:', error)
+      log.error('Error saving DMX rig:', error)
       return ipcError(error)
     }
   })
@@ -131,7 +134,7 @@ export function registerLightsRigsConfigHandlers(
 
       return { success: true }
     } catch (error) {
-      console.error(`Error deleting DMX rig ${id}:`, error)
+      log.error(`Error deleting DMX rig ${id}:`, error)
       return ipcError(error)
     }
   })

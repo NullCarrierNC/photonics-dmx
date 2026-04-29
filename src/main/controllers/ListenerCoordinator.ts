@@ -6,6 +6,8 @@ import { Rb3MenuCueHandler } from '../../photonics-dmx/cueHandlers/Rb3MenuCueHan
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('ListenerCoordinator')
 
 export interface ListenerCoordinatorDeps {
   getDmxLightManager: () => DmxLightManager | null
@@ -32,16 +34,16 @@ export class ListenerCoordinator {
 
   public enableYarg(isInitialized: boolean, initAsync: () => Promise<void>): void {
     if (!isInitialized) {
-      console.log('Initializing system before enabling YARG')
+      log.info('Initializing system before enabling YARG')
       initAsync()
         .then(() => this.enableYargInternal())
         .catch((error) => {
-          console.error('Error during initialization:', error)
+          log.error('Error during initialization:', error)
         })
       return
     }
     void this.enableYargInternal().catch((error) => {
-      console.error('Error enabling YARG:', error)
+      log.error('Error enabling YARG:', error)
     })
   }
 
@@ -49,7 +51,7 @@ export class ListenerCoordinator {
     const dmxLightManager = this.deps.getDmxLightManager()
     const effectsController = this.deps.getEffectsController()
     if (this.isYargEnabled || !effectsController || !dmxLightManager) {
-      console.log('Cannot enable YARG: already enabled or missing required components')
+      log.info('Cannot enable YARG: already enabled or missing required components')
       return
     }
     if (this.isRb3Enabled) {
@@ -72,13 +74,13 @@ export class ListenerCoordinator {
     this.yargListener.on(
       'yarg-error',
       (errorData: { type: string; message: string; datagramVersion?: number }) => {
-        console.error('YARG Listener Error:', errorData)
+        log.error('YARG Listener Error:', errorData)
         this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, errorData.message)
       },
     )
     this.yargListener.start()
     this.isYargEnabled = true
-    console.log('YARG listener enabled')
+    log.info('YARG listener enabled')
   }
 
   public async disableYarg(): Promise<void> {
@@ -88,11 +90,11 @@ export class ListenerCoordinator {
       try {
         effectsController.removeAllEffects()
         await effectsController.blackout(0)
-        console.log(
+        log.info(
           'ListenerCoordinator: Cleared all running effects and initiated blackout when disabling YARG',
         )
       } catch (error) {
-        console.error('Error clearing effects when disabling YARG:', error)
+        log.error('Error clearing effects when disabling YARG:', error)
       }
     }
     if (this.yargListener) {
@@ -109,11 +111,11 @@ export class ListenerCoordinator {
 
   public async enableRb3(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
     if (!isInitialized) {
-      console.log('Initializing system before enabling RB3')
+      log.info('Initializing system before enabling RB3')
       initAsync()
         .then(() => this.enableRb3Internal())
         .catch((error) => {
-          console.error('Error during initialization:', error)
+          log.error('Error during initialization:', error)
         })
       return
     }
@@ -124,7 +126,7 @@ export class ListenerCoordinator {
     const dmxLightManager = this.deps.getDmxLightManager()
     const effectsController = this.deps.getEffectsController()
     if (this.isRb3Enabled || !effectsController || !dmxLightManager) {
-      console.log('Cannot enable RB3: already enabled or missing required components')
+      log.info('Cannot enable RB3: already enabled or missing required components')
       return
     }
     if (this.isYargEnabled) {
@@ -135,7 +137,7 @@ export class ListenerCoordinator {
       this.cueHandler = null
       this.deps.setCueHandlerRef(null)
     }
-    console.log('ListenerCoordinator: Creating ProcessorManager with mode: direct')
+    log.info('ListenerCoordinator: Creating ProcessorManager with mode: direct')
     this.processorManager = new ProcessorManager(dmxLightManager, effectsController, {
       mode: 'direct',
     })
@@ -145,7 +147,7 @@ export class ListenerCoordinator {
     this.processorManager.setNetworkListener(this.rb3eListener)
     this.rb3eListener.start()
     this.isRb3Enabled = true
-    console.log('RB3 listener enabled in direct StageKit mode')
+    log.info('RB3 listener enabled in direct StageKit mode')
   }
 
   public async disableRb3(): Promise<void> {
@@ -155,11 +157,11 @@ export class ListenerCoordinator {
       try {
         effectsController.removeAllEffects()
         await effectsController.blackout(0)
-        console.log(
+        log.info(
           'ListenerCoordinator: Cleared all running effects and initiated blackout when disabling RB3',
         )
       } catch (error) {
-        console.error('Error clearing effects when disabling RB3:', error)
+        log.error('Error clearing effects when disabling RB3:', error)
       }
     }
     if (this.rb3eListener) {

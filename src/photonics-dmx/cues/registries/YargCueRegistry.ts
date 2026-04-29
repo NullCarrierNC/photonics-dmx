@@ -4,6 +4,8 @@ import { ICueGroup } from '../interfaces/INetCueGroup'
 import { INetCue, CueStyle } from '../interfaces/INetCue'
 import { YargMotionNodeCue } from '../node/runtime/YargMotionNodeCue'
 import { MotionSelectionState } from './MotionSelectionState'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('YargCueRegistry')
 
 /**
  * Interface for cue state updates sent to frontend
@@ -152,7 +154,7 @@ export class YargCueRegistry {
     this.lockedGroupIdForSong = null
     this.clearConsistencyTracking()
 
-    console.log('CueRegistry reset to initial state')
+    log.info('CueRegistry reset to initial state')
   }
 
   /**
@@ -293,7 +295,7 @@ export class YargCueRegistry {
     // No consistent selection available, get a new random selection
     const tempSelection = this.getRandomCueFromActiveGroups(cueType)
     if (!tempSelection) {
-      console.error(`No implementation found for cue: ${cueType}`)
+      log.error(`No implementation found for cue: ${cueType}`)
       return null
     }
 
@@ -353,7 +355,7 @@ export class YargCueRegistry {
    */
   public setCueConsistencyWindow(windowMs: number): void {
     this.cueConsistencyWindow = Math.max(0, windowMs)
-    console.log(`Cue consistency window set to ${this.cueConsistencyWindow}ms`)
+    log.info(`Cue consistency window set to ${this.cueConsistencyWindow}ms`)
   }
 
   /**
@@ -575,7 +577,7 @@ export class YargCueRegistry {
         return cue
       } else {
         // Something went wrong with the consistent selection, clear it and fall through to normal logic
-        console.warn(
+        log.warn(
           `[Consistency] Consistent selection validation failed for ${cueType}, falling back to normal selection`,
         )
         this.clearCueConsistencyTracking(cueType)
@@ -689,7 +691,7 @@ export class YargCueRegistry {
         return cue
       } else {
         // Something went wrong with the consistent selection, clear it and fall through to normal logic
-        console.warn(
+        log.warn(
           `[Consistency] Consistent selection validation failed for ${cueType}, falling back to normal selection`,
         )
         this.clearCueConsistencyTracking(cueType)
@@ -914,7 +916,7 @@ export class YargCueRegistry {
       if (this.enabledGroups.has(groupId)) {
         newActive.add(groupId)
       } else {
-        console.warn(`Cannot activate group '${groupId}': group not enabled`)
+        log.warn(`Cannot activate group '${groupId}': group not enabled`)
       }
     }
 
@@ -1028,7 +1030,7 @@ export class YargCueRegistry {
   public setStageKitPriority(preference: 'prefer-for-tracked' | 'random' | 'never'): void {
     const oldPriority = this.stageKitPriority
     this.stageKitPriority = preference
-    console.log(`[CueRegistry] Stage kit priority changed from '${oldPriority}' to '${preference}'`)
+    log.info(`[CueRegistry] Stage kit priority changed from '${oldPriority}' to '${preference}'`)
 
     // Clear consistency tracking when priority changes to ensure immediate effect
     this.clearConsistencyTracking()

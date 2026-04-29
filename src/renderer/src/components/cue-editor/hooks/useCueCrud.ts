@@ -23,6 +23,8 @@ import {
 } from '../lib/cueDefaults'
 import { firstByName } from '../lib/cueUtils'
 import { validateNodeCue, validateEffect, saveNodeCueFile, saveEffectFile } from '../../../ipcApi'
+import { createLogger } from '../../../../../shared/logger'
+const log = createLogger('useCueCrud')
 
 export type UseCueCrudParams = {
   editorDoc: EditorDocument | null
@@ -104,7 +106,7 @@ export function useCueCrud({
           setIsDirty(false)
           refreshEffectFiles()
         } catch (error) {
-          console.error('Failed to save effect file', error)
+          log.error('Failed to save effect file', error)
           onError?.('Failed to save effect file: ' + error)
         }
       } else {
@@ -138,7 +140,7 @@ export function useCueCrud({
           setIsDirty(false)
           refreshFiles()
         } catch (error) {
-          console.error('Failed to save cue file', error)
+          log.error('Failed to save cue file', error)
           onError?.('Failed to save cue file: ' + error)
         }
       }
@@ -168,7 +170,7 @@ export function useCueCrud({
     }
 
     if (baseDoc.mode === 'effect') {
-      console.warn('Cannot add cue in effect mode')
+      log.warn('Cannot add cue in effect mode')
       return
     }
 
@@ -204,7 +206,7 @@ export function useCueCrud({
     }
 
     if (baseDoc.mode === 'cue') {
-      console.warn('Cannot add effect in cue mode')
+      log.warn('Cannot add effect in cue mode')
       return
     }
 

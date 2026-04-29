@@ -5,6 +5,9 @@ import { ControllerManager } from './controllers/ControllerManager'
 import { setupMenu } from './menu'
 import { setGlobalBrightnessConfig } from '../photonics-dmx/helpers/dmxHelpers'
 import { clearSenderErrorTracking } from './senderErrorTracking'
+import { createLogger } from '../shared/logger'
+
+const log = createLogger('Application')
 
 export class Application {
   private windowManager: WindowManager
@@ -59,11 +62,11 @@ export class Application {
   }
 
   public async shutdown(): Promise<void> {
-    console.log('Application shutdown initiated')
+    log.info('Application shutdown initiated')
 
     // Allow max 5 seconds for shutdown
     const shutdownTimeout = setTimeout(() => {
-      console.warn('Shutdown taking too long, forcing exit')
+      log.warn('Shutdown taking too long, forcing exit')
       process.exit(0)
     }, 5000)
 
@@ -78,12 +81,12 @@ export class Application {
         await this.windowManager.closeAllWindows()
       }
 
-      console.log('Application shutdown completed successfully')
+      log.info('Application shutdown completed successfully')
 
       // Clear the timeout
       clearTimeout(shutdownTimeout)
     } catch (error) {
-      console.error('Error during application shutdown:', error)
+      log.error('Error during application shutdown:', error)
       // Make sure we still clear the timeout
       clearTimeout(shutdownTimeout)
       throw error

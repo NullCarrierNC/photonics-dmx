@@ -7,6 +7,8 @@ import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { sendToAllWindows } from '../../main/utils/windowUtils'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('AudioCueHandler')
 
 export type AudioCueHandlerOptions = {
   getMotionCueMinimumHoldMs?: () => number
@@ -153,7 +155,7 @@ export class AudioCueHandler extends EventEmitter {
 
     const cue = this.registry.getCueImplementation(cueType)
     if (!cue) {
-      console.warn(`Audio cue not found: ${cueType}`)
+      log.warn(`Audio cue not found: ${cueType}`)
       if (this.currentPrimaryCue) {
         this.currentPrimaryCue.onStop?.()
         this.currentPrimaryCue = null
@@ -295,7 +297,7 @@ export class AudioCueHandler extends EventEmitter {
 
     const cue = this.registry.getCueImplementation(cueType)
     if (!cue) {
-      console.warn(`Audio cue not found: ${cueType}`)
+      log.warn(`Audio cue not found: ${cueType}`)
       return
     }
 
@@ -316,7 +318,7 @@ export class AudioCueHandler extends EventEmitter {
 
     const cue = this.registry.getCueImplementation(cueType)
     if (!cue) {
-      console.warn(`Audio cue not found: ${cueType}`)
+      log.warn(`Audio cue not found: ${cueType}`)
       return
     }
 

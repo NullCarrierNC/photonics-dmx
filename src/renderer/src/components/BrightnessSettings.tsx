@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import { savePrefs } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('BrightnessSettings')
 
 const BrightnessSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
@@ -38,7 +40,7 @@ const BrightnessSettings: React.FC = () => {
         brightness: newBrightness,
       }))
     } catch (error) {
-      console.error('Failed to save brightness configuration:', error)
+      log.error('Failed to save brightness configuration:', error)
     }
   }
 
@@ -61,7 +63,7 @@ const BrightnessSettings: React.FC = () => {
         brightness: defaultBrightness,
       }))
     } catch (error) {
-      console.error('Failed to reset brightness configuration:', error)
+      log.error('Failed to reset brightness configuration:', error)
     }
   }
 

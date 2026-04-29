@@ -11,6 +11,8 @@ import type { ResolvedMotionPatternSetting } from '../../cues/node/compiler/Acti
 import type { ActiveMotionPattern, FrameContext } from './interfaces'
 import type { WaveformType } from '../../cues/types/nodeCueTypes'
 import { LightTransitionController } from './LightTransitionController'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('MotionPatternEngine')
 
 const TWO_PI = Math.PI * 2
 const DEG_TO_RAD = Math.PI / 180
@@ -390,7 +392,7 @@ export function evaluateWaveform(type: WaveformType, phase: number): number {
 function clampPercentAxis(axis: 'pan' | 'tilt', raw: number, lightId: string): number {
   const clamped = Math.max(0, Math.min(100, raw))
   if (raw < -1e-6 || raw > 100 + 1e-6) {
-    console.warn(
+    log.warn(
       `[motion-pattern] light ${lightId} ${axis} clamped from ${raw.toFixed(2)}% to ${clamped.toFixed(2)}%.`,
     )
   }

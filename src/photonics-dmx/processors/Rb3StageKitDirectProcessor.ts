@@ -17,6 +17,8 @@ import { getColor } from '../helpers/dmxHelpers'
 import { CueData } from '../cues/types/cueTypes'
 import { Color, RGBIO, TrackedLight } from '../types'
 import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('Rb3StageKitDirectProcessor')
 
 /**
  * StageKit data structure
@@ -79,7 +81,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     private cueHandler?: Rb3MenuCueHandler | null,
   ) {
     super()
-    console.log('StageKitDirectProcessor: Constructor called with dependencies:', {
+    log.info('StageKitDirectProcessor: Constructor called with dependencies:', {
       lightManagerType: lightManager.constructor.name,
       photonicsSequencerType: photonicsSequencer.constructor.name,
       stageKitConfig,
@@ -107,7 +109,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       dmxLightCount = 8
     }
 
-    console.log('StageKitDirectProcessor: Using DMX light count:', {
+    log.info('StageKitDirectProcessor: Using DMX light count:', {
       actualFromConfig: numLights,
       fallbackFromDefault: this.config.dmxLightCount,
       finalCount: dmxLightCount,
@@ -146,7 +148,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     )
     networkListener.on('rb3e:gameState', this.boundHandleGameStateEvent as (event: unknown) => void)
 
-    console.log(
+    log.info(
       'StageKitDirectProcessor: Registered listeners for stagekit:data and rb3e:gameState events',
     )
   }
@@ -164,7 +166,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       networkListener.off('rb3e:gameState', this.boundHandleGameStateEvent)
       this.boundHandleGameStateEvent = null
     }
-    console.log(
+    log.info(
       'StageKitDirectProcessor stopped listening for stagekit:data and rb3e:gameState events',
     )
   }
@@ -177,7 +179,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
     // If we're receiving StageKit events, we're in a song
     if (!this._inSong) {
-      console.log(
+      log.info(
         'StageKitDirectProcessor: Received StageKit event while not in song, marking as in song',
       )
       this._inSong = true
@@ -226,10 +228,10 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     cueData: CueData | null
   }): void {
     try {
-      console.log('StageKitDirectProcessor: Received game state event:', event)
+      log.info('StageKitDirectProcessor: Received game state event:', event)
       const { gameState, cueData: realCueData } = event
 
-      console.log(
+      log.info(
         `StageKitDirectProcessor: Game state changed from ${this._currentGameState} to ${gameState}`,
       )
 
@@ -238,14 +240,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       const returningToMenu = gameState === 'Menus' && this._inSong
 
       if (!stateChanged && !returningToMenu) {
-        console.log(
+        log.info(
           'StageKitDirectProcessor: Game state unchanged and not returning from song, skipping processing',
         )
         return
       }
 
       if (returningToMenu) {
-        console.log('StageKitDirectProcessor: Returning to menu from song, processing transition')
+        log.info('StageKitDirectProcessor: Returning to menu from song, processing transition')
       }
 
       const previousState = this._currentGameState
@@ -305,7 +307,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
       if (gameState === 'InGame') {
         // Transition to InGame: Clear all current light states completely
-        console.log(
+        log.info(
           'StageKitDirectProcessor: Transitioning to InGame - clearing all lights and LED positions',
         )
 
@@ -317,7 +319,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
         // Clear all lights and sequencer effects
         this.turnOffAllLights().catch((error) => {
-          console.error(
+          log.error(
             'StageKitDirectProcessor: Error clearing lights during InGame transition:',
             error,
           )
@@ -325,14 +327,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
         // Also call blackout on the sequencer to clear any effects on layers
         this.photonicsSequencer.blackout(0).catch((error) => {
-          console.error(
+          log.error(
             'StageKitDirectProcessor: Error calling sequencer blackout during InGame transition:',
             error,
           )
         })
       } else if (gameState === 'Menus') {
         // Transition to Menus: Trigger cue handler's handleCueDefault and clear LED positions
-        console.log(
+        log.info(
           'StageKitDirectProcessor: Transitioning to Menus - triggering cue handler and clearing LED positions',
         )
 
@@ -341,7 +343,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
         // Turn off the lights from direct control, but the sequencer isn't handling anything right now.
         this.turnOffAllLights().catch((error) => {
-          console.error(
+          log.error(
             'StageKitDirectProcessor: Error clearing lights during Menus transition:',
             error,
           )
@@ -359,7 +361,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         timestamp: event.timestamp,
       })
     } catch (error) {
-      console.error('StageKitDirectProcessor: Error handling game state event:', error)
+      log.error('StageKitDirectProcessor: Error handling game state event:', error)
     }
   }
 
@@ -376,12 +378,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     const allLights = this.lightManager.getLights(['front', 'back'], 'all')
 
     if (!strobeLights || strobeLights.length === 0) {
-      console.log(`StageKit: No strobe lights returned from lightManager`)
+      log.info(`StageKit: No strobe lights returned from lightManager`)
       return
     }
 
     if (!allLights) {
-      console.log(`StageKit: No front/back lights returned from lightManager`)
+      log.info(`StageKit: No front/back lights returned from lightManager`)
       return
     }
 
@@ -399,12 +401,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         targetLights.push(allLights[allLightIndex])
         dmxLightIndices.push(allLightIndex)
       } else {
-        console.log(`StageKit: Could not find strobe light ${strobeLight.id} in front/back lights`)
+        log.info(`StageKit: Could not find strobe light ${strobeLight.id} in front/back lights`)
       }
     }
 
     if (targetLights.length === 0) {
-      console.log(`StageKit: No matching lights found between strobe and front/back lights`)
+      log.info(`StageKit: No matching lights found between strobe and front/back lights`)
       return
     }
 
@@ -499,7 +501,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       // Check if this light has any colors to restore
       /*    const persistentColors = this.lightColorState.get(lightIndex) || new Set();
       const currentPassColors = this.currentPassColors.get(lightIndex) || new Set();
-      console.log(`StageKit: Light ${lightIndex} has persistent colors: [${Array.from(persistentColors).join(', ')}], current pass: [${Array.from(currentPassColors).join(', ')}]`);
+      log.info(`StageKit: Light ${lightIndex} has persistent colors: [${Array.from(persistentColors).join(', ')}], current pass: [${Array.from(currentPassColors).join(', ')}]`);
     */
 
       // Remove from strobed lights tracking
@@ -548,7 +550,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         // Check if this effect affects any of the target positions
         const hasOverlap = effectData.positions.some((pos) => targetDmxIndices.includes(pos))
         if (hasOverlap) {
-          console.log(`StageKit: Effect ${effectName} affects target positions`)
+          log.info(`StageKit: Effect ${effectName} affects target positions`)
           effectsToRemove.push(effectName)
         }
       }
@@ -799,10 +801,10 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       }
       this.activeStrobeEffects.clear()
       this.strobedLights.clear()
-      console.log('StageKitDirectProcessor: Turning off all DMX lights using blackout')
+      log.info('StageKitDirectProcessor: Turning off all DMX lights using blackout')
       this.photonicsSequencer.blackout(0)
     } catch (error) {
-      console.error('StageKitDirectProcessor: Error turning off all DMX lights:', error)
+      log.error('StageKitDirectProcessor: Error turning off all DMX lights:', error)
     }
   }
 
@@ -1149,32 +1151,32 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    */
   public setCueHandler(cueHandler: Rb3MenuCueHandler): void {
     this.cueHandler = cueHandler
-    console.log('StageKitDirectProcessor: Cue handler updated')
+    log.info('StageKitDirectProcessor: Cue handler updated')
   }
 
   /**
    * Start the menu animation timer to drive RB3E-only menu frame every 1000ms
    */
   private startMenuAnimationTimer(): void {
-    console.log('StageKitDirectProcessor: startMenuAnimationTimer called')
+    log.info('StageKitDirectProcessor: startMenuAnimationTimer called')
     // Clear any existing timer first
     this.clearMenuAnimationTimer()
 
     if (!this.cueHandler || typeof this.cueHandler.playMenuFrame !== 'function') {
-      console.warn(
+      log.warn(
         'StageKitDirectProcessor: Cannot start menu animation - no menu cue handler available',
       )
       return
     }
 
-    console.log('StageKitDirectProcessor: Starting menu animation timer (1000ms interval)')
+    log.info('StageKitDirectProcessor: Starting menu animation timer (1000ms interval)')
 
     this.menuAnimationTimer = setInterval(() => {
       if (this._currentGameState === 'Menus' && this.cueHandler) {
         try {
           this.cueHandler.playMenuFrame()
         } catch (error) {
-          console.error('StageKitDirectProcessor: Error in menu cue playMenuFrame:', error)
+          log.error('StageKitDirectProcessor: Error in menu cue playMenuFrame:', error)
         }
       }
     }, 1000)
@@ -1184,13 +1186,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Clear the menu animation timer and any RB3E menu-layer effects
    */
   private clearMenuAnimationTimer(): void {
-    console.log('StageKitDirectProcessor: clearMenuAnimationTimer called')
+    log.info('StageKitDirectProcessor: clearMenuAnimationTimer called')
     if (this.menuAnimationTimer) {
-      console.log('StageKitDirectProcessor: Clearing menu animation timer')
+      log.info('StageKitDirectProcessor: Clearing menu animation timer')
       clearInterval(this.menuAnimationTimer)
       this.menuAnimationTimer = null
     } else {
-      console.log('StageKitDirectProcessor: No menu animation timer to clear')
+      log.info('StageKitDirectProcessor: No menu animation timer to clear')
     }
     this.cueHandler?.clear()
   }
@@ -1201,7 +1203,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   public destroy(): void {
     // Clear any active lights before destroying
     this.turnOffAllLights().catch((error) => {
-      console.error('StageKitDirectProcessor: Error clearing lights during destroy:', error)
+      log.error('StageKitDirectProcessor: Error clearing lights during destroy:', error)
     })
 
     // Clear menu animation timer

@@ -1,6 +1,8 @@
 import { RGBIO, Transition } from '../../types'
 import { LightTransitionController } from './LightTransitionController'
 import { ILayerManager, ISystemEffectsController } from './interfaces'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('SystemEffectsController')
 
 /**
  * @class SystemEffectsController
@@ -53,7 +55,7 @@ export class SystemEffectsController implements ISystemEffectsController {
    */
   public async blackout(duration: number): Promise<void> {
     if (this.isBlackingOut) {
-      console.warn(`Blackout is already in progress. Ignoring the new blackout request.`)
+      log.warn(`Blackout is already in progress. Ignoring the new blackout request.`)
       return
     }
 
@@ -76,7 +78,7 @@ export class SystemEffectsController implements ISystemEffectsController {
 
     this.isBlackingOut = true
 
-    console.log(`Initiating blackout for ${duration}ms.`)
+    log.info(`Initiating blackout for ${duration}ms.`)
 
     try {
       const allLightIds = this.lightTransitionController.getAllLightIds()
@@ -182,7 +184,7 @@ export class SystemEffectsController implements ISystemEffectsController {
         }
       }
     } catch (error) {
-      console.error('An error occurred during blackout:', error)
+      log.error('An error occurred during blackout:', error)
     } finally {
       this.isBlackingOut = false
     }
@@ -194,7 +196,7 @@ export class SystemEffectsController implements ISystemEffectsController {
    */
   public cancelBlackout(): void {
     if (this.isBlackingOut) {
-      console.warn('Cancelling in-progress blackout.')
+      log.warn('Cancelling in-progress blackout.')
       this.isBlackingOut = false
       this.lightTransitionController.removeTransitionsByLayer(255)
     }

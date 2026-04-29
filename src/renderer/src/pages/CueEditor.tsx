@@ -56,6 +56,8 @@ import {
   getYargCueDataPropertyMeta,
 } from '../../../photonics-dmx/constants/cueDataPropertyMeta'
 import { readEffectFile, showItemInFolder } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('CueEditor')
 
 type EditorCueOrEffect =
   | YargNodeCueDefinition
@@ -724,7 +726,7 @@ const CueEditor: React.FC = () => {
           const effectDef = effectFileData.effects.find((e) => e.id === effectRef.effectId)
           return effectDef ? ([effectRef.effectId, effectDef] as const) : null
         } catch (error) {
-          console.warn(`Failed to load effect ${effectRef.effectId}:`, error)
+          log.warn(`Failed to load effect ${effectRef.effectId}:`, error)
           return null
         }
       })

@@ -2,6 +2,8 @@ import { useAtom } from 'jotai'
 import { lightingPrefsAtom, useComplexCuesAtom } from '../atoms'
 import { useEffect } from 'react'
 import { setCueStyle } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('CueStyleToggle')
 
 const CueStyleToggle = () => {
   const [lightingPrefs, setLightingPrefs] = useAtom(lightingPrefsAtom)
@@ -17,10 +19,10 @@ const CueStyleToggle = () => {
 
     if (newState) {
       setCueStyle('complex')
-      console.log('Complex')
+      log.info('Complex')
     } else {
       setCueStyle('simple')
-      console.log('Simple')
+      log.info('Simple')
     }
   }
 

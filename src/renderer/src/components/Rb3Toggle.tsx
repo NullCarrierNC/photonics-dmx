@@ -8,6 +8,8 @@ import {
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getSystemStatus, enableRb3, disableRb3, setAudioEnabled } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('Rb3Toggle')
 
 interface Rb3ToggleProps {
   disabled?: boolean
@@ -27,13 +29,13 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
           setIsRb3Enabled(response.isRb3Enabled)
         }
       } catch (error) {
-        console.error('Error initializing RB3E toggle state:', error)
+        log.error('Error initializing RB3E toggle state:', error)
       }
     }
 
     // Handle controllers restarted event
     const handleControllersRestarted = () => {
-      console.log('Controllers restarted, refreshing RB3E toggle state')
+      log.info('Controllers restarted, refreshing RB3E toggle state')
       initializeState()
     }
 
@@ -55,7 +57,7 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
 
     if (newState) {
       enableRb3()
-      console.log('RB3E Listener enabled')
+      log.info('RB3E Listener enabled')
       // Disable Audio when RB3E is enabled (mutual exclusion)
       if (isAudioEnabled) {
         setIsAudioEnabled(false)
@@ -63,7 +65,7 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
       }
     } else {
       disableRb3()
-      console.log('rb3e Listener disabled')
+      log.info('rb3e Listener disabled')
     }
   }
 

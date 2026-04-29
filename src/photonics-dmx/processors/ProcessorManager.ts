@@ -10,6 +10,8 @@ import { ILightingController } from '../controllers/sequencer/interfaces'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
 import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('ProcessorManager')
 
 /**
  * Available processing modes.
@@ -60,33 +62,30 @@ export class ProcessorManager extends EventEmitter {
       throw new Error(`Invalid mode: ${config.mode}. Only 'direct' mode is supported.`)
     }
 
-    console.log('ProcessorManager initialized with config:', this.config)
+    log.info('ProcessorManager initialized with config:', this.config)
   }
 
   /**
    * Set the network listener to process events from
    */
   public setNetworkListener(networkListener: EventEmitter): void {
-    console.log(
-      'ProcessorManager: setNetworkListener called with:',
-      networkListener.constructor.name,
-    )
-    console.log('ProcessorManager: Current mode is:', this.currentMode)
+    log.info('ProcessorManager: setNetworkListener called with:', networkListener.constructor.name)
+    log.info('ProcessorManager: Current mode is:', this.currentMode)
 
     // Stop listening to previous listener if any
     if (this.networkListener) {
-      console.log('ProcessorManager: Stopping previous processors...')
+      log.info('ProcessorManager: Stopping previous processors...')
       this.stopAllProcessors()
     }
 
     this.networkListener = networkListener
-    console.log('ProcessorManager: Network listener set')
+    log.info('ProcessorManager: Network listener set')
 
     // Start processors based on current mode
-    console.log('ProcessorManager: Starting processors for mode:', this.currentMode)
+    log.info('ProcessorManager: Starting processors for mode:', this.currentMode)
     this.startProcessors()
 
-    console.log('ProcessorManager: Network listener set and processors started')
+    log.info('ProcessorManager: Network listener set and processors started')
   }
 
   /**
@@ -98,7 +97,7 @@ export class ProcessorManager extends EventEmitter {
       this.stageKitDirectProcessor.setCueHandler(cueHandler)
     }
 
-    console.log('ProcessorManager: Cue handler set')
+    log.info('ProcessorManager: Cue handler set')
   }
 
   /**
@@ -119,7 +118,7 @@ export class ProcessorManager extends EventEmitter {
       this.stageKitDirectProcessor.updateConfig(stageKitConfig)
     }
 
-    console.log('ProcessorManager: StageKit config updated:', this.config.stageKitConfig)
+    log.info('ProcessorManager: StageKit config updated:', this.config.stageKitConfig)
   }
 
   /**
@@ -134,7 +133,7 @@ export class ProcessorManager extends EventEmitter {
    */
   private startProcessors(): void {
     if (!this.networkListener) {
-      console.warn('ProcessorManager: No network listener set, cannot start processors')
+      log.warn('ProcessorManager: No network listener set, cannot start processors')
       return
     }
 
@@ -148,19 +147,19 @@ export class ProcessorManager extends EventEmitter {
    * Start direct mode (StageKitDirectProcessor only)
    */
   private startDirectMode(): void {
-    console.log('ProcessorManager: Starting direct mode...')
+    log.info('ProcessorManager: Starting direct mode...')
 
     if (!this.stageKitDirectProcessor) {
-      console.log('ProcessorManager: Creating new StageKitDirectProcessor...')
+      log.info('ProcessorManager: Creating new StageKitDirectProcessor...')
       this.stageKitDirectProcessor = new Rb3StageKitDirectProcessor(
         this.lightManager,
         this.photonicsSequencer,
         this.config.stageKitConfig,
         this.cueHandler, // Pass cue handler for menu state handling
       )
-      console.log('ProcessorManager: StageKitDirectProcessor created successfully')
+      log.info('ProcessorManager: StageKitDirectProcessor created successfully')
     } else {
-      console.log('ProcessorManager: Using existing StageKitDirectProcessor')
+      log.info('ProcessorManager: Using existing StageKitDirectProcessor')
       // Update cue handler if it has changed
       if (this.cueHandler && this.stageKitDirectProcessor) {
         this.stageKitDirectProcessor.setCueHandler(this.cueHandler)
@@ -172,9 +171,9 @@ export class ProcessorManager extends EventEmitter {
       this.emitCueData(cueData)
     })
 
-    console.log('ProcessorManager: Starting StageKitDirectProcessor listening...')
+    log.info('ProcessorManager: Starting StageKitDirectProcessor listening...')
     this.stageKitDirectProcessor.startListening(this.networkListener!)
-    console.log('ProcessorManager: Direct mode started')
+    log.info('ProcessorManager: Direct mode started')
   }
 
   /**
@@ -187,7 +186,7 @@ export class ProcessorManager extends EventEmitter {
       }
     }
 
-    console.log('ProcessorManager: All processors stopped')
+    log.info('ProcessorManager: All processors stopped')
   }
 
   /**
@@ -258,6 +257,6 @@ export class ProcessorManager extends EventEmitter {
     // Remove all listeners
     this.removeAllListeners()
 
-    console.log('ProcessorManager destroyed')
+    log.info('ProcessorManager destroyed')
   }
 }

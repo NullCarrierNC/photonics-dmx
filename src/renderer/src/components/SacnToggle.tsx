@@ -1,6 +1,8 @@
 import { useAtom } from 'jotai'
 import { senderSacnEnabledAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('SacnToggle')
 
 interface SacnToggleProps {
   disabled?: boolean
@@ -27,10 +29,10 @@ const SacnToggle = ({ disabled = false, compact = false }: SacnToggleProps) => {
       }
 
       enableSender({ sender: 'sacn', ...currentSacnConfig })
-      console.log('sACN enabled with config:', currentSacnConfig)
+      log.info('sACN enabled with config:', currentSacnConfig)
     } else {
       disableSender({ sender: 'sacn' })
-      console.log('sACN disabled')
+      log.info('sACN disabled')
     }
   }
 

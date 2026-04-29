@@ -2,6 +2,8 @@ import { IpcMain } from 'electron'
 import { WindowManager } from '../WindowManager'
 import { ipcError } from './ipcResult'
 import { WINDOW } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('window-handlers')
 
 /**
  * Set up window-related IPC handlers
@@ -12,7 +14,7 @@ export function setupWindowHandlers(ipcMain: IpcMain, windowManager: WindowManag
       windowManager.openCueEditorWindow()
       return { success: true }
     } catch (error) {
-      console.error('Failed to open cue editor window:', error)
+      log.error('Failed to open cue editor window:', error)
       return {
         ...ipcError(error),
       }
@@ -24,7 +26,7 @@ export function setupWindowHandlers(ipcMain: IpcMain, windowManager: WindowManag
       windowManager.openAudioPreviewWindow()
       return { success: true }
     } catch (error) {
-      console.error('Failed to open audio preview window:', error)
+      log.error('Failed to open audio preview window:', error)
       return {
         ...ipcError(error),
       }

@@ -11,6 +11,9 @@ import {
   validateSenderEnablePayload,
   validateSenderId,
 } from './inputValidation'
+import { createLogger } from '../../shared/logger'
+
+const log = createLogger('Ipc.Sender')
 
 /**
  * Set up sender-related IPC handlers (enable/disable, sACN config, network interfaces).
@@ -58,7 +61,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       await controllerManager.getSenderManager().disableSender(senderValidation.value)
       return ipcSuccess()
     } catch (error) {
-      console.error('Error disabling sender:', error)
+      log.error('Error disabling sender:', error)
       return ipcError(error)
     }
   })
@@ -102,13 +105,13 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       const senderManager = controllerManager.getSenderManager()
       if (senderManager.getEnabledSenders().includes('sacn')) {
         await senderManager.restartSender('sacn', sacnConfig)
-        console.log('sACN configuration updated and sender restarted')
+        log.info('sACN configuration updated and sender restarted')
       } else {
-        console.log('sACN not currently enabled, configuration saved for next enable')
+        log.info('sACN not currently enabled, configuration saved for next enable')
       }
       return { success: true }
     } catch (error) {
-      console.error('Error updating sACN configuration:', error)
+      log.error('Error updating sACN configuration:', error)
       throw error
     }
   })
@@ -136,7 +139,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
         interfaces,
       }
     } catch (error) {
-      console.error('Error getting network interfaces:', error)
+      log.error('Error getting network interfaces:', error)
       return {
         ...ipcError(error),
         interfaces: [],

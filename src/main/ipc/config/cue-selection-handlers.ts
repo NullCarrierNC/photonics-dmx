@@ -6,6 +6,8 @@ import { AudioCueRegistry } from '../../../photonics-dmx/cues/registries/AudioCu
 import { ipcError } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { validateOptionalStringArray, validateDisabledCuesMap } from '../inputValidation'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('cue-selection-handlers')
 
 export function registerCueSelectionConfigHandlers(
   ipcMain: IpcMain,
@@ -57,11 +59,11 @@ export function registerCueSelectionConfigHandlers(
         .yarg.disabledCues
       registry.setDisabledCues(disabledYarg)
 
-      console.log('Updated CueRegistry enabled groups:', groupIds)
+      log.info('Updated CueRegistry enabled groups:', groupIds)
 
       return { success: true }
     } catch (error) {
-      console.error('Error setting enabled cue groups:', error)
+      log.error('Error setting enabled cue groups:', error)
       return ipcError(error)
     }
   })
@@ -110,10 +112,10 @@ export function registerCueSelectionConfigHandlers(
       registry.setDisabledCues(disabledAudio)
       controllerManager.refreshAudioCueSelection()
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
-      console.log('Updated AudioCueRegistry enabled groups:', groupIds)
+      log.info('Updated AudioCueRegistry enabled groups:', groupIds)
       return { success: true }
     } catch (error) {
-      console.error('Error setting enabled audio cue groups:', error)
+      log.error('Error setting enabled audio cue groups:', error)
       return ipcError(error)
     }
   })
@@ -136,7 +138,7 @@ export function registerCueSelectionConfigHandlers(
       YargCueRegistry.getInstance().setDisabledCues(validation.value)
       return { success: true }
     } catch (error) {
-      console.error('Error setting disabled YARG cues:', error)
+      log.error('Error setting disabled YARG cues:', error)
       return ipcError(error)
     }
   })
@@ -161,7 +163,7 @@ export function registerCueSelectionConfigHandlers(
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
       return { success: true }
     } catch (error) {
-      console.error('Error setting disabled audio cues:', error)
+      log.error('Error setting disabled audio cues:', error)
       return ipcError(error)
     }
   })
@@ -209,10 +211,10 @@ export function registerCueSelectionConfigHandlers(
         .yargMotion.disabledCues
       registry.setDisabledMotionCues(disabledMotion)
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED, undefined)
-      console.log('Updated YARG motion enabled groups:', groupIds)
+      log.info('Updated YARG motion enabled groups:', groupIds)
       return { success: true }
     } catch (error) {
-      console.error('Error setting enabled YARG motion cue groups:', error)
+      log.error('Error setting enabled YARG motion cue groups:', error)
       return ipcError(error)
     }
   })
@@ -237,7 +239,7 @@ export function registerCueSelectionConfigHandlers(
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED, undefined)
       return { success: true }
     } catch (error) {
-      console.error('Error setting disabled YARG motion cues:', error)
+      log.error('Error setting disabled YARG motion cues:', error)
       return ipcError(error)
     }
   })
@@ -287,10 +289,10 @@ export function registerCueSelectionConfigHandlers(
         .audioMotion.disabledCues
       registry.setDisabledMotionCues(disabledMotion)
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED, undefined)
-      console.log('Updated audio motion enabled groups:', groupIds)
+      log.info('Updated audio motion enabled groups:', groupIds)
       return { success: true }
     } catch (error) {
-      console.error('Error setting enabled audio motion cue groups:', error)
+      log.error('Error setting enabled audio motion cue groups:', error)
       return ipcError(error)
     }
   })
@@ -315,7 +317,7 @@ export function registerCueSelectionConfigHandlers(
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED, undefined)
       return { success: true }
     } catch (error) {
-      console.error('Error setting disabled audio motion cues:', error)
+      log.error('Error setting disabled audio motion cues:', error)
       return ipcError(error)
     }
   })

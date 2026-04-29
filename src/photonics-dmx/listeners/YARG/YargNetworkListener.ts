@@ -12,6 +12,9 @@ import {
   InstrumentNoteType,
   DrumNoteType,
 } from '../../cues/types/cueTypes'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('YargNetworkListener')
 
 export interface YargCueRuntime {
   notifySongStart(): void
@@ -167,7 +170,7 @@ export class YargNetworkListener extends EventEmitter {
     super() // Initialize EventEmitter
     this.cueHandler = cueHandler
 
-    console.log('YargNetworkListener initialized.')
+    log.info('YargNetworkListener initialized.')
 
     /*
     // Initialize the flush timer
@@ -192,7 +195,7 @@ export class YargNetworkListener extends EventEmitter {
 
   public start() {
     if (this.listening) {
-      console.warn('YargNetworkListener is already running.')
+      log.warn('YargNetworkListener is already running.')
       return
     }
 
@@ -203,7 +206,7 @@ export class YargNetworkListener extends EventEmitter {
 
     this.server.bind(PORT, () => {
       this.listening = true
-      console.log(`YargNetworkListener started and listening on port ${PORT}`)
+      log.info(`YargNetworkListener started and listening on port ${PORT}`)
     })
   }
 
@@ -219,7 +222,7 @@ export class YargNetworkListener extends EventEmitter {
     return new Promise((resolve) => {
       const sock = this.server!
       sock.close(() => {
-        console.log('YargNetworkListener server closed.')
+        log.info('YargNetworkListener server closed.')
         this.listening = false
         this.server = null
         resolve()
@@ -235,7 +238,7 @@ export class YargNetworkListener extends EventEmitter {
     if (!this.server) return
 
     this.server.on('error', (err) => {
-      console.error(`Server error:\n${err.stack}`)
+      log.error(`Server error:\n${err.stack}`)
       this.server?.close()
       this.listening = false
     })
@@ -243,7 +246,7 @@ export class YargNetworkListener extends EventEmitter {
     this.server.on('listening', () => {
       const address = this.server?.address()
       if (address) {
-        console.log(`Listening for YARG events on ${address.address}:${address.port}`)
+        log.info(`Listening for YARG events on ${address.address}:${address.port}`)
       }
     })
 
@@ -252,7 +255,7 @@ export class YargNetworkListener extends EventEmitter {
         // console.log(`Received message of ${msg.length} bytes: ${msg.toString('hex')}`);
         this.deserializePacket(msg)
       } catch (error) {
-        console.error('Failed to parse message:', error)
+        log.error('Failed to parse message:', error)
       }
     })
   }
@@ -300,7 +303,7 @@ export class YargNetworkListener extends EventEmitter {
       const header = buffer.readUInt32LE(offset)
       offset += 4
       if (header !== PACKET_HEADER) {
-        console.warn(`Invalid packet header: 0x${header.toString(16)}`)
+        log.warn(`Invalid packet header: 0x${header.toString(16)}`)
         return
       }
 
@@ -352,7 +355,7 @@ export class YargNetworkListener extends EventEmitter {
       offset += 1
 
       if (datagramVersion < YARG_DATAGRAM_VERSION) {
-        console.error(
+        log.error(
           `Unsupported datagram version: ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`,
         )
         const errorMessage = `YARG Datagram Version too old: received version ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`
@@ -421,7 +424,7 @@ export class YargNetworkListener extends EventEmitter {
       //console.log("Keyframe:", YargCueData.keyframe);
       this.processCueData(YargCueData)
     } catch (error) {
-      console.error('YARG Listener: Error during packet deserialization:', error)
+      log.error('YARG Listener: Error during packet deserialization:', error)
     }
   }
 
@@ -484,7 +487,7 @@ export class YargNetworkListener extends EventEmitter {
     if (cueType) {
       this.cueHandler.handleCue(cueType as CueType, YargCueData)
     } else {
-      console.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
+      log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }
 
     const activeStrobeStates: StrobeState[] = [
@@ -885,7 +888,7 @@ export class YargNetworkListener extends EventEmitter {
           existingLogs = [];
         }
       } catch (err) {
-        console.error('Failed to read existing log file. Starting fresh.', err);
+        log.error('Failed to read existing log file. Starting fresh.', err);
         existingLogs = [];
       }
     }
@@ -894,11 +897,11 @@ export class YargNetworkListener extends EventEmitter {
 
     try {
       fs.writeFileSync(this.logFilePath, JSON.stringify(combinedLogs, null, 2), 'utf-8');
-      console.log(`Flushed ${this.logBuffer.length} logs to ${this.logFilePath}`);
+      log.info(`Flushed ${this.logBuffer.length} logs to ${this.logFilePath}`);
       // Clear the buffer after flushing
       this.logBuffer = [];
     } catch (err) {
-      console.error('Failed to write log file:', err);
+      log.error('Failed to write log file:', err);
     }
   }
 
@@ -913,11 +916,11 @@ export class YargNetworkListener extends EventEmitter {
   ): void {
     // Check if we have a scene change
     if (this.lastScene !== null && this.lastScene !== currentScene) {
-      console.log(`YARG: Scene transition detected: ${this.lastScene} -> ${currentScene}`)
+      log.info(`YARG: Scene transition detected: ${this.lastScene} -> ${currentScene}`)
 
       // Handle Menu -> Gameplay transition (song start)
       if (this.lastScene === 'Menu' && currentScene === 'Gameplay') {
-        console.log('YARG: Song starting - triggering blackout to clear menu lighting')
+        log.info('YARG: Song starting - triggering blackout to clear menu lighting')
         this.cueHandler.notifySongStart()
         // Trigger a fast blackout to clear any menu lighting
         this.cueHandler.handleCue(CueType.Blackout_Fast, {

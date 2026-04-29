@@ -3,6 +3,8 @@ import { useAtom } from 'jotai'
 import { dmxRigsAtom, lightingPrefsAtom } from '../atoms'
 import { DmxRig } from '../../../photonics-dmx/types'
 import { getDmxRigs, saveDmxRig, deleteDmxRig, savePrefs } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('ActiveRigsSettings')
 
 const ActiveRigsSettings: React.FC = () => {
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
@@ -18,7 +20,7 @@ const ActiveRigsSettings: React.FC = () => {
         const loadedRigs = await getDmxRigs()
         setRigs(loadedRigs || [])
       } catch (error) {
-        console.error('Failed to load DMX rigs:', error)
+        log.error('Failed to load DMX rigs:', error)
       }
     }
 
@@ -65,7 +67,7 @@ const ActiveRigsSettings: React.FC = () => {
         }),
       )
     } catch (error) {
-      console.error('Failed to update rig active state:', error)
+      log.error('Failed to update rig active state:', error)
     }
   }
 
@@ -106,7 +108,7 @@ const ActiveRigsSettings: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Failed to update allow multiple active rigs preference:', error)
+      log.error('Failed to update allow multiple active rigs preference:', error)
     }
   }
 
@@ -116,7 +118,7 @@ const ActiveRigsSettings: React.FC = () => {
       setRigs((prev) => prev.filter((r) => r.id !== rigId))
       setShowDeleteConfirm(null)
     } catch (error) {
-      console.error('Failed to delete rig:', error)
+      log.error('Failed to delete rig:', error)
     }
   }
 

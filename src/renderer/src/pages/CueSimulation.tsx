@@ -29,6 +29,8 @@ import {
   stopMotionCueSimulation,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('CueSimulation')
 
 type CueRegistryType = 'YARG' | 'RB3E'
 
@@ -88,10 +90,10 @@ const CueSimulation: React.FC = () => {
     return () => {
       // Stop any running test effects when leaving the page
       stopTestEffect().catch((error) => {
-        console.error('Error stopping test effect on unmount:', error)
+        log.error('Error stopping test effect on unmount:', error)
       })
       stopMotionCueSimulation().catch((error) => {
-        console.error('Error stopping motion cue simulation on unmount:', error)
+        log.error('Error stopping motion cue simulation on unmount:', error)
       })
       // Clear any pending save timeout
       if (saveTimeoutRef.current) {
@@ -134,12 +136,12 @@ const CueSimulation: React.FC = () => {
                 setSelectedGroup(group.name)
               }
             } catch (error) {
-              console.error('Error fetching group details during load:', error)
+              log.error('Error fetching group details during load:', error)
             }
           }
         }
       } catch (error) {
-        console.error('Error loading simulation settings:', error)
+        log.error('Error loading simulation settings:', error)
       } finally {
         isLoadingFromPrefs.current = false
       }
@@ -173,7 +175,7 @@ const CueSimulation: React.FC = () => {
           },
         })
       } catch (error) {
-        console.error('Error saving simulation settings:', error)
+        log.error('Error saving simulation settings:', error)
       }
     }, 500) // 500ms debounce
   }, [
@@ -225,7 +227,7 @@ const CueSimulation: React.FC = () => {
             savedEffectIdRef.current = null
           }
         } catch (error) {
-          console.error('Error loading saved effect:', error)
+          log.error('Error loading saved effect:', error)
           hasLoadedSavedEffect.current = true
           savedEffectIdRef.current = null
         }
@@ -258,13 +260,13 @@ const CueSimulation: React.FC = () => {
   }, [selectedGroupId])
 
   const handleEffectSelect = useCallback(async (effect: EffectSelector) => {
-    console.log('Effect selected:', effect)
+    log.info('Effect selected:', effect)
     setSelectedEffect(effect)
   }, [])
 
   const handleTestEffect = async () => {
     if (!selectedEffect) {
-      console.log('No effect selected')
+      log.info('No effect selected')
       return
     }
 
@@ -276,10 +278,10 @@ const CueSimulation: React.FC = () => {
         selectedGroupId || undefined,
       )
       if (!result.success) {
-        console.error('Failed to start test effect:', result.error)
+        log.error('Failed to start test effect:', result.error)
       }
     } catch (error) {
-      console.error('Error starting test effect:', error)
+      log.error('Error starting test effect:', error)
     }
   }
 
@@ -287,7 +289,7 @@ const CueSimulation: React.FC = () => {
     try {
       await stopTestEffect()
     } catch (error) {
-      console.error('Error stopping test effect:', error)
+      log.error('Error stopping test effect:', error)
     }
   }
 
@@ -333,7 +335,7 @@ const CueSimulation: React.FC = () => {
         effectId: selectedEffect?.id || null,
       })
     } catch (error) {
-      console.error('Error simulating instrument note:', error)
+      log.error('Error simulating instrument note:', error)
     }
   }
 
@@ -369,7 +371,7 @@ const CueSimulation: React.FC = () => {
             return prevSelectedGroup
           })
         } catch (error) {
-          console.error('Error fetching group details:', error)
+          log.error('Error fetching group details:', error)
           setSelectedGroup('')
           setSelectedGroupId('')
         }
@@ -419,7 +421,7 @@ const CueSimulation: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Error fetching group info:', error)
+        log.error('Error fetching group info:', error)
       }
     }
 

@@ -4,6 +4,8 @@ import type { DmxRig } from '../../../../photonics-dmx/types'
 import { getDmxRig, getDmxRigs, saveDmxRig } from '../../ipcApi'
 import { createDefaultDmxRig } from './lightsLayoutHelpers'
 import type { Dispatch, SetStateAction } from 'react'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('useLightsLayoutRig')
 
 type SetRigs = Dispatch<SetStateAction<DmxRig[]>>
 type SetRigId = (id: string) => void
@@ -34,7 +36,7 @@ export function useLightsLayoutRig(
           setActiveRigId(defaultRig.id)
         }
       } catch (error) {
-        console.error('Failed to load DMX rigs:', error)
+        log.error('Failed to load DMX rigs:', error)
       }
     }
 
@@ -53,7 +55,7 @@ export function useLightsLayoutRig(
           setActiveLightsConfig(rig.config)
         }
       } catch (error) {
-        console.error('Failed to load rig configuration:', error)
+        log.error('Failed to load rig configuration:', error)
       }
     }
 

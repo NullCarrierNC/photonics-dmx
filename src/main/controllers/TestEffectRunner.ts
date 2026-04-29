@@ -4,6 +4,8 @@ import { sendToAllWindows } from '../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('TestEffectRunner')
 
 export interface TestEffectRunnerContext {
   getConfig: () => { getPreference: (key: string) => number }
@@ -36,7 +38,7 @@ export class TestEffectRunner {
     bpm?: number,
     cueGroup?: string,
   ): void {
-    console.log(
+    log.info(
       `TestEffectRunner.startTestEffect effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}, cueGroup: ${cueGroup ?? 'none'}`,
     )
 
@@ -49,7 +51,7 @@ export class TestEffectRunner {
     this.testBpm = bpm ?? 120
     this.effectId = effectId
     this.testCueGroup = cueGroup
-    console.log(`Set testVenueSize to: ${this.testVenueSize}, testBpm to: ${this.testBpm}`)
+    log.info(`Set testVenueSize to: ${this.testVenueSize}, testBpm to: ${this.testBpm}`)
 
     this.ctx
       .ensureInitialized()
@@ -57,7 +59,7 @@ export class TestEffectRunner {
         this.startInternal()
       })
       .catch((error: unknown) => {
-        console.error('Error during initialization:', error)
+        log.error('Error during initialization:', error)
       })
   }
 
@@ -88,13 +90,13 @@ export class TestEffectRunner {
     const effectsController = this.ctx.getEffectsController()
     const dmxLightManager = this.ctx.getDmxLightManager()
     if (!effectsController || !dmxLightManager) {
-      console.error('Cannot test effect: lighting system not initialized')
+      log.error('Cannot test effect: lighting system not initialized')
       return
     }
 
     let cueHandler = this.ctx.getCueHandler()
     if (!cueHandler) {
-      console.log('Creating temporary YARG cue handler for testing')
+      log.info('Creating temporary YARG cue handler for testing')
       cueHandler = this.ctx.createCueHandler(dmxLightManager, effectsController)
       this.ctx.setCueHandler(cueHandler)
     }
@@ -110,7 +112,7 @@ export class TestEffectRunner {
   private testCue(cueId: string): void {
     const cueHandler = this.ctx.getCueHandler()
     if (!cueHandler) {
-      console.error('No cue handler available. Make sure YARG or RB3 is enabled.')
+      log.error('No cue handler available. Make sure YARG or RB3 is enabled.')
       return
     }
 
@@ -154,10 +156,10 @@ export class TestEffectRunner {
         cueHandler.handleCue(cue, data)
         sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, data)
       } catch (error) {
-        console.error('Error handling cue:', error)
+        log.error('Error handling cue:', error)
       }
     } else {
-      console.error('\n Test Cue Error: no cue for ID ', cueId)
+      log.error('\n Test Cue Error: no cue for ID ', cueId)
     }
   }
 }

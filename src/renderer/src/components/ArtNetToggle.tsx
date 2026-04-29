@@ -1,6 +1,8 @@
 import { useAtom } from 'jotai'
 import { senderArtNetEnabledAtom, artNetConfigAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('ArtNetToggle')
 
 interface ArtNetToggleProps {
   disabled?: boolean
@@ -18,10 +20,10 @@ const ArtNetToggle = ({ disabled = false, compact = false }: ArtNetToggleProps) 
 
     if (newState) {
       enableSender({ sender: 'artnet', ...artNetConfig })
-      console.log('ArtNet enabled')
+      log.info('ArtNet enabled')
     } else {
       disableSender({ sender: 'artnet' })
-      console.log('ArtNet disabled')
+      log.info('ArtNet disabled')
     }
   }
 

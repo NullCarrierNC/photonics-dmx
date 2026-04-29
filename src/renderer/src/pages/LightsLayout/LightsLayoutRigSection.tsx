@@ -2,6 +2,8 @@ import React from 'react'
 import type { DmxRig } from '../../../../photonics-dmx/types'
 import { ConfigStrobeType } from '../../../../photonics-dmx/types'
 import { saveDmxRig } from '../../ipcApi'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('LightsLayoutRigSection')
 
 interface LightsLayoutRigSectionProps {
   rigs: DmxRig[]
@@ -65,7 +67,7 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
             setActiveRigId(newRig.id)
             setRigName(newRig.name)
           } catch (error) {
-            console.error('Failed to create new rig:', error)
+            log.error('Failed to create new rig:', error)
           }
         }}
         className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm">

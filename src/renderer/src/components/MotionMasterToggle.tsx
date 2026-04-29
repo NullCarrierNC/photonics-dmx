@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getMotionEnabled, setMotionEnabled } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('MotionMasterToggle')
 
 export interface MotionMasterToggleProps {
   /** When false, downstream motion preference controls are dimmed (controlled by parent). */
@@ -49,7 +51,7 @@ const MotionMasterToggle: React.FC<MotionMasterToggleProps> = ({ onMotionEnabled
           onMotionEnabledChange?.(next)
         }
       } catch (e) {
-        console.error('Failed to set motion enabled', e)
+        log.error('Failed to set motion enabled', e)
       } finally {
         setSaving(false)
       }

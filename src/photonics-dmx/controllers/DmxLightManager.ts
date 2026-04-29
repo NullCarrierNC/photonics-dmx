@@ -7,6 +7,9 @@ import {
   LightTarget,
   DmxFixture,
 } from '../types'
+import { createLogger } from '../../shared/logger'
+
+const log = createLogger('DmxLightManager')
 
 /**
  * Requests lights based on groups and targets.
@@ -149,7 +152,7 @@ export class DmxLightManager {
           break
         default:
           // Optionally handle unknown groups
-          console.warn(`Unknown group: ${g}`)
+          log.warn(`Unknown group: ${g}`)
           break
       }
     })
@@ -222,7 +225,7 @@ export class DmxLightManager {
           lights[randomBetween(0, lights.length - 1)],
         ]
       default:
-        console.warn(`Unknown target: ${target}`)
+        log.warn(`Unknown target: ${target}`)
         return []
     }
   }

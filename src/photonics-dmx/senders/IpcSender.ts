@@ -2,6 +2,8 @@ import { BrowserWindow } from 'electron'
 import { BaseSender, SenderError } from './BaseSender'
 import { sendToAllWindows } from '../../main/utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('IpcSender')
 
 /**
  * IPC Sender uses Electron IPC's to communicate
@@ -31,13 +33,13 @@ export class IpcSender extends BaseSender {
    */
   public async send(universeBuffer: Record<number, number>): Promise<void> {
     if (!this.enabled) {
-      console.error('IPC Sender: Not enabled')
+      log.error('IPC Sender: Not enabled')
       return
     }
 
     const windows = BrowserWindow.getAllWindows()
     if (windows.length === 0) {
-      console.error('IPC Sender: No browser window available when sending')
+      log.error('IPC Sender: No browser window available when sending')
       return
     }
 

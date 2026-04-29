@@ -13,6 +13,8 @@ import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { getIntensityScale } from '../cues/audio/utils/bandUtils'
 import { getColor } from '../helpers/dmxHelpers'
 import { getEffectSingleColor } from '../effects/effectSingleColor'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('AudioCueProcessor')
 
 /**
  * AudioCueProcessor - Processes audio data using cue-based system
@@ -82,12 +84,12 @@ export class AudioCueProcessor {
    */
   public start(): void {
     if (this.isActive) {
-      console.warn('AudioCueProcessor: Already active')
+      log.warn('AudioCueProcessor: Already active')
       return
     }
     this.isActive = true
     this.registry.onMotionSongStart()
-    console.log(
+    log.info(
       'AudioCueProcessor: Started with primary:',
       this.currentPrimaryCueType,
       'secondary:',
@@ -119,7 +121,7 @@ export class AudioCueProcessor {
       this.sequencer.removeEffectByLayer(layer, true)
     }
 
-    console.log('AudioCueProcessor: Stopped')
+    log.info('AudioCueProcessor: Stopped')
   }
 
   /**
@@ -127,7 +129,7 @@ export class AudioCueProcessor {
    */
   public updateConfig(config: AudioConfig): void {
     this.config = this.mergeAudioConfig(config)
-    console.log('AudioCueProcessor: Configuration updated')
+    log.info('AudioCueProcessor: Configuration updated')
   }
 
   /**
@@ -188,7 +190,7 @@ export class AudioCueProcessor {
         this.config.bands.length,
         gameModeActive,
       )
-      .catch((err) => console.error('AudioCueProcessor: handleAudioData error', err))
+      .catch((err) => log.error('AudioCueProcessor: handleAudioData error', err))
   }
 
   /**
@@ -205,7 +207,7 @@ export class AudioCueProcessor {
     this.disableGameMode()
     this.stop()
     this.cueHandler.destroy()
-    console.log('AudioCueProcessor: Shutdown complete')
+    log.info('AudioCueProcessor: Shutdown complete')
   }
 
   /**
@@ -220,7 +222,7 @@ export class AudioCueProcessor {
     })
     this.gameModeManager.start()
     this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null, true)
-    console.log('AudioCueProcessor: Game Mode enabled')
+    log.info('AudioCueProcessor: Game Mode enabled')
   }
 
   /**
@@ -240,7 +242,7 @@ export class AudioCueProcessor {
       this.getStrobeSlotSyncType(),
       false,
     )
-    console.log('AudioCueProcessor: Game Mode disabled')
+    log.info('AudioCueProcessor: Game Mode disabled')
   }
 
   public updateGameModeConfig(config: AudioGameModeConfig): void {
@@ -270,7 +272,7 @@ export class AudioCueProcessor {
 
     const selected = this.selectActiveCueType(this.currentPrimaryCueType)
     if (selected !== this.currentPrimaryCueType) {
-      console.log(
+      log.info(
         `AudioCueProcessor: Switching primary cue from ${this.currentPrimaryCueType} to ${selected}`,
       )
       this.currentPrimaryCueType = selected
@@ -279,9 +281,7 @@ export class AudioCueProcessor {
       this.currentSecondaryCueType &&
       !this.registry.getCueImplementation(this.currentSecondaryCueType)
     ) {
-      console.log(
-        `AudioCueProcessor: Clearing unavailable secondary ${this.currentSecondaryCueType}`,
-      )
+      log.info(`AudioCueProcessor: Clearing unavailable secondary ${this.currentSecondaryCueType}`)
       this.currentSecondaryCueType = null
     }
     this.cueHandler.syncSlots(
@@ -298,7 +298,7 @@ export class AudioCueProcessor {
   public setActiveCueType(cueType: AudioCueType): boolean {
     const cue = this.registry.getCueImplementation(cueType)
     if (!cue) {
-      console.warn(`AudioCueProcessor: Requested cue ${cueType} is not available in enabled groups`)
+      log.warn(`AudioCueProcessor: Requested cue ${cueType} is not available in enabled groups`)
       return false
     }
 
@@ -311,7 +311,7 @@ export class AudioCueProcessor {
           this.getStrobeSlotSyncType(),
           false,
         )
-        console.log(`AudioCueProcessor: Active primary cue set to ${cueType}`)
+        log.info(`AudioCueProcessor: Active primary cue set to ${cueType}`)
       }
     }
     return true
@@ -339,7 +339,7 @@ export class AudioCueProcessor {
     }
     const cue = this.registry.getCueImplementation(cueType)
     if (!cue) {
-      console.warn(
+      log.warn(
         `AudioCueProcessor: Requested secondary cue ${cueType} is not available in enabled groups`,
       )
       return false
@@ -352,7 +352,7 @@ export class AudioCueProcessor {
         this.getStrobeSlotSyncType(),
         false,
       )
-      console.log(`AudioCueProcessor: Active secondary cue set to ${cueType}`)
+      log.info(`AudioCueProcessor: Active secondary cue set to ${cueType}`)
     }
     return true
   }

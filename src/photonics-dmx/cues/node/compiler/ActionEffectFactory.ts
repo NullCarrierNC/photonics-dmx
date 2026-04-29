@@ -34,6 +34,8 @@ import {
 } from '../../types/nodeCueTypes'
 import { EasingType } from '../../../easing'
 import { VariableValue } from '../runtime/executionTypes'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('ActionEffectFactory')
 
 // Resolved action data (after ValueSource resolution)
 export interface ResolvedActionTarget {
@@ -185,7 +187,7 @@ export function resolvePositionToAbsolutePercent(
   const clampAxis = (axis: 'pan' | 'tilt', raw: number): number => {
     const clamped = clamp(raw, 0, 100)
     if (raw < -1e-6 || raw > 100 + 1e-6) {
-      console.warn(
+      log.warn(
         `[set-position] ${axis} clamped from ${raw.toFixed(2)}% to ${clamped.toFixed(2)}% (fixture range / home limits).`,
       )
     }

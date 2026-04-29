@@ -6,6 +6,9 @@ import {
   startYargMotionCueSimulation,
   stopMotionCueSimulation,
 } from '../../ipcApi'
+import { createLogger } from '../../../../shared/logger'
+
+const log = createLogger('CueSimulationMotion')
 
 type MotionGroupRow = { id: string; name: string; description?: string; cueCount: number }
 type MotionCueRow = { id: string; name: string; description: string }
@@ -35,7 +38,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
           setGroups(list)
         }
       } catch (e) {
-        console.error('Failed to load motion cue groups:', e)
+        log.error('Failed to load motion cue groups:', e)
       }
     }
     load()
@@ -62,7 +65,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
           })
         }
       } catch (e) {
-        console.error('Failed to load motion cues:', e)
+        log.error('Failed to load motion cues:', e)
       }
     }
     load()
@@ -77,13 +80,10 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     try {
       const result = await startYargMotionCueSimulation(groupId, cueId)
       if (!result.success) {
-        console.error(
-          'Failed to start motion cue simulation:',
-          'error' in result ? result.error : '',
-        )
+        log.error('Failed to start motion cue simulation:', 'error' in result ? result.error : '')
       }
     } catch (e) {
-      console.error('Error starting motion cue simulation:', e)
+      log.error('Error starting motion cue simulation:', e)
     } finally {
       setIsStarting(false)
     }
@@ -93,7 +93,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     try {
       await stopMotionCueSimulation()
     } catch (e) {
-      console.error('Error stopping motion cue simulation:', e)
+      log.error('Error stopping motion cue simulation:', e)
     }
   }, [])
 
