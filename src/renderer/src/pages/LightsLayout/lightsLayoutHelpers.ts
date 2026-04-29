@@ -1,3 +1,4 @@
+import equal from 'fast-deep-equal'
 import {
   ConfigLightLayoutType,
   ConfigStrobeType,
@@ -110,4 +111,27 @@ export function createDefaultDmxRig(): DmxRig {
       strobeLights: [],
     },
   }
+}
+
+/**
+ * If the same source light is saved in more than one role (e.g. front + strobe), reuses a single new id.
+ */
+export function mapLightsToNewIdsForSave(
+  lights: DmxLight[],
+  idMap: Record<string, string>,
+): DmxLight[] {
+  return lights.map((light) => {
+    const originalId = light.id ?? crypto.randomUUID()
+    if (!idMap[originalId]) {
+      idMap[originalId] = crypto.randomUUID()
+    }
+    return {
+      ...light,
+      id: idMap[originalId],
+    }
+  })
+}
+
+export function lightingConfigsEqual(a: LightingConfiguration, b: LightingConfiguration): boolean {
+  return equal(a, b)
 }

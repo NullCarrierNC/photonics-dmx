@@ -3,7 +3,7 @@ import { useAtom } from 'jotai'
 
 import LightSettings from '../components/LightSettings'
 import LightChannelsPreview from '../components/LightChannelsPreview'
-import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
+import ConfirmModal from '../components/ConfirmModal'
 import ToastContainer from '../components/Toast'
 import { DmxFixture, FixtureTypes } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
@@ -190,9 +190,17 @@ const MyLights = () => {
         </>
       )}
 
-      {showDeleteModal && (
-        <ConfirmDeleteModal onConfirm={handleDelete} onCancel={() => setShowDeleteModal(false)} />
-      )}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        title="Confirm Delete"
+        message="Are you sure you want to delete this light?"
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          void handleDelete()
+        }}
+        onCancel={() => setShowDeleteModal(false)}
+      />
     </div>
   )
 }

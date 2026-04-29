@@ -15,7 +15,8 @@ import {
 import { MdGraphicEq, MdTune } from 'react-icons/md'
 import { useAtom, useSetAtom } from 'jotai'
 import { Pages } from './../types'
-import { currentPageAtom } from './../atoms'
+import { currentPageAtom, lightsLayoutHasUnsavedChangesAtom } from './../atoms'
+import { useConfirm } from '../hooks/useConfirm'
 import { openCueEditorWindow, openAudioPreviewWindow } from '../ipcApi'
 
 interface LeftMenuProps {
@@ -33,8 +34,19 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 }) => {
   const setCurrentPage = useSetAtom(currentPageAtom)
   const [activeMenu, setActiveMenu] = useAtom(currentPageAtom)
+  const [lightsLayoutUnsaved] = useAtom(lightsLayoutHasUnsavedChangesAtom)
+  const confirm = useConfirm()
 
-  const handleMenuClick = (page: Pages) => {
+  const handleMenuClick = async (page: Pages) => {
+    if (activeMenu === Pages.LightLayout && page !== Pages.LightLayout && lightsLayoutUnsaved) {
+      const leave = await confirm({
+        title: 'Unsaved changes',
+        message: 'You have unsaved changes to this layout. Leave without saving?',
+        confirmLabel: 'Discard changes',
+        danger: true,
+      })
+      if (!leave) return
+    }
     setActiveMenu(page)
     setCurrentPage(page)
   }
