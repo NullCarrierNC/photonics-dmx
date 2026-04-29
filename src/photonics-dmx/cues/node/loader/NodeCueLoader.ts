@@ -30,6 +30,8 @@ import { EffectRegistry } from '../runtime/EffectRegistry'
 import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
 import type { EffectMode, EffectReference } from '../../types/nodeCueTypes'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('NodeCueLoader')
 
 export interface NodeCueFileSummary {
   path: string
@@ -378,7 +380,7 @@ export class NodeCueLoader extends EventEmitter {
             new YargNodeCue(file.group.id, compiled, effectRegistry, callbacks),
           )
         } catch (err) {
-          console.warn(`Skipping cue '${cue.cueType}':`, err)
+          log.warn(`Skipping cue '${cue.cueType}':`, err)
         }
       } else {
         if (motionMap.has(cue.id)) {
@@ -396,7 +398,7 @@ export class NodeCueLoader extends EventEmitter {
             new YargMotionNodeCue(file.group.id, compiled, effectRegistry, callbacks),
           )
         } catch (err) {
-          console.warn(`Skipping motion cue '${cue.id}':`, err)
+          log.warn(`Skipping motion cue '${cue.id}':`, err)
         }
       }
     }
@@ -436,7 +438,7 @@ export class NodeCueLoader extends EventEmitter {
           const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
           cueMap.set(cue.cueTypeId, new AudioNodeCue(file.group.id, compiled, effectRegistry))
         } catch (err) {
-          console.warn(`Skipping audio cue '${cue.cueTypeId}':`, err)
+          log.warn(`Skipping audio cue '${cue.cueTypeId}':`, err)
         }
       } else {
         if (motionMap.has(cue.id)) {
@@ -450,7 +452,7 @@ export class NodeCueLoader extends EventEmitter {
           const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
           motionMap.set(cue.id, new AudioMotionNodeCue(file.group.id, compiled, effectRegistry))
         } catch (err) {
-          console.warn(`Skipping audio motion cue '${cue.id}':`, err)
+          log.warn(`Skipping audio motion cue '${cue.id}':`, err)
         }
       }
     }
@@ -493,7 +495,7 @@ export class NodeCueLoader extends EventEmitter {
       await this.loadFile(mode, filePath)
       this.emit('changed', this.getSummary())
     } catch (error) {
-      console.error('Failed to reload node cue file', filePath, error)
+      log.error('Failed to reload node cue file', filePath, error)
     }
   }
 
@@ -573,7 +575,7 @@ export class NodeCueLoader extends EventEmitter {
         )
 
         if (!effectFile) {
-          console.warn(
+          log.warn(
             `Effect file ${effectRef.effectFileId} not found, skipping effect ${effectRef.effectId}`,
           )
           continue
@@ -582,7 +584,7 @@ export class NodeCueLoader extends EventEmitter {
         const effect = effectFile.effects.find((e) => e.id === effectRef.effectId)
 
         if (!effect) {
-          console.warn(
+          log.warn(
             `Effect ${effectRef.effectId} not found in file ${effectRef.effectFileId}, skipping`,
           )
           continue
@@ -597,7 +599,7 @@ export class NodeCueLoader extends EventEmitter {
         )
         registry.registerEffect(effectRef.effectId, compiledEffect)
       } catch (error) {
-        console.error(`Failed to load/compile effect ${effectRef.effectId}:`, error)
+        log.error(`Failed to load/compile effect ${effectRef.effectId}:`, error)
       }
     }
 

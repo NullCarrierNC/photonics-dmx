@@ -9,6 +9,8 @@ import {
 } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('RegistryInitializer')
 
 export interface RegistryInitializerContext {
   getConfig: () => ConfigurationManager
@@ -34,20 +36,20 @@ export class RegistryInitializer {
     const enabledGroupIds = config.getPreference('cueDomains').yarg.enabledGroups ?? []
     if (enabledGroupIds.length > 0) {
       registry.setEnabledGroups(enabledGroupIds)
-      console.log('CueRegistry initialized with enabled groups:', enabledGroupIds)
+      log.info('CueRegistry initialized with enabled groups:', enabledGroupIds)
     } else {
       const allGroups = registry.getAllGroups()
       registry.setEnabledGroups(allGroups)
-      console.log('CueRegistry initialized with all groups (no preference set):', allGroups)
+      log.info('CueRegistry initialized with all groups (no preference set):', allGroups)
     }
 
     const consistencyWindow = config.getPreference('cueConsistencyWindow')
     registry.setCueConsistencyWindow(consistencyWindow)
-    console.log('CueRegistry initialized with consistency window:', consistencyWindow, 'ms')
+    log.info('CueRegistry initialized with consistency window:', consistencyWindow, 'ms')
 
     const selectionMode = config.getCueGroupSelectionMode()
     registry.setCueGroupSelectionMode(selectionMode)
-    console.log('CueRegistry initialized with cue group selection mode:', selectionMode)
+    log.info('CueRegistry initialized with cue group selection mode:', selectionMode)
 
     const disabledYarg = config.getPreference('cueDomains').yarg.disabledCues
     registry.setDisabledCues(disabledYarg)
@@ -60,14 +62,14 @@ export class RegistryInitializer {
     const enabledGroupIds = config.getPreference('cueDomains').audio.enabledGroups
     if (enabledGroupIds && enabledGroupIds.length > 0) {
       registry.setEnabledGroups(enabledGroupIds)
-      console.log('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
+      log.info('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
     } else {
       const allGroups = registry.getRegisteredGroups()
       registry.setEnabledGroups(allGroups)
       if (allGroups.length > 0) {
         void config.updateCueDomain('audio', { enabledGroups: allGroups })
       }
-      console.log('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
+      log.info('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
     }
 
     const disabledAudio = config.getPreference('cueDomains').audio.disabledCues
@@ -84,9 +86,9 @@ export class RegistryInitializer {
     this.ctx.setEffectLoader(effectLoader)
 
     const summary = await effectLoader.loadAll()
-    console.log(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
+    log.info(`[EffectLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
     if (summary.failed > 0 && summary.errors.length > 0) {
-      summary.errors.forEach((err) => console.error('[EffectLoader]', err))
+      summary.errors.forEach((err) => log.error('[EffectLoader]', err))
       this.ctx.pushValidationError({ source: 'effect', errors: summary.errors })
     }
     await effectLoader.startWatching()
@@ -98,7 +100,7 @@ export class RegistryInitializer {
         try {
           await nodeCueLoader.reload()
         } catch (error) {
-          console.error('Failed to reload node cues after effect change:', error)
+          log.error('Failed to reload node cues after effect change:', error)
         }
       }
     })
@@ -121,9 +123,9 @@ export class RegistryInitializer {
     this.ctx.setNodeCueLoader(nodeCueLoader)
 
     const summary = await nodeCueLoader.loadAll()
-    console.log(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
+    log.info(`[NodeCueLoader] Loaded ${summary.loaded} files with ${summary.failed} failures.`)
     if (summary.failed > 0 && summary.errors.length > 0) {
-      summary.errors.forEach((err) => console.error('[NodeCueLoader]', err))
+      summary.errors.forEach((err) => log.error('[NodeCueLoader]', err))
       this.ctx.pushValidationError({ source: 'node-cue', errors: summary.errors })
     }
     await nodeCueLoader.startWatching()

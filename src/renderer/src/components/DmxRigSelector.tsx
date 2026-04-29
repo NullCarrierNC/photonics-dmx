@@ -3,6 +3,8 @@ import { DmxRig } from '../../../photonics-dmx/types'
 import { resolveLastUsedRigId } from '../atoms'
 import { getActiveRigs } from '../ipcApi'
 import { DmxRigSelectField } from './DmxRigSelectField'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('DmxRigSelector')
 
 interface DmxRigSelectorProps {
   selectedRigId: string | null
@@ -31,7 +33,7 @@ const DmxRigSelector: React.FC<DmxRigSelectorProps> = ({ selectedRigId, onRigCha
           onRigChange(resolved)
         }
       } catch (error) {
-        console.error('Failed to load active rigs:', error)
+        log.error('Failed to load active rigs:', error)
       }
     }
 

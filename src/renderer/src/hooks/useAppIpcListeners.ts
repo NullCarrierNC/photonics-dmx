@@ -6,6 +6,8 @@ import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAppVersion, getCorruptRecoveryEvents, getPrefs, getValidationErrors } from '../ipcApi'
 import type { CueStateUpdatePayload } from '../../../shared/ipcTypes'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('useAppIpcListeners')
 
 export interface UseAppIpcListenersParams {
   setAppVer: (v: string) => void
@@ -50,7 +52,7 @@ async function loadAndApplyPrefs(
   if (isCancelled()) {
     return
   }
-  console.log('\n Prefs', prefs)
+  log.info('\n Prefs', prefs)
 
   const updatedPrefs = { ...prefs }
 
@@ -61,7 +63,7 @@ async function loadAndApplyPrefs(
     openDmxEnabled: false,
   }
   if (!prefs.dmxOutputConfig) {
-    console.log('No saved DMX output config, using defaults:', defaultDmxOutputConfig)
+    log.info('No saved DMX output config, using defaults:', defaultDmxOutputConfig)
     updatedPrefs.dmxOutputConfig = defaultDmxOutputConfig
   } else {
     updatedPrefs.dmxOutputConfig = { ...defaultDmxOutputConfig, ...prefs.dmxOutputConfig }
@@ -69,7 +71,7 @@ async function loadAndApplyPrefs(
 
   const defaultEnttecProConfig = { port: '' }
   if (!prefs.enttecProConfig) {
-    console.log('No saved Enttec Pro config, using defaults:', defaultEnttecProConfig)
+    log.info('No saved Enttec Pro config, using defaults:', defaultEnttecProConfig)
     updatedPrefs.enttecProConfig = defaultEnttecProConfig
   } else {
     updatedPrefs.enttecProConfig = { ...defaultEnttecProConfig, ...prefs.enttecProConfig }
@@ -78,7 +80,7 @@ async function loadAndApplyPrefs(
 
   const defaultOpenDmxConfig = { port: '', dmxSpeed: 40 }
   if (!prefs.openDmxConfig) {
-    console.log('No saved OpenDMX config, using defaults:', defaultOpenDmxConfig)
+    log.info('No saved OpenDMX config, using defaults:', defaultOpenDmxConfig)
     updatedPrefs.openDmxConfig = defaultOpenDmxConfig
   } else {
     updatedPrefs.openDmxConfig = { ...defaultOpenDmxConfig, ...prefs.openDmxConfig }
@@ -89,7 +91,7 @@ async function loadAndApplyPrefs(
     const defaultStageKitPrefs = {
       yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never',
     }
-    console.log('No saved Stage Kit preferences, using defaults:', defaultStageKitPrefs)
+    log.info('No saved Stage Kit preferences, using defaults:', defaultStageKitPrefs)
     updatedPrefs.stageKitPrefs = defaultStageKitPrefs
   }
 
@@ -100,7 +102,7 @@ async function loadAndApplyPrefs(
     openDmxExpanded: false,
   }
   if (!prefs.dmxSettingsPrefs) {
-    console.log('No saved DMX settings preferences, using defaults:', defaultDmxSettingsPrefs)
+    log.info('No saved DMX settings preferences, using defaults:', defaultDmxSettingsPrefs)
     updatedPrefs.dmxSettingsPrefs = defaultDmxSettingsPrefs
   } else {
     updatedPrefs.dmxSettingsPrefs = { ...defaultDmxSettingsPrefs, ...prefs.dmxSettingsPrefs }
@@ -132,7 +134,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
           latest.current.setAppVer(ver)
         }
       } catch (error) {
-        console.error('Failed to get app version:', error)
+        log.error('Failed to get app version:', error)
       }
     })()
 
@@ -140,7 +142,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
       try {
         await loadAndApplyPrefs(latest.current, isCancelled)
       } catch (error) {
-        console.error('Failed to load preferences:', error)
+        log.error('Failed to load preferences:', error)
       }
     })()
 
@@ -151,7 +153,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
           latest.current.handleCueValidationErrors(errors)
         }
       } catch (error) {
-        console.error('Failed to fetch validation errors:', error)
+        log.error('Failed to fetch validation errors:', error)
       }
     })()
 
@@ -162,7 +164,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
           latest.current.handleConfigCorruptRecovered({ files })
         }
       } catch (error) {
-        console.error('Failed to fetch config corrupt recovery events:', error)
+        log.error('Failed to fetch config corrupt recovery events:', error)
       }
     })()
 

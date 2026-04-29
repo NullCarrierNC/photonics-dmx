@@ -1,5 +1,7 @@
 import { IEventScheduler } from './interfaces'
 import { Clock } from './Clock'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('EventScheduler')
 
 /**
  * @interface ScheduledEvent
@@ -126,7 +128,7 @@ export class EventScheduler implements IEventScheduler {
             eventsToRemove.push(eventId)
           }
         } catch (error) {
-          console.error('Error in scheduled event callback:', error)
+          log.error('Error in scheduled event callback:', error)
           eventsToRemove.push(eventId)
         }
       }

@@ -23,6 +23,9 @@ import {
   savePrefs,
   updateSacnConfig,
 } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('DmxOutputSettings')
 
 const DmxOutputSettings: React.FC = () => {
   const [isArtNetEnabled, setIsArtNetEnabled] = useAtom(senderArtNetEnabledAtom)
@@ -46,7 +49,7 @@ const DmxOutputSettings: React.FC = () => {
 
   // Load other preferences (ArtNet config, COM port, etc.)
   useEffect(() => {
-    console.log('Loading other preferences')
+    log.info('Loading other preferences')
 
     setComPort(prefs.enttecProConfig?.port ?? '')
     setOpenDmxComPort(prefs.openDmxConfig?.port ?? '')
@@ -70,10 +73,10 @@ const DmxOutputSettings: React.FC = () => {
         if (result.success) {
           setNetworkInterfaces(result.interfaces)
         } else {
-          console.error('Failed to load network interfaces:', result.error)
+          log.error('Failed to load network interfaces:', result.error)
         }
       } catch (error) {
-        console.error('Error loading network interfaces:', error)
+        log.error('Error loading network interfaces:', error)
       }
     }
 
@@ -82,12 +85,12 @@ const DmxOutputSettings: React.FC = () => {
 
   // Load DMX output configuration independently
   useEffect(() => {
-    console.log('Checking DMX output configuration state')
-    console.log('Preferences dmxOutputConfig:', prefs.dmxOutputConfig)
+    log.info('Checking DMX output configuration state')
+    log.info('Preferences dmxOutputConfig:', prefs.dmxOutputConfig)
 
     // Check if preferences need to be initialized
     if (!prefs.dmxOutputConfig) {
-      console.log('No DMX output config in preferences, initializing from sender states')
+      log.info('No DMX output config in preferences, initializing from sender states')
 
       // Initialize from current sender states
       const initialConfig = {
@@ -97,7 +100,7 @@ const DmxOutputSettings: React.FC = () => {
         openDmxEnabled: isOpenDmxEnabled,
       }
 
-      console.log('Initializing dmxOutputConfig from sender states:', initialConfig)
+      log.info('Initializing dmxOutputConfig from sender states:', initialConfig)
 
       // Save the initial configuration to preferences
       setPrefs((prev) => ({
@@ -106,7 +109,7 @@ const DmxOutputSettings: React.FC = () => {
       }))
 
       savePrefs({ dmxOutputConfig: initialConfig }).catch((error) => {
-        console.error('Failed to save initial DMX output configuration:', error)
+        log.error('Failed to save initial DMX output configuration:', error)
       })
     }
   }, [
@@ -120,7 +123,7 @@ const DmxOutputSettings: React.FC = () => {
 
   const handleSacnToggle = async () => {
     const currentState = prefs.dmxOutputConfig?.sacnEnabled || false
-    console.log('sACN toggle clicked, current state:', currentState)
+    log.info('sACN toggle clicked, current state:', currentState)
     const newState = !currentState
     const newConfig = {
       ...prefs.dmxOutputConfig,
@@ -144,22 +147,22 @@ const DmxOutputSettings: React.FC = () => {
 
     // If disabling sACN, stop the sender if it's running and turn off the toggle
     if (!newState && isSacnEnabled) {
-      console.log('Disabling sACN checkbox - stopping sACN sender and turning off toggle')
+      log.info('Disabling sACN checkbox - stopping sACN sender and turning off toggle')
       disableSender({ sender: 'sacn' })
       setIsSacnEnabled(false) // Turn off the toggle state
     }
 
     try {
       const result = await savePrefs({ dmxOutputConfig: newConfig })
-      console.log('Save result:', result)
+      log.info('Save result:', result)
     } catch (error) {
-      console.error('Failed to save DMX output configuration:', error)
+      log.error('Failed to save DMX output configuration:', error)
     }
   }
 
   const handleArtNetToggle = async () => {
     const currentState = prefs.dmxOutputConfig?.artNetEnabled || false
-    console.log('ArtNet toggle clicked, current state:', currentState)
+    log.info('ArtNet toggle clicked, current state:', currentState)
     const newState = !currentState
     const newConfig = {
       ...prefs.dmxOutputConfig,
@@ -169,7 +172,7 @@ const DmxOutputSettings: React.FC = () => {
       openDmxEnabled: prefs.dmxOutputConfig?.openDmxEnabled || false,
     }
 
-    console.log('Setting new config:', newConfig)
+    log.info('Setting new config:', newConfig)
 
     // Update the global preferences
     setPrefs((prev) => ({
@@ -179,29 +182,29 @@ const DmxOutputSettings: React.FC = () => {
 
     // If enabling ArtNet, start the sender
     if (newState && !isArtNetEnabled) {
-      console.log('Enabling ArtNet checkbox - starting ArtNet sender')
+      log.info('Enabling ArtNet checkbox - starting ArtNet sender')
       enableSender({ sender: 'artnet', ...artNetConfig })
       setIsArtNetEnabled(true) // Turn on the toggle state
     }
 
     // If disabling ArtNet, stop the sender if it's running and turn off the toggle
     if (!newState && isArtNetEnabled) {
-      console.log('Disabling ArtNet checkbox - stopping ArtNet sender and turning off toggle')
+      log.info('Disabling ArtNet checkbox - stopping ArtNet sender and turning off toggle')
       disableSender({ sender: 'artnet' })
       setIsArtNetEnabled(false) // Turn off the toggle state
     }
 
     try {
       const result = await savePrefs({ dmxOutputConfig: newConfig })
-      console.log('Save result:', result)
+      log.info('Save result:', result)
     } catch (error) {
-      console.error('Failed to save DMX output configuration:', error)
+      log.error('Failed to save DMX output configuration:', error)
     }
   }
 
   const handleEnttecProToggle = async () => {
     const currentState = prefs.dmxOutputConfig?.enttecProEnabled || false
-    console.log('Enttec Pro toggle clicked, current state:', currentState)
+    log.info('Enttec Pro toggle clicked, current state:', currentState)
     const newState = !currentState
     const newConfig = {
       ...prefs.dmxOutputConfig,
@@ -211,7 +214,7 @@ const DmxOutputSettings: React.FC = () => {
       openDmxEnabled: prefs.dmxOutputConfig?.openDmxEnabled || false,
     }
 
-    console.log('Setting new config:', newConfig)
+    log.info('Setting new config:', newConfig)
 
     // Update the global preferences
     setPrefs((prev) => ({
@@ -221,31 +224,29 @@ const DmxOutputSettings: React.FC = () => {
 
     // If enabling Enttec Pro, start the sender
     if (newState && !isEnttecProEnabled) {
-      console.log('Enabling Enttec Pro checkbox - starting Enttec Pro sender')
+      log.info('Enabling Enttec Pro checkbox - starting Enttec Pro sender')
       enableSender({ sender: 'enttecpro', devicePath: comPort })
       setIsEnttecProEnabled(true) // Turn on the toggle state
     }
 
     // If disabling Enttec Pro, stop the sender if it's running and turn off the toggle
     if (!newState && isEnttecProEnabled) {
-      console.log(
-        'Disabling Enttec Pro checkbox - stopping Enttec Pro sender and turning off toggle',
-      )
+      log.info('Disabling Enttec Pro checkbox - stopping Enttec Pro sender and turning off toggle')
       disableSender({ sender: 'enttecpro' })
       setIsEnttecProEnabled(false) // Turn off the toggle state
     }
 
     try {
       const result = await savePrefs({ dmxOutputConfig: newConfig })
-      console.log('Save result:', result)
+      log.info('Save result:', result)
     } catch (error) {
-      console.error('Failed to save DMX output configuration:', error)
+      log.error('Failed to save DMX output configuration:', error)
     }
   }
 
   const handleOpenDmxToggle = async () => {
     const currentState = prefs.dmxOutputConfig?.openDmxEnabled || false
-    console.log('OpenDMX toggle clicked, current state:', currentState)
+    log.info('OpenDMX toggle clicked, current state:', currentState)
     const newState = !currentState
     const newConfig = {
       ...prefs.dmxOutputConfig,
@@ -255,7 +256,7 @@ const DmxOutputSettings: React.FC = () => {
       enttecProEnabled: prefs.dmxOutputConfig?.enttecProEnabled || false,
     }
 
-    console.log('Setting new config:', newConfig)
+    log.info('Setting new config:', newConfig)
 
     setPrefs((prev) => ({
       ...prev,
@@ -263,22 +264,22 @@ const DmxOutputSettings: React.FC = () => {
     }))
 
     if (newState && !isOpenDmxEnabled) {
-      console.log('Enabling OpenDMX checkbox - starting OpenDMX sender')
+      log.info('Enabling OpenDMX checkbox - starting OpenDMX sender')
       enableSender({ sender: 'opendmx', devicePath: openDmxComPort, dmxSpeed: openDmxSpeed })
       setIsOpenDmxEnabled(true)
     }
 
     if (!newState && isOpenDmxEnabled) {
-      console.log('Disabling OpenDMX checkbox - stopping OpenDMX sender and turning off toggle')
+      log.info('Disabling OpenDMX checkbox - stopping OpenDMX sender and turning off toggle')
       disableSender({ sender: 'opendmx' })
       setIsOpenDmxEnabled(false)
     }
 
     try {
       const result = await savePrefs({ dmxOutputConfig: newConfig })
-      console.log('Save result:', result)
+      log.info('Save result:', result)
     } catch (error) {
-      console.error('Failed to save DMX output configuration:', error)
+      log.error('Failed to save DMX output configuration:', error)
     }
   }
 
@@ -300,7 +301,7 @@ const DmxOutputSettings: React.FC = () => {
         artNetConfig: newConfig,
       }))
     } catch (error) {
-      console.error('Failed to save ArtNet configuration:', error)
+      log.error('Failed to save ArtNet configuration:', error)
     }
   }
 
@@ -322,7 +323,7 @@ const DmxOutputSettings: React.FC = () => {
         enttecProConfig: newConfig,
       }))
     } catch (error) {
-      console.error('Failed to save EnttecPro port configuration:', error)
+      log.error('Failed to save EnttecPro port configuration:', error)
     }
   }
 
@@ -343,7 +344,7 @@ const DmxOutputSettings: React.FC = () => {
         openDmxConfig: newConfig,
       }))
     } catch (error) {
-      console.error('Failed to save OpenDMX port configuration:', error)
+      log.error('Failed to save OpenDMX port configuration:', error)
     }
   }
 
@@ -364,7 +365,7 @@ const DmxOutputSettings: React.FC = () => {
         openDmxConfig: newConfig,
       }))
     } catch (error) {
-      console.error('Failed to save OpenDMX speed configuration:', error)
+      log.error('Failed to save OpenDMX speed configuration:', error)
     }
   }
 
@@ -392,7 +393,7 @@ const DmxOutputSettings: React.FC = () => {
         await updateSacnConfig(newConfig)
       }
     } catch (error) {
-      console.error('Failed to save sACN configuration:', error)
+      log.error('Failed to save sACN configuration:', error)
     }
   }
 
@@ -418,7 +419,7 @@ const DmxOutputSettings: React.FC = () => {
         dmxSettingsPrefs: newDmxSettingsPrefs,
       }))
     } catch (error) {
-      console.error('Failed to save DMX settings preferences:', error)
+      log.error('Failed to save DMX settings preferences:', error)
     }
   }
 

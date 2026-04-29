@@ -2,6 +2,8 @@ import React from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import { setStageKitPriority } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('StageKitModeSettings')
 
 const StageKitModeSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
@@ -20,9 +22,9 @@ const StageKitModeSettings: React.FC = () => {
     try {
       // Save to backend using the specific stage kit priority handler
       await setStageKitPriority(priority)
-      console.log(`[StageKitModeSettings] Stage Kit priority changed to: ${priority}`)
+      log.info(`[StageKitModeSettings] Stage Kit priority changed to: ${priority}`)
     } catch (error) {
-      console.error('Failed to save Stage Kit priority:', error)
+      log.error('Failed to save Stage Kit priority:', error)
     }
   }
 

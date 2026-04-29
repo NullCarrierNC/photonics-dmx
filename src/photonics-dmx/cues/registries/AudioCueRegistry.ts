@@ -2,6 +2,8 @@ import { AudioCueType, AudioMotionCueRef } from '../types/audioCueTypes'
 import type { MotionGroupSelectionMode } from '../types/nodeCueTypes'
 import { IAudioCue } from '../interfaces/IAudioCue'
 import { MotionSelectionState } from './MotionSelectionState'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioCueRegistry')
 
 /**
  * Interface for an audio cue group
@@ -315,7 +317,7 @@ export class AudioCueRegistry {
     this.disabledCues.clear()
     this.motionState.reset()
     this.cueDetailsCache.clear()
-    console.log('AudioCueRegistry reset to initial state')
+    log.info('AudioCueRegistry reset to initial state')
   }
 
   public setMotionSelectionMode(mode: MotionGroupSelectionMode): void {

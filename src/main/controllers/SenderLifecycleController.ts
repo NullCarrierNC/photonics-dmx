@@ -1,4 +1,5 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
+import { createLogger } from '../../shared/logger'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
 import { SenderError, SenderId } from '../../photonics-dmx/senders/BaseSender'
 import { createSenderErrorHandler } from './senderErrorHandler'
@@ -9,6 +10,8 @@ import {
   getLastErrorHandledTime,
   removeSenderErrorHandled,
 } from '../senderErrorTracking'
+
+const log = createLogger('SenderLifecycle')
 
 interface NetworkErrorLike {
   code?: string
@@ -80,7 +83,7 @@ export class SenderLifecycleController {
       try {
         await this.senderManager.shutdown()
       } catch (err) {
-        console.error('Error shutting down sender manager:', err)
+        log.error('Error shutting down sender manager:', err)
       }
     }
   }
@@ -91,7 +94,7 @@ export class SenderLifecycleController {
       try {
         await this.senderManager.shutdown()
       } catch (err) {
-        console.error('Error shutting down sender manager:', err)
+        log.error('Error shutting down sender manager:', err)
       }
     }
     this.senderManager = null
@@ -129,9 +132,9 @@ export class SenderLifecycleController {
           useUnicast: sc?.useUnicast ?? false,
           unicastDestination: sc?.unicastDestination || undefined,
         })
-        console.log('Restored sACN sender from preferences')
+        log.info('Restored sACN sender from preferences')
       } catch (err) {
-        console.error('Failed to restore sACN sender after restart:', err)
+        log.error('Failed to restore sACN sender after restart:', err)
       }
     }
 
@@ -148,9 +151,9 @@ export class SenderLifecycleController {
             subuni: ac.subuni,
             port: ac.port,
           })
-          console.log('Restored Art-Net sender from preferences')
+          log.info('Restored Art-Net sender from preferences')
         } catch (err) {
-          console.error('Failed to restore Art-Net sender after restart:', err)
+          log.error('Failed to restore Art-Net sender after restart:', err)
         }
       }
     }
@@ -163,9 +166,9 @@ export class SenderLifecycleController {
             sender: 'enttecpro',
             devicePath: ec.port,
           })
-          console.log('Restored Enttec Pro sender from preferences')
+          log.info('Restored Enttec Pro sender from preferences')
         } catch (err) {
-          console.error('Failed to restore Enttec Pro sender after restart:', err)
+          log.error('Failed to restore Enttec Pro sender after restart:', err)
         }
       }
     }
@@ -179,9 +182,9 @@ export class SenderLifecycleController {
             devicePath: oc.port,
             dmxSpeed: oc.dmxSpeed,
           })
-          console.log('Restored OpenDMX sender from preferences')
+          log.info('Restored OpenDMX sender from preferences')
         } catch (err) {
-          console.error('Failed to restore OpenDMX sender after restart:', err)
+          log.error('Failed to restore OpenDMX sender after restart:', err)
         }
       }
     }
@@ -246,19 +249,19 @@ export class SenderLifecycleController {
 
       const sender = this.senderManager.getAndRemoveSenderForEmergency(senderId)
       if (sender) {
-        console.error(`Network sender error (${senderId}):`, error)
+        log.error(`Network sender error (${senderId}):`, error)
         sender.stop().catch((stopErr: unknown) => {
-          console.error(`Error stopping ${senderId} sender after network error:`, stopErr)
+          log.error(`Error stopping ${senderId} sender after network error:`, stopErr)
         })
         this.senderErrorHandler(senderError)
       } else {
-        console.error(`Network sender error (${senderId}):`, error)
+        log.error(`Network sender error (${senderId}):`, error)
         this.senderManager.markInitFailed(senderId)
         this.senderManager.emitSenderError(senderError)
       }
       return true
     } catch (err) {
-      console.error(`Error handling ${senderId} uncaught exception:`, err)
+      log.error(`Error handling ${senderId} uncaught exception:`, err)
       removeSenderErrorHandled(senderId)
       return false
     }

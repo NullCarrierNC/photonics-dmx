@@ -5,6 +5,8 @@ import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getDmxRig, enableSender } from '../ipcApi'
 import type { DmxRig, LightingConfiguration, IpcSenderConfig } from '../../../photonics-dmx/types'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('useDmxPreview')
 
 /**
  * Shared hook for DMX preview: rig loading, IPC sender lifecycle, and DMX value listening.
@@ -50,7 +52,7 @@ export function useDmxPreview(): {
           enableSender({ sender: 'ipc' } as IpcSenderConfig)
         }
       } catch (error) {
-        console.error('Failed to load rig configuration:', error)
+        log.error('Failed to load rig configuration:', error)
         if (!cancelled) {
           setSelectedRig(null)
           setRigConfig(null)
@@ -79,7 +81,7 @@ export function useDmxPreview(): {
           }
         })
         .catch((err) => {
-          console.error('useDmxPreview: failed to refresh rig config after restart', err)
+          log.error('useDmxPreview: failed to refresh rig config after restart', err)
         })
     }
 

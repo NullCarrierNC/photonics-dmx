@@ -14,6 +14,9 @@ import {
   YargEffectDefinition,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
+import { createLogger } from '../../../../shared/logger'
+
+const log = createLogger('EffectCompiler')
 
 export class EffectCompilationError extends Error {
   constructor(message: string) {
@@ -114,7 +117,7 @@ export class EffectCompiler {
     // Validate runtime event raiser/listener nodes reference valid registered events
     for (const raiser of eventRaisers) {
       if (!raiser.eventName) {
-        console.warn(`Event raiser '${raiser.label ?? raiser.id}' has no event selected.`)
+        log.warn(`Event raiser '${raiser.label ?? raiser.id}' has no event selected.`)
         continue
       }
       if (!eventNameSet.has(raiser.eventName)) {
@@ -126,7 +129,7 @@ export class EffectCompiler {
 
     for (const listener of eventListeners) {
       if (!listener.eventName) {
-        console.warn(`Event listener '${listener.label ?? listener.id}' has no event selected.`)
+        log.warn(`Event listener '${listener.label ?? listener.id}' has no event selected.`)
         continue
       }
       if (!eventNameSet.has(listener.eventName)) {

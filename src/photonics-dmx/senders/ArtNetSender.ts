@@ -1,6 +1,9 @@
 import { DMX, ArtnetDriver, IUniverseDriver } from 'dmx-ts'
 import { EventEmitter } from 'events'
+import { createLogger } from '../../shared/logger'
 import { BaseSender, SenderError } from './BaseSender'
+
+const log = createLogger('ArtNetSender')
 
 /** Default Art-Net output rate in Hz. */
 export const ARTNET_DEFAULT_MAX_OUTPUT_RATE = 44
@@ -50,7 +53,7 @@ export class ArtNetSender extends BaseSender {
 
       // Listen for error events from the DMX instance
       this.dmx.on('error', (err: unknown) => {
-        console.error('ArtNetSender DMX error event:', err)
+        log.error('ArtNetSender DMX error event:', err)
         const errObj =
           err && typeof err === 'object' ? (err as { code?: string; syscall?: string }) : null
         const isNetworkError =
@@ -79,7 +82,7 @@ export class ArtNetSender extends BaseSender {
       return
     }
 
-    console.log(`Stopping ArtNet sender on host ${this.host}...`)
+    log.info(`Stopping ArtNet sender on host ${this.host}...`)
 
     try {
       this.lastSendTimeMs = 0
@@ -93,10 +96,10 @@ export class ArtNetSender extends BaseSender {
       try {
         if (this.universe) {
           this.universe.update(zeroPayload)
-          console.log('Sent zero values to all ArtNet channels')
+          log.info('Sent zero values to all ArtNet channels')
         }
       } catch (err) {
-        console.error('Failed to send zero values before stopping:', err)
+        log.error('Failed to send zero values before stopping:', err)
       }
 
       // Give a small delay to ensure commands are sent
@@ -108,34 +111,34 @@ export class ArtNetSender extends BaseSender {
         if (this.dmx) {
           this.dmx.removeAllListeners()
         }
-        console.log('Removed all event listeners')
+        log.info('Removed all event listeners')
       } catch (err) {
-        console.error('Error removing event listeners:', err)
+        log.error('Error removing event listeners:', err)
       }
 
       // Close the DMX connection
       try {
         if (this.dmx) {
           await this.dmx.close()
-          console.log('ArtNet connection closed')
+          log.info('ArtNet connection closed')
         }
       } catch (err) {
-        console.error('Error during ArtNet close:', err)
+        log.error('Error during ArtNet close:', err)
 
         // If close fails, we'll try forcibly clearing references
         try {
           this.universe = undefined
           await new Promise((resolve) => setTimeout(resolve, 100))
         } catch (innerErr) {
-          console.error('Error during failsafe cleanup:', innerErr)
+          log.error('Error during failsafe cleanup:', innerErr)
         }
       }
     } catch (outerErr) {
-      console.error('Unhandled error during ArtNetSender stop:', outerErr)
+      log.error('Unhandled error during ArtNetSender stop:', outerErr)
     } finally {
       // Final cleanup, clear all references
       this.universe = undefined
-      console.log('ArtNetSender cleanup completed')
+      log.info('ArtNetSender cleanup completed')
     }
   }
 
@@ -161,7 +164,7 @@ export class ArtNetSender extends BaseSender {
 
       this.universe!.update(convertedBuffer)
     } catch (err: unknown) {
-      console.error('ArtNetSender error:', err)
+      log.error('ArtNetSender error:', err)
       const errObj =
         err && typeof err === 'object' ? (err as { code?: string; syscall?: string }) : null
       const isNetworkError =

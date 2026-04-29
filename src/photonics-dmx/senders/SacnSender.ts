@@ -1,8 +1,11 @@
 // src/senders/SacnSender.ts
 import { EventEmitter } from 'events'
+import { createLogger } from '../../shared/logger'
 import { BaseSender, SenderError } from './BaseSender'
 import { Sender } from 'sacn'
 import * as os from 'os'
+
+const log = createLogger('SacnSender')
 
 /** Default sACN output rate in Hz. */
 export const SACN_DEFAULT_MAX_OUTPUT_RATE = 44
@@ -119,7 +122,7 @@ export class SacnSender extends BaseSender {
       }
       await this.send(zeroBuffer)
     } catch (error) {
-      console.error('Failed to send zero values before stopping:', error)
+      log.error('Failed to send zero values before stopping:', error)
     } finally {
       this.sender.close()
       this.sender = undefined
@@ -141,7 +144,7 @@ export class SacnSender extends BaseSender {
 
       await this.sender!.send({ payload: universeBuffer })
     } catch (err: unknown) {
-      console.error('SacnSender error:', err)
+      log.error('SacnSender error:', err)
       const errObj =
         err && typeof err === 'object' ? (err as { code?: string; syscall?: string }) : null
       const isNetworkError =

@@ -35,6 +35,8 @@ import { ILightingController } from '../controllers/sequencer/interfaces'
 import { AudioLightingData, AudioConfig } from '../listeners/Audio/AudioTypes'
 import { getColor, validateColorString } from '../helpers/dmxHelpers'
 import { Color, TrackedLight } from '../types'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('AudioDirectProcessor')
 
 /** One colour per frequency band (8 bands). */
 const DEFAULT_DIRECT_RANGES = [
@@ -59,7 +61,7 @@ export class AudioDirectProcessor {
     private photonicsSequencer: ILightingController,
     _audioConfig: AudioConfig,
   ) {
-    console.log('AudioDirectProcessor: Constructor called with dependencies:', {
+    log.info('AudioDirectProcessor: Constructor called with dependencies:', {
       lightManagerType: lightManager.constructor.name,
       photonicsSequencerType: photonicsSequencer.constructor.name,
     })
@@ -67,7 +69,7 @@ export class AudioDirectProcessor {
     this.lightManager = lightManager
     this.photonicsSequencer = photonicsSequencer
 
-    console.log('AudioDirectProcessor initialized')
+    log.info('AudioDirectProcessor initialized')
   }
 
   /**
@@ -75,12 +77,12 @@ export class AudioDirectProcessor {
    */
   public start(): void {
     if (this.isActive) {
-      console.warn('AudioDirectProcessor: Already active')
+      log.warn('AudioDirectProcessor: Already active')
       return
     }
 
     this.isActive = true
-    console.log('AudioDirectProcessor: Started')
+    log.info('AudioDirectProcessor: Started')
   }
 
   /**
@@ -94,14 +96,14 @@ export class AudioDirectProcessor {
     this.isActive = false
     this.turnOffAllLights()
 
-    console.log('AudioDirectProcessor: Stopped')
+    log.info('AudioDirectProcessor: Stopped')
   }
 
   /**
    * Update configuration (no-op; frequency bands are derived from audio data)
    */
   public updateConfig(_config: AudioConfig): void {
-    console.log('AudioDirectProcessor: Configuration updated')
+    log.info('AudioDirectProcessor: Configuration updated')
   }
 
   /**
@@ -332,6 +334,6 @@ export class AudioDirectProcessor {
    */
   public shutdown(): void {
     this.stop()
-    console.log('AudioDirectProcessor: Shutdown complete')
+    log.info('AudioDirectProcessor: Shutdown complete')
   }
 }

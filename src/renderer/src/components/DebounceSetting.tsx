@@ -2,6 +2,8 @@ import { useAtom } from 'jotai'
 import { useEffect, useState } from 'react'
 import { effectDebounceTimeAtom } from '../atoms'
 import { getEffectDebounce, updateEffectDebounce } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('DebounceSetting')
 
 const DebounceSetting = () => {
   const [debounce, setDebounce] = useAtom(effectDebounceTimeAtom)
@@ -15,7 +17,7 @@ const DebounceSetting = () => {
         setInputValue(value.toString())
       })
       .catch((err) => {
-        console.error('Failed to retrieve effect debounce value:', err)
+        log.error('Failed to retrieve effect debounce value:', err)
       })
   }, [setDebounce])
 

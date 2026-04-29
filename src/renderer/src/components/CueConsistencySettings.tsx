@@ -15,6 +15,9 @@ import {
   getAudioMotionCueProbabilityPercent,
   setAudioMotionCueProbabilityPercent,
 } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('CueConsistencySettings')
 
 const PROBABILITY_SAVE_DEBOUNCE_MS = 300
 
@@ -98,7 +101,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           audioProbabilitySaveRef.current.lastSentValue = audioProbabilityResult.percent
         }
       } catch (error) {
-        console.error('Failed to load cue consistency settings:', error)
+        log.error('Failed to load cue consistency settings:', error)
       } finally {
         setIsLoading(false)
       }
@@ -120,12 +123,12 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
         if (result.success) {
           setConsistencyWindow(result.windowMs)
         } else {
-          console.error('Failed to save consistency window:', result.error)
+          log.error('Failed to save consistency window:', result.error)
           // Revert to previous value on failure
           setConsistencyWindow(consistencyWindow)
         }
       } catch (error) {
-        console.error('Failed to save consistency window:', error)
+        log.error('Failed to save consistency window:', error)
         // Revert to previous value on failure
         setConsistencyWindow(consistencyWindow)
       } finally {
@@ -172,7 +175,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           ref.current.lastSentValue = result.percent
           applyServerValue(result.percent)
         } else {
-          console.error(`Failed to save ${label}`)
+          log.error(`Failed to save ${label}`)
           const reloaded = await reload()
           if (reloaded.success && typeof reloaded.percent === 'number') {
             ref.current.lastSentValue = reloaded.percent
@@ -180,7 +183,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           }
         }
       } catch (error) {
-        console.error(`Failed to save ${label}:`, error)
+        log.error(`Failed to save ${label}:`, error)
         try {
           const reloaded = await reload()
           if (reloaded.success && typeof reloaded.percent === 'number') {
@@ -188,7 +191,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
             applyServerValue(reloaded.percent)
           }
         } catch (reloadError) {
-          console.error(`Failed to reload ${label}:`, reloadError)
+          log.error(`Failed to reload ${label}:`, reloadError)
         }
       }
     },
@@ -303,14 +306,14 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
         if (result.success && typeof result.minHoldMs === 'number') {
           setMotionMinHoldMsState(result.minHoldMs)
         } else if (!result.success) {
-          console.error('Failed to save motion min hold:', result.error)
+          log.error('Failed to save motion min hold:', result.error)
           const reload = await getMotionCueMinHoldMs()
           if (reload.success && typeof reload.minHoldMs === 'number') {
             setMotionMinHoldMsState(reload.minHoldMs)
           }
         }
       } catch (error) {
-        console.error('Failed to save motion min hold:', error)
+        log.error('Failed to save motion min hold:', error)
         const reload = await getMotionCueMinHoldMs()
         if (reload.success && typeof reload.minHoldMs === 'number') {
           setMotionMinHoldMsState(reload.minHoldMs)
@@ -354,11 +357,11 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
                 setIsSaving(true)
                 const result = await setCueGroupSelectionMode(mode)
                 if (!result.success) {
-                  console.error('Failed to save cue group selection mode:', result.error)
+                  log.error('Failed to save cue group selection mode:', result.error)
                   setSelectionMode(selectionMode)
                 }
               } catch (error) {
-                console.error('Failed to save cue group selection mode:', error)
+                log.error('Failed to save cue group selection mode:', error)
                 setSelectionMode(selectionMode)
               } finally {
                 setIsSaving(false)
@@ -421,11 +424,11 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
                 setIsSaving(true)
                 const result = await setYargMotionGroupSelectionMode(mode)
                 if (!result.success) {
-                  console.error('Failed to save YARG motion group selection mode:', result.error)
+                  log.error('Failed to save YARG motion group selection mode:', result.error)
                   setYargMotionSelectionModeState(yargMotionSelectionMode)
                 }
               } catch (error) {
-                console.error('Failed to save YARG motion group selection mode:', error)
+                log.error('Failed to save YARG motion group selection mode:', error)
                 setYargMotionSelectionModeState(yargMotionSelectionMode)
               } finally {
                 setIsSaving(false)
@@ -459,11 +462,11 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
                 setIsSaving(true)
                 const result = await setAudioMotionGroupSelectionMode(mode)
                 if (!result.success) {
-                  console.error('Failed to save audio motion group selection mode:', result.error)
+                  log.error('Failed to save audio motion group selection mode:', result.error)
                   setAudioMotionSelectionModeState(audioMotionSelectionMode)
                 }
               } catch (error) {
-                console.error('Failed to save audio motion group selection mode:', error)
+                log.error('Failed to save audio motion group selection mode:', error)
                 setAudioMotionSelectionModeState(audioMotionSelectionMode)
               } finally {
                 setIsSaving(false)

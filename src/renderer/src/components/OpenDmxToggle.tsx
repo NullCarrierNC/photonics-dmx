@@ -1,6 +1,8 @@
 import { useAtom } from 'jotai'
 import { openDmxComPortAtom, senderOpenDmxEnabledAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('OpenDmxToggle')
 
 interface OpenDmxToggleProps {
   disabled?: boolean
@@ -19,10 +21,10 @@ const OpenDmxToggle = ({ disabled = false, compact = false }: OpenDmxToggleProps
 
     if (newState) {
       enableSender({ sender: 'opendmx', devicePath: comPort, dmxSpeed: openDmxSpeed })
-      console.log('OpenDMX enabled')
+      log.info('OpenDMX enabled')
     } else {
       disableSender({ sender: 'opendmx' })
-      console.log('OpenDMX disabled')
+      log.info('OpenDMX disabled')
     }
   }
 

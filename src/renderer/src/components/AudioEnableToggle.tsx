@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { getAudioConfig, setAudioEnabled } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioEnableToggle')
 
 interface AudioEnableToggleProps {
   disabled?: boolean
@@ -16,7 +18,7 @@ const AudioEnableToggle: React.FC<AudioEnableToggleProps> = ({ disabled = false 
         const config = await getAudioConfig()
         setEnabled(config?.enabled || false)
       } catch (error) {
-        console.error('Failed to load audio enabled state:', error)
+        log.error('Failed to load audio enabled state:', error)
       } finally {
         setIsLoading(false)
       }
@@ -35,11 +37,11 @@ const AudioEnableToggle: React.FC<AudioEnableToggleProps> = ({ disabled = false 
       setIsSaving(true)
       const result = await setAudioEnabled(newValue)
       if (!result.success) {
-        console.error('Failed to save audio enabled state:', result.error)
+        log.error('Failed to save audio enabled state:', result.error)
         setEnabled(!newValue) // Revert on failure
       }
     } catch (error) {
-      console.error('Failed to save audio enabled state:', error)
+      log.error('Failed to save audio enabled state:', error)
       setEnabled(!newValue) // Revert on failure
     } finally {
       setIsSaving(false)

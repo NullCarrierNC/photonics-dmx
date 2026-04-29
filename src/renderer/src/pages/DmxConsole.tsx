@@ -28,6 +28,8 @@ import EnttecProToggle from '../components/EnttecProToggle'
 import OpenDmxToggle from '../components/OpenDmxToggle'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('DmxConsole')
 
 function channelSortKey(name: string): number {
   const order = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSpeed', 'pan', 'tilt']
@@ -109,7 +111,7 @@ const DmxConsole: React.FC = () => {
         }
         setLoadError(null)
       } catch (e) {
-        console.error(e)
+        log.error('Failed to load DMX rigs', e)
         if (!cancelled) {
           setLoadError('Failed to load rigs')
         }
@@ -132,7 +134,7 @@ const DmxConsole: React.FC = () => {
           setSelectedRig(rig ?? null)
         }
       } catch (e) {
-        console.error(e)
+        log.error('Failed to load DMX rig', e)
         if (!cancelled) {
           setSelectedRig(null)
           setLoadError('Failed to load rig')

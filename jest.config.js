@@ -2,6 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  silent: true,
   roots: ['<rootDir>/src'],
   transform: {
     '^.+\\.tsx?$': [

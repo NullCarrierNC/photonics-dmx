@@ -40,6 +40,8 @@ import { useLightsLayoutRig } from './LightsLayout/useLightsLayoutRig'
 import { useLightsLayoutActiveConfigSync } from './LightsLayout/useLightsLayoutActiveConfigSync'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../hooks/useConfirm'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('LightsLayout')
 
 /**
  * Handles the light layout and channel configuration.
@@ -360,7 +362,7 @@ const LightsLayout = () => {
 
   const handleSaveChanges = async () => {
     if (!activeRigId) {
-      console.error('No rig selected')
+      log.error('No rig selected')
       return
     }
 
@@ -419,7 +421,7 @@ const LightsLayout = () => {
       setShowSuccessMessage(true)
       setTimeout(() => setShowSuccessMessage(false), 3000)
     } catch (error) {
-      console.error('Failed to save rig:', error)
+      log.error('Failed to save rig:', error)
       showToast('Failed to save rig.', 'error', 5000)
     }
   }

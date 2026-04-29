@@ -17,6 +17,8 @@ import {
 } from '../helpers/dmxHelpers'
 import { SenderManager } from './SenderManager'
 import { LightStateManager } from './sequencer/LightStateManager'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('DmxPublisher')
 
 /**
  * Prepares DMX data to be sent to individual lights by
@@ -77,7 +79,7 @@ export class DmxPublisher {
       try {
         this._sender.send(this._mergedBuffer)
       } catch (error) {
-        console.error('Failed to send manual DMX data:', error)
+        log.error('Failed to send manual DMX data:', error)
       }
     }
   }
@@ -204,7 +206,7 @@ export class DmxPublisher {
         try {
           dmxChannelData = castToChannelType(dmxLight.fixture, channelsInput)
         } catch (error) {
-          console.error(`Error casting channels for Light ID: ${lightId} - ${error}`)
+          log.error(`Error casting channels for Light ID: ${lightId} - ${error}`)
           continue
         }
 
@@ -252,7 +254,7 @@ export class DmxPublisher {
       try {
         this._sender.send(this._mergedBuffer)
       } catch (error) {
-        console.error('Failed to send DMX data:', error)
+        log.error('Failed to send DMX data:', error)
       }
     }
   }
@@ -267,15 +269,15 @@ export class DmxPublisher {
       if (this._sender) {
         try {
           this._sender.send(this._immediateBlackoutData)
-          console.log('DmxPublisher sent final blackout signal')
+          log.info('DmxPublisher sent final blackout signal')
         } catch (err) {
-          console.error('Error sending final blackout signal:', err)
+          log.error('Error sending final blackout signal:', err)
         }
       }
 
-      console.log('DmxPublisher has been successfully shut down.')
+      log.info('DmxPublisher has been successfully shut down.')
     } catch (error) {
-      console.error('Error during DmxPublisher shutdown:', error)
+      log.error('Error during DmxPublisher shutdown:', error)
       throw error
     }
   }

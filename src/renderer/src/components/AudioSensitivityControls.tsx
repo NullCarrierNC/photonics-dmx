@@ -3,6 +3,8 @@ import type { AudioConfig } from '../../../shared/ipcTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAudioConfig, saveAudioConfig } from '../ipcApi'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioSensitivityControls')
 
 interface AudioSensitivityControlsProps {
   /** Omit long helper copy (e.g. DMX Preview quick controls). */
@@ -28,7 +30,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
         setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
         setStrobeProbability(config?.strobeProbability ?? 100)
       } catch (error) {
-        console.error('Failed to load audio sensitivity:', error)
+        log.error('Failed to load audio sensitivity:', error)
       } finally {
         setIsLoading(false)
       }
@@ -60,13 +62,13 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
       setIsSaving(true)
       const result = await saveAudioConfig({ sensitivity: newValue })
       if (!result.success) {
-        console.error('Failed to save audio sensitivity:', result.error)
+        log.error('Failed to save audio sensitivity:', result.error)
         // Revert on failure
         const config = await getAudioConfig()
         setSensitivity(config?.sensitivity ?? 2.5)
       }
     } catch (error) {
-      console.error('Failed to save audio sensitivity:', error)
+      log.error('Failed to save audio sensitivity:', error)
       // Revert on failure
       const config = await getAudioConfig()
       setSensitivity(config?.sensitivity ?? 2.5)
@@ -94,13 +96,13 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
       setIsSaving(true)
       const result = await saveAudioConfig({ noiseFloor: newValue })
       if (!result.success) {
-        console.error('Failed to save noise floor:', result.error)
+        log.error('Failed to save noise floor:', result.error)
         // Revert on failure
         const config = await getAudioConfig()
         setNoiseFloor(config?.noiseFloor ?? 60)
       }
     } catch (error) {
-      console.error('Failed to save noise floor:', error)
+      log.error('Failed to save noise floor:', error)
       // Revert on failure
       const config = await getAudioConfig()
       setNoiseFloor(config?.noiseFloor ?? 60)
@@ -128,14 +130,14 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
       setIsSaving(true)
       const result = await saveAudioConfig(updates)
       if (!result.success) {
-        console.error('Failed to save strobe settings:', result.error)
+        log.error('Failed to save strobe settings:', result.error)
         const config = await getAudioConfig()
         setStrobeEnabled(config?.strobeEnabled ?? false)
         setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
         setStrobeProbability(config?.strobeProbability ?? 100)
       }
     } catch (error) {
-      console.error('Failed to save strobe settings:', error)
+      log.error('Failed to save strobe settings:', error)
       const config = await getAudioConfig()
       setStrobeEnabled(config?.strobeEnabled ?? false)
       setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)

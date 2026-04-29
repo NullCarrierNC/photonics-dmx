@@ -19,6 +19,8 @@ import { TransitionEngine } from './TransitionEngine'
 import { MotionPatternEngine } from './MotionPatternEngine'
 import { Clock } from './Clock'
 import { performance } from 'perf_hooks'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('Sequencer')
 
 /**
  * @class Sequencer
@@ -432,7 +434,7 @@ export class Sequencer implements ILightingController {
    * Shuts down the lighting coordinator and all its components
    */
   public shutdown(): void {
-    console.log('PhotonicsSequencer shutdown: starting')
+    log.info('PhotonicsSequencer shutdown: starting')
 
     try {
       // Stop the clock
@@ -448,9 +450,9 @@ export class Sequencer implements ILightingController {
       // Clean up other resources
       this.eventScheduler.destroy()
 
-      console.log('PhotonicsSequencer shutdown: completed')
+      log.info('PhotonicsSequencer shutdown: completed')
     } catch (error) {
-      console.error('Error during PhotonicsSequencer shutdown:', error)
+      log.error('Error during PhotonicsSequencer shutdown:', error)
     }
   }
 }

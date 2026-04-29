@@ -14,6 +14,8 @@ import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { INetCue } from '../../photonics-dmx/cues/interfaces/INetCue'
 import { IAudioCue } from '../../photonics-dmx/cues/interfaces/IAudioCue'
 import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('simulation-handlers')
 
 /** YARG motion cue started from Cue Simulation; stopped explicitly or replaced by another start. */
 let activeSimulatedYargMotionCue: INetCue | null = null
@@ -83,7 +85,7 @@ export function setupSimulationHandlers(
       const registry = AudioCueRegistry.getInstance()
       return registry.getGroupSummaries()
     } catch (error) {
-      console.error('Error getting audio cue groups:', error)
+      log.error('Error getting audio cue groups:', error)
       return []
     }
   })
@@ -95,7 +97,7 @@ export function setupSimulationHandlers(
       if (!targetGroupId) return []
       return registry.getCueDetails(targetGroupId)
     } catch (error) {
-      console.error('Error getting available audio cues:', error)
+      log.error('Error getting available audio cues:', error)
       return []
     }
   })
@@ -104,16 +106,16 @@ export function setupSimulationHandlers(
     try {
       const registry = YargCueRegistry.getInstance()
       const targetGroupId = groupId || 'default'
-      console.log(`Getting cues for group: ${targetGroupId}`)
+      log.info(`Getting cues for group: ${targetGroupId}`)
       const group = registry.getGroup(targetGroupId)
       if (!group) {
-        console.error(`Group not found: ${targetGroupId}`)
+        log.error(`Group not found: ${targetGroupId}`)
         return []
       }
       const availableCueTypes = Array.from(group.cues.keys())
-      console.log(`Found ${availableCueTypes.length} cue types in group ${targetGroupId}`)
+      log.info(`Found ${availableCueTypes.length} cue types in group ${targetGroupId}`)
       if (availableCueTypes.length === 0) {
-        console.error(`No cue types found in group: ${targetGroupId}`)
+        log.error(`No cue types found in group: ${targetGroupId}`)
         return []
       }
       return availableCueTypes.map((cueType) => {
@@ -128,7 +130,7 @@ export function setupSimulationHandlers(
         }
       })
     } catch (error) {
-      console.error('Error getting available cues:', error)
+      log.error('Error getting available cues:', error)
       return []
     }
   })
@@ -145,18 +147,18 @@ export function setupSimulationHandlers(
       },
     ) => {
       const { effectId, venueSize, bpm, cueGroup } = data ?? {}
-      console.log(
+      log.info(
         `IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}, cueGroup: ${cueGroup ?? 'none'}`,
       )
       try {
         if (!controllerManager.getIsInitialized()) {
-          console.log('System not initialized, initializing now before testing effect')
+          log.info('System not initialized, initializing now before testing effect')
           await controllerManager.init()
         }
         controllerManager.startTestEffect(effectId, venueSize, bpm, cueGroup)
         return { success: true }
       } catch (error) {
-        console.error('Error starting test effect:', error)
+        log.error('Error starting test effect:', error)
         return ipcError(error)
       }
     },
@@ -167,7 +169,7 @@ export function setupSimulationHandlers(
       await controllerManager.stopTestEffect()
       return true
     } catch (error) {
-      console.error('Error stopping test effect:', error)
+      log.error('Error stopping test effect:', error)
       return false
     }
   })
@@ -209,7 +211,7 @@ export function setupSimulationHandlers(
             try {
               await cueHandler.handleCue(cueType, mockCueData)
             } catch (error) {
-              console.error('Error handling cue in simulate beat:', error)
+              log.error('Error handling cue in simulate beat:', error)
             }
           }
         }
@@ -259,7 +261,7 @@ export function setupSimulationHandlers(
             try {
               await cueHandler.handleCue(cueType, mockCueData)
             } catch (error) {
-              console.error('Error handling cue in simulate keyframe:', error)
+              log.error('Error handling cue in simulate keyframe:', error)
             }
           }
         }
@@ -309,7 +311,7 @@ export function setupSimulationHandlers(
             try {
               await cueHandler.handleCue(cueType, mockCueData)
             } catch (error) {
-              console.error('Error handling cue in simulate measure:', error)
+              log.error('Error handling cue in simulate measure:', error)
             }
           }
         }
@@ -393,7 +395,7 @@ export function setupSimulationHandlers(
               break
             }
             default:
-              console.warn(`Unknown instrument: ${instrument}`)
+              log.warn(`Unknown instrument: ${instrument}`)
               return { success: false, error: `Unknown instrument: ${instrument}` }
           }
 
@@ -411,7 +413,7 @@ export function setupSimulationHandlers(
         }
         return { success: false, error: 'No cue handler available' }
       } catch (error) {
-        console.error('Error simulating instrument note:', error)
+        log.error('Error simulating instrument note:', error)
         return ipcError(error)
       }
     },
@@ -464,7 +466,7 @@ export function setupSimulationHandlers(
         })
         return { success: true as const }
       } catch (error) {
-        console.error('Error starting YARG motion cue simulation:', error)
+        log.error('Error starting YARG motion cue simulation:', error)
         return ipcError(error)
       }
     },
@@ -508,7 +510,7 @@ export function setupSimulationHandlers(
         activeSimulatedAudioMotionCue = cue
         return { success: true as const }
       } catch (error) {
-        console.error('Error starting audio motion cue simulation:', error)
+        log.error('Error starting audio motion cue simulation:', error)
         return ipcError(error)
       }
     },
@@ -527,7 +529,7 @@ export function setupSimulationHandlers(
       }
       return { success: true as const }
     } catch (error) {
-      console.error('Error stopping motion cue simulation:', error)
+      log.error('Error stopping motion cue simulation:', error)
       return ipcError(error)
     }
   })
@@ -541,7 +543,7 @@ export function setupSimulationHandlers(
         senderStatus: controllerManager.getSenderStatus(),
       }
     } catch (error) {
-      console.error('Error getting system status:', error)
+      log.error('Error getting system status:', error)
       return ipcError(error)
     }
   })

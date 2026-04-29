@@ -5,6 +5,8 @@ import type { ControllerManager } from './controllers/ControllerManager'
 import { RENDERER_RECEIVE } from '../shared/ipcChannels'
 import type { AudioLightingData } from '../photonics-dmx/listeners/Audio/AudioTypes'
 import { denyWebContentsWillNavigate } from './rendererSessionSecurity'
+import { createLogger } from '../shared/logger'
+const log = createLogger('WindowManager')
 
 export class WindowManager {
   private mainWindow: BrowserWindow | null = null
@@ -47,7 +49,7 @@ export class WindowManager {
     try {
       await this.controllerManager.getConfig().updatePreferences({ [preferenceKey]: windowState })
     } catch (error) {
-      console.error('Failed to save window state:', error)
+      log.error('Failed to save window state:', error)
     }
   }
 

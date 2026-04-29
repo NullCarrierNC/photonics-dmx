@@ -18,6 +18,8 @@ import { UninitializedVariableError } from './valueResolver'
 import { VariableValue } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { findBestMatchingBandId, getBandEnergy } from '../../../listeners/Audio/bandEnergy'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('BaseAudioNodeCue')
 
 interface AudioEventState {
   previousValue: number
@@ -248,7 +250,7 @@ export abstract class BaseAudioNodeCue {
               `${event.id}: ${error.message}`,
             )
           }
-          console.error(`Error in findFirstAction for event ${event.id}:`, error)
+          log.error(`Error in findFirstAction for event ${event.id}:`, error)
           continue
         }
         if (!actionStep) {
@@ -567,7 +569,7 @@ export abstract class BaseAudioNodeCue {
       case 'variable': {
         if (logicNode.mode !== 'get') {
           if (logicNode.valueType === 'light-array') {
-            console.warn(
+            log.warn(
               'Cannot set light-array variable from variable node, use config-data node instead',
             )
             return edges.map((edge) => edge.to)

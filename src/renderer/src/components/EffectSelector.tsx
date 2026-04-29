@@ -3,6 +3,8 @@ import { EffectSelector } from 'src/photonics-dmx/types'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAvailableCues } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('EffectSelector')
 
 interface EffectsDropdownProps {
   groupId: string
@@ -52,7 +54,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
         setSelectedEffect(null)
       }
     } catch (error) {
-      console.error('Error fetching effects:', error)
+      log.error('Error fetching effects:', error)
       setEffects([])
       setSelectedEffect(null)
     } finally {

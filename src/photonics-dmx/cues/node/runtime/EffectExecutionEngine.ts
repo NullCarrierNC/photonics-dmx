@@ -49,6 +49,8 @@ import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluat
 import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { sendToAllWindows } from '../../../../main/utils/windowUtils'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('EffectExecutionEngine')
 
 type ChainStep = {
   action: ActionNode
@@ -195,7 +197,7 @@ export class EffectExecutionEngine {
     // Get the effect listener (entry point)
     const effectListener = Array.from(this.compiledEffect.effectListenerMap.values())[0]
     if (!effectListener) {
-      console.warn('No effect listener found in effect')
+      log.warn('No effect listener found in effect')
       return
     }
 
@@ -337,7 +339,7 @@ export class EffectExecutionEngine {
       return
     }
 
-    console.warn(`Unknown node type for id: ${nodeId}`)
+    log.warn(`Unknown node type for id: ${nodeId}`)
   }
 
   /**
@@ -366,7 +368,7 @@ export class EffectExecutionEngine {
     const lights = ActionEffectFactory.resolveLights(this.lightManager, action.target, getVar)
 
     if (!lights || lights.length === 0) {
-      console.warn(`No lights resolved for action ${action.id}, skipping`)
+      log.warn(`No lights resolved for action ${action.id}, skipping`)
       this.emitNodeExecution('deactivated', action.id)
       this.continueToNextNodes(action.id, context)
       return
@@ -374,7 +376,7 @@ export class EffectExecutionEngine {
 
     if (action.effectType === 'set-position') {
       if (!action.position) {
-        console.warn(`set-position action ${action.id} is missing position`)
+        log.warn(`set-position action ${action.id} is missing position`)
         this.emitNodeExecution('deactivated', action.id)
         this.continueToNextNodes(action.id, context)
         return
@@ -417,7 +419,7 @@ export class EffectExecutionEngine {
           resolvedLayer,
         })
         if (!effect) {
-          console.warn(`Failed to create set-position effect for action ${action.id}`)
+          log.warn(`Failed to create set-position effect for action ${action.id}`)
           this.emitNodeExecution('deactivated', action.id)
           this.continueToNextNodes(action.id, context)
           return
@@ -465,7 +467,7 @@ export class EffectExecutionEngine {
 
     if (action.effectType === 'motion-pattern') {
       if (!action.motionPattern) {
-        console.warn(`motion-pattern action ${action.id} is missing motionPattern`)
+        log.warn(`motion-pattern action ${action.id} is missing motionPattern`)
         this.emitNodeExecution('deactivated', action.id)
         this.continueToNextNodes(action.id, context)
         return
@@ -479,7 +481,7 @@ export class EffectExecutionEngine {
         !Number.isFinite(resolvedMotion.sizeDeg) ||
         resolvedMotion.sizeDeg <= 0
       ) {
-        console.warn(
+        log.warn(
           `motion-pattern action ${action.id}: speed (Hz) and size (deg) must be finite and positive`,
         )
         this.emitNodeExecution('deactivated', action.id)
@@ -526,7 +528,7 @@ export class EffectExecutionEngine {
     }
 
     if (!action.color) {
-      console.warn(`Action ${action.id} (${action.effectType}) is missing color`)
+      log.warn(`Action ${action.id} (${action.effectType}) is missing color`)
       this.emitNodeExecution('deactivated', action.id)
       this.continueToNextNodes(action.id, context)
       return
@@ -571,7 +573,7 @@ export class EffectExecutionEngine {
       })
 
       if (!effect) {
-        console.warn(`Failed to create effect for action ${action.id}`)
+        log.warn(`Failed to create effect for action ${action.id}`)
         this.emitNodeExecution('deactivated', action.id)
         this.continueToNextNodes(action.id, context)
         return
@@ -850,7 +852,7 @@ export class EffectExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${logic.id}: ${msg}`)
-      console.error(`Error executing logic node ${logic.id}:`, error)
+      log.error(`Error executing logic node ${logic.id}:`, error)
       this.emitNodeExecution('deactivated', logic.id)
     }
   }
@@ -904,7 +906,7 @@ export class EffectExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${delayNode.id}: ${msg}`)
-      console.error(`Error executing delay node ${delayNode.id}:`, error)
+      log.error(`Error executing delay node ${delayNode.id}:`, error)
       this.emitNodeExecution('deactivated', delayNode.id)
     }
   }
@@ -970,7 +972,7 @@ export class EffectExecutionEngine {
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
         this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
-        console.error(`Error executing node ${nodeId}:`, error)
+        log.error(`Error executing node ${nodeId}:`, error)
       }
     }
     context.endBatch()

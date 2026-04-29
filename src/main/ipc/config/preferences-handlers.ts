@@ -4,6 +4,8 @@ import { setGlobalBrightnessConfig } from '../../../photonics-dmx/helpers/dmxHel
 import { ipcError } from '../ipcResult'
 import { CONFIG } from '../../../shared/ipcChannels'
 import { validatePreferencesPayload } from '../inputValidation'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('preferences-handlers')
 
 export function registerPreferencesDiagnosticsConfigHandlers(
   ipcMain: IpcMain,
@@ -42,7 +44,7 @@ export function registerPreferencesDiagnosticsConfigHandlers(
 
       return { success: true }
     } catch (error) {
-      console.error('Error saving preferences:', error)
+      log.error('Error saving preferences:', error)
       return ipcError(error)
     }
   })

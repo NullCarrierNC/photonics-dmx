@@ -15,6 +15,8 @@ import { LightIcon } from './LightIcon'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
 import { BsLightningFill } from 'react-icons/bs'
 import MovingHeadCalibrationWizard from './MovingHeadCalibrationWizard'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('LightChannelsConfig')
 
 interface LightChannelsConfigProps {
   light: DmxLight | null
@@ -80,7 +82,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
 
       if (!fixtureTemplate) {
-        console.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
+        log.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
         // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when fixture not found
         setLocalChannels(null)
         setLocalConfig(null)
@@ -136,7 +138,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       // Find the fixture template to get the original offsets
       const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
       if (!fixtureTemplate) {
-        console.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
+        log.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
         return
       }
 

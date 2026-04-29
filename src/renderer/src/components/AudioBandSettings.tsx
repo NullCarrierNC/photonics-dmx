@@ -12,6 +12,9 @@ import {
   AUDIO_BAND_GAIN_MIN,
   type AudioBandDefinition,
 } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('AudioBandSettings')
 
 const PRESET_OPTIONS = AUDIO_BAND_PRESETS.map((p) => ({ id: p.id, label: p.label }))
 
@@ -34,7 +37,7 @@ const AudioBandSettings: React.FC = () => {
           setBands(config.bands.map((b) => ({ ...b })))
         }
       } catch (error) {
-        console.error('Failed to load audio band settings:', error)
+        log.error('Failed to load audio band settings:', error)
       } finally {
         setIsLoading(false)
       }
@@ -50,14 +53,14 @@ const AudioBandSettings: React.FC = () => {
       setIsSaving(true)
       const result = await saveAudioConfig({ bands: updatedBands })
       if (!result.success) {
-        console.error('Failed to save audio band settings:', result.error)
+        log.error('Failed to save audio band settings:', result.error)
         const config = await getAudioConfig()
         if (config?.bands && isValidEightBandList(config.bands)) {
           setBands(config.bands.map((b) => ({ ...b })))
         }
       }
     } catch (error) {
-      console.error('Failed to save audio band settings:', error)
+      log.error('Failed to save audio band settings:', error)
       const config = await getAudioConfig()
       if (config?.bands && isValidEightBandList(config.bands)) {
         setBands(config.bands.map((b) => ({ ...b })))

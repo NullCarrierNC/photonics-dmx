@@ -29,6 +29,9 @@ import {
   hasStraySenderFlatKeys,
   LEGACY_FLAT_SENDER_PREF_KEYS,
 } from './preferencesMigration'
+import { createLogger } from '../../shared/logger'
+
+const log = createLogger('ConfigurationManager')
 
 export type { AppPreferences } from './configurationDefaults'
 export type { CueDomain, CueDomainPrefs } from './cueDomainTypes'
@@ -119,8 +122,8 @@ export class ConfigurationManager {
       const migratedData: UserLightsConfig = { lights: currentData }
       this.userLights
         .update(migratedData)
-        .catch((err) => console.error('[Photonics Config] Failed to persist migrated lights:', err))
-      console.log(`[Photonics Config] Migrated legacy lights format to new format`)
+        .catch((err) => log.error('[Photonics Config] Failed to persist migrated lights:', err))
+      log.info(`[Photonics Config] Migrated legacy lights format to new format`)
     }
   }
 
@@ -142,9 +145,7 @@ export class ConfigurationManager {
     const next = applyLegacySenderFlatToNested(full, base)
     this.preferences
       .update(next)
-      .catch((err) =>
-        console.error('[Photonics Config] Failed to persist sender key cleanup:', err),
-      )
+      .catch((err) => log.error('[Photonics Config] Failed to persist sender key cleanup:', err))
   }
 
   /**
@@ -186,10 +187,8 @@ export class ConfigurationManager {
 
       this.dmxRigs
         .update({ ...currentRigs, rigs: [defaultRig] })
-        .catch((err) =>
-          console.error('[Photonics Config] Failed to persist migrated DMX rigs:', err),
-        )
-      console.log('[Photonics Config] Migrated existing layout to default DMX rig')
+        .catch((err) => log.error('[Photonics Config] Failed to persist migrated DMX rigs:', err))
+      log.info('[Photonics Config] Migrated existing layout to default DMX rig')
     }
   }
 
@@ -452,9 +451,7 @@ export class ConfigurationManager {
     if (changed) {
       void this.dmxRigs
         .update(migrated)
-        .catch((err) =>
-          console.error('[Photonics Config] Failed to persist migrated DMX rigs:', err),
-        )
+        .catch((err) => log.error('[Photonics Config] Failed to persist migrated DMX rigs:', err))
     }
     return migrated.rigs
   }

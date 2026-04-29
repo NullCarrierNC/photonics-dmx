@@ -3,6 +3,8 @@ import { EffectTransition, normalizeFixtureConfig, RGBIO } from '../../types'
 import { LightTransitionController } from './LightTransitionController'
 import { FrameContext, LightEffectState, ILayerManager, ITransitionEngine } from './interfaces'
 import { IEffectManager } from './interfaces'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('TransitionEngine')
 
 /**
  * @class TransitionEngine
@@ -164,9 +166,7 @@ export class TransitionEngine implements ITransitionEngine {
             this.handleWaitingUntil(lightEffect, currentTransition, currentTime)
             break
           default:
-            console.warn(
-              `Unknown state "${lightEffect.state}" for effect "${lightEffect.effect.id}".`,
-            )
+            log.warn(`Unknown state "${lightEffect.state}" for effect "${lightEffect.effect.id}".`)
         }
       })
     })
@@ -193,7 +193,7 @@ export class TransitionEngine implements ITransitionEngine {
       } else if (!newEffectStarted) {
         const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId)
         if (nextQueuedEffect) {
-          console.warn(
+          log.warn(
             `Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`,
           )
           this.layerManager.removeQueuedEffect(layer, lightId)

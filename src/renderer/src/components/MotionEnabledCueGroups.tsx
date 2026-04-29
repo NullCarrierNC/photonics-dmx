@@ -14,6 +14,9 @@ import {
   getDisabledAudioMotionCues,
   setDisabledAudioMotionCues,
 } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('MotionEnabledCueGroups')
 
 interface MotionCueInfo {
   id: string
@@ -95,7 +98,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
       setEnabledGroupIds(enabled)
       setDisabledByGroup(disabled)
     } catch (error) {
-      console.error('Failed to fetch motion cue groups:', error)
+      log.error('Failed to fetch motion cue groups:', error)
     } finally {
       setLoading(false)
     }
@@ -114,7 +117,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
         ? await setEnabledYargMotionCueGroups(nextEnabled)
         : await setEnabledAudioMotionCueGroups(nextEnabled)
     if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
-      console.error('Failed to save enabled motion cue groups')
+      log.error('Failed to save enabled motion cue groups')
       return
     }
     const disabledResult =
@@ -122,7 +125,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
         ? await setDisabledYargMotionCues(nextDisabled)
         : await setDisabledAudioMotionCues(nextDisabled)
     if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
-      console.error('Failed to save disabled motion cues')
+      log.error('Failed to save disabled motion cues')
       return
     }
     setEnabledGroupIds(nextEnabled)
@@ -191,7 +194,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
         )
         return
       } catch (error) {
-        console.error('Error fetching motion cue details:', error)
+        log.error('Error fetching motion cue details:', error)
       }
     }
 
@@ -213,7 +216,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
           prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
         )
       } catch (e) {
-        console.error('Failed to load motion cues for toggle:', e)
+        log.error('Failed to load motion cues for toggle:', e)
         return
       }
     }

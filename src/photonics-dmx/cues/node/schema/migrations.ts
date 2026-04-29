@@ -1,3 +1,6 @@
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('migrations')
+
 /**
  * Converts legacy `timing.easing` string to ValueSource for backward compatibility.
  */
@@ -129,7 +132,7 @@ function normalizeLegacyAudioBeatAliases(value: unknown): void {
   }
 
   if (changed) {
-    console.warn(
+    log.warn(
       `[audio cue] '${groupId}': deprecated 'audio-beat' was renamed to 'beat' (entry events and/or action wait timing). Re-save in the editor to clear this warning.`,
     )
   }

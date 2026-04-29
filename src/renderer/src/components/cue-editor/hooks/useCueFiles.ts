@@ -30,6 +30,8 @@ import { useCueFileIO } from './useCueFileIO'
 import { useCueCrud } from './useCueCrud'
 import { useCueMetadata } from './useCueMetadata'
 import { isCueTypeSelectable } from '../lib/cueUtils'
+import { createLogger } from '../../../../../shared/logger'
+const log = createLogger('useCueFiles')
 
 type UseCueFilesParams = {
   loadCueIntoFlow: (
@@ -83,7 +85,7 @@ const useCueFiles = ({
       const summary = await listNodeCueFiles()
       setFiles([...summary.yarg, ...summary.audio])
     } catch (error) {
-      console.error('Failed to list node cue files', error)
+      log.error('Failed to list node cue files', error)
     }
   }, [])
 
@@ -92,7 +94,7 @@ const useCueFiles = ({
       const summary = await listEffectFiles()
       setEffectFiles([...summary.yarg, ...summary.audio])
     } catch (error) {
-      console.error('Failed to list effect files', error)
+      log.error('Failed to list effect files', error)
     }
   }, [])
 

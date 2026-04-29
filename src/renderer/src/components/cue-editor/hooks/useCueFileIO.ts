@@ -33,6 +33,9 @@ import {
   validateNodeCue,
   validateEffect,
 } from '../../../ipcApi'
+import { createLogger } from '../../../../../shared/logger'
+
+const log = createLogger('useCueFileIO')
 
 export type UseCueFileIOParams = {
   editorDoc: EditorDocument | null
@@ -119,7 +122,7 @@ export function useCueFileIO({
         setLastFilePathForMode(modeKey, fileSummary.path)
         setLastActiveMode(modeKey)
       } catch (error) {
-        console.error('Failed to open node cue file', error)
+        log.error('Failed to open node cue file', error)
       }
     },
     [
@@ -154,7 +157,7 @@ export function useCueFileIO({
         setLastFilePathForMode(modeKey, fileSummary.path)
         setLastActiveMode(modeKey)
       } catch (error) {
-        console.error('Failed to open effect file', error)
+        log.error('Failed to open effect file', error)
       }
     },
     [
@@ -198,7 +201,7 @@ export function useCueFileIO({
         onSaveSuccess?.(`Effect saved: ${filename}`)
         return true
       } catch (error) {
-        console.error('Failed to save effect file', error)
+        log.error('Failed to save effect file', error)
         onSaveError?.(formatSaveError(error))
         return false
       }
@@ -227,7 +230,7 @@ export function useCueFileIO({
         onSaveSuccess?.(`Cue saved: ${filename}`)
         return true
       } catch (error) {
-        console.error('Failed to save node cue file', error)
+        log.error('Failed to save node cue file', error)
         onSaveError?.(formatSaveError(error))
         return false
       }
@@ -256,7 +259,7 @@ export function useCueFileIO({
         await deleteNodeCueFile(editorDoc.path)
       }
     } catch (error) {
-      console.error('Failed to delete file', error)
+      log.error('Failed to delete file', error)
       onSaveError?.(`Failed to delete: ${error instanceof Error ? error.message : String(error)}`)
       return
     }
@@ -369,7 +372,7 @@ export function useCueFileIO({
           loadCueIntoFlow(cueFile.cues.find((c) => c.id === cueId) ?? firstCue ?? null)
         }
       } catch (error) {
-        console.error('Failed to reload current file', error)
+        log.error('Failed to reload current file', error)
       }
     }
   }, [

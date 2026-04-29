@@ -7,6 +7,8 @@ import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
 import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { sendToAllWindows } from '../../main/utils/windowUtils'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('YargCueHandler')
 
 /**
  * YargCueHandler handles the cues called by the YARG network listener.
@@ -322,7 +324,7 @@ class YargCueHandler extends EventEmitter {
 
       await cue.execute(historicCueData, this._sequencer, this._lightManager)
     } else {
-      console.error(`No implementation found for cue: ${cueType}`)
+      log.error(`No implementation found for cue: ${cueType}`)
     }
 
     if (trackMode !== 'simulated') {
@@ -402,7 +404,7 @@ class YargCueHandler extends EventEmitter {
             await motionCue.execute(historicCueData, this._sequencer, this._lightManager)
           }
         } catch (error) {
-          console.error('Motion cue execution failed:', error)
+          log.error('Motion cue execution failed:', error)
           if (motionCue && this.currentMotionCue === motionCue) {
             this.currentMotionCue.onStop?.()
             this.currentMotionCue = null

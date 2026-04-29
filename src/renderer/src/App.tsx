@@ -45,6 +45,8 @@ import {
 } from './ipcApi'
 import { registerIpcListener } from './utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('App')
 
 /**
  * Main application component
@@ -89,7 +91,7 @@ export const App = (): JSX.Element => {
   // Handler for sender errors (non-network; network errors use SENDER_NETWORK_ERROR + toast)
   const handleSenderError = useCallback(
     (msg: string): void => {
-      console.error('Sender error:', msg)
+      log.error('Sender error:', msg)
       showToast(msg, 'error', 5000)
     },
     [showToast],
@@ -98,7 +100,7 @@ export const App = (): JSX.Element => {
   // Handler for YARG listener errors (protocol/datagram version mismatch, etc.)
   const handleYargError = useCallback(
     (msg: string): void => {
-      console.error('YARG error:', msg)
+      log.error('YARG error:', msg)
       showToast(`YARG: ${msg}`, 'error', 5000)
     },
     [showToast],
@@ -106,7 +108,7 @@ export const App = (): JSX.Element => {
 
   const handleNodeCueRuntimeError = useCallback(
     (msg: string): void => {
-      console.error('Node cue runtime error:', msg)
+      log.error('Node cue runtime error:', msg)
       showToast(msg, 'error', 5000)
     },
     [showToast],
@@ -149,7 +151,7 @@ export const App = (): JSX.Element => {
   // Handler for sender start failures
   const handleSenderStartFailure = useCallback(
     (data: { sender: string; error: string }): void => {
-      console.error(`Sender "${data.sender}" failed to start:`, data.error)
+      log.error(`Sender "${data.sender}" failed to start:`, data.error)
 
       // Update the UI state to reflect that the sender is not running
       switch (data.sender) {
@@ -169,7 +171,7 @@ export const App = (): JSX.Element => {
           setIpcEnabled(false)
           break
         default:
-          console.warn(`Unknown sender type in failure notification: ${data.sender}`)
+          log.warn(`Unknown sender type in failure notification: ${data.sender}`)
       }
 
       const senderName =
@@ -193,7 +195,7 @@ export const App = (): JSX.Element => {
   // Handler for sender network errors (invalid destinations, etc.)
   const handleSenderNetworkError = useCallback(
     (data: { sender: string; error: string; autoDisabled: boolean }): void => {
-      console.error(`Sender "${data.sender}" network error:`, data.error)
+      log.error(`Sender "${data.sender}" network error:`, data.error)
 
       // Update the UI state to reflect that the sender is not running
       switch (data.sender) {
@@ -210,7 +212,7 @@ export const App = (): JSX.Element => {
           setOpenDmxEnabled(false)
           break
         default:
-          console.warn(`Unknown sender type in network error notification: ${data.sender}`)
+          log.warn(`Unknown sender type in network error notification: ${data.sender}`)
       }
 
       // Show error toast message
@@ -231,13 +233,13 @@ export const App = (): JSX.Element => {
   // Handler for audio:enable from main process
   const handleAudioEnable = useCallback(
     async (config: AudioConfig): Promise<void> => {
-      console.log('Received audio:enable from main process', config)
+      log.info('Received audio:enable from main process', config)
 
       try {
         // Create AudioCaptureManager if it doesn't exist
         if (!audioCaptureManagerRef.current) {
           audioCaptureManagerRef.current = new AudioCaptureManager(config)
-          console.log('Created AudioCaptureManager')
+          log.info('Created AudioCaptureManager')
         } else {
           // Update config if manager already exists
           audioCaptureManagerRef.current.updateConfig(config)
@@ -245,9 +247,9 @@ export const App = (): JSX.Element => {
 
         // Start capturing audio
         await audioCaptureManagerRef.current.start(config.deviceId)
-        console.log('Audio capture started')
+        log.info('Audio capture started')
       } catch (error) {
-        console.error('Failed to start audio capture:', error)
+        log.error('Failed to start audio capture:', error)
         setIsSenderError(true)
         // Show full error message - extract message from Error objects or convert to string
         const errorMessage =
@@ -262,9 +264,9 @@ export const App = (): JSX.Element => {
         // Automatically disable audio in main process since it failed to start
         try {
           await setAudioEnabled(false)
-          console.log('Audio automatically disabled due to capture failure')
+          log.info('Audio automatically disabled due to capture failure')
         } catch (disableError) {
-          console.error('Failed to disable audio after capture failure:', disableError)
+          log.error('Failed to disable audio after capture failure:', disableError)
         }
       }
     },
@@ -273,23 +275,23 @@ export const App = (): JSX.Element => {
 
   // Handler for audio:disable from main process
   const handleAudioDisable = useCallback((): void => {
-    console.log('Received audio:disable from main process')
+    log.info('Received audio:disable from main process')
 
     if (audioCaptureManagerRef.current) {
       audioCaptureManagerRef.current.stop()
-      console.log('Audio capture stopped')
+      log.info('Audio capture stopped')
     }
   }, [])
 
   // Handler for audio:config-update from main process
   const handleAudioConfigUpdate = useCallback(
     (config: AudioConfig | undefined): void => {
-      console.log('Received audio:config-update from main process', config)
+      log.info('Received audio:config-update from main process', config)
 
       // Update AudioCaptureManager if it exists (only when config is defined; updateConfig expects Partial<AudioConfig>)
       if (config && audioCaptureManagerRef.current) {
         audioCaptureManagerRef.current.updateConfig(config)
-        console.log('AudioCaptureManager configuration updated')
+        log.info('AudioCaptureManager configuration updated')
       }
 
       if (!config) return
@@ -319,7 +321,7 @@ export const App = (): JSX.Element => {
           deviceId: prev.audioConfig?.deviceId,
         } as LightingPreferences['audioConfig'],
       }))
-      console.log('Lighting preferences updated with new audio config')
+      log.info('Lighting preferences updated with new audio config')
     },
     [setPrefs],
   )
@@ -335,7 +337,7 @@ export const App = (): JSX.Element => {
           }
         })
         .catch((err) => {
-          console.error('App: failed to sync sender status after restart', err)
+          log.error('App: failed to sync sender status after restart', err)
         })
     }
 
@@ -348,7 +350,7 @@ export const App = (): JSX.Element => {
     try {
       await savePrefs({ leftMenuCollapsed: newCollapsed })
     } catch (error) {
-      console.error('Failed to save left menu collapsed state:', error)
+      log.error('Failed to save left menu collapsed state:', error)
     }
   }
 
@@ -359,7 +361,7 @@ export const App = (): JSX.Element => {
         const data = await getLightLibrary()
         setLightLibrary(data || [])
       } catch (error) {
-        console.error('Failed to load light library:', error)
+        log.error('Failed to load light library:', error)
       }
     }
 
@@ -373,7 +375,7 @@ export const App = (): JSX.Element => {
         const data = await getMyLights()
         setMyLights(data || [])
       } catch (error) {
-        console.error('Failed to load my lights:', error)
+        log.error('Failed to load my lights:', error)
       }
     }
 
@@ -387,7 +389,7 @@ export const App = (): JSX.Element => {
         const data = await getLightLayout('myLayout.json')
         setActiveLightsConfig(data || null)
       } catch (error) {
-        console.error('Failed to load light layout:', error)
+        log.error('Failed to load light layout:', error)
       }
     }
 

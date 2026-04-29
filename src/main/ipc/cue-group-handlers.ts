@@ -3,6 +3,8 @@ import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegi
 import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('cue-group-handlers')
 
 /**
  * Set up YARG cue group registry IPC handlers (enabled groups, source group, consistency status).
@@ -33,13 +35,13 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       }
       const result = registry.enableGroup(groupId)
       if (result) {
-        console.log(`Enabled cue group: ${group.name}`)
+        log.info(`Enabled cue group: ${group.name}`)
         return { success: true }
       }
-      console.error(`Failed to enable group '${group.name}'.`)
+      log.error(`Failed to enable group '${group.name}'.`)
       return { success: false, error: `Failed to enable group '${group.name}'.` }
     } catch (error) {
-      console.error('Error enabling cue group:', error)
+      log.error('Error enabling cue group:', error)
       return ipcError(error)
     }
   })
@@ -53,16 +55,16 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       }
       const result = registry.disableGroup(groupId)
       if (result) {
-        console.log(`Disabled cue group: ${group.name}`)
+        log.info(`Disabled cue group: ${group.name}`)
         return { success: true }
       }
-      console.error(`Failed to disable group '${group.name}'. It may be the default group.`)
+      log.error(`Failed to disable group '${group.name}'. It may be the default group.`)
       return {
         success: false,
         error: `Failed to disable group '${group.name}'. It may be the default group.`,
       }
     } catch (error) {
-      console.error('Error disabling cue group:', error)
+      log.error('Error disabling cue group:', error)
       return ipcError(error)
     }
   })
@@ -84,7 +86,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       }
       return { success: false, error: `No state found for cue: ${cueType}` }
     } catch (error) {
-      console.error('Error getting cue source group:', error)
+      log.error('Error getting cue source group:', error)
       return ipcError(error)
     }
   })
@@ -95,7 +97,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       const status = registry.getConsistencyStatus()
       return { success: true, status }
     } catch (error) {
-      console.error('Error getting consistency status:', error)
+      log.error('Error getting consistency status:', error)
       return ipcError(error)
     }
   })

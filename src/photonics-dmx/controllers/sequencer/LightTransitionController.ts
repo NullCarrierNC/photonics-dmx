@@ -4,6 +4,8 @@ import { getEasingFunction } from '../../easing'
 
 import { LightStateManager } from './LightStateManager'
 import type { FrameContext } from './interfaces'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('LightTransitionController')
 
 /**
  * Holds data for each layer's transition on a specific light.
@@ -77,7 +79,7 @@ export class LightTransitionController {
     // CRITICAL: Reject new transitions if we're in the middle of clearing
     // This prevents race conditions where events trigger new transitions during cleanup
     if (this._clearingTransitions) {
-      console.warn(
+      log.warn(
         `[LTC] Rejected setTransition for light ${lightId} layer ${layer} - clearing in progress`,
       )
       return
@@ -531,7 +533,7 @@ export class LightTransitionController {
         this._transitionsByLight.delete(lightId)
       })
     } catch (error) {
-      console.error('Critical error in transition processing:', error)
+      log.error('Critical error in transition processing:', error)
       this.emergencyStateReset()
     }
 
@@ -752,7 +754,7 @@ export class LightTransitionController {
   public shutdown(): void {
     this._transitionsByLight.clear()
     this._currentLayerStates.clear()
-    console.log('LightTransitionController has been shut down.')
+    log.info('LightTransitionController has been shut down.')
   }
 
   /**
@@ -871,7 +873,7 @@ export class LightTransitionController {
         const corrected = this.validateAndCorrectLightState(lightId, state)
         if (JSON.stringify(state) !== JSON.stringify(corrected)) {
           const position = this.getLightPosition(lightId)
-          console.warn(
+          log.warn(
             `Corrected invalid state for light ${lightId} (position ${position}), layer ${layer}`,
           )
           layerMap.set(layer, corrected)
@@ -891,7 +893,7 @@ export class LightTransitionController {
       for (const [layer, transitionData] of layerMap.entries()) {
         if (currentTime - transitionData.startTime > maxTransitionAge) {
           const position = this.getLightPosition(lightId)
-          console.warn(
+          log.warn(
             `Removing orphaned transition for light ${lightId} (position ${position}), layer ${layer}`,
           )
           layerMap.delete(layer)
@@ -920,7 +922,7 @@ export class LightTransitionController {
    * Emergency state reset for critical error recovery
    */
   private emergencyStateReset(): void {
-    console.error('LightTransitionController: Performing emergency state reset')
+    log.error('LightTransitionController: Performing emergency state reset')
 
     // Force all lights to black state first
     const allLightIds = this._lightStateManager.getTrackedLightIds()

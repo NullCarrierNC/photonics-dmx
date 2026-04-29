@@ -10,6 +10,9 @@ import {
   validateAudioConfigPayload,
   validateAudioGameModePayload,
 } from '../inputValidation'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('audio-motion-handlers')
 
 export function registerAudioMotionConfigHandlers(
   ipcMain: IpcMain,
@@ -27,7 +30,7 @@ export function registerAudioMotionConfigHandlers(
         cues,
       }
     } catch (error) {
-      console.error('Error getting audio reactive cue state:', error)
+      log.error('Error getting audio reactive cue state:', error)
       return {
         ...ipcError(error),
         activeCueType: null,
@@ -45,7 +48,7 @@ export function registerAudioMotionConfigHandlers(
       }
       return { success: true }
     } catch (error) {
-      console.error('Error setting active audio cue:', error)
+      log.error('Error setting active audio cue:', error)
       return ipcError(error)
     }
   })
@@ -65,7 +68,7 @@ export function registerAudioMotionConfigHandlers(
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, validation.value)
       return { success: true, config: validation.value }
     } catch (error) {
-      console.error('Error setting audio game mode:', error)
+      log.error('Error setting audio game mode:', error)
       return { ...ipcError(error), success: false }
     }
   })
@@ -84,7 +87,7 @@ export function registerAudioMotionConfigHandlers(
       sendToAllWindows(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, enabled)
       return { success: true }
     } catch (error) {
-      console.error('Error setting motion enabled:', error)
+      log.error('Error setting motion enabled:', error)
       return { ...ipcError(error), success: false }
     }
   })
@@ -122,7 +125,7 @@ export function registerAudioMotionConfigHandlers(
       controllerManager.setActiveAudioMotionCueRef(null)
       return { success: true }
     } catch (error) {
-      console.error('Error setting active audio motion cue:', error)
+      log.error('Error setting active audio motion cue:', error)
       return { ...ipcError(error), success: false }
     }
   })
@@ -158,7 +161,7 @@ export function registerAudioMotionConfigHandlers(
       controllerManager.setActiveYargMotionCueRef(null)
       return { success: true }
     } catch (error) {
-      console.error('Error setting active YARG motion cue:', error)
+      log.error('Error setting active YARG motion cue:', error)
       return { ...ipcError(error), success: false }
     }
   })
@@ -184,11 +187,11 @@ export function registerAudioMotionConfigHandlers(
 
         registry.clearConsistencyTracking()
 
-        console.log('Updated stage kit priority to:', priority)
+        log.info('Updated stage kit priority to:', priority)
 
         return { success: true }
       } catch (error) {
-        console.error('Error setting stage kit priority:', error)
+        log.error('Error setting stage kit priority:', error)
         return ipcError(error)
       }
     },
@@ -199,7 +202,7 @@ export function registerAudioMotionConfigHandlers(
       const clockRate = controllerManager.getConfig().getPreference('clockRate')
       return { success: true, clockRate }
     } catch (error) {
-      console.error('Error getting clock rate:', error)
+      log.error('Error getting clock rate:', error)
       return ipcError(error)
     }
   })
@@ -217,11 +220,11 @@ export function registerAudioMotionConfigHandlers(
 
       await controllerManager.restartControllers()
 
-      console.log('Updated clock rate to:', clockRate, 'ms')
+      log.info('Updated clock rate to:', clockRate, 'ms')
 
       return { success: true }
     } catch (error) {
-      console.error('Error setting clock rate:', error)
+      log.error('Error setting clock rate:', error)
       return ipcError(error)
     }
   })
@@ -249,16 +252,16 @@ export function registerAudioMotionConfigHandlers(
       const updatedConfig = controllerManager.getConfig().getAudioConfig()
 
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, updatedConfig)
-      console.log('Sent audio:config-update to renderer')
+      log.info('Sent audio:config-update to renderer')
 
       if (controllerManager.getIsAudioEnabled()) {
         if (deviceChanged) {
-          console.log('Device changed, restarting audio capture...')
+          log.info('Device changed, restarting audio capture...')
           try {
             await controllerManager.disableAudio()
             await controllerManager.enableAudio()
           } catch (error) {
-            console.error('Failed to restart audio with new device:', error)
+            log.error('Failed to restart audio with new device:', error)
           }
         } else {
           controllerManager.updateAudioConfig(updatedConfig)
@@ -275,7 +278,7 @@ export function registerAudioMotionConfigHandlers(
 
       return { success: true }
     } catch (error) {
-      console.error('Error saving audio configuration:', error)
+      log.error('Error saving audio configuration:', error)
       return ipcError(error)
     }
   })
@@ -296,7 +299,7 @@ export function registerAudioMotionConfigHandlers(
 
       return { success: true }
     } catch (error) {
-      console.error('Error setting audio enabled state:', error)
+      log.error('Error setting audio enabled state:', error)
       return ipcError(error)
     }
   })

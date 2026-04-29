@@ -8,6 +8,9 @@ import {
   getDisabledAudioCues,
   setDisabledAudioCues,
 } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('AudioEnabledCueGroups')
 
 interface AudioCueInfo {
   id: string
@@ -74,7 +77,7 @@ const AudioEnabledCueGroups: React.FC = () => {
       setEnabledGroupIds(enabled)
       setDisabledByGroup(disabled)
     } catch (error) {
-      console.error('Failed to fetch audio cue groups:', error)
+      log.error('Failed to fetch audio cue groups:', error)
     } finally {
       setLoading(false)
     }
@@ -90,12 +93,12 @@ const AudioEnabledCueGroups: React.FC = () => {
   ) => {
     const enabledResult = await setEnabledAudioCueGroups(nextEnabled)
     if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
-      console.error('Failed to save enabled audio cue groups')
+      log.error('Failed to save enabled audio cue groups')
       return
     }
     const disabledResult = await setDisabledAudioCues(nextDisabled)
     if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
-      console.error('Failed to save disabled audio cues')
+      log.error('Failed to save disabled audio cues')
       return
     }
     setEnabledGroupIds(nextEnabled)
@@ -157,7 +160,7 @@ const AudioEnabledCueGroups: React.FC = () => {
         )
         return
       } catch (error) {
-        console.error('Error fetching audio cue details:', error)
+        log.error('Error fetching audio cue details:', error)
       }
     }
 
@@ -175,7 +178,7 @@ const AudioEnabledCueGroups: React.FC = () => {
           prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
         )
       } catch (e) {
-        console.error('Failed to load cues for toggle:', e)
+        log.error('Failed to load cues for toggle:', e)
         return
       }
     }

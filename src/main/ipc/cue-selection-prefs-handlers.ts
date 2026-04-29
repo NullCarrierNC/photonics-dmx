@@ -4,6 +4,8 @@ import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegi
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
 import { validateNumberInRange } from './inputValidation'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('cue-selection-prefs-handlers')
 
 /**
  * IPC handlers for cue selection preferences (consistency window, motion min-hold, group selection mode).
@@ -25,7 +27,7 @@ export function setupCueSelectionPrefsHandlers(
       registry.setCueConsistencyWindow(rounded)
       return { success: true, windowMs: rounded }
     } catch (error) {
-      console.error('Error setting cue consistency window:', error)
+      log.error('Error setting cue consistency window:', error)
       return ipcError(error)
     }
   })
@@ -35,7 +37,7 @@ export function setupCueSelectionPrefsHandlers(
       const windowMs = controllerManager.getConfig().getPreference('cueConsistencyWindow')
       return { success: true, windowMs }
     } catch (error) {
-      console.error('Error getting cue consistency window:', error)
+      log.error('Error getting cue consistency window:', error)
       return ipcError(error)
     }
   })
@@ -46,7 +48,7 @@ export function setupCueSelectionPrefsHandlers(
         controllerManager.getConfig().getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000
       return { success: true, minHoldMs }
     } catch (error) {
-      console.error('Error getting motion cue min hold:', error)
+      log.error('Error getting motion cue min hold:', error)
       return ipcError(error)
     }
   })
@@ -62,7 +64,7 @@ export function setupCueSelectionPrefsHandlers(
         controllerManager.getConfig().getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000
       return { success: true, minHoldMs }
     } catch (error) {
-      console.error('Error setting motion cue min hold:', error)
+      log.error('Error setting motion cue min hold:', error)
       return ipcError(error)
     }
   })
@@ -74,7 +76,7 @@ export function setupCueSelectionPrefsHandlers(
         100
       return { success: true, percent }
     } catch (error) {
-      console.error('Error getting motion cue probability percent:', error)
+      log.error('Error getting motion cue probability percent:', error)
       return ipcError(error)
     }
   })
@@ -91,7 +93,7 @@ export function setupCueSelectionPrefsHandlers(
         100
       return { success: true, percent: stored }
     } catch (error) {
-      console.error('Error setting motion cue probability percent:', error)
+      log.error('Error setting motion cue probability percent:', error)
       return ipcError(error)
     }
   })
@@ -103,7 +105,7 @@ export function setupCueSelectionPrefsHandlers(
         100
       return { success: true, percent }
     } catch (error) {
-      console.error('Error getting audio motion cue probability percent:', error)
+      log.error('Error getting audio motion cue probability percent:', error)
       return ipcError(error)
     }
   })
@@ -120,7 +122,7 @@ export function setupCueSelectionPrefsHandlers(
         100
       return { success: true, percent: stored }
     } catch (error) {
-      console.error('Error setting audio motion cue probability percent:', error)
+      log.error('Error setting audio motion cue probability percent:', error)
       return ipcError(error)
     }
   })
@@ -137,7 +139,7 @@ export function setupCueSelectionPrefsHandlers(
         registry.setCueGroupSelectionMode(mode)
         return { success: true, mode }
       } catch (error) {
-        console.error('Error setting cue group selection mode:', error)
+        log.error('Error setting cue group selection mode:', error)
         return ipcError(error)
       }
     },
@@ -148,7 +150,7 @@ export function setupCueSelectionPrefsHandlers(
       const mode = controllerManager.getConfig().getCueGroupSelectionMode()
       return { success: true, mode }
     } catch (error) {
-      console.error('Error getting cue group selection mode:', error)
+      log.error('Error getting cue group selection mode:', error)
       return ipcError(error)
     }
   })
