@@ -27,15 +27,13 @@ export interface ConsoleModeControllerDeps {
   pauseYarg: () => Promise<void>
   pauseRb3: () => Promise<void>
   pauseAudio: () => Promise<void>
-  restoreYarg: () => void
-  restoreRb3: () => Promise<void>
-  restoreAudio: () => Promise<void>
   refreshActiveRigs: () => void
   restartControllers: () => Promise<void>
 }
 
 /**
- * DMX console: pauses listeners and drives manual DMX, with rig and fixture property updates.
+ * DMX console: pauses network and audio listeners, then drives manual DMX and rig updates.
+ * Listeners are not restarted when the console closes; the user re-enables them from the UI.
  */
 export class ConsoleModeController {
   private consoleRestore: ConsoleListenerSnapshot | null = null
@@ -58,7 +56,7 @@ export class ConsoleModeController {
   }
 
   /**
-   * DMX Console: pause cue/audio listeners and take over DMX output with a manual buffer.
+   * DMX Console: pause network and audio listeners and take over DMX output with a manual buffer.
    */
   public async enableConsoleMode(
     rigId: string,
@@ -89,7 +87,7 @@ export class ConsoleModeController {
   }
 
   /**
-   * Resume normal cue-driven output and restore listeners that were active before the console.
+   * Clear manual console DMX. Paused listeners (YARG, RB3E, audio) stay off until the user turns them back on.
    */
   public async disableConsoleMode(): Promise<
     { success: true } | { success: false; error: string }
@@ -97,17 +95,8 @@ export class ConsoleModeController {
     if (this.consoleRestore === null) {
       return { success: true }
     }
-    const r = this.consoleRestore
     this.consoleRestore = null
     this.deps.getDmxPublisher()?.clearManualBuffer()
-    if (r.yarg) {
-      this.deps.restoreYarg()
-    } else if (r.rb3) {
-      await this.deps.restoreRb3()
-    }
-    if (r.audio) {
-      await this.deps.restoreAudio()
-    }
     return { success: true }
   }
 

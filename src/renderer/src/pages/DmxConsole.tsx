@@ -5,7 +5,6 @@ import {
   DmxLight,
   DmxRig,
   LightingConfiguration,
-  IpcSenderConfig,
   ConfigStrobeType,
   FixtureTypes,
 } from '../../../photonics-dmx/types'
@@ -16,10 +15,8 @@ import {
   disableConsole,
   sendConsoleDmx,
   setConsoleHome,
-  enableSender,
-  disableAllOutputSenders,
 } from '../ipcApi'
-import { previewRigIdAtom, resetOutputSenderToggleAtoms, resolveLastUsedRigId } from '../atoms'
+import { previewRigIdAtom, resolveLastUsedRigId } from '../atoms'
 import LightsDmxPreview from '../components/LightsDmxPreview'
 import { DmxRigSelectField } from '../components/DmxRigSelectField'
 import SacnToggle from '../components/SacnToggle'
@@ -158,19 +155,10 @@ const DmxConsole: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    if (selectedRigId) {
-      enableSender({ sender: 'ipc' } as IpcSenderConfig)
-    }
-  }, [selectedRigId])
-
-  useEffect(() => {
     return () => {
       if (consoleEnabledRef.current) {
         void disableConsole()
       }
-      void disableAllOutputSenders().then(({ disabled }) => {
-        resetOutputSenderToggleAtoms(disabled)
-      })
     }
   }, [])
 

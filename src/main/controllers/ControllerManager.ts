@@ -171,11 +171,6 @@ export class ControllerManager {
       pauseYarg: () => this.disableYarg(),
       pauseRb3: () => this.disableRb3(),
       pauseAudio: () => this.disableAudio(),
-      restoreYarg: () => {
-        this.enableYarg()
-      },
-      restoreRb3: () => this.enableRb3(),
-      restoreAudio: () => this.enableAudio(),
       refreshActiveRigs: () => this.refreshActiveRigs(),
       restartControllers: () => this.restartControllers(),
     })
