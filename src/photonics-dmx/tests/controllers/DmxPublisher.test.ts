@@ -236,6 +236,18 @@ describe('DmxPublisher', () => {
     })
   })
 
+  it('setManualBuffer with empty map sends full-universe blackout (512 channels at 0)', () => {
+    mockSenderManager.send.mockClear()
+    publisher.setManualBuffer({})
+    expect(mockSenderManager.send).toHaveBeenCalledTimes(1)
+    const [sent] = jest.mocked(mockSenderManager.send).mock.calls[0]
+    const buf = sent as Record<number, number>
+    expect(Object.keys(buf).length).toBe(512)
+    for (let ch = 1; ch <= 512; ch++) {
+      expect(buf[ch]).toBe(0)
+    }
+  })
+
   it('setManualBuffer sends raw buffer and publish is ignored until clearManualBuffer', () => {
     const config = createMockLightingConfig()
     publisher.updateActiveRigs([{ id: 'r1', name: 'R1', active: true, config }])

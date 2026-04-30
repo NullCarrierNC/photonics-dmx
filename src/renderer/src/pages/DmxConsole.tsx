@@ -362,7 +362,11 @@ const DmxConsole: React.FC = () => {
                     type="range"
                     min={0}
                     max={255}
-                    value={consoleBuffer[channelNumber] ?? 0}
+                    value={
+                      consoleEnabled
+                        ? consoleBuffer[channelNumber] ?? 0
+                        : dmxValues[channelNumber] ?? 0
+                    }
                     disabled={!consoleEnabled}
                     onChange={(e) => {
                       const v = parseInt(e.target.value, 10)
@@ -451,7 +455,7 @@ const DmxConsole: React.FC = () => {
           </button>
           {consoleEnabled && (
             <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
-              Game/Audio cue processing is paused while the console is active.
+              Game/Audio cue processing is disabled while the console is active.
             </p>
           )}
         </div>
