@@ -520,7 +520,6 @@ export class Rb3eNetworkListener extends EventEmitter {
 
     log.info(`RB3E_EVENT_STATE => ${gameState}`)
 
-    //TODO: Tie in game state to the rest of the system
     this.emit('rb3e:gameState', {
       gameState,
       platform: this.lastData?.cueData?.rb3Platform || 'Unknown',
