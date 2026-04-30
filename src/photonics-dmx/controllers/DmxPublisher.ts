@@ -75,12 +75,15 @@ export class DmxPublisher {
       }
       this._mergedBuffer[ch] = Math.max(0, Math.min(255, Math.round(v)))
     }
-    if (Object.keys(this._mergedBuffer).length > 0) {
-      try {
-        this._sender.send(this._mergedBuffer)
-      } catch (error) {
-        log.error('Failed to send manual DMX data:', error)
+    if (Object.keys(this._mergedBuffer).length === 0) {
+      for (let ch = 1; ch <= 512; ch++) {
+        this._mergedBuffer[ch] = this._immediateBlackoutData[ch]
       }
+    }
+    try {
+      this._sender.send(this._mergedBuffer)
+    } catch (error) {
+      log.error('Failed to send manual DMX data:', error)
     }
   }
 
