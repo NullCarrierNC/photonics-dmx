@@ -13,7 +13,7 @@ import {
   FiExternalLink,
 } from 'react-icons/fi'
 import { MdGraphicEq, MdTune } from 'react-icons/md'
-import { useAtom, useSetAtom } from 'jotai'
+import { useAtom } from 'jotai'
 import { Pages } from './../types'
 import { currentPageAtom, lightsLayoutHasUnsavedChangesAtom } from './../atoms'
 import { useConfirm } from '../hooks/useConfirm'
@@ -32,8 +32,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
   isCollapsed,
   onToggleCollapse,
 }) => {
-  const setCurrentPage = useSetAtom(currentPageAtom)
-  const [activeMenu, setActiveMenu] = useAtom(currentPageAtom)
+  const [activeMenu, setCurrentPage] = useAtom(currentPageAtom)
   const [lightsLayoutUnsaved] = useAtom(lightsLayoutHasUnsavedChangesAtom)
   const confirm = useConfirm()
 
@@ -47,7 +46,6 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
       })
       if (!leave) return
     }
-    setActiveMenu(page)
     setCurrentPage(page)
   }
 
