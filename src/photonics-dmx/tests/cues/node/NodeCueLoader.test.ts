@@ -21,6 +21,7 @@ import type {
   YargMotionNodeCueDefinition,
   YargNodeCueFile,
 } from '../../../cues/types/nodeCueTypes'
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 function yargMotionOnlyFile(): YargNodeCueFile {
   const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
@@ -121,6 +122,7 @@ describe('NodeCueLoader', () => {
     audioRegistry.reset()
 
     loader = new NodeCueLoader({
+      runtimeBroadcaster: noopRuntimeBroadcaster(),
       baseDir: tmpDir,
       yargRegistry,
       audioRegistry,

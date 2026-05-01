@@ -4,10 +4,6 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
-jest.mock('../../../../../main/utils/windowUtils', () => ({
-  sendToAllWindows: jest.fn(),
-}))
-
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import { YargMotionNodeCue } from '../../../../cues/node/runtime/YargMotionNodeCue'
 import { AudioMotionNodeCue } from '../../../../cues/node/runtime/AudioMotionNodeCue'

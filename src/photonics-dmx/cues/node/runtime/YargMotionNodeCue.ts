@@ -9,6 +9,8 @@ import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import { motionCueGraphPolicy } from './GraphExecutionPolicy'
 import type { YargMotionNodeCueDefinition } from '../../types/nodeCueTypes'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 /**
  * YARG motion node cue: event graph with position / motion-pattern actions; runs parallel to lighting cues.
@@ -22,6 +24,7 @@ export class YargMotionNodeCue implements INetCue {
   private readonly effectRegistry: EffectRegistry
   private readonly session: CueSession
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
+  private readonly runtimeBroadcaster: RuntimeBroadcaster
   private engine: GraphExecutionEngine | null = null
 
   constructor(
@@ -29,12 +32,14 @@ export class YargMotionNodeCue implements INetCue {
     compiledCue: CompiledYargCue,
     effectRegistry?: EffectRegistry,
     runtimeCallbacks?: NodeRuntimeCallbacks,
+    runtimeBroadcaster?: RuntimeBroadcaster,
   ) {
     this.groupId = groupId
     this.compiledCue = compiledCue
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
     this.session = new CueSession()
     this.runtimeCallbacks = runtimeCallbacks
+    this.runtimeBroadcaster = runtimeBroadcaster ?? noopRuntimeBroadcaster()
     const definition = compiledCue.definition as YargMotionNodeCueDefinition
     this.session.initializeVariables(definition.variables ?? [], compiledCue.groupVariables ?? [])
   }
@@ -75,6 +80,7 @@ export class YargMotionNodeCue implements INetCue {
         this.session,
         sequencer,
         lightManager,
+        this.runtimeBroadcaster,
         this.effectRegistry,
         definition.variables ?? [],
         this.runtimeCallbacks,

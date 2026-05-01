@@ -48,7 +48,7 @@ import {
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
-import { sendToAllWindows } from '../../../../main/utils/windowUtils'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('EffectExecutionEngine')
 
@@ -88,6 +88,7 @@ export class EffectExecutionEngine {
   /** When provided (e.g. by V2), use instead of reading/mutating the ref. */
   private readonly consumeInitialClearPolicy?: () => boolean
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
+  private readonly broadcaster: RuntimeBroadcaster
 
   /** Returns whether the next effect submission should use setEffect, and consumes the policy. */
   private getAndConsumeInitialClearPolicy(): boolean {
@@ -121,7 +122,7 @@ export class EffectExecutionEngine {
     if (this.runtimeCallbacks) {
       this.runtimeCallbacks.emit(channel, payload)
     } else {
-      sendToAllWindows(channel, payload)
+      this.broadcaster.emit(channel, payload)
     }
   }
 
@@ -138,6 +139,7 @@ export class EffectExecutionEngine {
     compiledEffect: CompiledEffect<BaseEventNode>,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
+    broadcaster: RuntimeBroadcaster,
     parameterValues: Record<string, any>,
     callerCueData: CueData | AudioCueData,
     firstSubmissionUsesSetEffectRef?: { use: boolean },
@@ -148,6 +150,7 @@ export class EffectExecutionEngine {
     this.compiledEffect = compiledEffect
     this.sequencer = sequencer
     this.lightManager = lightManager
+    this.broadcaster = broadcaster
     this.parameterValues = parameterValues
     this.callerCueData = callerCueData
     this.firstSubmissionUsesSetEffectRef = firstSubmissionUsesSetEffectRef

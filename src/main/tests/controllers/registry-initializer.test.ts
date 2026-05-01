@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
 import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
 import { RegistryInitializer } from '../../controllers/RegistryInitializer'
+import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
 
 describe('RegistryInitializer', () => {
   afterEach(() => {
@@ -32,6 +33,7 @@ describe('RegistryInitializer', () => {
     const config = { getPreference, getCueGroupSelectionMode } as never
     const init = new RegistryInitializer({
       getConfig: () => config,
+      runtimeBroadcaster: noopRuntimeBroadcaster(),
       sendToAllWindows: () => {
         // noop
       },

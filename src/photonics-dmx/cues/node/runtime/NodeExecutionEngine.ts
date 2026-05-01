@@ -58,7 +58,7 @@ import {
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
-import { sendToAllWindows } from '../../../../main/utils/windowUtils'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('NodeExecutionEngine')
 
@@ -105,6 +105,7 @@ export class NodeExecutionEngine {
   private activeContexts: Map<string, ExecutionContext> = new Map()
   private sequencer: ILightingController
   private lightManager: DmxLightManager
+  private runtimeBroadcaster: RuntimeBroadcaster
   private cueLevelVarStore: Map<string, VariableValue>
   private groupLevelVarStore: Map<string, VariableValue>
   private variableDefinitions: VariableDefinition[]
@@ -140,6 +141,7 @@ export class NodeExecutionEngine {
     cueId: string,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
+    runtimeBroadcaster: RuntimeBroadcaster,
     cueLevelVarStore: Map<string, VariableValue>,
     groupLevelVarStore: Map<string, VariableValue>,
     effectRegistry: EffectRegistry,
@@ -156,6 +158,7 @@ export class NodeExecutionEngine {
     this.cueId = cueId
     this.sequencer = sequencer
     this.lightManager = lightManager
+    this.runtimeBroadcaster = runtimeBroadcaster
     this.cueLevelVarStore = cueLevelVarStore
     this.groupLevelVarStore = groupLevelVarStore
     this.effectRegistry = effectRegistry
@@ -350,7 +353,7 @@ export class NodeExecutionEngine {
     if (this.runtimeCallbacks) {
       this.runtimeCallbacks.emit(channel, payload)
     } else {
-      sendToAllWindows(channel, payload)
+      this.runtimeBroadcaster.emit(channel, payload)
     }
   }
 
@@ -1212,6 +1215,7 @@ export class NodeExecutionEngine {
         compiledEffect,
         this.sequencer,
         this.lightManager,
+        this.runtimeBroadcaster,
         paramValues,
         context.cueData, // Pass caller's cue data
         this.firstSubmissionUsesSetEffectRef,

@@ -15,8 +15,7 @@ import { Beat, CueData } from '../../../cues/types/cueTypes'
 import type { ILightingController } from '../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../controllers/DmxLightManager'
 import type { TrackedLight } from '../../../types'
-
-jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 const createCueData = (beat?: Beat): CueData =>
   ({
@@ -294,6 +293,7 @@ describe('Node cue logic runtime', () => {
         definition.id,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -371,6 +371,7 @@ describe('Node cue logic runtime', () => {
         definition.id,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -435,6 +436,7 @@ describe('Node cue logic runtime', () => {
         definition.id,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -501,6 +503,7 @@ describe('Node cue logic runtime', () => {
         definition.id,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -560,6 +563,7 @@ describe('Node cue logic runtime', () => {
         definition.id,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -639,6 +643,7 @@ describe('Node cue logic runtime', () => {
         definition.id,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -704,6 +709,7 @@ describe('Node cue logic runtime', () => {
         definition.id,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),

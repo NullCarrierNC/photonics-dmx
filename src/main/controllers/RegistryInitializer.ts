@@ -7,6 +7,7 @@ import {
   NodeCueLoader,
   NodeCueListSummary,
 } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
+import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
@@ -14,6 +15,7 @@ const log = createLogger('RegistryInitializer')
 
 export interface RegistryInitializerContext {
   getConfig: () => ConfigurationManager
+  runtimeBroadcaster: RuntimeBroadcaster
   sendToAllWindows: (channel: string, ...args: unknown[]) => void
   pushValidationError: (err: { source: 'node-cue' | 'effect'; errors: string[] }) => void
   refreshAudioCueSelection: () => void
@@ -119,6 +121,7 @@ export class RegistryInitializer {
       yargRegistry: YargCueRegistry.getInstance(),
       audioRegistry: AudioCueRegistry.getInstance(),
       effectLoader: this.ctx.getEffectLoader() ?? undefined,
+      runtimeBroadcaster: this.ctx.runtimeBroadcaster,
     })
     this.ctx.setNodeCueLoader(nodeCueLoader)
 

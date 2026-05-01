@@ -9,6 +9,8 @@ import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import { cueGraphPolicy } from './GraphExecutionPolicy'
 import type { YargLightingNodeCueDefinition } from '../../types/nodeCueTypes'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 /**
  * YARG node cue: uses CueSession and GraphExecutionEngine.
@@ -21,6 +23,7 @@ export class YargNodeCue implements INetCue {
   private readonly effectRegistry: EffectRegistry
   private readonly session: CueSession
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
+  private readonly runtimeBroadcaster: RuntimeBroadcaster
   private engine: GraphExecutionEngine | null = null
 
   constructor(
@@ -28,12 +31,14 @@ export class YargNodeCue implements INetCue {
     compiledCue: CompiledYargCue,
     effectRegistry?: EffectRegistry,
     runtimeCallbacks?: NodeRuntimeCallbacks,
+    runtimeBroadcaster?: RuntimeBroadcaster,
   ) {
     this.groupId = groupId
     this.compiledCue = compiledCue
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
     this.session = new CueSession()
     this.runtimeCallbacks = runtimeCallbacks
+    this.runtimeBroadcaster = runtimeBroadcaster ?? noopRuntimeBroadcaster()
     const definition = compiledCue.definition as YargLightingNodeCueDefinition
     this.session.initializeVariables(definition.variables ?? [], compiledCue.groupVariables ?? [])
   }
@@ -71,6 +76,7 @@ export class YargNodeCue implements INetCue {
         this.session,
         sequencer,
         lightManager,
+        this.runtimeBroadcaster,
         this.effectRegistry,
         definition.variables ?? [],
         this.runtimeCallbacks,

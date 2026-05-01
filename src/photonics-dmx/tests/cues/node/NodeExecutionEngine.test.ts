@@ -19,12 +19,10 @@ import type { CompiledEffect } from '../../../cues/node/runtime/EffectRegistry'
 import type { TrackedLight } from '../../../types'
 import { type FixtureConfig, DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../../types'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
-import { sendToAllWindows } from '../../../../main/utils/windowUtils'
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 /** Minimal fixture config for test TrackedLight objects */
 type MinimalLightConfig = Partial<FixtureConfig>
-
-jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
 
 describe('NodeExecutionEngine', () => {
   let mockSequencer: ILightingController
@@ -179,6 +177,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -301,6 +300,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -419,6 +419,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -530,6 +531,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -705,6 +707,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -775,6 +778,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -849,6 +853,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -936,6 +941,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         effectRegistry,
@@ -1000,6 +1006,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         effectRegistry,
@@ -1126,6 +1133,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         effectRegistry,
@@ -1299,6 +1307,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         effectRegistry,
@@ -1392,6 +1401,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -1501,6 +1511,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -1593,6 +1604,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -1728,6 +1740,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -1841,6 +1854,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -1958,6 +1972,7 @@ describe('NodeExecutionEngine', () => {
         'test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2053,6 +2068,7 @@ describe('NodeExecutionEngine', () => {
         'test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2126,11 +2142,15 @@ describe('NodeExecutionEngine', () => {
         adjacency: new Map([['event1', [{ from: 'event1', to: 'action1' }]]]),
       }
 
+      const emit = jest.fn()
+      const testBroadcaster = { emit }
+
       const engine = new NodeExecutionEngine(
         compiledCue,
         'test-cue',
         mockSequencer,
         mockLightManager,
+        testBroadcaster,
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2140,7 +2160,7 @@ describe('NodeExecutionEngine', () => {
       engine.startExecution(eventNode, createCueData('Strong'))
 
       jest.runAllTimers()
-      expect(sendToAllWindows).toHaveBeenCalledWith(
+      expect(emit).toHaveBeenCalledWith(
         RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
         expect.stringContaining('nonExistentColor'),
       )
@@ -2245,6 +2265,7 @@ describe('NodeExecutionEngine', () => {
         'test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2341,6 +2362,7 @@ describe('NodeExecutionEngine', () => {
         'test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2411,6 +2433,7 @@ describe('NodeExecutionEngine', () => {
         'test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2513,6 +2536,7 @@ describe('NodeExecutionEngine', () => {
         'test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2604,6 +2628,7 @@ describe('NodeExecutionEngine', () => {
         'test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2694,6 +2719,7 @@ describe('NodeExecutionEngine', () => {
         'test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2785,6 +2811,7 @@ describe('NodeExecutionEngine', () => {
         'test-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2859,6 +2886,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:position-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -2931,6 +2959,7 @@ describe('NodeExecutionEngine', () => {
         'test-group:crossbeat-style-cue',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),

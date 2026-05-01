@@ -3,6 +3,7 @@ import { ConfigurationManager } from '../../services/configuration/Configuration
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
 import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor'
+import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import {
   AudioConfig,
   AudioGameModeConfig,
@@ -19,6 +20,7 @@ export interface AudioControllerDeps {
   getEffectsController: () => ILightingController | null
   config: ConfigurationManager
   sendToAllWindows: (channel: string, ...args: unknown[]) => void
+  runtimeBroadcaster: RuntimeBroadcaster
 }
 
 type AudioDataHandler = (event: unknown, data: unknown) => void
@@ -57,6 +59,7 @@ export class AudioController {
       this.audioProcessor = new AudioCueProcessor(
         dmxLightManager,
         effectsController,
+        this.deps.runtimeBroadcaster,
         audioConfig,
         preferredCueType,
         null,

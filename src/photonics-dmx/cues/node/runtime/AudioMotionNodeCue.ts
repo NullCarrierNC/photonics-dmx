@@ -4,6 +4,8 @@ import { CompiledAudioCue } from '../compiler/NodeCueCompiler'
 import { AudioMotionNodeCueDefinition, AudioNodeCueDefinition } from '../../types/nodeCueTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { BaseAudioNodeCue } from './BaseAudioNodeCue'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 /**
  * Maximum BPM passed into audio motion graphs. Detected tempo can spike; motion-pattern speed is in Hz
@@ -26,13 +28,24 @@ export function withMotionSafeAudioData(data: AudioCueData): AudioCueData {
  * primary/secondary/strobe slot semantics (`style` is omitted). BPM is clamped before graph execution.
  */
 export class AudioMotionNodeCue extends BaseAudioNodeCue implements IAudioCue {
-  constructor(groupId: string, compiledCue: CompiledAudioCue, effectRegistry?: EffectRegistry) {
+  constructor(
+    groupId: string,
+    compiledCue: CompiledAudioCue,
+    effectRegistry?: EffectRegistry,
+    runtimeBroadcaster?: RuntimeBroadcaster,
+  ) {
     const definition = compiledCue.definition as AudioNodeCueDefinition
     if (definition.kind !== 'motion') {
       throw new Error('AudioMotionNodeCue requires a motion cue definition')
     }
     const motion = definition as AudioMotionNodeCueDefinition
-    super(groupId, compiledCue, effectRegistry, motion.id)
+    super(
+      groupId,
+      compiledCue,
+      effectRegistry,
+      runtimeBroadcaster ?? noopRuntimeBroadcaster(),
+      motion.id,
+    )
   }
 
   protected transformCueDataForExecution(data: AudioCueData): AudioCueData {

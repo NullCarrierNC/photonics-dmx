@@ -21,6 +21,7 @@ import { createMockLightingConfig } from '../../helpers/testFixtures'
 import type { ILightingController } from '../../../controllers/sequencer/interfaces'
 import type { NodeRuntimeCallbacks } from '../../../cues/node/runtime/executionTypes'
 import type { TrackedLight } from '../../../types'
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
 
@@ -141,6 +142,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
       session,
       sequencer,
       lightManager,
+      noopRuntimeBroadcaster(),
       new EffectRegistry(),
       compiled.definition.variables ?? [],
       noopCallbacks,
@@ -163,6 +165,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
       session,
       sequencer,
       lightManager,
+      noopRuntimeBroadcaster(),
       new EffectRegistry(),
       compiled.definition.variables ?? [],
       noopCallbacks,
@@ -215,6 +218,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
       session,
       sequencer,
       lightManager,
+      noopRuntimeBroadcaster(),
       new EffectRegistry(),
       compiled.definition.variables ?? [],
       noopCallbacks,

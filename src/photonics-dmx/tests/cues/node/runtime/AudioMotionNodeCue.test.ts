@@ -3,9 +3,6 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
-jest.mock('../../../../../main/utils/windowUtils', () => ({
-  sendToAllWindows: jest.fn(),
-}))
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import {
   AUDIO_MOTION_MAX_BPM,

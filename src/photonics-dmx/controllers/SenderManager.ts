@@ -8,8 +8,14 @@ import { SacnSender } from '../senders/SacnSender'
 import { EnttecProSender } from '../senders/EnttecProSender'
 import { OpenDmxSender } from '../senders/OpenDmxSender'
 import type { SenderConfig } from '../types'
+import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 
 const log = createLogger('SenderManager')
+
+export type SenderManagerIpcOptions = {
+  broadcaster: RuntimeBroadcaster
+  hasReceivers: () => boolean
+}
 
 /**
  * Senders are responsible for actually broadcasting the
@@ -27,7 +33,7 @@ export class SenderManager {
   private initializingSenderPorts: Map<string, number | null> = new Map()
   private onSenderEnabledCallback: ((senderId: string) => void) | null = null
 
-  constructor() {
+  constructor(private readonly ipcOptions: SenderManagerIpcOptions) {
     this.enabledSenders = new Map<string, BaseSender>()
     this.eventEmitter = new EventEmitter()
   }
@@ -84,7 +90,7 @@ export class SenderManager {
           return
         }
 
-        this.ipcSender = new IpcSender()
+        this.ipcSender = new IpcSender(this.ipcOptions.broadcaster, this.ipcOptions.hasReceivers)
         await this.ipcSender.start()
 
         log.info('IPC sender enabled and started successfully.')

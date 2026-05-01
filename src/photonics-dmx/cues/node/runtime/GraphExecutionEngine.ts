@@ -19,6 +19,7 @@ import { ExecutionStateMachine } from './ExecutionStateMachine'
 import { ExecutionPhase } from './executionTypes'
 import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
 import type { ExecutionParameters } from './GraphExecutionPolicy'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 /**
  * True if the payload carries instrument-event data (e.g. drum/guitar/bass/keys notes).
@@ -64,6 +65,7 @@ export class GraphExecutionEngine {
   private readonly lightManager: DmxLightManager
   private readonly callbacks?: NodeRuntimeCallbacks
   private readonly variableDefinitions: VariableDefinition[]
+  private readonly runtimeBroadcaster: RuntimeBroadcaster
   private effectRegistry?: EffectRegistry
   private compiledCue?: CompiledYargCue
   private compiledEffect?: CompiledEffect<BaseEventNode>
@@ -93,6 +95,7 @@ export class GraphExecutionEngine {
     session: IGraphExecutionSession,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
+    runtimeBroadcaster: RuntimeBroadcaster,
     effectRegistry: EffectRegistry,
     variableDefinitions: VariableDefinition[],
     callbacks?: NodeRuntimeCallbacks,
@@ -102,6 +105,7 @@ export class GraphExecutionEngine {
       session,
       sequencer,
       lightManager,
+      runtimeBroadcaster,
       variableDefinitions,
       callbacks,
       cueId,
@@ -123,6 +127,7 @@ export class GraphExecutionEngine {
     session: IGraphExecutionSession,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
+    runtimeBroadcaster: RuntimeBroadcaster,
     variableDefinitions: VariableDefinition[],
     callbacks?: NodeRuntimeCallbacks,
   ): GraphExecutionEngine {
@@ -132,6 +137,7 @@ export class GraphExecutionEngine {
       session,
       sequencer,
       lightManager,
+      runtimeBroadcaster,
       variableDefinitions,
       callbacks,
       cueId,
@@ -145,6 +151,7 @@ export class GraphExecutionEngine {
     session: IGraphExecutionSession,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
+    runtimeBroadcaster: RuntimeBroadcaster,
     variableDefinitions: VariableDefinition[],
     callbacks?: NodeRuntimeCallbacks,
     cueId = '',
@@ -153,6 +160,7 @@ export class GraphExecutionEngine {
     this.session = session
     this.sequencer = sequencer
     this.lightManager = lightManager
+    this.runtimeBroadcaster = runtimeBroadcaster
     this.variableDefinitions = variableDefinitions
     this.callbacks = callbacks
     this.cueId = cueId
@@ -211,6 +219,7 @@ export class GraphExecutionEngine {
       this.cueId,
       this.sequencer,
       this.lightManager,
+      this.runtimeBroadcaster,
       this.session.getCueLevelVarStore(),
       this.session.getGroupLevelVarStore(),
       this.effectRegistry,
@@ -235,6 +244,7 @@ export class GraphExecutionEngine {
       this.compiledEffect,
       this.sequencer,
       this.lightManager,
+      this.runtimeBroadcaster,
       parameterValues as Record<string, unknown>,
       callerCueData as CueData,
       undefined,

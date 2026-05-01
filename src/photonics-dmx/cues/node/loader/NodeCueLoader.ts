@@ -31,6 +31,7 @@ import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
 import type { EffectMode, EffectReference } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 const log = createLogger('NodeCueLoader')
 
 export interface NodeCueFileSummary {
@@ -65,6 +66,8 @@ interface NodeCueLoaderOptions {
   yargRegistry: YargCueRegistry
   audioRegistry: AudioCueRegistry
   effectLoader?: EffectLoader
+  /** Injected host emit for cue/effect runtime IPC; required for production main. */
+  runtimeBroadcaster: RuntimeBroadcaster
   /** When provided, passed to YargNodeCue for debug/error emission. */
   getNodeRuntimeCallbacks?: () => NodeRuntimeCallbacks | undefined
   /** When provided, compiled effects are cached here and reused across cues. */
@@ -377,7 +380,13 @@ export class NodeCueLoader extends EventEmitter {
           const callbacks = this.options.getNodeRuntimeCallbacks?.()
           cueMap.set(
             cue.cueType,
-            new YargNodeCue(file.group.id, compiled, effectRegistry, callbacks),
+            new YargNodeCue(
+              file.group.id,
+              compiled,
+              effectRegistry,
+              callbacks,
+              this.options.runtimeBroadcaster,
+            ),
           )
         } catch (err) {
           log.warn(`Skipping cue '${cue.cueType}':`, err)
@@ -395,7 +404,13 @@ export class NodeCueLoader extends EventEmitter {
           const callbacks = this.options.getNodeRuntimeCallbacks?.()
           motionMap.set(
             cue.id,
-            new YargMotionNodeCue(file.group.id, compiled, effectRegistry, callbacks),
+            new YargMotionNodeCue(
+              file.group.id,
+              compiled,
+              effectRegistry,
+              callbacks,
+              this.options.runtimeBroadcaster,
+            ),
           )
         } catch (err) {
           log.warn(`Skipping motion cue '${cue.id}':`, err)
@@ -436,7 +451,15 @@ export class NodeCueLoader extends EventEmitter {
           const compiled = NodeCueCompiler.compileAudioCue(cue)
           compiled.groupVariables = file.group.variables ?? []
           const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
-          cueMap.set(cue.cueTypeId, new AudioNodeCue(file.group.id, compiled, effectRegistry))
+          cueMap.set(
+            cue.cueTypeId,
+            new AudioNodeCue(
+              file.group.id,
+              compiled,
+              effectRegistry,
+              this.options.runtimeBroadcaster,
+            ),
+          )
         } catch (err) {
           log.warn(`Skipping audio cue '${cue.cueTypeId}':`, err)
         }
@@ -450,7 +473,15 @@ export class NodeCueLoader extends EventEmitter {
           const compiled = NodeCueCompiler.compileAudioCue(cue)
           compiled.groupVariables = file.group.variables ?? []
           const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
-          motionMap.set(cue.id, new AudioMotionNodeCue(file.group.id, compiled, effectRegistry))
+          motionMap.set(
+            cue.id,
+            new AudioMotionNodeCue(
+              file.group.id,
+              compiled,
+              effectRegistry,
+              this.options.runtimeBroadcaster,
+            ),
+          )
         } catch (err) {
           log.warn(`Skipping audio motion cue '${cue.id}':`, err)
         }
