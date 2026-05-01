@@ -22,6 +22,7 @@ import { createMockLightingConfig } from '../../helpers/testFixtures'
 import type { ILightingController } from '../../../controllers/sequencer/interfaces'
 import type { CueData } from '../../../cues/types/cueTypes'
 import type { NodeRuntimeCallbacks } from '../../../cues/node/runtime/executionTypes'
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
 
@@ -161,6 +162,7 @@ describe('GraphExecutionEngine', () => {
         session,
         sequencer,
         lightManager,
+        noopRuntimeBroadcaster(),
         new EffectRegistry(),
         compiledCue.definition.variables ?? [],
         noopCallbacks,
@@ -181,6 +183,7 @@ describe('GraphExecutionEngine', () => {
         session,
         sequencer,
         lightManager,
+        noopRuntimeBroadcaster(),
         new EffectRegistry(),
         compiledCue.definition.variables ?? [],
         noopCallbacks,
@@ -202,6 +205,7 @@ describe('GraphExecutionEngine', () => {
         session,
         sequencer,
         lightManager,
+        noopRuntimeBroadcaster(),
         new EffectRegistry(),
         compiledCue.definition.variables ?? [],
         noopCallbacks,
@@ -229,6 +233,7 @@ describe('GraphExecutionEngine', () => {
         session,
         sequencer,
         lightManager,
+        noopRuntimeBroadcaster(),
         new EffectRegistry(),
         compiled.definition.variables ?? [],
         noopCallbacks,
@@ -273,6 +278,7 @@ describe('GraphExecutionEngine', () => {
         session,
         sequencer,
         lightManager,
+        noopRuntimeBroadcaster(),
         new EffectRegistry(),
         compiled.definition.variables ?? [],
         noopCallbacks,
@@ -371,6 +377,7 @@ describe('GraphExecutionEngine', () => {
         session,
         sequencer,
         lightManager,
+        noopRuntimeBroadcaster(),
         new EffectRegistry(),
         compiled.definition.variables ?? [],
         noopCallbacks,

@@ -13,7 +13,7 @@ import {
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock'
 import { app } from 'electron'
-import { sendToAllWindows } from '../utils/windowUtils'
+import { sendToAllWindows, mainRuntimeBroadcaster, hasBrowserWindows } from '../utils/windowUtils'
 import { copyDefaultData } from '../utils/copyDefaultData'
 import * as path from 'path'
 import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
@@ -88,7 +88,10 @@ export class ControllerManager {
 
   constructor() {
     this.config = new ConfigurationManager()
-    this.senderLifecycle = new SenderLifecycleController(() => this.config)
+    this.senderLifecycle = new SenderLifecycleController(() => this.config, {
+      broadcaster: mainRuntimeBroadcaster,
+      hasReceivers: hasBrowserWindows,
+    })
     this.testEffectRunner = new TestEffectRunner({
       getConfig: () => ({
         getPreference: (key: string) =>
@@ -104,6 +107,7 @@ export class ControllerManager {
             this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
           getMotionCueProbabilityPercent: () =>
             this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
+          runtimeBroadcaster: mainRuntimeBroadcaster,
         })
         h.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
         h.setManualMotionRef(
@@ -130,6 +134,7 @@ export class ControllerManager {
           sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
         },
         sendToAllWindows,
+        runtimeBroadcaster: mainRuntimeBroadcaster,
         setCueHandlerRef: (h) => {
           this.cueHandler = h
         },
@@ -139,6 +144,7 @@ export class ControllerManager {
         getEffectsController: () => this.effectsController,
         config: this.config,
         sendToAllWindows,
+        runtimeBroadcaster: mainRuntimeBroadcaster,
       },
     )
     this.registryInit = new RegistryInitializer({
@@ -158,6 +164,7 @@ export class ControllerManager {
       setEffectLoader: (l) => {
         this.effectLoader = l
       },
+      runtimeBroadcaster: mainRuntimeBroadcaster,
     })
     this.consoleMode = new ConsoleModeController({
       getConfig: () => this.config,
@@ -456,6 +463,7 @@ export class ControllerManager {
         this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
       getMotionCueProbabilityPercent: () =>
         this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
+      runtimeBroadcaster: mainRuntimeBroadcaster,
     })
     yargHandler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
     yargHandler.setManualMotionRef(

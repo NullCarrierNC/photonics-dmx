@@ -8,10 +8,6 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
-jest.mock('../../../main/utils/windowUtils', () => ({
-  sendToAllWindows: jest.fn(),
-}))
-
 import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
 import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
 import { CueStyle, INetCue } from '../../cues/interfaces/INetCue'

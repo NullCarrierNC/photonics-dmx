@@ -6,7 +6,8 @@ import { DmxLightManager } from '../controllers/DmxLightManager'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
 import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
-import { sendToAllWindows } from '../../main/utils/windowUtils'
+import type { RuntimeBroadcaster } from '../runtime/broadcaster'
+import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('YargCueHandler')
 
@@ -38,6 +39,7 @@ export type YargCueHandlerOptions = {
   getMotionCueMinimumHoldMs?: () => number
   /** Probability (0-100) that an automatic motion cue pick will play on a new lighting cue. Defaults to 100 (always). */
   getMotionCueProbabilityPercent?: () => number
+  runtimeBroadcaster?: RuntimeBroadcaster
 }
 
 class YargCueHandler extends EventEmitter {
@@ -56,6 +58,7 @@ class YargCueHandler extends EventEmitter {
   private lastEmittedMotionKey: string | null = null
   private readonly getMotionCueMinimumHoldMs: () => number
   private readonly getMotionCueProbabilityPercent: () => number
+  private readonly runtimeBroadcaster: RuntimeBroadcaster
   private cueHistory: CueType[] = []
   private currentCue?: CueType
   private executionCount = 0
@@ -78,7 +81,7 @@ class YargCueHandler extends EventEmitter {
       return
     }
     this.lastEmittedMotionKey = key
-    sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+    this.runtimeBroadcaster.emit(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
       ref,
       source,
       manualFallback: manualFallback === true,
@@ -115,6 +118,7 @@ class YargCueHandler extends EventEmitter {
     this.registry = YargCueRegistry.getInstance()
     this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
     this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
+    this.runtimeBroadcaster = options?.runtimeBroadcaster ?? noopRuntimeBroadcaster()
   }
 
   public notifySongStart(): void {
@@ -360,7 +364,7 @@ class YargCueHandler extends EventEmitter {
               pickManualFallback = true
               motionCue = registry.getRandomMotionCue()
               pickSource = 'auto'
-              sendToAllWindows(RENDERER_RECEIVE.DEBUG_LOG, {
+              this.runtimeBroadcaster.emit(RENDERER_RECEIVE.DEBUG_LOG, {
                 message:
                   'Selected YARG motion cue is unavailable (disabled or unknown); using a random motion program.',
                 variables: [],

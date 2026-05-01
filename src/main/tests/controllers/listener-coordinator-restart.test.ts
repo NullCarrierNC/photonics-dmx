@@ -9,6 +9,7 @@ import {
 } from '../../controllers/ListenerCoordinator'
 import { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager'
 import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces'
+import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
 
 function makeDeps(): ListenerCoordinatorDeps {
   const effects = {
@@ -25,6 +26,7 @@ function makeDeps(): ListenerCoordinatorDeps {
     getMotionCueProbabilityPercent: () => 100,
     sendSenderError: jest.fn(),
     sendToAllWindows: jest.fn(),
+    runtimeBroadcaster: noopRuntimeBroadcaster(),
     setCueHandlerRef: jest.fn(),
   }
 }

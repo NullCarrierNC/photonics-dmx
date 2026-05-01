@@ -7,6 +7,7 @@ import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
+import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 const log = createLogger('ListenerCoordinator')
 
 export interface ListenerCoordinatorDeps {
@@ -18,6 +19,7 @@ export interface ListenerCoordinatorDeps {
   getMotionCueProbabilityPercent: () => number
   sendSenderError: (message: string) => void
   sendToAllWindows: (channel: string, payload: unknown) => void
+  runtimeBroadcaster: RuntimeBroadcaster
   setCueHandlerRef: (h: YargCueHandler | null) => void
 }
 
@@ -63,6 +65,7 @@ export class ListenerCoordinator {
     this.cueHandler = new YargCueHandler(dmxLightManager, effectsController, {
       getMotionCueMinimumHoldMs: this.deps.getMotionCueMinimumHoldMs,
       getMotionCueProbabilityPercent: this.deps.getMotionCueProbabilityPercent,
+      runtimeBroadcaster: this.deps.runtimeBroadcaster,
     })
     this.cueHandler.setMotionEnabled(this.deps.getMotionEnabled())
     this.cueHandler.setManualMotionRef(this.deps.getActiveYargMotionCueRef())

@@ -6,7 +6,8 @@ import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
-import { sendToAllWindows } from '../../main/utils/windowUtils'
+import type { RuntimeBroadcaster } from '../runtime/broadcaster'
+import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('AudioCueHandler')
 
@@ -14,6 +15,7 @@ export type AudioCueHandlerOptions = {
   getMotionCueMinimumHoldMs?: () => number
   /** Probability (0-100) that an automatic motion cue pick will play on a primary cue change. Defaults to 100 (always). */
   getMotionCueProbabilityPercent?: () => number
+  runtimeBroadcaster?: RuntimeBroadcaster
 }
 
 /**
@@ -37,6 +39,7 @@ export class AudioCueHandler extends EventEmitter {
   private executionCount = 0
   private readonly getMotionCueMinimumHoldMs: () => number
   private readonly getMotionCueProbabilityPercent: () => number
+  private readonly runtimeBroadcaster: RuntimeBroadcaster
 
   constructor(
     private lightManager: DmxLightManager,
@@ -47,6 +50,7 @@ export class AudioCueHandler extends EventEmitter {
     this.registry = AudioCueRegistry.getInstance()
     this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
     this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
+    this.runtimeBroadcaster = options?.runtimeBroadcaster ?? noopRuntimeBroadcaster()
   }
 
   public isMotionLayerEnabled(): boolean {
@@ -137,7 +141,7 @@ export class AudioCueHandler extends EventEmitter {
       return
     }
     this.lastEmittedMotionKey = key
-    sendToAllWindows(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, {
+    this.runtimeBroadcaster.emit(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, {
       ref,
       source,
       manualFallback: manualFallback === true,
@@ -252,7 +256,7 @@ export class AudioCueHandler extends EventEmitter {
         manualFallback = true
         motionCue = this.registry.getRandomMotionCue()
         source = 'auto'
-        sendToAllWindows(RENDERER_RECEIVE.DEBUG_LOG, {
+        this.runtimeBroadcaster.emit(RENDERER_RECEIVE.DEBUG_LOG, {
           message:
             'Selected audio motion cue is unavailable (disabled or unknown); using a random motion program.',
           variables: [],

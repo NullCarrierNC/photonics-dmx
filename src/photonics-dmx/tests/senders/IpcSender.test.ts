@@ -1,33 +1,24 @@
 /**
- * IpcSender tests: start/stop lifecycle, send calls sendToAllWindows, getUniverse returns -1.
+ * IpcSender tests: start/stop lifecycle, emit via broadcaster when receivers exist, getUniverse returns -1.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { IpcSender } from '../../senders/IpcSender'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
-const mockSendToAllWindows = jest.fn()
-jest.mock('../../../main/utils/windowUtils', () => ({
-  sendToAllWindows: (...args: unknown[]) => mockSendToAllWindows(...args),
-}))
-
-const mockGetAllWindows = jest.fn(() => [{ id: 1 }])
-jest.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: () => mockGetAllWindows() },
-}))
-
 describe('IpcSender', () => {
   let sender: IpcSender
+  const mockEmit = jest.fn()
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockGetAllWindows.mockReturnValue([{ id: 1 }])
-    sender = new IpcSender()
+    const hasReceivers = jest.fn<() => boolean>().mockReturnValue(true)
+    sender = new IpcSender({ emit: mockEmit }, hasReceivers)
   })
 
   it('start enables sender', async () => {
     await sender.start()
     await sender.send({ 1: 255 })
-    expect(mockSendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.DMX_VALUES, {
+    expect(mockEmit).toHaveBeenCalledWith(RENDERER_RECEIVE.DMX_VALUES, {
       universeBuffer: { 1: 255 },
     })
   })
@@ -35,16 +26,18 @@ describe('IpcSender', () => {
   it('stop disables sender', async () => {
     await sender.start()
     await sender.stop()
+    mockEmit.mockClear()
     await sender.send({ 1: 255 })
-    expect(mockSendToAllWindows).not.toHaveBeenCalled()
+    expect(mockEmit).not.toHaveBeenCalled()
   })
 
-  it('send calls sendToAllWindows with DMX values', async () => {
-    await sender.start()
-    await sender.send({ 1: 100, 2: 200 })
-    expect(mockSendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.DMX_VALUES, {
-      universeBuffer: { 1: 100, 2: 200 },
-    })
+  it('does not emit when no receivers', async () => {
+    const hasReceivers = jest.fn<() => boolean>().mockReturnValue(false)
+    const localSender = new IpcSender({ emit: mockEmit }, hasReceivers)
+    await localSender.start()
+    mockEmit.mockClear()
+    await localSender.send({ 1: 100, 2: 200 })
+    expect(mockEmit).not.toHaveBeenCalled()
   })
 
   it('getUniverse returns -1', () => {

@@ -4,8 +4,7 @@ import type { YargEffectDefinition } from '../../../../cues/types/nodeCueTypes'
 import { defaultCueData, type CueData } from '../../../../cues'
 import { getColor } from '../../../../helpers/dmxHelpers'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
-
-jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
+import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 
 const createCueData = (overrides: Partial<CueData> = {}): CueData => ({
   ...defaultCueData,
@@ -85,6 +84,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { colorParam: 'green' },
       createCueData(),
     )
@@ -157,6 +157,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { startDelay: 30 },
       createCueData(),
     )
@@ -234,6 +235,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { fadeDuration: 40 },
       createCueData(),
     )
@@ -322,6 +324,7 @@ describe('Effect runtime with real Sequencer', () => {
         compiledEffect,
         harness.sequencer,
         harness.lightManager,
+        noopRuntimeBroadcaster(),
         {},
         createCueData(),
       )
@@ -422,6 +425,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       {},
       createCueData(),
     )
@@ -503,6 +507,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { targetLights: selectedLights },
       createCueData(),
     )
@@ -595,6 +600,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { colorName: 'red', brightness: 'max', blendMode: 'add' },
       createCueData(),
     )
@@ -664,6 +670,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       {},
       createCueData(),
     )

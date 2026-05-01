@@ -1,9 +1,6 @@
 /**
  * AudioCueProcessor: strobe slot independent from secondary; getEffective* accessors.
  */
-jest.mock('../../../main/utils/windowUtils', () => ({
-  sendToAllWindows: jest.fn(),
-}))
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { AudioCueProcessor } from '../../processors/AudioCueProcessor'
 import { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
@@ -19,6 +16,7 @@ import {
 } from '../../listeners/Audio/AudioConfig'
 import { AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER } from '../../processors/audioIdleConstants'
 import { AudioLightingData } from '../../listeners/Audio/AudioTypes'
+import { noopRuntimeBroadcaster } from '../../runtime/broadcaster'
 
 const TEST_GROUP = 'audio-cue-processor-test-group'
 
@@ -108,6 +106,7 @@ describe('AudioCueProcessor', () => {
     processor = new AudioCueProcessor(
       lightManager,
       sequencer,
+      noopRuntimeBroadcaster(),
       audioConfig,
       'proc-primary',
       'proc-secondary',

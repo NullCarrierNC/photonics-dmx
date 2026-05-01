@@ -12,7 +12,7 @@ import {
   AudioNodeCueDefinition,
 } from '../../types/nodeCueTypes'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
-import { sendToAllWindows } from '../../../../main/utils/windowUtils'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { UninitializedVariableError } from './valueResolver'
 import { VariableValue } from './executionTypes'
@@ -107,6 +107,7 @@ export abstract class BaseAudioNodeCue {
     groupId: string,
     protected readonly compiledCue: CompiledAudioCue,
     effectRegistry: EffectRegistry | undefined,
+    private readonly runtimeBroadcaster: RuntimeBroadcaster,
     cueType: AudioCueType,
   ) {
     const definition = compiledCue.definition as AudioNodeCueDefinition
@@ -168,6 +169,7 @@ export abstract class BaseAudioNodeCue {
         this.id,
         sequencer,
         lightManager,
+        this.runtimeBroadcaster,
         this.cueLevelVarStore,
         this.groupLevelVarStore,
         this.effectRegistry,
@@ -245,7 +247,7 @@ export abstract class BaseAudioNodeCue {
           actionStep = this.findFirstAction(event.id)
         } catch (error) {
           if (error instanceof UninitializedVariableError) {
-            sendToAllWindows(
+            this.runtimeBroadcaster.emit(
               RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
               `${event.id}: ${error.message}`,
             )

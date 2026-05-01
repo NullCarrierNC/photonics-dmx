@@ -14,6 +14,7 @@ import { getIntensityScale } from '../cues/audio/utils/bandUtils'
 import { getColor } from '../helpers/dmxHelpers'
 import { getEffectSingleColor } from '../effects/effectSingleColor'
 import { createLogger } from '../../shared/logger'
+import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 const log = createLogger('AudioCueProcessor')
 
 /**
@@ -42,6 +43,7 @@ export class AudioCueProcessor {
   constructor(
     lightManager: DmxLightManager,
     private sequencer: ILightingController,
+    runtimeBroadcaster: RuntimeBroadcaster,
     audioConfig: AudioConfig,
     preferredCueType?: AudioCueType,
     preferredSecondaryCueType?: AudioCueType | null,
@@ -56,6 +58,7 @@ export class AudioCueProcessor {
     this.cueHandler = new AudioCueHandler(lightManager, sequencer, {
       getMotionCueMinimumHoldMs,
       getMotionCueProbabilityPercent,
+      runtimeBroadcaster,
     })
     this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType, null, false)
   }

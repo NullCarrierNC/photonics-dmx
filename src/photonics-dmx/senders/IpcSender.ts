@@ -1,6 +1,5 @@
-import { BrowserWindow } from 'electron'
 import { BaseSender, SenderError } from './BaseSender'
-import { sendToAllWindows } from '../../main/utils/windowUtils'
+import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('IpcSender')
@@ -14,9 +13,11 @@ const log = createLogger('IpcSender')
 export class IpcSender extends BaseSender {
   private enabled: boolean = false
 
-  public constructor() {
+  public constructor(
+    private readonly broadcaster: RuntimeBroadcaster,
+    private readonly hasReceivers: () => boolean,
+  ) {
     super()
-    // Window will be determined when sending, not during construction
   }
 
   public async start(): Promise<void> {
@@ -37,13 +38,12 @@ export class IpcSender extends BaseSender {
       return
     }
 
-    const windows = BrowserWindow.getAllWindows()
-    if (windows.length === 0) {
+    if (!this.hasReceivers()) {
       log.error('IPC Sender: No browser window available when sending')
       return
     }
 
-    sendToAllWindows(RENDERER_RECEIVE.DMX_VALUES, { universeBuffer })
+    this.broadcaster.emit(RENDERER_RECEIVE.DMX_VALUES, { universeBuffer })
   }
 
   protected verifySenderStarted(): void {}

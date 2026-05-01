@@ -1,6 +1,9 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import { createLogger } from '../../shared/logger'
-import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
+import {
+  SenderManager,
+  type SenderManagerIpcOptions,
+} from '../../photonics-dmx/controllers/SenderManager'
 import { SenderError, SenderId } from '../../photonics-dmx/senders/BaseSender'
 import { createSenderErrorHandler } from './senderErrorHandler'
 import { sendToAllWindows } from '../utils/windowUtils'
@@ -36,8 +39,11 @@ export class SenderLifecycleController {
   private readonly senderErrorHandler: (error: SenderError) => void
   private senderErrorTrackingCallback: ((senderId: string) => void) | null = null
 
-  constructor(private readonly getConfig: () => ConfigurationManager) {
-    this.senderManager = new SenderManager()
+  constructor(
+    private readonly getConfig: () => ConfigurationManager,
+    private readonly ipcSenderOptions: SenderManagerIpcOptions,
+  ) {
+    this.senderManager = new SenderManager(ipcSenderOptions)
     this.senderErrorHandler = createSenderErrorHandler(
       () => this.getSenderManager(),
       sendToAllWindows,
@@ -47,7 +53,7 @@ export class SenderLifecycleController {
 
   public ensureSenderManager(): void {
     if (this.senderManager === null) {
-      this.senderManager = new SenderManager()
+      this.senderManager = new SenderManager(this.ipcSenderOptions)
       this.senderManager.onSendError(this.senderErrorHandler)
       if (this.senderErrorTrackingCallback) {
         this.senderManager.setOnSenderEnabled(this.senderErrorTrackingCallback)
