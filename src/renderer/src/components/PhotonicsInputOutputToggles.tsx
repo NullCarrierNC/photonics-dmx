@@ -8,7 +8,7 @@ import SacnToggle from './SacnToggle'
 import ArtNetToggle from './ArtNetToggle'
 import OpenDmxToggle from './OpenDmxToggle'
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa'
-import { myValidDmxLightsAtom } from '../atoms'
+import { lightingPrefsAtom, myValidDmxLightsAtom } from '../atoms'
 import { useLifecyclePhase, isLifecycleBusy } from '../hooks/useLifecyclePhase'
 
 interface DmxSettingsProps {
@@ -18,6 +18,8 @@ interface DmxSettingsProps {
 const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [validDmxLights] = useAtom(myValidDmxLightsAtom)
+  const [prefs] = useAtom(lightingPrefsAtom)
+  const advancedModeEnabled = prefs.advancedModeEnabled ?? false
   const lifecyclePhase = useLifecyclePhase()
   // Lock listener and sender toggles while the controller graph is mid-transition (restart, shutdown, failed, etc.).
   const lifecycleLocked = isLifecycleBusy(lifecyclePhase)
@@ -46,7 +48,7 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
             <div className="flex flex-row gap-8 items-start flex-wrap">
               <YargToggle disabled={togglesDisabled} />
               <Rb3Toggle disabled={togglesDisabled} />
-              <AudioToggle disabled={togglesDisabled} />
+              {advancedModeEnabled && <AudioToggle disabled={togglesDisabled} />}
             </div>
           </div>
 

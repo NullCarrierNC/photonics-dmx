@@ -273,6 +273,7 @@ export interface LightingPreferences {
   activeAudioCueType?: AudioCueType
   cueConsistencyWindow?: number
   allowMultipleActiveRigs?: boolean
+  advancedModeEnabled?: boolean
 
   // Frontend-specific preferences
   dmxOutputConfig?: {

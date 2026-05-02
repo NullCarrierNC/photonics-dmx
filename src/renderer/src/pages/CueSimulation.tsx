@@ -1,6 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { useAtom } from 'jotai'
-import { audioListenerEnabledAtom, previewRigIdAtom } from '@renderer/atoms'
+import { getDefaultStore, useAtom } from 'jotai'
+import {
+  audioListenerEnabledAtom,
+  lightingPrefsAtom,
+  previewRigIdAtom,
+  resolveLastUsedRigId,
+} from '@renderer/atoms'
 import { EffectSelector } from '../../../photonics-dmx/types'
 import EffectsDropdown from '../components/EffectSelector'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
@@ -22,6 +27,7 @@ import {
   savePrefs,
   getCueGroups,
   getAvailableCues,
+  getActiveRigs,
   simulateBeat,
   simulateKeyframe,
   simulateMeasure,
@@ -45,6 +51,8 @@ const isYargVisualCueGroup = (g: CueGroup) => g.cueTypes.length > 0
 
 const CueSimulation: React.FC = () => {
   const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom)
+  const [lightingPrefs] = useAtom(lightingPrefsAtom)
+  const advancedModeEnabled = lightingPrefs.advancedModeEnabled ?? false
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null)
   const [selectedRegistryType, setSelectedRegistryType] = useState<CueRegistryType>('YARG')
   const [selectedGroup, setSelectedGroup] = useState<string>('Select')
@@ -84,6 +92,36 @@ const CueSimulation: React.FC = () => {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasLoadedSavedEffect = useRef(false)
   const savedEffectIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!advancedModeEnabled) {
+      stopMotionCueSimulation().catch((error) => {
+        log.error('Error stopping motion cue simulation when Advanced Mode is disabled', error)
+      })
+    }
+  }, [advancedModeEnabled])
+
+  useEffect(() => {
+    if (advancedModeEnabled) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const activeRigs = await getActiveRigs()
+        if (cancelled) return
+        const orderedIds = activeRigs.map((r) => r.id)
+        const currentId = getDefaultStore().get(previewRigIdAtom)
+        const resolved = resolveLastUsedRigId(currentId, orderedIds)
+        if (resolved !== currentId) {
+          setSelectedRigId(resolved)
+        }
+      } catch (e) {
+        log.error('Failed to resolve preview rig when Advanced Mode is off', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [advancedModeEnabled, setSelectedRigId])
 
   // Cleanup effect: stop any running test effects when component unmounts
   useEffect(() => {
@@ -441,8 +479,9 @@ const CueSimulation: React.FC = () => {
 
       <CueSimulationAbout isOpen={isAboutOpen} onToggle={() => setIsAboutOpen(!isAboutOpen)} />
 
-      {/* Rig Selector */}
-      <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+      {advancedModeEnabled && (
+        <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+      )}
 
       <div className="my-6">
         <h2 className="text-xl font-bold mb-2 text-gray-800 dark:text-gray-200">
@@ -535,7 +574,7 @@ const CueSimulation: React.FC = () => {
             onSimulateNote={handleSimulateInstrumentNote}
             disabled={!selectedGroupId}
           />
-          <CueSimulationMotion />
+          {advancedModeEnabled && <CueSimulationMotion />}
         </>
       )}
 
@@ -571,7 +610,9 @@ const CueSimulation: React.FC = () => {
       )}
       {selectedRig === null && (
         <p className="text-gray-600 dark:text-gray-400 mt-4">
-          Please select a rig to preview DMX data.
+          {advancedModeEnabled
+            ? 'Please select a rig to preview DMX data.'
+            : 'No active rigs configured. Create and activate a rig in Lights Layout to see DMX preview.'}
         </p>
       )}
     </div>

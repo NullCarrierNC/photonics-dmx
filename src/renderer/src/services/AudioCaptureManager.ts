@@ -168,7 +168,7 @@ export class AudioCaptureManager {
           // Device may have been disconnected
           if (deviceId) {
             throw new Error(
-              `Audio device not found. The saved device is no longer connected. Please select a different device in Audio Settings.`,
+              `Audio device not found. The saved device is no longer connected. Please select a different device in Preferences → Audio.`,
             )
           } else {
             throw new Error('No microphone found. Please connect a microphone and try again.')
