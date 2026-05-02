@@ -63,6 +63,8 @@ export interface AppPreferences {
     openDmxExpanded: boolean
   }
   allowMultipleActiveRigs?: boolean
+  /** When true, show audio preferences, spectrum analyzer, cue editor, multi-rig UI, and other advanced features. */
+  advancedModeEnabled?: boolean
   audioConfig?: AudioConfig
   activeAudioCueType?: AudioCueType
   audioGameMode?: AudioGameModeConfig
@@ -140,6 +142,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
     openDmxExpanded: false,
   },
   allowMultipleActiveRigs: false,
+  advancedModeEnabled: false,
   audioConfig: DEFAULT_AUDIO_CONFIG,
   cueEditorWindowState: {
     width: 1200,

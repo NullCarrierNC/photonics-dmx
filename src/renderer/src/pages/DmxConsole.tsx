@@ -16,7 +16,7 @@ import {
   sendConsoleDmx,
   setConsoleHome,
 } from '../ipcApi'
-import { previewRigIdAtom, resolveLastUsedRigId } from '../atoms'
+import { lightingPrefsAtom, previewRigIdAtom, resolveLastUsedRigId } from '../atoms'
 import LightsDmxPreview from '../components/LightsDmxPreview'
 import { DmxRigSelectField } from '../components/DmxRigSelectField'
 import SacnToggle from '../components/SacnToggle'
@@ -77,6 +77,8 @@ function isMovingHeadFixture(fixture: FixtureTypes): boolean {
 
 const DmxConsole: React.FC = () => {
   const [rigs, setRigs] = useState<DmxRig[]>([])
+  const [prefs] = useAtom(lightingPrefsAtom)
+  const advancedModeEnabled = prefs.advancedModeEnabled ?? false
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
   const [selectedRig, setSelectedRig] = useState<DmxRig | null>(null)
   const [consoleEnabled, setConsoleEnabled] = useState(false)
@@ -433,14 +435,16 @@ const DmxConsole: React.FC = () => {
       </p>
 
       <div className="mb-8 flex flex-wrap items-end gap-6 pt-4">
-        <DmxRigSelectField
-          className="mb-0"
-          label="Rig"
-          rigs={rigs}
-          selectedRigId={selectedRigId}
-          onChange={(id) => void handleRigSelect(id)}
-          showInactiveSuffix
-        />
+        {advancedModeEnabled && (
+          <DmxRigSelectField
+            className="mb-0"
+            label="Rig"
+            rigs={rigs}
+            selectedRigId={selectedRigId}
+            onChange={(id) => void handleRigSelect(id)}
+            showInactiveSuffix
+          />
+        )}
         <div className="flex flex-wrap items-center gap-4">
           <button
             type="button"

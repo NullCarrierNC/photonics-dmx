@@ -14,7 +14,7 @@ import {
 import { MdGraphicEq, MdTune } from 'react-icons/md'
 import { useAtom } from 'jotai'
 import { Pages } from './../types'
-import { currentPageAtom, lightsLayoutHasUnsavedChangesAtom } from './../atoms'
+import { currentPageAtom, lightsLayoutHasUnsavedChangesAtom, lightingPrefsAtom } from './../atoms'
 import { useConfirm } from '../hooks/useConfirm'
 import { openCueEditorWindow, openAudioPreviewWindow } from '../ipcApi'
 
@@ -33,6 +33,8 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 }) => {
   const [activeMenu, setCurrentPage] = useAtom(currentPageAtom)
   const [lightsLayoutUnsaved] = useAtom(lightsLayoutHasUnsavedChangesAtom)
+  const [prefs] = useAtom(lightingPrefsAtom)
+  const advancedModeEnabled = prefs.advancedModeEnabled ?? false
   const confirm = useConfirm()
 
   const handleMenuClick = async (page: Pages) => {
@@ -129,33 +131,37 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           {!isCollapsed && <span className="text-[10pt]">Preferences</span>}
         </button>
 
-        {/* Audio Preview — separate window (no main route; never show as selected) */}
-        <button
-          onClick={handleAudioPreviewClick}
-          className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-2'} p-2 hover:text-gray-400 text-gray-800 dark:text-gray-300`}
-          title={isCollapsed ? 'Audio Preview' : undefined}>
-          <MdGraphicEq className="text-xl" />
-          {!isCollapsed && (
-            <span className="text-[10pt] flex items-center gap-1">
-              Spectrum Analyzer
-              <FiExternalLink className="text-[10pt]" />
-            </span>
-          )}
-        </button>
+        {advancedModeEnabled && (
+          <>
+            {/* Audio Preview — separate window (no main route; never show as selected) */}
+            <button
+              onClick={handleAudioPreviewClick}
+              className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-2'} p-2 hover:text-gray-400 text-gray-800 dark:text-gray-300`}
+              title={isCollapsed ? 'Audio Preview' : undefined}>
+              <MdGraphicEq className="text-xl" />
+              {!isCollapsed && (
+                <span className="text-[10pt] flex items-center gap-1">
+                  Spectrum Analyzer
+                  <FiExternalLink className="text-[10pt]" />
+                </span>
+              )}
+            </button>
 
-        {/* Cue Editor Button */}
-        <button
-          onClick={handleCueEditorClick}
-          className={buttonClasses(Pages.CueEditor)}
-          title={isCollapsed ? 'Cue Editor' : undefined}>
-          <FiPenTool className="text-xl" />
-          {!isCollapsed && (
-            <span className="text-[10pt] flex items-center gap-1">
-              Cue Editor
-              <FiExternalLink className="text-[10pt]" />
-            </span>
-          )}
-        </button>
+            {/* Cue Editor Button */}
+            <button
+              onClick={handleCueEditorClick}
+              className={buttonClasses(Pages.CueEditor)}
+              title={isCollapsed ? 'Cue Editor' : undefined}>
+              <FiPenTool className="text-xl" />
+              {!isCollapsed && (
+                <span className="text-[10pt] flex items-center gap-1">
+                  Cue Editor
+                  <FiExternalLink className="text-[10pt]" />
+                </span>
+              )}
+            </button>
+          </>
+        )}
 
         {/* Network Debug Button */}
         <button

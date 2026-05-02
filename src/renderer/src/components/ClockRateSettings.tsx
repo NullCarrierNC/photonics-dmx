@@ -101,7 +101,7 @@ const ClockRateSettings: React.FC = () => {
 
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
             Default is 10ms. Increase for better performance on slower systems. Range: 1-100ms but
-            you probably should't go higher than 40ms.
+            you probably shouldn't go higher than 40ms.
           </p>
         </div>
       </div>

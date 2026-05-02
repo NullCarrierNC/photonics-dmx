@@ -648,6 +648,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'stageKitPrefs',
   'dmxSettingsPrefs',
   'allowMultipleActiveRigs',
+  'advancedModeEnabled',
   'audioConfig',
   'activeAudioCueType',
   'audioGameMode',
@@ -693,6 +694,10 @@ export function validatePreferencesPayload(
       return d
     }
     cleaned.cueDomains = d.value
+  }
+
+  if ('advancedModeEnabled' in cleaned && typeof cleaned.advancedModeEnabled !== 'boolean') {
+    return { ok: false, error: 'advancedModeEnabled must be a boolean' }
   }
 
   return { ok: true, value: cleaned as Partial<AppPreferences> }

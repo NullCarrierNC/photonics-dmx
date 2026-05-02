@@ -18,6 +18,7 @@ import {
   dmxRigsAtom,
   activeRigIdAtom,
   lightsLayoutHasUnsavedChangesAtom,
+  lightingPrefsAtom,
 } from '@renderer/atoms'
 import LightsLayoutRigSection from './LightsLayout/LightsLayoutRigSection'
 import LightsLayoutForm from './LightsLayout/LightsLayoutForm'
@@ -55,6 +56,8 @@ const LightsLayout = () => {
   const [myFixtureLibrary] = useAtom(myDmxLightsAtom)
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
   const [activeRigId, setActiveRigId] = useAtom(activeRigIdAtom)
+  const [prefs] = useAtom(lightingPrefsAtom)
+  const advancedModeEnabled = prefs.advancedModeEnabled ?? false
   const setLightsLayoutUnsaved = useSetAtom(lightsLayoutHasUnsavedChangesAtom)
 
   const [selectedCount, setSelectedCount] = useState<number | null>(() => {
@@ -455,15 +458,17 @@ const LightsLayout = () => {
         </div>
       ) : (
         <>
-          <LightsLayoutRigSection
-            rigs={rigs}
-            activeRigId={activeRigId}
-            setActiveRigId={setActiveRigId}
-            rigName={rigName}
-            setRigName={setRigName}
-            onRigsChange={setRigs}
-            onBeforeDiscardingUnsaved={tryConfirmUnsaved}
-          />
+          {advancedModeEnabled && (
+            <LightsLayoutRigSection
+              rigs={rigs}
+              activeRigId={activeRigId}
+              setActiveRigId={setActiveRigId}
+              rigName={rigName}
+              setRigName={setRigName}
+              onRigsChange={setRigs}
+              onBeforeDiscardingUnsaved={tryConfirmUnsaved}
+            />
+          )}
 
           <LightsLayoutForm
             selectedCount={selectedCount}
