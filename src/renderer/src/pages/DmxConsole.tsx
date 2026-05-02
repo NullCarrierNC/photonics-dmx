@@ -7,6 +7,7 @@ import {
   LightingConfiguration,
   ConfigStrobeType,
   FixtureTypes,
+  IpcSenderConfig,
 } from '../../../photonics-dmx/types'
 import {
   getDmxRig,
@@ -15,6 +16,7 @@ import {
   disableConsole,
   sendConsoleDmx,
   setConsoleHome,
+  enableSender,
 } from '../ipcApi'
 import { lightingPrefsAtom, previewRigIdAtom, resolveLastUsedRigId } from '../atoms'
 import LightsDmxPreview from '../components/LightsDmxPreview'
@@ -145,6 +147,18 @@ const DmxConsole: React.FC = () => {
       cancelled = true
     }
   }, [selectedRigId])
+
+  useEffect(() => {
+    let cancelled = false
+    void enableSender({ sender: 'ipc' } as IpcSenderConfig).catch((err) => {
+      if (!cancelled) {
+        log.error('Failed to enable IPC preview sender', err)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     return registerIpcListener(RENDERER_RECEIVE.DMX_VALUES, (data) => {
