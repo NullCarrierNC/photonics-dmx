@@ -442,7 +442,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
 
       {!audioEnabled && (
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Enable Audio Reactive mode in Audio Settings to pick a cue.
+          Enable Audio Reactive mode in Preferences → Audio to pick a cue.
         </p>
       )}
 

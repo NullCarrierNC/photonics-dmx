@@ -6,7 +6,6 @@ import {
   FiCpu,
   FiInfo,
   FiSliders,
-  FiVolume2,
   FiPenTool,
   FiChevronLeft,
   FiChevronRight,
@@ -128,15 +127,6 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           title={isCollapsed ? 'Preferences' : undefined}>
           <FiSliders className="text-xl" />
           {!isCollapsed && <span className="text-[10pt]">Preferences</span>}
-        </button>
-
-        {/* Audio Settings */}
-        <button
-          onClick={() => handleMenuClick(Pages.AudioSettings)}
-          className={buttonClasses(Pages.AudioSettings)}
-          title={isCollapsed ? 'Audio Settings' : undefined}>
-          <FiVolume2 className="text-xl" />
-          {!isCollapsed && <span className="text-[10pt]">Audio Settings</span>}
         </button>
 
         {/* Audio Preview — separate window (no main route; never show as selected) */}

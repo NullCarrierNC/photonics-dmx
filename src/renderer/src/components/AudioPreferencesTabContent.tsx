@@ -1,19 +1,18 @@
 import React from 'react'
-import AudioToggle from '../components/AudioToggle'
-import AudioDeviceSelector from '../components/AudioDeviceSelector'
-import AudioSensitivityControls from '../components/AudioSensitivityControls'
-import AudioStrobeSettings from '../components/AudioStrobeSettings'
-import AudioBandSettings from '../components/AudioBandSettings'
-import AudioBeatDetection from '../components/AudioBeatDetection'
-import AudioSmoothingSettings from '../components/AudioSmoothingSettings'
-import AudioGameModeSettings from '../components/AudioGameModeSettings'
-import AudioIdleDetectionSettings from '../components/AudioIdleDetectionSettings'
+import AudioToggle from './AudioToggle'
+import AudioDeviceSelector from './AudioDeviceSelector'
+import AudioSensitivityControls from './AudioSensitivityControls'
+import AudioStrobeSettings from './AudioStrobeSettings'
+import AudioBandSettings from './AudioBandSettings'
+import AudioBeatDetection from './AudioBeatDetection'
+import AudioSmoothingSettings from './AudioSmoothingSettings'
+import AudioGameModeSettings from './AudioGameModeSettings'
+import AudioIdleDetectionSettings from './AudioIdleDetectionSettings'
 
-const AudioSettings: React.FC = () => {
+/** Audio-reactive and input settings for the Preferences Audio tab. */
+const AudioPreferencesTabContent: React.FC = () => {
   return (
-    <div className="p-6 space-y-2 pb-4">
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Audio Settings</h1>
-
+    <div className="space-y-2">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
           Audio-Reactive Lighting
@@ -87,4 +86,4 @@ const AudioSettings: React.FC = () => {
   )
 }
 
-export default AudioSettings
+export default AudioPreferencesTabContent

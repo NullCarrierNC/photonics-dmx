@@ -18,7 +18,6 @@ const Header: React.FC = () => {
     [Pages.CueSimulation]: 'Cue Simulation',
     [Pages.CueEditor]: 'Cue Editor',
     [Pages.Preferences]: 'Preferences',
-    [Pages.AudioSettings]: 'Audio Settings',
     [Pages.About]: 'About Photonics (ALPHA VERSION)',
   }
 
