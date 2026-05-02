@@ -15,6 +15,7 @@ import {
   VariableDefinition,
 } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
+import { validateSharedActionNodePayload } from './sharedActionNodeValidation'
 
 const log = createLogger('EffectCompiler')
 
@@ -233,17 +234,6 @@ export class EffectCompiler {
   }
 
   private static validateAction(action: ActionNode): void {
-    // Check if groups is defined (ValueSource should always have a value)
-    if (!action.target.groups) {
-      throw new EffectCompilationError(
-        `Action '${action.label ?? action.id}' must target at least one group.`,
-      )
-    }
-    // If it's a literal source, check the value isn't empty
-    if (action.target.groups.source === 'literal' && !action.target.groups.value) {
-      throw new EffectCompilationError(
-        `Action '${action.label ?? action.id}' must target at least one group.`,
-      )
-    }
+    validateSharedActionNodePayload(action, (message) => new EffectCompilationError(message))
   }
 }

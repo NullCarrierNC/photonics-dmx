@@ -147,7 +147,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
   })
 
   describe('get-cue-groups handler', () => {
-    it('should return all registered groups with their descriptions', async () => {
+    it('should return all registered lighting cue groups with their descriptions', async () => {
       const groupInfo = await getCueGroupsHandler({})
 
       expect(groupInfo).toHaveLength(2)
@@ -163,6 +163,22 @@ describe('IPC Light Handlers for Cue Registry', () => {
         description: 'Custom effects group',
         cueTypes: [CueType.Chorus, CueType.Verse],
       })
+    })
+
+    it('omits motion-only groups (no lighting cues) from the lighting cue group list', async () => {
+      const motionOnlyGroup: ICueGroup = {
+        id: 'motion-only',
+        name: 'Default Motion',
+        description: 'Motion programs only',
+        cues: new Map(),
+        motionCues: new Map([['m1', new MockCueImplementation('m1', 'A motion program')]]),
+      }
+      registry.registerGroup(motionOnlyGroup)
+
+      const groupInfo = await getCueGroupsHandler({})
+
+      expect(groupInfo).toHaveLength(2)
+      expect(groupInfo.map((g: { id: string }) => g.id)).not.toContain('motion-only')
     })
   })
 

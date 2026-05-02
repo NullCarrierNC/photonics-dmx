@@ -128,7 +128,7 @@ export class NodeCueLoader extends EventEmitter {
   }
 
   public async readFile(filePath: string): Promise<NodeCueFile> {
-    const resolvedPath = this.resolvePath(filePath)
+    const resolvedPath = this.resolveExistingCueFilePath(filePath)
     const mode = this.getModeFromPath(resolvedPath)
     if (!mode) {
       throw new Error('Unsupported node cue path.')
@@ -144,6 +144,15 @@ export class NodeCueLoader extends EventEmitter {
     }
 
     return validation.data
+  }
+
+  /**
+   * Resolves a renderer-supplied path to an absolute path inside the YARG/audio cue roots,
+   * or throws. Use this when an IPC handler needs the rooted path (e.g. for fs.copyFile during
+   * export) and must not trust the raw IPC string.
+   */
+  public resolveCueFilePathForIpc(filePath: string): string {
+    return this.resolveExistingCueFilePath(filePath)
   }
 
   public async saveFile(
@@ -173,7 +182,7 @@ export class NodeCueLoader extends EventEmitter {
   }
 
   public async deleteFile(filePath: string): Promise<{ success: boolean }> {
-    const resolvedPath = this.resolvePath(filePath)
+    const resolvedPath = this.resolveExistingCueFilePath(filePath)
     const mode = this.getModeFromPath(resolvedPath)
     if (!mode) {
       throw new Error('Unsupported node cue path.')
@@ -558,6 +567,30 @@ export class NodeCueLoader extends EventEmitter {
 
   private resolvePath(targetPath: string): string {
     return path.resolve(targetPath)
+  }
+
+  /**
+   * Resolves a user-supplied path to an absolute path that must lie under the YARG or audio cue roots.
+   * Relative segments are anchored to {@link NodeCueLoaderOptions.baseDir} so paths cannot escape via cwd.
+   */
+  private resolveExistingCueFilePath(userPath: string): string {
+    if (typeof userPath !== 'string' || userPath.trim().length === 0) {
+      throw new Error('Node cue path is required.')
+    }
+    if (userPath.includes('\0')) {
+      throw new Error('Node cue path must not contain null bytes.')
+    }
+    const trimmed = userPath.trim()
+    const resolved = path.isAbsolute(trimmed)
+      ? path.resolve(trimmed)
+      : path.resolve(this.baseDir, trimmed)
+    if (
+      !this.isPathWithinDir(resolved, this.yargDir) &&
+      !this.isPathWithinDir(resolved, this.audioDir)
+    ) {
+      throw new Error('Node cue file path must be under the YARG or audio cue directories.')
+    }
+    return resolved
   }
 
   private resolveInDir(baseDir: string, filename: string): string {

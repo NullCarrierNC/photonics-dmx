@@ -79,7 +79,7 @@ export class EffectLoader extends EventEmitter {
   }
 
   public async readFile(filePath: string): Promise<EffectFile> {
-    const resolvedPath = this.resolvePath(filePath)
+    const resolvedPath = this.resolveExistingEffectFilePath(filePath)
     const mode = this.getModeFromPath(resolvedPath)
     if (!mode) {
       throw new Error('Unsupported effect file path.')
@@ -98,6 +98,15 @@ export class EffectLoader extends EventEmitter {
     }
 
     return validation.data
+  }
+
+  /**
+   * Resolves a renderer-supplied path to an absolute path inside the YARG/audio effect roots,
+   * or throws. Use this when an IPC handler needs the rooted path (e.g. for fs.copyFile during
+   * export) and must not trust the raw IPC string.
+   */
+  public resolveEffectFilePathForIpc(filePath: string): string {
+    return this.resolveExistingEffectFilePath(filePath)
   }
 
   public async saveFile(
@@ -127,7 +136,7 @@ export class EffectLoader extends EventEmitter {
   }
 
   public async deleteFile(filePath: string): Promise<{ success: boolean }> {
-    const resolvedPath = this.resolvePath(filePath)
+    const resolvedPath = this.resolveExistingEffectFilePath(filePath)
     const mode = this.getModeFromPath(resolvedPath)
     if (!mode) {
       throw new Error('Unsupported effect file path.')
@@ -330,6 +339,30 @@ export class EffectLoader extends EventEmitter {
 
   private resolvePath(targetPath: string): string {
     return path.resolve(targetPath)
+  }
+
+  /**
+   * Resolves a user-supplied path to an absolute path that must lie under the YARG or audio effect roots.
+   * Relative segments are anchored to {@link EffectLoaderOptions.baseDir}.
+   */
+  private resolveExistingEffectFilePath(userPath: string): string {
+    if (typeof userPath !== 'string' || userPath.trim().length === 0) {
+      throw new Error('Effect file path is required.')
+    }
+    if (userPath.includes('\0')) {
+      throw new Error('Effect file path must not contain null bytes.')
+    }
+    const trimmed = userPath.trim()
+    const resolved = path.isAbsolute(trimmed)
+      ? path.resolve(trimmed)
+      : path.resolve(this.baseDir, trimmed)
+    if (
+      !this.isPathWithinDir(resolved, this.yargDir) &&
+      !this.isPathWithinDir(resolved, this.audioDir)
+    ) {
+      throw new Error('Effect file path must be under the YARG or audio effect directories.')
+    }
+    return resolved
   }
 
   private resolveInDir(baseDir: string, filename: string): string {

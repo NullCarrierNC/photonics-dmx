@@ -203,11 +203,13 @@ export class AudioCueRegistry {
    * Get summaries for all groups (used by renderer)
    */
   public getGroupSummaries(): Array<{ id: string; name: string; description: string }> {
-    return Array.from(this.groups.values()).map((group) => ({
-      id: group.id,
-      name: group.name,
-      description: group.description,
-    }))
+    return Array.from(this.groups.values())
+      .filter((group) => group.cues.size > 0)
+      .map((group) => ({
+        id: group.id,
+        name: group.name,
+        description: group.description,
+      }))
   }
 
   /**

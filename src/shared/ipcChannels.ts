@@ -42,6 +42,12 @@ export const SHELL = {
   RUN_NODE_SCRIPT: 'shell:runNodeScript',
 } as const
 
+// ---- Lifecycle ----
+/** Controller-manager runtime lifecycle channels (used by renderer to disable actions outside `running`). */
+export const LIFECYCLE = {
+  GET_PHASE: 'lifecycle:get-phase',
+} as const
+
 // ---- Cue / listeners ----
 export const CUE = {
   DISABLE_YARG: 'disable-yarg',
@@ -171,6 +177,7 @@ export const CHANNELS = {
   ...EFFECTS,
   ...WINDOW,
   ...SHELL,
+  ...LIFECYCLE,
   ...CUE,
   ...LIGHT,
   ...CONFIG,
@@ -219,6 +226,8 @@ export const RENDERER_RECEIVE = {
   DEBUG_LOG: 'node-cues:debug-log',
   NODE_EXECUTION: 'node-cues:node-execution',
   NODE_CUE_RUNTIME_ERROR: 'node-cue:runtime-error',
+  /** Controller-manager lifecycle phase changed (every transition between phases). */
+  LIFECYCLE_PHASE_CHANGED: 'lifecycle:phase-changed',
 } as const
 
 export type RendererReceiveChannel = (typeof RENDERER_RECEIVE)[keyof typeof RENDERER_RECEIVE]

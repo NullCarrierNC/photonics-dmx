@@ -18,7 +18,7 @@ If you see the term `light` this is the virtual representation used within the l
 7. `DmxLightManager`: manages the virtual representation of the physical DMX fixtures.
 8. `DmxPublisher`: maps the abstract light state to each fixture's specific DMX channels using the fixture profiles defined in the configuration.
 9. `SenderManager`: manages the various output senders that transmit DMX data to physical devices or other systems.
-10. `Senders`: provide the bridge to the real world. sACN/ArtNet for DMX over the network, EnttecPro for Enttec USB dongles, and IPC for sending DMX data to the application UI.
+10. `Senders`: provide the bridge to the real world. sACN/ArtNet for DMX over the network, EnttecPro and OpenDMX for USB dongles, and IPC for sending DMX data to the application UI.
 
 Configuration is handled by the `ConfigurationManager` and related services, which manage user preferences and fixture setup.
 
@@ -30,11 +30,15 @@ Photonics uses node-based cues for YARG and audio lighting. Cues and reusable ef
 
 | Component                                       | Role                                                                                             |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `NodeCueLoader` / `EffectLoader`                | Loads JSON cue/effect files from disk, validates with AJV schema, watches for changes (chokidar) |
-| `NodeCueCompiler` / `EffectCompiler`            | Compiles JSON node graph to `CompiledYargCue` / `CompiledAudioCue`                               |
-| `YargCueRegistry` / `EffectRegistry`            | Registers compiled cues for dispatch when game events arrive                                     |
+| `NodeCueLoader` / `EffectLoader`                | Loads JSON cue/effect files from disk, validates with AJV schema, watches for changes (chokidar); paths are confined to app-owned cue/effect roots |
+| `NodeCueCompiler` / `EffectCompiler`            | Compiles JSON node graph to `CompiledYargCue` / `CompiledAudioCue` / compiled effects             |
+| `YargCueRegistry` / `AudioCueRegistry`          | Registers YARG and audio lighting cues plus motion programs for random/locked selection          |
+| `GraphExecutionEngine`                          | Unified graph runner with cue/effect policy, sessions, and queuing                                   |
 | `NodeExecutionEngine` / `EffectExecutionEngine` | Executes node graph at runtime: evaluates logic, resolves values, dispatches actions             |
 | `YargNodeCue` / `AudioNodeCue`                  | Runtime cue instance that receives events and drives effects via the sequencer                   |
+
+`sACN`, `Art-Net`, `EnttecPro`, `OpenDMX`, and `IPC` senders are available for DMX output; preferences and console
+flows pick active rigs and enabled senders through `ConfigurationManager` and `SenderManager`.
 
 Node types include: event listeners (YARG cues, effect triggers), logic (variables, math, conditionals, loops), actions
 (light effects with timing), event raisers, effect raisers/listeners. The visual cue editor (in the renderer) provides a

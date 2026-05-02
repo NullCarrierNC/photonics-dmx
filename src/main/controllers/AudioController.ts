@@ -13,6 +13,7 @@ import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRe
 import { AudioCueType, AudioMotionCueRef } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
+import { validateAudioLightingData } from '../ipc/audioLightingValidation'
 const log = createLogger('AudioController')
 
 export interface AudioControllerDeps {
@@ -30,6 +31,9 @@ export class AudioController {
   private isAudioEnabled = false
   private audioDataHandler: AudioDataHandler | null = null
   private broadcastAudioMirror: ((data: AudioLightingData) => void) | null = null
+  /** Throttle logs for invalid renderer audio frames (can arrive at high rate). */
+  private invalidAudioFrameCount = 0
+  private invalidAudioFrameLastLogMs = 0
 
   constructor(private readonly deps: AudioControllerDeps) {}
 
@@ -97,7 +101,20 @@ export class AudioController {
         this.audioDataHandler = null
       }
       this.audioDataHandler = (_: unknown, data: unknown) => {
-        const lightingData = data as AudioLightingData
+        const validated = validateAudioLightingData(data)
+        if (!validated.ok) {
+          this.invalidAudioFrameCount++
+          const now = Date.now()
+          if (now - this.invalidAudioFrameLastLogMs > 2000) {
+            log.warn(
+              `Invalid AUDIO_DATA frame (${this.invalidAudioFrameCount} since last log): ${validated.error}`,
+            )
+            this.invalidAudioFrameCount = 0
+            this.invalidAudioFrameLastLogMs = now
+          }
+          return
+        }
+        const lightingData = validated.value
         if (this.audioProcessor && this.isAudioEnabled) {
           this.audioProcessor.processAudioData(lightingData)
         }

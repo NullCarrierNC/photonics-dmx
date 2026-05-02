@@ -9,6 +9,7 @@ import {
   NODE_CUES,
   EFFECTS,
   WINDOW,
+  LIFECYCLE,
   LIGHT,
   CONFIG,
   CUE,
@@ -26,12 +27,19 @@ import type {
   LightingConfiguration,
   SenderConfig,
   AudioCueType,
+  CueType,
   AppPreferences,
   AudioConfig,
   AudioGameModeConfig,
   AudioLightingData,
 } from '../../shared/ipcTypes'
 import type { FixtureConfig } from '../../photonics-dmx/types'
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+export const getLifecyclePhase = () => window.api.invoke(LIFECYCLE.GET_PHASE, undefined)
 
 // ---------------------------------------------------------------------------
 // Cue consistency window
@@ -119,7 +127,7 @@ export const enableCueGroup = (groupId: string) =>
 export const disableCueGroup = (groupId: string) =>
   window.api.invoke(LIGHT.DISABLE_CUE_GROUP, groupId)
 
-export const getCueSourceGroup = (cueType: string) =>
+export const getCueSourceGroup = (cueType: CueType) =>
   window.api.invoke(LIGHT.GET_CUE_SOURCE_GROUP, cueType)
 
 export const getAvailableCues = (groupId: string | undefined) =>

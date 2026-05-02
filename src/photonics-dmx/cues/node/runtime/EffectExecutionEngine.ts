@@ -12,8 +12,6 @@ import { CompiledEffect } from '../compiler/EffectCompiler'
 import {
   ActionEffectFactory,
   ResolvedActionTarget,
-  ResolvedColorSetting,
-  ResolvedActionTiming,
   ResolvedPositionSetting,
   buildSetPositionSubmissionFingerprint,
   resolvedMotionPatternSettingsEqual,
@@ -47,19 +45,18 @@ import {
 } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
+import {
+  buildActionChain,
+  markConsecutiveActionChainTailVisited,
+  mapSetColorChainStepsForEffectFactory,
+  resolveChainStep,
+  runContextBatch,
+  tryBuildHomogeneousSetColorChainData,
+} from './graphActionHelpers'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('EffectExecutionEngine')
-
-type ChainStep = {
-  action: ActionNode
-  lights: TrackedLight[]
-  lightIds: string
-  resolvedLayer: number
-  resolvedTiming: ResolvedActionTiming
-  resolvedColor: ResolvedColorSetting
-}
 
 export class EffectExecutionEngine {
   private static nextInstanceId = 0
@@ -541,27 +538,11 @@ export class EffectExecutionEngine {
     const resolvedTiming = resolveActionTiming(action.timing, context)
     const resolvedLayer = resolveActionLayer(action.layer, context)
 
-    // Build action chain: collect consecutive single-edge set-color action nodes
-    const buildActionChain = (): ActionNode[] => {
-      const { adjacency, actionMap } = this.compiledEffect
-      const chain: ActionNode[] = [action]
-      const visitedInChain = new Set<string>([action.id])
-      let currentId = action.id
-      while (true) {
-        const outgoing = adjacency.get(currentId) ?? []
-        if (outgoing.length !== 1) break
-        const nextId = outgoing[0].to
-        const nextAction = actionMap.get(nextId)
-        if (!nextAction) break
-        if (visitedInChain.has(nextId)) break
-        chain.push(nextAction)
-        visitedInChain.add(nextId)
-        currentId = nextId
-      }
-      return chain
-    }
-
-    const actionChain = buildActionChain()
+    const actionChain = buildActionChain(
+      action,
+      this.compiledEffect.adjacency,
+      this.compiledEffect.actionMap,
+    )
 
     const iterIdx = context.getForEachIterationIndex()
 
@@ -627,47 +608,9 @@ export class EffectExecutionEngine {
       return
     }
 
-    // Try to resolve each chain step (only set-color actions can be chained)
-    const resolveChainStep = (a: ActionNode): ChainStep | null => {
-      if (a.effectType !== 'set-color') return null
-      if (!a.color) return null
-
-      const layerNum = resolveActionLayer(a.layer, context)
-      const rc = resolveActionColor(a.color, context)
-      const rtiming = resolveActionTiming(a.timing, context)
-      const chainLights = ActionEffectFactory.resolveLights(this.lightManager, a.target, getVar)
-      if (!chainLights || chainLights.length === 0) return null
-
-      const lightIds = chainLights.map((l) => l.id).join(',')
-      return {
-        action: a,
-        lights: chainLights,
-        lightIds,
-        resolvedLayer: layerNum,
-        resolvedTiming: rtiming,
-        resolvedColor: rc,
-      }
-    }
-
-    const chainData = (() => {
-      const steps: ChainStep[] = []
-      let baseLayer: number | null = null
-      let baseLightIds: string | null = null
-
-      for (const stepAction of actionChain) {
-        const step = resolveChainStep(stepAction)
-        if (!step) return null
-        if (baseLayer === null) {
-          baseLayer = step.resolvedLayer
-          baseLightIds = step.lightIds
-        } else if (baseLayer !== step.resolvedLayer || baseLightIds !== step.lightIds) {
-          return null
-        }
-        steps.push(step)
-      }
-
-      return { steps, baseLayer: baseLayer ?? 0, baseLights: steps[0]?.lights ?? [] }
-    })()
+    const chainData = tryBuildHomogeneousSetColorChainData(actionChain, (a) =>
+      resolveChainStep(a, context, this.lightManager, getVar),
+    )
 
     if (!chainData) {
       submitSingleAction()
@@ -679,21 +622,16 @@ export class EffectExecutionEngine {
         ? `effect_${this.compiledEffect.definition.id}_${this.instanceId}_chain_${actionChain[0].id}:${iterIdx}`
         : `effect_${this.compiledEffect.definition.id}_${this.instanceId}_chain_${actionChain[0].id}`
 
-    // Mark rest of chain nodes as visited so they don't execute independently
-    for (let i = 1; i < actionChain.length; i++) {
-      context.markVisited(actionChain[i].id)
-      this.emitNodeExecution('activated', actionChain[i].id)
-    }
+    markConsecutiveActionChainTailVisited(context, actionChain, (nodeId) =>
+      this.emitNodeExecution('activated', nodeId),
+    )
 
     const composedEffect = ActionEffectFactory.buildEffectChain(
-      chainData.steps.map((step) => ({
-        action: step.action,
-        lights: chainData.baseLights,
-        resolvedColor: step.resolvedColor,
-        resolvedTiming: step.resolvedTiming,
-        resolvedLayer: chainData.baseLayer,
-        intensityScale: 1,
-      })),
+      mapSetColorChainStepsForEffectFactory(
+        chainData.steps,
+        chainData.baseLights,
+        chainData.baseLayer,
+      ),
     )
 
     if (!composedEffect) {
@@ -968,20 +906,13 @@ export class EffectExecutionEngine {
    * have had a chance to register blocking nodes (e.g. delays).
    */
   private continueExecution(nodeIds: string[], context: ExecutionContext): void {
-    context.beginBatch()
-    for (const nodeId of nodeIds) {
-      try {
-        this.executeNode(nodeId, context)
-      } catch (error) {
+    runContextBatch(context, nodeIds, (nodeId) => this.executeNode(nodeId, context), {
+      onNodeError: (nodeId, error) => {
         const msg = error instanceof Error ? error.message : String(error)
         this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
         log.error(`Error executing node ${nodeId}:`, error)
-      }
-    }
-    context.endBatch()
-    if (context.tryComplete()) {
-      context.dispose()
-    }
+      },
+    })
   }
 
   /**

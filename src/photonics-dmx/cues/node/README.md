@@ -19,7 +19,9 @@ NodeCueCompiler / EffectCompiler   (compile graph → CompiledYargCue / Compiled
     ↓
 YargCueRegistry / AudioCueRegistry / EffectRegistry   (register for dispatch)
     ↓
-YargNodeCue / YargMotionNodeCue / AudioNodeCue / AudioMotionNodeCue → GraphExecutionEngine → NodeExecutionEngine / EffectExecutionEngine   (execute at runtime)
+YargNodeCue / YargMotionNodeCue → GraphExecutionEngine (policy + IGraphExecutionSession) → NodeExecutionEngine
+AudioNodeCue / AudioMotionNodeCue → NodeExecutionEngine (directly, via BaseAudioNodeCue)
+EffectExecutionEngine                                                       (when an Action references a reusable effect)
     ↓
 Sequencer   (effects)
 ```
@@ -41,8 +43,9 @@ node/
 | --------------------- | ----------------------------------------------------------------------------------------------------- |
 | `NodeCueCompiler`     | Compiles `YargNodeCueDefinition` / `AudioNodeCueDefinition` to `CompiledYargCue` / `CompiledAudioCue` |
 | `EffectCompiler`      | Compiles `YargEffectDefinition` / `AudioEffectDefinition` to executable effect                        |
+| `sharedActionNodeValidation` | Shared structural checks for action targets, set-position, set-color, and motion-pattern payloads used by both compilers |
 | `GraphCompiler`       | Facade that delegates to NodeCueCompiler and EffectCompiler for cues and effects                      |
-| `ActionEffectFactory` | Builds concrete Effect objects from ActionNode config (colour, timing, targets)                       |
+| `ActionEffectFactory` | Builds concrete Effect objects from ActionNode config (color, timing, targets)                       |
 
 ### loader/
 
@@ -59,6 +62,7 @@ node/
 | `EffectExecutionEngine` | Executes effect definitions (used when an Action references a reusable effect)                                                |
 | `GraphExecutionEngine`  | Unified engine for cue/effect graphs; wraps NodeExecutionEngine/EffectExecutionEngine, queuing, state machine                 |
 | `GraphExecutionPolicy`  | Policy for GraphExecutionEngine (cue vs effect entry events, queuing, revisit)                                                |
+| `graphActionHelpers`    | Small shared pieces for homogeneous set-color chains (visit marking, step collection, effect-factory argument mapping)         |
 | `CueSession`            | Per-cue session state: variable stores, first-submission policy, cue-started flag                                             |
 | `ExecutionStateMachine` | Lifecycle phases (IDLE, RUNNING, BLOCKED, COMPLETED, CANCELLED) per context                                                   |
 | `CompiledEffectIndex`   | Cache of compiled effects for reuse across cues when loader provides it                                                       |
@@ -102,6 +106,11 @@ Core types live in `../types/nodeCueTypes.ts`:
 
 JSON files are validated against AJV schemas before load. Invalid files are reported (e.g. in the loader summary)
 and not registered. The cue editor validates on save and displays errors.
+
+Compilers additionally enforce graph shape: cues require actions reachable from system events and event listeners;
+effects require effect-listener entry points. Shared physical action rules (targets, set-position, set-color,
+motion-pattern) live in `sharedActionNodeValidation.ts` so cues and effects stay aligned. Cues still differ from
+effects in revisit/reachability rules and entry wiring (see `GraphExecutionPolicy` and compiler reachability starts).
 
 ## Related
 

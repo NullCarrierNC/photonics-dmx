@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
-import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   getAudioCueGroups,
   getEnabledAudioCueGroups,
@@ -9,6 +8,10 @@ import {
   setDisabledAudioCues,
 } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { CueGroupEnableList } from './cue-groups/CueGroupEnableList'
+import { CueGroupRow } from './cue-groups/CueGroupRow'
+import { useCueGroupRovingTabIndex } from './cue-groups/useCueGroupRovingTabIndex'
+import { useLatestGenerationGate } from './cue-groups/useLatestGenerationGate'
 
 const log = createLogger('AudioEnabledCueGroups')
 
@@ -26,57 +29,43 @@ interface AudioCueGroupDetails {
   isExpanded: boolean
 }
 
-function GroupEnableCheckbox(props: {
-  checked: boolean
-  indeterminate: boolean
-  onChange: (next: boolean) => void
-}): React.ReactElement {
-  const ref = useRef<HTMLInputElement>(null)
-  useLayoutEffect(() => {
-    if (ref.current) {
-      ref.current.indeterminate = props.indeterminate
-    }
-  }, [props.indeterminate])
-
-  return (
-    <input
-      ref={ref}
-      type="checkbox"
-      className="form-checkbox h-5 w-5 text-blue-600 rounded"
-      checked={props.checked && !props.indeterminate}
-      onChange={(e) => props.onChange(e.target.checked)}
-      onClick={(e) => e.stopPropagation()}
-    />
-  )
-}
+type RowError = { message: string; onRetry: () => void }
 
 const AudioEnabledCueGroups: React.FC = () => {
   const [allGroups, setAllGroups] = useState<AudioCueGroupDetails[]>([])
   const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([])
   const [disabledByGroup, setDisabledByGroup] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [expandErrorByGroup, setExpandErrorByGroup] = useState<Record<string, RowError>>({})
+  const [persistErrorByGroup, setPersistErrorByGroup] = useState<Record<string, RowError>>({})
+  const persistGeneration = useLatestGenerationGate()
+  const roving = useCueGroupRovingTabIndex(allGroups.map((g) => g.id))
 
   const fetchGroups = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const [groups, enabled, disabled] = await Promise.all([
         getAudioCueGroups(),
         getEnabledAudioCueGroups(),
         getDisabledAudioCues(),
       ])
 
-      const mappedGroups: AudioCueGroupDetails[] = groups.map(
-        (group: { id: string; name: string; description: string }) => ({
-          ...group,
-          cues: [],
-          isExpanded: false,
-        }),
-      )
+      const mappedGroups: AudioCueGroupDetails[] = groups.map((group) => ({
+        ...group,
+        cues: [],
+        isExpanded: false,
+      }))
 
       setAllGroups(mappedGroups)
       setEnabledGroupIds(enabled)
       setDisabledByGroup(disabled)
+      setExpandErrorByGroup({})
+      setPersistErrorByGroup({})
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load audio cue groups'
+      setLoadError(message)
       log.error('Failed to fetch audio cue groups:', error)
     } finally {
       setLoading(false)
@@ -87,22 +76,49 @@ const AudioEnabledCueGroups: React.FC = () => {
     fetchGroups()
   }, [fetchGroups])
 
+  const clearPersistError = useCallback((groupId: string) => {
+    setPersistErrorByGroup((prev) => {
+      if (!prev[groupId]) return prev
+      const next = { ...prev }
+      delete next[groupId]
+      return next
+    })
+  }, [])
+
   const persistEnabledAndDisabled = async (
     nextEnabled: string[],
     nextDisabled: Record<string, string[]>,
-  ) => {
-    const enabledResult = await setEnabledAudioCueGroups(nextEnabled)
-    if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
-      log.error('Failed to save enabled audio cue groups')
-      return
+  ): Promise<{ ok: true } | { ok: false; error: string } | { stale: true }> => {
+    const token = persistGeneration.nextGeneration()
+    try {
+      const enabledResult = await setEnabledAudioCueGroups(nextEnabled)
+      if (!persistGeneration.isCurrentGeneration(token)) {
+        return { stale: true }
+      }
+      if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
+        log.error('Failed to save enabled audio cue groups')
+        return {
+          ok: false,
+          error: enabledResult.error || 'Failed to save enabled audio cue groups',
+        }
+      }
+      const disabledResult = await setDisabledAudioCues(nextDisabled)
+      if (!persistGeneration.isCurrentGeneration(token)) {
+        return { stale: true }
+      }
+      if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
+        log.error('Failed to save disabled audio cues')
+        return { ok: false, error: disabledResult.error || 'Failed to save disabled audio cues' }
+      }
+      setEnabledGroupIds(nextEnabled)
+      setDisabledByGroup(nextDisabled)
+      return { ok: true }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to save audio cue group settings'
+      log.error('Persistence error for audio cue groups:', error)
+      return { ok: false, error: message }
     }
-    const disabledResult = await setDisabledAudioCues(nextDisabled)
-    if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
-      log.error('Failed to save disabled audio cues')
-      return
-    }
-    setEnabledGroupIds(nextEnabled)
-    setDisabledByGroup(nextDisabled)
   }
 
   const getGroupCheckboxState = (
@@ -145,8 +161,25 @@ const AudioEnabledCueGroups: React.FC = () => {
       nextEnabled = nextEnabled.filter((id) => id !== groupId)
     }
 
-    void persistEnabledAndDisabled(nextEnabled, nextDisabled)
+    void (async () => {
+      const result = await persistEnabledAndDisabled(nextEnabled, nextDisabled)
+      if ('stale' in result) return
+      if (result.ok) {
+        clearPersistError(groupId)
+      } else {
+        setPersistErrorByGroup((prev) => ({
+          ...prev,
+          [groupId]: { message: result.error, onRetry: () => handleGroupToggle(groupId, turnOn) },
+        }))
+      }
+    })()
   }
+
+  const expandRow = useCallback((groupId: string, cues: AudioCueInfo[]) => {
+    setAllGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
+    )
+  }, [])
 
   const handleAccordionToggle = async (groupId: string) => {
     const group = allGroups.find((g) => g.id === groupId)
@@ -155,12 +188,23 @@ const AudioEnabledCueGroups: React.FC = () => {
     if (!group.isExpanded && group.cues.length === 0) {
       try {
         const cueDetails = await getAvailableAudioCues(groupId)
-        setAllGroups((prev) =>
-          prev.map((g) => (g.id === groupId ? { ...g, cues: cueDetails, isExpanded: true } : g)),
-        )
+        setExpandErrorByGroup((prev) => {
+          if (!prev[groupId]) return prev
+          const next = { ...prev }
+          delete next[groupId]
+          return next
+        })
+        expandRow(groupId, cueDetails)
         return
       } catch (error) {
         log.error('Error fetching audio cue details:', error)
+        const message =
+          error instanceof Error ? error.message : 'Failed to load cues for this group'
+        setExpandErrorByGroup((prev) => ({
+          ...prev,
+          [groupId]: { message, onRetry: () => void handleAccordionToggle(groupId) },
+        }))
+        return
       }
     }
 
@@ -174,11 +218,14 @@ const AudioEnabledCueGroups: React.FC = () => {
     if (cues.length === 0) {
       try {
         cues = await getAvailableAudioCues(groupId)
-        setAllGroups((prev) =>
-          prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
-        )
+        expandRow(groupId, cues)
       } catch (e) {
         log.error('Failed to load cues for toggle:', e)
+        const message = e instanceof Error ? e.message : 'Failed to load cues for this group'
+        setExpandErrorByGroup((prev) => ({
+          ...prev,
+          [groupId]: { message, onRetry: () => void handleCueToggle(groupId, cueId, turnOn) },
+        }))
         return
       }
     }
@@ -209,101 +256,88 @@ const AudioEnabledCueGroups: React.FC = () => {
       }
     }
 
-    await persistEnabledAndDisabled(nextEnabled, nextDisabled)
-  }
-
-  if (loading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4 border-b pb-2">Audio Cue Groups</h2>
-        <p>Loading audio cue groups...</p>
-      </div>
-    )
+    const result = await persistEnabledAndDisabled(nextEnabled, nextDisabled)
+    if ('stale' in result) return
+    if (result.ok) {
+      clearPersistError(groupId)
+    } else {
+      setPersistErrorByGroup((prev) => ({
+        ...prev,
+        [groupId]: {
+          message: result.error,
+          onRetry: () => void handleCueToggle(groupId, cueId, turnOn),
+        },
+      }))
+    }
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
-        Audio Cue Groups
-      </h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        Audio cue groups contain different implementations of the audio-reactive effects. Enable the
-        groups you want available when Audio Reactive mode is running. You can disable individual
-        cues within an enabled group; the group stays enabled if at least one cue remains on.
-      </p>
-      <div className="space-y-4">
-        {allGroups.map((group) => {
-          const { checked, indeterminate } = getGroupCheckboxState(group)
-          const disabledSet = new Set(disabledByGroup[group.id] ?? [])
-          return (
-            <div key={group.id} className="border rounded-lg border-gray-200 dark:border-gray-600">
-              <div
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                onClick={() => handleAccordionToggle(group.id)}>
-                <div className="flex items-center flex-1">
-                  <div className="mr-3 text-gray-600 dark:text-gray-400">
-                    {group.isExpanded ? (
-                      <FaChevronDown className="w-4 h-4" />
-                    ) : (
-                      <FaChevronRight className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold">{group.name}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{group.description}</p>
-                  </div>
-                </div>
-                <GroupEnableCheckbox
-                  checked={checked}
-                  indeterminate={indeterminate}
-                  onChange={(on) => handleGroupToggle(group.id, on)}
-                />
+    <CueGroupEnableList
+      title="Audio Lighting Cue Groups"
+      description="Audio cue groups contain different implementations of the audio-reactive effects. Enable the groups you want available when Audio Reactive mode is running. You can disable individual cues within an enabled group; the group stays enabled if at least one cue remains on."
+      loading={loading}
+      loadError={loadError}
+      onRetryLoad={() => {
+        void fetchGroups()
+      }}>
+      {allGroups.map((group) => {
+        const { checked, indeterminate } = getGroupCheckboxState(group)
+        const disabledSet = new Set(disabledByGroup[group.id] ?? [])
+        return (
+          <CueGroupRow
+            key={group.id}
+            groupId={group.id}
+            name={group.name}
+            description={group.description}
+            isExpanded={group.isExpanded}
+            onToggleExpanded={() => void handleAccordionToggle(group.id)}
+            checked={checked}
+            indeterminate={indeterminate}
+            onEnableChange={(on) => handleGroupToggle(group.id, on)}
+            tabIndex={roving.tabIndexFor(group.id)}
+            expandButtonRef={(el) => roving.setRef(group.id, el)}
+            onExpandButtonKeyDown={(e) => roving.onKeyDown(e, group.id)}
+            onExpandButtonFocus={() => roving.onFocus(group.id)}
+            loadError={expandErrorByGroup[group.id] ?? null}
+            persistError={persistErrorByGroup[group.id] ?? null}>
+            {group.cues.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                No cues found in this group.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">
+                  Cues in this group ({group.cues.length}):
+                </h4>
+                {group.cues
+                  .sort((a, b) => a.id.localeCompare(b.id))
+                  .map((cue) => {
+                    const isOn = enabledGroupIds.includes(group.id) && !disabledSet.has(cue.id)
+                    const rowLabelId = `audio-cue-${group.id}-${cue.id}-label`
+                    return (
+                      <div key={cue.id} className="flex items-start gap-2 pl-4">
+                        <input
+                          type="checkbox"
+                          className="form-checkbox mt-0.5 h-4 w-4 text-blue-600 rounded shrink-0"
+                          checked={isOn}
+                          onChange={(e) => handleCueToggle(group.id, cue.id, e.target.checked)}
+                          aria-labelledby={rowLabelId}
+                        />
+                        <p id={rowLabelId} className="text-xs text-gray-600 dark:text-gray-400">
+                          <span className="font-medium text-gray-800 dark:text-gray-200">
+                            {cue.id}:
+                          </span>{' '}
+                          {cue.description}
+                        </p>
+                      </div>
+                    )
+                  })}
               </div>
-
-              {group.isExpanded && (
-                <div className="p-4 border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
-                  {group.cues.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                      No cues found in this group.
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">
-                        Cues in this group ({group.cues.length}):
-                      </h4>
-                      {group.cues
-                        .sort((a, b) => a.id.localeCompare(b.id))
-                        .map((cue) => {
-                          const isOn =
-                            enabledGroupIds.includes(group.id) && !disabledSet.has(cue.id)
-                          return (
-                            <div key={cue.id} className="flex items-start gap-2 pl-4">
-                              <input
-                                type="checkbox"
-                                className="form-checkbox mt-0.5 h-4 w-4 text-blue-600 rounded shrink-0"
-                                checked={isOn}
-                                onChange={(e) =>
-                                  handleCueToggle(group.id, cue.id, e.target.checked)
-                                }
-                              />
-                              <p className="text-xs text-gray-600 dark:text-gray-400">
-                                <span className="font-medium text-gray-800 dark:text-gray-200">
-                                  {cue.id}:
-                                </span>{' '}
-                                {cue.description}
-                              </p>
-                            </div>
-                          )
-                        })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
+            )}
+          </CueGroupRow>
+        )
+      })}
+    </CueGroupEnableList>
   )
 }
 

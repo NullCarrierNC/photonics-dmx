@@ -1,3 +1,4 @@
+import type { CueType } from './cues/types/cueTypes'
 import {
   cubicIn,
   cubicInOut,
@@ -725,6 +726,8 @@ export interface CueGroup {
   id: string
   name: string
   description: string
+  /** Populated when the row comes from main-process cue registry IPC. */
+  cueTypes?: CueType[]
 }
 
 export type Easing = {
