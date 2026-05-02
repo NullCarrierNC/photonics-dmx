@@ -51,7 +51,15 @@ The editor communicates with the main process via:
 - **EFFECTS** – Effect files: list, read, save, delete, validate, import/export
 - **SHELL** – Open folder, show file in folder (for "Open File Location")
 
+It also subscribes to two main → renderer push channels for live editor feedback during cue execution:
+
+- **`RENDERER_RECEIVE.NODE_EXECUTION`** – Node activation/deactivation events emitted by the runtime engines; consumed by `useActiveNodes` to highlight currently-running nodes in the canvas.
+- **`RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR`** – Per-node runtime errors emitted by `EffectExecutionEngine` (and surfaced in `DebugPanel`); consumed by `useErrorNodes` to flag failing nodes.
+
 See `src/shared/ipcChannels.ts` for channel constants.
+
+Read/delete/save paths are resolved on the main process against the loader-owned cue and effect roots so arbitrary
+filesystem paths from the renderer cannot escape those directories.
 
 ## Node Types
 

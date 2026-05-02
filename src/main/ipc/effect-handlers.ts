@@ -106,11 +106,14 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
 
   ipcMain.handle(EFFECTS.EXPORT, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
-    await loader.readFile(filePath) // ensure file is valid/exists
+    // Resolve through the loader so the source path used for fs.copyFile is the same
+    // rooted path the loader vetted; never copy from the raw IPC string.
+    const resolvedSource = loader.resolveEffectFilePathForIpc(filePath)
+    await loader.readFile(resolvedSource) // ensure file is valid/exists
 
     const result = await dialog.showSaveDialog({
       title: 'Export Effect File',
-      defaultPath: path.basename(filePath),
+      defaultPath: path.basename(resolvedSource),
       filters: [{ name: 'Effect Files', extensions: ['json'] }],
     })
 
@@ -118,7 +121,7 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: false, error: 'User cancelled export.' }
     }
 
-    await fs.copyFile(filePath, result.filePath)
+    await fs.copyFile(resolvedSource, result.filePath)
     return { success: true, path: result.filePath }
   })
 }

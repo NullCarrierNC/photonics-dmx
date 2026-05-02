@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
-import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import { ipcError } from './ipcResult'
+import { isNonEmptyString, validateCueType } from './inputValidation'
 import { LIGHT } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('cue-group-handlers')
@@ -15,18 +15,26 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(LIGHT.GET_CUE_GROUPS, async () => {
     const registry = YargCueRegistry.getInstance()
     const groupIds = registry.getAllGroups()
-    return groupIds.map((groupId) => {
-      const group = registry.getGroup(groupId)
-      return {
-        id: groupId,
-        name: group!.name,
-        description: group!.description,
-        cueTypes: group ? Array.from(group.cues.keys()) : [],
-      }
-    })
+    return groupIds
+      .map((groupId) => {
+        const group = registry.getGroup(groupId)
+        if (!group || group.cues.size === 0) {
+          return null
+        }
+        return {
+          id: groupId,
+          name: group.name,
+          description: group.description,
+          cueTypes: Array.from(group.cues.keys()),
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
   })
 
-  ipcMain.handle(LIGHT.ENABLE_CUE_GROUP, async (_, groupId: string) => {
+  ipcMain.handle(LIGHT.ENABLE_CUE_GROUP, async (_, groupId: unknown) => {
+    if (!isNonEmptyString(groupId)) {
+      return { success: false, error: 'groupId is required' }
+    }
     try {
       const registry = YargCueRegistry.getInstance()
       const group = registry.getGroup(groupId)
@@ -46,7 +54,10 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
     }
   })
 
-  ipcMain.handle(LIGHT.DISABLE_CUE_GROUP, async (_, groupId: string) => {
+  ipcMain.handle(LIGHT.DISABLE_CUE_GROUP, async (_, groupId: unknown) => {
+    if (!isNonEmptyString(groupId)) {
+      return { success: false, error: 'groupId is required' }
+    }
     try {
       const registry = YargCueRegistry.getInstance()
       const group = registry.getGroup(groupId)
@@ -69,10 +80,14 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
     }
   })
 
-  ipcMain.handle(LIGHT.GET_CUE_SOURCE_GROUP, async (_, cueType: string) => {
+  ipcMain.handle(LIGHT.GET_CUE_SOURCE_GROUP, async (_, cueType: unknown) => {
+    const validated = validateCueType(cueType)
+    if (!validated.ok) {
+      return { success: false, error: validated.error }
+    }
     try {
       const registry = YargCueRegistry.getInstance()
-      const cueState = registry.getCueState(cueType as CueType)
+      const cueState = registry.getCueState(validated.value)
       if (cueState) {
         return {
           success: true,
@@ -84,7 +99,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
           limit: cueState.limit,
         }
       }
-      return { success: false, error: `No state found for cue: ${cueType}` }
+      return { success: false, error: `No state found for cue: ${validated.value}` }
     } catch (error) {
       log.error('Error getting cue source group:', error)
       return ipcError(error)

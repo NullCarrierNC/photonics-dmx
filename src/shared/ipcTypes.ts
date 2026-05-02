@@ -17,6 +17,7 @@ import {
   EFFECTS,
   WINDOW,
   SHELL,
+  LIFECYCLE,
   CUE,
   LIGHT,
   CONFIG,
@@ -61,6 +62,19 @@ export type {
   AudioGameModeConfig,
   AudioLightingData,
 } from '../photonics-dmx/listeners/Audio/AudioTypes'
+
+/**
+ * Runtime lifecycle phases for the main-process controller graph.
+ * Owned by `ControllerManager`; mirrored here so the renderer can disable actions outside `running`.
+ */
+export type LifecyclePhase =
+  | 'initializing'
+  | 'running'
+  | 'restarting'
+  | 'consoleMode'
+  | 'failed'
+  | 'shuttingDown'
+  | 'stopped'
 
 import type {
   NodeCueFile,
@@ -196,6 +210,12 @@ export interface IpcInvokeMap {
   [EFFECTS.EXPORT]: {
     request: string
     response: { success: true; path: string } | IpcErrorResult
+  }
+
+  // ---- Lifecycle ----
+  [LIFECYCLE.GET_PHASE]: {
+    request: void
+    response: LifecyclePhase
   }
 
   // ---- Window ----
@@ -357,7 +377,7 @@ export interface IpcInvokeMap {
     response: Array<{ id: string; name: string; description: string }>
   }
   [LIGHT.GET_CUE_SOURCE_GROUP]: {
-    request: string
+    request: CueType
     response:
       | {
           success: true
@@ -817,6 +837,7 @@ export interface IpcEventMap {
   }
   [RENDERER_RECEIVE.NODE_EXECUTION]: NodeExecutionPayload
   [RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR]: string
+  [RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED]: LifecyclePhase
 }
 
 export type IpcEventChannel = keyof IpcEventMap

@@ -24,7 +24,16 @@ import {
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { Brightness, Color, DmxFixture } from '../../photonics-dmx/types'
 import { FixtureTypes } from '../../photonics-dmx/types'
+import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
+import type { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
+import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 
+/**
+ * Renderer-supplied IPC payloads MUST be treated as `unknown`. Validators in this module return a
+ * `ValidationResult<T>` whose success value is assignable to the corresponding
+ * `IpcInvokeMap[Channel]['request']` for the channel that uses them. When you change a request type
+ * in `ipcTypes.ts`, update the matching validator's return type here so the contract stays narrow.
+ */
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
 const SENDER_IDS = new Set(['sacn', 'ipc', 'enttecpro', 'artnet', 'opendmx'])
@@ -61,6 +70,103 @@ export function validateNumberInRange(
     return { ok: false, error: `${fieldName} must be between ${min} and ${max}` }
   }
   return { ok: true, value: num }
+}
+
+/**
+ * Validates that `value` is one of the literal strings in `allowed`.
+ * Accepts a `field` label for the error message.
+ */
+export function validateStringUnion<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  field: string,
+): ValidationResult<T> {
+  if (typeof value !== 'string') {
+    return { ok: false, error: `${field} must be a string` }
+  }
+  if (!(allowed as readonly string[]).includes(value)) {
+    return { ok: false, error: `${field} must be one of: ${allowed.join(', ')}` }
+  }
+  return { ok: true, value: value as T }
+}
+
+const YARG_AUDIO_MOTION_SELECTION_MODES = ['oncePerSong', 'perCueChange', 'none'] as const
+const CUE_GROUP_SELECTION_MODES = ['oncePerSong', 'withinSong'] as const
+const STAGE_KIT_PRIORITIES = ['prefer-for-tracked', 'random', 'never'] as const
+
+export type YargAudioMotionSelectionMode = (typeof YARG_AUDIO_MOTION_SELECTION_MODES)[number]
+export type CueGroupSelectionMode = (typeof CUE_GROUP_SELECTION_MODES)[number]
+export type StageKitPriority = (typeof STAGE_KIT_PRIORITIES)[number]
+
+export function validateMotionSelectionMode(
+  value: unknown,
+): ValidationResult<YargAudioMotionSelectionMode> {
+  return validateStringUnion(value, YARG_AUDIO_MOTION_SELECTION_MODES, 'selection mode')
+}
+
+export function validateCueGroupSelectionMode(
+  value: unknown,
+): ValidationResult<CueGroupSelectionMode> {
+  return validateStringUnion(value, CUE_GROUP_SELECTION_MODES, 'cue group selection mode')
+}
+
+export function validateStageKitPriority(value: unknown): ValidationResult<StageKitPriority> {
+  return validateStringUnion(value, STAGE_KIT_PRIORITIES, 'stage kit priority')
+}
+
+const CUE_TYPE_VALUES = new Set<string>(Object.values(CueType))
+
+/**
+ * Structural validation for a YARG `CueType`. Returns the narrowed enum value on success.
+ */
+export function validateCueType(value: unknown): ValidationResult<CueType> {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return { ok: false, error: 'cueType is required' }
+  }
+  if (!CUE_TYPE_VALUES.has(value)) {
+    return { ok: false, error: `cueType '${value}' is not a known CueType` }
+  }
+  return { ok: true, value: value as CueType }
+}
+
+/**
+ * Validates an audio cue type against the runtime AudioCueRegistry. Optionally restricts to
+ * currently-enabled cues; defaults to the full registered set so handlers can decide.
+ */
+export function validateAudioCueType(
+  value: unknown,
+  options: { onlyEnabled?: boolean } = {},
+): ValidationResult<AudioCueType> {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return { ok: false, error: 'cueType is required' }
+  }
+  const registry = AudioCueRegistry.getInstance()
+  const known = registry.getAvailableCueTypes(!options.onlyEnabled)
+  if (!known.includes(value)) {
+    return { ok: false, error: `audio cueType '${value}' is not registered` }
+  }
+  return { ok: true, value }
+}
+
+/**
+ * Validates a `{ groupId, cueId }` cue-ref payload (or null). Used by the audio/YARG motion
+ * "active cue ref" channels.
+ */
+export function validateCueRefPayload(
+  value: unknown,
+): ValidationResult<{ groupId: string; cueId: string } | null> {
+  if (value === null || value === undefined) {
+    return { ok: true, value: null }
+  }
+  if (!isPlainObject(value)) {
+    return { ok: false, error: 'cue ref must be an object with groupId and cueId' }
+  }
+  const groupId = typeof value.groupId === 'string' ? value.groupId.trim() : ''
+  const cueId = typeof value.cueId === 'string' ? value.cueId.trim() : ''
+  if (!groupId || !cueId) {
+    return { ok: false, error: 'groupId and cueId are required' }
+  }
+  return { ok: true, value: { groupId, cueId } }
 }
 
 export function validateOptionalStringArray(

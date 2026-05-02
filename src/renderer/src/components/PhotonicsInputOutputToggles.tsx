@@ -9,6 +9,7 @@ import ArtNetToggle from './ArtNetToggle'
 import OpenDmxToggle from './OpenDmxToggle'
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa'
 import { myValidDmxLightsAtom } from '../atoms'
+import { useLifecyclePhase, isLifecycleBusy } from '../hooks/useLifecyclePhase'
 
 interface DmxSettingsProps {
   startOpen: boolean
@@ -17,12 +18,16 @@ interface DmxSettingsProps {
 const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [validDmxLights] = useAtom(myValidDmxLightsAtom)
+  const lifecyclePhase = useLifecyclePhase()
+  // Lock listener and sender toggles while the controller graph is mid-transition (restart, shutdown, failed, etc.).
+  const lifecycleLocked = isLifecycleBusy(lifecyclePhase)
 
   useEffect(() => {
     setIsOpen(startOpen)
   }, [startOpen])
 
   const hasInvalidConfig = useMemo(() => validDmxLights.length === 0, [validDmxLights.length])
+  const togglesDisabled = hasInvalidConfig || lifecycleLocked
 
   return (
     <div className=" rounded-lg shadow-sm mb-4">
@@ -39,9 +44,9 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
           <div className="mb-6">
             <h3 className="text-md font-medium mb-3 text-gray-700 dark:text-gray-300">Input</h3>
             <div className="flex flex-row gap-8 items-start flex-wrap">
-              <YargToggle disabled={hasInvalidConfig} />
-              <Rb3Toggle disabled={hasInvalidConfig} />
-              <AudioToggle disabled={hasInvalidConfig} />
+              <YargToggle disabled={togglesDisabled} />
+              <Rb3Toggle disabled={togglesDisabled} />
+              <AudioToggle disabled={togglesDisabled} />
             </div>
           </div>
 
@@ -51,12 +56,20 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
               DMX Output
             </h3>
             <div className="flex flex-row gap-8 items-start flex-wrap">
-              <SacnToggle disabled={hasInvalidConfig} />
-              <ArtNetToggle disabled={hasInvalidConfig} />
-              <EnttecProToggle disabled={hasInvalidConfig} />
-              <OpenDmxToggle disabled={hasInvalidConfig} />
+              <SacnToggle disabled={togglesDisabled} />
+              <ArtNetToggle disabled={togglesDisabled} />
+              <EnttecProToggle disabled={togglesDisabled} />
+              <OpenDmxToggle disabled={togglesDisabled} />
             </div>
           </div>
+          {lifecyclePhase === 'failed' && (
+            <div className="mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                The lighting controllers failed to reinitialize after their last restart. Make a
+                configuration change and restart, or restart the application.
+              </p>
+            </div>
+          )}
           {hasInvalidConfig && (
             <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
               <div className="flex items-center">

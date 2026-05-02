@@ -2,13 +2,15 @@ import { IpcMain } from 'electron'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
-import { AudioCueType } from '../../../photonics-dmx/cues/types/audioCueTypes'
 import { ipcError } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
-  isPlainObject,
+  validateAudioCueType,
   validateAudioConfigPayload,
   validateAudioGameModePayload,
+  validateCueRefPayload,
+  validateNumberInRange,
+  validateStageKitPriority,
 } from '../inputValidation'
 import { createLogger } from '../../../shared/logger'
 
@@ -40,9 +42,15 @@ export function registerAudioMotionConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.SET_ACTIVE_AUDIO_CUE, async (_, cueType: AudioCueType) => {
+  ipcMain.handle(CONFIG.SET_ACTIVE_AUDIO_CUE, async (_, cueType: unknown) => {
     try {
-      const result = controllerManager.setActiveAudioCueType(cueType)
+      // Structural validation rejects unknown cue types up front; the controller still re-checks
+      // membership against currently-enabled groups (cue may be registered but disabled).
+      const validation = validateAudioCueType(cueType)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      const result = controllerManager.setActiveAudioCueType(validation.value)
       if (!result.success) {
         return result
       }
@@ -100,29 +108,14 @@ export function registerAudioMotionConfigHandlers(
 
   ipcMain.handle(CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE, async (_, ref: unknown) => {
     try {
-      if (ref !== null && ref !== undefined) {
-        if (!isPlainObject(ref)) {
-          return { success: false, error: 'Invalid active audio motion cue ref' }
-        }
-        const groupId =
-          typeof (ref as { groupId?: unknown }).groupId === 'string'
-            ? (ref as { groupId: string }).groupId.trim()
-            : ''
-        const cueId =
-          typeof (ref as { cueId?: unknown }).cueId === 'string'
-            ? (ref as { cueId: string }).cueId.trim()
-            : ''
-        if (!groupId || !cueId) {
-          return { success: false, error: 'groupId and cueId are required' }
-        }
-        await controllerManager
-          .getConfig()
-          .updateCueDomain('audioMotion', { activeCueRef: { groupId, cueId } })
-        controllerManager.setActiveAudioMotionCueRef({ groupId, cueId })
-        return { success: true }
+      const validation = validateCueRefPayload(ref)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
       }
-      await controllerManager.getConfig().updateCueDomain('audioMotion', { activeCueRef: null })
-      controllerManager.setActiveAudioMotionCueRef(null)
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('audioMotion', { activeCueRef: validation.value })
+      controllerManager.setActiveAudioMotionCueRef(validation.value)
       return { success: true }
     } catch (error) {
       log.error('Error setting active audio motion cue:', error)
@@ -136,29 +129,14 @@ export function registerAudioMotionConfigHandlers(
 
   ipcMain.handle(CONFIG.SET_ACTIVE_YARG_MOTION_CUE, async (_, ref: unknown) => {
     try {
-      if (ref !== null && ref !== undefined) {
-        if (!isPlainObject(ref)) {
-          return { success: false, error: 'Invalid active YARG motion cue ref' }
-        }
-        const groupId =
-          typeof (ref as { groupId?: unknown }).groupId === 'string'
-            ? (ref as { groupId: string }).groupId.trim()
-            : ''
-        const cueId =
-          typeof (ref as { cueId?: unknown }).cueId === 'string'
-            ? (ref as { cueId: string }).cueId.trim()
-            : ''
-        if (!groupId || !cueId) {
-          return { success: false, error: 'groupId and cueId are required' }
-        }
-        await controllerManager
-          .getConfig()
-          .updateCueDomain('yargMotion', { activeCueRef: { groupId, cueId } })
-        controllerManager.setActiveYargMotionCueRef({ groupId, cueId })
-        return { success: true }
+      const validation = validateCueRefPayload(ref)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
       }
-      await controllerManager.getConfig().updateCueDomain('yargMotion', { activeCueRef: null })
-      controllerManager.setActiveYargMotionCueRef(null)
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('yargMotion', { activeCueRef: validation.value })
+      controllerManager.setActiveYargMotionCueRef(validation.value)
       return { success: true }
     } catch (error) {
       log.error('Error setting active YARG motion cue:', error)
@@ -171,31 +149,28 @@ export function registerAudioMotionConfigHandlers(
     return prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked'
   })
 
-  ipcMain.handle(
-    CONFIG.SET_STAGE_KIT_PRIORITY,
-    async (_, priority: 'prefer-for-tracked' | 'random' | 'never') => {
-      try {
-        if (!['prefer-for-tracked', 'random', 'never'].includes(priority)) {
-          return { success: false, error: 'Invalid stage kit priority' }
-        }
-        await controllerManager.getConfig().updatePreferences({
-          stageKitPrefs: { yargPriority: priority },
-        })
-
-        const registry = YargCueRegistry.getInstance()
-        registry.setStageKitPriority(priority)
-
-        registry.clearConsistencyTracking()
-
-        log.info('Updated stage kit priority to:', priority)
-
-        return { success: true }
-      } catch (error) {
-        log.error('Error setting stage kit priority:', error)
-        return ipcError(error)
+  ipcMain.handle(CONFIG.SET_STAGE_KIT_PRIORITY, async (_, priority: unknown) => {
+    try {
+      const validation = validateStageKitPriority(priority)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
       }
-    },
-  )
+      await controllerManager.getConfig().updatePreferences({
+        stageKitPrefs: { yargPriority: validation.value },
+      })
+
+      const registry = YargCueRegistry.getInstance()
+      registry.setStageKitPriority(validation.value)
+      registry.clearConsistencyTracking()
+
+      log.info('Updated stage kit priority to:', validation.value)
+
+      return { success: true }
+    } catch (error) {
+      log.error('Error setting stage kit priority:', error)
+      return ipcError(error)
+    }
+  })
 
   ipcMain.handle(CONFIG.GET_CLOCK_RATE, async () => {
     try {
@@ -207,20 +182,18 @@ export function registerAudioMotionConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.SET_CLOCK_RATE, async (_, clockRate: number) => {
+  ipcMain.handle(CONFIG.SET_CLOCK_RATE, async (_, clockRate: unknown) => {
     try {
-      if (clockRate < 1 || clockRate > 100) {
-        return {
-          success: false,
-          error: 'Clock rate must be between 1 and 100 milliseconds',
-        }
+      const rateValidation = validateNumberInRange(clockRate, 1, 100, 'clockRate')
+      if (!rateValidation.ok) {
+        return { success: false, error: rateValidation.error }
       }
 
-      await controllerManager.getConfig().setClockRate(clockRate)
+      await controllerManager.getConfig().setClockRate(rateValidation.value)
 
       await controllerManager.restartControllers()
 
-      log.info('Updated clock rate to:', clockRate, 'ms')
+      log.info('Updated clock rate to:', rateValidation.value, 'ms')
 
       return { success: true }
     } catch (error) {
@@ -287,8 +260,11 @@ export function registerAudioMotionConfigHandlers(
     return controllerManager.getIsAudioEnabled()
   })
 
-  ipcMain.handle(CONFIG.SET_AUDIO_ENABLED, async (_, enabled: boolean) => {
+  ipcMain.handle(CONFIG.SET_AUDIO_ENABLED, async (_, enabled: unknown) => {
     try {
+      if (typeof enabled !== 'boolean') {
+        return { success: false, error: 'enabled must be a boolean' }
+      }
       if (enabled) {
         await controllerManager.enableAudio()
       } else {

@@ -158,11 +158,14 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
 
   ipcMain.handle(NODE_CUES.EXPORT, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
-    await loader.readFile(filePath) // ensure file is valid/exists
+    // Resolve through the loader so the source path used for fs.copyFile is the same
+    // rooted path the loader vetted; never copy from the raw IPC string.
+    const resolvedSource = loader.resolveCueFilePathForIpc(filePath)
+    await loader.readFile(resolvedSource) // ensure file is valid/exists
 
     const result = await dialog.showSaveDialog({
       title: 'Export Node Cue File',
-      defaultPath: path.basename(filePath),
+      defaultPath: path.basename(resolvedSource),
       filters: [{ name: 'Node Cue Files', extensions: ['json'] }],
     })
 
@@ -170,7 +173,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false, error: 'User cancelled export.' }
     }
 
-    await fs.copyFile(filePath, result.filePath)
+    await fs.copyFile(resolvedSource, result.filePath)
     return { success: true, path: result.filePath }
   })
 }

@@ -57,19 +57,18 @@ import {
 } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
+import {
+  buildActionChain,
+  markConsecutiveActionChainTailVisited,
+  mapSetColorChainStepsForEffectFactory,
+  resolveChainStep,
+  runContextBatch,
+  tryBuildHomogeneousSetColorChainData,
+} from './graphActionHelpers'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('NodeExecutionEngine')
-
-type ChainStep = {
-  action: ActionNode
-  lights: TrackedLight[]
-  lightIds: string
-  resolvedLayer: number
-  resolvedTiming: ResolvedActionTiming
-  resolvedColor: ResolvedColorSetting
-}
 
 /**
  * Infer variable type from a value source when the effect parameter definition is missing.
@@ -709,31 +708,11 @@ export class NodeExecutionEngine {
        * red and yellow). By submitting action B while action A is still active, the
        * sequencer queues it and preserves layer state, allowing smooth fades.
        */
-      const buildActionChain = (): ActionNode[] => {
-        const { adjacency, actionMap } = this.compiledCue
-        const chain: ActionNode[] = [actionNode]
-        const visitedInChain = new Set<string>([actionNode.id])
-
-        let currentId = actionNode.id
-        // Only follow the chain when there's exactly one outgoing edge
-        // and it leads to another action node.
-        while (true) {
-          const outgoing = adjacency.get(currentId) ?? []
-          if (outgoing.length !== 1) break
-          const nextId = outgoing[0].to
-          const nextAction = actionMap.get(nextId)
-          if (!nextAction) break
-          if (visitedInChain.has(nextId)) break
-
-          chain.push(nextAction)
-          visitedInChain.add(nextId)
-          currentId = nextId
-        }
-
-        return chain
-      }
-
-      const actionChain = buildActionChain()
+      const actionChain = buildActionChain(
+        actionNode,
+        this.compiledCue.adjacency,
+        this.compiledCue.actionMap,
+      )
 
       const resolvedAction = {
         ...actionNode,
@@ -847,67 +826,15 @@ export class NodeExecutionEngine {
         return
       }
 
-      const resolveChainStep = (a: ActionNode): ChainStep | null => {
-        if (a.effectType === 'blackout') {
-          return null
-        }
-        if (a.effectType !== 'set-color') {
-          return null
-        }
-        if (!a.color) {
-          return null
-        }
-
-        const layerNum = resolveActionLayer(a.layer, context)
-        const rc = resolveActionColor(a.color, context)
-        const rtiming = resolveActionTiming(a.timing, context)
-
-        const chainLights = ActionEffectFactory.resolveLights(
-          this.lightManager,
-          a.target,
-          (varName: string) => {
-            const cueVar = context.cueLevelVarStore.get(varName)
-            const groupVar = context.groupLevelVarStore.get(varName)
-            return cueVar ?? groupVar
-          },
-        )
-
-        if (!chainLights || chainLights.length === 0) {
-          return null
-        }
-
-        const lightIds = chainLights.map((light) => light.id).join(',')
-        return {
-          action: a,
-          lights: chainLights,
-          lightIds,
-          resolvedLayer: layerNum,
-          resolvedTiming: rtiming,
-          resolvedColor: rc,
-        }
+      const getChainVar = (varName: string): VariableValue | undefined => {
+        const cueVar = context.cueLevelVarStore.get(varName)
+        const groupVar = context.groupLevelVarStore.get(varName)
+        return cueVar ?? groupVar
       }
 
-      const chainData = (() => {
-        const steps: ChainStep[] = []
-        let baseLayer: number | null = null
-        let baseLightIds: string | null = null
-
-        for (const stepAction of actionChain) {
-          const step = resolveChainStep(stepAction)
-          if (!step) {
-            return null
-          }
-          if (baseLayer === null) {
-            baseLayer = step.resolvedLayer
-            baseLightIds = step.lightIds
-          } else if (baseLayer !== step.resolvedLayer || baseLightIds !== step.lightIds) {
-            return null
-          }
-          steps.push(step)
-        }
-
-        return { steps, baseLayer: baseLayer ?? 0, baseLights: steps[0]?.lights ?? [] }
-      })()
+      const chainData = tryBuildHomogeneousSetColorChainData(actionChain, (a) =>
+        resolveChainStep(a, context, this.lightManager, getChainVar),
+      )
 
       if (!chainData) {
         submitSingleAction()
@@ -925,21 +852,16 @@ export class NodeExecutionEngine {
         actions: actionChain.map((a) => ({ id: a.id, effectType: a.effectType })),
       })
 
-      // Ensure the rest of the chain nodes won't execute independently later.
-      for (let i = 1; i < actionChain.length; i++) {
-        context.markVisited(actionChain[i].id)
-        this.emitNodeExecution('activated', actionChain[i].id)
-      }
+      markConsecutiveActionChainTailVisited(context, actionChain, (nodeId) =>
+        this.emitNodeExecution('activated', nodeId),
+      )
 
       const composedEffect = ActionEffectFactory.buildEffectChain(
-        chainData.steps.map((step) => ({
-          action: step.action,
-          lights: chainData.baseLights,
-          resolvedColor: step.resolvedColor,
-          resolvedTiming: step.resolvedTiming,
-          resolvedLayer: chainData.baseLayer,
-          intensityScale: 1,
-        })),
+        mapSetColorChainStepsForEffectFactory(
+          chainData.steps,
+          chainData.baseLights,
+          chainData.baseLayer,
+        ),
       )
 
       if (!composedEffect) {
@@ -1440,18 +1362,9 @@ export class NodeExecutionEngine {
    * before sibling branches have had a chance to register blocking nodes (e.g. delays).
    */
   private continueExecution(nodeIds: string[], context: ExecutionContext): void {
-    context.beginBatch()
-    for (const nodeId of nodeIds) {
-      this.executeNode(nodeId, context)
-    }
-    context.endBatch()
-    // After the batch completes, check whether the context is now done.
-    // This handles pure-logic flows where no blocking node was registered.
-    if (context.tryComplete()) {
-      context.dispose()
-    } else {
-      this.onContextLifecycle?.(context.id, 'blocked')
-    }
+    runContextBatch(context, nodeIds, (nodeId) => this.executeNode(nodeId, context), {
+      onBlocked: () => this.onContextLifecycle?.(context.id, 'blocked'),
+    })
   }
 
   /**

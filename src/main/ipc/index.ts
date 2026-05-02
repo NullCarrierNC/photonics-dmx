@@ -9,6 +9,7 @@ import { setupEffectHandlers } from './effect-handlers'
 import { setupShellHandlers } from './shell-handlers'
 import { setupWindowHandlers } from './window-handlers'
 import { setupConsoleHandlers } from './console-handlers'
+import { setupLifecycleHandlers } from './lifecycle-handlers'
 
 /**
  * Set up all IPC handlers
@@ -32,6 +33,7 @@ export function setupIpcHandlers(
   setupEffectHandlers(ipcMain, controllerManager)
   setupShellHandlers(ipcMain)
   setupWindowHandlers(ipcMain, windowManager)
+  setupLifecycleHandlers(ipcMain, controllerManager)
 
   controllerManager.setAudioMirrorBroadcaster((data) => {
     windowManager.broadcastAudioMirror(data)

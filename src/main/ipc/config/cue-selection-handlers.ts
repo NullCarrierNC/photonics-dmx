@@ -44,22 +44,23 @@ export function registerCueSelectionConfigHandlers(
     return enabled!
   })
 
-  ipcMain.handle(CONFIG.SET_ENABLED_CUE_GROUPS, async (_, groupIds: string[]) => {
+  ipcMain.handle(CONFIG.SET_ENABLED_CUE_GROUPS, async (_, groupIds: unknown) => {
     try {
       const validation = validateOptionalStringArray(groupIds, 'groupIds')
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      await controllerManager.getConfig().updateCueDomain('yarg', { enabledGroups: groupIds })
+      const validatedIds = validation.value
+      await controllerManager.getConfig().updateCueDomain('yarg', { enabledGroups: validatedIds })
 
       const registry = YargCueRegistry.getInstance()
 
-      registry.setEnabledGroups(groupIds)
+      registry.setEnabledGroups(validatedIds)
       const disabledYarg = controllerManager.getConfig().getPreference('cueDomains')
         .yarg.disabledCues
       registry.setDisabledCues(disabledYarg)
 
-      log.info('Updated CueRegistry enabled groups:', groupIds)
+      log.info('Updated CueRegistry enabled groups:', validatedIds)
 
       return { success: true }
     } catch (error) {
@@ -98,21 +99,22 @@ export function registerCueSelectionConfigHandlers(
     return enabled
   })
 
-  ipcMain.handle(CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS, async (_, groupIds: string[]) => {
+  ipcMain.handle(CONFIG.SET_ENABLED_AUDIO_CUE_GROUPS, async (_, groupIds: unknown) => {
     try {
       const validation = validateOptionalStringArray(groupIds, 'groupIds')
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      await controllerManager.getConfig().updateCueDomain('audio', { enabledGroups: groupIds })
+      const validatedIds = validation.value
+      await controllerManager.getConfig().updateCueDomain('audio', { enabledGroups: validatedIds })
       const registry = AudioCueRegistry.getInstance()
-      registry.setEnabledGroups(groupIds)
+      registry.setEnabledGroups(validatedIds)
       const disabledAudio = controllerManager.getConfig().getPreference('cueDomains')
         .audio.disabledCues
       registry.setDisabledCues(disabledAudio)
       controllerManager.refreshAudioCueSelection()
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
-      log.info('Updated AudioCueRegistry enabled groups:', groupIds)
+      log.info('Updated AudioCueRegistry enabled groups:', validatedIds)
       return { success: true }
     } catch (error) {
       log.error('Error setting enabled audio cue groups:', error)
@@ -198,20 +200,23 @@ export function registerCueSelectionConfigHandlers(
     return enabled
   })
 
-  ipcMain.handle(CONFIG.SET_ENABLED_YARG_MOTION_CUE_GROUPS, async (_, groupIds: string[]) => {
+  ipcMain.handle(CONFIG.SET_ENABLED_YARG_MOTION_CUE_GROUPS, async (_, groupIds: unknown) => {
     try {
       const validation = validateOptionalStringArray(groupIds, 'groupIds')
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      await controllerManager.getConfig().updateCueDomain('yargMotion', { enabledGroups: groupIds })
+      const validatedIds = validation.value
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('yargMotion', { enabledGroups: validatedIds })
       const registry = YargCueRegistry.getInstance()
-      registry.setEnabledMotionGroups(groupIds)
+      registry.setEnabledMotionGroups(validatedIds)
       const disabledMotion = controllerManager.getConfig().getPreference('cueDomains')
         .yargMotion.disabledCues
       registry.setDisabledMotionCues(disabledMotion)
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED, undefined)
-      log.info('Updated YARG motion enabled groups:', groupIds)
+      log.info('Updated YARG motion enabled groups:', validatedIds)
       return { success: true }
     } catch (error) {
       log.error('Error setting enabled YARG motion cue groups:', error)
@@ -274,22 +279,23 @@ export function registerCueSelectionConfigHandlers(
     return enabled
   })
 
-  ipcMain.handle(CONFIG.SET_ENABLED_AUDIO_MOTION_CUE_GROUPS, async (_, groupIds: string[]) => {
+  ipcMain.handle(CONFIG.SET_ENABLED_AUDIO_MOTION_CUE_GROUPS, async (_, groupIds: unknown) => {
     try {
       const validation = validateOptionalStringArray(groupIds, 'groupIds')
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
+      const validatedIds = validation.value
       await controllerManager
         .getConfig()
-        .updateCueDomain('audioMotion', { enabledGroups: groupIds })
+        .updateCueDomain('audioMotion', { enabledGroups: validatedIds })
       const registry = AudioCueRegistry.getInstance()
-      registry.setEnabledMotionGroups(groupIds)
+      registry.setEnabledMotionGroups(validatedIds)
       const disabledMotion = controllerManager.getConfig().getPreference('cueDomains')
         .audioMotion.disabledCues
       registry.setDisabledMotionCues(disabledMotion)
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED, undefined)
-      log.info('Updated audio motion enabled groups:', groupIds)
+      log.info('Updated audio motion enabled groups:', validatedIds)
       return { success: true }
     } catch (error) {
       log.error('Error setting enabled audio motion cue groups:', error)

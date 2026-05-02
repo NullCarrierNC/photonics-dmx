@@ -3,7 +3,7 @@ import { ControllerManager } from '../controllers/ControllerManager'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
-import { validateNumberInRange } from './inputValidation'
+import { validateCueGroupSelectionMode, validateNumberInRange } from './inputValidation'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('cue-selection-prefs-handlers')
 
@@ -15,7 +15,7 @@ export function setupCueSelectionPrefsHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
-  ipcMain.handle(LIGHT.SET_CUE_CONSISTENCY_WINDOW, async (_, windowMs: number) => {
+  ipcMain.handle(LIGHT.SET_CUE_CONSISTENCY_WINDOW, async (_, windowMs: unknown) => {
     try {
       const validated = validateNumberInRange(windowMs, 0, 600000, 'cueConsistencyWindow')
       if (!validated.ok) {
@@ -53,7 +53,7 @@ export function setupCueSelectionPrefsHandlers(
     }
   })
 
-  ipcMain.handle(LIGHT.SET_MOTION_CUE_MIN_HOLD_MS, async (_, ms: number) => {
+  ipcMain.handle(LIGHT.SET_MOTION_CUE_MIN_HOLD_MS, async (_, ms: unknown) => {
     try {
       const validated = validateNumberInRange(ms, 0, 600000, 'motionCueMinimumHoldMs')
       if (!validated.ok) {
@@ -81,7 +81,7 @@ export function setupCueSelectionPrefsHandlers(
     }
   })
 
-  ipcMain.handle(LIGHT.SET_MOTION_CUE_PROBABILITY_PERCENT, async (_, percent: number) => {
+  ipcMain.handle(LIGHT.SET_MOTION_CUE_PROBABILITY_PERCENT, async (_, percent: unknown) => {
     try {
       const validated = validateNumberInRange(percent, 0, 100, 'motionCueProbabilityPercent')
       if (!validated.ok) {
@@ -110,7 +110,7 @@ export function setupCueSelectionPrefsHandlers(
     }
   })
 
-  ipcMain.handle(LIGHT.SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, async (_, percent: number) => {
+  ipcMain.handle(LIGHT.SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, async (_, percent: unknown) => {
     try {
       const validated = validateNumberInRange(percent, 0, 100, 'audioMotionCueProbabilityPercent')
       if (!validated.ok) {
@@ -127,23 +127,23 @@ export function setupCueSelectionPrefsHandlers(
     }
   })
 
-  ipcMain.handle(
-    LIGHT.SET_CUE_GROUP_SELECTION_MODE,
-    async (_, mode: 'oncePerSong' | 'withinSong') => {
-      try {
-        if (mode !== 'oncePerSong' && mode !== 'withinSong') {
-          return ipcError(new Error('Invalid mode: must be "oncePerSong" or "withinSong"'))
-        }
-        await controllerManager.getConfig().updateCueDomain('yarg', { selectionMode: mode })
-        const registry = YargCueRegistry.getInstance()
-        registry.setCueGroupSelectionMode(mode)
-        return { success: true, mode }
-      } catch (error) {
-        log.error('Error setting cue group selection mode:', error)
-        return ipcError(error)
+  ipcMain.handle(LIGHT.SET_CUE_GROUP_SELECTION_MODE, async (_, mode: unknown) => {
+    try {
+      const validated = validateCueGroupSelectionMode(mode)
+      if (!validated.ok) {
+        return ipcError(new Error(validated.error))
       }
-    },
-  )
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('yarg', { selectionMode: validated.value })
+      const registry = YargCueRegistry.getInstance()
+      registry.setCueGroupSelectionMode(validated.value)
+      return { success: true, mode: validated.value }
+    } catch (error) {
+      log.error('Error setting cue group selection mode:', error)
+      return ipcError(error)
+    }
+  })
 
   ipcMain.handle(LIGHT.GET_CUE_GROUP_SELECTION_MODE, async () => {
     try {

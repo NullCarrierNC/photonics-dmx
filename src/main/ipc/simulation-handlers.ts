@@ -15,6 +15,7 @@ import { INetCue } from '../../photonics-dmx/cues/interfaces/INetCue'
 import { IAudioCue } from '../../photonics-dmx/cues/interfaces/IAudioCue'
 import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
 import { createLogger } from '../../shared/logger'
+import { isNonEmptyString, isPlainObject } from './inputValidation'
 const log = createLogger('simulation-handlers')
 
 /** YARG motion cue started from Cue Simulation; stopped explicitly or replaced by another start. */
@@ -90,10 +91,12 @@ export function setupSimulationHandlers(
     }
   })
 
-  ipcMain.handle(LIGHT.GET_AVAILABLE_AUDIO_CUES, async (_, groupId?: string) => {
+  ipcMain.handle(LIGHT.GET_AVAILABLE_AUDIO_CUES, async (_, groupId?: unknown) => {
     try {
       const registry = AudioCueRegistry.getInstance()
-      const targetGroupId = groupId || registry.getDefaultGroup() || registry.getEnabledGroups()[0]
+      const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
+      const targetGroupId =
+        resolvedGroupId || registry.getDefaultGroup() || registry.getEnabledGroups()[0]
       if (!targetGroupId) return []
       return registry.getCueDetails(targetGroupId)
     } catch (error) {
@@ -102,10 +105,11 @@ export function setupSimulationHandlers(
     }
   })
 
-  ipcMain.handle(LIGHT.GET_AVAILABLE_CUES, async (_, groupId?: string) => {
+  ipcMain.handle(LIGHT.GET_AVAILABLE_CUES, async (_, groupId?: unknown) => {
     try {
       const registry = YargCueRegistry.getInstance()
-      const targetGroupId = groupId || 'default'
+      const targetGroupId =
+        typeof groupId === 'string' && groupId.trim() !== '' ? groupId : 'default'
       log.info(`Getting cues for group: ${targetGroupId}`)
       const group = registry.getGroup(targetGroupId)
       if (!group) {
@@ -419,102 +423,104 @@ export function setupSimulationHandlers(
     },
   )
 
-  ipcMain.handle(
-    LIGHT.START_YARG_MOTION_CUE_SIMULATION,
-    async (_, data: { groupId: string; cueId: string }) => {
-      try {
-        const { groupId, cueId } = data ?? {}
-        if (!groupId || !cueId) {
-          return ipcError(new Error('groupId and cueId are required'))
-        }
-        if (!controllerManager.getIsInitialized()) {
-          await controllerManager.init()
-        }
-        const lightManager = controllerManager.getDmxLightManager()
-        const sequencer = controllerManager.getLightingController()
-        if (!lightManager || !sequencer) {
-          return ipcError(new Error('Lighting system not available'))
-        }
-        const group = YargCueRegistry.getInstance().getGroup(groupId)
-        if (!group) {
-          return ipcError(new Error(`YARG motion group not found: ${groupId}`))
-        }
-        const cue = group.motionCues?.get(cueId)
-        if (!cue) {
-          return ipcError(new Error(`YARG motion cue not found: ${groupId}/${cueId}`))
-        }
-        activeSimulatedYargMotionCue?.onStop?.()
-        activeSimulatedYargMotionCue = null
-        activeSimulatedAudioMotionCue?.onStop?.()
-        activeSimulatedAudioMotionCue = null
-        simulatedAudioMotionExecutionCount = 0
-        sequencer.cancelPanTiltClear()
-        const mockCueData = createMockCueData({
-          venueSize: 'Small',
-          bpm: 120,
-          simulationCueGroup: groupId,
-        })
-        const maybePromise = cue.execute(mockCueData, sequencer, lightManager)
-        if (maybePromise instanceof Promise) {
-          await maybePromise
-        }
-        activeSimulatedYargMotionCue = cue
-        sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
-          ref: { groupId, cueId },
-          source: 'auto',
-          manualFallback: false,
-        })
-        return { success: true as const }
-      } catch (error) {
-        log.error('Error starting YARG motion cue simulation:', error)
-        return ipcError(error)
+  ipcMain.handle(LIGHT.START_YARG_MOTION_CUE_SIMULATION, async (_, data: unknown) => {
+    try {
+      if (!isPlainObject(data)) {
+        return ipcError(new Error('Invalid motion simulation payload'))
       }
-    },
-  )
+      const groupId = data.groupId
+      const cueId = data.cueId
+      if (!isNonEmptyString(groupId) || !isNonEmptyString(cueId)) {
+        return ipcError(new Error('groupId and cueId are required'))
+      }
+      if (!controllerManager.getIsInitialized()) {
+        await controllerManager.init()
+      }
+      const lightManager = controllerManager.getDmxLightManager()
+      const sequencer = controllerManager.getLightingController()
+      if (!lightManager || !sequencer) {
+        return ipcError(new Error('Lighting system not available'))
+      }
+      const group = YargCueRegistry.getInstance().getGroup(groupId)
+      if (!group) {
+        return ipcError(new Error(`YARG motion group not found: ${groupId}`))
+      }
+      const cue = group.motionCues?.get(cueId)
+      if (!cue) {
+        return ipcError(new Error(`YARG motion cue not found: ${groupId}/${cueId}`))
+      }
+      activeSimulatedYargMotionCue?.onStop?.()
+      activeSimulatedYargMotionCue = null
+      activeSimulatedAudioMotionCue?.onStop?.()
+      activeSimulatedAudioMotionCue = null
+      simulatedAudioMotionExecutionCount = 0
+      sequencer.cancelPanTiltClear()
+      const mockCueData = createMockCueData({
+        venueSize: 'Small',
+        bpm: 120,
+        simulationCueGroup: groupId,
+      })
+      const maybePromise = cue.execute(mockCueData, sequencer, lightManager)
+      if (maybePromise instanceof Promise) {
+        await maybePromise
+      }
+      activeSimulatedYargMotionCue = cue
+      sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+        ref: { groupId, cueId },
+        source: 'auto',
+        manualFallback: false,
+      })
+      return { success: true as const }
+    } catch (error) {
+      log.error('Error starting YARG motion cue simulation:', error)
+      return ipcError(error)
+    }
+  })
 
-  ipcMain.handle(
-    LIGHT.START_AUDIO_MOTION_CUE_SIMULATION,
-    async (_, data: { groupId: string; cueId: string }) => {
-      try {
-        const { groupId, cueId } = data ?? {}
-        if (!groupId || !cueId) {
-          return ipcError(new Error('groupId and cueId are required'))
-        }
-        if (!controllerManager.getIsInitialized()) {
-          await controllerManager.init()
-        }
-        const lightManager = controllerManager.getDmxLightManager()
-        const sequencer = controllerManager.getLightingController()
-        if (!lightManager || !sequencer) {
-          return ipcError(new Error('Lighting system not available'))
-        }
-        const group = AudioCueRegistry.getInstance().getGroup(groupId)
-        if (!group) {
-          return ipcError(new Error(`Audio motion group not found: ${groupId}`))
-        }
-        const cue = group.motionCues?.get(cueId)
-        if (!cue) {
-          return ipcError(new Error(`Audio motion cue not found: ${groupId}/${cueId}`))
-        }
-        activeSimulatedYargMotionCue?.onStop?.()
-        activeSimulatedYargMotionCue = null
-        activeSimulatedAudioMotionCue?.onStop?.()
-        activeSimulatedAudioMotionCue = null
-        simulatedAudioMotionExecutionCount = 0
-        sequencer.cancelPanTiltClear()
-        const mockAudio = createMockAudioCueData(1)
-        const maybePromise = cue.execute(mockAudio, sequencer, lightManager)
-        if (maybePromise instanceof Promise) {
-          await maybePromise
-        }
-        activeSimulatedAudioMotionCue = cue
-        return { success: true as const }
-      } catch (error) {
-        log.error('Error starting audio motion cue simulation:', error)
-        return ipcError(error)
+  ipcMain.handle(LIGHT.START_AUDIO_MOTION_CUE_SIMULATION, async (_, data: unknown) => {
+    try {
+      if (!isPlainObject(data)) {
+        return ipcError(new Error('Invalid motion simulation payload'))
       }
-    },
-  )
+      const groupId = data.groupId
+      const cueId = data.cueId
+      if (!isNonEmptyString(groupId) || !isNonEmptyString(cueId)) {
+        return ipcError(new Error('groupId and cueId are required'))
+      }
+      if (!controllerManager.getIsInitialized()) {
+        await controllerManager.init()
+      }
+      const lightManager = controllerManager.getDmxLightManager()
+      const sequencer = controllerManager.getLightingController()
+      if (!lightManager || !sequencer) {
+        return ipcError(new Error('Lighting system not available'))
+      }
+      const group = AudioCueRegistry.getInstance().getGroup(groupId)
+      if (!group) {
+        return ipcError(new Error(`Audio motion group not found: ${groupId}`))
+      }
+      const cue = group.motionCues?.get(cueId)
+      if (!cue) {
+        return ipcError(new Error(`Audio motion cue not found: ${groupId}/${cueId}`))
+      }
+      activeSimulatedYargMotionCue?.onStop?.()
+      activeSimulatedYargMotionCue = null
+      activeSimulatedAudioMotionCue?.onStop?.()
+      activeSimulatedAudioMotionCue = null
+      simulatedAudioMotionExecutionCount = 0
+      sequencer.cancelPanTiltClear()
+      const mockAudio = createMockAudioCueData(1)
+      const maybePromise = cue.execute(mockAudio, sequencer, lightManager)
+      if (maybePromise instanceof Promise) {
+        await maybePromise
+      }
+      activeSimulatedAudioMotionCue = cue
+      return { success: true as const }
+    } catch (error) {
+      log.error('Error starting audio motion cue simulation:', error)
+      return ipcError(error)
+    }
+  })
 
   ipcMain.handle(LIGHT.STOP_MOTION_CUE_SIMULATION, async () => {
     try {

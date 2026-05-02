@@ -1,13 +1,20 @@
 import { describe, expect, it } from '@jest/globals'
 import {
   isPlainObject,
+  validateCueGroupSelectionMode,
+  validateCueRefPayload,
+  validateCueType,
   validateHost,
   validateLightingConfiguration,
+  validateMotionSelectionMode,
   validateNumberInRange,
   validatePathUnderAllowedRoots,
   validateSenderEnablePayload,
   validateSenderId,
+  validateStageKitPriority,
+  validateStringUnion,
 } from '../../ipc/inputValidation'
+import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
 
 describe('inputValidation', () => {
   describe('isPlainObject', () => {
@@ -225,6 +232,107 @@ describe('inputValidation', () => {
       expect(validateLightingConfiguration({ ...validPayload, frontLights: {} }).ok).toBe(false)
       expect(validateLightingConfiguration({ ...validPayload, backLights: null }).ok).toBe(false)
       expect(validateLightingConfiguration({ ...validPayload, strobeLights: 'x' }).ok).toBe(false)
+    })
+  })
+
+  describe('validateStringUnion', () => {
+    const allowed = ['a', 'b', 'c'] as const
+
+    it('accepts a member of the union', () => {
+      const r = validateStringUnion('b', allowed, 'field')
+      expect(r).toEqual({ ok: true, value: 'b' })
+    })
+
+    it('rejects values not in the union', () => {
+      expect(validateStringUnion('z', allowed, 'field').ok).toBe(false)
+    })
+
+    it('rejects non-string inputs', () => {
+      expect(validateStringUnion(1, allowed, 'field').ok).toBe(false)
+      expect(validateStringUnion(undefined, allowed, 'field').ok).toBe(false)
+    })
+  })
+
+  describe('validateMotionSelectionMode', () => {
+    it('accepts every supported mode', () => {
+      for (const mode of ['oncePerSong', 'perCueChange', 'none'] as const) {
+        expect(validateMotionSelectionMode(mode).ok).toBe(true)
+      }
+    })
+
+    it('rejects "withinSong" (cue-group mode, not motion mode)', () => {
+      expect(validateMotionSelectionMode('withinSong').ok).toBe(false)
+    })
+
+    it('rejects non-string inputs', () => {
+      expect(validateMotionSelectionMode(null).ok).toBe(false)
+    })
+  })
+
+  describe('validateCueGroupSelectionMode', () => {
+    it('accepts oncePerSong and withinSong only', () => {
+      expect(validateCueGroupSelectionMode('oncePerSong').ok).toBe(true)
+      expect(validateCueGroupSelectionMode('withinSong').ok).toBe(true)
+    })
+
+    it('rejects motion-only modes', () => {
+      expect(validateCueGroupSelectionMode('perCueChange').ok).toBe(false)
+      expect(validateCueGroupSelectionMode('none').ok).toBe(false)
+    })
+  })
+
+  describe('validateStageKitPriority', () => {
+    it('accepts every supported priority', () => {
+      for (const priority of ['prefer-for-tracked', 'random', 'never'] as const) {
+        expect(validateStageKitPriority(priority).ok).toBe(true)
+      }
+    })
+
+    it('rejects unknown priority', () => {
+      expect(validateStageKitPriority('always').ok).toBe(false)
+      expect(validateStageKitPriority(0).ok).toBe(false)
+    })
+  })
+
+  describe('validateCueType', () => {
+    it('accepts a known CueType enum value', () => {
+      const known = Object.values(CueType)[0] as string
+      const r = validateCueType(known)
+      expect(r.ok).toBe(true)
+      if (r.ok) expect(r.value).toBe(known)
+    })
+
+    it('rejects an unknown string', () => {
+      expect(validateCueType('not-a-real-cue').ok).toBe(false)
+    })
+
+    it('rejects empty / non-string inputs', () => {
+      expect(validateCueType('').ok).toBe(false)
+      expect(validateCueType(null).ok).toBe(false)
+      expect(validateCueType(7).ok).toBe(false)
+    })
+  })
+
+  describe('validateCueRefPayload', () => {
+    it('accepts null and undefined as the explicit "no active cue" value', () => {
+      expect(validateCueRefPayload(null)).toEqual({ ok: true, value: null })
+      expect(validateCueRefPayload(undefined)).toEqual({ ok: true, value: null })
+    })
+
+    it('accepts a well-formed { groupId, cueId } object and trims whitespace', () => {
+      const r = validateCueRefPayload({ groupId: '  g1 ', cueId: ' c1 ' })
+      expect(r).toEqual({ ok: true, value: { groupId: 'g1', cueId: 'c1' } })
+    })
+
+    it('rejects non-object payloads', () => {
+      expect(validateCueRefPayload('bad').ok).toBe(false)
+      expect(validateCueRefPayload(42).ok).toBe(false)
+    })
+
+    it('rejects payloads missing groupId or cueId', () => {
+      expect(validateCueRefPayload({ groupId: '' }).ok).toBe(false)
+      expect(validateCueRefPayload({ cueId: 'c1' }).ok).toBe(false)
+      expect(validateCueRefPayload({ groupId: 'g1', cueId: '   ' }).ok).toBe(false)
     })
   })
 

@@ -231,4 +231,62 @@ describe('NodeCueLoader', () => {
     expect(group).toBeDefined()
     expect(group!.motionCues?.get('am-cue-called')).toBeDefined()
   })
+
+  describe('cue file path resolution', () => {
+    it('rejects readFile for paths outside YARG/audio cue directories', async () => {
+      await expect(loader.readFile('/etc/passwd')).rejects.toThrow(
+        /Node cue file path must be under the YARG or audio cue directories/,
+      )
+    })
+
+    it('allows readFile with a path relative to baseDir', async () => {
+      const file = yargMotionOnlyFile()
+      const v = validateYargNodeCueFile(file)
+      expect(v.valid).toBe(true)
+
+      const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+      fs.mkdirSync(yargDir, { recursive: true })
+      const filename = 'rel-path-test.json'
+      fs.writeFileSync(path.join(yargDir, filename), JSON.stringify(file), 'utf-8')
+
+      const rel = path.join('node-data', 'cues', 'yarg', filename)
+      const read = await loader.readFile(rel)
+      expect(read.group.id).toBe('loader-test-yarg-motion')
+    })
+  })
+
+  describe('resolveCueFilePathForIpc (used by EXPORT)', () => {
+    it('returns the rooted absolute path for a relative in-root path', () => {
+      const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+      fs.mkdirSync(yargDir, { recursive: true })
+      const filename = 'export-target.json'
+      fs.writeFileSync(path.join(yargDir, filename), '{}', 'utf-8')
+      const rel = path.join('node-data', 'cues', 'yarg', filename)
+
+      const resolved = loader.resolveCueFilePathForIpc(rel)
+      expect(resolved).toBe(path.resolve(yargDir, filename))
+    })
+
+    it('rejects path traversal escaping the cue roots', () => {
+      expect(() => loader.resolveCueFilePathForIpc('../../etc/passwd')).toThrow(
+        /must be under the YARG or audio cue directories/,
+      )
+    })
+
+    it('rejects an absolute path outside the cue roots', () => {
+      expect(() => loader.resolveCueFilePathForIpc('/etc/passwd')).toThrow(
+        /must be under the YARG or audio cue directories/,
+      )
+    })
+
+    it('rejects empty input', () => {
+      expect(() => loader.resolveCueFilePathForIpc('')).toThrow(/required/)
+    })
+
+    it('rejects null-byte injection', () => {
+      const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+      const malicious = path.join(yargDir, 'a.json\0/etc/passwd')
+      expect(() => loader.resolveCueFilePathForIpc(malicious)).toThrow(/null bytes/)
+    })
+  })
 })

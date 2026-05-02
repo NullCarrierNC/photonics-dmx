@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
-import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   getYargMotionCueGroups,
   getAudioMotionCueGroups,
@@ -15,6 +14,10 @@ import {
   setDisabledAudioMotionCues,
 } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { CueGroupEnableList } from './cue-groups/CueGroupEnableList'
+import { CueGroupRow } from './cue-groups/CueGroupRow'
+import { useCueGroupRovingTabIndex } from './cue-groups/useCueGroupRovingTabIndex'
+import { useLatestGenerationGate } from './cue-groups/useLatestGenerationGate'
 
 const log = createLogger('MotionEnabledCueGroups')
 
@@ -33,44 +36,28 @@ interface MotionCueGroupDetails {
   isExpanded: boolean
 }
 
-function GroupEnableCheckbox(props: {
-  checked: boolean
-  indeterminate: boolean
-  onChange: (next: boolean) => void
-}): React.ReactElement {
-  const ref = useRef<HTMLInputElement>(null)
-  useLayoutEffect(() => {
-    if (ref.current) {
-      ref.current.indeterminate = props.indeterminate
-    }
-  }, [props.indeterminate])
-
-  return (
-    <input
-      ref={ref}
-      type="checkbox"
-      className="form-checkbox h-5 w-5 text-blue-600 rounded"
-      checked={props.checked && !props.indeterminate}
-      onChange={(e) => props.onChange(e.target.checked)}
-      onClick={(e) => e.stopPropagation()}
-    />
-  )
-}
-
 export interface MotionEnabledCueGroupsProps {
   /** YARG motion runs with YARG lighting; audio motion runs alongside audio-reactive lighting. */
   platform: 'yarg' | 'audio'
 }
+
+type RowError = { message: string; onRetry: () => void }
 
 const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platform }) => {
   const [allGroups, setAllGroups] = useState<MotionCueGroupDetails[]>([])
   const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([])
   const [disabledByGroup, setDisabledByGroup] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [expandErrorByGroup, setExpandErrorByGroup] = useState<Record<string, RowError>>({})
+  const [persistErrorByGroup, setPersistErrorByGroup] = useState<Record<string, RowError>>({})
+  const persistGeneration = useLatestGenerationGate()
+  const roving = useCueGroupRovingTabIndex(allGroups.map((g) => g.id))
 
   const fetchGroups = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const [groups, enabled, disabled] = await Promise.all(
         platform === 'yarg'
           ? [getYargMotionCueGroups(), getEnabledYargMotionCueGroups(), getDisabledYargMotionCues()]
@@ -81,14 +68,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
             ],
       )
 
-      const mappedGroups: MotionCueGroupDetails[] = (
-        groups as Array<{
-          id: string
-          name: string
-          description?: string
-          cueCount: number
-        }>
-      ).map((group) => ({
+      const mappedGroups: MotionCueGroupDetails[] = groups.map((group) => ({
         ...group,
         cues: [],
         isExpanded: false,
@@ -97,7 +77,11 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
       setAllGroups(mappedGroups)
       setEnabledGroupIds(enabled)
       setDisabledByGroup(disabled)
+      setExpandErrorByGroup({})
+      setPersistErrorByGroup({})
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load motion cue groups'
+      setLoadError(message)
       log.error('Failed to fetch motion cue groups:', error)
     } finally {
       setLoading(false)
@@ -108,28 +92,55 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
     fetchGroups()
   }, [fetchGroups])
 
+  const clearPersistError = useCallback((groupId: string) => {
+    setPersistErrorByGroup((prev) => {
+      if (!prev[groupId]) return prev
+      const next = { ...prev }
+      delete next[groupId]
+      return next
+    })
+  }, [])
+
   const persistEnabledAndDisabled = async (
     nextEnabled: string[],
     nextDisabled: Record<string, string[]>,
-  ) => {
-    const enabledResult =
-      platform === 'yarg'
-        ? await setEnabledYargMotionCueGroups(nextEnabled)
-        : await setEnabledAudioMotionCueGroups(nextEnabled)
-    if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
-      log.error('Failed to save enabled motion cue groups')
-      return
+  ): Promise<{ ok: true } | { ok: false; error: string } | { stale: true }> => {
+    const token = persistGeneration.nextGeneration()
+    try {
+      const enabledResult =
+        platform === 'yarg'
+          ? await setEnabledYargMotionCueGroups(nextEnabled)
+          : await setEnabledAudioMotionCueGroups(nextEnabled)
+      if (!persistGeneration.isCurrentGeneration(token)) {
+        return { stale: true }
+      }
+      if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
+        log.error('Failed to save enabled motion cue groups')
+        return {
+          ok: false,
+          error: enabledResult.error || 'Failed to save enabled motion cue groups',
+        }
+      }
+      const disabledResult =
+        platform === 'yarg'
+          ? await setDisabledYargMotionCues(nextDisabled)
+          : await setDisabledAudioMotionCues(nextDisabled)
+      if (!persistGeneration.isCurrentGeneration(token)) {
+        return { stale: true }
+      }
+      if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
+        log.error('Failed to save disabled motion cues')
+        return { ok: false, error: disabledResult.error || 'Failed to save disabled motion cues' }
+      }
+      setEnabledGroupIds(nextEnabled)
+      setDisabledByGroup(nextDisabled)
+      return { ok: true }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to save motion cue group settings'
+      log.error('Persistence error for motion cue groups:', error)
+      return { ok: false, error: message }
     }
-    const disabledResult =
-      platform === 'yarg'
-        ? await setDisabledYargMotionCues(nextDisabled)
-        : await setDisabledAudioMotionCues(nextDisabled)
-    if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
-      log.error('Failed to save disabled motion cues')
-      return
-    }
-    setEnabledGroupIds(nextEnabled)
-    setDisabledByGroup(nextDisabled)
   }
 
   const getGroupCheckboxState = (
@@ -172,8 +183,34 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
       nextEnabled = nextEnabled.filter((id) => id !== groupId)
     }
 
-    void persistEnabledAndDisabled(nextEnabled, nextDisabled)
+    void (async () => {
+      const result = await persistEnabledAndDisabled(nextEnabled, nextDisabled)
+      if ('stale' in result) return
+      if (result.ok) {
+        clearPersistError(groupId)
+      } else {
+        setPersistErrorByGroup((prev) => ({
+          ...prev,
+          [groupId]: { message: result.error, onRetry: () => handleGroupToggle(groupId, turnOn) },
+        }))
+      }
+    })()
   }
+
+  const expandRow = useCallback((groupId: string, cues: MotionCueInfo[]) => {
+    setAllGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
+    )
+  }, [])
+
+  const fetchCuesForGroup = useCallback(
+    async (groupId: string): Promise<MotionCueInfo[]> => {
+      return platform === 'yarg'
+        ? getAvailableYargMotionCues(groupId)
+        : getAvailableAudioMotionCues(groupId)
+    },
+    [platform],
+  )
 
   const handleAccordionToggle = async (groupId: string) => {
     const group = allGroups.find((g) => g.id === groupId)
@@ -181,25 +218,28 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
 
     if (!group.isExpanded && group.cues.length === 0) {
       try {
-        const cueDetails = (
-          platform === 'yarg'
-            ? await getAvailableYargMotionCues(groupId)
-            : await getAvailableAudioMotionCues(groupId)
-        ) as MotionCueInfo[]
-
-        setAllGroups((prevGroups) =>
-          prevGroups.map((g) =>
-            g.id === groupId ? { ...g, cues: cueDetails, isExpanded: true } : g,
-          ),
-        )
+        const cueDetails = await fetchCuesForGroup(groupId)
+        setExpandErrorByGroup((prev) => {
+          if (!prev[groupId]) return prev
+          const next = { ...prev }
+          delete next[groupId]
+          return next
+        })
+        expandRow(groupId, cueDetails)
         return
       } catch (error) {
         log.error('Error fetching motion cue details:', error)
+        const message = error instanceof Error ? error.message : 'Failed to load motion cues'
+        setExpandErrorByGroup((prev) => ({
+          ...prev,
+          [groupId]: { message, onRetry: () => void handleAccordionToggle(groupId) },
+        }))
+        return
       }
     }
 
-    setAllGroups((prevGroups) =>
-      prevGroups.map((g) => (g.id === groupId ? { ...g, isExpanded: !g.isExpanded } : g)),
+    setAllGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, isExpanded: !g.isExpanded } : g)),
     )
   }
 
@@ -207,16 +247,15 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
     let cues = allGroups.find((g) => g.id === groupId)?.cues ?? []
     if (cues.length === 0) {
       try {
-        cues = (
-          platform === 'yarg'
-            ? await getAvailableYargMotionCues(groupId)
-            : await getAvailableAudioMotionCues(groupId)
-        ) as MotionCueInfo[]
-        setAllGroups((prev) =>
-          prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
-        )
+        cues = await fetchCuesForGroup(groupId)
+        expandRow(groupId, cues)
       } catch (e) {
         log.error('Failed to load motion cues for toggle:', e)
+        const message = e instanceof Error ? e.message : 'Failed to load motion cues'
+        setExpandErrorByGroup((prev) => ({
+          ...prev,
+          [groupId]: { message, onRetry: () => void handleCueToggle(groupId, cueId, turnOn) },
+        }))
         return
       }
     }
@@ -247,7 +286,19 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
       }
     }
 
-    await persistEnabledAndDisabled(nextEnabled, nextDisabled)
+    const result = await persistEnabledAndDisabled(nextEnabled, nextDisabled)
+    if ('stale' in result) return
+    if (result.ok) {
+      clearPersistError(groupId)
+    } else {
+      setPersistErrorByGroup((prev) => ({
+        ...prev,
+        [groupId]: {
+          message: result.error,
+          onRetry: () => void handleCueToggle(groupId, cueId, turnOn),
+        },
+      }))
+    }
   }
 
   const title = platform === 'yarg' ? 'YARG Motion Cue Groups' : 'Audio Motion Cue Groups'
@@ -256,98 +307,74 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
       ? 'YARG motion programs run in parallel with YARG lighting cues and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.'
       : 'Audio motion programs run alongside audio-reactive lighting cues (same timing as your primary/secondary/strobe layers) and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.'
 
-  if (loading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4 border-b pb-2">{title}</h2>
-        <p>Loading motion cue groups...</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
-        {title}
-      </h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">{description}</p>
-      <div className="space-y-4">
-        {allGroups.map((group) => {
-          const { checked, indeterminate } = getGroupCheckboxState(group)
-          const disabledSet = new Set(disabledByGroup[group.id] ?? [])
-          return (
-            <div key={group.id} className="border rounded-lg border-gray-200 dark:border-gray-600">
-              <div
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                onClick={() => handleAccordionToggle(group.id)}>
-                <div className="flex items-center flex-1">
-                  <div className="mr-3 text-gray-600 dark:text-gray-400">
-                    {group.isExpanded ? (
-                      <FaChevronDown className="w-4 h-4" />
-                    ) : (
-                      <FaChevronRight className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold">{group.name}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{group.description}</p>
-                  </div>
-                </div>
-                <GroupEnableCheckbox
-                  checked={checked}
-                  indeterminate={indeterminate}
-                  onChange={(on) => handleGroupToggle(group.id, on)}
-                />
+    <CueGroupEnableList
+      title={title}
+      description={description}
+      loading={loading}
+      loadError={loadError}
+      onRetryLoad={() => {
+        void fetchGroups()
+      }}>
+      {allGroups.map((group) => {
+        const { checked, indeterminate } = getGroupCheckboxState(group)
+        const disabledSet = new Set(disabledByGroup[group.id] ?? [])
+        return (
+          <CueGroupRow
+            key={group.id}
+            groupId={group.id}
+            name={group.name}
+            description={group.description}
+            isExpanded={group.isExpanded}
+            onToggleExpanded={() => void handleAccordionToggle(group.id)}
+            checked={checked}
+            indeterminate={indeterminate}
+            onEnableChange={(on) => handleGroupToggle(group.id, on)}
+            tabIndex={roving.tabIndexFor(group.id)}
+            expandButtonRef={(el) => roving.setRef(group.id, el)}
+            onExpandButtonKeyDown={(e) => roving.onKeyDown(e, group.id)}
+            onExpandButtonFocus={() => roving.onFocus(group.id)}
+            loadError={expandErrorByGroup[group.id] ?? null}
+            persistError={persistErrorByGroup[group.id] ?? null}>
+            {group.cues.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                No motion programs found in this group.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">
+                  Motion programs in this group ({group.cues.length}):
+                </h4>
+                {group.cues
+                  .sort((a, b) => a.id.localeCompare(b.id))
+                  .map((cue) => {
+                    const isOn = enabledGroupIds.includes(group.id) && !disabledSet.has(cue.id)
+                    const rowLabelId = `motion-cue-${platform}-${group.id}-${cue.id}-label`
+                    return (
+                      <div key={cue.id} className="flex items-start gap-2 pl-4">
+                        <input
+                          type="checkbox"
+                          className="form-checkbox mt-0.5 h-4 w-4 text-blue-600 rounded shrink-0"
+                          checked={isOn}
+                          onChange={(e) => handleCueToggle(group.id, cue.id, e.target.checked)}
+                          aria-labelledby={rowLabelId}
+                        />
+                        <p id={rowLabelId} className="text-xs text-gray-600 dark:text-gray-400">
+                          <span className="font-medium text-gray-800 dark:text-gray-200">
+                            {cue.name}
+                          </span>
+                          <span className="text-gray-500 dark:text-gray-500"> ({cue.id})</span>
+                          {cue.description ? <> — {cue.description}</> : null}
+                        </p>
+                      </div>
+                    )
+                  })}
               </div>
-
-              {group.isExpanded && (
-                <div className="p-4 border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
-                  {group.cues.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                      No motion programs found in this group.
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">
-                        Motion programs in this group ({group.cues.length}):
-                      </h4>
-                      {group.cues
-                        .sort((a, b) => a.id.localeCompare(b.id))
-                        .map((cue) => {
-                          const isOn =
-                            enabledGroupIds.includes(group.id) && !disabledSet.has(cue.id)
-                          return (
-                            <div key={cue.id} className="flex items-start gap-2 pl-4">
-                              <input
-                                type="checkbox"
-                                className="form-checkbox mt-0.5 h-4 w-4 text-blue-600 rounded shrink-0"
-                                checked={isOn}
-                                onChange={(e) =>
-                                  handleCueToggle(group.id, cue.id, e.target.checked)
-                                }
-                              />
-                              <p className="text-xs text-gray-600 dark:text-gray-400">
-                                <span className="font-medium text-gray-800 dark:text-gray-200">
-                                  {cue.name}
-                                </span>
-                                <span className="text-gray-500 dark:text-gray-500">
-                                  {' '}
-                                  ({cue.id})
-                                </span>
-                                {cue.description ? <> — {cue.description}</> : null}
-                              </p>
-                            </div>
-                          )
-                        })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
+            )}
+          </CueGroupRow>
+        )
+      })}
+    </CueGroupEnableList>
   )
 }
 

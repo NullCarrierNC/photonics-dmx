@@ -12,6 +12,8 @@ const log = createLogger('Application')
 export class Application {
   private windowManager: WindowManager
   private controllerManager: ControllerManager
+  private applicationShutdownPromise: Promise<void> | null = null
+  private applicationShutdownCompleted = false
 
   constructor() {
     this.windowManager = new WindowManager()
@@ -62,34 +64,47 @@ export class Application {
   }
 
   public async shutdown(): Promise<void> {
-    log.info('Application shutdown initiated')
+    if (this.applicationShutdownCompleted) {
+      return
+    }
 
-    // Allow max 5 seconds for shutdown
-    const shutdownTimeout = setTimeout(() => {
-      log.warn('Shutdown taking too long, forcing exit')
-      process.exit(0)
-    }, 5000)
+    this.applicationShutdownPromise ??= (async () => {
+      log.info('Application shutdown initiated')
+
+      // Allow max 5 seconds for shutdown
+      const shutdownTimeout = setTimeout(() => {
+        log.warn('Shutdown taking too long, forcing exit')
+        process.exit(0)
+      }, 5000)
+
+      try {
+        // Shutdown controller manager
+        if (this.controllerManager) {
+          await this.controllerManager.shutdown()
+        }
+
+        // Clear all windows
+        if (this.windowManager) {
+          await this.windowManager.closeAllWindows()
+        }
+
+        log.info('Application shutdown completed successfully')
+
+        // Clear the timeout
+        clearTimeout(shutdownTimeout)
+        this.applicationShutdownCompleted = true
+      } catch (error) {
+        log.error('Error during application shutdown:', error)
+        // Make sure we still clear the timeout
+        clearTimeout(shutdownTimeout)
+        throw error
+      }
+    })()
 
     try {
-      // Shutdown controller manager
-      if (this.controllerManager) {
-        await this.controllerManager.shutdown()
-      }
-
-      // Clear all windows
-      if (this.windowManager) {
-        await this.windowManager.closeAllWindows()
-      }
-
-      log.info('Application shutdown completed successfully')
-
-      // Clear the timeout
-      clearTimeout(shutdownTimeout)
-    } catch (error) {
-      log.error('Error during application shutdown:', error)
-      // Make sure we still clear the timeout
-      clearTimeout(shutdownTimeout)
-      throw error
+      await this.applicationShutdownPromise
+    } finally {
+      this.applicationShutdownPromise = null
     }
   }
 }
