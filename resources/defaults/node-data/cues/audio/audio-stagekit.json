@@ -1048,9 +1048,9 @@
           }
         },
         "viewport": {
-          "x": 305.39821838833745,
-          "y": 134.2054870095694,
-          "zoom": 1.0097512975966862
+          "x": 302.65276898787704,
+          "y": 80.18393656230717,
+          "zoom": 0.5
         }
       },
       "kind": "lighting"
@@ -1396,9 +1396,9 @@
           }
         },
         "viewport": {
-          "x": 358.38843371067196,
-          "y": 123.54975275928155,
-          "zoom": 0.75
+          "x": 302.65276898787704,
+          "y": 80.18393656230717,
+          "zoom": 0.5
         }
       },
       "kind": "lighting"
@@ -1744,14 +1744,14 @@
             "y": 75.20708613929582
           },
           "sk_audio_harmony-red": {
-            "x": 606.628922487376,
-            "y": 398.7999057534871
+            "x": 600.628922487376,
+            "y": 428.7999057534871
           }
         },
         "viewport": {
-          "x": 217.26640588667397,
-          "y": 124.01831617697113,
-          "zoom": 0.6121681962001025
+          "x": 302.65276898787704,
+          "y": 80.18393656230717,
+          "zoom": 0.5
         }
       },
       "kind": "lighting"
@@ -2916,226 +2916,6 @@
           "x": 599.8212406577077,
           "y": 123.03028304688632,
           "zoom": 0.75
-        }
-      },
-      "kind": "lighting"
-    },
-    {
-      "id": "cue-sk-audio-menu",
-      "name": "Menu",
-      "description": "Low blue base then blue rotation across all lights (beat-stepped).",
-      "cueTypeId": "audio-sk-menu",
-      "variables": [
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": []
-        }
-      ],
-      "effects": [
-        {
-          "effectId": "effect-audio-rotation-cw",
-          "effectFileId": "audio-stagekit-effects",
-          "name": "Rotation CW"
-        }
-      ],
-      "nodes": {
-        "events": [
-          {
-            "id": "ev-sk_audio_menu-start",
-            "type": "event",
-            "eventType": "cue-started",
-            "triggerMode": "edge",
-            "label": "Cue started",
-            "threshold": 0.5
-          },
-          {
-            "id": "ev-sk_audio_menu-beat",
-            "type": "event",
-            "eventType": "beat",
-            "triggerMode": "edge",
-            "label": "Beat",
-            "threshold": 0.35
-          }
-        ],
-        "actions": [
-          {
-            "id": "sk_audio_menu-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "blue"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "low"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 200
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
-        "logic": [
-          {
-            "id": "sk_audio_menu-all",
-            "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          }
-        ],
-        "eventRaisers": [],
-        "eventListeners": [],
-        "effectRaisers": [
-          {
-            "id": "sk_audio_menu-sweep",
-            "type": "effect-raiser",
-            "effectId": "effect-audio-rotation-cw",
-            "isPersistent": true,
-            "parameterValues": {
-              "lights": {
-                "source": "variable",
-                "name": "allLights"
-              },
-              "layer": {
-                "source": "literal",
-                "value": 10
-              },
-              "color": {
-                "source": "literal",
-                "value": "blue"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "beat"
-              },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
-              "beatsPerCycle": {
-                "source": "literal",
-                "value": 1
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "groupSize": {
-                "source": "literal",
-                "value": 1
-              },
-              "startOffset": {
-                "source": "literal",
-                "value": 0
-              }
-            }
-          }
-        ],
-        "notes": []
-      },
-      "connections": [
-        {
-          "from": "ev-sk_audio_menu-start",
-          "to": "sk_audio_menu-all"
-        },
-        {
-          "from": "sk_audio_menu-all",
-          "to": "sk_audio_menu-base"
-        },
-        {
-          "from": "ev-sk_audio_menu-beat",
-          "to": "sk_audio_menu-sweep"
-        }
-      ],
-      "layout": {
-        "nodePositions": {
-          "ev-sk_audio_menu-start": {
-            "x": 0,
-            "y": 0
-          },
-          "ev-sk_audio_menu-beat": {
-            "x": 255.32802124135196,
-            "y": 0
-          },
-          "sk_audio_menu-base": {
-            "x": -45.188653877200124,
-            "y": 206.2134548269534
-          },
-          "sk_audio_menu-all": {
-            "x": -20.575119617980988,
-            "y": 88.29520154545207
-          },
-          "sk_audio_menu-sweep": {
-            "x": 237.64059230443183,
-            "y": 112.68622524255761
-          }
-        },
-        "viewport": {
-          "x": 174.26532695142242,
-          "y": 95.28193809095421,
-          "zoom": 1.1180327900991907
         }
       },
       "kind": "lighting"

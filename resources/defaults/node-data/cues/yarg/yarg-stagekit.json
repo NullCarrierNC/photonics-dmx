@@ -912,6 +912,22 @@
             "note": "Cue Called fires repeatedly while a cue is active. \n\nIf the cue is already running the second call \nwill get queued and run when the first ends.",
             "style": "notes",
             "title": "Cue Called Fires Repeatedly"
+          },
+          {
+            "id": "notes-2c8d8cd1-dc8d-4e61-8da7-e1eda88ae14e",
+            "type": "notes",
+            "label": "Info",
+            "note": "Data Nodes lets you extract information about the\ncurrent setup (number of lights, etc) and the current \ncue (BPM, etc). \n\nThese can then be assigned to Variables where additional\noperations are performed.",
+            "style": "info",
+            "title": "About Data & Math Nodes"
+          },
+          {
+            "id": "notes-25ecbc84-36e6-405f-b95b-bb195d7824a1",
+            "type": "notes",
+            "label": "Notes",
+            "note": "Effects are re-usable components that can be shared\nbetween different cues.\n\nThey're self-contained effect graphs that you can pass\nvariables to.",
+            "style": "notes",
+            "title": "About Effects"
           }
         ]
       },
@@ -984,18 +1000,26 @@
             "y": 127.9694596529007
           },
           "notes-5d9969ec-26a8-49db-9003-30d499e9fb46": {
-            "x": -372.68071951362424,
-            "y": -45.64732857635829
+            "x": -353.8381016295966,
+            "y": -47.63076203783487
           },
           "notes-e0f2caaf-39a0-4a8a-8b31-633bc16f5794": {
-            "x": 479.38152520363303,
-            "y": -83.84894968453943
+            "x": 433.7625555896715,
+            "y": -85.83238314601601
+          },
+          "notes-2c8d8cd1-dc8d-4e61-8da7-e1eda88ae14e": {
+            "x": -356.04872204640344,
+            "y": 222.61276682159234
+          },
+          "notes-25ecbc84-36e6-405f-b95b-bb195d7824a1": {
+            "x": 274.44816632078334,
+            "y": 441.63875259412487
           }
         },
         "viewport": {
-          "x": 293.39635176984063,
-          "y": 174.23034915966474,
-          "zoom": 0.6704553503110334
+          "x": 87.63925254672813,
+          "y": -54.85750710615855,
+          "zoom": 1.0381392705430577
         }
       },
       "variables": [
@@ -2695,6 +2719,10 @@
             "x": 256.4145216449624,
             "y": 203.6432303664177
           },
+          "sk-searchlights-has-red": {
+            "x": 528.5939066428691,
+            "y": 117.99012338370085
+          },
           "sk-searchlights-beat-dur": {
             "x": 256.4145216449624,
             "y": 320
@@ -2703,23 +2731,19 @@
             "x": 256.4145216449624,
             "y": 436
           },
-          "sk-searchlights-has-red": {
-            "x": 528.5939066428691,
-            "y": 117.99012338370085
-          },
           "sk-searchlights-yellow": {
-            "x": 657.1555101107931,
-            "y": 410.542650937968
+            "x": 680.8908121039353,
+            "y": 323.5132102964461
           },
           "sk-searchlights-red": {
-            "x": 403.32514767062867,
-            "y": 410.5616975835794
+            "x": 460.6854608207227,
+            "y": 327.4881406075813
           }
         },
         "viewport": {
-          "x": 306.3906413058846,
-          "y": 114.71862801416893,
-          "zoom": 0.6101403985958002
+          "x": 113.07094410940383,
+          "y": 183.80438818130648,
+          "zoom": 0.505576040425652
         }
       },
       "variables": [
@@ -3960,10 +3984,6 @@
                 "source": "literal",
                 "value": 0
               },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
               "easing": {
                 "source": "literal",
                 "value": "linear"
@@ -4024,10 +4044,6 @@
                 "value": "none"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
               },
@@ -4094,10 +4110,6 @@
                 "source": "literal",
                 "value": 0
               },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
               "easing": {
                 "source": "literal",
                 "value": "linear"
@@ -4158,10 +4170,6 @@
                 "value": "none"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
               },
@@ -4355,9 +4363,9 @@
             "outputs": [],
             "message": {
               "source": "literal",
-              "value": "False debug"
+              "value": "Red drum fired in a LARGE venue. No visual effect"
             },
-            "variablesToLog": []
+            "variablesToLog": ["venueSize"]
           },
           {
             "id": "logic-73dfe094-ce27-449b-a7ee-bb9adc56f0a4",
@@ -4450,9 +4458,17 @@
             "id": "notes-keyframe",
             "type": "notes",
             "label": "Notes",
-            "note": "Large venues only. ",
+            "note": "Large venues only (for this cue, not for other cues). ",
             "style": "notes",
             "title": "Keyframe effects are used by "
+          },
+          {
+            "id": "notes-60892ecc-7114-4cba-b297-ed18b71fc73d",
+            "type": "notes",
+            "label": "Notes",
+            "note": "Debugger nodes allow you to log messages and\n data to the debug window at the bottom right \nof this editor screen. Have this window open when\nrunning the cue to see the debug message.",
+            "style": "notes",
+            "title": "About Debugger Nodes"
           }
         ]
       },
@@ -4601,16 +4617,16 @@
             "y": 140.62499114135187
           },
           "logic-40434612-430d-4ef1-b249-8a7dee3d7904": {
-            "x": 941.6786425443959,
-            "y": 222.49618480699644
+            "x": 1041.0943714752984,
+            "y": 154.9444715590755
           },
           "logic-73dfe094-ce27-449b-a7ee-bb9adc56f0a4": {
             "x": 201.1509873638313,
             "y": 74.55863532092144
           },
           "effect-raiser-0884a514-9a0a-49fd-bce1-e559a66c3736": {
-            "x": 816.431321202833,
-            "y": 311.6665412894248
+            "x": 807.5093968115982,
+            "y": 267.05691933325056
           },
           "notes-2f0424a5-32d8-4814-969e-fb20f2a0c5f9": {
             "x": 442.36860426945054,
@@ -4619,12 +4635,16 @@
           "notes-keyframe": {
             "x": 103.13815163754794,
             "y": -64.03149971149406
+          },
+          "notes-60892ecc-7114-4cba-b297-ed18b71fc73d": {
+            "x": 952.5750411874621,
+            "y": -24.428688897314373
           }
         },
         "viewport": {
-          "x": 146.30743467670717,
-          "y": 108.99571128680736,
-          "zoom": 0.8613384127065319
+          "x": -101.1696406495422,
+          "y": 152.38340127603828,
+          "zoom": 0.7845840978967509
         }
       },
       "variables": [
@@ -5043,62 +5063,62 @@
             "y": 4.495253369212151
           },
           "event-sk-frenzy-called": {
-            "x": 281.23462290675366,
-            "y": 764.4983377760096
+            "x": 522.6633209351005,
+            "y": 11.828058922771788
           },
           "action-sk-frenzy-c1": {
-            "x": 248.17898465692997,
-            "y": 1007.4019052572548
+            "x": 492.3058877539561,
+            "y": 82.04650200853553
           },
           "action-sk-frenzy-c2": {
-            "x": 262.6387510653585,
-            "y": 1127.221950661391
+            "x": 506.76565416238464,
+            "y": 201.8665474126717
           },
           "action-sk-frenzy-c3": {
-            "x": 250.01708178035915,
-            "y": 1257.7226627506316
+            "x": 494.14398487738526,
+            "y": 332.36725950191226
           },
           "sk-frenzy-bpm": {
-            "x": 258.8737454749644,
-            "y": 122.50129394605756
+            "x": 275.0629758870408,
+            "y": 68.53719257246962
           },
           "sk-frenzy-beat-ms": {
-            "x": 263.76673735305667,
-            "y": 251.67416900396347
+            "x": 279.9559677651332,
+            "y": 168.02981187490207
           },
           "sk-frenzy-step": {
-            "x": 250.94871445931494,
-            "y": 374.65800731256604
+            "x": 277.9307651461089,
+            "y": 268.0789070997298
           },
           "sk-frenzy-venue": {
-            "x": 262.3235076479614,
-            "y": 492.671338878572
+            "x": 287.9564558004157,
+            "y": 369.9030082536593
           },
           "sk-frenzy-is-large": {
-            "x": 270.62068171426654,
-            "y": 620.2178792208433
+            "x": 282.76260452332383,
+            "y": 474.5148055121558
           },
           "sk-frenzy-set-large": {
-            "x": -4.347600633278489,
-            "y": 750.820196647197
+            "x": 95.48598690785923,
+            "y": 611.8626356102079
           },
           "sk-frenzy-set-large-2": {
-            "x": -7.086887315287072,
-            "y": 874.8138165473938
+            "x": 87.35029008849187,
+            "y": 695.3831794802138
           },
           "sk-frenzy-set-small": {
-            "x": 523.4569780472666,
-            "y": 751.3664292581379
+            "x": 484.33300455141534,
+            "y": 615.1070732898281
           },
           "sk-frenzy-set-small-2": {
-            "x": 508.7405654527247,
-            "y": 874.9185961931944
+            "x": 489.8531299719691,
+            "y": 710.3280870037511
           }
         },
         "viewport": {
-          "x": 299.3906413058846,
-          "y": -167.28137198583107,
-          "zoom": 0.6101403985958002
+          "x": 136.46811480172994,
+          "y": 83.03199068183994,
+          "zoom": 0.7412335049014175
         }
       },
       "variables": [
@@ -5228,10 +5248,6 @@
                 "source": "literal",
                 "value": 0
               },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
               "easing": {
                 "source": "literal",
                 "value": "linear"
@@ -5292,10 +5308,6 @@
                 "value": "none"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
               },
@@ -5362,10 +5374,6 @@
                 "source": "literal",
                 "value": 0
               },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
               "easing": {
                 "source": "literal",
                 "value": "linear"
@@ -5426,10 +5434,6 @@
                 "value": "none"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
               },
@@ -5496,10 +5500,6 @@
                 "source": "literal",
                 "value": 0
               },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
               "easing": {
                 "source": "literal",
                 "value": "linear"
@@ -5560,10 +5560,6 @@
                 "value": "none"
               },
               "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 0
               },
@@ -6053,8 +6049,8 @@
             "y": 511.82765133821636
           },
           "sk-ss-is-dischord": {
-            "x": 270.1769848316908,
-            "y": 382.9671789482236
+            "x": 181.16960235740703,
+            "y": 384.94512078098546
           },
           "sk-ss-setup-all": {
             "x": 14.896089898621995,
@@ -6066,9 +6062,9 @@
           }
         },
         "viewport": {
-          "x": 306.3906413058846,
-          "y": 114.71862801416893,
-          "zoom": 0.6101403985958002
+          "x": 113.07094410940383,
+          "y": 183.80438818130648,
+          "zoom": 0.505576040425652
         }
       },
       "variables": [
