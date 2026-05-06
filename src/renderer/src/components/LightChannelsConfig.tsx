@@ -13,9 +13,10 @@ import {
 } from '../../../photonics-dmx/types'
 import { LightIcon } from './LightIcon'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
-import { BsLightningFill } from 'react-icons/bs'
+import { BsArrowsMove, BsLightningFill } from 'react-icons/bs'
 import MovingHeadCalibrationWizard from './MovingHeadCalibrationWizard'
 import { createLogger } from '../../../shared/logger'
+import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
 const log = createLogger('LightChannelsConfig')
 
 interface LightChannelsConfigProps {
@@ -28,6 +29,12 @@ interface LightChannelsConfigProps {
   rigId?: string | null
   /** Current rig lighting config (for 3D preview in the calibration wizard). */
   lightingConfig: LightingConfiguration
+  /** Drag handle only; card body is not draggable. */
+  dragHandle?: {
+    setActivatorRef: (el: HTMLElement | null) => void
+    attributes: DraggableAttributes
+    listeners?: DraggableSyntheticListeners | undefined
+  }
 }
 
 const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSpeed']
@@ -68,6 +75,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   myLights,
   rigId,
   lightingConfig,
+  dragHandle,
 }) => {
   const [localChannels, setLocalChannels] = useState<
     RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels | StrobeDmxChannels | null
@@ -298,16 +306,40 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     !!light.id &&
     (light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH)
 
+  let dragHandleButton: React.ReactNode = null
+  if (dragHandle) {
+    const { setActivatorRef, attributes, listeners } = dragHandle
+    const { onClick: dragOnClick, ...listenerRest } = listeners ?? {}
+    dragHandleButton = (
+      <button
+        type="button"
+        ref={(node) => {
+          setActivatorRef(node)
+        }}
+        {...attributes}
+        {...listenerRest}
+        onClick={(e) => {
+          dragOnClick?.(e)
+          e.stopPropagation()
+        }}
+        aria-label="Drag to reorder light"
+        className="absolute top-2 right-2 z-10 -translate-y-[6px] translate-x-[6px] p-1 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 touch-none">
+        <BsArrowsMove aria-hidden />
+      </button>
+    )
+  }
+
   return (
     <div
       onClick={onClick}
-      className={`flex flex-col flex-grow items-center space-y-2 p-4 max-w-[440px] rounded-lg shadow cursor-pointer 
+      className={`relative flex flex-col flex-grow items-center space-y-2 p-4 max-w-[440px] rounded-lg shadow cursor-pointer 
                   text-gray-800 dark:text-gray-200 
                   ${
                     isHighlighted
                       ? 'bg-yellow-500 dark:bg-yellow-600'
                       : 'bg-gray-300 dark:bg-[#303548] hover:bg-gray-200 dark:hover:bg-[#40465a]'
                   }`}>
+      {dragHandleButton}
       {calibrationOpen && showCalibrate && light && rigId && (
         <MovingHeadCalibrationWizard
           key={light.id}
