@@ -139,6 +139,8 @@ const useCueFiles = ({
     setFilename,
     mode,
     cueKind,
+    files,
+    effectFiles,
     setValidationErrors,
     setIsDirty,
     loadCueIntoFlow,
@@ -146,6 +148,14 @@ const useCueFiles = ({
     refreshEffectFiles: fileIO.refreshEffectFiles,
     onError,
   })
+
+  const existingGroupIdsForNewFileModal = useMemo(() => {
+    const list =
+      editorMode === 'effect'
+        ? effectFiles.filter((f) => f.mode === mode)
+        : files.filter((f) => f.mode === mode)
+    return new Set(list.map((f) => f.groupId.trim().toLowerCase()))
+  }, [editorMode, effectFiles, files, mode])
 
   const metadata = useCueMetadata({
     editorDoc,
@@ -376,6 +386,7 @@ const useCueFiles = ({
     handleExport: fileIO.handleExport,
     refreshFiles: fileIO.refreshFiles,
     handleReload: fileIO.handleReload,
+    existingGroupIdsForNewFileModal,
   }
 }
 

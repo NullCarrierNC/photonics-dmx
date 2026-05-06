@@ -173,6 +173,8 @@ export class NodeCueLoader extends EventEmitter {
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
+    this.assertNoConflictingGroupIdForPath(filePath, mode, content.group.id)
+
     await fs.mkdir(path.dirname(filePath), { recursive: true })
     await fs.writeFile(filePath, JSON.stringify(content, null, 2), 'utf-8')
     await this.loadFile(mode, filePath)
@@ -513,6 +515,35 @@ export class NodeCueLoader extends EventEmitter {
       result.motionCues = motionMap
     }
     return result
+  }
+
+  /**
+   * Prevents two cue files in the same domain (yarg vs audio) from sharing one `group.id`,
+   * which would overwrite the other in the registry (see registerFile / unregisterGroup).
+   */
+  private assertNoConflictingGroupIdForPath(
+    targetPath: string,
+    mode: NodeCueMode,
+    groupId: string,
+  ): void {
+    const normalizedTarget = path.resolve(targetPath)
+    const key = groupId.trim().toLowerCase()
+    if (!key) {
+      return
+    }
+    for (const [registeredPath, reg] of this.fileRegistrations) {
+      if (reg.mode !== mode) {
+        continue
+      }
+      if (path.resolve(registeredPath) === normalizedTarget) {
+        continue
+      }
+      if (reg.groupId.trim().toLowerCase() === key) {
+        throw new Error(
+          `Another ${mode} cue file already uses group id '${groupId}'. Choose a different group ID.`,
+        )
+      }
+    }
   }
 
   private updateSummary(summary: NodeCueFileSummary): void {
