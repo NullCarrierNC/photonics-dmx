@@ -1,4 +1,6 @@
 import { useCallback } from 'react'
+import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
+import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type {
   AudioNodeCueDefinition,
   AudioEffectDefinition,
@@ -35,6 +37,8 @@ export type UseCueCrudParams = {
   mode: NodeCueMode
   /** Lighting vs motion for new cues and blank files (both YARG and Audio). */
   cueKind: NodeCueKind
+  files: NodeCueFileSummary[]
+  effectFiles: EffectFileSummary[]
   setValidationErrors: (errors: string[]) => void
   setIsDirty: (dirty: boolean) => void
   loadCueIntoFlow: (
@@ -58,6 +62,8 @@ export function useCueCrud({
   setFilename,
   mode,
   cueKind,
+  files,
+  effectFiles,
   setValidationErrors,
   setIsDirty,
   loadCueIntoFlow,
@@ -74,6 +80,21 @@ export function useCueCrud({
       itemDescription: string
     }) => {
       const isInEffectMode = editorDoc?.mode === 'effect'
+      const newIdKey = metadata.groupId.trim().toLowerCase()
+      if (newIdKey) {
+        const summaries = isInEffectMode
+          ? effectFiles.filter((f) => f.mode === mode)
+          : files.filter((f) => f.mode === mode)
+        const taken = summaries.some((s) => s.groupId.trim().toLowerCase() === newIdKey)
+        if (taken) {
+          onError?.(
+            isInEffectMode
+              ? `Effect group ID "${metadata.groupId.trim()}" is already in use. Choose a different ID.`
+              : `Cue group ID "${metadata.groupId.trim()}" is already in use. Choose a different ID.`,
+          )
+          return
+        }
+      }
 
       if (isInEffectMode) {
         const file = createDefaultEffectFile(mode as EffectMode)
@@ -149,6 +170,8 @@ export function useCueCrud({
       editorDoc?.mode,
       mode,
       cueKind,
+      files,
+      effectFiles,
       onError,
       loadCueIntoFlow,
       refreshFiles,

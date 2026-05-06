@@ -130,8 +130,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     },
   )
 
-  ipcMain.handle(NODE_CUES.IMPORT, async (_event, preferredMode?: NodeCueMode) => {
-    const loader = ensureLoader(controllerManager)
+  ipcMain.handle(NODE_CUES.IMPORT_PICK, async (_event, preferredMode?: NodeCueMode) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Node Cue Files', extensions: ['json'] }],
@@ -150,10 +149,12 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     }
 
     const mode = preferredMode ?? validation.mode
-    const filename = path.basename(sourcePath)
-    const saveResult = await loader.saveFile(mode, filename, validation.data)
-    await persistGroupEnableAfterNodeCueSave(controllerManager, mode, validation.data.group.id)
-    return { success: true, path: saveResult.path }
+    return {
+      success: true,
+      sourceBasename: path.basename(sourcePath),
+      mode,
+      content: validation.data,
+    }
   })
 
   ipcMain.handle(NODE_CUES.EXPORT, async (_event, filePath: string) => {

@@ -20,6 +20,7 @@ import EffectRaiserNodeComponent from '../components/cue-editor/components/flow/
 import EffectListenerNodeComponent from '../components/cue-editor/components/flow/EffectListenerNode'
 import NotesNodeComponent from '../components/cue-editor/components/flow/NotesNode'
 import NewFileModal from '../components/cue-editor/components/NewFileModal'
+import ImportCueFileModal from '../components/cue-editor/components/ImportCueFileModal'
 import ToastContainer from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles'
@@ -197,6 +198,7 @@ const CueEditor: React.FC = () => {
     setIsDirty,
     handleModeChange,
     handleCreateNewFile,
+    existingGroupIdsForNewFileModal,
     updateGroupMeta,
     updateCueMetadata,
     updateEffectMetadata,
@@ -211,6 +213,11 @@ const CueEditor: React.FC = () => {
     handleImport,
     handleExport,
     handleReload,
+    pendingImport,
+    clearPendingImport,
+    commitPendingImport,
+    existingGroupIdsForImportModal,
+    existingFilenamesLowerForImportModal,
   } = useCueFiles({
     loadCueIntoFlow: loadCueIntoFlowProxy,
     getUpdatedDocument: getUpdatedDocumentProxy,
@@ -1097,12 +1104,30 @@ const CueEditor: React.FC = () => {
         isOpen={showNewFileModal}
         isEffectMode={isEffectMode}
         mode={mode}
+        existingGroupIds={existingGroupIdsForNewFileModal}
         onCancel={() => setShowNewFileModal(false)}
         onSave={(metadata) => {
           handleCreateNewFile(metadata)
           setShowNewFileModal(false)
         }}
       />
+
+      {pendingImport !== null && (
+        <ImportCueFileModal
+          key={`${pendingImport.kind}-${pendingImport.sourceBasename}`}
+          isOpen
+          isEffectMode={pendingImport.kind === 'effect'}
+          mode={pendingImport.saveMode}
+          sourceBasename={pendingImport.sourceBasename}
+          defaultGroupId={pendingImport.suggestedGroupId}
+          existingGroupIds={existingGroupIdsForImportModal}
+          existingFilenamesLower={existingFilenamesLowerForImportModal}
+          onCancel={clearPendingImport}
+          onSave={(saveFilename, groupId) => {
+            void commitPendingImport(saveFilename, groupId)
+          }}
+        />
+      )}
 
       {pendingNavigation && (
         <div

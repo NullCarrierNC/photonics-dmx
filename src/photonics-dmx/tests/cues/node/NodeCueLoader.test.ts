@@ -289,4 +289,22 @@ describe('NodeCueLoader', () => {
       expect(() => loader.resolveCueFilePathForIpc(malicious)).toThrow(/null bytes/)
     })
   })
+
+  describe('saveFile group id uniqueness', () => {
+    it('rejects saving a second cue file with the same group.id on a different path', async () => {
+      const file = yargMotionOnlyFile()
+      await loader.saveFile('yarg', 'first.json', file)
+      await expect(loader.saveFile('yarg', 'second.json', file)).rejects.toThrow(
+        /already uses group id/,
+      )
+    })
+
+    it('allows overwriting the same path with the same group.id', async () => {
+      const file = yargMotionOnlyFile()
+      await loader.saveFile('yarg', 'only.json', file)
+      await expect(loader.saveFile('yarg', 'only.json', file)).resolves.toMatchObject({
+        success: true,
+      })
+    })
+  })
 })

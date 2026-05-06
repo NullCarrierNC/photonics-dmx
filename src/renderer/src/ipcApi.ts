@@ -484,7 +484,8 @@ export const validateNodeCue = (payload: { path?: string; content?: NodeCueFile 
 export const getNodeCueTypes = (mode: NodeCueMode, kind?: NodeCueKind) =>
   window.api.invoke(NODE_CUES.GET_CUE_TYPES, { mode, kind })
 
-export const importNodeCueFile = (mode?: NodeCueMode) => window.api.invoke(NODE_CUES.IMPORT, mode)
+export const pickNodeCueImportFile = (mode?: NodeCueMode) =>
+  window.api.invoke(NODE_CUES.IMPORT_PICK, mode)
 
 export const exportNodeCueFile = (filePath: string) => window.api.invoke(NODE_CUES.EXPORT, filePath)
 
@@ -509,7 +510,8 @@ export const deleteEffectFile = (filePath: string) => window.api.invoke(EFFECTS.
 export const validateEffect = (payload: { path?: string; content?: EffectFile }) =>
   window.api.invoke(EFFECTS.VALIDATE, payload)
 
-export const importEffectFile = (mode?: EffectMode) => window.api.invoke(EFFECTS.IMPORT, mode)
+export const pickEffectImportFile = (mode?: EffectMode) =>
+  window.api.invoke(EFFECTS.IMPORT_PICK, mode)
 
 export const exportEffectFile = (filePath: string) => window.api.invoke(EFFECTS.EXPORT, filePath)
 

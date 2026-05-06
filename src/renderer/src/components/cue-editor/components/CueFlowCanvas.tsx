@@ -25,6 +25,7 @@ import type {
   YargEventNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
+import { NODE_DRAG_MIME, parseNodeDrag, type NodeDragPayload } from '../lib/nodeDragPayload'
 
 type Props = {
   nodes: EditorNode[]
@@ -103,6 +104,82 @@ const CueFlowCanvas: React.FC<Props> = ({
   }
 
   const menuRef = React.useRef<HTMLDivElement>(null)
+  const reactFlowInstanceRef = React.useRef<ReactFlowInstance | null>(null)
+
+  const handleInit = React.useCallback(
+    (instance: ReactFlowInstance) => {
+      reactFlowInstanceRef.current = instance
+      setReactFlowInstance(instance)
+    },
+    [setReactFlowInstance],
+  )
+
+  const dispatchAdd = React.useCallback(
+    (payload: NodeDragPayload, position: { x: number; y: number }) => {
+      switch (payload.kind) {
+        case 'system-event':
+          addEventNode(getDefaultEventOption(activeMode, activeCueKind), position)
+          return
+        case 'event-listener':
+          if (addEventListenerNode) addEventListenerNode(position)
+          return
+        case 'effect-listener':
+          if (addEffectListenerNode) addEffectListenerNode(position)
+          return
+        case 'event-raiser':
+          if (addEventRaiserNode) addEventRaiserNode(position)
+          return
+        case 'effect-raiser':
+          if (addEffectRaiserNode) addEffectRaiserNode(position)
+          return
+        case 'action':
+          addActionNode(payload.effectType, position)
+          return
+        case 'logic':
+          addLogicNode(payload.logicType, position)
+          return
+        case 'notes':
+          if (addNotesNode) addNotesNode(payload.variant, position)
+          return
+      }
+    },
+    [
+      activeMode,
+      activeCueKind,
+      addEventNode,
+      addEventListenerNode,
+      addEffectListenerNode,
+      addEventRaiserNode,
+      addEffectRaiserNode,
+      addActionNode,
+      addLogicNode,
+      addNotesNode,
+    ],
+  )
+
+  const handleDragOver = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes(NODE_DRAG_MIME)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }, [])
+
+  const handleDrop = React.useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      const raw = event.dataTransfer.getData(NODE_DRAG_MIME)
+      const payload = parseNodeDrag(raw)
+      const wrapper = flowWrapperRef.current
+      const instance = reactFlowInstanceRef.current
+      if (!payload || !wrapper || !instance) return
+      event.preventDefault()
+      const bounds = wrapper.getBoundingClientRect()
+      const position = instance.project({
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      })
+      dispatchAdd(payload, position)
+    },
+    [dispatchAdd, flowWrapperRef],
+  )
 
   // Adjust menu position after render to prevent overflow
   React.useEffect(() => {
@@ -147,7 +224,11 @@ const CueFlowCanvas: React.FC<Props> = ({
   }, [paneContextMenu])
 
   return (
-    <div className="flex-1 relative" ref={flowWrapperRef}>
+    <div
+      className="flex-1 relative"
+      ref={flowWrapperRef}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -155,7 +236,7 @@ const CueFlowCanvas: React.FC<Props> = ({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
-        onInit={setReactFlowInstance}
+        onInit={handleInit}
         isValidConnection={isValidConnection}
         onNodeContextMenu={onNodeContextMenu}
         onEdgeContextMenu={onEdgeContextMenu}

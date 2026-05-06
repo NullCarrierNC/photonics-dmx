@@ -127,6 +127,8 @@ export class EffectLoader extends EventEmitter {
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
+    this.assertNoConflictingEffectGroupIdForPath(filePath, mode, content.group.id)
+
     await fs.mkdir(path.dirname(filePath), { recursive: true })
     await fs.writeFile(filePath, JSON.stringify(content, null, 2), 'utf-8')
     await this.loadFile(mode, filePath)
@@ -280,6 +282,30 @@ export class EffectLoader extends EventEmitter {
 
     this.updateSummary(summary)
     return summary
+  }
+
+  /** Two effect JSON files in the same mode must not share the same `group.id`. */
+  private assertNoConflictingEffectGroupIdForPath(
+    targetPath: string,
+    mode: EffectMode,
+    groupId: string,
+  ): void {
+    const normalizedTarget = path.resolve(targetPath)
+    const key = groupId.trim().toLowerCase()
+    if (!key) {
+      return
+    }
+    const summaries = mode === 'yarg' ? this.summaries.yarg : this.summaries.audio
+    for (const s of summaries) {
+      if (path.resolve(s.path) === normalizedTarget) {
+        continue
+      }
+      if (s.groupId.trim().toLowerCase() === key) {
+        throw new Error(
+          `Another ${mode} effect file already uses group id '${groupId}'. Choose a different group ID.`,
+        )
+      }
+    }
   }
 
   private updateSummary(summary: EffectFileSummary): void {

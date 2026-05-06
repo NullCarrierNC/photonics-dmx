@@ -8,7 +8,6 @@ import type {
   YargNodeCueDefinition,
   YargEffectDefinition,
   EffectFile,
-  EffectMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { firstByName } from '../lib/cueUtils'
@@ -26,9 +25,7 @@ import {
   saveEffectFile,
   deleteNodeCueFile,
   deleteEffectFile,
-  importNodeCueFile,
   exportNodeCueFile,
-  importEffectFile,
   exportEffectFile,
   validateNodeCue,
   validateEffect,
@@ -79,7 +76,7 @@ export function useCueFileIO({
   setFilename,
   selectedCueId,
   setSelectedCueId,
-  mode,
+  mode: _mode,
   setMode,
   setValidationErrors,
   setIsDirty,
@@ -312,17 +309,6 @@ export function useCueFileIO({
     setIsDirty,
   ])
 
-  const handleImport = useCallback(async () => {
-    if (editorDoc?.mode === 'effect') {
-      const effectMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
-      await importEffectFile(effectMode)
-      refreshEffectFiles()
-    } else {
-      await importNodeCueFile(mode)
-      refreshFiles()
-    }
-  }, [editorDoc?.mode, mode, refreshFiles, refreshEffectFiles])
-
   const handleExport = useCallback(async () => {
     if (!editorDoc?.path) return
     if (editorDoc.mode === 'effect') {
@@ -393,7 +379,6 @@ export function useCueFileIO({
     selectEffectFile,
     handleSave,
     handleDelete,
-    handleImport,
     handleExport,
     handleReload,
     refreshFiles,
