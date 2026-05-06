@@ -43,6 +43,27 @@ function isCueTypeSelectable(type: string): boolean {
   return true
 }
 
+/**
+ * Picks a group id for an imported file when the original id is already registered.
+ * Preserves the original string when it does not collide (case-insensitive).
+ */
+function suggestNonConflictingGroupId(
+  originalId: string,
+  takenLowercase: ReadonlySet<string>,
+): string {
+  const base = originalId.trim() || 'imported-group'
+  if (!takenLowercase.has(base.toLowerCase())) {
+    return base
+  }
+  let n = 2
+  let candidate = `${base}-imported`
+  while (takenLowercase.has(candidate.toLowerCase())) {
+    candidate = `${base}-imported-${n}`
+    n += 1
+  }
+  return candidate
+}
+
 /** Returns the first item when sorted alphabetically by name (matches sidebar order). */
 function firstByName<T extends { name?: string; id: string }>(items: T[]): T | null {
   if (items.length === 0) return null
@@ -60,4 +81,5 @@ export {
   getTextColorForBg,
   getYargEventLabel,
   isCueTypeSelectable,
+  suggestNonConflictingGroupId,
 }

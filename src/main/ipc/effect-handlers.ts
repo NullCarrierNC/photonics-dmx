@@ -75,8 +75,7 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     throw new Error('Validation payload must include either content or path.')
   })
 
-  ipcMain.handle(EFFECTS.IMPORT, async (_event, preferredMode?: EffectMode) => {
-    const loader = ensureLoader(controllerManager)
+  ipcMain.handle(EFFECTS.IMPORT_PICK, async (_event, preferredMode?: EffectMode) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Effect Files', extensions: ['json'] }],
@@ -99,9 +98,12 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     }
 
     const mode = preferredMode ?? validation.mode
-    const filename = path.basename(sourcePath)
-    const saveResult = await loader.saveFile(mode, filename, validation.data)
-    return { success: true, path: saveResult.path }
+    return {
+      success: true,
+      sourceBasename: path.basename(sourcePath),
+      mode,
+      content: validation.data,
+    }
   })
 
   ipcMain.handle(EFFECTS.EXPORT, async (_event, filePath: string) => {

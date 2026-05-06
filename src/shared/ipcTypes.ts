@@ -167,9 +167,11 @@ export interface IpcInvokeMap {
     request: { mode: NodeCueMode; kind?: NodeCueKind }
     response: string[]
   }
-  [NODE_CUES.IMPORT]: {
+  [NODE_CUES.IMPORT_PICK]: {
     request: NodeCueMode | undefined
-    response: { success: true; path: string } | IpcErrorResult
+    response:
+      | { success: true; sourceBasename: string; mode: NodeCueMode; content: NodeCueFile }
+      | IpcErrorResult
   }
   [NODE_CUES.EXPORT]: {
     request: string
@@ -203,9 +205,11 @@ export interface IpcInvokeMap {
       | { valid: true; data: EffectFile; errors: string[]; mode: EffectMode }
       | { valid: false; errors: string[] }
   }
-  [EFFECTS.IMPORT]: {
+  [EFFECTS.IMPORT_PICK]: {
     request: EffectMode | undefined
-    response: { success: true; path: string } | IpcErrorResult
+    response:
+      | { success: true; sourceBasename: string; mode: EffectMode; content: EffectFile }
+      | IpcErrorResult
   }
   [EFFECTS.EXPORT]: {
     request: string

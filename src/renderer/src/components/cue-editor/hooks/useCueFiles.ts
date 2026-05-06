@@ -7,10 +7,21 @@ import type {
   NodeCueMode,
   YargNodeCueDefinition,
   EffectFile,
+  EffectMode,
   YargEffectDefinition,
   AudioEffectDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { getNodeCueTypes, listNodeCueFiles, listEffectFiles } from '../../../ipcApi'
+import {
+  getNodeCueTypes,
+  listNodeCueFiles,
+  listEffectFiles,
+  pickEffectImportFile,
+  pickNodeCueImportFile,
+  saveEffectFile,
+  saveNodeCueFile,
+  validateEffect,
+  validateNodeCue,
+} from '../../../ipcApi'
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import {
@@ -29,9 +40,25 @@ import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/l
 import { useCueFileIO } from './useCueFileIO'
 import { useCueCrud } from './useCueCrud'
 import { useCueMetadata } from './useCueMetadata'
-import { isCueTypeSelectable } from '../lib/cueUtils'
+import { isCueTypeSelectable, suggestNonConflictingGroupId } from '../lib/cueUtils'
 import { createLogger } from '../../../../../shared/logger'
 const log = createLogger('useCueFiles')
+
+export type PendingCueEditorImport =
+  | {
+      kind: 'cue'
+      sourceBasename: string
+      saveMode: NodeCueMode
+      suggestedGroupId: string
+      content: NodeCueFile
+    }
+  | {
+      kind: 'effect'
+      sourceBasename: string
+      saveMode: EffectMode
+      suggestedGroupId: string
+      content: EffectFile
+    }
 
 type UseCueFilesParams = {
   loadCueIntoFlow: (
@@ -75,6 +102,7 @@ const useCueFiles = ({
   const [availableCueTypes, setAvailableCueTypes] = useState<string[]>([])
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [isDirty, setIsDirty] = useState<boolean>(false)
+  const [pendingImport, setPendingImport] = useState<PendingCueEditorImport | null>(null)
   const restoredLastFileRef = useRef<boolean>(false)
   const lastStoredFilePathRef = useRef<string | null>(getStoredLastFilePath())
 
@@ -156,6 +184,150 @@ const useCueFiles = ({
         : files.filter((f) => f.mode === mode)
     return new Set(list.map((f) => f.groupId.trim().toLowerCase()))
   }, [editorMode, effectFiles, files, mode])
+
+  const existingGroupIdsForImportModal = useMemo(() => {
+    if (!pendingImport) {
+      return new Set<string>()
+    }
+    const list =
+      pendingImport.kind === 'effect'
+        ? effectFiles.filter((f) => f.mode === pendingImport.saveMode)
+        : files.filter((f) => f.mode === pendingImport.saveMode)
+    return new Set(list.map((f) => f.groupId.trim().toLowerCase()))
+  }, [pendingImport, effectFiles, files])
+
+  const existingFilenamesLowerForImportModal = useMemo(() => {
+    if (!pendingImport) {
+      return new Set<string>()
+    }
+    const list =
+      pendingImport.kind === 'effect'
+        ? effectFiles.filter((f) => f.mode === pendingImport.saveMode)
+        : files.filter((f) => f.mode === pendingImport.saveMode)
+    return new Set(
+      list.map((f) => {
+        const base = f.path.split(/[/\\]/).pop() ?? ''
+        return base.toLowerCase()
+      }),
+    )
+  }, [pendingImport, effectFiles, files])
+
+  const handleImport = useCallback(async () => {
+    if (editorDoc?.mode === 'effect') {
+      const effectMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
+      const result = await pickEffectImportFile(effectMode)
+      if (!result.success) {
+        if (result.error !== 'User cancelled import.') {
+          onError?.(result.error)
+        }
+        return
+      }
+      const taken = new Set(
+        effectFiles
+          .filter((f) => f.mode === result.mode)
+          .map((f) => f.groupId.trim().toLowerCase()),
+      )
+      const suggestedGroupId = suggestNonConflictingGroupId(result.content.group.id, taken)
+      setPendingImport({
+        kind: 'effect',
+        sourceBasename: result.sourceBasename,
+        saveMode: result.mode,
+        suggestedGroupId,
+        content: result.content,
+      })
+    } else {
+      const result = await pickNodeCueImportFile(mode)
+      if (!result.success) {
+        if (result.error !== 'User cancelled import.') {
+          onError?.(result.error)
+        }
+        return
+      }
+      const taken = new Set(
+        files.filter((f) => f.mode === result.mode).map((f) => f.groupId.trim().toLowerCase()),
+      )
+      const suggestedGroupId = suggestNonConflictingGroupId(result.content.group.id, taken)
+      setPendingImport({
+        kind: 'cue',
+        sourceBasename: result.sourceBasename,
+        saveMode: result.mode,
+        suggestedGroupId,
+        content: result.content,
+      })
+    }
+  }, [editorDoc?.mode, mode, effectFiles, files, onError])
+
+  const clearPendingImport = useCallback(() => {
+    setPendingImport(null)
+  }, [])
+
+  const commitPendingImport = useCallback(
+    async (saveFilename: string, groupId: string) => {
+      if (!pendingImport) {
+        return
+      }
+      try {
+        const raw = JSON.parse(JSON.stringify(pendingImport.content)) as NodeCueFile | EffectFile
+        delete raw.bundled
+        raw.group = { ...raw.group, id: groupId.trim() }
+
+        if (pendingImport.kind === 'cue') {
+          const cuePayload = raw as NodeCueFile
+          const validation = await validateNodeCue({ content: cuePayload })
+          if (!validation.valid) {
+            onError?.(`Import validation failed: ${validation.errors.join(', ')}`)
+            return
+          }
+          const response = await saveNodeCueFile({
+            mode: cuePayload.mode,
+            filename: saveFilename,
+            content: cuePayload,
+          })
+          if (!response.success) {
+            onError?.(`Failed to save imported cue: ${saveFilename}`)
+            return
+          }
+          await refreshFiles()
+          const summaryList = await listNodeCueFiles()
+          const flat = [...summaryList.yarg, ...summaryList.audio]
+          const summary = flat.find((s) => s.path === response.path)
+          if (summary) {
+            await fileIO.selectFile(summary)
+          }
+          onSaveSuccess?.(`Cue imported: ${saveFilename}`)
+        } else {
+          const effectPayload = raw as EffectFile
+          const validation = await validateEffect({ content: effectPayload })
+          if (!validation.valid) {
+            onError?.(`Import validation failed: ${validation.errors.join(', ')}`)
+            return
+          }
+          const response = await saveEffectFile({
+            mode: effectPayload.mode,
+            filename: saveFilename,
+            content: effectPayload,
+          })
+          if (!response.success) {
+            onError?.(`Failed to save imported effect: ${saveFilename}`)
+            return
+          }
+          await refreshEffectFiles()
+          const summaryList = await listEffectFiles()
+          const flat = [...summaryList.yarg, ...summaryList.audio]
+          const summary = flat.find((s) => s.path === response.path)
+          if (summary) {
+            await fileIO.selectEffectFile(summary)
+          }
+          onSaveSuccess?.(`Effect imported: ${saveFilename}`)
+        }
+        setPendingImport(null)
+      } catch (error) {
+        log.error('Failed to commit import', error)
+        onError?.(error instanceof Error ? error.message : String(error))
+      }
+    },
+    [pendingImport, fileIO, onError, onSaveSuccess, refreshFiles, refreshEffectFiles],
+  )
 
   const metadata = useCueMetadata({
     editorDoc,
@@ -382,11 +554,16 @@ const useCueFiles = ({
     selectEffectFile: fileIO.selectEffectFile,
     handleSave: fileIO.handleSave,
     handleDelete: fileIO.handleDelete,
-    handleImport: fileIO.handleImport,
+    handleImport,
     handleExport: fileIO.handleExport,
     refreshFiles: fileIO.refreshFiles,
     handleReload: fileIO.handleReload,
     existingGroupIdsForNewFileModal,
+    pendingImport,
+    clearPendingImport,
+    commitPendingImport,
+    existingGroupIdsForImportModal,
+    existingFilenamesLowerForImportModal,
   }
 }
 

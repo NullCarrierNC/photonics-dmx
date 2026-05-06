@@ -13,7 +13,7 @@ export const NODE_CUES = {
   DELETE: 'node-cues:delete',
   VALIDATE: 'node-cues:validate',
   GET_CUE_TYPES: 'node-cues:get-cue-types',
-  IMPORT: 'node-cues:import',
+  IMPORT_PICK: 'node-cues:import-pick',
   EXPORT: 'node-cues:export',
 } as const
 
@@ -25,7 +25,7 @@ export const EFFECTS = {
   SAVE: 'effects:save',
   DELETE: 'effects:delete',
   VALIDATE: 'effects:validate',
-  IMPORT: 'effects:import',
+  IMPORT_PICK: 'effects:import-pick',
   EXPORT: 'effects:export',
 } as const
 
