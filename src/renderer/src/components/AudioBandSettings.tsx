@@ -16,7 +16,14 @@ import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('AudioBandSettings')
 
-const PRESET_OPTIONS = AUDIO_BAND_PRESETS.map((p) => ({ id: p.id, label: p.label }))
+const PRESET_OPTIONS = (() => {
+  const copy = [...AUDIO_BAND_PRESETS]
+  const rhythmIdx = copy.findIndex((p) => p.id === 'rhythm-game')
+  const rhythm = rhythmIdx >= 0 ? copy.splice(rhythmIdx, 1)[0] : undefined
+  copy.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
+  const ordered = rhythm ? [rhythm, ...copy] : copy
+  return ordered.map((p) => ({ id: p.id, label: p.label }))
+})()
 
 function isValidEightBandList(bands: unknown): bands is AudioBandDefinition[] {
   return Array.isArray(bands) && bands.length === 8
