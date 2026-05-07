@@ -212,6 +212,8 @@ export const RENDERER_RECEIVE = {
   YARG_MOTION_CUE_CHANGE: 'yarg-motion:cue-active-change',
   /** Game Mode primary cue changed (main process → renderer). */
   AUDIO_GAME_MODE_CUE_CHANGE: 'audio:game-mode-cue-change',
+  /** Game Mode next-cue switch window (deadline + pending beat) for countdown UI. */
+  AUDIO_GAME_MODE_DEADLINE: 'audio:game-mode-deadline',
   /** Strobe cue firing state (main process → renderer, on transitions). */
   AUDIO_STROBE_STATE: 'audio:strobe-state',
   /** Mirrored AudioLightingData for Audio Preview window (main process → single target window). */

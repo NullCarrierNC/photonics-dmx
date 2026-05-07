@@ -82,6 +82,9 @@ export class AudioController {
           activeCueType,
         })
       })
+      this.audioProcessor.setOnGameModeScheduleChange((info) => {
+        this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE, info)
+      })
       this.audioProcessor.setMotionEnabled(this.deps.config.getPreference('motionEnabled') ?? true)
       this.audioProcessor.setManualMotionRef(
         this.deps.config.getPreference('cueDomains').audioMotion.activeCueRef ?? null,
@@ -157,6 +160,7 @@ export class AudioController {
     if (this.audioProcessor) {
       this.audioProcessor.setOnStrobeStateChange(null)
       this.audioProcessor.setOnGameModeCueChange(null)
+      this.audioProcessor.setOnGameModeScheduleChange(null)
       this.audioProcessor.shutdown()
       this.audioProcessor = null
     }

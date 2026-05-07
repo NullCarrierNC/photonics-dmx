@@ -181,6 +181,12 @@ export interface AudioGameModeConfig {
   cueDurationMax: number
 }
 
+/** Main-process game mode schedule snapshot (wall-clock deadline until next switch window ends). */
+export interface AudioGameModeSchedulePayload {
+  deadlineMs: number | null
+  pending: boolean
+}
+
 export const DEFAULT_AUDIO_GAME_MODE: AudioGameModeConfig = {
   enabled: false,
   cueDurationMin: 5,
