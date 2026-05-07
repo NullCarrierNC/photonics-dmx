@@ -60,6 +60,7 @@ export type {
 export type {
   AudioConfig,
   AudioGameModeConfig,
+  AudioGameModeSchedulePayload,
   AudioLightingData,
 } from '../photonics-dmx/listeners/Audio/AudioTypes'
 
@@ -104,6 +105,7 @@ import type {
 import type {
   AudioConfig,
   AudioGameModeConfig,
+  AudioGameModeSchedulePayload,
   AudioLightingData,
 } from '../photonics-dmx/listeners/Audio/AudioTypes'
 
@@ -823,6 +825,7 @@ export interface IpcEventMap {
     manualFallback: boolean
   }
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
+  [RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE]: AudioGameModeSchedulePayload
   [RENDERER_RECEIVE.AUDIO_STROBE_STATE]: {
     active: boolean
     strobeCueType: string | null

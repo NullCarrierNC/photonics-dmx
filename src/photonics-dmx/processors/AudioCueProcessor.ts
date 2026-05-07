@@ -1,4 +1,9 @@
-import { AudioLightingData, AudioConfig, AudioGameModeConfig } from '../listeners/Audio/AudioTypes'
+import {
+  AudioLightingData,
+  AudioConfig,
+  AudioGameModeConfig,
+  AudioGameModeSchedulePayload,
+} from '../listeners/Audio/AudioTypes'
 import { DEFAULT_AUDIO_CONFIG, DEFAULT_AUDIO_IDLE_DETECTION } from '../listeners/Audio'
 
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
@@ -35,6 +40,7 @@ export class AudioCueProcessor {
   private strobeCueType: AudioCueType | null = null
   private onStrobeStateChange: ((active: boolean) => void) | null = null
   private onGameModeCueChange: ((cueType: AudioCueType) => void) | null = null
+  private onGameModeScheduleChange: ((info: AudioGameModeSchedulePayload) => void) | null = null
   private readonly lightManager: DmxLightManager
   private readonly idleController = new AudioIdleController()
   private idleLookActive = false
@@ -223,6 +229,9 @@ export class AudioCueProcessor {
     this.gameModeManager.setOnCueSwitch((cueType) => {
       this.onGameModeCueChange?.(cueType)
     })
+    this.gameModeManager.setOnScheduleChange((info) => {
+      this.onGameModeScheduleChange?.(info)
+    })
     this.gameModeManager.start()
     this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null, true)
     log.info('AudioCueProcessor: Game Mode enabled')
@@ -236,8 +245,9 @@ export class AudioCueProcessor {
       return
     }
     this.tearDownIdleState()
-    this.gameModeManager.setOnCueSwitch(null)
     this.gameModeManager.stop()
+    this.gameModeManager.setOnCueSwitch(null)
+    this.gameModeManager.setOnScheduleChange(null)
     this.gameModeManager = null
     this.cueHandler.syncSlots(
       this.currentPrimaryCueType,
@@ -407,6 +417,12 @@ export class AudioCueProcessor {
 
   public setOnGameModeCueChange(cb: ((cueType: AudioCueType) => void) | null): void {
     this.onGameModeCueChange = cb
+  }
+
+  public setOnGameModeScheduleChange(
+    cb: ((info: AudioGameModeSchedulePayload) => void) | null,
+  ): void {
+    this.onGameModeScheduleChange = cb
   }
 
   /**

@@ -13,6 +13,7 @@ import {
   setActiveAudioMotionCue,
 } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import type { AudioGameModeSchedulePayload } from '../../../shared/ipcTypes'
 
 const log = createLogger('AudioCueSelectorPanel')
 
@@ -68,6 +69,10 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     [],
   )
   const [savingMotion, setSavingMotion] = useState(false)
+  const [gameModeSchedule, setGameModeSchedule] = useState<AudioGameModeSchedulePayload | null>(
+    null,
+  )
+  const [, setGameModeScheduleTick] = useState(0)
 
   const loadCueState = useCallback(async (silent = false) => {
     try {
@@ -87,8 +92,12 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       try {
         const gm = await getAudioGameMode()
         setGameModeEnabled(gm.enabled)
+        if (!gm.enabled) {
+          setGameModeSchedule(null)
+        }
       } catch {
         setGameModeEnabled(false)
+        setGameModeSchedule(null)
       }
 
       if (!enabled) {
@@ -105,6 +114,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setMotionCuesOptions([])
         setMotionPlayingLabel(null)
         setMotionPlayingGroupLabel(null)
+        setGameModeSchedule(null)
         return
       }
 
@@ -204,6 +214,35 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE, handleGameModeCueChange)
     }
   }, [])
+
+  useEffect(() => {
+    const handleGameModeDeadline = (payload: AudioGameModeSchedulePayload) => {
+      if (payload.deadlineMs == null && !payload.pending) {
+        setGameModeSchedule(null)
+      } else {
+        setGameModeSchedule(payload)
+      }
+    }
+    addIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE, handleGameModeDeadline)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE, handleGameModeDeadline)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (
+      !gameModeEnabled ||
+      !gameModeSchedule ||
+      gameModeSchedule.pending ||
+      gameModeSchedule.deadlineMs == null
+    ) {
+      return
+    }
+    const id = setInterval(() => {
+      setGameModeScheduleTick((t) => t + 1)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [gameModeEnabled, gameModeSchedule])
 
   useEffect(() => {
     const clearHideTimer = () => {
@@ -330,6 +369,11 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     }
     return availableCues.find((cue) => cue.id === secondaryCueType)
   }, [availableCues, secondaryCueType])
+
+  const gameModeRemainingSec =
+    !gameModeSchedule?.deadlineMs || gameModeSchedule.pending
+      ? 0
+      : Math.max(0, Math.ceil((gameModeSchedule.deadlineMs - Date.now()) / 1000))
 
   const handleCueChange = async (cueId: string) => {
     setSelectedCueId(cueId)
@@ -463,6 +507,17 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
               <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
                 Current cue
               </h3>
+              {gameModeEnabled && gameModeSchedule && (
+                <span
+                  className="shrink-0 text-sm font-medium tabular-nums text-gray-600 dark:text-gray-300"
+                  aria-live="polite">
+                  {gameModeSchedule.pending
+                    ? 'Waiting for beat...'
+                    : gameModeSchedule.deadlineMs != null
+                      ? `Next cue in ${gameModeRemainingSec}s`
+                      : null}
+                </span>
+              )}
             </div>
             <div className="overflow-x-auto">
               {gameModeEnabled ? (
