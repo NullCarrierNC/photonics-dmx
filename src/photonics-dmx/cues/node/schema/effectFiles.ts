@@ -49,6 +49,7 @@ const yargEffectFileSchema: JSONSchemaType<YargEffectFile> = {
       } as unknown as JSONSchemaType<YargEffectDefinition>,
     },
     bundled: { type: 'boolean', nullable: true },
+    cueVersion: { type: 'integer', nullable: true, minimum: 1 },
   },
 }
 
@@ -81,6 +82,7 @@ const audioEffectFileSchema: JSONSchemaType<AudioEffectFile> = {
       } as unknown as JSONSchemaType<AudioEffectDefinition>,
     },
     bundled: { type: 'boolean', nullable: true },
+    cueVersion: { type: 'integer', nullable: true, minimum: 1 },
   },
 }
 

@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "cueVersion": 1,
   "mode": "yarg",
   "group": {
     "id": "yarg-motion-default",

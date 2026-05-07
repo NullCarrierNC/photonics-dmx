@@ -269,6 +269,7 @@ const useCueFiles = ({
       try {
         const raw = JSON.parse(JSON.stringify(pendingImport.content)) as NodeCueFile | EffectFile
         delete raw.bundled
+        delete raw.cueVersion
         raw.group = { ...raw.group, id: groupId.trim() }
 
         if (pendingImport.kind === 'cue') {

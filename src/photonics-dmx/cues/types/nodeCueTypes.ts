@@ -333,7 +333,10 @@ export interface AudioMotionNodeCueDefinition extends BaseCueDefinition {
 export type AudioNodeCueDefinition = AudioLightingNodeCueDefinition | AudioMotionNodeCueDefinition
 
 export interface YargNodeCueFile {
+  /** Schema version. */
   version: 1
+  /** Bundled content revision; used at startup to refresh defaults from the app bundle. */
+  cueVersion?: number
   mode: 'yarg'
   group: NodeCueGroupMeta
   cues: YargNodeCueDefinition[]
@@ -341,7 +344,10 @@ export interface YargNodeCueFile {
 }
 
 export interface AudioNodeCueFile {
+  /** Schema version. */
   version: 1
+  /** Bundled content revision; used at startup to refresh defaults from the app bundle. */
+  cueVersion?: number
   mode: 'audio'
   group: NodeCueGroupMeta
   cues: AudioNodeCueDefinition[]
@@ -616,6 +622,8 @@ export interface EffectGroupMeta {
 
 export interface YargEffectFile {
   version: 1
+  /** Bundled content revision; used at startup to refresh defaults from the app bundle. */
+  cueVersion?: number
   mode: 'yarg'
   group: EffectGroupMeta
   effects: YargEffectDefinition[]
@@ -624,6 +632,8 @@ export interface YargEffectFile {
 
 export interface AudioEffectFile {
   version: 1
+  /** Bundled content revision; used at startup to refresh defaults from the app bundle. */
+  cueVersion?: number
   mode: 'audio'
   group: EffectGroupMeta
   effects: AudioEffectDefinition[]
