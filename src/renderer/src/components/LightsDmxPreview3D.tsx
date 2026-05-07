@@ -346,8 +346,8 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
       <Suspense fallback={null}>
         <FloorLabel text="Upstage" position={[0, 0.02, -3]} />
         <FloorLabel text="Downstage" position={[0, 0.02, downstageLabelZ]} />
-        <FloorLabel text="Stage Right" position={[3.2, 0.02, 0]} yawRad={-Math.PI / 2} />
-        <FloorLabel text="Stage Left" position={[-3.2, 0.02, 0]} yawRad={Math.PI / 2} />
+        <FloorLabel text="Stage Right" position={[-3.2, 0.02, 0]} yawRad={Math.PI / 2} />
+        <FloorLabel text="Stage Left" position={[3.2, 0.02, 0]} yawRad={-Math.PI / 2} />
       </Suspense>
 
       {isStacked && (
