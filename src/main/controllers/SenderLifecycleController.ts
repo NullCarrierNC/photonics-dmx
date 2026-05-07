@@ -32,6 +32,7 @@ export type OutputSenderStateSnapshot = {
   artnet: boolean
   enttecpro: boolean
   opendmx: boolean
+  ipc: boolean
 }
 
 export class SenderLifecycleController {
@@ -75,6 +76,7 @@ export class SenderLifecycleController {
       artnet: sm.isSenderEnabled('artnet'),
       enttecpro: sm.isSenderEnabled('enttecpro'),
       opendmx: sm.isSenderEnabled('opendmx'),
+      ipc: sm.isSenderEnabled('ipc'),
     }
   }
 
@@ -110,6 +112,7 @@ export class SenderLifecycleController {
    * Re-enable DMX output senders based on persisted preferences.
    * Called after controller restart so that sACN / Art-Net / USB senders
    * resume automatically without the user needing to toggle them off and on.
+   * When `activeSenders.ipc` is true (pre-restart snapshot), restores the IPC preview sender.
    */
   public async restoreSenderOutputsFromPrefs(
     activeSenders?: OutputSenderStateSnapshot,
@@ -123,10 +126,20 @@ export class SenderLifecycleController {
       artnet: outputConfig.artNetEnabled,
       enttecpro: outputConfig.enttecProEnabled,
       opendmx: outputConfig.openDmxEnabled,
+      ipc: false,
     }
 
     this.ensureSenderManager()
     const sm = this.senderManager!
+
+    if (sendersToRestore.ipc) {
+      try {
+        await sm.enableSender('ipc', 'ipc', { sender: 'ipc' })
+        log.info('Restored IPC sender after restart')
+      } catch (err) {
+        log.error('Failed to restore IPC sender after restart:', err)
+      }
+    }
 
     if (sendersToRestore.sacn) {
       const sc = prefs.sacnConfig
