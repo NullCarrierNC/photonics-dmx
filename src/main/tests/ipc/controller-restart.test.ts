@@ -51,6 +51,11 @@ function listenerStub() {
       getIsYargEnabled: jest.fn().mockReturnValue(false),
       getIsRb3Enabled: jest.fn().mockReturnValue(false),
     },
+    audio: {
+      getIsAudioEnabled: jest.fn().mockReturnValue(false),
+      disableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
+    },
   }
 }
 
@@ -251,6 +256,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
       artnet: false,
       enttecpro: false,
       opendmx: false,
+      ipc: false,
     })
 
     expect(senderManager.enableSender).toHaveBeenCalledTimes(1)
@@ -299,6 +305,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
           artnet: false,
           enttecpro: false,
           opendmx: false,
+          ipc: false,
         }),
         restoreSenderOutputsFromPrefs: restoreFromPrefs,
       },
@@ -319,9 +326,155 @@ describe('ControllerManager lifecycle and sender restore', () => {
       artnet: false,
       enttecpro: false,
       opendmx: false,
+      ipc: false,
     })
     expect(setManualBuffer).not.toHaveBeenCalled()
     expect(fake.lifecyclePhase).toBe('running')
+  })
+
+  it('restartControllers passes ipc flag through snapshot so preview sender can be restored', async () => {
+    const restoreFromPrefs = jest.fn().mockImplementation(() => Promise.resolve())
+    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
+      listenerLifecycle: listenerStub(),
+      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
+      dmxPublisher: {
+        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
+        setManualBuffer: jest.fn(),
+      },
+      cueHandler: { shutdown: jest.fn() },
+      dmxLightManager: {},
+      lightStateManager: {},
+      lightTransitionController: {},
+      sequencer: {},
+      isInitialized: true,
+      lifecyclePhase: 'running',
+      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      init: jest.fn().mockImplementation(function (this: RestartFake) {
+        this.isInitialized = true
+        this.lifecyclePhase = 'running'
+        return Promise.resolve()
+      }),
+      senderLifecycle: {
+        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue({
+          sacn: false,
+          artnet: false,
+          enttecpro: false,
+          opendmx: false,
+          ipc: true,
+        }),
+        restoreSenderOutputsFromPrefs: restoreFromPrefs,
+      },
+      consoleMode: {
+        onControllersReinitializedWhileConsoleOpen: jest.fn(),
+        getConsoleRestore: jest.fn().mockReturnValue(null),
+      },
+    })
+
+    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
+
+    expect(restoreFromPrefs).toHaveBeenCalledWith({
+      sacn: false,
+      artnet: false,
+      enttecpro: false,
+      opendmx: false,
+      ipc: true,
+    })
+  })
+
+  it('restartControllers disables and re-enables Audio when it was active', async () => {
+    const listeners = listenerStub()
+    const disableAudio = listeners.audio.disableAudio as jest.Mock
+    const enableAudio = listeners.audio.enableAudio as jest.Mock
+    ;(listeners.audio.getIsAudioEnabled as jest.Mock).mockReturnValue(true)
+
+    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
+      listenerLifecycle: listeners,
+      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
+      dmxPublisher: {
+        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
+        setManualBuffer: jest.fn(),
+      },
+      cueHandler: { shutdown: jest.fn() },
+      dmxLightManager: {},
+      lightStateManager: {},
+      lightTransitionController: {},
+      sequencer: {},
+      isInitialized: true,
+      lifecyclePhase: 'running',
+      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      init: jest.fn().mockImplementation(function (this: RestartFake) {
+        this.isInitialized = true
+        this.lifecyclePhase = 'running'
+        return Promise.resolve()
+      }),
+      senderLifecycle: {
+        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
+        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
+      },
+      consoleMode: {
+        onControllersReinitializedWhileConsoleOpen: jest.fn(),
+        getConsoleRestore: jest.fn().mockReturnValue(null),
+      },
+    })
+
+    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
+
+    expect(disableAudio).toHaveBeenCalledTimes(1)
+    expect(enableAudio).toHaveBeenCalledTimes(1)
+    expect(enableAudio).toHaveBeenCalledWith(true, expect.any(Function))
+  })
+
+  it('restartControllers does not touch Audio when Audio was not enabled', async () => {
+    const listeners = listenerStub()
+    const disableAudio = listeners.audio.disableAudio as jest.Mock
+    const enableAudio = listeners.audio.enableAudio as jest.Mock
+
+    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
+      listenerLifecycle: listeners,
+      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
+      dmxPublisher: {
+        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
+        setManualBuffer: jest.fn(),
+      },
+      cueHandler: { shutdown: jest.fn() },
+      dmxLightManager: {},
+      lightStateManager: {},
+      lightTransitionController: {},
+      sequencer: {},
+      isInitialized: true,
+      lifecyclePhase: 'running',
+      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      init: jest.fn().mockImplementation(function (this: RestartFake) {
+        this.isInitialized = true
+        this.lifecyclePhase = 'running'
+        return Promise.resolve()
+      }),
+      senderLifecycle: {
+        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
+        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
+      },
+      consoleMode: {
+        onControllersReinitializedWhileConsoleOpen: jest.fn(),
+        getConsoleRestore: jest.fn().mockReturnValue(null),
+      },
+    })
+
+    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
+
+    expect(disableAudio).not.toHaveBeenCalled()
+    expect(enableAudio).not.toHaveBeenCalled()
   })
 
   it('restartControllers restores console phase when DMX console is open', async () => {
@@ -358,6 +511,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
           artnet: false,
           enttecpro: false,
           opendmx: false,
+          ipc: false,
         }),
         restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
       },

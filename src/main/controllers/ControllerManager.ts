@@ -819,6 +819,7 @@ export class ControllerManager {
 
     const wasYargEnabled = this.listenerLifecycle.yargRb3.getIsYargEnabled()
     const wasRb3Enabled = this.listenerLifecycle.yargRb3.getIsRb3Enabled()
+    const wasAudioEnabled = this.listenerLifecycle.audio.getIsAudioEnabled()
     const activeSendersBeforeRestart = this.senderLifecycle.getActiveOutputSenderSnapshotIfAny()
     const wasConsoleMode = this.consoleMode.getConsoleRestore() !== null
 
@@ -828,6 +829,9 @@ export class ControllerManager {
       }
       if (wasRb3Enabled) {
         await this.listenerLifecycle.yargRb3.disableRb3()
+      }
+      if (wasAudioEnabled) {
+        await this.listenerLifecycle.audio.disableAudio()
       }
 
       if (this.effectsController) {
@@ -881,6 +885,10 @@ export class ControllerManager {
         this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
       } else if (wasRb3Enabled) {
         await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
+      }
+
+      if (wasAudioEnabled) {
+        await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
       }
 
       // Restore DMX output senders from persisted preferences so that output
