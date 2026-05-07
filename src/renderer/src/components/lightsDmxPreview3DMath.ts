@@ -77,8 +77,8 @@ export function panTiltDmxToStageVector(
   const horizMag = Math.abs(Math.sin(phi0Rad))
 
   /**
-   * World xz aligned with the 2D preview disc: world +x = stage right; disc horizontal and world x
-   * share sign (positive = audience-right = stage-left on the disc). Disc screen-y → world +z
+   * World xz aligned with the 2D preview disc: world +x = stage right (performers' right,
+   * audience/house left); raw.x uses the same sign as discUx. Disc screen-y → world +z
    * (downstage toward audience).
    */
   const raw: StageVector3 = {
