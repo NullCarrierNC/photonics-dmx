@@ -35,7 +35,10 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
       try {
         const list = await getYargMotionCueGroups()
         if (!cancelled && Array.isArray(list)) {
-          setGroups(list)
+          const sorted = [...list].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+          )
+          setGroups(sorted)
         }
       } catch (e) {
         log.error('Failed to load motion cue groups:', e)
