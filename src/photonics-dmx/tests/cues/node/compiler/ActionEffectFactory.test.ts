@@ -205,14 +205,14 @@ describe('resolvePositionToAbsolutePercent', () => {
     expect(ccw.pan).toBeCloseTo(50 - d, 5)
   })
 
-  it('direction mode anchors to panStageDeg, not panHome', () => {
+  it('direction mode: bearing 0 picks pan alias closest to home when stage-zero has multiple motor equivalents', () => {
     const cfg = { ...base, panHome: 30, panStageDeg: 360, panRangeDeg: 540 }
-    const stageZeroPct = (360 / 540) * 100
     const result = resolvePositionToAbsolutePercent(
       { mode: 'direction', bearingDeg: 0, angleFromVerticalDeg: 0 },
       cfg,
     )
-    expect(result.pan).toBeCloseTo(stageZeroPct, 5)
+    // Same beam as panStageDeg (360° motor); 0° alias is closer to home at 162° than 360°.
+    expect(result.pan).toBeCloseTo(0, 5)
   })
 
   it('direction mode anchors tilt to tiltStageDeg, not tiltHome', () => {
@@ -249,13 +249,21 @@ describe('resolvePositionToAbsolutePercent', () => {
     expect(result.pan).toBeCloseTo((300 / 540) * 100, 4)
   })
 
-  it('direction mode: panStage 360 keeps 360 alias over 0 when both are valid', () => {
-    const cfg = { ...base, panHome: 30, panStageDeg: 360, panRangeDeg: 540, panDirectionCW: true }
+  it('direction mode: 540° fixture with home on second revolution does not pick far pan alias for bearing 0', () => {
+    const panMotorDeg450Pct = (450 / 540) * 100
+    const cfg = {
+      ...base,
+      panHome: panMotorDeg450Pct,
+      panStageDeg: 90,
+      panRangeDeg: 540,
+      panDirectionCW: true,
+    }
     const result = resolvePositionToAbsolutePercent(
       { mode: 'direction', bearingDeg: 0, angleFromVerticalDeg: 0 },
       cfg,
     )
-    expect(result.pan).toBeCloseTo((360 / 540) * 100, 5)
+    expect(result.pan).toBeCloseTo(panMotorDeg450Pct, 5)
+    expect(result.pan).not.toBeCloseTo((90 / 540) * 100, 2)
   })
 
   it('direction mode: invertPan=true with panDirectionCW=true behaves like panDirectionCW=false (logicalPanDir XOR)', () => {

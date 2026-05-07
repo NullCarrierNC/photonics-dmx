@@ -31,6 +31,7 @@ import ArtNetToggle from './ArtNetToggle'
 import EnttecProToggle from './EnttecProToggle'
 import OpenDmxToggle from './OpenDmxToggle'
 import LightsDmxPreview3D from './LightsDmxPreview3D'
+import { MotorEdgeHomeWarnings } from './MotorEdgeHomeWarnings'
 
 const STEP_TITLES = [
   'Pan range',
@@ -573,6 +574,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
               Set as Home
             </button>
+            <MotorEdgeHomeWarnings panHome={config.panHome} tiltHome={config.tiltHome} />
             <p className="text-xs text-gray-600 dark:text-gray-400">
               Pan home {config.panHome}% · Tilt home {config.tiltHome}%
             </p>
@@ -586,6 +588,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
               Confirm calibration values. Save writes to this rig and the matching My Lights
               template.
             </p>
+            <MotorEdgeHomeWarnings panHome={config.panHome} tiltHome={config.tiltHome} />
             <ul className="space-y-1 font-mono text-xs bg-gray-100 dark:bg-gray-900 p-3 rounded max-h-48 overflow-y-auto">
               <li>panRangeDeg: {config.panRangeDeg}</li>
               <li>tiltRangeDeg: {config.tiltRangeDeg}</li>

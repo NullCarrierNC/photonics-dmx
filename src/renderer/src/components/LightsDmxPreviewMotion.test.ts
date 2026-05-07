@@ -45,7 +45,12 @@ function offsetsToMotor(
   const panHomeDeg = (cfg.panHome / 100) * cfg.panRangeDeg
   const tiltHomeDeg = (cfg.tiltHome / 100) * cfg.tiltRangeDeg
   const rawPan = panHomeDeg + panDir * panOffsetDeg
-  const chosen = pickAliasedPanMotorDeg(rawPan, cfg.panRangeDeg, preferredPanMotorDeg, 'continuity')
+  const chosen = pickAliasedPanMotorDeg(
+    rawPan,
+    cfg.panRangeDeg,
+    preferredPanMotorDeg,
+    'continuity-clamp',
+  )
   const tiltMotor = tiltHomeDeg + tiltOffsetDeg
   return { panMotor: chosen, tiltMotor, nextPref: chosen }
 }

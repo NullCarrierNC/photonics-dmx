@@ -106,6 +106,29 @@ function encirclingPanMotorWindow(
   return { low: w0, high: w0 + 360 }
 }
 
+function pickPanMotorDegNearestLinearPreferClampOnTie(
+  pool: number[],
+  clampedCandidate: number,
+  preferredPanMotorDeg: number,
+): number {
+  let best = pool[0]!
+  let bestDist = Math.abs(best - preferredPanMotorDeg)
+  for (const c of pool) {
+    const d = Math.abs(c - preferredPanMotorDeg)
+    if (d < bestDist - 1e-9) {
+      best = c
+      bestDist = d
+    } else if (Math.abs(d - bestDist) < 1e-9) {
+      const cIsClamp = Math.abs(c - clampedCandidate) < 1e-9
+      const bestIsClamp = Math.abs(best - clampedCandidate) < 1e-9
+      if (cIsClamp && !bestIsClamp) {
+        best = c
+      }
+    }
+  }
+  return best
+}
+
 function pickPanMotorDegEncircling(
   azimuthDeg0To360: number,
   panHomeDeg: number,
@@ -121,19 +144,12 @@ function pickPanMotorDegEncircling(
       candidates.push(c)
     }
   }
+  const clampedInWindow = Math.max(low, Math.min(high, a))
   if (candidates.length > 0) {
-    let best = candidates[0]!
-    let bestAbs = Math.abs(wrapSignedDeg(best - preferredPanMotorDeg))
-    for (const c of candidates) {
-      const w = Math.abs(wrapSignedDeg(c - preferredPanMotorDeg))
-      if (w < bestAbs - 1e-9) {
-        best = c
-        bestAbs = w
-      }
-    }
-    return best
+    const pool = Array.from(new Set([...candidates, clampedInWindow]))
+    return pickPanMotorDegNearestLinearPreferClampOnTie(pool, clampedInWindow, preferredPanMotorDeg)
   }
-  return Math.max(low, Math.min(high, a))
+  return clampedInWindow
 }
 
 function wrapSignedDeg(d: number): number {
@@ -176,20 +192,10 @@ function pickPanMotorDegFromAzimuth(
       candidates.push(c)
     }
   }
-  if (candidates.length === 1) {
-    return candidates[0]!
-  }
-  if (candidates.length > 1) {
-    let best = candidates[0]!
-    let bestAbs = Math.abs(wrapSignedDeg(best - preferredPanMotorDeg))
-    for (const c of candidates) {
-      const w = Math.abs(wrapSignedDeg(c - preferredPanMotorDeg))
-      if (w < bestAbs - 1e-9) {
-        best = c
-        bestAbs = w
-      }
-    }
-    return best
+  const clampedInRange = Math.max(0, Math.min(panRangeDeg, a))
+  if (candidates.length >= 1) {
+    const pool = Array.from(new Set([...candidates, clampedInRange]))
+    return pickPanMotorDegNearestLinearPreferClampOnTie(pool, clampedInRange, preferredPanMotorDeg)
   }
   const s = shortestPanMotorDegToHome(a, preferredPanMotorDeg)
   return Math.max(0, Math.min(panRangeDeg, s))
@@ -215,7 +221,12 @@ function effectiveCircleGeometry(
   }
   const panDir = logicalPanDir(c)
   const rawPanTarget = c.panStageDeg + panDir * bearingDeg
-  const panCenterDeg = pickAliasedPanMotorDeg(rawPanTarget, c.panRangeDeg, panHomeDeg, 'intent')
+  const panCenterDeg = pickAliasedPanMotorDeg(
+    rawPanTarget,
+    c.panRangeDeg,
+    panHomeDeg,
+    'continuity-clamp',
+  )
   return {
     phi0Eff: alphaDeg,
     panCenterDeg,
@@ -508,7 +519,7 @@ describe('gimbalCompensatedPanTiltOffsetsDeg', () => {
     expect(Math.abs(down.panOffsetDeg - stageRight.panOffsetDeg)).toBeGreaterThan(1)
   })
 
-  it('near pole bearing uses the same pan motor as direction-mode set-position at vertical', () => {
+  it('near pole bearing: circle center matches continuity-clamp alias pick (motion path)', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
     const c: FixtureConfig = {
       ...defaultMh,
@@ -520,13 +531,13 @@ describe('gimbalCompensatedPanTiltOffsetsDeg', () => {
     }
     const bearingDeg = 180
     const geo = effectiveCircleGeometry(c, 30, 1, bearingDeg)
-    const { pan } = resolvePositionToAbsolutePercent(
-      { mode: 'direction', bearingDeg, angleFromVerticalDeg: 0 },
-      c,
-    )
-    const expectedCenterMotor = (pan / 100) * c.panRangeDeg
+    const panHomeDeg = (c.panHome / 100) * c.panRangeDeg
+    const rawPanTarget = c.panStageDeg + logicalPanDir(c) * bearingDeg
     expect(geo.phi0Eff).toBeCloseTo(30, 6)
-    expect(geo.panCenterDeg).toBeCloseTo(expectedCenterMotor, 4)
+    expect(geo.panCenterDeg).toBeCloseTo(
+      pickAliasedPanMotorDeg(rawPanTarget, c.panRangeDeg, panHomeDeg, 'continuity-clamp'),
+      4,
+    )
     warn.mockRestore()
   })
 
@@ -876,9 +887,13 @@ it('invertPan flips logical panDir so sine offset aliases on 540° window (DMX m
   const state = ltc.getLightState(light.id, 2)
   const panHomeDeg = (light.config.panHome / 100) * defaultMh.panRangeDeg
   const rawMotor = panHomeDeg + -60
-  const chosen = pickAliasedPanMotorDeg(rawMotor, defaultMh.panRangeDeg, panHomeDeg, 'continuity')
+  const chosen = pickAliasedPanMotorDeg(
+    rawMotor,
+    defaultMh.panRangeDeg,
+    panHomeDeg,
+    'continuity-clamp',
+  )
   expect(state.pan).toBeCloseTo((chosen / defaultMh.panRangeDeg) * 100, 5)
-  expect(state.pan).toBeGreaterThan(10)
   expect(state.tilt).toBeCloseTo(light.config.tiltHome, 5)
 })
 
@@ -992,7 +1007,7 @@ it('reported near-pole light does not hit tilt clamp in normal circle motion', (
   warn.mockRestore()
 })
 
-it('up-firing panHome 0 / panStageDeg 0: circle motion does not pan-clamp and spans pan', () => {
+it('up-firing panHome 0 / panStageDeg 0: edge home produces limited pan sweep (clamp motion path)', () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
   const lsm = new LightStateManager()
   const ltc = new LightTransitionController(lsm)
@@ -1032,7 +1047,9 @@ it('up-firing panHome 0 / panStageDeg 0: circle motion does not pan-clamp and sp
   }
 
   expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('up-fire-edge-home pan clamped'))
-  expect(maxPan - minPan).toBeGreaterThan(8)
+  expect(minPan).toBeGreaterThanOrEqual(-1e-6)
+  expect(maxPan).toBeLessThan(15)
+  expect(maxPan - minPan).toBeLessThan(12)
   warn.mockRestore()
 })
 

@@ -98,6 +98,29 @@ function encirclingPanMotorWindow(
   return { low: w0, high: w0 + 360 }
 }
 
+function pickPanMotorDegNearestLinearPreferClampOnTie(
+  pool: number[],
+  clampedCandidate: number,
+  preferredPanMotorDeg: number,
+): number {
+  let best = pool[0]!
+  let bestDist = Math.abs(best - preferredPanMotorDeg)
+  for (const c of pool) {
+    const d = Math.abs(c - preferredPanMotorDeg)
+    if (d < bestDist - 1e-9) {
+      best = c
+      bestDist = d
+    } else if (Math.abs(d - bestDist) < 1e-9) {
+      const cIsClamp = Math.abs(c - clampedCandidate) < 1e-9
+      const bestIsClamp = Math.abs(best - clampedCandidate) < 1e-9
+      if (cIsClamp && !bestIsClamp) {
+        best = c
+      }
+    }
+  }
+  return best
+}
+
 /** Map beam azimuth to a pan motor angle inside the encircling window (continuous 360° sweep). */
 function pickPanMotorDegEncircling(
   azimuthDeg0To360: number,
@@ -114,26 +137,20 @@ function pickPanMotorDegEncircling(
       candidates.push(c)
     }
   }
+  const clampedInWindow = Math.max(low, Math.min(high, a))
   if (candidates.length > 0) {
-    let best = candidates[0]!
-    let bestAbs = Math.abs(wrapSignedDeg(best - preferredPanMotorDeg))
-    for (const c of candidates) {
-      const w = Math.abs(wrapSignedDeg(c - preferredPanMotorDeg))
-      if (w < bestAbs - 1e-9) {
-        best = c
-        bestAbs = w
-      }
-    }
-    return best
+    const pool = Array.from(new Set([...candidates, clampedInWindow]))
+    return pickPanMotorDegNearestLinearPreferClampOnTie(pool, clampedInWindow, preferredPanMotorDeg)
   }
-  return Math.max(low, Math.min(high, a))
+  return clampedInWindow
 }
 
 /**
  * Map beam azimuth to a physical pan motor angle in [0, panRangeDeg].
  * When panRangeDeg >= 360°, use the same home-centred 360° window as encircling so lifts stay
  * continuous and never pick negative equivalents that clamp in % space.
- * When panRangeDeg < 360°, enumerate lifts in range and pick nearest to home in circular distance.
+ * When panRangeDeg < 360°, enumerate lifts in range and pick nearest to preferred in linear motor
+ * distance, with in-range clamp tie-break (matches encircling branch).
  */
 function pickPanMotorDegFromAzimuth(
   azimuthDeg0To360: number,
@@ -157,20 +174,10 @@ function pickPanMotorDegFromAzimuth(
       candidates.push(c)
     }
   }
-  if (candidates.length === 1) {
-    return candidates[0]!
-  }
-  if (candidates.length > 1) {
-    let best = candidates[0]!
-    let bestAbs = Math.abs(wrapSignedDeg(best - preferredPanMotorDeg))
-    for (const c of candidates) {
-      const w = Math.abs(wrapSignedDeg(c - preferredPanMotorDeg))
-      if (w < bestAbs - 1e-9) {
-        best = c
-        bestAbs = w
-      }
-    }
-    return best
+  const clampedInRange = Math.max(0, Math.min(panRangeDeg, a))
+  if (candidates.length >= 1) {
+    const pool = Array.from(new Set([...candidates, clampedInRange]))
+    return pickPanMotorDegNearestLinearPreferClampOnTie(pool, clampedInRange, preferredPanMotorDeg)
   }
   const s = shortestPanMotorDegToHome(a, preferredPanMotorDeg)
   return Math.max(0, Math.min(panRangeDeg, s))
@@ -335,14 +342,12 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
   } else {
     phi0EffectiveDeg = alphaDeg
     const panDir = logicalPanDir(cMotion)
-    // Match direction-mode set-position: same raw target and intent-based 360° alias pick
-    // as resolvePositionToAbsolutePercent direction mode (bearing from panStageDeg).
     const rawPanTarget = cMotion.panStageDeg + panDir * bearingDeg
     circleCenterPanMotorDeg = pickAliasedPanMotorDeg(
       rawPanTarget,
       cMotion.panRangeDeg,
-      panHomeDeg,
-      'intent',
+      preferredPanMotorDeg ?? panHomeDeg,
+      'continuity-clamp',
     )
   }
 
@@ -414,7 +419,7 @@ function offsetDegToAbsolutePercent(
     rawPanMotorDeg,
     c.panRangeDeg,
     preferredPanMotorDeg,
-    'continuity',
+    'continuity-clamp',
   )
   const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
   const tiltDir = shouldMirrorTiltForStageRelative(c) ? -1 : 1
