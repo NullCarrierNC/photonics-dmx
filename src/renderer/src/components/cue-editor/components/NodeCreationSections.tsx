@@ -8,7 +8,7 @@ import type {
   AudioEventNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorMode, NotesVariant } from '../lib/types'
-import { NODE_EFFECT_TYPES } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { getEffectTypesForCueKind } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
 import type { EventOption } from '../lib/types'
 import { NODE_DRAG_MIME, serializeNodeDrag, type NodeDragPayload } from '../lib/nodeDragPayload'
@@ -113,23 +113,28 @@ const EffectListenerSection: React.FC<{
 )
 
 const ActionNodesSection: React.FC<{
+  cueKind: NodeCueKind
+  editorMode: EditorMode
   addActionNode: (effect: NodeEffectType) => void
-}> = ({ addActionNode }) => (
-  <div>
-    <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
-    <div className="grid grid-cols-3 gap-2 text-xs">
-      {NODE_EFFECT_TYPES.map((effect) => (
-        <button
-          key={effect}
-          className={`border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
-          {...makeDragHandlers({ kind: 'action', effectType: effect })}
-          onClick={() => addActionNode(effect)}>
-          {effect}
-        </button>
-      ))}
+}> = ({ cueKind, editorMode, addActionNode }) => {
+  const effectTypes = getEffectTypesForCueKind(editorMode === 'effect' ? 'lighting' : cueKind)
+  return (
+    <div>
+      <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        {effectTypes.map((effect) => (
+          <button
+            key={effect}
+            className={`border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
+            {...makeDragHandlers({ kind: 'action', effectType: effect })}
+            onClick={() => addActionNode(effect)}>
+            {effect}
+          </button>
+        ))}
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 const LogicNodesSection: React.FC<{
   addLogicNode: (logicType: LogicNode['logicType']) => void
@@ -323,7 +328,7 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
         <EffectListenerSection addEffectListenerNode={addEffectListenerNode} />
       )}
 
-      <ActionNodesSection addActionNode={addActionNode} />
+      <ActionNodesSection cueKind={cueKind} editorMode={editorMode} addActionNode={addActionNode} />
 
       <LogicNodesSection addLogicNode={addLogicNode} />
 
