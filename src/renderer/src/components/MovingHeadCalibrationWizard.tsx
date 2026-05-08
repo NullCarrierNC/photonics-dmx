@@ -493,7 +493,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
         body = (
           <div className="space-y-4">
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Use the pan slider to aim the beam directly upstage (toward the screen / stage).
+              Use the pan slider to aim the beam directly upstage (<em>away from the audience</em>).
               Adjust tilt if needed, then capture.
             </p>
             <DmxSlider label="Pan (DMX)" value={panDmxLive} onChange={setPanDmx} />
@@ -522,9 +522,8 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
         body = (
           <div className="space-y-4">
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Use the tilt slider to aim the beam at the fixture&apos;s vertical pole (straight up
-              in the fixture&apos;s head frame — the direction the engine uses as tilt reference),
-              then capture.
+              Use the tilt slider to aim the beam at the fixture&apos;s vertical pole (straight
+              up/down in the fixture&apos;s head frame), then capture.
             </p>
             <DmxSlider label="Tilt (DMX)" value={tiltDmxLive} onChange={setTiltDmx} />
             <button

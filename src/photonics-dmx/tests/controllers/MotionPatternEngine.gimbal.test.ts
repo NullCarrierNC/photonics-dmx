@@ -1053,6 +1053,59 @@ it('up-firing panHome 0 / panStageDeg 0: edge home produces limited pan sweep (c
   warn.mockRestore()
 })
 
+it('up-firing front fixtures (phi0 < 0): no startup 180° snap and no periodic flip-flop', () => {
+  const lsm = new LightStateManager()
+  const ltc = new LightTransitionController(lsm)
+  const engine = new MotionPatternEngine(ltc)
+  const light = {
+    id: 'front-up-firing',
+    position: 3,
+    config: {
+      ...defaultMh,
+      panHome: 33,
+      tiltHome: 19,
+      panStageDeg: 0,
+      tiltStageDeg: 95,
+      panDirectionCW: false,
+      invertPan: false,
+      invertTilt: false,
+    },
+  }
+
+  engine.addPattern({
+    name: 'front-circle',
+    config: { ...basePattern, pattern: 'circle', sizeDeg: 30, gimbalCompensation: true },
+    lights: [light],
+    layer: 8,
+    startTime: 0,
+    rampUpDurationMs: 0,
+  })
+
+  const panHomePct = 33
+  let maxPanDelta = 0
+  let prevPan: number | undefined
+
+  // Run for 3 full revolutions (at 1 Hz, 3 seconds = 3000ms. 3000 / 25ms = 120 frames)
+  for (let i = 0; i < 120; i++) {
+    engine.advanceFrame({ frameStartTime: i * 25, deltaTime: 25, frameIndex: i })
+    const state = ltc.getLightState(light.id, 8)
+    const pan = state.pan ?? panHomePct
+
+    if (prevPan !== undefined) {
+      const delta = Math.abs(pan - prevPan)
+      maxPanDelta = Math.max(maxPanDelta, delta)
+    } else {
+      // First frame: should not snap 180° (which would be ~33% difference on a 540° fixture)
+      expect(Math.abs(pan - panHomePct)).toBeLessThan(10)
+    }
+    prevPan = pan
+  }
+
+  // A 180° snap or flip-flop would cause a delta of > 30%.
+  // Smooth motion should keep per-frame deltas small (< 5%).
+  expect(maxPanDelta).toBeLessThan(5)
+})
+
 it('light 6 down-firing config: pan/tilt stays within range and draws orbit across the pole', () => {
   const lsm = new LightStateManager()
   const ltc = new LightTransitionController(lsm)
@@ -1420,6 +1473,116 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
       const bottomXY = runDirectionTargetPreview(mixedBottomCfg, bearing, 30)
       expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(2)
       expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(2)
+    }
+  })
+
+  /**
+   * Regression for fixtures with asymmetric tiltStageDeg (≠ tiltRangeDeg/2).
+   *
+   * The old code gate on shouldMirrorTiltForStageRelative required tiltStageDeg to equal
+   * tiltRangeDeg/2. Fixtures with any other value (e.g. tiltStageDeg=93° on a 180° fixture) were
+   * never mirrored, breaking stage-relative parity. The new code drops that condition.
+   *
+   * Fixture notes:
+   *   Top: floor, tiltHome=76%, tiltStageDeg=93° → phi0=+43.8° (home above pole)
+   *   Nod bottom: tiltHome=24% → stage-equivalent home (100−76=24), matched for waveform parity
+   *   Circle bottom: tiltHome=27% → actualHome≈48.6°, canonical phi0≈44.4° ≈ floor phi0=43.8°
+   *
+   * The asymmetric pole shifts the canonical phi0 slightly from the floor phi0, so the tolerance
+   * is 3.5% rather than the 2% used for symmetric calibrations.
+   */
+  const asymTopCfg: FixtureConfig = {
+    ...defaultMh,
+    panHome: 0,
+    panMax: 200,
+    panDirectionCW: false,
+    panStageDeg: 0,
+    tiltHome: 76,
+    tiltStageDeg: 93,
+    invertPan: false,
+    invertTilt: false,
+  }
+
+  it('asymmetric tiltStageDeg (≠90°): Nod keeps top and bottom stage position aligned', () => {
+    // tiltHome=24% → stage-equivalent of floor 76% (100−76=24) via waveform tiltDir path
+    const asymNodBottomCfg: FixtureConfig = {
+      ...defaultMh,
+      panHome: 100,
+      panMax: 200,
+      panDirectionCW: true,
+      panStageDeg: 540,
+      tiltHome: 24,
+      tiltStageDeg: 93,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const nodPattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'linear-sweep' },
+        linearSweepAxis: { source: 'literal', value: 'vertical' },
+        speed: { source: 'literal', value: 2 },
+        size: { source: 'literal', value: 20 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    for (let i = 0; i < 8; i++) {
+      const t = (i / 8) * 500
+      const topXY = runPipelineTick(asymTopCfg, nodPattern, t)
+      const bottomXY = runPipelineTick(asymNodBottomCfg, nodPattern, t)
+      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(3.5)
+      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(3.5)
+    }
+  })
+
+  it('asymmetric tiltStageDeg (≠90°): Circle keeps top and bottom stage position aligned', () => {
+    // tiltHome=27% → actualHome≈48.6°, canonical phi0=93−48.6≈44.4° ≈ floor phi0=43.8°
+    const asymCircleBottomCfg: FixtureConfig = {
+      ...defaultMh,
+      panHome: 100,
+      panMax: 200,
+      panDirectionCW: true,
+      panStageDeg: 540,
+      tiltHome: 27,
+      tiltStageDeg: 93,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const circlePattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'circle' },
+        bearing: { source: 'literal', value: 180 },
+        speed: { source: 'literal', value: 1 },
+        size: { source: 'literal', value: 25 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    for (let i = 0; i < 12; i++) {
+      const t = (i / 12) * 1000
+      const topXY = runPipelineTick(asymTopCfg, circlePattern, t)
+      const bottomXY = runPipelineTick(asymCircleBottomCfg, circlePattern, t)
+      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(3.5)
+      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(3.5)
+    }
+  })
+
+  it('asymmetric tiltStageDeg (≠90°): direction mode keeps DS/US/SL/SR aligned across mounts', () => {
+    const asymDirBottomCfg: FixtureConfig = {
+      ...defaultMh,
+      panHome: 100,
+      panMax: 200,
+      panDirectionCW: true,
+      panStageDeg: 540,
+      tiltHome: 24,
+      tiltStageDeg: 93,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const bearings = [180, 0, 270, 90]
+    for (const bearing of bearings) {
+      const topXY = runDirectionTargetPreview(asymTopCfg, bearing, 30)
+      const bottomXY = runDirectionTargetPreview(asymDirBottomCfg, bearing, 30)
+      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(3.5)
+      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(3.5)
     }
   })
 })

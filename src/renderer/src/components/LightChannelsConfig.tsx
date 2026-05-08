@@ -418,10 +418,15 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
         <div className="mt-2 w-full">
           <h3 className="text-lg font-bold">Config</h3>
           {(light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH) && (
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-              Home sets the idle/default pose. Stage-reference fields set the calibration anchor for
-              direction and circle cues.
-            </p>
+            <>
+              <p className="text-xs text-gray-600 dark:text-gray-200 mb-2">
+                Use the Calibrate button below to configure these fields interactively.
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                Home sets the idle/default pose. Stage-reference fields set the calibration anchor
+                for direction and circle cues.
+              </p>
+            </>
           )}
           <ul className="text-sm space-y-1">
             {Object.entries(localConfig).map(([key, value]) => {

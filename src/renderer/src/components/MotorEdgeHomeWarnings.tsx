@@ -15,16 +15,18 @@ export function MotorEdgeHomeWarnings(props: { panHome: number; tiltHome: number
       role="status">
       {panEdge && (
         <p>
-          Home is set near the pan motor&apos;s mechanical limit. Motion cues will be asymmetric
-          (oscillating only one direction from home). For full symmetric motion, point the fixture
-          at a mid-range position before capturing home.
+          CAUTION: Home is set near the pan motor&apos;s mechanical limit (start or stop range
+          limit). Motion cues will not be able to animate correctly as you can't rotate past the
+          min/max limits. Try panning the light so the Pan slider is further away from the min or
+          max limit.
         </p>
       )}
       {tiltEdge && (
         <p>
-          Home is set near the tilt motor&apos;s mechanical limit. Motion cues will be asymmetric
-          (oscillating only one direction from home). For full symmetric motion, point the fixture
-          at a mid-range position before capturing home.
+          CAUTION: Home is set near the tilt motor&apos;s mechanical limit (start or stop range
+          limit). Motion cues will not be able to animate correctly as you can't tilt past the
+          min/max limits. Try tilting the light so the Tilt slider is further away from the min or
+          max limit.
         </p>
       )}
     </div>
