@@ -21,20 +21,6 @@ import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
 import type { ExecutionParameters } from './GraphExecutionPolicy'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 
-/**
- * True if the payload carries instrument-event data (e.g. drum/guitar/bass/keys notes).
- * Used to avoid overwriting a queued instrument-bearing run with a plain tick.
- */
-function hasInstrumentNotes(params: ExecutionParameters): boolean {
-  const data = params as CueData
-  return (
-    (Array.isArray(data.drumNotes) && data.drumNotes.length > 0) ||
-    (Array.isArray(data.guitarNotes) && data.guitarNotes.length > 0) ||
-    (Array.isArray(data.bassNotes) && data.bassNotes.length > 0) ||
-    (Array.isArray(data.keysNotes) && data.keysNotes.length > 0)
-  )
-}
-
 /** Session interface: variable stores and initial-clear policy. */
 export interface IGraphExecutionSession {
   getCueLevelVarStore(): Map<string, VariableValue>
@@ -257,6 +243,9 @@ export class GraphExecutionEngine {
   /**
    * Run a cue graph: get entry nodes from policy, optionally queue, then start execution.
    * Caller must pass entryContext.hasCueStartedFired from session when policy uses queuing.
+   *
+   * Non-lifecycle entry events (beat, measure, instrument notes, etc.) dispatch immediately so
+   * they are not dropped while a cue-started/cue-called chain is blocking.
    */
   startCueRun(
     parameters: ExecutionParameters,
@@ -264,27 +253,41 @@ export class GraphExecutionEngine {
   ): void {
     const compiled = this.compiledCueOrEffect as CompiledYargCue
     const entryNodes = this.policy.getEntryNodes(compiled, parameters, entryContext)
+    const { cueStartedNodes, cueCalledNodes, nonLifecycleNodes } =
+      this.splitLifecycleEntryNodes(entryNodes)
+    const hasCueEvent = cueStartedNodes.length > 0 || cueCalledNodes.length > 0
+    const lifecycleWouldQueue = this.policy.queuing && hasCueEvent && this.isExecutingCueStarted
+    if (!lifecycleWouldQueue) {
+      this.applyActivationSetup(cueStartedNodes, cueCalledNodes)
+    }
+    this.dispatchNonLifecycleEvents(nonLifecycleNodes, parameters)
+    this.dispatchLifecycleEvents(cueStartedNodes, cueCalledNodes, parameters)
+  }
+
+  private splitLifecycleEntryNodes(entryNodes: BaseEventNode[]): {
+    cueStartedNodes: BaseEventNode[]
+    cueCalledNodes: BaseEventNode[]
+    nonLifecycleNodes: BaseEventNode[]
+  } {
     const cueStartedNodes = entryNodes.filter(
       (n) => (n as { eventType?: string }).eventType === 'cue-started',
     )
     const cueCalledNodes = entryNodes.filter(
       (n) => (n as { eventType?: string }).eventType === 'cue-called',
     )
+    const nonLifecycleNodes = entryNodes.filter((n) => {
+      const et = (n as { eventType?: string }).eventType
+      return et !== 'cue-started' && et !== 'cue-called'
+    })
+    return { cueStartedNodes, cueCalledNodes, nonLifecycleNodes }
+  }
+
+  /** Initial-clear policy and cue-level variable reset before any entry submissions for this tick. */
+  private applyActivationSetup(
+    cueStartedNodes: BaseEventNode[],
+    cueCalledNodes: BaseEventNode[],
+  ): void {
     const hasCueEvent = cueStartedNodes.length > 0 || cueCalledNodes.length > 0
-
-    if (this.policy.queuing && hasCueEvent && this.isExecutingCueStarted) {
-      const existing = this.queuedParameters[0]
-      if (existing && hasInstrumentNotes(existing) && !hasInstrumentNotes(parameters)) {
-        return
-      }
-      this.queuedParameters = [parameters]
-      return
-    }
-
-    if (hasCueEvent) {
-      this.isExecutingCueStarted = true
-    }
-
     if (
       this.policy.useInitialClearPolicy &&
       this.session.setFirstSubmissionUsesSetEffect &&
@@ -293,21 +296,50 @@ export class GraphExecutionEngine {
     ) {
       this.session.setFirstSubmissionUsesSetEffect()
     }
-
     if (cueStartedNodes.length > 0 && this.session.resetCueLevelVariables) {
       this.session.resetCueLevelVariables(this.variableDefinitions)
     }
-    const otherNodes = entryNodes.filter((n) => {
-      const et = (n as { eventType?: string }).eventType
-      return et !== 'cue-started' && et !== 'cue-called'
-    })
+  }
+
+  /**
+   * Start execution for every triggered entry node except cue-started / cue-called.
+   * Does not participate in lifecycle queuing.
+   */
+  private dispatchNonLifecycleEvents(
+    nonLifecycleNodes: BaseEventNode[],
+    parameters: ExecutionParameters,
+  ): void {
+    if (nonLifecycleNodes.length === 0) {
+      return
+    }
+    const params = parameters as CueData
+    const engine = this.getOrCreateNodeEngine()
+    for (const event of nonLifecycleNodes) {
+      engine.startExecution(event as BaseEventNode, params)
+    }
+  }
+
+  /**
+   * Run cue-started / cue-called chains with queuing when a previous lifecycle run is in flight.
+   */
+  private dispatchLifecycleEvents(
+    cueStartedNodes: BaseEventNode[],
+    cueCalledNodes: BaseEventNode[],
+    parameters: ExecutionParameters,
+  ): void {
+    const hasCueEvent = cueStartedNodes.length > 0 || cueCalledNodes.length > 0
+
+    if (this.policy.queuing && hasCueEvent && this.isExecutingCueStarted) {
+      this.queuedParameters = [parameters]
+      return
+    }
+
+    if (hasCueEvent) {
+      this.isExecutingCueStarted = true
+    }
 
     const params = parameters as CueData
     const engine = this.getOrCreateNodeEngine()
-
-    for (const event of otherNodes) {
-      engine.startExecution(event as BaseEventNode, params)
-    }
 
     if (cueStartedNodes.length > 0) {
       this.runCueStartedThenCalled(engine, cueStartedNodes, cueCalledNodes, params)
@@ -378,7 +410,11 @@ export class GraphExecutionEngine {
     if (this.queuedParameters.length > 0) {
       const next = this.queuedParameters.shift()!
       const hasCueStartedFired = this.session.hasCueStartedFired?.() ?? false
-      this.startCueRun(next, { hasCueStartedFired })
+      const compiled = this.compiledCueOrEffect as CompiledYargCue
+      const entryNodes = this.policy.getEntryNodes(compiled, next, { hasCueStartedFired })
+      const { cueStartedNodes, cueCalledNodes } = this.splitLifecycleEntryNodes(entryNodes)
+      this.applyActivationSetup(cueStartedNodes, cueCalledNodes)
+      this.dispatchLifecycleEvents(cueStartedNodes, cueCalledNodes, next)
     }
   }
 
