@@ -223,6 +223,8 @@ const NodeSidebar: React.FC<Props> = ({
               <ActionNodeEditor
                 node={selectedNode.data.payload as ActionNode}
                 activeMode={activeMode}
+                cueKind={cueKind}
+                editorMode={editorMode}
                 selectedActionHasEventParent={selectedActionHasEventParent}
                 availableVariables={availableVariables}
                 updateNode={(updates) => updateSelectedNode<ActionNode>(updates)}

@@ -14,7 +14,7 @@ import ReactFlow, {
 } from 'reactflow'
 import type { EditorNode, EventOption, NotesVariant } from '../lib/types'
 import {
-  NODE_EFFECT_TYPES,
+  getEffectTypesForCueKind,
   type LogicNode,
   type NodeEffectType,
   type NodeCueKind,
@@ -348,18 +348,23 @@ const CueFlowCanvas: React.FC<Props> = ({
           <div className="px-3 py-1 font-semibold italic text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 border-t border-b border-gray-300 dark:border-gray-600">
             Action Nodes
           </div>
-          {[...NODE_EFFECT_TYPES].sort().map((effectType) => (
-            <button
-              key={effectType}
-              className="block w-full text-left px-3 py-1 text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() =>
-                handlePaneMenuClick(() =>
-                  addActionNode(effectType, { x: paneContextMenu.flowX, y: paneContextMenu.flowY }),
-                )
-              }>
-              {effectType}
-            </button>
-          ))}
+          {[...getEffectTypesForCueKind(editorMode === 'effect' ? 'lighting' : activeCueKind)]
+            .sort()
+            .map((effectType) => (
+              <button
+                key={effectType}
+                className="block w-full text-left px-3 py-1 text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
+                onClick={() =>
+                  handlePaneMenuClick(() =>
+                    addActionNode(effectType, {
+                      x: paneContextMenu.flowX,
+                      y: paneContextMenu.flowY,
+                    }),
+                  )
+                }>
+                {effectType}
+              </button>
+            ))}
           <div className="px-3 py-1 font-semibold italic text-amber-800 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/30 border-t border-b border-amber-400 dark:border-amber-600">
             Logic Nodes
           </div>

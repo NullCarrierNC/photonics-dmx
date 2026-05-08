@@ -460,6 +460,13 @@ export const NODE_EFFECT_TYPES = [
 
 export type NodeEffectType = (typeof NODE_EFFECT_TYPES)[number]
 
+export const LIGHTING_EFFECT_TYPES = ['set-color', 'blackout'] as const
+
+export const MOTION_EFFECT_TYPES = ['set-position', 'motion-pattern'] as const
+
+export const getEffectTypesForCueKind = (kind: NodeCueKind): readonly NodeEffectType[] =>
+  kind === 'motion' ? MOTION_EFFECT_TYPES : LIGHTING_EFFECT_TYPES
+
 export const WAVEFORM_TYPES = ['sine', 'cosine', 'triangle', 'sawtooth', 'square'] as const
 
 export type WaveformType = (typeof WAVEFORM_TYPES)[number]
