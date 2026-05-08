@@ -108,4 +108,49 @@ describe('GraphExecutionPolicy motion vs visual', () => {
     expect(policy.entryEventTypes).toContain('cue-called')
     expect(policy.entryEventTypes).toContain('cue-started')
   })
+
+  it('getEntryNodes orders cue-started, then cue-called, then other triggered events', () => {
+    const evStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+    const evCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+    const evBeat: YargEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
+    const action: ActionNode = {
+      id: 'a1',
+      type: 'action',
+      effectType: 'set-position',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      position: {
+        mode: 'direction',
+        bearing: { source: 'literal', value: 'downstage' },
+        angle: { source: 'literal', value: 10 },
+      },
+      timing: {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 200 },
+        waitUntilCondition: { source: 'literal', value: 'none' },
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+      layer: { source: 'literal', value: 0 },
+    }
+    const def: YargMotionNodeCueDefinition = {
+      kind: 'motion',
+      id: 'm-order',
+      name: 'Motion order',
+      nodes: { events: [evBeat, evCalled, evStart], actions: [action], logic: [] },
+      connections: [
+        { from: 'ev-start', to: 'a1' },
+        { from: 'ev-called', to: 'a1' },
+        { from: 'ev-beat', to: 'a1' },
+      ],
+    }
+    const compiled = NodeCueCompiler.compileYargCue(def)
+    const policy = cueGraphPolicy('g', 'c')
+    const params = minimalParams()
+    const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: false })
+    const types = nodes.map((n) => (n as YargEventNode).eventType)
+    expect(types).toEqual(['cue-started', 'cue-called', 'beat'])
+  })
 })
