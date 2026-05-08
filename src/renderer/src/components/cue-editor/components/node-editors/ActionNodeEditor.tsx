@@ -1,12 +1,13 @@
 import React from 'react'
 import type {
   ActionNode,
+  NodeCueKind,
   NodeEffectType,
   NodeCueMode,
   NodePositionSetting,
   PositionMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { NODE_EFFECT_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { getEffectTypesForCueKind } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../shared/ValueSourceEditor'
 import ActionTargetSection from './action-editors/ActionTargetSection'
@@ -27,10 +28,13 @@ import {
   buildDefaultMotionPatternAction,
   buildDefaultSetPositionAction,
 } from '../../lib/cueDefaults'
+import type { EditorMode } from '../../lib/types'
 
 interface ActionNodeEditorProps {
   node: ActionNode
   activeMode: NodeCueMode
+  cueKind: NodeCueKind
+  editorMode: EditorMode
   selectedActionHasEventParent: boolean
   availableVariables: { name: string; type: string; scope: 'cue' | 'cue-group' }[]
   updateNode: (updates: Partial<ActionNode>) => void
@@ -39,6 +43,8 @@ interface ActionNodeEditorProps {
 const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
   node,
   activeMode,
+  cueKind,
+  editorMode,
   selectedActionHasEventParent,
   availableVariables,
   updateNode,
@@ -111,6 +117,13 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
     updateNode({ position: next })
   }
 
+  const contextEffectTypes = getEffectTypesForCueKind(
+    editorMode === 'effect' ? 'lighting' : cueKind,
+  )
+  const effectTypeSelectOptions = contextEffectTypes.includes(node.effectType)
+    ? contextEffectTypes
+    : [...contextEffectTypes, node.effectType]
+
   return (
     <div className="space-y-3 text-xs">
       <label className="flex flex-col font-medium">
@@ -119,7 +132,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.effectType}
           onChange={(event) => setEffectType(event.target.value as NodeEffectType)}>
-          {NODE_EFFECT_TYPES.map((effect) => (
+          {effectTypeSelectOptions.map((effect) => (
             <option key={effect} value={effect}>
               {effect}
             </option>
