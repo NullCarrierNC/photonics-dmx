@@ -164,10 +164,10 @@
               "stage-right",
               "stage-left",
               "upstage",
-              "se",
-              "ne",
-              "sw",
-              "nw"
+              "downstage-right",
+              "upstage-right",
+              "downstage-left",
+              "upstage-left"
             ],
             "assignTo": "vogueSlowBearing"
           }

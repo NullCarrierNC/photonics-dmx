@@ -18,7 +18,6 @@ import {
   bearingLiteralToCanonicalSelectValue,
 } from '../../../../../../photonics-dmx/helpers/stageDirections'
 
-const STAGE_BEARING_VALID_LITERALS = STAGE_DIRECTION_OPTIONS.map((o) => o.value)
 import {
   LINEAR_SWEEP_AXES,
   MOTION_PATTERN_TYPES,
@@ -267,7 +266,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
                 })
               }
               expected="string"
-              validLiterals={STAGE_BEARING_VALID_LITERALS}
+              validLiteralOptions={STAGE_DIRECTION_OPTIONS}
               availableVariables={availableVariables}
             />
           )}
@@ -399,7 +398,7 @@ const ActionNodeEditor: React.FC<ActionNodeEditorProps> = ({
                   })
                 }
                 expected="string"
-                validLiterals={STAGE_BEARING_VALID_LITERALS}
+                validLiteralOptions={STAGE_DIRECTION_OPTIONS}
                 availableVariables={availableVariables}
               />
               <ValueSourceEditor

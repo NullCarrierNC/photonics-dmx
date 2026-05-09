@@ -1,5 +1,10 @@
 import { describe, expect, it } from '@jest/globals'
-import { backLightBearingIsFlipped, reflectBearingUsDs } from './stageDirections'
+import {
+  backLightBearingIsFlipped,
+  bearingLiteralToCanonicalSelectValue,
+  parseBearingFromResolvedValue,
+  reflectBearingUsDs,
+} from './stageDirections'
 
 describe('reflectBearingUsDs', () => {
   it('swaps US and DS', () => {
@@ -26,5 +31,25 @@ describe('backLightBearingIsFlipped', () => {
     expect(backLightBearingIsFlipped('two-rows', 'back')).toBe(false)
     expect(backLightBearingIsFlipped('front-back', 'front')).toBe(false)
     expect(backLightBearingIsFlipped(undefined, 'back')).toBe(false)
+  })
+})
+
+describe('parseBearingFromResolvedValue', () => {
+  it('rejects legacy compass tokens', () => {
+    expect(() => parseBearingFromResolvedValue('se')).toThrow(/Invalid bearing/)
+    expect(() => parseBearingFromResolvedValue('ne')).toThrow(/Invalid bearing/)
+  })
+
+  it('accepts stage-direction names', () => {
+    expect(parseBearingFromResolvedValue('downstage-right')).toBe(135)
+    expect(parseBearingFromResolvedValue('upstage-right')).toBe(45)
+  })
+})
+
+describe('bearingLiteralToCanonicalSelectValue', () => {
+  it('maps degrees to hyphenated canonical direction', () => {
+    expect(bearingLiteralToCanonicalSelectValue(45)).toBe('upstage-right')
+    expect(bearingLiteralToCanonicalSelectValue(135)).toBe('downstage-right')
+    expect(bearingLiteralToCanonicalSelectValue(315)).toBe('upstage-left')
   })
 })

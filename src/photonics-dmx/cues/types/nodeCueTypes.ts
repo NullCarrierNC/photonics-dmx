@@ -529,7 +529,7 @@ export type PositionMode = 'direction' | 'offset' | 'absolute'
 /**
  * Motion position for set-position actions.
  *
- * - `direction`: bearing (named compass / stage term or degrees) + angle from vertical in degrees.
+ * - `direction`: bearing (named stage directions or degrees) + angle from vertical in degrees.
  * - `offset`: signed pan/tilt offsets in degrees from fixture home.
  * - `absolute` (legacy): pan/tilt as normalised 0–100% of configured min–max (no home-relative offset).
  *
@@ -537,7 +537,7 @@ export type PositionMode = 'direction' | 'offset' | 'absolute'
  */
 export interface NodePositionSetting {
   mode?: PositionMode
-  /** Direction mode: compass / stage name or degrees (ValueSource resolves to string or number). */
+  /** Direction mode: stage direction name or degrees (ValueSource resolves to string or number). */
   bearing?: ValueSource
   /** Direction mode: degrees from vertical (positive = away from vertical). */
   angle?: ValueSource

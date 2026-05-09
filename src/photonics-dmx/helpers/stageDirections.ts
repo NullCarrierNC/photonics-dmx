@@ -1,37 +1,57 @@
 /**
- * Stage-relative compass bearings for moving-head direction mode.
- * North = upstage (0°), angles increase clockwise when viewed from above.
+ * Stage-relative bearings for moving-head direction mode.
+ * Angles increase clockwise when viewed from above (0° at upstage).
  */
 
 export const STAGE_DIRECTION_BEARING_DEG: Readonly<Record<string, number>> = {
-  'n': 0,
-  'north': 0,
   'upstage': 0,
-  'ne': 45,
-  'e': 90,
-  'east': 90,
+  'upstage-right': 45,
   'stage-right': 90,
-  'se': 135,
-  's': 180,
-  'south': 180,
+  'downstage-right': 135,
   'downstage': 180,
-  'sw': 225,
-  'w': 270,
-  'west': 270,
+  'downstage-left': 225,
   'stage-left': 270,
-  'nw': 315,
+  'upstage-left': 315,
 }
 
-/** Dropdown options for the bearing selector in the cue editor (8 directions including diagonals). */
+/** Compass aliases from older cue files; mapped at load time to stage direction names. */
+const LEGACY_COMPASS_BEARING_ALIASES: Readonly<Record<string, string>> = {
+  n: 'upstage',
+  north: 'upstage',
+  ne: 'upstage-right',
+  e: 'stage-right',
+  east: 'stage-right',
+  se: 'downstage-right',
+  s: 'downstage',
+  south: 'downstage',
+  sw: 'downstage-left',
+  w: 'stage-left',
+  west: 'stage-left',
+  nw: 'upstage-left',
+}
+
+/** Dropdown options for the bearing selector (8-way stage directions). */
 export const STAGE_DIRECTION_OPTIONS: ReadonlyArray<{ label: string; value: string }> = [
-  { label: 'Downstage (Toward audience)', value: 'downstage' },
-  { label: 'Downstage-right (Toward audience, audience-left)', value: 'se' },
-  { label: 'Stage-right (Audience-left)', value: 'stage-right' },
-  { label: 'Upstage-right (Away from audience, audience-left)', value: 'ne' },
   { label: 'Upstage (Away from audience)', value: 'upstage' },
-  { label: 'Upstage-left (Away from audience, audience-right)', value: 'nw' },
+  {
+    label: 'Upstage-right (Away from audience, audience-left)',
+    value: 'upstage-right',
+  },
+  { label: 'Stage-right (Audience-left)', value: 'stage-right' },
+  {
+    label: 'Downstage-right (Toward audience, audience-left)',
+    value: 'downstage-right',
+  },
+  { label: 'Downstage (Toward audience)', value: 'downstage' },
+  {
+    label: 'Downstage-left (Toward audience, audience-right)',
+    value: 'downstage-left',
+  },
   { label: 'Stage-left (Audience-right)', value: 'stage-left' },
-  { label: 'Downstage-left (Toward audience, audience-right)', value: 'sw' },
+  {
+    label: 'Upstage-left (Away from audience, audience-right)',
+    value: 'upstage-left',
+  },
 ]
 
 export function normalizeBearingDegrees(deg: number): number {
@@ -54,7 +74,19 @@ for (const { value } of STAGE_DIRECTION_OPTIONS) {
 }
 
 /**
- * Maps a cue literal (alias or degrees) to a canonical dropdown value from {@link STAGE_DIRECTION_OPTIONS}.
+ * If `raw` is a legacy compass token, returns its stage-era replacement; otherwise `null`.
+ */
+export function migrateLegacyBearingToken(raw: string): string | null {
+  const trimmed = raw.trim().toLowerCase()
+  if (trimmed === '') {
+    return null
+  }
+  const mapped = LEGACY_COMPASS_BEARING_ALIASES[trimmed]
+  return mapped ?? null
+}
+
+/**
+ * Maps a cue literal (degrees or canonical stage direction) to a canonical dropdown value from {@link STAGE_DIRECTION_OPTIONS}.
  */
 export function bearingLiteralToCanonicalSelectValue(literal: unknown): string {
   if (typeof literal === 'number') {
@@ -86,7 +118,7 @@ export function bearingLiteralToCanonicalSelectValue(literal: unknown): string {
 }
 
 /**
- * Resolves a bearing from a cue literal (named direction or numeric degrees string) or a number.
+ * Resolves a bearing from a cue literal (stage direction name or numeric degrees string) or a number.
  */
 export function parseBearingFromResolvedValue(value: string | number): number {
   if (typeof value === 'number') {

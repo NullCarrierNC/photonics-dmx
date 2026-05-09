@@ -173,6 +173,34 @@ describe('NodeCueLoader', () => {
     expect(loader.getAvailableCueTypes('audio', 'motion')).toEqual([])
   })
 
+  it('migrates legacy compass bearing literals when loading from disk', async () => {
+    const file = yargMotionOnlyFile()
+    const cue = file.cues[0] as YargMotionNodeCueDefinition
+    const motionAction = cue.nodes.actions[0]
+    motionAction.motionPattern = {
+      pattern: { source: 'literal', value: 'circle' },
+      speed: { source: 'literal', value: 0.5 },
+      size: { source: 'literal', value: 30 },
+      bearing: { source: 'literal', value: 'se' },
+    }
+
+    const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+    fs.writeFileSync(path.join(yargDir, 'legacy-bearing.json'), JSON.stringify(file), 'utf-8')
+
+    await loader.loadAll()
+
+    const rel = path.join('node-data', 'cues', 'yarg', 'legacy-bearing.json')
+    const read = await loader.readFile(rel)
+    expect(read.mode).toBe('yarg')
+    const motionCue = read.cues[0] as YargMotionNodeCueDefinition
+    const bearingLit = motionCue.nodes.actions[0].motionPattern?.bearing
+    expect(bearingLit?.source).toBe('literal')
+    if (bearingLit?.source === 'literal') {
+      expect(bearingLit.value).toBe('downstage-right')
+    }
+  })
+
   it('loads an Audio motion cue using cue-called as the entry event', async () => {
     const evCalled: AudioEventNodeUnion = {
       id: 'ev-called',
