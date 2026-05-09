@@ -62,24 +62,18 @@ export function panTiltDmxToStageVector(
   const sinPhi = Math.sin(phi0Deg * DEG_TO_RAD)
   const atPole = Math.abs(sinPhi) < 1e-10
   const phiSign = atPole ? 1 : Math.sign(sinPhi)
-  const homePhiDeg = (c.tiltHome / 100) * c.tiltRangeDeg - poleDeg
-  const homeSinPhi = Math.sin(homePhiDeg * DEG_TO_RAD)
-  const homePhiSign = Math.abs(homeSinPhi) < 1e-10 ? 0 : Math.sign(homeSinPhi)
-  const flipPhi =
-    shouldMirrorTiltForStageRelative(c) && homePhiSign !== 0 && homePhiSign === phiSign
+  const flipPhi = shouldMirrorTiltForStageRelative(c)
   const effectivePhiSign = flipPhi ? -phiSign : phiSign
   /** Same disc components as {@link panTiltDmxToSphericalXY} (x = SR/SL, y = US/DS on the disc). */
   const discUx = effectivePhiSign * Math.sin(panRad)
   const discUy = -effectivePhiSign * Math.cos(panRad)
 
   const phi0Rad = phi0Deg * DEG_TO_RAD
-  /** Horizontal magnitude from pole; sign of aim comes from disc (same as {@link panTiltDmxToSphericalXY}). */
   const horizMag = Math.abs(Math.sin(phi0Rad))
 
   /**
    * World xz aligned with the 2D preview disc: world +x = stage right (performers' right,
-   * audience/house left); raw.x uses the same sign as discUx. Disc screen-y → world +z
-   * (downstage toward audience).
+   * audience/house left); raw.x aligns with discUx. Disc screen-y maps to world +z (downstage).
    */
   const raw: StageVector3 = {
     x: horizMag * discUx,

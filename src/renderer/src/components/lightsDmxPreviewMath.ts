@@ -27,9 +27,9 @@ export interface SphericalXYOptions {
  * audience (house) perspective, SR on the house-left side and SL on the house-right side of the
  * disc; θ = mod360(B − 180°) maps bearing to dot position on that disc.
  *
- * u_x = −sign(φ)·sin(θ), u_y = −sign(φ)·cos(θ) (sign(φ)=1 at the pole) so crossing the tilt pole
- * flips compass on the disc with logical beam direction for floor and truss mounts (same gimbal
- * geometry in logical motor space after DMX invert). Radial distance uses |φ| and asymmetric span
+ * u_x = −effectiveSign·sin(θ), u_y = −effectiveSign·cos(θ) (effectiveSign=1 at the pole). Crossing the tilt pole
+ * flips compass on the disc. When {@link shouldMirrorTiltForStageRelative} applies (inverted tilt and tilt home
+ * away from 50%), φSign is negated at each angle so compass direction tracks through vertical instead of snapping back toward the idle hemisphere. Radial distance uses |φ| and asymmetric span
  * toward tiltMin / tiltMax from the pole.
  */
 export function panTiltDmxToSphericalXY(
@@ -65,11 +65,7 @@ export function panTiltDmxToSphericalXY(
   const sinPhi = Math.sin(phi0Deg * DEG_TO_RAD)
   const atPole = Math.abs(sinPhi) < 1e-10
   const phiSign = atPole ? 1 : Math.sign(sinPhi)
-  const homePhiDeg = (c.tiltHome / 100) * c.tiltRangeDeg - poleDeg
-  const homeSinPhi = Math.sin(homePhiDeg * DEG_TO_RAD)
-  const homePhiSign = Math.abs(homeSinPhi) < 1e-10 ? 0 : Math.sign(homeSinPhi)
-  const flipPhi =
-    shouldMirrorTiltForStageRelative(c) && homePhiSign !== 0 && homePhiSign === phiSign
+  const flipPhi = shouldMirrorTiltForStageRelative(c)
   const effectivePhiSign = flipPhi ? -phiSign : phiSign
   const ux = -effectivePhiSign * Math.sin(panRad)
   const uy = -effectivePhiSign * Math.cos(panRad)
