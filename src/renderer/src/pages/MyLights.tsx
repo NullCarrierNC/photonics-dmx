@@ -93,23 +93,23 @@ const MyLights = () => {
         be available in the <em>Lights Layout</em> where different channels can be assigned.
       </p>
 
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
         <strong>Note on Strobes:</strong> while some DMX fixtures support strobe channels, using
         this feature with different models of can DMX lights cause the lights to stobe out of sync
         with each other. To avoid this Photonics will use lights marked as strobe-capable as a
-        strobe using regular DMX channels (E.g. RGB @ 255).
+        strobe by flashing regular DMX colour channels (E.g. RGB @ 255).
+      </p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        <strong>NOTE:</strong> As LED lights usually use pulse-width modulation (PWM) to control
+        brightness, this isn't a problem. This is not recommended for tungsten-based lights.
       </p>
 
       <p className="mb-2 italic font-bold text-orange-400 text-[9pt]">
         Physical strobe fixtures are not yet implemented. You can use regular RGB PAR lights as
         either a dedicated strobe, or as a strobe-capable light.
       </p>
-      <p className="mb-2 italic font-bold text-orange-400  text-[9pt]">
-        Moving Head RGB lights are fundamentally supported, but will only move to the configured
-        home position. Lighting effects do not yet include motion.
-      </p>
       <p className="mb-4 italic font-bold text-orange-400  text-[9pt]">
-        Gobo based lights are not supported.
+        Gobo (colour wheel) based lights are not supported.
       </p>
 
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
@@ -127,7 +127,7 @@ const MyLights = () => {
       </p>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
         Don't assign the same light twice here: in Light Layout you can assign this template to as
-        many different physical lights as you want.
+        many different physical lights as you want. This is for defining the channel relationships.
       </p>
 
       <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">

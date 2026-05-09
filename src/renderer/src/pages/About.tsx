@@ -5,14 +5,14 @@ const About = () => {
 
       <div className="flex flex-col">
         <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          Photonics is a DMX sequencer for YARG, Rock Band 3 Enhanced, and audio visualization. It
-          uses the light show data provided by the game to select and configure different lighting
-          effects that are output to DMX lighting fixtures.
+          Photonics is a DMX sequencer for YARG, Rock Band 3 Enhanced, and music visualization. It
+          uses the light show data provided by the game, or audio analysis to select and configure
+          different lighting effects that are output to DMX lighting fixtures.
         </p>
 
         <h2 className="text-xl font-bold mb-4 mt-4 text-orange-400">Development Status</h2>
         <p className="mb-4 text-orange-400">
-          Photonics is still in its Alpha stages, and as such is not feature complete. We'd
+          Photonics is still in its Alpha stages, and as such changes should be expected. We'd
           appreciate any feedback you can provide! You can read more about the project status on the{' '}
           <a
             href="https://photonics.rocks/project-status/"
