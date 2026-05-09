@@ -1,4 +1,5 @@
 import { createLogger } from '../../../../shared/logger'
+import { migrateLegacyBearings } from '../loader/migrateLegacyBearings'
 const log = createLogger('migrations')
 
 /**
@@ -40,7 +41,9 @@ export function migrateEasingInNodeCueFile(value: unknown): unknown {
       },
     }
   })
-  return { ...file, cues: migratedCues }
+  const out = { ...file, cues: migratedCues }
+  migrateLegacyBearings(out)
+  return out
 }
 
 export function migrateEasingInEffectFile(value: unknown): unknown {

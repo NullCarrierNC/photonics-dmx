@@ -29,6 +29,7 @@ import { IAudioCue } from '../../interfaces/IAudioCue'
 import { EffectRegistry } from '../runtime/EffectRegistry'
 import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
+import { migrateLegacyBearings } from './migrateLegacyBearings'
 import type { EffectMode, EffectReference } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
@@ -136,6 +137,7 @@ export class NodeCueLoader extends EventEmitter {
 
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed = JSON.parse(data)
+    migrateLegacyBearings(parsed)
     const validation =
       mode === 'yarg' ? validateYargNodeCueFile(parsed) : validateAudioNodeCueFile(parsed)
 
@@ -284,6 +286,7 @@ export class NodeCueLoader extends EventEmitter {
   private async loadFile(mode: NodeCueMode, filePath: string): Promise<NodeCueFileSummary | null> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed = JSON.parse(contents)
+    migrateLegacyBearings(parsed)
     const validation =
       mode === 'yarg' ? validateYargNodeCueFile(parsed) : validateAudioNodeCueFile(parsed)
 

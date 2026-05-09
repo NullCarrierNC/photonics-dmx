@@ -27,6 +27,8 @@ interface ValueSourceEditorProps {
     | 'event'
     | 'either'
   validLiterals?: string[]
+  /** When set, constrained literal dropdown uses these labels instead of repeating the stored value as the label (takes precedence over {@link validLiterals}). */
+  validLiteralOptions?: ReadonlyArray<{ value: string; label: string }>
   availableVariables: {
     name: string
     type: string
@@ -44,6 +46,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   onChange,
   expected = 'either',
   validLiterals,
+  validLiteralOptions,
   availableVariables,
   integerOnly = false,
   activeMode,
@@ -58,6 +61,12 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     }
     return undefined
   })()
+
+  const constrainedLiteralChoices: ReadonlyArray<{ value: string; label: string }> | undefined =
+    validLiteralOptions ??
+    (effectiveValidLiterals
+      ? effectiveValidLiterals.map((v) => ({ value: v, label: v }))
+      : undefined)
 
   const source = value ?? {
     source: 'literal',
@@ -134,7 +143,11 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
       })
     } else {
       // Switch to literal mode
-      const defaultValue = isBoolean ? false : isString ? effectiveValidLiterals?.[0] ?? '' : 0
+      const defaultValue = isBoolean
+        ? false
+        : isString
+          ? constrainedLiteralChoices?.[0]?.value ?? ''
+          : 0
       onChange({ source: 'literal', value: defaultValue })
     }
   }
@@ -164,15 +177,15 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
               <option value="true">true</option>
               <option value="false">false</option>
             </select>
-          ) : effectiveValidLiterals ? (
-            // Show dropdown for constrained literals (e.g., colours, brightness levels)
+          ) : constrainedLiteralChoices ? (
+            // Show dropdown for constrained literals (e.g., colours, bearing directions)
             <select
               className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={String(source.value)}
               onChange={(event) => onChange({ ...source, value: event.target.value })}>
-              {effectiveValidLiterals.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
+              {constrainedLiteralChoices.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
