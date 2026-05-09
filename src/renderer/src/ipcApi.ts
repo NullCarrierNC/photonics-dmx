@@ -354,14 +354,6 @@ export const updateConsoleChannel = (payload: {
   channelNumber: number
 }) => window.api.invoke(LIGHT.CONSOLE_UPDATE_CHANNEL, payload)
 
-export const setConsoleHome = (payload: {
-  rigId: string
-  lightId: string
-  fixtureId: string
-  panHome: number
-  tiltHome: number
-}) => window.api.invoke(LIGHT.CONSOLE_SET_HOME, payload)
-
 export const setConsoleFixtureConfig = (payload: {
   rigId: string
   lightId: string

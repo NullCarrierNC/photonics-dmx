@@ -15,7 +15,6 @@ import {
   enableConsole,
   disableConsole,
   sendConsoleDmx,
-  setConsoleHome,
   enableSender,
 } from '../ipcApi'
 import { lightingPrefsAtom, previewRigIdAtom, resolveLastUsedRigId } from '../atoms'
@@ -275,33 +274,6 @@ const DmxConsole: React.FC = () => {
     })
   }
 
-  const handleSetHome = async (light: DmxLight) => {
-    if (!selectedRigId || light.id === null) {
-      return
-    }
-    setActionError(null)
-    const baseCh = channelsAsRecord(light.channels)
-    const ov = light.id ? channelOverrides[light.id] ?? {} : {}
-    const effectiveCh = { ...baseCh, ...ov } as { pan: number; tilt: number }
-    const panHome = consoleBuffer[effectiveCh.pan] ?? dmxValues[effectiveCh.pan] ?? 0
-    const tiltHome = consoleBuffer[effectiveCh.tilt] ?? dmxValues[effectiveCh.tilt] ?? 0
-    const result = await setConsoleHome({
-      rigId: selectedRigId,
-      lightId: light.id,
-      fixtureId: light.fixtureId,
-      panHome,
-      tiltHome,
-    })
-    if (!result.success) {
-      setActionError(result.error)
-      return
-    }
-    const rig = await getDmxRig(selectedRigId)
-    if (rig) {
-      setSelectedRig(rig)
-    }
-  }
-
   const renderFixtureCard = (light: DmxLight) => {
     const lightOverrides = light.id ? channelOverrides[light.id] : undefined
     const sorted = getEffectiveChannelEntries(light, lightOverrides)
@@ -395,17 +367,6 @@ const DmxConsole: React.FC = () => {
             )
           })}
         </ul>
-        {(light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH) && (
-          <div className="mt-2 flex justify-end">
-            <button
-              type="button"
-              disabled={!consoleEnabled}
-              onClick={() => void handleSetHome(light)}
-              className="px-3 py-1.5 text-sm rounded-md bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed">
-              Set as Home Position
-            </button>
-          </div>
-        )}
       </div>
     )
   }
@@ -445,7 +406,6 @@ const DmxConsole: React.FC = () => {
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         <strong>Note:</strong> Changing DMX colour channel numbers here is temporary for this
         session only and is <strong>not saved</strong> to your rig or My Lights configuration.
-        Setting a moving head's home position will update the light's configuration.
       </p>
 
       <div className="mb-8 flex flex-wrap items-end gap-6 pt-4">
