@@ -208,7 +208,7 @@ export function resolvePositionToAbsolutePercent(
       rawPanMotorDeg,
       c.panRangeDeg,
       panHomeDeg,
-      'intent',
+      'continuity',
     )
     const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
     const tiltDir = shouldMirrorTiltForStageRelative(c) ? -1 : 1
@@ -227,7 +227,7 @@ export function resolvePositionToAbsolutePercent(
     rawPanMotorDeg,
     c.panRangeDeg,
     panHomeDeg,
-    'intent',
+    'continuity',
   )
   const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
   const tiltRaw =

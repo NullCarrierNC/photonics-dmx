@@ -53,6 +53,36 @@ function pickAliasByIntent(rawMotorDeg: number, unique: number[]): number {
 }
 
 /**
+ * Motion paths only: when `rawMotorDeg` is outside `[0, panRangeDeg]`, also consider
+ * `clampedFallback` and pick whichever is closer to `preferredMotorDeg` in linear motor distance;
+ * on a tie, prefer the clamped edge value.
+ */
+function preferClampOverAliasWhenOverflowMotion(
+  rawMotorDeg: number,
+  panRangeDeg: number,
+  bestAliasFromUnique: number,
+  clampedFallback: number,
+  preferredMotorDeg: number,
+): number {
+  if (!Number.isFinite(preferredMotorDeg)) {
+    preferredMotorDeg = 0
+  }
+  const overflow = rawMotorDeg < -1e-9 || rawMotorDeg > panRangeDeg + 1e-9
+  if (!overflow) {
+    return bestAliasFromUnique
+  }
+  const dClamp = Math.abs(clampedFallback - preferredMotorDeg)
+  const dAlias = Math.abs(bestAliasFromUnique - preferredMotorDeg)
+  if (dClamp < dAlias - 1e-9) {
+    return clampedFallback
+  }
+  if (dAlias < dClamp - 1e-9) {
+    return bestAliasFromUnique
+  }
+  return clampedFallback
+}
+
+/**
  * Among aliases, pick closest to `preferredMotorDeg` on the physical motor axis (minimal travel).
  */
 function pickAliasByContinuity(unique: number[], preferredMotorDeg: number): number {
@@ -71,13 +101,15 @@ function pickAliasByContinuity(unique: number[], preferredMotorDeg: number): num
   return best
 }
 
-export type PanAliasPickMode = 'continuity' | 'intent'
+export type PanAliasPickMode = 'continuity' | 'continuity-clamp' | 'intent'
 
 /**
  * Returns a physical pan motor angle in `[0, panRangeDeg]` equivalent to `rawMotorDeg`
  * up to 360° repeats.
  *
- * - `continuity`: minimise circular distance to `preferredMotorDeg` (motion / streaming).
+ * - `continuity`: minimise linear motor distance among aliases (set-position; overflow may wrap).
+ * - `continuity-clamp`: like continuity, but when `rawMotorDeg` is outside the pan range,
+ *   also consider clamping to 0 or `panRangeDeg` and pick by linear distance (motion cues).
  * - `intent`: prefer the alias with smallest |k| in `rawMotorDeg + k·360` (set-position / bearing).
  */
 export function pickAliasedPanMotorDeg(
@@ -90,13 +122,24 @@ export function pickAliasedPanMotorDeg(
   if (unique.length === 0) {
     return clampedFallback
   }
-  if (unique.length === 1) {
-    return unique[0]!
-  }
   if (mode === 'intent') {
+    if (unique.length === 1) {
+      return unique[0]!
+    }
     return pickAliasByIntent(rawMotorDeg, unique)
   }
-  return pickAliasByContinuity(unique, preferredMotorDeg)
+  const bestAlias =
+    unique.length === 1 ? unique[0]! : pickAliasByContinuity(unique, preferredMotorDeg)
+  if (mode === 'continuity-clamp') {
+    return preferClampOverAliasWhenOverflowMotion(
+      rawMotorDeg,
+      panRangeDeg,
+      bestAlias,
+      clampedFallback,
+      preferredMotorDeg,
+    )
+  }
+  return bestAlias
 }
 
 /** Logical pan % (0–100) from a physical motor angle in `[0, panRangeDeg]`. */

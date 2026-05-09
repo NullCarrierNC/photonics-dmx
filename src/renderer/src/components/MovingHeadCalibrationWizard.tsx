@@ -31,6 +31,7 @@ import ArtNetToggle from './ArtNetToggle'
 import EnttecProToggle from './EnttecProToggle'
 import OpenDmxToggle from './OpenDmxToggle'
 import LightsDmxPreview3D from './LightsDmxPreview3D'
+import { MotorEdgeHomeWarnings } from './MotorEdgeHomeWarnings'
 
 const STEP_TITLES = [
   'Pan range',
@@ -492,7 +493,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
         body = (
           <div className="space-y-4">
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Use the pan slider to aim the beam directly upstage (toward the screen / stage).
+              Use the pan slider to aim the beam directly upstage (<em>away from the audience</em>).
               Adjust tilt if needed, then capture.
             </p>
             <DmxSlider label="Pan (DMX)" value={panDmxLive} onChange={setPanDmx} />
@@ -521,9 +522,8 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
         body = (
           <div className="space-y-4">
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Use the tilt slider to aim the beam at the fixture&apos;s vertical pole (straight up
-              in the fixture&apos;s head frame — the direction the engine uses as tilt reference),
-              then capture.
+              Use the tilt slider to aim the beam at the fixture&apos;s vertical pole (straight
+              up/down in the fixture&apos;s head frame), then capture.
             </p>
             <DmxSlider label="Tilt (DMX)" value={tiltDmxLive} onChange={setTiltDmx} />
             <button
@@ -573,6 +573,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
               Set as Home
             </button>
+            <MotorEdgeHomeWarnings panHome={config.panHome} tiltHome={config.tiltHome} />
             <p className="text-xs text-gray-600 dark:text-gray-400">
               Pan home {config.panHome}% · Tilt home {config.tiltHome}%
             </p>
@@ -586,6 +587,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
               Confirm calibration values. Save writes to this rig and the matching My Lights
               template.
             </p>
+            <MotorEdgeHomeWarnings panHome={config.panHome} tiltHome={config.tiltHome} />
             <ul className="space-y-1 font-mono text-xs bg-gray-100 dark:bg-gray-900 p-3 rounded max-h-48 overflow-y-auto">
               <li>panRangeDeg: {config.panRangeDeg}</li>
               <li>tiltRangeDeg: {config.tiltRangeDeg}</li>

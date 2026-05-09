@@ -9,7 +9,12 @@ import {
 } from '../../cues/node/compiler/ActionEffectFactory'
 import { resolveMotionPattern } from '../../cues/node/runtime/actionResolver'
 import { ExecutionContext } from '../../cues/node/runtime/ExecutionContext'
-import { logicalPanDir, mirrorDmxForMovingHeadInvert, percentToDmx } from '../../helpers/dmxHelpers'
+import {
+  logicalPanDir,
+  mirrorDmxForMovingHeadInvert,
+  percentToDmx,
+  shouldMirrorTiltForStageRelative,
+} from '../../helpers/dmxHelpers'
 import { pickAliasedPanMotorDeg } from '../../helpers/panMotorAlias'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
@@ -106,6 +111,29 @@ function encirclingPanMotorWindow(
   return { low: w0, high: w0 + 360 }
 }
 
+function pickPanMotorDegNearestLinearPreferClampOnTie(
+  pool: number[],
+  clampedCandidate: number,
+  preferredPanMotorDeg: number,
+): number {
+  let best = pool[0]!
+  let bestDist = Math.abs(best - preferredPanMotorDeg)
+  for (const c of pool) {
+    const d = Math.abs(c - preferredPanMotorDeg)
+    if (d < bestDist - 1e-9) {
+      best = c
+      bestDist = d
+    } else if (Math.abs(d - bestDist) < 1e-9) {
+      const cIsClamp = Math.abs(c - clampedCandidate) < 1e-9
+      const bestIsClamp = Math.abs(best - clampedCandidate) < 1e-9
+      if (cIsClamp && !bestIsClamp) {
+        best = c
+      }
+    }
+  }
+  return best
+}
+
 function pickPanMotorDegEncircling(
   azimuthDeg0To360: number,
   panHomeDeg: number,
@@ -121,19 +149,12 @@ function pickPanMotorDegEncircling(
       candidates.push(c)
     }
   }
+  const clampedInWindow = Math.max(low, Math.min(high, a))
   if (candidates.length > 0) {
-    let best = candidates[0]!
-    let bestAbs = Math.abs(wrapSignedDeg(best - preferredPanMotorDeg))
-    for (const c of candidates) {
-      const w = Math.abs(wrapSignedDeg(c - preferredPanMotorDeg))
-      if (w < bestAbs - 1e-9) {
-        best = c
-        bestAbs = w
-      }
-    }
-    return best
+    const pool = Array.from(new Set([...candidates, clampedInWindow]))
+    return pickPanMotorDegNearestLinearPreferClampOnTie(pool, clampedInWindow, preferredPanMotorDeg)
   }
-  return Math.max(low, Math.min(high, a))
+  return clampedInWindow
 }
 
 function wrapSignedDeg(d: number): number {
@@ -176,20 +197,10 @@ function pickPanMotorDegFromAzimuth(
       candidates.push(c)
     }
   }
-  if (candidates.length === 1) {
-    return candidates[0]!
-  }
-  if (candidates.length > 1) {
-    let best = candidates[0]!
-    let bestAbs = Math.abs(wrapSignedDeg(best - preferredPanMotorDeg))
-    for (const c of candidates) {
-      const w = Math.abs(wrapSignedDeg(c - preferredPanMotorDeg))
-      if (w < bestAbs - 1e-9) {
-        best = c
-        bestAbs = w
-      }
-    }
-    return best
+  const clampedInRange = Math.max(0, Math.min(panRangeDeg, a))
+  if (candidates.length >= 1) {
+    const pool = Array.from(new Set([...candidates, clampedInRange]))
+    return pickPanMotorDegNearestLinearPreferClampOnTie(pool, clampedInRange, preferredPanMotorDeg)
   }
   const s = shortestPanMotorDegToHome(a, preferredPanMotorDeg)
   return Math.max(0, Math.min(panRangeDeg, s))
@@ -215,7 +226,12 @@ function effectiveCircleGeometry(
   }
   const panDir = logicalPanDir(c)
   const rawPanTarget = c.panStageDeg + panDir * bearingDeg
-  const panCenterDeg = pickAliasedPanMotorDeg(rawPanTarget, c.panRangeDeg, panHomeDeg, 'intent')
+  const panCenterDeg = pickAliasedPanMotorDeg(
+    rawPanTarget,
+    c.panRangeDeg,
+    panHomeDeg,
+    'continuity-clamp',
+  )
   return {
     phi0Eff: alphaDeg,
     panCenterDeg,
@@ -508,7 +524,7 @@ describe('gimbalCompensatedPanTiltOffsetsDeg', () => {
     expect(Math.abs(down.panOffsetDeg - stageRight.panOffsetDeg)).toBeGreaterThan(1)
   })
 
-  it('near pole bearing uses the same pan motor as direction-mode set-position at vertical', () => {
+  it('near pole bearing: circle center matches continuity-clamp alias pick (motion path)', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
     const c: FixtureConfig = {
       ...defaultMh,
@@ -520,13 +536,13 @@ describe('gimbalCompensatedPanTiltOffsetsDeg', () => {
     }
     const bearingDeg = 180
     const geo = effectiveCircleGeometry(c, 30, 1, bearingDeg)
-    const { pan } = resolvePositionToAbsolutePercent(
-      { mode: 'direction', bearingDeg, angleFromVerticalDeg: 0 },
-      c,
-    )
-    const expectedCenterMotor = (pan / 100) * c.panRangeDeg
+    const panHomeDeg = (c.panHome / 100) * c.panRangeDeg
+    const rawPanTarget = c.panStageDeg + logicalPanDir(c) * bearingDeg
     expect(geo.phi0Eff).toBeCloseTo(30, 6)
-    expect(geo.panCenterDeg).toBeCloseTo(expectedCenterMotor, 4)
+    expect(geo.panCenterDeg).toBeCloseTo(
+      pickAliasedPanMotorDeg(rawPanTarget, c.panRangeDeg, panHomeDeg, 'continuity-clamp'),
+      4,
+    )
     warn.mockRestore()
   })
 
@@ -876,9 +892,13 @@ it('invertPan flips logical panDir so sine offset aliases on 540° window (DMX m
   const state = ltc.getLightState(light.id, 2)
   const panHomeDeg = (light.config.panHome / 100) * defaultMh.panRangeDeg
   const rawMotor = panHomeDeg + -60
-  const chosen = pickAliasedPanMotorDeg(rawMotor, defaultMh.panRangeDeg, panHomeDeg, 'continuity')
+  const chosen = pickAliasedPanMotorDeg(
+    rawMotor,
+    defaultMh.panRangeDeg,
+    panHomeDeg,
+    'continuity-clamp',
+  )
   expect(state.pan).toBeCloseTo((chosen / defaultMh.panRangeDeg) * 100, 5)
-  expect(state.pan).toBeGreaterThan(10)
   expect(state.tilt).toBeCloseTo(light.config.tiltHome, 5)
 })
 
@@ -992,7 +1012,7 @@ it('reported near-pole light does not hit tilt clamp in normal circle motion', (
   warn.mockRestore()
 })
 
-it('up-firing panHome 0 / panStageDeg 0: circle motion does not pan-clamp and spans pan', () => {
+it('up-firing panHome 0 / panStageDeg 0: edge home produces limited pan sweep (clamp motion path)', () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
   const lsm = new LightStateManager()
   const ltc = new LightTransitionController(lsm)
@@ -1032,8 +1052,63 @@ it('up-firing panHome 0 / panStageDeg 0: circle motion does not pan-clamp and sp
   }
 
   expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('up-fire-edge-home pan clamped'))
-  expect(maxPan - minPan).toBeGreaterThan(8)
+  expect(minPan).toBeGreaterThanOrEqual(-1e-6)
+  expect(maxPan).toBeLessThan(15)
+  expect(maxPan - minPan).toBeLessThan(12)
   warn.mockRestore()
+})
+
+it('up-firing front fixtures (phi0 < 0): no startup 180° snap and no periodic flip-flop', () => {
+  const lsm = new LightStateManager()
+  const ltc = new LightTransitionController(lsm)
+  const engine = new MotionPatternEngine(ltc)
+  const light = {
+    id: 'front-up-firing',
+    position: 3,
+    config: {
+      ...defaultMh,
+      panHome: 33,
+      tiltHome: 19,
+      panStageDeg: 0,
+      tiltStageDeg: 95,
+      panDirectionCW: false,
+      invertPan: false,
+      invertTilt: false,
+    },
+  }
+
+  engine.addPattern({
+    name: 'front-circle',
+    config: { ...basePattern, pattern: 'circle', sizeDeg: 30, gimbalCompensation: true },
+    lights: [light],
+    layer: 8,
+    startTime: 0,
+    rampUpDurationMs: 0,
+  })
+
+  const panHomePct = 33
+  let maxPanDelta = 0
+  let prevPan: number | undefined
+
+  // Run for 3 full revolutions (at 1 Hz, 3 seconds = 3000ms. 3000 / 25ms = 120 frames)
+  for (let i = 0; i < 120; i++) {
+    engine.advanceFrame({ frameStartTime: i * 25, deltaTime: 25, frameIndex: i })
+    const state = ltc.getLightState(light.id, 8)
+    const pan = state.pan ?? panHomePct
+
+    if (prevPan !== undefined) {
+      const delta = Math.abs(pan - prevPan)
+      maxPanDelta = Math.max(maxPanDelta, delta)
+    } else {
+      // First frame: should not snap 180° (which would be ~33% difference on a 540° fixture)
+      expect(Math.abs(pan - panHomePct)).toBeLessThan(10)
+    }
+    prevPan = pan
+  }
+
+  // A 180° snap or flip-flop would cause a delta of > 30%.
+  // Smooth motion should keep per-frame deltas small (< 5%).
+  expect(maxPanDelta).toBeLessThan(5)
 })
 
 it('light 6 down-firing config: pan/tilt stays within range and draws orbit across the pole', () => {
@@ -1404,5 +1479,218 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
       expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(2)
       expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(2)
     }
+  })
+
+  /**
+   * Regression for fixtures with asymmetric tiltStageDeg (≠ tiltRangeDeg/2).
+   *
+   * The old code gate on shouldMirrorTiltForStageRelative required tiltStageDeg to equal
+   * tiltRangeDeg/2. Fixtures with any other value (e.g. tiltStageDeg=93° on a 180° fixture) were
+   * never mirrored, breaking stage-relative parity. The new code drops that condition.
+   *
+   * Fixture notes:
+   *   Top: floor, tiltHome=76%, tiltStageDeg=93° → phi0=+43.8° (home above pole)
+   *   Nod bottom: tiltHome=24% → stage-equivalent home (100−76=24), matched for waveform parity
+   *   Circle bottom: tiltHome=27% → actualHome≈48.6°, canonical phi0≈44.4° ≈ floor phi0=43.8°
+   *
+   * The asymmetric pole shifts the canonical phi0 slightly from the floor phi0, so the tolerance
+   * is 3.5% rather than the 2% used for symmetric calibrations.
+   */
+  const asymTopCfg: FixtureConfig = {
+    ...defaultMh,
+    panHome: 0,
+    panMax: 200,
+    panDirectionCW: false,
+    panStageDeg: 0,
+    tiltHome: 76,
+    tiltStageDeg: 93,
+    invertPan: false,
+    invertTilt: false,
+  }
+
+  it('asymmetric tiltStageDeg (≠90°): Nod keeps top and bottom stage position aligned', () => {
+    // tiltHome=24% → stage-equivalent of floor 76% (100−76=24) via waveform tiltDir path
+    const asymNodBottomCfg: FixtureConfig = {
+      ...defaultMh,
+      panHome: 100,
+      panMax: 200,
+      panDirectionCW: true,
+      panStageDeg: 540,
+      tiltHome: 24,
+      tiltStageDeg: 93,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const nodPattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'linear-sweep' },
+        linearSweepAxis: { source: 'literal', value: 'vertical' },
+        speed: { source: 'literal', value: 2 },
+        size: { source: 'literal', value: 20 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    for (let i = 0; i < 8; i++) {
+      const t = (i / 8) * 500
+      const topXY = runPipelineTick(asymTopCfg, nodPattern, t)
+      const bottomXY = runPipelineTick(asymNodBottomCfg, nodPattern, t)
+      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(3.5)
+      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(3.5)
+    }
+  })
+
+  it('asymmetric tiltStageDeg (≠90°): Circle keeps top and bottom stage position aligned', () => {
+    // tiltHome=27% → actualHome≈48.6°, canonical phi0=93−48.6≈44.4° ≈ floor phi0=43.8°
+    const asymCircleBottomCfg: FixtureConfig = {
+      ...defaultMh,
+      panHome: 100,
+      panMax: 200,
+      panDirectionCW: true,
+      panStageDeg: 540,
+      tiltHome: 27,
+      tiltStageDeg: 93,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const circlePattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'circle' },
+        bearing: { source: 'literal', value: 180 },
+        speed: { source: 'literal', value: 1 },
+        size: { source: 'literal', value: 25 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    for (let i = 0; i < 12; i++) {
+      const t = (i / 12) * 1000
+      const topXY = runPipelineTick(asymTopCfg, circlePattern, t)
+      const bottomXY = runPipelineTick(asymCircleBottomCfg, circlePattern, t)
+      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(3.5)
+      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(3.5)
+    }
+  })
+
+  it('asymmetric tiltStageDeg (≠90°): direction mode keeps DS/US/SL/SR aligned across mounts', () => {
+    const asymDirBottomCfg: FixtureConfig = {
+      ...defaultMh,
+      panHome: 100,
+      panMax: 200,
+      panDirectionCW: true,
+      panStageDeg: 540,
+      tiltHome: 24,
+      tiltStageDeg: 93,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const bearings = [180, 0, 270, 90]
+    for (const bearing of bearings) {
+      const topXY = runDirectionTargetPreview(asymTopCfg, bearing, 30)
+      const bottomXY = runDirectionTargetPreview(asymDirBottomCfg, bearing, 30)
+      expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(3.5)
+      expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(3.5)
+    }
+  })
+
+  /**
+   * Regression for the orbit direction unification fix.
+   *
+   * Before the phaseSign fix, the orbit's pan direction depended on sign(phi0). A phi0<0 fixture
+   * (home below the tilt pole) would orbit CCW in stage space while phi0>0 fixtures orbited CW,
+   * because panTiltOffsetsFromBeam's +180° azimuth offset for phi0<0 inverts the motor travel
+   * direction relative to the sphere orbit's e2 component.
+   *
+   * The fix negates the phase when phi0<0 so the e2 traversal direction is reversed, cancelling
+   * the azimuth flip and restoring CW stage rotation.
+   *
+   * Direction is verified via the shoelace signed area of the closed orbit on the preview disc,
+   * sampled over one full period. After gimbal `phaseSign`, stage-CW is unified, but the disc
+   * still applies `effectivePhiSign` from {@link panTiltDmxToSphericalXY}: when
+   * `shouldMirrorTiltForStageRelative` flips the tilt hemisphere for preview, the same stage-CW
+   * orbit appears with opposite winding on (ux, uy), so the shoelace sign expectation depends
+   * on that flag (negative area when mirrored, positive when not).
+   *
+   * Monotonic bearing increase is NOT used because non-polar orbits (|phi0| > alpha) oscillate
+   * in bearing; the shoelace area correctly captures CW vs CCW regardless of orbit radius.
+   *
+   * Light 2 (real rig): floor, panDirectionCW=false, invertPan=false, phi0=-46.8° (below pole)
+   * Light 6 (real rig): truss, panDirectionCW=true, invertPan=true, phi0=+43.8° (above pole)
+   */
+  /**
+   * Helper: sample the preview disc over one orbit and assert stage-CW via shoelace winding.
+   * Sign depends on `shouldMirrorTiltForStageRelative` (see block comment above).
+   */
+  function assertCircleCW(config: FixtureConfig, pattern: ResolvedMotionPatternSetting): void {
+    const nSamples = 32
+    const periodMs = Math.round(1000 / pattern.speedHz)
+    const pts: { ux: number; uy: number }[] = []
+    for (let i = 0; i < nSamples; i++) {
+      const t = (i / nSamples) * periodMs
+      const { xPct, yPct } = runPipelineTick(config, pattern, t)
+      pts.push({ ux: (xPct - 50) / 50, uy: (yPct - 50) / 50 })
+    }
+    let area2 = 0
+    for (let i = 0; i < nSamples; i++) {
+      const p0 = pts[i]!
+      const p1 = pts[(i + 1) % nSamples]!
+      area2 += p0.ux * p1.uy - p0.uy * p1.ux
+    }
+    const mirroredTiltPreview = shouldMirrorTiltForStageRelative(config)
+    if (mirroredTiltPreview) {
+      expect(area2).toBeLessThan(0)
+    } else {
+      expect(area2).toBeGreaterThan(0)
+    }
+  }
+
+  it('circle direction: phi0<0 floor fixture (real-rig Light 2) orbits CW', () => {
+    const light2Config: FixtureConfig = {
+      ...defaultMh,
+      panHome: 34,
+      panMax: 255,
+      panRangeDeg: 540,
+      panDirectionCW: false,
+      panStageDeg: 0,
+      tiltHome: 24,
+      tiltRangeDeg: 180,
+      tiltStageDeg: 90,
+      invertPan: false,
+      invertTilt: false,
+    }
+    const circlePattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'circle' },
+        bearing: { source: 'literal', value: 180 },
+        speed: { source: 'literal', value: 1 },
+        size: { source: 'literal', value: 20 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    assertCircleCW(light2Config, circlePattern)
+  })
+
+  it('circle direction: phi0>0 truss fixture (real-rig Light 6) orbits CW', () => {
+    const light6Config: FixtureConfig = {
+      ...defaultMh,
+      panHome: 67,
+      panMax: 255,
+      panRangeDeg: 540,
+      panDirectionCW: true,
+      panStageDeg: 540,
+      tiltHome: 76,
+      tiltRangeDeg: 180,
+      tiltStageDeg: 93,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const circlePattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'circle' },
+        bearing: { source: 'literal', value: 180 },
+        speed: { source: 'literal', value: 1 },
+        size: { source: 'literal', value: 20 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    assertCircleCW(light6Config, circlePattern)
   })
 })

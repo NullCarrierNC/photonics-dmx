@@ -1,6 +1,7 @@
 import { performance } from 'perf_hooks'
 import { normalizeFixtureConfig, RGBIO, TrackedLight } from '../../types'
 import {
+  canonicalGimbalTiltHomeDeg,
   degreeOffsetToPercent,
   logicalPanDir,
   shouldMirrorTiltForStageRelative,
@@ -98,6 +99,29 @@ function encirclingPanMotorWindow(
   return { low: w0, high: w0 + 360 }
 }
 
+function pickPanMotorDegNearestLinearPreferClampOnTie(
+  pool: number[],
+  clampedCandidate: number,
+  preferredPanMotorDeg: number,
+): number {
+  let best = pool[0]!
+  let bestDist = Math.abs(best - preferredPanMotorDeg)
+  for (const c of pool) {
+    const d = Math.abs(c - preferredPanMotorDeg)
+    if (d < bestDist - 1e-9) {
+      best = c
+      bestDist = d
+    } else if (Math.abs(d - bestDist) < 1e-9) {
+      const cIsClamp = Math.abs(c - clampedCandidate) < 1e-9
+      const bestIsClamp = Math.abs(best - clampedCandidate) < 1e-9
+      if (cIsClamp && !bestIsClamp) {
+        best = c
+      }
+    }
+  }
+  return best
+}
+
 /** Map beam azimuth to a pan motor angle inside the encircling window (continuous 360° sweep). */
 function pickPanMotorDegEncircling(
   azimuthDeg0To360: number,
@@ -114,26 +138,20 @@ function pickPanMotorDegEncircling(
       candidates.push(c)
     }
   }
+  const clampedInWindow = Math.max(low, Math.min(high, a))
   if (candidates.length > 0) {
-    let best = candidates[0]!
-    let bestAbs = Math.abs(wrapSignedDeg(best - preferredPanMotorDeg))
-    for (const c of candidates) {
-      const w = Math.abs(wrapSignedDeg(c - preferredPanMotorDeg))
-      if (w < bestAbs - 1e-9) {
-        best = c
-        bestAbs = w
-      }
-    }
-    return best
+    const pool = Array.from(new Set([...candidates, clampedInWindow]))
+    return pickPanMotorDegNearestLinearPreferClampOnTie(pool, clampedInWindow, preferredPanMotorDeg)
   }
-  return Math.max(low, Math.min(high, a))
+  return clampedInWindow
 }
 
 /**
  * Map beam azimuth to a physical pan motor angle in [0, panRangeDeg].
  * When panRangeDeg >= 360°, use the same home-centred 360° window as encircling so lifts stay
  * continuous and never pick negative equivalents that clamp in % space.
- * When panRangeDeg < 360°, enumerate lifts in range and pick nearest to home in circular distance.
+ * When panRangeDeg < 360°, enumerate lifts in range and pick nearest to preferred in linear motor
+ * distance, with in-range clamp tie-break (matches encircling branch).
  */
 function pickPanMotorDegFromAzimuth(
   azimuthDeg0To360: number,
@@ -157,20 +175,10 @@ function pickPanMotorDegFromAzimuth(
       candidates.push(c)
     }
   }
-  if (candidates.length === 1) {
-    return candidates[0]!
-  }
-  if (candidates.length > 1) {
-    let best = candidates[0]!
-    let bestAbs = Math.abs(wrapSignedDeg(best - preferredPanMotorDeg))
-    for (const c of candidates) {
-      const w = Math.abs(wrapSignedDeg(c - preferredPanMotorDeg))
-      if (w < bestAbs - 1e-9) {
-        best = c
-        bestAbs = w
-      }
-    }
-    return best
+  const clampedInRange = Math.max(0, Math.min(panRangeDeg, a))
+  if (candidates.length >= 1) {
+    const pool = Array.from(new Set([...candidates, clampedInRange]))
+    return pickPanMotorDegNearestLinearPreferClampOnTie(pool, clampedInRange, preferredPanMotorDeg)
   }
   const s = shortestPanMotorDegToHome(a, preferredPanMotorDeg)
   return Math.max(0, Math.min(panRangeDeg, s))
@@ -221,12 +229,21 @@ function tiltMotorDegFromBeam(
   return poleTiltDeg + sPhi * side * thetaDeg
 }
 
+/**
+ * Inverse kinematics: beam direction → pan/tilt motor offsets.
+ *
+ * `tiltHomeDegForIK` drives the IK geometry and may be a canonical (mirrored) value for
+ * inverted fixtures. `tiltHomeDegForOffset` is the actual motor home used for the output
+ * offset baseline and for the motor-bounds check — these differ for inverted fixtures with
+ * asymmetric `tiltStageDeg`.
+ */
 function panTiltOffsetsFromBeam(
   x: number,
   y: number,
   z: number,
   panHomeDeg: number,
-  tiltHomeDeg: number,
+  tiltHomeDegForIK: number,
+  tiltHomeDegForOffset: number,
   poleTiltDeg: number,
   panRangeDeg: number,
   tiltRangeDeg: number,
@@ -235,8 +252,9 @@ function panTiltOffsetsFromBeam(
 ): { panOffsetDeg: number; tiltOffsetDeg: number } {
   const zc = Math.max(-1, Math.min(1, z))
   const az0 = panAzimuthDegFromBeamXY(x, y)
+  const initialMotorAzimuth = phi0EffectiveDeg < 0 ? modPositive(az0 + 180, 360) : az0
   let panMotorDeg = pickPanMotorDegFromAzimuth(
-    az0,
+    initialMotorAzimuth,
     panHomeDeg,
     panRangeDeg,
     preferredPanMotorDeg ?? panHomeDeg,
@@ -260,11 +278,20 @@ function panTiltOffsetsFromBeam(
     tiltMotorDeg = tiltMotorDegFromBeam(zc, poleTiltDeg, phi0EffectiveDeg, x, y, panMotorDeg)
   }
 
-  if (tiltMotorDeg < 0 || tiltMotorDeg > tiltRangeDeg) {
-    const flippedTilt = poleTiltDeg - (tiltMotorDeg - poleTiltDeg)
+  // Convert from IK (canonical) motor space to actual motor space.
+  // When canonical mirroring was applied (ikHome ≠ actualHome), the canonical orbit is the
+  // pole-reflection of the actual orbit: actualMotor = 2·poleTiltDeg − ikMotor.
+  // When no mirror was applied (ikHome === actualHome), the IK ran in actual space directly.
+  const wasMirrored = Math.abs(tiltHomeDegForIK - tiltHomeDegForOffset) > 1e-9
+  const tiltMotorDegActual = wasMirrored ? 2 * poleTiltDeg - tiltMotorDeg : tiltMotorDeg
+  let finalTiltMotorDeg = tiltMotorDegActual
+  let finalPanMotorDeg = panMotorDeg
+
+  if (finalTiltMotorDeg < 0 || finalTiltMotorDeg > tiltRangeDeg) {
+    const flippedTilt = poleTiltDeg - (finalTiltMotorDeg - poleTiltDeg)
     if (flippedTilt >= 0 && flippedTilt <= tiltRangeDeg) {
-      tiltMotorDeg = flippedTilt
-      panMotorDeg = pickPanMotorDegFromAzimuth(
+      finalTiltMotorDeg = flippedTilt
+      finalPanMotorDeg = pickPanMotorDegFromAzimuth(
         modPositive(panMotorDeg + 180, 360),
         panHomeDeg,
         panRangeDeg,
@@ -273,8 +300,8 @@ function panTiltOffsetsFromBeam(
     }
   }
 
-  const panOffsetDeg = panMotorDeg - panHomeDeg
-  const tiltOffsetDeg = tiltMotorDeg - tiltHomeDeg
+  const panOffsetDeg = finalPanMotorDeg - panHomeDeg
+  const tiltOffsetDeg = finalTiltMotorDeg - tiltHomeDegForOffset
 
   return { panOffsetDeg, tiltOffsetDeg }
 }
@@ -308,23 +335,23 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
   const baseBearing = bearingDegRaw ?? 180
   const bearingDeg = bearingIsFlipped === true ? reflectBearingUsDs(baseBearing) : baseBearing
   const c = normalizeFixtureConfig(fixtureConfig)
-  const mirrorTiltOffset = shouldMirrorTiltForStageRelative(c)
-  const cMotion = {
-    ...c,
-    tiltHome: mirrorTiltOffset ? 100 - c.tiltHome : c.tiltHome,
-  }
-  const tiltRange = cMotion.tiltRangeDeg
-  const tiltHomeDeg = (cMotion.tiltHome / 100) * tiltRange
-  const poleTiltDeg = cMotion.tiltStageDeg
-  const phi0Deg = tiltHomeDeg - poleTiltDeg
-  const tiltHeadroomDeg = Math.max(0, Math.min(tiltHomeDeg, tiltRange - tiltHomeDeg))
+  const tiltRange = c.tiltRangeDeg
+  const actualTiltHomeDeg = (c.tiltHome / 100) * tiltRange
+  // Canonical IK home: for inverted fixtures, mirror tilt home across the pole so the IK
+  // solver sees a positive phi0 in the up-firing frame regardless of tiltStageDeg.
+  const ikTiltHomeDeg = canonicalGimbalTiltHomeDeg(c)
+  const poleTiltDeg = c.tiltStageDeg
+  const phi0Deg = ikTiltHomeDeg - poleTiltDeg
+  // Headroom uses the actual motor home to respect physical travel limits.
+  const tiltHeadroomDeg = Math.max(0, Math.min(actualTiltHomeDeg, tiltRange - actualTiltHomeDeg))
   const alphaDeg = Math.min(sizeDeg * ramp, tiltHeadroomDeg)
   if (alphaDeg <= 0 || !Number.isFinite(alphaDeg)) {
     return { panOffsetDeg: 0, tiltOffsetDeg: 0 }
   }
 
-  const panHomeDeg = (cMotion.panHome / 100) * cMotion.panRangeDeg
-  const panRangeDeg = cMotion.panRangeDeg
+  const panHomeDeg = (c.panHome / 100) * c.panRangeDeg
+  const panRangeDeg = c.panRangeDeg
+  const panDir = logicalPanDir(c)
 
   const enclosesPole = Math.abs(phi0Deg) < alphaDeg - NEAR_POLE_EPS_DEG
   let phi0EffectiveDeg: number
@@ -334,27 +361,32 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
     circleCenterPanMotorDeg = panHomeDeg
   } else {
     phi0EffectiveDeg = alphaDeg
-    const panDir = logicalPanDir(cMotion)
-    // Match direction-mode set-position: same raw target and intent-based 360° alias pick
-    // as resolvePositionToAbsolutePercent direction mode (bearing from panStageDeg).
-    const rawPanTarget = cMotion.panStageDeg + panDir * bearingDeg
+    const rawPanTarget = c.panStageDeg + panDir * bearingDeg
     circleCenterPanMotorDeg = pickAliasedPanMotorDeg(
       rawPanTarget,
-      cMotion.panRangeDeg,
-      panHomeDeg,
-      'intent',
+      c.panRangeDeg,
+      preferredPanMotorDeg ?? panHomeDeg,
+      'continuity-clamp',
     )
   }
 
-  const tRad = modPositive(phase, TWO_PI)
+  // panTiltOffsetsFromBeam applies a +180° azimuth offset when phi0EffectiveDeg < 0, which flips
+  // the motor pan direction of travel relative to the sphere orbit. Negate phase so stage-CW
+  // matches the cue label for both hemispheres (same intrinsic pan sense as phi0 > 0).
+  const phaseSign = phi0EffectiveDeg < 0 ? -1 : 1
+  const tRad = modPositive(phaseSign * phase, TWO_PI)
 
   const { x, y, z } = sphereCircleUnit(phi0EffectiveDeg, alphaDeg, circleCenterPanMotorDeg, tRad)
+  // IK runs in canonical frame (ikTiltHomeDeg); output offsets are in actual motor space
+  // because panTiltOffsetsFromBeam uses tiltHomeDegForOffset (actualTiltHomeDeg) for the
+  // offset baseline and bounds check.
   return panTiltOffsetsFromBeam(
     x,
     y,
     z,
     panHomeDeg,
-    tiltHomeDeg,
+    ikTiltHomeDeg,
+    actualTiltHomeDeg,
     poleTiltDeg,
     panRangeDeg,
     tiltRange,
@@ -399,12 +431,22 @@ function clampPercentAxis(axis: 'pan' | 'tilt', raw: number, lightId: string): n
   return clamped
 }
 
+/**
+ * Converts stage-relative degree offsets (waveform path) or actual motor-space offsets
+ * (gimbal path) to absolute logical pan/tilt percentages.
+ *
+ * `gimbalMode` must be true when the offsets come from `gimbalCompensatedPanTiltOffsetsDeg`.
+ * In that case the tilt offset is already in actual logical motor space and must NOT have the
+ * percentage-space mirror applied (that mirror is only correct for stage-relative waveform
+ * offsets, not for motor offsets that the IK already solved in the right frame).
+ */
 function offsetDegToAbsolutePercent(
   panOffsetDeg: number,
   tiltOffsetDeg: number,
   fixtureConfig: TrackedLight['config'],
   lightId: string,
   preferredPanMotorDeg: number,
+  gimbalMode = false,
 ): { pan: number; tilt: number; chosenPanMotorDeg: number } {
   const c = normalizeFixtureConfig(fixtureConfig)
   const panDir = logicalPanDir(c)
@@ -414,10 +456,13 @@ function offsetDegToAbsolutePercent(
     rawPanMotorDeg,
     c.panRangeDeg,
     preferredPanMotorDeg,
-    'continuity',
+    'continuity-clamp',
   )
   const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
-  const tiltDir = shouldMirrorTiltForStageRelative(c) ? -1 : 1
+  // Gimbal offsets are in actual motor space; applying the percentage-space mirror would
+  // double-flip the tilt. Waveform offsets are stage-relative and need the mirror to land
+  // on the correct side of home after the DMX publisher applies hardware inversion.
+  const tiltDir = !gimbalMode && shouldMirrorTiltForStageRelative(c) ? -1 : 1
   const tiltRaw = c.tiltHome + tiltDir * degreeOffsetToPercent(tiltOffsetDeg, c.tiltRangeDeg)
   return {
     pan: clampPercentAxis('pan', panRaw, lightId),
@@ -517,6 +562,7 @@ export class MotionPatternEngine {
         const preferredPanMotorDeg =
           this.lastPanMotorDegByPatternLight.get(continuityKey) ?? panHomeDeg
 
+        let gimbalMode = false
         if (cfg.gimbalCompensation) {
           const comp = gimbalCompensatedPanTiltOffsetsDeg({
             sizeDeg: cfg.sizeDeg,
@@ -529,6 +575,7 @@ export class MotionPatternEngine {
           })
           panOffsetDeg = comp.panOffsetDeg
           tiltOffsetDeg = comp.tiltOffsetDeg
+          gimbalMode = true
         } else {
           const panOsc = evaluateWaveform(cfg.panWaveform, phasePan)
           const tiltOsc = evaluateWaveform(cfg.tiltWaveform, phaseTilt)
@@ -542,6 +589,7 @@ export class MotionPatternEngine {
           light.config,
           light.id,
           preferredPanMotorDeg,
+          gimbalMode,
         )
         this.lastPanMotorDegByPatternLight.set(continuityKey, chosenPanMotorDeg)
 

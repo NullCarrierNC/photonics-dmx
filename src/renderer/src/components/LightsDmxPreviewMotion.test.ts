@@ -45,7 +45,12 @@ function offsetsToMotor(
   const panHomeDeg = (cfg.panHome / 100) * cfg.panRangeDeg
   const tiltHomeDeg = (cfg.tiltHome / 100) * cfg.tiltRangeDeg
   const rawPan = panHomeDeg + panDir * panOffsetDeg
-  const chosen = pickAliasedPanMotorDeg(rawPan, cfg.panRangeDeg, preferredPanMotorDeg, 'continuity')
+  const chosen = pickAliasedPanMotorDeg(
+    rawPan,
+    cfg.panRangeDeg,
+    preferredPanMotorDeg,
+    'continuity-clamp',
+  )
   const tiltMotor = tiltHomeDeg + tiltOffsetDeg
   return { panMotor: chosen, tiltMotor, nextPref: chosen }
 }
@@ -469,6 +474,60 @@ describe('wizard raw console DMX preview (invert flags off)', () => {
     for (const target of targets) {
       const top = previewFromDirection(topCalibrated, target.bearing)
       const bottom = previewFromDirection(bottomCalibrated, target.bearing)
+      expect(Math.abs(bottom.xPct - top.xPct)).toBeLessThan(2)
+      expect(Math.abs(bottom.yPct - top.yPct)).toBeLessThan(2)
+    }
+  })
+
+  /**
+   * Regression: asymmetric tiltStageDeg (≠ tiltRangeDeg/2). The old code required tiltStageDeg
+   * to be exactly at the range midpoint for the shouldMirrorTiltForStageRelative check to fire.
+   * Fixtures like Light 6 with tiltStageDeg=93° (not exactly 90°) were not getting flipPhi in the
+   * preview, causing the disc dot to appear in the wrong hemisphere.
+   */
+  it('stage-relative decode: asymmetric tiltStageDeg (≠90°) top/bottom agree on DS/US/SL/SR', () => {
+    const asymTop: FixtureConfig = {
+      ...upfire,
+      panDirectionCW: false,
+      panStageDeg: 0,
+      panHome: 0,
+      tiltStageDeg: 93,
+      tiltHome: 76,
+    }
+    const asymBottom: FixtureConfig = {
+      ...truss,
+      panDirectionCW: true,
+      panStageDeg: 540,
+      panHome: 100,
+      tiltStageDeg: 93,
+      tiltHome: 24,
+    }
+
+    const previewFromDirection = (
+      cfg: FixtureConfig,
+      bearingDeg: number,
+      angleFromVerticalDeg = 30,
+    ): { xPct: number; yPct: number } => {
+      const logical = resolvePositionToAbsolutePercent(
+        { mode: 'direction', bearingDeg, angleFromVerticalDeg },
+        cfg,
+      )
+      let panDmx = percentToDmx(logical.pan, cfg.panMin, cfg.panMax)
+      let tiltDmx = percentToDmx(logical.tilt, cfg.tiltMin, cfg.tiltMax)
+      if (cfg.invertPan) {
+        panDmx = mirrorDmxForMovingHeadInvert(panDmx, cfg.panMin, cfg.panMax)
+      }
+      if (cfg.invertTilt) {
+        tiltDmx = mirrorDmxForMovingHeadInvert(tiltDmx, cfg.tiltMin, cfg.tiltMax)
+      }
+      return panTiltDmxToSphericalXY(panDmx, tiltDmx, cfg)
+    }
+
+    const targets = [{ bearing: 180 }, { bearing: 0 }, { bearing: 90 }, { bearing: 270 }] as const
+
+    for (const target of targets) {
+      const top = previewFromDirection(asymTop, target.bearing)
+      const bottom = previewFromDirection(asymBottom, target.bearing)
       expect(Math.abs(bottom.xPct - top.xPct)).toBeLessThan(2)
       expect(Math.abs(bottom.yPct - top.yPct)).toBeLessThan(2)
     }

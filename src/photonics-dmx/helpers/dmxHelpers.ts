@@ -91,24 +91,42 @@ export function logicalTiltDir(c: { invertTilt: boolean }): 1 | -1 {
   return c.invertTilt ? -1 : 1
 }
 
-const TILT_STAGE_MID_EPS_DEG = 1e-6
-
 /**
- * Some inverted fixtures are calibrated with stage vertical at the exact tilt midpoint.
- * In that geometry we mirror logical tilt percentages so stage-relative intent remains
- * mount-agnostic while DMX inversion still applies only once at publish/decode boundaries.
+ * For waveform / static-offset paths, inverted fixtures with a home position away from 50%
+ * need a percentage-space mirror so that stage-relative degree offsets land on the correct
+ * side of the physical home after the DMX publisher applies its channel-midpoint inversion.
+ * This mirror is independent of `tiltStageDeg`.
  */
 export function shouldMirrorTiltForStageRelative(c: {
   invertTilt: boolean
-  tiltStageDeg: number
-  tiltRangeDeg: number
   tiltHome: number
 }): boolean {
-  return (
-    c.invertTilt &&
-    Math.abs(c.tiltStageDeg - c.tiltRangeDeg / 2) <= TILT_STAGE_MID_EPS_DEG &&
-    Math.abs(c.tiltHome - 50) > 0.5
-  )
+  return c.invertTilt && Math.abs(c.tiltHome - 50) > 0.5
+}
+
+/**
+ * For gimbal IK, the solver requires phi0 = tiltHomeDeg − tiltStageDeg to be positive so the
+ * home beam is on the correct side of the tilt pole. When an inverted fixture's logical home is
+ * below the pole (phi0 < 0), we mirror the home across the pole in degree space to produce a
+ * canonical IK home with phi0 > 0. The canonical orbit (around the mirrored home) maps back to
+ * the actual orbit via pole-reflection of the IK output. When phi0 >= 0 the IK runs correctly
+ * in-place and the actual home is returned unchanged.
+ *
+ * The returned value may exceed [0, tiltRangeDeg] and must NOT be used for headroom or
+ * motor-bounds checks — only for IK geometry.
+ */
+export function canonicalGimbalTiltHomeDeg(c: {
+  invertTilt: boolean
+  tiltHome: number
+  tiltRangeDeg: number
+  tiltStageDeg: number
+}): number {
+  const tiltHomeDeg = (c.tiltHome / 100) * c.tiltRangeDeg
+  const phi0 = tiltHomeDeg - c.tiltStageDeg
+  if (c.invertTilt && phi0 < -1e-9) {
+    return 2 * c.tiltStageDeg - tiltHomeDeg
+  }
+  return tiltHomeDeg
 }
 
 // Global brightness configuration - will be set by the application
