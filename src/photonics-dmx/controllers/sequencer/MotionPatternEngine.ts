@@ -351,6 +351,7 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
 
   const panHomeDeg = (c.panHome / 100) * c.panRangeDeg
   const panRangeDeg = c.panRangeDeg
+  const panDir = logicalPanDir(c)
 
   const enclosesPole = Math.abs(phi0Deg) < alphaDeg - NEAR_POLE_EPS_DEG
   let phi0EffectiveDeg: number
@@ -360,7 +361,6 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
     circleCenterPanMotorDeg = panHomeDeg
   } else {
     phi0EffectiveDeg = alphaDeg
-    const panDir = logicalPanDir(c)
     const rawPanTarget = c.panStageDeg + panDir * bearingDeg
     circleCenterPanMotorDeg = pickAliasedPanMotorDeg(
       rawPanTarget,
@@ -370,7 +370,11 @@ export function gimbalCompensatedPanTiltOffsetsDeg(params: {
     )
   }
 
-  const tRad = modPositive(phase, TWO_PI)
+  // panTiltOffsetsFromBeam applies a +180° azimuth offset when phi0EffectiveDeg < 0, which flips
+  // the motor pan direction of travel relative to the sphere orbit. Negate phase so stage-CW
+  // matches the cue label for both hemispheres (same intrinsic pan sense as phi0 > 0).
+  const phaseSign = phi0EffectiveDeg < 0 ? -1 : 1
+  const tRad = modPositive(phaseSign * phase, TWO_PI)
 
   const { x, y, z } = sphereCircleUnit(phi0EffectiveDeg, alphaDeg, circleCenterPanMotorDeg, tRad)
   // IK runs in canonical frame (ikTiltHomeDeg); output offsets are in actual motor space

@@ -9,7 +9,12 @@ import {
 } from '../../cues/node/compiler/ActionEffectFactory'
 import { resolveMotionPattern } from '../../cues/node/runtime/actionResolver'
 import { ExecutionContext } from '../../cues/node/runtime/ExecutionContext'
-import { logicalPanDir, mirrorDmxForMovingHeadInvert, percentToDmx } from '../../helpers/dmxHelpers'
+import {
+  logicalPanDir,
+  mirrorDmxForMovingHeadInvert,
+  percentToDmx,
+  shouldMirrorTiltForStageRelative,
+} from '../../helpers/dmxHelpers'
 import { pickAliasedPanMotorDeg } from '../../helpers/panMotorAlias'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
@@ -1584,5 +1589,108 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
       expect(Math.abs(bottomXY.xPct - topXY.xPct)).toBeLessThan(3.5)
       expect(Math.abs(bottomXY.yPct - topXY.yPct)).toBeLessThan(3.5)
     }
+  })
+
+  /**
+   * Regression for the orbit direction unification fix.
+   *
+   * Before the phaseSign fix, the orbit's pan direction depended on sign(phi0). A phi0<0 fixture
+   * (home below the tilt pole) would orbit CCW in stage space while phi0>0 fixtures orbited CW,
+   * because panTiltOffsetsFromBeam's +180° azimuth offset for phi0<0 inverts the motor travel
+   * direction relative to the sphere orbit's e2 component.
+   *
+   * The fix negates the phase when phi0<0 so the e2 traversal direction is reversed, cancelling
+   * the azimuth flip and restoring CW stage rotation.
+   *
+   * Direction is verified via the shoelace signed area of the closed orbit on the preview disc,
+   * sampled over one full period. After gimbal `phaseSign`, stage-CW is unified, but the disc
+   * still applies `effectivePhiSign` from {@link panTiltDmxToSphericalXY}: when
+   * `shouldMirrorTiltForStageRelative` flips the tilt hemisphere for preview, the same stage-CW
+   * orbit appears with opposite winding on (ux, uy), so the shoelace sign expectation depends
+   * on that flag (negative area when mirrored, positive when not).
+   *
+   * Monotonic bearing increase is NOT used because non-polar orbits (|phi0| > alpha) oscillate
+   * in bearing; the shoelace area correctly captures CW vs CCW regardless of orbit radius.
+   *
+   * Light 2 (real rig): floor, panDirectionCW=false, invertPan=false, phi0=-46.8° (below pole)
+   * Light 6 (real rig): truss, panDirectionCW=true, invertPan=true, phi0=+43.8° (above pole)
+   */
+  /**
+   * Helper: sample the preview disc over one orbit and assert stage-CW via shoelace winding.
+   * Sign depends on `shouldMirrorTiltForStageRelative` (see block comment above).
+   */
+  function assertCircleCW(config: FixtureConfig, pattern: ResolvedMotionPatternSetting): void {
+    const nSamples = 32
+    const periodMs = Math.round(1000 / pattern.speedHz)
+    const pts: { ux: number; uy: number }[] = []
+    for (let i = 0; i < nSamples; i++) {
+      const t = (i / nSamples) * periodMs
+      const { xPct, yPct } = runPipelineTick(config, pattern, t)
+      pts.push({ ux: (xPct - 50) / 50, uy: (yPct - 50) / 50 })
+    }
+    let area2 = 0
+    for (let i = 0; i < nSamples; i++) {
+      const p0 = pts[i]!
+      const p1 = pts[(i + 1) % nSamples]!
+      area2 += p0.ux * p1.uy - p0.uy * p1.ux
+    }
+    const mirroredTiltPreview = shouldMirrorTiltForStageRelative(config)
+    if (mirroredTiltPreview) {
+      expect(area2).toBeLessThan(0)
+    } else {
+      expect(area2).toBeGreaterThan(0)
+    }
+  }
+
+  it('circle direction: phi0<0 floor fixture (real-rig Light 2) orbits CW', () => {
+    const light2Config: FixtureConfig = {
+      ...defaultMh,
+      panHome: 34,
+      panMax: 255,
+      panRangeDeg: 540,
+      panDirectionCW: false,
+      panStageDeg: 0,
+      tiltHome: 24,
+      tiltRangeDeg: 180,
+      tiltStageDeg: 90,
+      invertPan: false,
+      invertTilt: false,
+    }
+    const circlePattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'circle' },
+        bearing: { source: 'literal', value: 180 },
+        speed: { source: 'literal', value: 1 },
+        size: { source: 'literal', value: 20 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    assertCircleCW(light2Config, circlePattern)
+  })
+
+  it('circle direction: phi0>0 truss fixture (real-rig Light 6) orbits CW', () => {
+    const light6Config: FixtureConfig = {
+      ...defaultMh,
+      panHome: 67,
+      panMax: 255,
+      panRangeDeg: 540,
+      panDirectionCW: true,
+      panStageDeg: 540,
+      tiltHome: 76,
+      tiltRangeDeg: 180,
+      tiltStageDeg: 93,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const circlePattern = resolveMotionPattern(
+      {
+        pattern: { source: 'literal', value: 'circle' },
+        bearing: { source: 'literal', value: 180 },
+        speed: { source: 'literal', value: 1 },
+        size: { source: 'literal', value: 20 },
+      } as NodeMotionPatternSetting,
+      makeExecutionContext(),
+    )
+    assertCircleCW(light6Config, circlePattern)
   })
 })

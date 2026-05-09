@@ -1,5 +1,3 @@
-import React from 'react'
-
 /** Warning when pan or tilt home is captured within 5% of a mechanical limit (0% or 100%). */
 export function MotorEdgeHomeWarnings(props: { panHome: number; tiltHome: number }) {
   const { panHome, tiltHome } = props
