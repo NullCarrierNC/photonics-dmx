@@ -9,6 +9,7 @@ import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectProcessor'
 import { getColor } from '../../helpers/dmxHelpers'
+import { CueData } from '../../cues/types/cueTypes'
 import { Effect, RGBIO } from '../../types'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
 
@@ -65,6 +66,13 @@ function emitStageKit(emitter: EventEmitter): void {
     positions: [0, 1],
     color: 'red',
     brightness: 'medium',
+    timestamp: Date.now(),
+  })
+}
+
+function emitScreenName(emitter: EventEmitter, screenName: string): void {
+  emitter.emit('rb3e:screenName', {
+    screenName,
     timestamp: Date.now(),
   })
 }
@@ -143,6 +151,56 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     processor.destroy()
     jest.useRealTimers()
     jest.restoreAllMocks()
+  })
+
+  it('song_select_screen emits Default menu cue when it is not already running', () => {
+    emitGameState(networkListener, 'InGame')
+    emitStageKit(networkListener)
+
+    const handled: CueData[] = []
+    processor.on('cueHandled', (d: CueData) => {
+      handled.push(d)
+    })
+
+    emitScreenName(networkListener, 'song_select_screen')
+
+    expect(handled).toHaveLength(1)
+    expect(handled[0].lightingCue).toBe('Default')
+    expect(handled[0].currentScene).toBe('Menu')
+    expect(handled[0].rb3ScreenName).toBe('song_select_screen')
+  })
+
+  it('song_select_screen does not re-emit Default menu when cue is already running (e.g. after main_hub)', () => {
+    emitGameState(networkListener, 'InGame')
+    emitStageKit(networkListener)
+
+    const handled: CueData[] = []
+    processor.on('cueHandled', (d: CueData) => {
+      handled.push(d)
+    })
+
+    emitScreenName(networkListener, 'main_hub_screen')
+    expect(handled).toHaveLength(1)
+
+    emitScreenName(networkListener, 'song_select_screen')
+    expect(handled).toHaveLength(1)
+  })
+
+  it('main_hub_screen emits Default menu cue while game state is still InGame', () => {
+    emitGameState(networkListener, 'InGame')
+    emitStageKit(networkListener)
+
+    const handled: CueData[] = []
+    processor.on('cueHandled', (d: CueData) => {
+      handled.push(d)
+    })
+
+    emitScreenName(networkListener, 'main_hub_screen')
+
+    expect(handled).toHaveLength(1)
+    expect(handled[0].lightingCue).toBe('Default')
+    expect(handled[0].currentScene).toBe('Menu')
+    expect(handled[0].rb3ScreenName).toBe('main_hub_screen')
   })
 
   it('after InGame and StageKit data, Menus + 1s timer schedules menu base and per-light red/yellow effects', async () => {
